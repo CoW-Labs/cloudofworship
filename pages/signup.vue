@@ -247,7 +247,7 @@ const signup = async () => {
     loading.value = false
   } else {
     loading.value = true
-    const { data, error } = await useAPIFetch("/churches", {
+    const { data, error } = await useAPIFetch("/church", {
       method: "POST",
       body: {
         name: church.value,
