@@ -26,7 +26,7 @@ export const quickActionsArr = [
   },
   {
     icon: "i-bx-search",
-    name: "Search Bible",
+    name: "Search Whole Bible",
     desc: "Find scriptures with familiar words",
     action: "new-search-bible",
     meta: "",

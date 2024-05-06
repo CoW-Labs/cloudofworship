@@ -38,7 +38,7 @@
           :slide="slide"
           :live="false"
           :selectable="bulkSelectSlides"
-          :id="useURLFriendlyString(`${slide.name}-${index}`)"
+          :id="slide?.id?.replace(/\d+/g, '')"
           :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
           grid-type
           :selected="activeSlide?.id === slide?.id"
@@ -93,7 +93,9 @@ watch(
     setTimeout(() => {
       // Scroll down to newest slide on slide create
       const slideId = activeSlide.value?.id
-      const newestSlide = slidesGrid.value?.querySelector(`#${slideId}`)
+      const newestSlide = slidesGrid.value?.querySelector(
+        `#${slideId?.replace(/\d+/g, "")}`
+      )
       newestSlide?.scrollIntoView()
     }, 100)
   },
