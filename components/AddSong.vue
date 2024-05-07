@@ -70,12 +70,19 @@ const addSong = async () => {
     artist: artist.value,
     lyrics: lyrics.value,
     author: "me",
-    createdAt: props.song?.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   }
   try {
     loading.value = true
-    await db.library.add({ id: songId, type: "song", content: song }, songId)
+    await db.library.add(
+      {
+        id: songId,
+        type: "song",
+        content: song,
+        createdAt: props.song?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      songId
+    )
     toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
   } catch (err: any) {
     if (err.name === "ConstraintError") {
@@ -84,6 +91,8 @@ const addSong = async () => {
           id: songId,
           type: "song",
           content: song,
+          createdAt: props.song?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         })
         toast.add({
           icon: "i-bx-save",
