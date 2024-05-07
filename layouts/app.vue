@@ -39,6 +39,7 @@ import kjvBible from "../public/kjv.json"
 // import ampBible from "../public/amp.json"
 import hymns from "../public/hymns.json"
 import { useAppStore } from "~/store/app"
+import type { LibraryItem, Media } from "~/types"
 
 useHead({
   title: "Cloud of Worshippers",
@@ -91,20 +92,69 @@ const downloadEssentialResources = async () => {
   }, 500)
 }
 
+function base64ToBlobURL(base64String: string, mimeType: string) {
+  const byteCharacters = atob(decodeURIComponent(base64String))
+  const byteNumbers = new Array(byteCharacters.length)
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  }
+  const byteArray = new Uint8Array(byteNumbers)
+  const blob = new Blob([byteArray], { type: mimeType })
+  return URL.createObjectURL(blob)
+}
+
 const retrieveAllMediaFilesFromDB = async () => {
+  const db = useIndexedDB()
+
+  // For active slides
   const slides = [...appStore.activeSlides]
   slides.forEach(async (slide) => {
     if (slide.type === slideTypes.media) {
-      const mediaObj = await useIndexedDB()
-        .media.where({ id: slide.id })
-        .toArray()
+      const mediaObj = await db.media.where({ id: slide.id }).toArray()
       if (mediaObj[0]) {
-        const fileUrl = URL.createObjectURL(mediaObj[0].content)
+        let b64 = null
+        // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
+        const arrayBuffer: ArrayBuffer = mediaObj[0]?.data
+        const blob = new Blob([arrayBuffer], {
+          type: mediaObj[0]?.content?.type,
+        })
+        const fileUrl = URL.createObjectURL(blob)
         slide.data.url = fileUrl
         slide.background = fileUrl
         appStore.setActiveSlides(slides)
       }
     }
+  })
+
+  // For saved slides
+  const savedSlides = await db.library.where("type").equals("slide").toArray()
+  const slidesChanges = await savedSlides?.map((slide) => {
+    db.media.get(slide.id).then((resp) => {
+      const media = resp
+
+      const arrayBuffer: ArrayBuffer = media?.data as ArrayBuffer
+      const blob = new Blob([arrayBuffer], {
+        type: media?.content?.type,
+      })
+      const fileUrl = URL.createObjectURL(blob)
+      // console.log(fileUrl)
+      // console.log({
+      //   key: slide.id,
+      //   changes: {
+      //     "content.data": { ...slide.content.data, url: fileUrl },
+      //   },
+      // })
+      const updatedLibraryItem = {
+        ...slide,
+        content: {
+          ...slide.content,
+          background: fileUrl,
+          data: { ...slide.content.data, url: fileUrl },
+        },
+      }
+      // console.log(updatedLibraryItem)
+      db.library.update(slide.id, updatedLibraryItem)
+    })
   })
 }
 

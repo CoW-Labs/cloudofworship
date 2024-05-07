@@ -235,11 +235,11 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
   // Delete Probable Media files linked in DB (as long as they are not saved in Library)
   const db = useIndexedDB()
-  // const itemSaved = await db.library.get(slideId)
-  // if (!itemSaved) {
-  //   await db.media.delete(slideId)
-  // }
-  await db.media.delete(slideId)
+  const itemSaved = await db.library.get(slideId)
+  if (!itemSaved) {
+    await db.media.delete(slideId)
+  }
+  // await db.media.delete(slideId)
 
   if (addToast) {
     toast.add({ title: `${tempSlide?.name} deleted`, icon: "i-tabler-trash" })
@@ -346,15 +346,25 @@ const createNewSongSlide = (song: Song) => {
 const createNewMediaSlide = async (file: any) => {
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.empty
+  let data = null
 
-  // Store Blob in DB for easy retrieval on reload
-  await useIndexedDB().media.add({
-    id: tempSlide.id,
-    content: file.blob,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  })
-  delete file.blob
+  // Read Blob as array buffer
+  const fileReader = new FileReader()
+  if (file.blob) {
+    fileReader.readAsArrayBuffer(file.blob)
+    fileReader.addEventListener("loadend", async (event) => {
+      data = fileReader.result
+      // Store Blob in DB for easy retrieval on reload
+      await useIndexedDB().media.add({
+        id: tempSlide.id,
+        content: file.blob,
+        data: data as ArrayBuffer,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      delete file.blob
+    })
+  }
 
   tempSlide.type = slideTypes.media
   tempSlide.backgroundType = file.type
@@ -512,6 +522,7 @@ const saveSlide = async (item: Slide) => {
       )
       toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
     } else {
+      delete tempItem.data.blob
       await db.library.add(
         {
           id: tempItem.id,
@@ -536,6 +547,7 @@ const saveSlide = async (item: Slide) => {
         })
         toast.add({ icon: "i-bx-save", title: "Updated song saved to Library" })
       } else {
+        delete tempItem.data.blob
         db.library.update(tempItem.id, {
           id: tempItem.id,
           type: "slide",

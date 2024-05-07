@@ -20,7 +20,7 @@ class WorshipCloudDatabase extends Dexie {
     super('WorshipCloudDatabase')
     this.version(2).stores({
       songs: 'id,lyrics,title,album,cover,artist,verses,createdAt,updatedAt',
-      media: 'id,content,createdAt,updatedAt', // id === slide.id
+      media: 'id,content,data,createdAt,updatedAt', // id === slide.id
       library: 'id,type,content,createdAt,updatedAt'
     })
   }

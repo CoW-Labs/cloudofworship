@@ -77,6 +77,7 @@ export interface Song {
 export interface Media {
   id: string
   content: any
+  data?: ArrayBuffer
   createdAt?: string
   updatedAt?: string
 }
