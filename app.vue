@@ -64,6 +64,9 @@ const overrideAppSettings = () => {
   // Override App Settings if current app version mismatches appVersion in state
   // TODO: When appSettings is editable by user, it must take preference over system settings and override
   if (currentAppSettings.appVersion !== appVersion.value) {
+    const db = useIndexedDB()
+    db.newSchemaUpdate()
+
     appStore.setAppSettings({
       ...currentAppSettings,
       appVersion: appVersion.value,

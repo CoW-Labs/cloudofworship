@@ -142,7 +142,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import type { Slide, Song } from "~/types"
+import type { LibraryItem, Slide, Song } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
 import { useObservable } from "@vueuse/rxjs"
 import fuzzysort from "fuzzysort"
@@ -162,11 +162,21 @@ const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const page = ref<string>(props.page || "")
 const songToEdit = ref<Song>()
-const libraryItems = useObservable<
-  { id: string; type: String; content: Slide | Song }[]
->(
+const libraryItems = useObservable<LibraryItem[]>(
   liveQuery(async () => {
-    return await useIndexedDB().library.reverse().toArray()
+    const data = await useIndexedDB()
+      .library.orderBy("createdAt")
+      .reverse()
+      .toArray()
+    // const tempData = JSON.parse(JSON.stringify([...data]))
+    // console.log(tempData)
+    // tempData.sort((a, b) => {
+    //   const dateA = new Date(a.createdAt)
+    //   const dateB = new Date(b.createdAt)
+
+    //   return dateA.getTime() > dateB.getTime()
+    // })
+    return data
   }) as any
 )
 const searchedLibraryItems = ref<any[]>([])

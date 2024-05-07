@@ -351,6 +351,8 @@ const createNewMediaSlide = async (file: any) => {
   await useIndexedDB().media.add({
     id: tempSlide.id,
     content: file.blob,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   })
   delete file.blob
 
@@ -499,13 +501,25 @@ const saveSlide = async (item: Slide) => {
     if (tempItem.type === slideTypes.song) {
       tempSong.verses = [...tempSong?.verses] as []
       await db.library.add(
-        { id: tempSong.id, type: "song", content: tempSong },
+        {
+          id: tempSong.id,
+          type: "song",
+          content: tempSong,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
         tempSong.id
       )
       toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
     } else {
       await db.library.add(
-        { id: tempItem.id, type: "slide", content: tempItem },
+        {
+          id: tempItem.id,
+          type: "slide",
+          content: tempItem,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
         tempItem.id
       )
       toast.add({ icon: "i-bx-save", title: "Slide saved to Library" })
@@ -517,6 +531,8 @@ const saveSlide = async (item: Slide) => {
           id: tempSong.id,
           type: "song",
           content: tempSong,
+          createdAt: tempItem?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         })
         toast.add({ icon: "i-bx-save", title: "Updated song saved to Library" })
       } else {
@@ -524,6 +540,8 @@ const saveSlide = async (item: Slide) => {
           id: tempItem.id,
           type: "slide",
           content: tempItem,
+          createdAt: tempItem?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         })
         toast.add({
           icon: "i-bx-save",

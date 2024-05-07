@@ -70,6 +70,8 @@ const addSong = async () => {
     artist: artist.value,
     lyrics: lyrics.value,
     author: "me",
+    createdAt: props.song?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   }
   try {
     loading.value = true
