@@ -10,7 +10,9 @@ export interface Slide {
   songId?: string // only for hymns/songs, could be [hymn.number] or [song.id]
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
   data?: Song | Scripture | Hymn // for song/bible/hymn/file, Object mapped to Slide only on client
-  slideStyle?: SlideStyle
+  slideStyle?: SlideStyle,
+  createdAt?: string,
+  updatedAt?: string
 }
 
 export interface Alert {
@@ -68,6 +70,23 @@ export interface Song {
   cover?: string
   author?: string
   verses?: Array<string>
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface Media {
+  id: string
+  content: any
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface LibraryItem {
+  id: string
+  type: String
+  content: Slide | Song
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface SlideStyle {
@@ -76,6 +95,7 @@ export interface SlideStyle {
   alignment?: string
   font?: string
   backgroundFillType?: string
+  repeatVideo?: boolean
 }
 
 export interface AppSettings {

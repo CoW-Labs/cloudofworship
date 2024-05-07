@@ -25,7 +25,9 @@
         v-if="slide?.backgroundType === backgroundTypes.video"
         :src="slide?.background"
         autoplay
-        :loop="slide?.type !== slideTypes.media"
+        :loop="
+          slide?.type !== slideTypes.media || slide?.slideStyle?.repeatVideo
+        "
         :muted="
           !(fullScreen && slide?.type === slideTypes.media) ? 'muted' : 'false'
         "
