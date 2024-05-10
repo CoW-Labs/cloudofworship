@@ -6,8 +6,12 @@ export default defineAppConfig({
       rounded: 'rounded-md',
       background: 'bg-slate-100 dark:bg-slate-900',
       color: 'text-black dark:text-white',
-      ring: 'ring-none',
+      ring: 'ring-none ring-0 ring-transparent',
       shadow: 'none',
+      // arrow: {
+      //   ring: 'ring-gray-800',
+      //   background: 'bg-red-500'
+      // }
     },
     input: {
       wrapper: 'shadow-none',

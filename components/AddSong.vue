@@ -18,10 +18,10 @@
           Hint
         </div>
         <p class="mt-2 text-sm">
-          Add an empty line in between verses containing
-          <span class="font-bold">[force-verse-break]</span> if you wish to
-          force the lyrics to broken into verses. This feature is especially
-          useful for adding worship lineup.
+          Add an
+          <span class="font-bold">empty line</span> if you wish to forcefully
+          break your lyrics into verses. This feature is especially useful for
+          adding a worship lineup.
         </p>
       </div>
       <UFormGroup label="Lyrics" size="lg">

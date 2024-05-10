@@ -52,12 +52,17 @@
               />
             </div>
             <div class="texts flex-col justify-between">
-              <h4 class="font-medium mt-2 break-all">{{ slide?.name }}</h4>
+              <h4
+                class="font-medium mt-2 overflow-hidden truncate w-40 2xl:w-56"
+              >
+                {{ slide?.name }}
+              </h4>
               <SlideChip :slide-type="slide?.type" class="mt-1" />
             </div>
             <LiveSlideIndicator
               :visible="liveSlide?.id === slide?.id"
-              class="mr-2 mt-4"
+              hide-text
+              class="ml-2 mt-4 left-20 right-auto"
             />
             <!-- DELETE SLIDE BUTTON -->
             <div class="actions absolute bottom-2 right-2 flex gap-1">
