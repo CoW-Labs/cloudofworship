@@ -340,6 +340,7 @@ const createNewSongSlide = (song: Song) => {
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
+  console.log("called")
   toast.add({ title: "Song slide created", icon: "i-bx-music" })
 }
 

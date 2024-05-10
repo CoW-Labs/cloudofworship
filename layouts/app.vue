@@ -39,6 +39,8 @@ import kjvBible from "../public/kjv.json"
 // import ampBible from "../public/amp.json"
 import hymns from "../public/hymns.json"
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
+import type { Church } from "~/store/auth"
 import type { LibraryItem, Media } from "~/types"
 
 useHead({
@@ -49,6 +51,7 @@ defineProps({
 })
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const loadingResources = ref<boolean>(true)
 const downloadProgress = ref<number>(5)
 
@@ -101,6 +104,20 @@ function base64ToBlobURL(base64String: string, mimeType: string) {
   const byteArray = new Uint8Array(byteNumbers)
   const blob = new Blob([byteArray], { type: mimeType })
   return URL.createObjectURL(blob)
+}
+
+const getChurch = async () => {
+  const churchId = authStore.user?.churchId
+  if (churchId) {
+    const promise = useAPIFetch(`/church/${churchId}`)
+    authStore.setChurch(promise.data as unknown as Church)
+  } else {
+    navigateTo("/signup?registerChurch=1")
+    useToast().add({
+      icon: "i-bx-church",
+      title: "Add your church in less than 1 minute to continue.",
+    })
+  }
 }
 
 const retrieveAllMediaFilesFromDB = async () => {
@@ -158,6 +175,7 @@ const retrieveAllMediaFilesFromDB = async () => {
   })
 }
 
+getChurch()
 downloadEssentialResources()
 retrieveAllMediaFilesFromDB()
 </script>
