@@ -1,0 +1,25 @@
+{
+  "name": "Cloud of Worshippers",
+  "short_name": "clowd",
+  "description": "Cloud of Worshippers",
+  "theme_color": "#ffffff",
+  "start_url": "/",
+  "display": "fullscreen",
+  "icons": [
+    {
+      "src": "/cloud-w-144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "/cloud-w-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/cloud-w-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

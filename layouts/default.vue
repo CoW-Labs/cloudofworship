@@ -1,6 +1,5 @@
 <template>
-  <div class="app-ctn max-h-[100vh] overflow-hidden">
-    <Navbar />
+  <div>
     <slot />
   </div>
 </template>

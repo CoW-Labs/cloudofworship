@@ -4,31 +4,61 @@
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
     :style="`padding: ${padding || 0}vw`"
   >
-    <div class="content" v-html="slide?.contents?.[0]"></div>
-    <div class="content" v-html="slide?.contents?.[1]"></div>
+    <div
+      v-if="contentVisible"
+      class="content come-up-1"
+      :class="[useURLFriendlyString(slide?.slideStyle?.font || 'Inter')]"
+      v-html="slide?.contents?.[0]"
+    ></div>
+    <div
+      v-if="contentVisible"
+      class="content come-up-2"
+      v-html="slide?.contents?.[1]"
+    ></div>
   </div>
   <div
     v-else-if="slide?.layout === slideLayoutTypes.full_text"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
     :style="`padding: ${padding || 0}vw`"
   >
-    <div class="content" v-html="slide?.contents?.[1]"></div>
+    <div
+      v-if="contentVisible"
+      class="content come-up-1"
+      v-html="slide?.contents?.[1]"
+    ></div>
   </div>
   <div
     v-else-if="slide?.layout === slideLayoutTypes.two_column"
     class="slide-layout-ctn flex gap-4 h-[100%] justify-around items-center"
     :style="`padding: ${padding || 0}vw`"
   >
-    <div class="content" v-html="slide?.contents?.[0]"></div>
-    <div class="content" v-html="slide?.contents?.[1]"></div>
+    <div
+      v-if="contentVisible"
+      class="content come-up-1"
+      v-html="slide?.contents?.[0]"
+    ></div>
+    <div
+      v-if="contentVisible"
+      class="content come-up-2"
+      v-html="slide?.contents?.[1]"
+    ></div>
   </div>
   <div
     v-else-if="slide?.layout === slideLayoutTypes.bible"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
     :style="`padding: ${padding || 0}vw`"
   >
-    <div class="content" v-html="slide?.contents?.[0]"></div>
-    <div class="content" v-html="slide?.contents?.[1]"></div>
+    <div
+      v-if="contentVisible"
+      class="content come-up-1"
+      :class="[useURLFriendlyString(slide?.slideStyle?.font || 'Inter')]"
+      v-html="slide?.contents?.[0]"
+    ></div>
+    <div
+      v-if="contentVisible"
+      class="content come-up-2"
+      v-html="slide?.contents?.[1]"
+    ></div>
   </div>
 </template>
 
@@ -38,5 +68,6 @@ import type { Slide } from "~/types"
 const props = defineProps<{
   slide: Slide
   padding: string
+  contentVisible: boolean
 }>()
 </script>

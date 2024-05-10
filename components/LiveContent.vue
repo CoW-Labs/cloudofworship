@@ -1,15 +1,33 @@
 <template>
-  <div class="live-content tiptap border-none h-[100%] pointer-events-none ">
-    <SlideContentByLayout :slide="slide" :padding="padding" />
+  <div
+    class="live-content tiptap border-none w-[100%] h-[100%] pointer-events-none text-left"
+    :class="{
+      'center-live-content': slide?.slideStyle?.alignment === 'center',
+      'left-live-content': slide?.slideStyle?.alignment === 'left',
+      'right-live-content': slide?.slideStyle?.alignment === 'right',
+    }"
+    :id="slide?.name"
+  >
+    <!-- <div
+    class="live-content tiptap border-none w-[100%] h-[100%] pointer-events-none absolute inset-0 bg-no-repeat bg-cover"
+    :id="slide?.name"
+    :style="`padding: ${padding || 0}vw; ${useSlideBackground(slide)}`"
+  > -->
+    <SlideContentByLayout
+      :content-visible="contentVisible"
+      :slide="slide"
+      :padding="padding"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import type { Slide } from "~/types"
+import type { Slide, SlideStyle } from "~/types"
 
 const props = defineProps<{
   slide: Slide
   padding: string
+  contentVisible: boolean
 }>()
 
 const emit = defineEmits(["slide-update", "update-live-output-slides"])

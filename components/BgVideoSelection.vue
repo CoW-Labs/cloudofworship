@@ -12,6 +12,7 @@
         :src="video"
         muted
         autoplay
+        crossorigin="anonymous"
       ></video>
       <IconWrapper
         v-if="video === value"
@@ -29,8 +30,11 @@ defineProps<{
   value: string
 }>()
 const backgroundVideos = [
-  "/large_assets/video-bg-1.mp4",
-  "/large_assets/video-bg-2.mp4",
-  "/large_assets/video-bg-3.mp4",
+  "/video-bg-1.mp4",
+  "/video-bg-2.mp4",
+  "/video-bg-3.mp4",
+  "/video-bg-4.mp4",
+  "/video-bg-5.mp4",
+  "/video-bg-6.mp4",
 ]
 </script>

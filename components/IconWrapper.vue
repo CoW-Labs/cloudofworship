@@ -2,13 +2,17 @@
   <div
     :class="
       roundedBg
-        ? `icon-bg bg-primary-50 rounded-full flex items-center justify-center p-2 max-h-${
+        ? `icon-bg bg-primary-50 dark:bg-primary-900 rounded-full flex items-center justify-center p-2 max-h-${
             size + 4
           }`
         : ''
     "
   >
-    <UIcon :name="name" :class="`w-${size} h-${size}`" dynamic />
+    <UIcon
+      :name="name"
+      :class="`w-${size} h-${size} ${animate ? 'animate-ping' : ''}`"
+      dynamic
+    />
   </div>
 </template>
 
@@ -20,5 +24,6 @@ const props = defineProps({
   },
   name: String,
   roundedBg: Boolean,
+  animate: Boolean,
 })
 </script>

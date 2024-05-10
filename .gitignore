@@ -5,6 +5,8 @@
 .nitro
 .cache
 dist
+dev-dist
+dist-electron
 
 # Node dependencies
 node_modules
@@ -26,3 +28,4 @@ logs
 # local large assets
 # large_assets
 
+bible-json-converter.ts

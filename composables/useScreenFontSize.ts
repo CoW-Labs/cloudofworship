@@ -27,7 +27,7 @@ const useScreenFontSize = (content: string) => {
   let newLineCharacters =
     [...content.matchAll(regex)].length
   contentLength += (newLineCharacters * 25)
-  const fontSize = 4.7 + (contentLength - 125) * (2.8 - 5) / (525 - 125)
+  const fontSize = 4.9 + (contentLength - 125) * (2.8 - 5) / (525 - 125)
 
   return fontSize.toFixed(2)
 }

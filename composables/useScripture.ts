@@ -1,10 +1,12 @@
 import { useAppStore } from '~/store/app'
 import { Scripture } from '~/types'
-import kjvBible from '../public/large_assets/kjv.json'
-import nkjvBible from '../public/large_assets/nkjv.json'
-import nivBible from '../public/large_assets/niv.json'
 
-const useScripture = (label: string = '1:1:1', version: string): Scripture | null => {
+const useScripture = (label: string = '1:1:1', version: string = ''): Scripture | null => {
+  const nuxtApp = useNuxtApp()
+  const kjvBible = nuxtApp.$kjvBible
+  const nkjvBible = nuxtApp.$nkjvBible
+  const nivBible = nuxtApp.$nivBible
+  const ampBible = nuxtApp.$ampBible
 
   // set default version
   const appStore = useAppStore()
@@ -19,7 +21,6 @@ const useScripture = (label: string = '1:1:1', version: string): Scripture | nul
   let scripture = ''
 
   try {
-    console.log(shortLabelSplitted)
     switch (version) {
       case 'NKJV':
         scripture = nkjvBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
@@ -27,6 +28,10 @@ const useScripture = (label: string = '1:1:1', version: string): Scripture | nul
         break
       case 'NIV':
         scripture = nivBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
+        appStore.setDefaultBibleVersion(version)
+        break
+      case 'AMP':
+        scripture = ampBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
         appStore.setDefaultBibleVersion(version)
         break
       default:
@@ -42,7 +47,7 @@ const useScripture = (label: string = '1:1:1', version: string): Scripture | nul
       labelShortFormat: label
     }
   } catch (err) {
-    console.log(err)
+    // console.log(err)
     toast.add({ title: 'Scripture not found', icon: 'i-bx-error', color: 'red' })
   }
 

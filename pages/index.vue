@@ -5,6 +5,10 @@
     <LiveOutput />
   </div>
 </template>
-<script setup></script>
+<script setup>
+definePageMeta({
+  layout: "app",
+})
+</script>
 
 <style scoped></style>

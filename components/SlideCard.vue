@@ -2,12 +2,22 @@
   <!-- GRID TYPE CARD -->
   <div
     v-if="gridType"
-    class="slide-card border-2 border-transparent flex items-center justify-center text-left gap-3 p-2 h-[120px] rounded-md bg-primary hover:bg-primary-700 transition-all cursor-pointer relative overflow-hidden"
-    :class="{ 'border-black': selected }"
+    class="slide-card gap-3 h-[120px] rounded-md bg-primary hover:bg-primary-700 transition-all cursor-pointer relative overflow-hidden"
+    :id="slide?.id?.replace(/\d+/g, '')"
+    :class="[
+      selected ? 'border-black' : 'border-transparent',
+      { selectable: selectable },
+    ]"
   >
-    <button class=" " @click="$emit('click')">
+    <button
+      :class="['transition-all', { 'opacity-70 ': selectable }]"
+      @click="$emit('click')"
+    >
       <div class="slide-preview text-white overflow-hidden md-preview">
-        <LiveContent :slide="slide" padding="0" />
+        <LiveContentWithBackground
+          :slide="slide"
+          :slide-styles="settings.slideStyles"
+        />
       </div>
       <div
         class="overlay-gradient absolute inset-0"
@@ -16,50 +26,126 @@
       <div
         class="texts flex items-center gap-2 text-white absolute top-1 right-2 left-2"
       >
-        <h4 class="font-medium ws-nowrap mt-1">{{ slide?.name }}</h4>
-        <SlideChip :slide-type="slide?.type" dark-mode class="mt-1" />
+        <h4 class="font-medium ws-nowrap mt-1 text-left text-xs">
+          {{ useShortSlideName(slide) }}
+        </h4>
+        <SlideChip :slide-type="slide?.type" class="mt-1" dark-mode />
       </div>
     </button>
-    <!-- DELETE SLIDE BUTTON -->
-    <ConfirmDialog
-      class="absolute bottom-2 right-2"
-      button-icon="i-bx-trash"
-      header="Delete slide"
-      label="Are you sure you want to delete this slide? This action is not reversible"
-      @confirm="$emit('delete', slide?.id)"
-    >
-    </ConfirmDialog>
-  </div>
 
-  <!-- LIST TYPE CARD -->
+    <!-- DELETE AND DUPLICATE SLIDE BUTTON -->
+    <div class="actions absolute bottom-2 right-2 flex gap-1">
+      <UTooltip v-if="slide.type === slideTypes.text" text="Duplicate Slide">
+        <UButton
+          icon="i-bx-copy"
+          size="xs"
+          variant="ghost"
+          class="px-1.5 text-white hover:bg-primary-500"
+          @click.stop.prevent="$emit('duplicate')"
+        >
+        </UButton>
+      </UTooltip>
+
+      <ConfirmDialog
+        v-if="
+          slide?.type === slideTypes.text ||
+          slide?.type === slideTypes.media ||
+          slide?.type === slideTypes.song
+        "
+        button-icon="i-bx-save"
+        header="Save to Library"
+        button-styles="px-1.5 text-white hover:bg-primary"
+        label="You are about to save this slide to your library for quick and easy access in the future. Continue?"
+        @confirm="$emit('save-slide', slide?.id)"
+      >
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        button-icon="i-tabler-trash"
+        header="Delete slide"
+        button-styles="px-1.5 text-white hover:bg-primary"
+        label="Are you sure you want to delete this slide? This action is not reversible"
+        @confirm="$emit('delete', slide?.id)"
+      >
+      </ConfirmDialog>
+    </div>
+    <div
+      v-if="selectable"
+      class="selectable-actions absolute bottom-4 right-3 flex gap-1"
+    >
+      <UCheckbox
+        name="select"
+        :model-value="checkboxSelected"
+        :ui="{ base: 'h-8 w-8' }"
+        @change="$emit('bulk-selected', $event)"
+      />
+    </div>
+  </div>
   <button
     v-else
-    class="slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 rounded-md hover:bg-primary-50 transition-all cursor-pointer relative"
-    :class="{ 'bg-red-100': live }"
-    @click="$emit('click')"
+    class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-primary-950 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900 transition-all cursor-pointer relative"
+    :id="slide?.id"
+    @click="appStore.setLiveSlide(slide?.id || '0')"
   >
     <div
-      class="slide-preview w-24 min-w-24 h-16 bg-primary-600 text-white rounded-md overflow-hidden sm-preview"
+      class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
     >
-      <LiveContent :slide="slide" padding="0" />
+      <LiveContentWithBackground
+        :slide="slide"
+        :slide-styles="settings.slideStyles"
+      />
     </div>
     <div class="texts flex-col justify-between">
       <h4 class="font-medium mt-2">{{ slide?.name }}</h4>
       <SlideChip :slide-type="slide?.type" class="mt-1" />
     </div>
-    <LiveSlideIndicator :visible="live" class="mr-2 mt-4" />
+    <!-- DELETE SLIDE BUTTON -->
+    <div class="actions absolute bottom-2 right-2 flex gap-1">
+      <UTooltip text="Preview/Edit Slide" :popper="{ placement: 'top' }">
+        <UButton
+          icon="i-bx-edit"
+          size="xs"
+          variant="ghost"
+          class="px-1 text-primary-500 hover:bg-primary-white"
+          @click.stop.prevent="useGlobalEmit('new-active-slide', slide)"
+        />
+      </UTooltip>
+    </div>
   </button>
 </template>
 
 <script setup lang="ts">
 import type { Slide } from "~/types"
+import { useAppStore } from "~/store/app"
+
+const appStore = useAppStore()
+const { settings } = storeToRefs(appStore)
 
 const props = defineProps<{
   slide: Slide
   live: boolean
   gridType: boolean
   selected: boolean
+  selectable: boolean
+  checkboxSelected: boolean
 }>()
 </script>
 
-<style scoped></style>
+<style scoped>
+.slide-card .actions {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: 0.3s;
+}
+
+.slide-card:hover .actions {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.slide-card.selectable .actions {
+  display: none;
+}
+</style>
