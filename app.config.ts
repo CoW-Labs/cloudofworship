@@ -7,7 +7,7 @@ export default defineAppConfig({
       background: 'bg-slate-100 dark:bg-slate-900',
       color: 'text-black dark:text-white',
       ring: 'ring-none',
-      shadow: 'none'
+      shadow: 'none',
     },
     input: {
       wrapper: 'shadow-none',
