@@ -291,6 +291,7 @@ export const churchesArr = [
   "Kingdom Embassy International Church",
   "Faith City Church",
   "All Nations Baptist Church",
+  "Fountain of Mercy Christian Church",
   "Grace Covenant Assembly",
   "The Apostolic Faith Church",
   "St. Andrews Anglican Church",
