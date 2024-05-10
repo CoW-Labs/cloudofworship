@@ -43,4 +43,8 @@ onMounted(() => {
 })
 </script>
 
-<style scoped></style>
+<style>
+body {
+  overflow: hidden;
+}
+</style>
