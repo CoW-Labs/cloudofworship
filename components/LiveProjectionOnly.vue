@@ -170,12 +170,6 @@ onMounted(() => {
   try {
     video.value?.play()
   } catch (err) {}
-  window.addEventListener("resize", () => {
-    if (!document.fullscreenElement) {
-      console.log("triggered")
-      document.documentElement.requestFullscreen()
-    }
-  })
 })
 
 const activateFullScreen = () => {
