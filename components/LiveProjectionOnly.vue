@@ -1,5 +1,5 @@
 <template>
-  <div class="w-[100%] min-h-[220px] relative">
+  <div class="live-output-ctn w-[100%] min-h-[220px] relative">
     <div
       class="live-output w-[100%] min-h-[220px] rounded-md relative overflow-hidden border bg-no-repeat transition-all backdrop-blur-0 bg-black dark:border-none"
       v-if="contentVisible"
@@ -189,4 +189,8 @@ const activateFullScreen = () => {
 }
 </script>
 
-<style scoped></style>
+<style>
+.live-output-ctn * {
+  overflow: hidden;
+}
+</style>
