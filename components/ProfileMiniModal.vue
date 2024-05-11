@@ -1,6 +1,6 @@
 <template>
   <div class="profile-modal-ctn flex">
-    <div class="profile-modal text-center w-48">
+    <div class="profile-modal text-center w-52">
       <div class="avatar-ctn bg-primary-100 dark:bg-primary-800 p-4">
         <UAvatar
           alt="Favour Felix"
@@ -38,14 +38,12 @@
           >Share Feedback 💜
         </UButton>
         <UButton
-          to="https://cloudofworshippers.featurebase.app"
-          target="_blank"
           size="xl"
           variant="ghost"
           color="gray"
-          disabled
-          class="px-5 py-3 text-md rounded-none justify-start items-start opacity-30"
+          class="px-5 py-3 text-md rounded-none justify-start items-start"
           block
+          @click="$emit('open-settings')"
           >App Settings
         </UButton>
         <ConfirmDialog

@@ -14,6 +14,7 @@ export const useAppStore = defineStore('app', {
       settings: {
         appVersion: '0.1.0',
         defaultBibleVersion: 'KJV',
+        defaultFont: 'Inter',
         defaultBackground: {
           hymn: {
             backgroundType: "video",
@@ -64,6 +65,9 @@ export const useAppStore = defineStore('app', {
     },
     setDefaultBibleVersion(version: string) {
       this.settings = { ...this.settings, defaultBibleVersion: version }
+    },
+    setDefaultFont(font: string) {
+      this.settings = { ...this.settings, defaultFont: font }
     },
     setAlert(alert: Alert | null) {
       this.alert = alert

@@ -281,7 +281,11 @@ const createNewBibleSlide = (scripture: Scripture) => {
 
   // Calculate font-size of scripture content
   let fontSize = useScreenFontSize(scripture?.content)
-  tempSlide.slideStyle = { ...tempSlide.slideStyle, fontSize: Number(fontSize) }
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: Number(fontSize),
+    font: appStore.settings.defaultFont,
+  }
   tempSlide.contents = useSlideContent(tempSlide, scripture)
 
   slides.value?.push(tempSlide)
@@ -305,7 +309,11 @@ const createNewHymnSlide = (hymn: Hymn) => {
 
   // Calculate font-size of scripture content
   let fontSize = useScreenFontSize(currentHymnVerse)
-  tempSlide.slideStyle = { ...tempSlide.slideStyle, fontSize: Number(fontSize) }
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: Number(fontSize),
+    font: appStore.settings.defaultFont,
+  }
   tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
 
   slides.value?.push(tempSlide)
@@ -327,7 +335,11 @@ const createNewSongSlide = (song: Song) => {
 
   // Calculate font-size of scripture content
   let fontSize = useScreenFontSize(currentSongVerse)
-  tempSlide.slideStyle = { ...tempSlide.slideStyle, fontSize: Number(fontSize) }
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: Number(fontSize),
+    font: appStore.settings.defaultFont,
+  }
   tempSlide.data = song
   tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
   tempSlide.name = useSlideName(tempSlide)

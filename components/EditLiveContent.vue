@@ -42,7 +42,7 @@
                 slide?.type === slideTypes?.hymn ||
                 slide?.type === slideTypes?.song
               "
-              class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-md mx-1 flex items-center gap-1 h-[36px] px-1"
+              class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-0 mr-0"
             >
               <UTooltip text="Previous verse" :popper="{ arrow: true }">
                 <UButton
@@ -83,10 +83,6 @@
               >
                 Chorus
               </UButton>
-              <BibleVersionSelect
-                v-if="slide?.type === slideTypes?.bible"
-                @change="$emit('update-bible-version', $event)"
-              />
             </div>
             <PreviewVerses
               v-if="
@@ -98,6 +94,11 @@
               :slide="slide"
               :verse="verse"
               @goto-verse="$emit('goto-verse', $event)"
+            />
+            <BibleVersionSelect
+              class="bg-primary-200 dark:bg-primary-900 rounded-r-md mr-1 flex items-center gap-1 h-[36px]"
+              v-if="slide?.type === slideTypes?.bible"
+              @change="$emit('update-bible-version', $event)"
             />
             <UPopover
               v-if="slide?.layout !== slideLayoutTypes.bible"
