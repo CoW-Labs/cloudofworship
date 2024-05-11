@@ -120,16 +120,28 @@
           </div>
         </div>
       </UFormGroup>
-      <UFormGroup size="lg">
+      <UFormGroup size="lg" class="relative">
         <UInput
           placeholder="Your branch, zone, district, campus?"
           v-model="churchIdentity"
         />
-
-        <div class="help text-gray-400 text-xs mt-2 flex gap-1 come-up-1">
-          <IconWrapper name="i-bx-info-circle" size="3" />
-          How would you identify your church?
-        </div>
+        <UTooltip
+          color="black"
+          class="absolute right-1 top-1.5"
+          text="How would you identify your church?"
+          :ui="{
+            background: 'bg-primary-100 dark:bg-gray-900',
+            color: 'text-primary-900 dark:text-primary-100',
+          }"
+        >
+          <UButton
+            class="p-1 hover:bg-primary-200"
+            variant="ghost"
+            color="black"
+          >
+            <IconWrapper name="i-bx-info-circle" size="5" />
+          </UButton>
+        </UTooltip>
       </UFormGroup>
       <UFormGroup size="lg">
         <UInput
@@ -137,16 +149,32 @@
           v-model="churchPastor"
         />
       </UFormGroup>
-      <UFormGroup size="lg">
+      <UFormGroup size="lg" class="relative">
         <UInput
           placeholder="Your church's address (optional)"
           v-model="churchAddress"
         />
+        <UTooltip
+          color="black"
+          class="absolute right-1 top-1.5"
+          text="[City, State, Country] is enough information"
+          :ui="{
+            background: 'bg-primary-100 dark:bg-gray-900',
+            color: 'text-primary-900 dark:text-primary-100',
+          }"
+        >
+          <UButton
+            class="p-1 hover:bg-primary-200"
+            variant="ghost"
+            color="black"
+          >
+            <IconWrapper name="i-bx-info-circle" size="5" />
+          </UButton>
+        </UTooltip>
 
-        <div class="help text-gray-400 text-xs mt-2 flex gap-1 come-up-1">
+        <!-- <div class="help text-gray-400 text-xs mt-2 flex gap-1 come-up-1">
           <IconWrapper name="i-bx-info-circle" size="3" />
-          [City, State, Country] is enough information
-        </div>
+        </div> -->
       </UFormGroup>
       <UButton
         block
@@ -176,8 +204,9 @@ definePageMeta({
 
 const token = useCookie("token")
 const authStore = useAuthStore()
+const route = useRoute()
 
-const step = ref(1)
+const step = ref(route.query.registerChurch ? 2 : 1)
 const fullName = ref("")
 const email = ref("")
 const password = ref("")

@@ -3,7 +3,7 @@
     class="min-h-[100vh] w-[100%] bg-radial-gradient grid place-items-center"
   >
     <h2
-      class="text-[6vw] text-center font-black stroke-current outlined-text w-[100%] text-transparent absolute bottom-[12.5%]"
+      class="text-[6vw] text-center font-black stroke-current outlined-text w-[100%] text-transparent absolute bottom-[5%]"
     >
       Your church's power point.
     </h2>

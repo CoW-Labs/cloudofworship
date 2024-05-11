@@ -6,11 +6,14 @@ export interface Slide {
   contents: Array<string>
   backgroundType?: string
   background?: string
+  backgroundVideoKey?: string
   title?: string // For hymn and song titles, also for scripture labels (e.g Ephesians 3:1)
   songId?: string // only for hymns/songs, could be [hymn.number] or [song.id]
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
   data?: Song | Scripture | Hymn // for song/bible/hymn/file, Object mapped to Slide only on client
-  slideStyle?: SlideStyle
+  slideStyle?: SlideStyle,
+  createdAt?: string,
+  updatedAt?: string
 }
 
 export interface Alert {
@@ -68,6 +71,24 @@ export interface Song {
   cover?: string
   author?: string
   verses?: Array<string>
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface Media {
+  id: string
+  content?: any
+  data?: ArrayBuffer
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface LibraryItem {
+  id: string
+  type: String
+  content: Slide | Song
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface SlideStyle {
@@ -75,12 +96,16 @@ export interface SlideStyle {
   brightness?: number
   alignment?: string
   font?: string
+  fontSize?: number // size in vw
+  fontSizePercent?: number,
   backgroundFillType?: string
+  repeatVideo?: boolean
 }
 
 export interface AppSettings {
   appVersion: string,
   defaultBibleVersion: string,
+  defaultFont: string,
   defaultBackground: {
     hymn: { backgroundType: string, background: string },
     bible: { backgroundType: string, background: string },

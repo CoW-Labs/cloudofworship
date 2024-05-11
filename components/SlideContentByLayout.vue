@@ -46,7 +46,10 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.bible"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding || 0}vw`"
+    :style="`padding: ${padding || 0}vw; font-size: ${
+      (slide?.slideStyle?.fontSize!!) *
+      ((slide?.slideStyle?.fontSizePercent || 100) / 100)
+    }vw`"
   >
     <div
       v-if="contentVisible"

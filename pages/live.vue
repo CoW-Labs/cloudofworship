@@ -25,14 +25,14 @@ const { liveSlideId, activeSlide, activeSlides, settings } =
   storeToRefs(appStore)
 
 const liveSlide = computed(() => {
-  console.log(activeSlides.value)
+  // console.log(activeSlides.value)
   return activeSlides.value.find((slide) => slide.id === liveSlideId.value)
 })
 
-watch(liveSlide, (newVal, oldVal) => {
-  console.log(newVal)
-  console.log(oldVal)
-})
+// watch(liveSlide, (newVal, oldVal) => {
+//   console.log(newVal)
+//   console.log(oldVal)
+// })
 
 onMounted(() => {
   const toast = useToast()
@@ -43,4 +43,8 @@ onMounted(() => {
 })
 </script>
 
-<style scoped></style>
+<style>
+body {
+  overflow: hidden;
+}
+</style>

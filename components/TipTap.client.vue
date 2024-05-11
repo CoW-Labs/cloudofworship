@@ -43,7 +43,10 @@
       'right-live-content': slide?.slideStyle?.alignment === 'right',
     }"
   >
-    <TiptapEditorContent :editor="uneditableEditorOne" />
+    <TiptapEditorContent
+      :editor="uneditableEditorOne"
+      :class="useURLFriendlyString(slide?.slideStyle?.font || '')"
+    />
     <TiptapEditorContent :editor="uneditableEditorTwo" />
   </div>
 </template>

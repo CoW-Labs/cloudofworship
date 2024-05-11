@@ -49,7 +49,7 @@
         <!-- SAVED SONGS -->
         <div
           v-if="activeLibraryTab === 0"
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-280px)] come-up-1"
         >
           <AddSong
             v-if="page === 'add-song'"
@@ -76,7 +76,7 @@
         <!-- SAVED SLIDES -->
         <div
           v-if="activeLibraryTab === 1"
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-280px)] come-up-1"
         >
           <EmptyState
             v-if="savedSlides?.length === 0"
@@ -97,7 +97,7 @@
         <!-- SAVED SONGS -->
         <div
           v-if="activeLibraryTab === 0"
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-280px)] come-up-1"
         >
           <AddSong
             v-if="page === 'add-song'"
@@ -123,7 +123,7 @@
         <!-- SAVED SLIDES -->
         <div
           v-if="activeLibraryTab === 1"
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-280px)] come-up-1"
         >
           <EmptyState
             v-if="savedSlidesSearchResults?.length === 0"
@@ -142,7 +142,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import type { Slide, Song } from "~/types"
+import type { LibraryItem, Slide, Song } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
 import { useObservable } from "@vueuse/rxjs"
 import fuzzysort from "fuzzysort"
@@ -162,11 +162,21 @@ const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const page = ref<string>(props.page || "")
 const songToEdit = ref<Song>()
-const libraryItems = useObservable<
-  { id: string; type: String; content: Slide | Song }[]
->(
+const libraryItems = useObservable<LibraryItem[]>(
   liveQuery(async () => {
-    return await useIndexedDB().library.reverse().toArray()
+    const data = await useIndexedDB()
+      .library.orderBy("createdAt")
+      .reverse()
+      .toArray()
+    // const tempData = JSON.parse(JSON.stringify([...data]))
+    // console.log(tempData)
+    // tempData.sort((a, b) => {
+    //   const dateA = new Date(a.createdAt)
+    //   const dateB = new Date(b.createdAt)
+
+    //   return dateA.getTime() > dateB.getTime()
+    // })
+    return data
   }) as any
 )
 const searchedLibraryItems = ref<any[]>([])

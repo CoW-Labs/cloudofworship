@@ -18,10 +18,10 @@
           Hint
         </div>
         <p class="mt-2 text-sm">
-          Add an empty line in between verses containing
-          <span class="font-bold">[force-verse-break]</span> if you wish to
-          force the lyrics to broken into verses. This feature is especially
-          useful for adding worship lineup.
+          Add an
+          <span class="font-bold">empty line</span> if you wish to forcefully
+          break your lyrics into verses. This feature is especially useful for
+          adding a worship lineup.
         </p>
       </div>
       <UFormGroup label="Lyrics" size="lg">
@@ -73,7 +73,16 @@ const addSong = async () => {
   }
   try {
     loading.value = true
-    await db.library.add({ id: songId, type: "song", content: song }, songId)
+    await db.library.add(
+      {
+        id: songId,
+        type: "song",
+        content: song,
+        createdAt: props.song?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      songId
+    )
     toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
   } catch (err: any) {
     if (err.name === "ConstraintError") {
@@ -82,6 +91,8 @@ const addSong = async () => {
           id: songId,
           type: "song",
           content: song,
+          createdAt: props.song?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         })
         toast.add({
           icon: "i-bx-save",

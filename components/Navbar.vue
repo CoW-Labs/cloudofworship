@@ -51,18 +51,29 @@
             />
           </UButton>
           <template #panel>
-            <ProfileMiniModal :user="user" :church="church" />
+            <ProfileMiniModal
+              :user="user"
+              :church="church"
+              @open-settings="settingsModalOpen = true"
+            />
           </template>
         </UPopover>
+        <SettingsModal
+          :is-open="settingsModalOpen"
+          @close-modal="settingsModalOpen = false"
+        />
+        <ChangelogModal />
       </div>
     </div>
   </Transition>
 </template>
 
 <script setup>
+import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 const route = useRoute()
 const darkMode = ref(false)
+const settingsModalOpen = ref(false)
 const colorMode = useColorMode()
 const authStore = useAuthStore()
 
@@ -77,6 +88,10 @@ const isDark = computed({
   set() {
     colorMode.preference = colorMode.value === "dark" ? "light" : "dark"
   },
+})
+
+useAppStore().emitter.on("close-modal", () => {
+  settingsModalOpen.value = false
 })
 </script>
 

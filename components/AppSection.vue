@@ -7,7 +7,7 @@
     >
       <h2
         class="font-medium text-sm flex items-center top-0 bottom-[auto]"
-        :class="[secondaryButtons ? 'justify-between' : '']"
+        :class="[secondaryButtons ? 'justify-between' : '', headingStyles]"
       >
         <template v-if="subHeading">
           <UButton
@@ -66,6 +66,7 @@ const props = defineProps({
   heading: String,
   subHeading: String,
   slotCtnStyles: String,
+  headingStyles: String,
   secondaryButtons: Array,
 })
 </script>

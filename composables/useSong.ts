@@ -17,7 +17,8 @@ const useSong = (song: Song, linesPerDisplay: number = 4): Song | null => {
     const verses = []
     let tempVerse = ''
     let lineCount = 0
-    const lyricLines = song.lyrics?.replaceAll('\n\n', '\n')?.replaceAll('\n \n', '\n')?.split('\n')
+    // const lyricLines = song.lyrics?.replaceAll('\n\n', '\n')?.replaceAll('\n \n', '\n')?.split('\n')
+    const lyricLines = song.lyrics?.replaceAll('\n \n', '\n\n')?.split('\n')
 
     for (let i = 0; i < lyricLines.length; i++) {
       let line = lyricLines[i]
@@ -25,33 +26,33 @@ const useSong = (song: Song, linesPerDisplay: number = 4): Song | null => {
       //   continue
       // }
 
-      line = line.replaceAll("â", "'").replaceAll('solo: ', '')?.replaceAll(' ??? ', '')?.replaceAll(' ?? ', '')
+      line = line.replaceAll("â", "'").replaceAll('solo: ', '')?.replaceAll(' ??? ', '')?.replaceAll(' ?? ', '')?.replaceAll('[force-verse-break]', '')
       tempVerse += `${line}\n`
       lineCount += 1
 
 
-      if (tempVerse.includes('[force-verse-break]')) {
-        console.log(lyricLines[i])
-        console.log(lyricLines[i + 1])
-        verses.push(tempVerse?.replace('[force-verse-break]', ''))
+      if (tempVerse.includes('\n\n')) {
+        // console.log(lyricLines[i])
+        // console.log(lyricLines[i + 1])
+        verses.push(tempVerse?.replace('\n\n', ''))
         lineCount = 0
         tempVerse = ''
         continue
       }
 
       if (lineCount === linesPerDisplay) {
-        verses.push(tempVerse?.replace('[force-verse-break]', ''))
+        verses.push(tempVerse?.replace('\n\n', ''))
         lineCount = 0
         tempVerse = ''
         // }
       }
 
       if ((lyricLines.length - i) === 1) {
-        verses.push(tempVerse?.replace('[force-verse-break]\n', ''))
+        verses.push(tempVerse?.replace('\n\n', ''))
       }
     }
 
-    song.verses = verses
+    song.verses = verses?.filter(verse => verse !== '')
     return song
   } catch (err) {
     toast.add({ title: 'Song not found', icon: 'i-bx-music', color: 'red' })

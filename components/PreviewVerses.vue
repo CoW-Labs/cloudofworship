@@ -6,34 +6,50 @@
     <UButton
       block
       variant="ghost"
-      v-show="verseTemp.trim()"
+      v-show="
+        slide?.type === slideTypes.bible
+          ? verseTemp?.scripture.trim()
+          : verseTemp?.trim()
+      "
       v-for="(verseTemp, index) in slide?.type === slideTypes.bible
         ? nearBibleVerses
         : relatedData?.verses"
       :key="`verse-${index}`"
       class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-300 dark:hover:bg-primary-900 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
       :class="{
-        'bg-primary-300 dark:bg-primary-900': `Verse ${index + 1}` === verse,
+        'bg-primary-300 dark:bg-primary-900':
+          slide?.type === slideTypes.bible
+            ? `${bibleChapter}:${verseTemp?.verse}` === verse
+            : `Verse ${index + 1}` === verse,
       }"
-      @click="$emit('goto-verse', `Verse ${index + 1}`)"
+      @click="
+        $emit(
+          'goto-verse',
+          slide?.type === slideTypes.bible
+            ? `${bibleChapter}:${verseTemp?.verse}`
+            : `Verse ${index + 1}`
+        )
+      "
     >
-      <div class="flex-initial min-w-20 text-xs font-semibold">
+      <div class="flex-initial min-w-[8ch] text-xs font-semibold">
         {{
-          slide?.type === slideTypes.bible ? verseTemp : `Verse ${index + 1}`
+          slide?.type === slideTypes.bible
+            ? `${bibleChapter?.substring(bibleChapter?.lastIndexOf(" "))}:${
+                verseTemp?.verse
+              }`
+            : `Verse ${index + 1}`
         }}
       </div>
       <div class="flex-initial w-[100%] text-xs">
         {{
-          slide?.type === slideTypes.bible
-            ? useScripture(useScriptureLabel(verseTemp))?.content
-            : verseTemp
+          slide?.type === slideTypes.bible ? verseTemp?.scripture : verseTemp
         }}
       </div>
     </UButton>
   </div>
 </template>
 <script setup lang="ts">
-import type { Slide } from "~/types"
+import type { Scripture, Slide } from "~/types"
 
 const props = defineProps<{
   slide: Slide
@@ -53,32 +69,54 @@ const relatedData = computed(() => {
   return {}
 })
 
+const bibleChapter = computed(() => props.verse?.split(":")?.[0])
+
+const allChapterVerses = () => {
+  const chapter = useScriptureChapter(props.verse)
+  return chapter?.content
+}
+
 // Return bible verses in proximity to currentVerse
 const nearBibleVerses = computed(() => {
   if (props.slide?.type === slideTypes.bible) {
-    const verseLineup = []
-    // const currentChapter = Number(verse.value?.split(":")?.[0]?.at(-1))
+    const verseLineup: Scripture[] = []
     const currentVerse = Number(props.verse?.split(":")?.[1])
+    const verseNumbers = getNumberRange(currentVerse)
+    const chapterVerses = allChapterVerses()
 
-    for (let i = 0; i < 3; i++) {
-      let prevVerse: string | number = currentVerse - i
-      if (prevVerse > 0) {
-        prevVerse = `${props.verse?.split(":")?.[0]}:${
-          prevVerse < 1 ? 1 : prevVerse
-        }`
-        verseLineup.push(prevVerse)
+    verseNumbers?.forEach((n) => {
+      if (chapterVerses?.[n]) {
+        verseLineup.push(chapterVerses?.[n])
       }
-    }
-    for (let i = 1; i < 3; i++) {
-      let nextVerse: string | number = currentVerse + i
-      if (nextVerse > 0) {
-        nextVerse = `${props.verse?.split(":")?.[0]}:${nextVerse}`
-        verseLineup.push(nextVerse)
-      }
-    }
-    verseLineup.sort()
+    })
+
     return verseLineup
   }
   return []
 })
+
+const getNumberRange = (number: number, rangeBound = 20) => {
+  const lowerRange = []
+  const higherRange = []
+
+  if (number <= rangeBound) {
+    for (let i = 1; i <= number; i++) {
+      lowerRange.push(i)
+    }
+  } else {
+    for (let i = number - 9; i < number; i++) {
+      lowerRange.push(i)
+    }
+  }
+
+  for (let i = number + 1; i <= number + rangeBound; i++) {
+    higherRange.push(i)
+  }
+
+  const range = new Set(
+    [...lowerRange, number, ...higherRange]?.filter((n) => n !== 0)
+  )
+
+  return Array.from(range)
+}
 </script>

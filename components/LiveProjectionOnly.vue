@@ -1,5 +1,5 @@
 <template>
-  <div class="w-[100%] min-h-[220px] relative">
+  <div class="live-output-ctn w-[100%] min-h-[220px] relative">
     <div
       class="live-output w-[100%] min-h-[220px] rounded-md relative overflow-hidden border bg-no-repeat transition-all backdrop-blur-0 bg-black dark:border-none"
       v-if="contentVisible"
@@ -25,7 +25,9 @@
         v-if="slide?.backgroundType === backgroundTypes.video"
         :src="slide?.background"
         autoplay
-        :loop="slide?.type !== slideTypes.media"
+        :loop="
+          slide?.type !== slideTypes.media || slide?.slideStyle?.repeatVideo
+        "
         :muted="
           !(fullScreen && slide?.type === slideTypes.media) ? 'muted' : 'false'
         "
@@ -58,7 +60,9 @@
         v-if="!fullScreen || slideLabel"
         class="heading p-3 absolute z-10 inset-0"
       >
-        <h5 class="font-semibold text-white">
+        <h5
+          class="font-semibold text-white overflow-hidden truncate w-48 2xl:w-64"
+        >
           {{ slide?.name || "No Live Slide" }}
         </h5>
         <LiveSlideIndicator :visible="!!slide?.name" class="mr-4 mt-4" />
@@ -187,4 +191,4 @@ const activateFullScreen = () => {
 }
 </script>
 
-<style scoped></style>
+<style></style>

@@ -38,7 +38,7 @@
           :slide="slide"
           :live="false"
           :selectable="bulkSelectSlides"
-          :id="useURLFriendlyString(`${slide.name}-${index}`)"
+          :id="slide?.id?.replace(/\d+/g, '')"
           :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
           grid-type
           :selected="activeSlide?.id === slide?.id"
@@ -93,7 +93,9 @@ watch(
     setTimeout(() => {
       // Scroll down to newest slide on slide create
       const slideId = activeSlide.value?.id
-      const newestSlide = slidesGrid.value?.querySelector(`#${slideId}`)
+      const newestSlide = slidesGrid.value?.querySelector(
+        `#${slideId?.replace(/\d+/g, "")}`
+      )
       newestSlide?.scrollIntoView()
     }, 100)
   },
@@ -201,6 +203,8 @@ const preSlideCreation = (): Slide => {
     contents: [],
     slideStyle: {
       alignment: "left",
+      fontSizePercent: 100,
+      font: "Inter",
     },
   }
   return tempSlide
@@ -233,11 +237,11 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
   // Delete Probable Media files linked in DB (as long as they are not saved in Library)
   const db = useIndexedDB()
-  // const itemSaved = await db.library.get(slideId)
-  // if (!itemSaved) {
-  //   await db.media.delete(slideId)
-  // }
-  await db.media.delete(slideId)
+  const itemSaved = await db.library.get(slideId)
+  if (!itemSaved) {
+    await db.media.delete(slideId)
+  }
+  // await db.media.delete(slideId)
 
   if (addToast) {
     toast.add({ title: `${tempSlide?.name} deleted`, icon: "i-tabler-trash" })
@@ -277,8 +281,12 @@ const createNewBibleSlide = (scripture: Scripture) => {
 
   // Calculate font-size of scripture content
   let fontSize = useScreenFontSize(scripture?.content)
-
-  tempSlide.contents = useSlideContent(tempSlide, scripture, fontSize)
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: Number(fontSize),
+    font: appStore.settings.defaultFont,
+  }
+  tempSlide.contents = useSlideContent(tempSlide, scripture)
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide, true)
@@ -301,12 +309,12 @@ const createNewHymnSlide = (hymn: Hymn) => {
 
   // Calculate font-size of scripture content
   let fontSize = useScreenFontSize(currentHymnVerse)
-  tempSlide.contents = useSlideContent(
-    tempSlide,
-    hymn,
-    fontSize,
-    currentHymnVerse
-  )
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: Number(fontSize),
+    font: appStore.settings.defaultFont,
+  }
+  tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
@@ -327,30 +335,43 @@ const createNewSongSlide = (song: Song) => {
 
   // Calculate font-size of scripture content
   let fontSize = useScreenFontSize(currentSongVerse)
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: Number(fontSize),
+    font: appStore.settings.defaultFont,
+  }
   tempSlide.data = song
-  tempSlide.contents = useSlideContent(
-    tempSlide,
-    song,
-    fontSize,
-    currentSongVerse
-  )
+  tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
   tempSlide.name = useSlideName(tempSlide)
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
+  console.log("called")
   toast.add({ title: "Song slide created", icon: "i-bx-music" })
 }
 
 const createNewMediaSlide = async (file: any) => {
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.empty
+  let data = null
 
-  // Store Blob in DB for easy retrieval on reload
-  await useIndexedDB().media.add({
-    id: tempSlide.id,
-    content: file.blob,
-  })
-  delete file.blob
+  // Read Blob as array buffer
+  const fileReader = new FileReader()
+  if (file.blob) {
+    fileReader.readAsArrayBuffer(file.blob)
+    fileReader.addEventListener("loadend", async (event) => {
+      data = fileReader.result
+      // Store Blob in DB for easy retrieval on reload
+      await useIndexedDB().media.add({
+        id: tempSlide.id,
+        content: file.blob,
+        data: data as ArrayBuffer,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      delete file.blob
+    })
+  }
 
   tempSlide.type = slideTypes.media
   tempSlide.backgroundType = file.type
@@ -415,8 +436,12 @@ const gotoScripture = (title: string, version: string) => {
     tempSlide.title = scriptureLabel
     tempSlide.data = scripture
     let fontSize = useScreenFontSize(scripture?.content)
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: Number(fontSize),
+    }
 
-    tempSlide.contents = useSlideContent(tempSlide, scripture, fontSize)
+    tempSlide.contents = useSlideContent(tempSlide, scripture)
     tempSlide.name = useSlideName(tempSlide)
     activeSlide.value = tempSlide
     slides.value.splice(slideIndex, 1, tempSlide)
@@ -438,7 +463,11 @@ const gotoHymnVerse = (title: string) => {
       tempSlide.title = realTitle
       // Calculate font-size of content
       let fontSize = useScreenFontSize(nextVerse)
-      tempSlide.contents = useSlideContent(tempSlide, hymn, fontSize, nextVerse)
+      tempSlide.slideStyle = {
+        ...tempSlide.slideStyle,
+        fontSize: Number(fontSize),
+      }
+      tempSlide.contents = useSlideContent(tempSlide, hymn, nextVerse)
       activeSlide.value = tempSlide
       slides.value.splice(slideIndex, 1, tempSlide)
       updateLiveOutput(activeSlide.value)
@@ -460,8 +489,12 @@ const gotoSongVerse = (title: string) => {
       tempSlide.title = title
       // Calculate font-size of content
       let fontSize = useScreenFontSize(nextVerse)
+      tempSlide.slideStyle = {
+        ...tempSlide.slideStyle,
+        fontSize: Number(fontSize),
+      }
       tempSlide.data = song
-      tempSlide.contents = useSlideContent(tempSlide, song, fontSize, nextVerse)
+      tempSlide.contents = useSlideContent(tempSlide, song, nextVerse)
       activeSlide.value = tempSlide
       slides.value.splice(slideIndex, 1, tempSlide)
       updateLiveOutput(activeSlide.value)
@@ -478,8 +511,12 @@ const gotoChorus = () => {
     const chorus = hymn?.chorus as string
     // Calculate font-size of scripture content
     let fontSize = useScreenFontSize(chorus)
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: Number(fontSize),
+    }
 
-    tempSlide.contents = useSlideContent(tempSlide, hymn, fontSize, chorus)
+    tempSlide.contents = useSlideContent(tempSlide, hymn, chorus)
     activeSlide.value = tempSlide
     slides.value.splice(slideIndex, 1, tempSlide)
     updateLiveOutput(activeSlide.value)
@@ -497,13 +534,26 @@ const saveSlide = async (item: Slide) => {
     if (tempItem.type === slideTypes.song) {
       tempSong.verses = [...tempSong?.verses] as []
       await db.library.add(
-        { id: tempSong.id, type: "song", content: tempSong },
+        {
+          id: tempSong.id,
+          type: "song",
+          content: tempSong,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
         tempSong.id
       )
       toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
     } else {
+      delete tempItem.data.blob
       await db.library.add(
-        { id: tempItem.id, type: "slide", content: tempItem },
+        {
+          id: tempItem.id,
+          type: "slide",
+          content: tempItem,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
         tempItem.id
       )
       toast.add({ icon: "i-bx-save", title: "Slide saved to Library" })
@@ -515,13 +565,18 @@ const saveSlide = async (item: Slide) => {
           id: tempSong.id,
           type: "song",
           content: tempSong,
+          createdAt: tempItem?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         })
         toast.add({ icon: "i-bx-save", title: "Updated song saved to Library" })
       } else {
+        delete tempItem.data.blob
         db.library.update(tempItem.id, {
           id: tempItem.id,
           type: "slide",
           content: tempItem,
+          createdAt: tempItem?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         })
         toast.add({
           icon: "i-bx-save",

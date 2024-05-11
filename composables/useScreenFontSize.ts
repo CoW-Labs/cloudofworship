@@ -1,4 +1,4 @@
-const useScreenFontSize = (content: string) => {
+const useScreenFontSize = (content: string, fontSizePercent: number = 100) => {
   // if (content.length <= 150) {
   //   fontSize = 5
   // } else if (content.length < 200) {
@@ -28,8 +28,12 @@ const useScreenFontSize = (content: string) => {
     [...content.matchAll(regex)].length
   contentLength += (newLineCharacters * 25)
   const fontSize = 4.9 + (contentLength - 125) * (2.8 - 5) / (525 - 125)
+  let percentageIncrease = fontSizePercent / 100
 
-  return fontSize.toFixed(2)
+  // console.log(fontSize.toFixed(2))
+  // console.log((fontSize * percentageIncrease).toFixed(2))
+
+  return (fontSize * percentageIncrease).toFixed(2)
 }
 
 export default useScreenFontSize;

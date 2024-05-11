@@ -2,190 +2,200 @@
   <div class="main relative min-h-[300px] h-[45vh]">
     <div>
       <div
-        class="toolbar w-[100%] p-2 px-4 bg-primary-100 dark:bg-primary-800 rounded-t-md flex items-center justify-between overflow-hidden"
+        class="toolbar w-[100%] p-2 px-4 min-h-[56px] bg-primary-100 dark:bg-primary-800 rounded-t-md flex items-center justify-between overflow-hidden"
       >
-        <TransitionGroup name="list">
-          <div
-            v-for="slide in animatedSlides"
-            :key="slide?.id"
-            class="slide-name flex items-center gap-2 top-1 text-primary-900 dark:text-primary-100"
-          >
-            <h4 class="font-medium text-nowrap">
-              {{ useShortSlideName(slide, { longer: true }) }}
-            </h4>
-            <SlideChip :slide-type="slide?.type" dark-mode />
-          </div>
-        </TransitionGroup>
-        <div class="actions flex items-center ml-6">
-          <!-- <FontSelect
+        <template v-if="slide">
+          <TransitionGroup name="list">
+            <div
+              v-for="slide in animatedSlides"
+              :key="slide?.id"
+              class="slide-name flex items-center gap-2 top-1 text-primary-900 dark:text-primary-100"
+            >
+              <h4 class="font-medium text-nowrap">
+                {{ useShortSlideName(slide, { longer: true }) }}
+              </h4>
+              <SlideChip :slide-type="slide?.type" dark-mode />
+            </div>
+          </TransitionGroup>
+          <div class="actions flex items-center ml-6">
+            <!-- <FontSelect
             v-if="slide?.type === slideTypes?.text"
             size="sm"
             class="mr-2"
             @change="$emit('update-bible-version', $event)"
           /> -->
-          <UTooltip text="Take slide live" :popper="{ arrow: true }">
-            <UButton
-              variant="ghost"
-              color="primary"
-              class="p-2 px-2 hover:text-red-600 hover:bg-red-300"
-              icon="i-bx-slideshow"
-              @click="$emit('take-live')"
-            >
-            </UButton>
-          </UTooltip>
+            <UTooltip text="Take slide live" :popper="{ arrow: true }">
+              <UButton
+                variant="ghost"
+                color="primary"
+                class="p-2 px-2 hover:text-red-600 hover:bg-red-300"
+                icon="i-bx-slideshow"
+                @click="$emit('take-live')"
+              >
+              </UButton>
+            </UTooltip>
 
-          <!-- VERSE SWITCH -->
-          <div
-            v-if="
-              slide?.type === slideTypes?.bible ||
-              slide?.type === slideTypes?.hymn ||
-              slide?.type === slideTypes?.song
-            "
-            class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-md mx-1 flex items-center gap-1 h-[36px] px-1"
-          >
-            <UTooltip text="Previous verse" :popper="{ arrow: true }">
-              <UButton
-                variant="ghost"
-                class="p-1"
-                icon="i-bx-chevron-left"
-                @click="$emit('goto-verse', previousVerse)"
-              />
-            </UTooltip>
-            <UInput
-              placeholder="Verse"
-              size="xs"
-              variant="none"
-              v-model="verse"
-              :inputClass="`'bg-white border-0 shadow-none outline-none text-center dark:text-primary-900 transition-all ${
-                slide?.type !== slideTypes.bible ? 'w-[10ch]' : 'w-[16ch]'
-              }`"
-              @keydown.enter="$emit('goto-verse', verse)"
-            />
-            <UTooltip text="Next verse" :popper="{ arrow: true }">
-              <UButton
-                variant="ghost"
-                class="p-1"
-                icon="i-bx-chevron-right"
-                @click="$emit('goto-verse', nextVerse)"
-              />
-            </UTooltip>
-            <UButton
-              v-if="slide?.type === slideTypes?.hymn && slide?.hasChorus"
-              class="rounded-md"
-              size="xs"
-              @click="$emit('goto-chorus', verse)"
+            <!-- VERSE SWITCH -->
+            <div
+              v-if="
+                slide?.type === slideTypes?.bible ||
+                slide?.type === slideTypes?.hymn ||
+                slide?.type === slideTypes?.song
+              "
+              class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-1 mr-0"
             >
-              Chorus
-            </UButton>
+              <UTooltip text="Previous verse" :popper="{ arrow: true }">
+                <UButton
+                  variant="ghost"
+                  class="p-1"
+                  icon="i-bx-chevron-left"
+                  @click="$emit('goto-verse', previousVerse)"
+                />
+              </UTooltip>
+              <UInput
+                placeholder="Verse"
+                size="xs"
+                variant="none"
+                v-model="verse"
+                :inputClass="`bg-white border-0 shadow-none outline-none text-center dark:text-primary-900 transition-all ${
+                  verse?.length > 20 ? 'px-1' : ''
+                }`"
+                :style="`width: ${
+                  slide?.type === slideTypes.bible
+                    ? (verse?.replaceAll(' ', '').length || 10) + 3
+                    : (verse?.length || 10) + 2
+                }ch`"
+                @keydown.enter="$emit('goto-verse', verse)"
+              />
+              <UTooltip text="Next verse" :popper="{ arrow: true }">
+                <UButton
+                  variant="ghost"
+                  class="p-1"
+                  icon="i-bx-chevron-right"
+                  @click="$emit('goto-verse', nextVerse)"
+                />
+              </UTooltip>
+              <UButton
+                v-if="slide?.type === slideTypes?.hymn && slide?.hasChorus"
+                class="rounded-md"
+                size="xs"
+                @click="$emit('goto-chorus', verse)"
+              >
+                Chorus
+              </UButton>
+            </div>
+            <PreviewVerses
+              v-if="
+                slide?.type === slideTypes.hymn ||
+                slide?.type === slideTypes.song ||
+                slide?.type === slideTypes.bible
+              "
+              class="preview-verses"
+              :slide="slide"
+              :verse="verse"
+              @goto-verse="$emit('goto-verse', $event)"
+            />
             <BibleVersionSelect
+              class="bg-primary-200 dark:bg-primary-900 rounded-r-md mr-1 flex items-center gap-1 h-[36px]"
               v-if="slide?.type === slideTypes?.bible"
               @change="$emit('update-bible-version', $event)"
             />
-          </div>
-          <PreviewVerses
-            v-if="
-              slide?.type === slideTypes.hymn || slide?.type === slideTypes.song
-            "
-            class="preview-verses"
-            :slide="slide"
-            :verse="verse"
-            @goto-verse="$emit('goto-verse', $event)"
-          />
-          <UPopover
-            v-if="slide?.layout !== slideLayoutTypes.bible"
-            v-model:open="layoutPopoverOpen"
-          >
-            <UTooltip text="Switch slide layout" :popper="{ arrow: true }">
-              <UButton
-                variant="ghost"
-                icon="i-mingcute-layout-3-line"
-                :disabled="!slide"
-              />
-            </UTooltip>
-            <template #panel>
-              <SlideLayoutSelection
-                :value="slide?.layout"
-                @select="onSelectLayout"
-              />
-            </template>
-          </UPopover>
-          <div
-            v-show="slide?.type !== slideTypes.media"
-            class="button-group flex rounded-md mx-1 p-1"
-            :class="{
-              'bg-primary-200 dark:bg-primary-900':
-                slide?.layout !== slideLayoutTypes.bible,
-            }"
-          >
-            <UPopover v-model:open="bgEditBgPopoverOpen">
-              <UTooltip text="Style background" :popper="{ arrow: true }">
+            <UPopover
+              v-if="slide?.layout !== slideLayoutTypes.bible"
+              v-model:open="layoutPopoverOpen"
+            >
+              <UTooltip text="Switch slide layout" :popper="{ arrow: true }">
                 <UButton
                   variant="ghost"
-                  class="px-1.5"
-                  icon="i-bx-slider"
+                  icon="i-mingcute-layout-3-line"
                   :disabled="!slide"
                 />
               </UTooltip>
               <template #panel>
-                <BgStyle />
-              </template>
-            </UPopover>
-            <UPopover v-model:open="bgImagePopoverOpen">
-              <UTooltip text="Add background image" :popper="{ arrow: true }">
-                <UButton
-                  variant="ghost"
-                  class="px-1.5"
-                  icon="i-bx-image-add"
-                  :disabled="!slide"
-                />
-              </UTooltip>
-              <template #panel>
-                <BgImageSelection
-                  :value="slide?.background"
-                  @select="onSelectBackground(backgroundTypes.image, $event)"
+                <SlideLayoutSelection
+                  :value="slide?.layout"
+                  @select="onSelectLayout"
                 />
               </template>
             </UPopover>
-            <UPopover v-model:open="bgVideoPopoverOpen">
-              <UTooltip text="Add background video" :popper="{ arrow: true }">
-                <UButton
-                  variant="ghost"
-                  class="px-1.5"
-                  icon="i-bx-film"
-                  :disabled="!slide"
-                />
-              </UTooltip>
-              <template #panel>
-                <BgVideoSelection
-                  :value="slide?.background"
-                  @select="onSelectBackground(backgroundTypes.video, $event)"
-                />
-              </template>
-            </UPopover>
-            <UPopover v-model:open="bgColorPopoverOpen">
-              <UTooltip text="Add background color" :popper="{ arrow: true }">
-                <UButton
-                  variant="ghost"
-                  class="px-1.5"
-                  icon="i-mdi-square-rounded"
-                  :disabled="!slide"
-                />
-              </UTooltip>
-              <template #panel>
-                <BgColorSelection
-                  :value="slide?.background"
-                  @select="onSelectBackground(backgroundTypes.solid, $event)"
-                />
-              </template>
-            </UPopover>
-          </div>
-          <!-- <UButton
+            <div
+              v-show="slide?.type !== slideTypes.media"
+              class="button-group flex rounded-md mx-1 p-1"
+              :class="{
+                'bg-primary-200 dark:bg-primary-900':
+                  slide?.layout !== slideLayoutTypes.bible,
+              }"
+            >
+              <UPopover v-model:open="bgEditBgPopoverOpen">
+                <UTooltip text="Style background" :popper="{ arrow: true }">
+                  <UButton
+                    variant="ghost"
+                    class="px-1.5"
+                    icon="i-bx-slider"
+                    :disabled="!slide"
+                  />
+                </UTooltip>
+                <template #panel>
+                  <BgStyle />
+                </template>
+              </UPopover>
+              <UPopover v-model:open="bgImagePopoverOpen">
+                <UTooltip text="Add background image" :popper="{ arrow: true }">
+                  <UButton
+                    variant="ghost"
+                    class="px-1.5"
+                    icon="i-bx-image-add"
+                    :disabled="!slide"
+                  />
+                </UTooltip>
+                <template #panel>
+                  <BgImageSelection
+                    :value="slide?.background"
+                    @select="onSelectBackground(backgroundTypes.image, $event)"
+                  />
+                </template>
+              </UPopover>
+              <UPopover v-model:open="bgVideoPopoverOpen">
+                <UTooltip text="Add background video" :popper="{ arrow: true }">
+                  <UButton
+                    variant="ghost"
+                    class="px-1.5"
+                    icon="i-bx-film"
+                    :disabled="!slide"
+                  />
+                </UTooltip>
+                <template #panel>
+                  <BgVideoSelection
+                    :value="slide?.background"
+                    @select="onSelectBackground(backgroundTypes.video, $event)"
+                  />
+                </template>
+              </UPopover>
+              <UPopover v-model:open="bgColorPopoverOpen">
+                <UTooltip text="Add background color" :popper="{ arrow: true }">
+                  <UButton
+                    variant="ghost"
+                    class="px-1.5"
+                    icon="i-mdi-square-rounded"
+                    :disabled="!slide"
+                  />
+                </UTooltip>
+                <template #panel>
+                  <BgColorSelection
+                    :value="slide?.background"
+                    @select="onSelectBackground(backgroundTypes.solid, $event)"
+                  />
+                </template>
+              </UPopover>
+            </div>
+            <!-- <UButton
           class="px-2 pr-3 ml-1 text-xs"
           icon="i-bx-play-circle"
           @click="$emit('update-live-output-slides')"
           >Promote to Live</UButton
         > -->
-        </div>
+          </div>
+        </template>
       </div>
 
       <TipTapToolbar
@@ -311,14 +321,18 @@ const onSelectLayout = (data: string) => {
   emit("slide-update", tempSlide)
 }
 
-const onSelectBackground = (backgroundType: string, data: string) => {
+const onSelectBackground = (
+  backgroundType: string,
+  data: { video: string; key: string } // could be an object or just a [data] string containing image_url/color
+) => {
   bgImagePopoverOpen.value = false
   bgVideoPopoverOpen.value = false
   bgColorPopoverOpen.value = false
 
   const tempSlide: Slide = {
     ...props.slide,
-    background: data,
+    background: data.video || data,
+    backgroundVideoKey: data.key || undefined,
     backgroundType,
   }
   emit("slide-update", tempSlide)
@@ -330,6 +344,7 @@ const onUpdateSlideContent = (editorIndex: number, content: string) => {
     ...props.slide,
     contents: [...slideContents.value],
   }
+  // console.log("updated content", tempSlide)
   tempSlide.name = useSlideName(tempSlide)
   emit("slide-update", tempSlide)
   // emit("update-live-output-slides")

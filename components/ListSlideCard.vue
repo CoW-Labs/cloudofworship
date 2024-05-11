@@ -20,7 +20,7 @@
       />
     </div>
     <div class="texts flex-col justify-between">
-      <h4 class="font-medium mt-2">{{ slide?.name }}</h4>
+      <h4 class="font-medium mt-2 break-all">{{ slide?.name }}</h4>
       <SlideChip :slide-type="slide?.type" class="mt-1" />
     </div>
     <!-- DELETE SLIDE BUTTON -->

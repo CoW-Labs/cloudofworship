@@ -10,10 +10,10 @@
   >
     <IconWrapper name="i-bx-music" class="mt-1 text-primary" rounded-bg />
     <div class="texts">
-      <h4 class="font-semibold">
+      <h4 class="font-semibold break-all">
         {{ song?.title || "" }}
       </h4>
-      <p class="font-light text-xs mt-1">
+      <p class="font-light text-xs mt-1 break-all">
         {{ song?.artist || song?.author || "" }}
       </p>
       <p

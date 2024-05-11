@@ -38,7 +38,7 @@ const appStore = useAppStore()
 nuxtApp.provide("emitter", emitter)
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("0.6.0")
+const appVersion = ref<string>("0.6.2")
 
 const registerServiceWorker = async () => {
   if ("serviceWorker" in navigator) {
@@ -59,34 +59,7 @@ const registerServiceWorker = async () => {
   }
 }
 
-const overrideAppSettings = () => {
-  const currentAppSettings = appStore.settings
-  // Override App Settings if current app version mismatches appVersion in state
-  // TODO: When appSettings is editable by user, it must take preference over system settings and override
-  if (currentAppSettings.appVersion !== appVersion.value) {
-    appStore.setAppSettings({
-      ...currentAppSettings,
-      appVersion: appVersion.value,
-      defaultBackground: {
-        hymn: {
-          backgroundType: "video",
-          background: "/video-bg-1.mp4",
-        },
-        bible: {
-          backgroundType: "video",
-          background: "/video-bg-3.mp4",
-        },
-        text: {
-          backgroundType: "video",
-          background: "/video-bg-4.mp4",
-        },
-      },
-    })
-  }
-}
-
 registerServiceWorker()
-overrideAppSettings()
 </script>
 
 <style>
