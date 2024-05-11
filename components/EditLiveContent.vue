@@ -339,12 +339,14 @@ const onUpdateSlideContent = (editorIndex: number, content: string) => {
     ...props.slide,
     contents: [...slideContents.value],
   }
+  console.log("updated content", tempSlide)
   tempSlide.name = useSlideName(tempSlide)
   emit("slide-update", tempSlide)
   // emit("update-live-output-slides")
 }
 
 const onUpdateSlideStyle = (slideStyle: SlideStyle) => {
+  console.log("slideStyle", slideStyle)
   const tempSlide: Slide = {
     ...props.slide,
     slideStyle,

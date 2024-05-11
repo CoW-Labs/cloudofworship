@@ -60,7 +60,9 @@
         v-if="!fullScreen || slideLabel"
         class="heading p-3 absolute z-10 inset-0"
       >
-        <h5 class="font-semibold text-white">
+        <h5
+          class="font-semibold text-white overflow-hidden truncate w-48 2xl:w-64"
+        >
           {{ slide?.name || "No Live Slide" }}
         </h5>
         <LiveSlideIndicator :visible="!!slide?.name" class="mr-4 mt-4" />

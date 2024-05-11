@@ -71,45 +71,51 @@
       />
     </UTooltip>
     <div class="button-group rounded-md p-1 flex items-center gap-1">
-      <UButton
-        @click="
-          $emit('update-style', { ...slide.slideStyle, alignment: 'left' })
-        "
-        class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
-        :class="{
-          'bg-primary text-white dark:text-primary-500':
-            slide?.slideStyle?.alignment === 'left',
-        }"
-        icon="i-bi-text-left"
-        variant="ghost"
-        :disabled="slide?.type === slideTypes.media"
-      />
-      <UButton
-        @click="
-          $emit('update-style', { ...slide.slideStyle, alignment: 'center' })
-        "
-        class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
-        :class="{
-          'bg-primary text-white dark:text-primary-900':
-            slide?.slideStyle?.alignment === 'center',
-        }"
-        icon="i-bi-text-center"
-        variant="ghost"
-        :disabled="slide?.type === slideTypes.media"
-      />
-      <UButton
-        @click="
-          $emit('update-style', { ...slide.slideStyle, alignment: 'right' })
-        "
-        class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
-        :class="{
-          'bg-primary text-white dark:text-primary-900':
-            slide?.slideStyle?.alignment === 'right',
-        }"
-        icon="i-bi-text-right"
-        variant="ghost"
-        :disabled="slide?.type === slideTypes.media"
-      />
+      <UTooltip text="Align left">
+        <UButton
+          @click="
+            $emit('update-style', { ...slide.slideStyle, alignment: 'left' })
+          "
+          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
+          :class="{
+            'bg-primary text-white dark:text-primary-500':
+              slide?.slideStyle?.alignment === 'left',
+          }"
+          icon="i-bi-text-left"
+          variant="ghost"
+          :disabled="slide?.type === slideTypes.media"
+        />
+      </UTooltip>
+      <UTooltip text="Align center">
+        <UButton
+          @click="
+            $emit('update-style', { ...slide.slideStyle, alignment: 'center' })
+          "
+          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
+          :class="{
+            'bg-primary text-white dark:text-primary-900':
+              slide?.slideStyle?.alignment === 'center',
+          }"
+          icon="i-bi-text-center"
+          variant="ghost"
+          :disabled="slide?.type === slideTypes.media"
+        />
+      </UTooltip>
+      <UTooltip text="Align right">
+        <UButton
+          @click="
+            $emit('update-style', { ...slide.slideStyle, alignment: 'right' })
+          "
+          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
+          :class="{
+            'bg-primary text-white dark:text-primary-900':
+              slide?.slideStyle?.alignment === 'right',
+          }"
+          icon="i-bi-text-right"
+          variant="ghost"
+          :disabled="slide?.type === slideTypes.media"
+        />
+      </UTooltip>
     </div>
     <FontSelect
       v-if="slide?.type !== slideTypes?.text"
@@ -118,16 +124,69 @@
       :disabled="slide?.type === slideTypes.media"
       @change="$emit('update-font', $event)"
     />
+    <div class="button-group rounded-md p-1 flex items-center gap-1">
+      <UTooltip text="Decrease font size">
+        <UButton
+          :disabled="slideFontSize <= MIN_FONT_SIZE"
+          @click="
+            $emit('update-style', {
+              ...slide.slideStyle,
+              fontSizePercent: (slideFontSize =
+                slideFontSize - 5 > MIN_FONT_SIZE
+                  ? slideFontSize - 5
+                  : MIN_FONT_SIZE),
+            })
+          "
+          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
+          icon="i-mdi-format-annotation-minus"
+          variant="ghost"
+        />
+      </UTooltip>
+      <UInput
+        v-model="slideFontSize"
+        disabled
+        class="w-[45px] font-medium text-sm pr-0"
+      ></UInput>
+      <UTooltip text="Increase font size">
+        <UButton
+          :disabled="slideFontSize >= MAX_FONT_SIZE"
+          @click="
+            $emit('update-style', {
+              ...slide.slideStyle,
+              fontSizePercent: (slideFontSize =
+                slideFontSize + 5 < MAX_FONT_SIZE
+                  ? slideFontSize + 5
+                  : MAX_FONT_SIZE),
+            })
+          "
+          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
+          icon="i-mdi-format-annotation-plus"
+          variant="ghost"
+        />
+      </UTooltip>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { Slide } from "~/types"
+
+const MAX_FONT_SIZE = 125
+const MIN_FONT_SIZE = 80
 const props = defineProps<{
   slide: Slide
 }>()
-const backgroundFillType = ref<string>(
-  props.slide?.slideStyle?.backgroundFillType || "Fit"
+const backgroundFillType = ref<string>("")
+const slideFontSize = ref<number>(0)
+
+watch(
+  () => props.slide,
+  () => {
+    backgroundFillType.value =
+      props.slide?.slideStyle?.backgroundFillType || "Fit"
+    slideFontSize.value = props.slide?.slideStyle?.fontSizePercent || 100
+  },
+  { immediate: true }
 )
 </script>
 

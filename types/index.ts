@@ -95,6 +95,8 @@ export interface SlideStyle {
   brightness?: number
   alignment?: string
   font?: string
+  fontSize?: number // size in vw
+  fontSizePercent?: number,
   backgroundFillType?: string
   repeatVideo?: boolean
 }

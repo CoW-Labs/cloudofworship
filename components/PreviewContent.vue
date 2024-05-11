@@ -203,6 +203,8 @@ const preSlideCreation = (): Slide => {
     contents: [],
     slideStyle: {
       alignment: "left",
+      fontSizePercent: 100,
+      font: "Inter",
     },
   }
   return tempSlide
@@ -279,8 +281,8 @@ const createNewBibleSlide = (scripture: Scripture) => {
 
   // Calculate font-size of scripture content
   let fontSize = useScreenFontSize(scripture?.content)
-
-  tempSlide.contents = useSlideContent(tempSlide, scripture, fontSize)
+  tempSlide.slideStyle = { ...tempSlide.slideStyle, fontSize: Number(fontSize) }
+  tempSlide.contents = useSlideContent(tempSlide, scripture)
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide, true)
@@ -303,12 +305,8 @@ const createNewHymnSlide = (hymn: Hymn) => {
 
   // Calculate font-size of scripture content
   let fontSize = useScreenFontSize(currentHymnVerse)
-  tempSlide.contents = useSlideContent(
-    tempSlide,
-    hymn,
-    fontSize,
-    currentHymnVerse
-  )
+  tempSlide.slideStyle = { ...tempSlide.slideStyle, fontSize: Number(fontSize) }
+  tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
@@ -329,13 +327,9 @@ const createNewSongSlide = (song: Song) => {
 
   // Calculate font-size of scripture content
   let fontSize = useScreenFontSize(currentSongVerse)
+  tempSlide.slideStyle = { ...tempSlide.slideStyle, fontSize: Number(fontSize) }
   tempSlide.data = song
-  tempSlide.contents = useSlideContent(
-    tempSlide,
-    song,
-    fontSize,
-    currentSongVerse
-  )
+  tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
   tempSlide.name = useSlideName(tempSlide)
 
   slides.value?.push(tempSlide)
@@ -430,8 +424,12 @@ const gotoScripture = (title: string, version: string) => {
     tempSlide.title = scriptureLabel
     tempSlide.data = scripture
     let fontSize = useScreenFontSize(scripture?.content)
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: Number(fontSize),
+    }
 
-    tempSlide.contents = useSlideContent(tempSlide, scripture, fontSize)
+    tempSlide.contents = useSlideContent(tempSlide, scripture)
     tempSlide.name = useSlideName(tempSlide)
     activeSlide.value = tempSlide
     slides.value.splice(slideIndex, 1, tempSlide)
@@ -453,7 +451,11 @@ const gotoHymnVerse = (title: string) => {
       tempSlide.title = realTitle
       // Calculate font-size of content
       let fontSize = useScreenFontSize(nextVerse)
-      tempSlide.contents = useSlideContent(tempSlide, hymn, fontSize, nextVerse)
+      tempSlide.slideStyle = {
+        ...tempSlide.slideStyle,
+        fontSize: Number(fontSize),
+      }
+      tempSlide.contents = useSlideContent(tempSlide, hymn, nextVerse)
       activeSlide.value = tempSlide
       slides.value.splice(slideIndex, 1, tempSlide)
       updateLiveOutput(activeSlide.value)
@@ -475,8 +477,12 @@ const gotoSongVerse = (title: string) => {
       tempSlide.title = title
       // Calculate font-size of content
       let fontSize = useScreenFontSize(nextVerse)
+      tempSlide.slideStyle = {
+        ...tempSlide.slideStyle,
+        fontSize: Number(fontSize),
+      }
       tempSlide.data = song
-      tempSlide.contents = useSlideContent(tempSlide, song, fontSize, nextVerse)
+      tempSlide.contents = useSlideContent(tempSlide, song, nextVerse)
       activeSlide.value = tempSlide
       slides.value.splice(slideIndex, 1, tempSlide)
       updateLiveOutput(activeSlide.value)
@@ -493,8 +499,12 @@ const gotoChorus = () => {
     const chorus = hymn?.chorus as string
     // Calculate font-size of scripture content
     let fontSize = useScreenFontSize(chorus)
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: Number(fontSize),
+    }
 
-    tempSlide.contents = useSlideContent(tempSlide, hymn, fontSize, chorus)
+    tempSlide.contents = useSlideContent(tempSlide, hymn, chorus)
     activeSlide.value = tempSlide
     slides.value.splice(slideIndex, 1, tempSlide)
     updateLiveOutput(activeSlide.value)
