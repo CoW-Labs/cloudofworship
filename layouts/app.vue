@@ -47,7 +47,7 @@ import type { LibraryItem, Media } from "~/types"
 useHead({
   title: "Cloud of Worshippers",
 })
-defineProps({
+const props = defineProps({
   appVersion: String,
 })
 
@@ -144,6 +144,42 @@ const downloadEssentialResources = async () => {
   }, 500)
 }
 
+const overrideAppSettings = () => {
+  const currentAppSettings = appStore.settings
+  // Override App Settings if current app version mismatches appVersion in state
+  // TODO: When appSettings is editable by user, it must take preference over system settings and override
+  // console.log(currentAppSettings.appVersion, props.appVersion)
+  if (currentAppSettings.appVersion !== props.appVersion) {
+    const db = useIndexedDB()
+    db.newSchemaUpdate()
+
+    // console.log("calling again")
+    setTimeout(() => {
+      useGlobalEmit("show-changelog")
+    }, 2000)
+
+    appStore.setAppSettings({
+      ...currentAppSettings,
+      appVersion: props.appVersion,
+      defaultFont: "Inter",
+      defaultBackground: {
+        hymn: {
+          backgroundType: "video",
+          background: "/video-bg-1.mp4",
+        },
+        bible: {
+          backgroundType: "video",
+          background: "/video-bg-3.mp4",
+        },
+        text: {
+          backgroundType: "video",
+          background: "/video-bg-4.mp4",
+        },
+      },
+    })
+  }
+}
+
 function base64ToBlobURL(base64String: string, mimeType: string) {
   const byteCharacters = atob(decodeURIComponent(base64String))
   const byteNumbers = new Array(byteCharacters.length)
@@ -223,6 +259,10 @@ const retrieveAllMediaFilesFromDB = async () => {
     })
   })
 }
+
+onMounted(() => {
+  overrideAppSettings()
+})
 
 getChurch()
 downloadEssentialResources()
