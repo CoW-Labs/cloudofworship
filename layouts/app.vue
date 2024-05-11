@@ -59,7 +59,7 @@ const downloadProgress = ref<number>(5)
 const saveAllBackgroundVideos = async () => {
   const db = useIndexedDB()
   const savedBgVideos = await db.cached.count()
-  if (savedBgVideos >= 7) {
+  if (savedBgVideos >= 6) {
     return
   }
   const bgVideoPromise = await Promise.all([
@@ -81,8 +81,9 @@ const saveAllBackgroundVideos = async () => {
     bgVideoPromise[5].blob(),
     // bgVideoPromise[6].blob(),
   ])
-  bgVideoResponse.forEach((blob) => {
+  bgVideoResponse.forEach((blob, index) => {
     const tempMedia: Media = {
+      id: `/video-bg-${index + 1}.mp4`,
       data: blob,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

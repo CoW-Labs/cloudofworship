@@ -23,7 +23,7 @@ class WorshipCloudDatabase extends Dexie {
       songs: 'id,lyrics,title,album,cover,artist,verses,createdAt,updatedAt',
       media: 'id,content,data,createdAt,updatedAt', // id === slide.id
       library: 'id,type,content,createdAt,updatedAt',
-      cached: '++id,content,data,createdAt,updatedAt'
+      cached: 'id,content,data,createdAt,updatedAt'
     })
   }
 

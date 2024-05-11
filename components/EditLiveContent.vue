@@ -320,14 +320,18 @@ const onSelectLayout = (data: string) => {
   emit("slide-update", tempSlide)
 }
 
-const onSelectBackground = (backgroundType: string, data: string) => {
+const onSelectBackground = (
+  backgroundType: string,
+  data: { video: string; key: string } // could be an object or just a [data] string containing image_url/color
+) => {
   bgImagePopoverOpen.value = false
   bgVideoPopoverOpen.value = false
   bgColorPopoverOpen.value = false
 
   const tempSlide: Slide = {
     ...props.slide,
-    background: data,
+    background: data.video || data,
+    backgroundVideoKey: data.key || undefined,
     backgroundType,
   }
   emit("slide-update", tempSlide)
@@ -339,7 +343,7 @@ const onUpdateSlideContent = (editorIndex: number, content: string) => {
     ...props.slide,
     contents: [...slideContents.value],
   }
-  console.log("updated content", tempSlide)
+  // console.log("updated content", tempSlide)
   tempSlide.name = useSlideName(tempSlide)
   emit("slide-update", tempSlide)
   // emit("update-live-output-slides")

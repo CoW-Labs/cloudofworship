@@ -1,9 +1,9 @@
 <template>
   <div class="bg-image-selection p-2 gap-2 grid grid-cols-3">
     <UButton
-      v-for="video in backgroundVideos"
+      v-for="(video, index) in backgroundVideos"
       :key="video"
-      @click="$emit('select', video)"
+      @click="$emit('select', { video, key: `/video-bg-${index + 1}.mp4` })"
       class="min-w-[80px] h-[60px] p-0 text-black bg-cover transition-all overflow-hidden relative"
     >
       <video
@@ -29,7 +29,7 @@
 defineProps<{
   value: string
 }>()
-const backgroundVideos = [
+const backgroundVideoKeys = [
   "/video-bg-1.mp4",
   "/video-bg-2.mp4",
   "/video-bg-3.mp4",
@@ -37,4 +37,20 @@ const backgroundVideos = [
   "/video-bg-5.mp4",
   "/video-bg-6.mp4",
 ]
+const backgroundVideos = ref([])
+
+const loadVideos = async () => {
+  const cachedVideos = await useBackgroundVideos()
+  backgroundVideos.value = cachedVideos.map((blob) => URL.createObjectURL(blob))
+}
+
+onMounted(() => {
+  loadVideos()
+})
+
+// onBeforeUnmount(() => {
+//   backgroundVideos?.value?.forEach((url) => {
+//     URL.revokeObjectURL(url)
+//   })
+// })
 </script>

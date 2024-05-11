@@ -70,61 +70,16 @@
         variant="ghost"
       />
     </UTooltip>
-    <div class="button-group rounded-md p-1 flex items-center gap-1">
-      <UTooltip text="Align left">
-        <UButton
-          @click="
-            $emit('update-style', { ...slide.slideStyle, alignment: 'left' })
-          "
-          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
-          :class="{
-            'bg-primary text-white dark:text-primary-500':
-              slide?.slideStyle?.alignment === 'left',
-          }"
-          icon="i-bi-text-left"
-          variant="ghost"
-          :disabled="slide?.type === slideTypes.media"
-        />
-      </UTooltip>
-      <UTooltip text="Align center">
-        <UButton
-          @click="
-            $emit('update-style', { ...slide.slideStyle, alignment: 'center' })
-          "
-          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
-          :class="{
-            'bg-primary text-white dark:text-primary-900':
-              slide?.slideStyle?.alignment === 'center',
-          }"
-          icon="i-bi-text-center"
-          variant="ghost"
-          :disabled="slide?.type === slideTypes.media"
-        />
-      </UTooltip>
-      <UTooltip text="Align right">
-        <UButton
-          @click="
-            $emit('update-style', { ...slide.slideStyle, alignment: 'right' })
-          "
-          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
-          :class="{
-            'bg-primary text-white dark:text-primary-900':
-              slide?.slideStyle?.alignment === 'right',
-          }"
-          icon="i-bi-text-right"
-          variant="ghost"
-          :disabled="slide?.type === slideTypes.media"
-        />
-      </UTooltip>
-    </div>
     <FontSelect
-      v-if="slide?.type !== slideTypes?.text"
+      v-if="slide?.type !== slideTypes?.media"
       size="lg"
       :selected-font="slide?.slideStyle?.font"
-      :disabled="slide?.type === slideTypes.media"
       @change="$emit('update-font', $event)"
     />
-    <div class="button-group rounded-md p-1 flex items-center gap-1">
+    <div
+      v-if="slide?.type !== slideTypes?.media"
+      class="button-group rounded-md p-1 flex items-center gap-1"
+    >
       <UTooltip text="Decrease font size">
         <UButton
           :disabled="slideFontSize <= MIN_FONT_SIZE"
@@ -161,6 +116,53 @@
           "
           class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
           icon="i-mdi-format-annotation-plus"
+          variant="ghost"
+        />
+      </UTooltip>
+    </div>
+    <div
+      v-if="slide?.type !== slideTypes?.media"
+      class="button-group rounded-md p-1 flex items-center gap-1"
+    >
+      <UTooltip text="Align left">
+        <UButton
+          @click="
+            $emit('update-style', { ...slide.slideStyle, alignment: 'left' })
+          "
+          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
+          :class="{
+            'bg-primary text-white dark:text-primary-500':
+              slide?.slideStyle?.alignment === 'left',
+          }"
+          icon="i-bi-text-left"
+          variant="ghost"
+        />
+      </UTooltip>
+      <UTooltip text="Align center">
+        <UButton
+          @click="
+            $emit('update-style', { ...slide.slideStyle, alignment: 'center' })
+          "
+          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
+          :class="{
+            'bg-primary text-white dark:text-primary-900':
+              slide?.slideStyle?.alignment === 'center',
+          }"
+          icon="i-bi-text-center"
+          variant="ghost"
+        />
+      </UTooltip>
+      <UTooltip text="Align right">
+        <UButton
+          @click="
+            $emit('update-style', { ...slide.slideStyle, alignment: 'right' })
+          "
+          class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300"
+          :class="{
+            'bg-primary text-white dark:text-primary-900':
+              slide?.slideStyle?.alignment === 'right',
+          }"
+          icon="i-bi-text-right"
           variant="ghost"
         />
       </UTooltip>
