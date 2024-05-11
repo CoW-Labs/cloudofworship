@@ -105,6 +105,7 @@ export interface SlideStyle {
 export interface AppSettings {
   appVersion: string,
   defaultBibleVersion: string,
+  defaultFont: string,
   defaultBackground: {
     hymn: { backgroundType: string, background: string },
     bible: { backgroundType: string, background: string },

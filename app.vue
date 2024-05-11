@@ -38,7 +38,7 @@ const appStore = useAppStore()
 nuxtApp.provide("emitter", emitter)
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("0.6.1")
+const appVersion = ref<string>("0.6.2")
 
 const registerServiceWorker = async () => {
   if ("serviceWorker" in navigator) {
@@ -70,6 +70,7 @@ const overrideAppSettings = () => {
     appStore.setAppSettings({
       ...currentAppSettings,
       appVersion: appVersion.value,
+      defaultFont: "Inter",
       defaultBackground: {
         hymn: {
           backgroundType: "video",
