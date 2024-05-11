@@ -346,7 +346,6 @@ const onUpdateSlideContent = (editorIndex: number, content: string) => {
 }
 
 const onUpdateSlideStyle = (slideStyle: SlideStyle) => {
-  console.log("slideStyle", slideStyle)
   const tempSlide: Slide = {
     ...props.slide,
     slideStyle,
