@@ -42,7 +42,7 @@
                 slide?.type === slideTypes?.hymn ||
                 slide?.type === slideTypes?.song
               "
-              class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-0 mr-0"
+              class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-1 mr-0"
             >
               <UTooltip text="Previous verse" :popper="{ arrow: true }">
                 <UButton
