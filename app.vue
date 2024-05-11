@@ -59,38 +59,7 @@ const registerServiceWorker = async () => {
   }
 }
 
-const overrideAppSettings = () => {
-  const currentAppSettings = appStore.settings
-  // Override App Settings if current app version mismatches appVersion in state
-  // TODO: When appSettings is editable by user, it must take preference over system settings and override
-  if (currentAppSettings.appVersion !== appVersion.value) {
-    const db = useIndexedDB()
-    db.newSchemaUpdate()
-
-    appStore.setAppSettings({
-      ...currentAppSettings,
-      appVersion: appVersion.value,
-      defaultFont: "Inter",
-      defaultBackground: {
-        hymn: {
-          backgroundType: "video",
-          background: "/video-bg-1.mp4",
-        },
-        bible: {
-          backgroundType: "video",
-          background: "/video-bg-3.mp4",
-        },
-        text: {
-          backgroundType: "video",
-          background: "/video-bg-4.mp4",
-        },
-      },
-    })
-  }
-}
-
 registerServiceWorker()
-overrideAppSettings()
 </script>
 
 <style>

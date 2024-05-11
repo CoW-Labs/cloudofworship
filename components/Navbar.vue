@@ -58,11 +58,12 @@
             />
           </template>
         </UPopover>
+        <SettingsModal
+          :is-open="settingsModalOpen"
+          @close-modal="settingsModalOpen = false"
+        />
+        <ChangelogModal />
       </div>
-      <SettingsModal
-        :is-open="settingsModalOpen"
-        @close-modal="settingsModalOpen = false"
-      />
     </div>
   </Transition>
 </template>
