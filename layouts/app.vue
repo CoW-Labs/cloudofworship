@@ -24,6 +24,7 @@
             'Loading NIV Bible...',
             'Loading AMP Bible...',
             'Loading Hymns...',
+            'Loading background videos...',
             'Finishing up',
           ]"
         />
@@ -54,6 +55,49 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const loadingResources = ref<boolean>(true)
 const downloadProgress = ref<number>(5)
+
+const saveAllBackgroundVideos = async () => {
+  const db = useIndexedDB()
+  const savedBgVideos = await db.cached.count()
+  if (savedBgVideos >= 7) {
+    return
+  }
+  const bgVideoPromise = await Promise.all([
+    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-1.mp4`),
+    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`),
+    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`),
+    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`),
+    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`),
+    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`),
+    // fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-7.mp4`),
+  ])
+  // console.log("values", bgVideoPromise)
+  const bgVideoResponse = await Promise.all([
+    bgVideoPromise[0].blob(),
+    bgVideoPromise[1].blob(),
+    bgVideoPromise[2].blob(),
+    bgVideoPromise[3].blob(),
+    bgVideoPromise[4].blob(),
+    bgVideoPromise[5].blob(),
+    // bgVideoPromise[6].blob(),
+  ])
+  bgVideoResponse.forEach((blob) => {
+    const tempMedia: Media = {
+      data: blob,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    db.cached.add(tempMedia)
+  })
+
+  // console.log("values", bgVideoResponse.values())
+  // const blobData = await bgVideoPromise.blob()
+  // // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
+  // const arrayBuffer: ArrayBuffer = mediaObj[0]?.data
+  // const blob = new Blob([blobData], {
+  //   type: 'video/mp4',
+  // })
+}
 
 const downloadEssentialResources = async () => {
   loadingResources.value = true
@@ -89,8 +133,12 @@ const downloadEssentialResources = async () => {
     downloadProgress.value = 6
   }
 
+  // Download background videos
+  await saveAllBackgroundVideos()
+  downloadProgress.value = 7
+
   setTimeout(() => {
-    downloadProgress.value = 7
+    downloadProgress.value = 8
     loadingResources.value = false
   }, 500)
 }

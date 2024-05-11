@@ -15,13 +15,15 @@ class WorshipCloudDatabase extends Dexie {
   public songs!: Table<Song>
   public media!: Table<Media>
   public library!: Table<LibraryItem, string>
+  public cached!: Table<Media>
 
   public constructor() {
     super('WorshipCloudDatabase')
     this.version(2).stores({
       songs: 'id,lyrics,title,album,cover,artist,verses,createdAt,updatedAt',
       media: 'id,content,data,createdAt,updatedAt', // id === slide.id
-      library: 'id,type,content,createdAt,updatedAt'
+      library: 'id,type,content,createdAt,updatedAt',
+      cached: '++id,content,data,createdAt,updatedAt'
     })
   }
 

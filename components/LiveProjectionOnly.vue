@@ -191,8 +191,4 @@ const activateFullScreen = () => {
 }
 </script>
 
-<style>
-.live-output-ctn * {
-  overflow: hidden;
-}
-</style>
+<style></style>
