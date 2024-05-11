@@ -531,6 +531,7 @@ body {
   line-height: 1.1vw !important;
 }
 
+.lg-preview .tiptap.live-content .scripture-label,
 .lg-preview .tiptap.live-content .song-label {
   font-size: 0.5vw;
 }
@@ -578,6 +579,7 @@ body {
   line-height: 0.6vw;
 }
 
+.md-preview .tiptap.live-content .scripture-label,
 .md-preview .tiptap.live-content .song-label {
   font-size: 0.15vw;
 }
@@ -633,6 +635,7 @@ body {
   line-height: 0.3vw !important;
 }
 
+.sm-preview .tiptap.live-content .scripture-label,
 .sm-preview .tiptap.live-content .song-label {
   font-size: 0.2vw;
 }
