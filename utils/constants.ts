@@ -191,9 +191,9 @@ export const bibleBooks = [
 
 export const bibleVersions = [
   'KJV',
-  // 'NKJV', 
-  // 'NIV', 
-  // 'AMP'
+  'NKJV',
+  'NIV',
+  'AMP'
 ]
 
 export const appFonts = [
