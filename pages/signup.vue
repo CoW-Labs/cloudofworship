@@ -293,6 +293,7 @@ const signup = async () => {
       })
     } else {
       authStore.setChurch(data?.value)
+      authStore.setUser({ ...authStore.user, churchId: data?.value?._id })
       useToast().add({
         title: "You are all set! 🎉",
         color: "green",
