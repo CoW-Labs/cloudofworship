@@ -2,6 +2,7 @@
   <div v-if="!loadingResources" class="app-ctn max-h-[100vh] overflow-hidden">
     <Navbar :app-version="appVersion" />
     <slot />
+    <FullScreenLoader v-if="fullScreenLoading" />
   </div>
   <div
     v-else
@@ -42,6 +43,7 @@ import hymns from "../public/hymns.json"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
+import type { Emitter } from "mitt"
 import type { LibraryItem, Media } from "~/types"
 
 useHead({
@@ -55,6 +57,14 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const loadingResources = ref<boolean>(true)
 const downloadProgress = ref<number>(5)
+const fullScreenLoading = ref<boolean>(false)
+
+// LISTEN TO EVENTS
+const emitter = useNuxtApp().$emitter as Emitter<any>
+emitter.on("app-loading", (loading) => {
+  // console.log("triggered", loading)
+  fullScreenLoading.value = loading
+})
 
 const saveAllBackgroundVideos = async () => {
   const db = useIndexedDB()
