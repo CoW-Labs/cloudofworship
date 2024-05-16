@@ -48,6 +48,7 @@
             >
               <LiveContentWithBackground
                 :slide="slide"
+                :slide-label="slide?.name"
                 :slide-styles="settings.slideStyles"
               />
             </div>

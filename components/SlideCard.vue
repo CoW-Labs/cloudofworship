@@ -16,6 +16,7 @@
       <div class="slide-preview text-white overflow-hidden md-preview">
         <LiveContentWithBackground
           :slide="slide"
+          :slide-label="slide?.name"
           :slide-styles="settings.slideStyles"
         />
       </div>
@@ -92,6 +93,7 @@
     >
       <LiveContentWithBackground
         :slide="slide"
+        :slide-label="slide?.name"
         :slide-styles="settings.slideStyles"
       />
     </div>

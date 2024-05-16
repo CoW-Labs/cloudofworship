@@ -26,11 +26,9 @@
         :src="slide?.background"
         autoplay
         :loop="
-          slide?.type !== slideTypes.media || slide?.slideStyle?.repeatVideo
+          slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
         "
-        :muted="
-          !(fullScreen && slide?.type === slideTypes.media) ? 'muted' : 'false'
-        "
+        :muted="fullScreen ? slide?.slideStyle?.isMediaMuted : true"
         playsinline="true"
         :class="[
           'h-[100%] w-[100%] absolute inset-0',
@@ -51,7 +49,6 @@
         ]"
         crossorigin="anonymous"
       ></video>
-
       <div
         v-if="!fullScreen || slideLabel"
         class="overlay-gradient absolute z-10 inset-0"
@@ -135,11 +132,13 @@
 </template>
 
 <script setup lang="ts">
+import type { Emitter } from "mitt"
 import type { Slide, SlideStyle } from "~/types"
 const appMounted = ref<boolean>(false)
 const video = ref<HTMLVideoElement | null>(null)
 const foregroundContentVisible = ref<boolean>(true)
 const isLargePreviewOpen = ref<boolean>(false)
+const emitter = useNuxtApp().$emitter as Emitter<any>
 
 const props = defineProps<{
   slideLabel: Boolean
@@ -148,6 +147,7 @@ const props = defineProps<{
   fullScreen: Boolean
   fullScreenHeight: string
   slideStyles: SlideStyle
+  audioMuted: Boolean
 }>()
 
 watch(
@@ -155,6 +155,7 @@ watch(
   (newVal, oldVal) => {
     try {
       if (appMounted) {
+        // console.log(video.value)
         video.value?.play()
         if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
           foregroundContentVisible.value = false
@@ -162,16 +163,40 @@ watch(
             foregroundContentVisible.value = true
           }, 100)
         }
+
+        // Play/pause video
+        if (newVal.slideStyle?.isMediaPlaying) {
+          video.value?.play()
+        } else {
+          video.value?.pause()
+        }
+
+        // TODO: Listen to see if video is playing or paused
+        // video.value?.addEventListener("play", (ev) => {
+        //   useGlobalEmit()
+        // })
+        // video.value?.addEventListener("pause", (ev) => {
+        //   console.log(ev)
+        // })
       }
-    } catch (err) {}
+    } catch (err) {
+      // console.log(err)
+    }
   }
 )
 
 onMounted(() => {
   appMounted.value = true
-  try {
-    video.value?.play()
-  } catch (err) {}
+  // try {
+  video.value?.play()
+  // } catch (err) {}
+
+  emitter.on("media-seek", (seekPosition: string) => {
+    // video.value?.fastSeek(Number(seekPosition))
+    console.log(seekPosition, video.value?.currentTime)
+    // Number(seekPosition)
+    video.value.currentTime = 0
+  })
 })
 
 const activateFullScreen = () => {

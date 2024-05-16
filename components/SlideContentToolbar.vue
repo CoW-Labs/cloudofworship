@@ -47,29 +47,80 @@
         </template>
       </USelectMenu>
     </UTooltip>
-    <UTooltip
-      text="Repeat media"
-      :popper="{ placement: 'top' }"
+    <!-- VIDEO MEDIA SLIDE OPTIONS -->
+    <template
       v-if="
         slide?.type === slideTypes.media && slide?.data?.type?.includes('video')
       "
     >
-      <UButton
-        @click="
-          $emit('update-style', {
-            ...slide.slideStyle,
-            repeatVideo: !slide.slideStyle?.repeatVideo,
-          })
-        "
-        class="dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500"
-        :class="{
-          'bg-primary text-white dark:text-primary-500':
-            slide?.slideStyle?.repeatVideo,
-        }"
-        icon="i-tabler-repeat"
-        variant="ghost"
-      />
-    </UTooltip>
+      <UTooltip text="Mute/Unmute media" :popper="{ placement: 'top' }">
+        <UButton
+          @click="
+            $emit('update-style', {
+              ...slide.slideStyle,
+              isMediaMuted: !slide.slideStyle?.isMediaMuted,
+            })
+          "
+          :class="[
+            'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
+          ]"
+          :icon="
+            slide.slideStyle?.isMediaMuted
+              ? 'i-tabler-volume'
+              : 'i-tabler-volume-off'
+          "
+          variant="ghost"
+        />
+      </UTooltip>
+      <UTooltip text="Repeat media" :popper="{ placement: 'top' }">
+        <UButton
+          @click="
+            $emit('update-style', {
+              ...slide.slideStyle,
+              repeatMedia: !slide.slideStyle?.repeatMedia,
+            })
+          "
+          :class="[
+            'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
+            {
+              'bg-primary text-white dark:text-primary-500':
+                slide?.slideStyle?.repeatMedia,
+            },
+          ]"
+          icon="i-tabler-repeat"
+          variant="ghost"
+        />
+      </UTooltip>
+      <UTooltip text="Play/pause media" :popper="{ placement: 'top' }">
+        <UButton
+          @click="
+            $emit('update-style', {
+              ...slide.slideStyle,
+              isMediaPlaying: !slide.slideStyle?.isMediaPlaying,
+            })
+          "
+          :class="[
+            'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
+          ]"
+          :icon="
+            slide.slideStyle?.isMediaPlaying
+              ? 'i-tabler-pause'
+              : 'i-tabler-play'
+          "
+          variant="ghost"
+        />
+      </UTooltip>
+      <!-- <UTooltip text="Restart media" :popper="{ placement: 'top' }">
+        <UButton
+          @click="useGlobalEmit('media-seek', '0')"
+          :class="[
+            'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
+          ]"
+          icon="i-tabler-skip-back"
+          variant="ghost"
+        />
+      </UTooltip> -->
+    </template>
     <FontSelect
       v-if="slide?.type !== slideTypes?.media"
       size="lg"

@@ -123,18 +123,24 @@ const downloadEssentialResources = async () => {
 
   // Download NKJV Bible
   // const nkjvBible = await useS3File("nkjv.json")
-  useNuxtApp().provide("nkjvBible", nkjvBible || "")
-  downloadProgress.value = 3
+  if (!useNuxtApp().$nkjvBible) {
+    useNuxtApp().provide("nkjvBible", nkjvBible || "")
+    downloadProgress.value = 3
+  }
 
   // Download NIV Bible
   // const nivBible = await useS3File("niv.json")
-  useNuxtApp().provide("nivBible", nivBible || "")
-  downloadProgress.value = 4
+  if (!useNuxtApp().$nivBible) {
+    useNuxtApp().provide("nivBible", nivBible || "")
+    downloadProgress.value = 4
+  }
 
   // Download AMP Bible
   // const ampBible = await useS3File("amp.json")
-  useNuxtApp().provide("ampBible", ampBible || "")
-  downloadProgress.value = 5
+  if (!useNuxtApp().$ampBible) {
+    useNuxtApp().provide("ampBible", ampBible || "")
+    downloadProgress.value = 5
+  }
 
   // Download all hymns
   // const hymns = await useS3File("hymns.json")
@@ -202,6 +208,7 @@ function base64ToBlobURL(base64String: string, mimeType: string) {
 }
 
 const getChurch = async () => {
+  console.log(authStore.user)
   const churchId = authStore.user?.churchId
   if (churchId) {
     const promise = useAPIFetch(`/church/${churchId}`)
