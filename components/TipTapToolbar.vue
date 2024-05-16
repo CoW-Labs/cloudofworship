@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="editor"
-    class="my-2 flex gap-1 w-[100%] overflow-auto absolute z-10 bg-white dark:bg-[#121212] p-1 right-0 left-0 top-[45px]"
+    class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] p-1 right-0 left-0 top-[45px]"
   >
     <UButton
       @click="editor.chain().focus().toggleBold().run()"
@@ -32,7 +32,7 @@
       icon="i-bx-strikethrough"
       variant="ghost"
     />
-    <UButton
+    <!-- <UButton
       @click="editor.chain().focus().toggleCode().run()"
       :disabled="!editor.can().chain().focus().toggleCode().run()"
       :class="{
@@ -40,12 +40,12 @@
       }"
       icon="i-bx-code"
       variant="ghost"
-    />
+    /> -->
     <div
       class="button-group bg-primary-100 dark:bg-primary-900 rounded-md mx-1 p-1 flex items-center gap-1"
     >
       <UButton
-        v-for="headingSize in 4"
+        v-for="headingSize in 3"
         :key="`heading-size-${headingSize}`"
         @click="
           editor.chain().focus().toggleHeading({ level: headingSize }).run()
@@ -128,14 +128,9 @@
         variant="ghost"
       />
     </div>
-    <UButton
-      @click="editor.chain().focus().toggleCodeBlock().run()"
-      :class="{
-        'bg-primary text-white dark:text-primary-900':
-          editor.isActive('codeBlock'),
-      }"
-      icon="i-bx-code-curly"
-      variant="ghost"
+    <TipTapFontSelect
+      @change="editor.chain().focus().setFontFamily($event).run()"
+      :editor="editor"
     />
     <UButton
       @click="editor.chain().focus().toggleBlockquote().run()"
@@ -144,6 +139,15 @@
           editor.isActive('blockquote'),
       }"
       icon="i-bx-bxs-quote-right"
+      variant="ghost"
+    />
+    <UButton
+      @click="editor.chain().focus().toggleCodeBlock().run()"
+      :class="{
+        'bg-primary text-white dark:text-primary-900':
+          editor.isActive('codeBlock'),
+      }"
+      icon="i-bx-code-curly"
       variant="ghost"
     />
   </div>

@@ -110,7 +110,7 @@
           variant="ghost"
         />
       </UTooltip>
-      <!-- <UTooltip text="Restart media" :popper="{ placement: 'top' }">
+      <UTooltip text="Restart media" :popper="{ placement: 'top' }">
         <UButton
           @click="useGlobalEmit('media-seek', '0')"
           :class="[
@@ -119,7 +119,7 @@
           icon="i-tabler-skip-back"
           variant="ghost"
         />
-      </UTooltip> -->
+      </UTooltip>
     </template>
     <FontSelect
       v-if="slide?.type !== slideTypes?.media"

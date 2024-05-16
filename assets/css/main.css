@@ -450,16 +450,20 @@ body {
 .tiptap.live-content pre {
   background: #0d0d0d;
   color: #fff;
-  font-family: "JetBrainsMono", monospace;
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
+  margin-top: 2%;
+  -webkit-border-radius: 0.5rem;
+  -moz-border-radius: 0.5rem;
+  -ms-border-radius: 0.5rem;
+  -o-border-radius: 0.5rem;
 }
 
 .tiptap.live-content pre code {
   color: inherit;
   padding: 0;
   background: none;
-  font-size: 0.8rem;
+  font-size: 2.5vw;
 }
 
 .tiptap.live-content img {
@@ -517,6 +521,11 @@ body {
 .right-live-content .copyright-content {
   margin-left: auto;
 }
+.tiptap.live-content blockquote {
+  border-left: 5px solid #ffffff80;
+  padding-left: 5%;
+}
+
 
 /* LIVE CONTENT LG PREVIEW */
 .lg-preview .slide-layout-ctn {
@@ -570,6 +579,9 @@ body {
 .lg-preview .tiptap.live-content h4 {
   font-size: 1vw;
 }
+.lg-preview .tiptap.live-content blockquote {
+  border-left-width: 1px;
+}
 
 /* LIVE CONTENT MD PREVIEW */
 .md-preview .slide-layout-ctn {
@@ -620,6 +632,9 @@ body {
 .md-preview .tiptap.live-content h4 {
   font-size: 0.4vw;
 }
+.md-preview .tiptap.live-content blockquote {
+  border-left-width: 1px;
+}
 
 /* LIVE CONTENT SM PREVIEW */
 .sm-preview .slide-layout-ctn {
@@ -669,6 +684,9 @@ body {
 
 .sm-preview .tiptap.live-content h4 {
   font-size: 0.25vw;
+}
+.sm-preview .tiptap.live-content blockquote {
+  border-left-width: 1px;
 }
 
 @media screen and (min-width: 1500px) {

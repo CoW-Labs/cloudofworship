@@ -56,6 +56,8 @@ import type { Slide } from "~/types"
 import TiptapHighlight from "@tiptap/extension-highlight"
 import TiptapTextAlign from "@tiptap/extension-text-align"
 import TiptapPlaceholder from "@tiptap/extension-placeholder"
+import TipTapTextStyle from "@tiptap/extension-text-style"
+import TipTapFontFamily from "@tiptap/extension-font-family"
 
 const props = defineProps<{
   slide: Slide
@@ -103,6 +105,10 @@ const editorOne = ref(
       TiptapPlaceholder.configure({
         placeholder: "Your title here",
       }),
+      TipTapTextStyle,
+      TipTapFontFamily.configure({
+        types: ["textStyle"],
+      }),
     ],
     onCreate: ({ editor }) => {
       editor.chain().focus().toggleHeading({ level: 1 }).run()
@@ -133,6 +139,10 @@ const editorTwo = ref(
         placeholder:
           "Full (richtext) content goes here: \n- Apply text formatting options in toolbar above.\n- Textbox is expandable based on input",
       }),
+      TipTapTextStyle,
+      TipTapFontFamily.configure({
+        types: ["textStyle"],
+      }),
     ],
     onBlur: ({ editor }) => {
       emit("update", 1, editor.getHTML())
@@ -156,6 +166,13 @@ const editorThree = ref(
         placeholder:
           "Full (richtext) content goes here: \n- Apply text formatting options in toolbar above.\n- Textbox is expandable based on input",
       }),
+      TipTapTextStyle,
+      TipTapFontFamily.configure({
+        types: ["textStyle"],
+      }),
+      TipTapFontFamily.configure({
+        types: ["textStyle"],
+      }),
     ],
     onBlur: ({ editor }) => {
       emit("update", 2, editor.getHTML())
@@ -178,6 +195,10 @@ const uneditableEditorOne = ref(
       TiptapPlaceholder.configure({
         placeholder:
           "Full (richtext) content goes here: \n- Apply text formatting options in toolbar above.\n- Textbox is expandable based on input",
+      }),
+      TipTapTextStyle,
+      TipTapFontFamily.configure({
+        types: ["textStyle"],
       }),
     ],
     // onUpdate: ({ editor }) => {
@@ -204,6 +225,10 @@ const uneditableEditorTwo = ref(
       TiptapPlaceholder.configure({
         placeholder:
           "Full (richtext) content goes here: \n- Apply text formatting options in toolbar above.\n- Textbox is expandable based on input",
+      }),
+      TipTapTextStyle,
+      TipTapFontFamily.configure({
+        types: ["textStyle"],
       }),
     ],
     // onUpdate: ({ editor }) => {
