@@ -12,7 +12,7 @@
     <AppSection
       heading="App Settings"
       class="border-0"
-      heading-styles="text-xl font-semibold"
+      heading-styles="text-lg font-semibold"
       :secondary-buttons="[
         {
           label: '',
@@ -47,10 +47,12 @@
         <div
           class="rhs w-[100%] border border-gray-100 rounded-lg p-6 min-h-[600px]"
         >
-          <h3 class="font-semibold text-xl mb-4">
+          <!-- SUB-SETTINGS HEADER -->
+          <h3 class="font-semibold text-lg mb-4">
             {{ activeTab }}
           </h3>
           <Transition name="fade-sm">
+            <!-- ACCOUNT SETTINGS -->
             <div
               class="settings-ctn h-[100%]"
               v-if="activeTab === 'Account Settings'"
@@ -63,6 +65,7 @@
                 class="pb-4"
               />
             </div>
+            <!-- PROFILE SETTINGS -->
             <div
               class="settings-ctn h-[100%]"
               v-else-if="activeTab === 'Profile Settings'"
@@ -75,6 +78,7 @@
                 class="pb-4"
               />
             </div>
+            <!-- SLIDE SETTINGS -->
             <div
               class="settings-ctn h-[100%]"
               v-else-if="activeTab === 'Slide Settings'"
@@ -139,6 +143,7 @@
                 </UFormGroup>
               </UForm>
             </div>
+            <!-- STORAGE SETTINGS -->
             <div
               class="settings-ctn h-[100%]"
               v-else-if="activeTab === 'Storage Settings'"

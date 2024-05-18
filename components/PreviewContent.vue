@@ -162,7 +162,10 @@ emitter.on("new-song-search", (query: string) => {
 
 emitter.on("new-media", (data: any) => {
   if (data) {
-    createNewMediaSlide(data)
+    // console.log("media-data", data)
+    if (data?.length > 0) {
+      createMultipleNewMediaSlides(data)
+    }
   }
 })
 
@@ -350,7 +353,10 @@ const createNewSongSlide = (song: Song) => {
   toast.add({ title: "Song slide created", icon: "i-bx-music" })
 }
 
-const createNewMediaSlide = async (file: any) => {
+const createNewMediaSlide = async (
+  file: any,
+  options?: { oneOfManySlides: boolean }
+) => {
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.empty
   let data = null
@@ -381,7 +387,22 @@ const createNewMediaSlide = async (file: any) => {
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
-  toast.add({ title: "Media slide created", icon: "i-bx-image" })
+  if (!options?.oneOfManySlides) {
+    toast.add({ title: "Media slide created", icon: "i-bx-image" })
+  }
+}
+
+const createMultipleNewMediaSlides = async (files: any[]) => {
+  useGlobalEmit("app-loading", true)
+  const multipleSlidesPromise: Promise<any>[] = []
+  files?.forEach((file) => {
+    multipleSlidesPromise.push(
+      createNewMediaSlide(file, { oneOfManySlides: true })
+    )
+  })
+  await Promise.all(multipleSlidesPromise)
+  useGlobalEmit("app-loading", false)
+  toast.add({ title: "Media slides created", icon: "i-bx-image" })
 }
 
 const updateLiveOutput = (updatedSlide: Slide) => {

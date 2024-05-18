@@ -2,6 +2,7 @@
   <div v-if="!loadingResources" class="app-ctn max-h-[100vh] overflow-hidden">
     <Navbar :app-version="appVersion" />
     <slot />
+    <FullScreenLoader v-if="fullScreenLoading" />
   </div>
   <div
     v-else
@@ -42,6 +43,7 @@ import hymns from "../public/hymns.json"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
+import type { Emitter } from "mitt"
 import type { LibraryItem, Media } from "~/types"
 
 useHead({
@@ -55,6 +57,15 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const loadingResources = ref<boolean>(true)
 const downloadProgress = ref<number>(5)
+const fullScreenLoading = ref<boolean>(false)
+const cachedVideosURLs = ref<string[]>()
+
+// LISTEN TO EVENTS
+const emitter = useNuxtApp().$emitter as Emitter<any>
+emitter.on("app-loading", (loading) => {
+  // console.log("triggered", loading)
+  fullScreenLoading.value = loading
+})
 
 const saveAllBackgroundVideos = async () => {
   const db = useIndexedDB()
@@ -113,18 +124,24 @@ const downloadEssentialResources = async () => {
 
   // Download NKJV Bible
   // const nkjvBible = await useS3File("nkjv.json")
-  useNuxtApp().provide("nkjvBible", nkjvBible || "")
-  downloadProgress.value = 3
+  if (!useNuxtApp().$nkjvBible) {
+    useNuxtApp().provide("nkjvBible", nkjvBible || "")
+    downloadProgress.value = 3
+  }
 
   // Download NIV Bible
   // const nivBible = await useS3File("niv.json")
-  useNuxtApp().provide("nivBible", nivBible || "")
-  downloadProgress.value = 4
+  if (!useNuxtApp().$nivBible) {
+    useNuxtApp().provide("nivBible", nivBible || "")
+    downloadProgress.value = 4
+  }
 
   // Download AMP Bible
   // const ampBible = await useS3File("amp.json")
-  useNuxtApp().provide("ampBible", ampBible || "")
-  downloadProgress.value = 5
+  if (!useNuxtApp().$ampBible) {
+    useNuxtApp().provide("ampBible", ampBible || "")
+    downloadProgress.value = 5
+  }
 
   // Download all hymns
   // const hymns = await useS3File("hymns.json")
@@ -165,15 +182,15 @@ const overrideAppSettings = () => {
       defaultBackground: {
         hymn: {
           backgroundType: "video",
-          background: "/video-bg-1.mp4",
+          background: cachedVideosURLs.value?.[0],
         },
         bible: {
           backgroundType: "video",
-          background: "/video-bg-3.mp4",
+          background: cachedVideosURLs.value?.[2],
         },
         text: {
           backgroundType: "video",
-          background: "/video-bg-4.mp4",
+          background: cachedVideosURLs.value?.[3],
         },
       },
     })
@@ -192,6 +209,7 @@ function base64ToBlobURL(base64String: string, mimeType: string) {
 }
 
 const getChurch = async () => {
+  // console.log(authStore.user)
   const churchId = authStore.user?.churchId
   if (churchId) {
     const promise = useAPIFetch(`/church/${churchId}`)
@@ -258,6 +276,18 @@ const retrieveAllMediaFilesFromDB = async () => {
       db.library.update(slide.id, updatedLibraryItem)
     })
   })
+
+  setCachedVideosURL()
+}
+
+const setCachedVideosURL = async () => {
+  const cachedVideos = await useBackgroundVideos()
+  const tempCachedVideosURLs = cachedVideos?.map((blob) =>
+    URL.createObjectURL(blob)
+  )
+  cachedVideosURLs.value = tempCachedVideosURLs as string[]
+  // console.log(tempCachedVideosURLs)
+  appStore.setBackgroundVideos(tempCachedVideosURLs)
 }
 
 onMounted(async () => {

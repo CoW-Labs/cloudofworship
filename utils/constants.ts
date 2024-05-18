@@ -67,8 +67,8 @@ export const quickActionsArr = [
     // type: slideTypes.text
   },
   {
-    icon: "i-bx-save",
-    name: "Add to Library",
+    icon: "i-bx-library",
+    name: "My Library",
     desc: "Save your favorite songs, slides",
     action: "new-library",
     meta: "save files images pictures videos songs documents",
@@ -76,7 +76,7 @@ export const quickActionsArr = [
     // type: slideTypes.text
   },
   {
-    icon: "i-bx-info-circle",
+    icon: "i-bx-bell",
     name: "Add Banners/Alert",
     desc: "Notify your audience without disruption",
     action: "new-alert",

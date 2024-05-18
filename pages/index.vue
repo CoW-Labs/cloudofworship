@@ -9,6 +9,14 @@
 definePageMeta({
   layout: "app",
 })
+useHead({
+  link: [
+    {
+      rel: "manifest",
+      href: "/live-manifest.json",
+    },
+  ],
+})
 </script>
 
 <style scoped></style>

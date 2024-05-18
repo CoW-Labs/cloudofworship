@@ -26,6 +26,9 @@
 </template>
 
 <script setup lang="ts">
+import { useAppStore } from "~/store/app"
+const appStore = useAppStore()
+
 defineProps<{
   value: string
 }>()
@@ -37,16 +40,7 @@ const backgroundVideoKeys = [
   "/video-bg-5.mp4",
   "/video-bg-6.mp4",
 ]
-const backgroundVideos = ref([])
-
-const loadVideos = async () => {
-  const cachedVideos = await useBackgroundVideos()
-  backgroundVideos.value = cachedVideos.map((blob) => URL.createObjectURL(blob))
-}
-
-onMounted(() => {
-  loadVideos()
-})
+const backgroundVideos = ref(appStore.backgroundVideos)
 
 // onBeforeUnmount(() => {
 //   backgroundVideos?.value?.forEach((url) => {

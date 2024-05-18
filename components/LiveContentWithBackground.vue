@@ -8,7 +8,7 @@
       ref="video"
       v-if="slide?.backgroundType === backgroundTypes.video"
       :src="slide?.background"
-      :loop="slide?.slideStyle?.repeatVideo"
+      :loop="slide?.slideStyle?.repeatMedia"
       class="h-[100%] w-[100%] object-cover absolute inset-0"
       crossorigin="anonymous"
     ></video>

@@ -8,7 +8,7 @@
       <label class="text-xs font-semibold mb-2 block">
         Background brightness
       </label>
-      <URange v-model="brightness" size="sm" min="50" max="100" />
+      <URange v-model="brightness" size="sm" min="20" max="100" />
     </UFormGroup>
   </div>
 </template>

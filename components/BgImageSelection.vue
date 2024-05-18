@@ -29,7 +29,10 @@ defineProps<{
 const backgroundImages = [
   "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740",
   "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?q=80&w=1740",
+  "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?q=80&w=1740",
   "https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=1740",
+  "https://images.unsplash.com/photo-1509021436665-8f07dbf5bf1d?q=80&w=1740",
+  "https://images.unsplash.com/photo-1593485589800-579b43749b15?q=80&w=1740",
   "https://images.unsplash.com/photo-1478147427282-58a87a120781?q=80&w=1740",
   "https://images.unsplash.com/photo-1507874457470-272b3c8d8ee2?q=80&w=1740",
   "https://images.unsplash.com/photo-1491396023581-4344e51fec5c?q=80&w=1740",

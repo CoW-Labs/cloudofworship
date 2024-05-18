@@ -236,6 +236,17 @@ const searchedActions = computed(() => {
   })
   results = results?.map((result) => result.obj)
 
+  // Sort by showing [searchableOnly] actions last
+  results.sort((a, b) => {
+    if (a.searchableOnly && !b.searchableOnly) {
+      return 1
+    } else if (!a.searchableOnly && b.searchableOnly) {
+      return -1
+    } else {
+      return 0
+    }
+  })
+
   // If true, then show Bible types first.
   if (bibleChapterAndVerse.value) {
     results.sort((a, b) => {

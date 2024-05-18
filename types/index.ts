@@ -97,9 +97,12 @@ export interface SlideStyle {
   alignment?: string
   font?: string
   fontSize?: number // size in vw
-  fontSizePercent?: number,
+  fontSizePercent?: number
   backgroundFillType?: string
-  repeatVideo?: boolean
+  repeatMedia?: boolean
+  isMediaPlaying?: boolean
+  mediaSeekPosition?: number
+  isMediaMuted?: boolean
 }
 
 export interface AppSettings {
