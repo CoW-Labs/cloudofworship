@@ -62,7 +62,7 @@
           :is-open="settingsModalOpen"
           @close-modal="settingsModalOpen = false"
         />
-        <ChangelogModal />
+        <ChangelogModal :app-version="appVersion" />
       </div>
     </div>
   </Transition>
