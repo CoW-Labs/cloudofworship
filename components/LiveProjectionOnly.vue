@@ -133,12 +133,14 @@
 
 <script setup lang="ts">
 import type { Emitter } from "mitt"
+import { useAppStore } from "~/store/app"
 import type { Slide, SlideStyle } from "~/types"
 const appMounted = ref<boolean>(false)
 const video = ref<HTMLVideoElement | null>(null)
 const foregroundContentVisible = ref<boolean>(true)
 const isLargePreviewOpen = ref<boolean>(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
+const appStore = useAppStore()
 
 const props = defineProps<{
   slideLabel: Boolean
@@ -154,7 +156,7 @@ watch(
   () => props.slide,
   (newVal, oldVal) => {
     try {
-      if (appMounted) {
+      if (appMounted && props.slide.id === appStore.liveSlideId) {
         // console.log(video.value)
         video.value?.play()
         if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
@@ -165,9 +167,14 @@ watch(
         }
 
         // Play/pause video
+        // console.log(newVal.name, newVal.slideStyle)
         if (newVal.slideStyle?.isMediaPlaying) {
           video.value?.play()
-        } else {
+        } else if (
+          !newVal.slideStyle?.isMediaPlaying &&
+          newVal.slideStyle?.isMediaPlaying !== undefined
+        ) {
+          // console.log("triggered pause")
           video.value?.pause()
         }
 

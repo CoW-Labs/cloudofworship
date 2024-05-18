@@ -86,7 +86,6 @@ const selectedFont = computed(() => {
     })
     if (tempFontActive) {
       font.value = tempFont
-      console.log(`${tempFont}`)
       return `${tempFont}`
     }
   })

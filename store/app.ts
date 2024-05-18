@@ -31,6 +31,7 @@ export const useAppStore = defineStore('app', {
         },
         slideStyles: { blur: 0.5, brightness: 50 } as SlideStyle
       },
+      backgroundVideos: [] as string[],
       alert: null as Alert | null,
       copyrightContent: {
         'KJV': '',
@@ -71,6 +72,12 @@ export const useAppStore = defineStore('app', {
     },
     setAlert(alert: Alert | null) {
       this.alert = alert
+    },
+    setBackgroundVideos(bgVideos: string[]) {
+      this.backgroundVideos = bgVideos
+      this.settings.defaultBackground.hymn.background = bgVideos?.[0]
+      this.settings.defaultBackground.bible.background = bgVideos?.[2]
+      this.settings.defaultBackground.text.background = bgVideos?.[3]
     }
   },
   persist: {
