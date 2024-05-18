@@ -56,7 +56,8 @@ const changelog = `
 - Added text formatting for font family in text slides
 - Updated quotes formatting option for text slides
 - Add multiple media slides in one go
-- New and improved song search`
+- New and improved song search
+- Added dark mode for auth screens`
 
 const appStore = useAppStore()
 
