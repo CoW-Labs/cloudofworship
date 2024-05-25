@@ -51,13 +51,9 @@ defineProps<{
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const changelog = `
-- Updated song data
-- Added new background images
-- Added text formatting for font family in text slides
-- Updated quotes formatting option for text slides
-- Add multiple media slides in one go
-- New and improved song search
-- Added dark mode for auth screens`
+- Added full text search for songs: you can now search by artists, the actual song lyrics or even an album name.
+- You can now search for songs from quick actions home.
+- Fixed: Recurring download of assets on reload.`
 
 const appStore = useAppStore()
 

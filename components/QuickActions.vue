@@ -24,6 +24,17 @@
           ></UButton>
         </div>
 
+        <Transition name="fade-sm">
+          <NotFoundBanner
+            v-if="searchInput.length >= 4"
+            icon="i-bx-music"
+            sub="Are you looking for contemporary songs and not hymns?"
+            action="new-song-search"
+            :query="searchInput"
+            action-text="Search here"
+          />
+        </Transition>
+
         <!-- BASIC ACTIONS -->
         <div
           v-if="searchInput.length < 2"
