@@ -35,11 +35,11 @@
 </template>
 
 <script setup lang="ts">
-import kjvBible from "../public/kjv.json"
-import nkjvBible from "../public/nkjv.json"
-import nivBible from "../public/niv.json"
-import ampBible from "../public/amp.json"
-import hymns from "../public/hymns.json"
+// import kjvBible from "../public/kjv.json"
+// import nkjvBible from "../public/nkjv.json"
+// import nivBible from "../public/niv.json"
+// import ampBible from "../public/amp.json"
+// import hymns from "../public/hymns.json"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
@@ -116,37 +116,36 @@ const downloadEssentialResources = async () => {
   downloadProgress.value = 1
 
   // Download KJV Bible
-  // const kjvBible = await useS3File("kjv.json")
   if (!useNuxtApp().$kjvBible) {
+    const kjvBible = await useS3File("kjv.json")
     useNuxtApp().provide("kjvBible", kjvBible || "")
     downloadProgress.value = 2
   }
 
   // Download NKJV Bible
-  // const nkjvBible = await useS3File("nkjv.json")
   if (!useNuxtApp().$nkjvBible) {
+    const nkjvBible = await useS3File("nkjv.json")
     useNuxtApp().provide("nkjvBible", nkjvBible || "")
     downloadProgress.value = 3
   }
 
   // Download NIV Bible
-  // const nivBible = await useS3File("niv.json")
   if (!useNuxtApp().$nivBible) {
+    const nivBible = await useS3File("niv.json")
     useNuxtApp().provide("nivBible", nivBible || "")
     downloadProgress.value = 4
   }
 
   // Download AMP Bible
-  // const ampBible = await useS3File("amp.json")
   if (!useNuxtApp().$ampBible) {
+    const ampBible = await useS3File("amp.json")
     useNuxtApp().provide("ampBible", ampBible || "")
     downloadProgress.value = 5
   }
 
   // Download all hymns
-  // const hymns = await useS3File("hymns.json")
-
   if (!useNuxtApp().$hymns) {
+    const hymns = await useS3File("hymns.json")
     useNuxtApp().provide("hymns", hymns || "")
     downloadProgress.value = 6
   }
@@ -158,7 +157,7 @@ const downloadEssentialResources = async () => {
   setTimeout(() => {
     downloadProgress.value = 8
     loadingResources.value = false
-  }, 500)
+  }, 100)
 }
 
 const overrideAppSettings = () => {

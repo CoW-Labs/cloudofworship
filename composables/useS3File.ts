@@ -19,7 +19,7 @@ const useS3File = async (fileName: string) => {
 
   const response = await client.send(command)
   const str = await response.Body?.transformToString()
-  return str
+  return JSON.parse(str)
 }
 
 export default useS3File
