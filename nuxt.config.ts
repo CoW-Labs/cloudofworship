@@ -4,6 +4,48 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
+      charset: "utf-8",
+      htmlAttrs: {
+        lang: "en",
+      },
+      viewport: "initial-scale=1",
+      title: "Cloud of Worshippers - Your church's powerpoint",
+      meta: [
+        {
+          name: "description",
+          content:
+            "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worshippers is your church's power point.",
+        },
+        { name: "format-detection", content: "telephone=no" },
+        { hid: "og:type", property: "og:type", content: "website" },
+        { hid: "og-url", name: "og:url", content: "https://cloudofworshippers.com" },
+        {
+          hid: "og:image",
+          property: "og:image",
+          content: "https://revaise.s3.us-east-2.amazonaws.com/clouw-og.webp",
+        },
+        {
+          hid: "twitter:image",
+          name: "twitter:image",
+          content: "https://revaise.s3.us-east-2.amazonaws.com/clouw-og.webp",
+        },
+        {
+          hid: "twitter:domain",
+          name: "twitter:domain",
+          content: "cloudofworshippers.com",
+        },
+        {
+          hid: "twitter:description",
+          name: "twitter:description",
+          content:
+            "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worshippers is your church's power point.",
+        },
+        {
+          hid: "twitter:url",
+          name: "twitter:url",
+          content: "https://cloudofworshippers.com",
+        },
+      ],
       link: [
         {
           rel: 'manifest',
