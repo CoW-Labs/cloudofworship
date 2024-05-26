@@ -71,6 +71,9 @@ definePageMeta({
 })
 
 const authStore = useAuthStore()
+const runtimeConfig = useRuntimeConfig()
+const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
+console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()
 const email = ref("")
@@ -78,7 +81,7 @@ const password = ref("")
 const passwordType = ref("password")
 const loading = ref(false)
 const token = useCookie("token", {
-  secure: true,
+  secure: !isDevEnvironment,
   sameSite: true,
 })
 
