@@ -207,6 +207,12 @@
         :slide="slide"
         @update-style="onUpdateSlideStyle"
         @update-font="onUpdateSlideStyle({ ...slide.slideStyle, font: $event })"
+        @update-media-seek-position="
+          onUpdateMediaSeekPosition({
+            ...slide.slideStyle,
+            mediaSeekPosition: 0,
+          })
+        "
         @update-bg-fill-type="
           onUpdateSlideStyle({
             ...slide.slideStyle,
@@ -357,6 +363,14 @@ const onUpdateSlideStyle = (slideStyle: SlideStyle) => {
   }
   tempSlide.name = useSlideName(tempSlide)
   emit("slide-update", tempSlide)
+}
+
+const onUpdateMediaSeekPosition = (slideStyle: SlideStyle) => {
+  onUpdateSlideStyle(slideStyle)
+
+  setTimeout(() => {
+    onUpdateSlideStyle({ ...slideStyle, mediaSeekPosition: -1 })
+  }, 5000)
 }
 </script>
 
