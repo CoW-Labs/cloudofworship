@@ -5,15 +5,15 @@ const useS3File = async (fileName: string) => {
   const runtimeConfig = useRuntimeConfig()
 
   const client = new S3Client({
-    region: runtimeConfig.public.AWS_BUCKET_REGION,
+    region: runtimeConfig.public.CLOUD_AWS_BUCKET_REGION,
     credentials: {
-      accessKeyId: runtimeConfig.public.AWS_ACCESS_KEY_ID,
-      secretAccessKey: runtimeConfig.public.AWS_SECRET_ACCESS_KEY
+      accessKeyId: runtimeConfig.public.CLOUD_AWS_ACCESS_KEY_ID,
+      secretAccessKey: runtimeConfig.public.CLOUD_AWS_SECRET_ACCESS_KEY
     }
   })
 
   const command = new GetObjectCommand({
-    Bucket: runtimeConfig.public.AWS_BUCKET_NAME,
+    Bucket: runtimeConfig.public.CLOUD_AWS_BUCKET_NAME,
     Key: fileName
   })
 

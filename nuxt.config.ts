@@ -79,10 +79,10 @@ export default defineNuxtConfig({
     public: {
       BASE_URL: process.env.BASE_URL || 'https://worshipcloud-api-6xak8.ondigitalocean.app/api/v1',
       ASSETS_BASE_URL: process.env.ASSETS_BASE_URL || 'https://worshipcloud.favourfelix.com',
-      AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME,
-      AWS_BUCKET_REGION: process.env.AWS_BUCKET_REGION,
-      AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
-      AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY
+      AWS_BUCKET_NAME: process.env.CLOUD_AWS_BUCKET_NAME,
+      AWS_BUCKET_REGION: process.env.CLOUD_AWS_BUCKET_REGION,
+      AWS_ACCESS_KEY_ID: process.env.CLOUD_AWS_ACCESS_KEY_ID,
+      AWS_SECRET_ACCESS_KEY: process.env.CLOUD_AWS_SECRET_ACCESS_KEY
     }
   },
   modules: [
