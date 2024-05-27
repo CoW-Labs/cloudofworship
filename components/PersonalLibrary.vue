@@ -49,7 +49,7 @@
         <!-- SAVED SONGS -->
         <div
           v-if="activeLibraryTab === 0"
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-280px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)] come-up-1"
         >
           <AddSong
             v-if="page === 'add-song'"
@@ -76,7 +76,7 @@
         <!-- SAVED SLIDES -->
         <div
           v-if="activeLibraryTab === 1"
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-280px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)] come-up-1"
         >
           <EmptyState
             v-if="savedSlides?.length === 0"
@@ -97,7 +97,7 @@
         <!-- SAVED SONGS -->
         <div
           v-if="activeLibraryTab === 0"
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-280px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)] come-up-1"
         >
           <AddSong
             v-if="page === 'add-song'"
@@ -123,7 +123,7 @@
         <!-- SAVED SLIDES -->
         <div
           v-if="activeLibraryTab === 1"
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-280px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)] come-up-1"
         >
           <EmptyState
             v-if="savedSlidesSearchResults?.length === 0"

@@ -112,7 +112,12 @@
       </UTooltip>
       <UTooltip text="Restart media" :popper="{ placement: 'top' }">
         <UButton
-          @click="useGlobalEmit('media-seek', '0')"
+          @click="
+            () => {
+              useGlobalEmit('media-seek', '0')
+              $emit('update-media-seek-position')
+            }
+          "
           :class="[
             'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
           ]"

@@ -96,12 +96,12 @@ export interface SlideStyle {
   brightness?: number
   alignment?: string
   font?: string
-  fontSize?: number // size in vw
+  fontSize?: number // size in vw[viewportWidth]
   fontSizePercent?: number
   backgroundFillType?: string
   repeatMedia?: boolean
   isMediaPlaying?: boolean
-  mediaSeekPosition?: number
+  mediaSeekPosition?: number // 0 or -1, -1 means not at the beginning
   isMediaMuted?: boolean
 }
 

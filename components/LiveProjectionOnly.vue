@@ -166,6 +166,11 @@ watch(
           }, 100)
         }
 
+        // console.log(newVal.slideStyle?.mediaSeekPosition)
+        if (newVal.slideStyle?.mediaSeekPosition === 0) {
+          video.value.currentTime = newVal.slideStyle?.mediaSeekPosition
+        }
+
         // Play/pause video
         // console.log(newVal.name, newVal.slideStyle)
         if (newVal.slideStyle?.isMediaPlaying) {
@@ -198,12 +203,12 @@ onMounted(() => {
   video.value?.play()
   // } catch (err) {}
 
-  emitter.on("media-seek", (seekPosition: string) => {
-    // video.value?.fastSeek(Number(seekPosition))
-    console.log(seekPosition, video.value?.currentTime)
-    // Number(seekPosition)
-    video.value.currentTime = 0
-  })
+  // emitter.on("media-seek", (seekPosition: string) => {
+  //   // video.value?.fastSeek(Number(seekPosition))
+  //   // console.log(seekPosition, video.value?.currentTime)
+  //   // Number(seekPosition)
+  //   video.value.currentTime = 0
+  // })
 })
 
 const activateFullScreen = () => {
