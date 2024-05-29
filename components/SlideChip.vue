@@ -4,13 +4,14 @@
     :class="[getBGBySlideType(slideType)]"
   >
     <IconWrapper :name="getIconBySlideType(slideType)" size="4" />
-    {{ slideType }}
+    {{ slideType }} {{ slideSubType ? ` (${slideSubType})` : "" }}
   </p>
 </template>
 
 <script setup>
 const props = defineProps({
   slideType: String,
+  slideSubType: String,
   darkMode: Boolean,
 })
 const getIconBySlideType = (slideType) => {

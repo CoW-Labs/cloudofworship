@@ -14,7 +14,11 @@
               <h4 class="font-medium text-nowrap">
                 {{ useShortSlideName(slide, { longer: true }) }}
               </h4>
-              <SlideChip :slide-type="slide?.type" dark-mode />
+              <SlideChip
+                :slide-type="slide?.type"
+                :slide-sub-type="slide?.data?.type"
+                dark-mode
+              />
             </div>
           </TransitionGroup>
           <div class="actions flex items-center ml-6">

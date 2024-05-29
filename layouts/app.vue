@@ -253,7 +253,9 @@ const retrieveAllMediaFilesFromDB = async () => {
         })
         const fileUrl = URL.createObjectURL(blob)
         slide.data.url = fileUrl
-        slide.background = fileUrl
+        if (!slide.data?.type?.includes("audio")) {
+          slide.background = fileUrl
+        }
         appStore.setActiveSlides(slides)
       }
     }
