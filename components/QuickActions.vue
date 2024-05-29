@@ -106,45 +106,54 @@ import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { quickActionsArr } from "~/utils/constants"
 import fuzzysort from "fuzzysort"
+const db = useIndexedDB()
 
 let searchInputBeforeTwoDigitNumbers = ""
 const searchInput = ref<string>("")
 const focusedActionIndex = ref<number>(0)
+const actions = ref<any[]>([])
 const quickActions = ref<HTMLDivElement | null>(null)
 const appStore = useAppStore()
 const page = ref<string>("") // song, search
 const songSearchQuery = ref<string>("")
-const hymns = useNuxtApp().$hymns as Array<Hymn>
+const hymns = ref<Hymn[]>([])
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const libraryPage = ref<string>("")
 
-const actions = quickActionsArr.concat(
-  bibleBooks?.map((book, index) => {
-    const bibleBookIndex = index + 1 // Does not start from 0, starts from 1
-    return {
-      icon: "i-bx-bible",
-      name: `${book}`,
-      desc: `Open the book of ${book}`,
-      action: "new-bible",
-      meta: `${book} 0:0 1:1 2:2 3:3 4:4 5:5 6:6 7:7 8:8 9:9 10:10 -`,
-      searchableOnly: true,
-      bibleBookIndex,
-      type: slideTypes.bible,
-    }
-  }),
-  hymns?.map((hymn: Hymn) => {
-    return {
-      icon: "i-bx-church",
-      name: `${hymn.title}`,
-      desc: `verse and chorus included`,
-      action: "new-hymn",
-      meta: `hymn ${hymn.meta}`,
-      searchableOnly: true,
-      hymnIndex: hymn.number,
-      type: slideTypes.hymn,
-    }
-  })
-)
+const getAllHymns = async () => {
+  const allHymns = await db.bibleAndHymns.get("hymns")
+  hymns.value = allHymns?.data as unknown as Hymn[]
+
+  actions.value = quickActionsArr.concat(
+    bibleBooks?.map((book, index) => {
+      const bibleBookIndex = index + 1 // Does not start from 0, starts from 1
+      return {
+        icon: "i-bx-bible",
+        name: `${book}`,
+        desc: `Open the book of ${book}`,
+        action: "new-bible",
+        meta: `${book} 0:0 1:1 2:2 3:3 4:4 5:5 6:6 7:7 8:8 9:9 10:10 -`,
+        searchableOnly: true,
+        bibleBookIndex,
+        type: slideTypes.bible,
+      }
+    }),
+    hymns.value?.map((hymn: Hymn) => {
+      return {
+        icon: "i-bx-church",
+        name: `${hymn.title}`,
+        desc: `verse and chorus included`,
+        action: "new-hymn",
+        meta: `hymn ${hymn.meta}`,
+        searchableOnly: true,
+        hymnIndex: hymn.number,
+        type: slideTypes.hymn,
+      }
+    })
+  )
+}
+
+getAllHymns()
 
 emitter.on("new-song", ({ fromSaved }) => {
   if (!fromSaved) {
@@ -242,7 +251,7 @@ const searchedActions = computed(() => {
       ? searchInputBeforeTwoDigitNumbers
       : searchInputBeforeTwoDigitNumbers?.substring(0, colonIndex)
 
-  let results = fuzzysort.go(searchInputBeforeColon, actions, {
+  let results = fuzzysort.go(searchInputBeforeColon, actions.value, {
     keys: ["name", "desc", "meta"],
   })
   results = results?.map((result) => result.obj)

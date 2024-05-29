@@ -133,15 +133,15 @@ emitter.on("new-text", (slide: Slide) => {
   createNewSlide(slide)
 })
 
-emitter.on("new-bible", (data: string) => {
-  const scripture = useScripture(data)
+emitter.on("new-bible", async (data: string) => {
+  const scripture = await useScripture(data)
   if (scripture) {
     createNewBibleSlide(scripture)
   }
 })
 
-emitter.on("new-hymn", (data: string) => {
-  const hymn = useHymn(data)
+emitter.on("new-hymn", async (data: string) => {
+  const hymn = await useHymn(data)
   if (hymn) {
     createNewHymnSlide(hymn)
   }
@@ -431,7 +431,7 @@ const gotoAction = (title: string, version: string) => {
   }
 }
 
-const gotoScripture = (title: string, version: string) => {
+const gotoScripture = async (title: string, version: string) => {
   // Check that [title] is not abbreviated or in short form
   // If it is, replace to long/unabbreviated form
   let bibleBook = title.substring(0, title?.lastIndexOf(" "))
@@ -451,7 +451,7 @@ const gotoScripture = (title: string, version: string) => {
   }:${scriptureSplitted?.[2]}`
   const scriptureShortLabel = `${scriptureSplitted?.[0]}:${scriptureSplitted?.[1]}:${scriptureSplitted?.[2]}`
 
-  const scripture = useScripture(scriptureShortLabel, version)
+  const scripture = await useScripture(scriptureShortLabel, version)
   if (scripture) {
     // Calculate font-size of scripture content
     tempSlide.title = scriptureLabel

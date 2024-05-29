@@ -56,6 +56,8 @@ const props = defineProps<{
   verse: string
 }>()
 
+const allChapterVerses = ref<any[]>()
+
 // Return connected Hymn / Song object related
 const relatedData = computed(() => {
   switch (props.slide?.type) {
@@ -71,10 +73,19 @@ const relatedData = computed(() => {
 
 const bibleChapter = computed(() => props.verse?.split(":")?.[0])
 
-const allChapterVerses = () => {
-  const chapter = useScriptureChapter(props.verse)
-  return chapter?.content
+const getAllChapterVerses = async () => {
+  const chapter = await useScriptureChapter(props.verse)
+  allChapterVerses.value = chapter?.content
 }
+
+watch(
+  bibleChapter,
+  () => {
+    console.log("updated bible chapter")
+    getAllChapterVerses()
+  },
+  { immediate: true }
+)
 
 // Return bible verses in proximity to currentVerse
 const nearBibleVerses = computed(() => {
@@ -82,13 +93,13 @@ const nearBibleVerses = computed(() => {
     const verseLineup: Scripture[] = []
     const currentVerse = Number(props.verse?.split(":")?.[1])
     const verseNumbers = getNumberRange(currentVerse)
-    const chapterVerses = allChapterVerses()
 
     verseNumbers?.forEach((n) => {
-      if (chapterVerses?.[n]) {
-        verseLineup.push(chapterVerses?.[n])
+      if (allChapterVerses.value?.[n]) {
+        verseLineup.push(allChapterVerses.value?.[n])
       }
     })
+    console.log("triggered", verseLineup)
 
     return verseLineup
   }

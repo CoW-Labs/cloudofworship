@@ -1,8 +1,9 @@
-import { Hymn } from '~/types'
+import type { Hymn } from '~/types'
 
-const useHymn = (number: string): Hymn | null => {
-  const nuxtApp = useNuxtApp()
-  const hymns = nuxtApp.$hymns as Array<Hymn>
+const useHymn = async (number: string): Promise<Hymn | null> => {
+  const db = useIndexedDB()
+  let hymns: any = await db.bibleAndHymns.get('hymns')
+  hymns = hymns?.data as unknown as Hymn[]
   const toast = useToast()
 
   try {

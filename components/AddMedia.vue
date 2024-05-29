@@ -19,7 +19,7 @@
       <input
         type="file"
         class="invisible"
-        accept="video/*,image/*"
+        accept="video/*,image/*,audio/*"
         multiple
         @change="files = $event.target?.files"
       />

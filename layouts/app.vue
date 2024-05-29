@@ -111,42 +111,56 @@ const saveAllBackgroundVideos = async () => {
   // })
 }
 
+const tempBibleVersion = (version: string, data: any) => ({
+  id: version,
+  data,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+})
+
 const downloadEssentialResources = async () => {
+  const db = useIndexedDB()
+
   loadingResources.value = true
   downloadProgress.value = 1
 
   // Download KJV Bible
-  if (!useNuxtApp().$kjvBible) {
+  let tempBible = await db.bibleAndHymns.get("KJV")
+  if (!tempBible) {
     const kjvBible = await useS3File("kjv.json")
-    useNuxtApp().provide("kjvBible", kjvBible || "")
+    db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
     downloadProgress.value = 2
   }
 
   // Download NKJV Bible
-  if (!useNuxtApp().$nkjvBible) {
+  tempBible = await db.bibleAndHymns.get("NKJV")
+  if (!tempBible) {
     const nkjvBible = await useS3File("nkjv.json")
-    useNuxtApp().provide("nkjvBible", nkjvBible || "")
+    db.bibleAndHymns.add(tempBibleVersion("NKJV", nkjvBible))
     downloadProgress.value = 3
   }
 
   // Download NIV Bible
-  if (!useNuxtApp().$nivBible) {
+  tempBible = await db.bibleAndHymns.get("NIV")
+  if (!tempBible) {
     const nivBible = await useS3File("niv.json")
-    useNuxtApp().provide("nivBible", nivBible || "")
+    db.bibleAndHymns.add(tempBibleVersion("NIV", nivBible))
     downloadProgress.value = 4
   }
 
   // Download AMP Bible
-  if (!useNuxtApp().$ampBible) {
+  tempBible = await db.bibleAndHymns.get("AMP")
+  if (!tempBible) {
     const ampBible = await useS3File("amp.json")
-    useNuxtApp().provide("ampBible", ampBible || "")
+    db.bibleAndHymns.add(tempBibleVersion("AMP", ampBible))
     downloadProgress.value = 5
   }
 
   // Download all hymns
-  if (!useNuxtApp().$hymns) {
+  tempBible = await db.bibleAndHymns.get("hymns")
+  if (!tempBible) {
     const hymns = await useS3File("hymns.json")
-    useNuxtApp().provide("hymns", hymns || "")
+    db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
     downloadProgress.value = 6
   }
 
