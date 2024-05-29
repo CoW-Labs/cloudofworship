@@ -1,32 +1,55 @@
 <template>
-  <div class="bg-image-selection p-2 gap-2 grid grid-cols-4">
-    <UButton
-      v-for="image in backgroundImages"
-      :key="image"
-      @click="$emit('select', image)"
-      class="w-[40px] h-[40px] p-0 text-black bg-cover transition-all overflow-hidden relative"
-    >
-      <div
-        class="bg-image min-w-[40px] h-[40px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
-        :class="{ 'opacity-30': image === value }"
-        :style="`background-image: url(${image})`"
-      ></div>
-      <IconWrapper
-        v-if="image === value"
-        name="i-bx-check"
-        size="5"
-        :rounded-bg="true"
-        class="absolute text-primary-500 scale-50 bottom-2 right-2"
+  <div class="bg-image-selection-ctn p-2">
+    <div class="bg-image-selection gap-2 grid grid-cols-4">
+      <UButton
+        v-for="image in backgroundImages"
+        :key="image"
+        @click="$emit('select', image)"
+        class="w-[40px] h-[40px] p-0 text-black bg-cover transition-all overflow-hidden relative"
+      >
+        <div
+          class="bg-image min-w-[40px] h-[40px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
+          :class="{ 'opacity-30': image === value }"
+          :style="`background-image: url(${image})`"
+        ></div>
+        <IconWrapper
+          v-if="image === value"
+          name="i-bx-check"
+          size="5"
+          :rounded-bg="true"
+          class="absolute text-primary-500 scale-50 bottom-2 right-2"
+        />
+      </UButton>
+    </div>
+  </div>
+  <div class="button-ctn p-2 pt-0">
+    <label class="relative">
+      <input
+        type="file"
+        name=""
+        id=""
+        class="absolute inset-0 opacity-0 cursor-pointer"
+        accept="image/*"
+        @change="saveAndSelectImage($event.target?.files?.[0])"
       />
-    </UButton>
+      <UButton class="z-1" block variant="outline" icon="i-bx-plus" size="xs"
+        >Add from device</UButton
+      >
+    </label>
   </div>
 </template>
 
 <script setup lang="ts">
+import type { Media } from "~/types"
+
 defineProps<{
   value: string
 }>()
-const backgroundImages = [
+
+const emit = defineEmits(["select"])
+
+const bgImageToBeSelected = ref<string | null>(null)
+const backgroundImages = ref<string[]>([
   "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740",
   "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?q=80&w=1740",
   "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?q=80&w=1740",
@@ -43,5 +66,41 @@ const backgroundImages = [
   "https://images.unsplash.com/photo-1523821741446-edb2b68bb7a0?q=80&w=1740",
   "https://images.unsplash.com/photo-1597773150796-e5c14ebecbf5?q=80&w=1740",
   "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1740",
-]
+])
+
+const getAllLocallySavedImages = async () => {
+  const db = useIndexedDB()
+  const images = await db.cached.where({ content: "image" }).toArray()
+
+  // console.log(images.reverse())
+
+  // Create Object URLs from locally saved images
+  const imageURLs: string[] = []
+  images.forEach((image) => {
+    const blobURL = URL.createObjectURL(image.data as unknown as Blob)
+    imageURLs.push(blobURL)
+    if (image.id === bgImageToBeSelected.value) {
+      bgImageToBeSelected.value = blobURL
+    }
+  })
+  backgroundImages.value = backgroundImages.value.concat(imageURLs)
+}
+
+const saveAndSelectImage = async (file: any) => {
+  const db = useIndexedDB()
+  const randomId = useID(6)
+  const tempMedia: Media = {
+    id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
+    data: file,
+    content: "image",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+  db.cached.add(tempMedia)
+  bgImageToBeSelected.value = tempMedia.id
+  await getAllLocallySavedImages()
+  emit("select", bgImageToBeSelected.value)
+}
+
+getAllLocallySavedImages()
 </script>
