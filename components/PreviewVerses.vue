@@ -81,7 +81,6 @@ const getAllChapterVerses = async () => {
 watch(
   bibleChapter,
   () => {
-    console.log("updated bible chapter")
     getAllChapterVerses()
   },
   { immediate: true }
@@ -99,7 +98,6 @@ const nearBibleVerses = computed(() => {
         verseLineup.push(allChapterVerses.value?.[n])
       }
     })
-    console.log("triggered", verseLineup)
 
     return verseLineup
   }

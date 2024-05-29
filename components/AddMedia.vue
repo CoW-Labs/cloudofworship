@@ -9,7 +9,7 @@
         class="py-4"
         rounded-bg
       ></IconWrapper>
-      <h4 class="text-md mt-4 font-medium">Add image or video slides</h4>
+      <h4 class="text-md mt-4 font-medium">Add image, video or audio slides</h4>
       <div
         class="text-center max-w-[150px] mx-auto px-4 py-1 mt-4 bg-primary-500 rounded-md flex items-center text-white cursor-pointer gap-1"
       >
@@ -32,7 +32,11 @@
         class="bg-primary-100 dark:bg-primary-900 rounded-md p-4 py-2 text-md font-semibold capitalize mb-2"
       >
         Media Preview
-        <span class="font-normal">({{ fileObjs?.length }} images/videos)</span>
+        <span class="font-normal"
+          >({{ fileObjs?.length }} file{{
+            fileObjs?.length > 1 ? "s" : ""
+          }})</span
+        >
       </h3>
       <Transition name="fade-sm">
         <div
@@ -51,6 +55,14 @@
               alt="previewed slide image"
               class="rounded-md max-h-[40vh] 2xl:max-h-[100%] bg-primary-950"
             />
+            <audio
+              v-if="fileObj?.type === 'audio'"
+              alt="previewed slide image"
+              controls
+              class="max-h-[40vh] 2xl:max-h-[100%] w-[100%]"
+            >
+              <source :src="fileObj.url" type="audio/mp3" />
+            </audio>
             <video
               v-else
               :src="fileObj.url"

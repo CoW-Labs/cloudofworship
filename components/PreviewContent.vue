@@ -379,9 +379,12 @@ const createNewMediaSlide = async (
     })
   }
 
+  const randomImage =
+    "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740"
   tempSlide.type = slideTypes.media
-  tempSlide.backgroundType = file.type
-  tempSlide.background = file.url
+  tempSlide.slideStyle.backgroundFillType = backgroundFillTypes.crop
+  tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
+  tempSlide.background = file.type === "audio" ? randomImage : file.url
   tempSlide.data = file
   tempSlide.name = useSlideName(tempSlide)
 

@@ -50,7 +50,9 @@
     <!-- VIDEO MEDIA SLIDE OPTIONS -->
     <template
       v-if="
-        slide?.type === slideTypes.media && slide?.data?.type?.includes('video')
+        slide?.type === slideTypes.media &&
+        (slide?.data?.type?.includes('video') ||
+          slide?.data?.type?.includes('audio'))
       "
     >
       <UTooltip text="Mute/Unmute media" :popper="{ placement: 'top' }">

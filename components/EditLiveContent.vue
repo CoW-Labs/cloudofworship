@@ -119,7 +119,11 @@
               </template>
             </UPopover>
             <div
-              v-show="slide?.type !== slideTypes.media"
+              v-show="
+                slide?.type !== slideTypes.media ||
+                (slide?.type === slideTypes.media &&
+                  slide?.data?.type?.includes('audio'))
+              "
               class="button-group flex rounded-md mx-1 p-1"
               :class="{
                 'bg-primary-200 dark:bg-primary-900':
@@ -155,7 +159,10 @@
                   />
                 </template>
               </UPopover>
-              <UPopover v-model:open="bgVideoPopoverOpen">
+              <UPopover
+                v-if="!slide?.data?.type?.includes('audio')"
+                v-model:open="bgVideoPopoverOpen"
+              >
                 <UTooltip text="Add background video" :popper="{ arrow: true }">
                   <UButton
                     variant="ghost"

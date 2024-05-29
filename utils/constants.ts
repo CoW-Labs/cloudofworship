@@ -60,7 +60,7 @@ export const quickActionsArr = [
   {
     icon: "i-bx-image",
     name: "Add Media",
-    desc: "Display video or image media",
+    desc: "Display image, video or audio media",
     action: "new-media",
     meta: "",
     type: slideTypes.media,

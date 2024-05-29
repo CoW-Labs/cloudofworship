@@ -19,6 +19,19 @@
       @dblclick="activateFullScreen()"
       :style="useSlideBackground(slide)"
     >
+      <!-- AUDIO BACKGROUND -->
+      <audio
+        ref="video"
+        v-if="slide?.data?.type?.includes('audio')"
+        :src="slide?.data?.url"
+        autoplay
+        :loop="
+          slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
+        "
+        :muted="fullScreen ? slide?.slideStyle?.isMediaMuted : true"
+        playsinline="true"
+        crossorigin="anonymous"
+      ></audio>
       <!-- VIDEO BACKGROUND -->
       <video
         ref="video"
