@@ -71,7 +71,7 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
-import type { Hymn, Scripture, Slide, Song } from "~/types"
+import type { Hymn, Scripture, Slide, Song, Countdown } from "~/types"
 const appStore = useAppStore()
 const toast = useToast()
 
@@ -84,6 +84,8 @@ const bulkActionLabel = ref<string>("Select Slides")
 const bulkActionIcon = ref<string>("")
 const bulkSelectSlides = ref<boolean>(false)
 const bulkSelectedSlides = ref<string[]>([])
+const activeCountdownInterval = ref<any>(null)
+const countdownTimeLeft = ref<number>(0)
 
 watch(
   slides,
@@ -109,7 +111,6 @@ watch(activeSlides, () => {
 
 const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
   activeSlide.value = slide
-
   if (goLive) {
     appStore.setActiveSlides(slides.value)
     appStore.setLiveSlide(activeSlide.value.id)
@@ -175,6 +176,24 @@ emitter.on("new-active-slide", (data: Slide) => {
   }
 })
 
+emitter.on("new-countdown", (data: Countdown) => {
+  if (data) {
+    createNewCountdownSlide(data)
+  }
+})
+
+// This can start and temporarily pause a countdown
+emitter.on("start-countdown", (data: Slide) => {
+  startCountdown(data)
+})
+
+emitter.on("restart-countdown", (data: Slide) => {
+  const countdown = data?.data as Countdown
+  if (countdown?.time) {
+    startCountdown(data, true)
+  }
+})
+
 emitter.on("select-slides", () => {
   if (bulkActionLabel.value === "Select Slides") {
     bulkSelectSlides.value = !bulkSelectSlides.value
@@ -234,6 +253,14 @@ const createNewSlide = (duplicateSlide?: Slide) => {
 
 const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   const tempSlide = appStore.activeSlides.find((s) => s.id === slideId)
+
+  // Clear interval if slide is a countdown slide before deleting
+  if (tempSlide?.type === slideTypes.countdown) {
+    console.log("clearing interval", activeCountdownInterval.value)
+    clearInterval(activeCountdownInterval.value)
+    countdownTimeLeft.value = 0
+  }
+
   const slideIndex = slides.value.findIndex((s) => s.id === slideId)
   slides.value.splice(slideIndex, 1)
   appStore.setActiveSlides(slides.value)
@@ -263,6 +290,10 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 }
 
 const onUpdateSlide = (slide: Slide) => {
+  // Always pause countdown slide before updating it
+  if (slide.type === slideTypes.countdown) {
+    useGlobalEmit("start-countdown", slide)
+  }
   makeSlideActive(slide)
   const slideIndex = slides.value?.findIndex(
     (slideInner: Slide) => slide.id === slideInner.id
@@ -270,6 +301,10 @@ const onUpdateSlide = (slide: Slide) => {
   slides.value?.splice(slideIndex || 0, 1, slide)
 
   updateLiveOutput(slide)
+  // when updating of countdown slide is done, continue timer
+  if (slide.type === slideTypes.countdown) {
+    useGlobalEmit("start-countdown", slide)
+  }
 }
 
 const createNewBibleSlide = (scripture: Scripture) => {
@@ -406,6 +441,119 @@ const createMultipleNewMediaSlides = async (files: any[]) => {
   await Promise.all(multipleSlidesPromise)
   useGlobalEmit("app-loading", false)
   toast.add({ title: "Media slides created", icon: "i-bx-image" })
+}
+
+const removeExistingCountdownSlides = () => {
+  const tempSlides = slides.value?.filter(
+    (slide) => slide.type !== slideTypes.countdown
+  )
+  slides.value = tempSlides
+}
+
+/**
+ * This function updates any countdown slide that has been previously created rather than creating a new one
+ * @param countdown
+ */
+const createNewCountdownSlide = (countdown: Countdown) => {
+  console.log(activeSlide.value)
+  // Only one countdown slide can be active, clear any active interval
+  removeExistingCountdownSlides()
+  clearInterval(activeCountdownInterval.value)
+  countdownTimeLeft.value = 0
+
+  const tempSlide = { ...preSlideCreation() }
+  tempSlide.layout = slideLayoutTypes.countdown
+  tempSlide.type = slideTypes.countdown
+  tempSlide.background = appStore.settings.defaultBackground.hymn.background
+  tempSlide.backgroundType =
+    appStore.settings.defaultBackground.hymn.backgroundType
+  ;(tempSlide.data = countdown),
+    (tempSlide.name = `${countdown.time?.replace("00:", "")}`)
+  tempSlide.contents = useSlideContent(tempSlide, countdown)
+
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: 17.5,
+    alignment: "center",
+    font: appStore.settings.defaultFont,
+  }
+
+  slides.value?.push(tempSlide)
+
+  // Take slide live if current active slide is a countdown
+  if (activeSlide.value?.type === slideTypes.countdown) {
+    makeSlideActive(tempSlide, true)
+  }
+  toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
+}
+
+const updateCountdownSlide = (
+  slide: Slide,
+  timeRemaining: number,
+  isPlaying: boolean = true
+) => {
+  const tempSlide = { ...slide }
+  const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
+  tempSlide.data = {
+    ...tempSlide.data,
+    timeLeft: useMilliToTimeString(timeRemaining),
+  }
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    isMediaPlaying: isPlaying,
+  }
+  // console.log("tempSlide", tempSlide.data)
+  tempSlide.contents = useSlideContent(tempSlide, tempSlide?.data!!)
+  // activeSlide.value = tempSlide
+  slides.value.splice(slideIndex, 1, tempSlide)
+  updateLiveOutput(tempSlide)
+}
+
+const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
+  const countdown = slide?.data as Countdown
+  if (countdown?.time) {
+    const countdownTimeout = useTimeStringToMilli(
+      restartCountdown ? slide.data?.time : slide.data?.timeLeft
+    )
+    if (activeCountdownInterval.value === null || restartCountdown) {
+      // console.log("play or restart")
+      if (restartCountdown) {
+        clearInterval(activeCountdownInterval.value)
+        countdownTimeLeft.value = countdownTimeout
+      } else {
+        countdownTimeLeft.value =
+          countdownTimeLeft.value === 0
+            ? countdownTimeout
+            : countdownTimeLeft.value
+      }
+      const countdownInterval = setInterval(() => {
+        // console.log("1 second gone", countdownTimeLeft.value)
+        if (countdownTimeLeft.value - 1000 < 1000) {
+          countdownTimeLeft.value = 0
+          clearInterval(activeCountdownInterval.value)
+        } else {
+          countdownTimeLeft.value = countdownTimeLeft.value - 1000
+        }
+
+        updateCountdownSlide(slide, countdownTimeLeft.value)
+        activeCountdownInterval.value = countdownInterval
+      }, 1000)
+      activeCountdownInterval.value = countdownInterval
+
+      setTimeout(() => {
+        clearInterval(countdownInterval)
+        activeCountdownInterval.value = null
+        updateCountdownSlide(slide, countdownTimeLeft.value, false)
+      }, countdownTimeout)
+    } else {
+      const countdownTimeout = useTimeStringToMilli(slide.data?.timeLeft)
+      console.log("reached pause section", activeCountdownInterval.value)
+      console.log("reached pause section", countdownTimeLeft.value)
+      clearInterval(activeCountdownInterval.value)
+      activeCountdownInterval.value = null
+      updateCountdownSlide(slide, countdownTimeLeft.value, false)
+    }
+  }
 }
 
 const updateLiveOutput = (updatedSlide: Slide) => {

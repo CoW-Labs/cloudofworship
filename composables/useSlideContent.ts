@@ -1,5 +1,5 @@
 import { useAppStore } from "~/store/app"
-import type { Hymn, Scripture, Slide, Song } from "~/types/index"
+import type { Countdown, Hymn, Scripture, Slide, Song } from "~/types/index"
 
 /**
  * 
@@ -8,7 +8,7 @@ import type { Hymn, Scripture, Slide, Song } from "~/types/index"
  * @param nextVerse 
  * @returns 
  */
-const useSlideContent = (slide: Slide, data: Scripture | Hymn | Song, nextVerse: string = '') => {
+const useSlideContent = (slide: Slide, data: Scripture | Hymn | Song | Countdown, nextVerse: string = '') => {
   const appStore = useAppStore()
 
   // Remove unwanted sequences from string
@@ -34,6 +34,13 @@ const useSlideContent = (slide: Slide, data: Scripture | Hymn | Song, nextVerse:
       return [
         `<p class="song-content">${nextVerse?.replaceAll("\n", '<br class="mt-3">')}</>`,
         `<p class="song-label"><b>${data?.title}</b> • ${data.artist}</p>`,
+      ]
+    case slideTypes.countdown:
+      data = data as Countdown
+      return [
+        `<p class="countdown-label" style="line-height: 0;">${data?.content}</p>`,
+        `<p class="countdown-content opacity-75 leading-[1]">${data?.timeLeft?.replace('00:', '')}</>`,
+        // <p class="copyright-content">${appStore.copyrightContent[data?.version]}</p>`,
       ]
   }
 

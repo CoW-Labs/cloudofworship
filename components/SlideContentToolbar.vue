@@ -178,6 +178,35 @@
         />
       </UTooltip>
     </div>
+    <!-- COUNTDOWN SLIDE CONTROLS -->
+    <div
+      v-if="slide?.type === slideTypes.countdown"
+      class="button-group bg-primary-100 dark:bg-primary-900 rounded-md mx-1 p-1 h-[36px] mt-[2px] flex items-center gap-1"
+    >
+      <UTooltip text="Start/pause countdown" :popper="{ placement: 'top' }">
+        <UButton
+          @click="useGlobalEmit('start-countdown', slide)"
+          :class="[
+            'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
+          ]"
+          variant="ghost"
+        >
+          <IconWrapper size="5" name="i-tabler-play" />
+          /
+          <IconWrapper size="5" name="i-tabler-pause" />
+        </UButton>
+      </UTooltip>
+      <UTooltip text="Restart countdown" :popper="{ placement: 'top' }">
+        <UButton
+          @click="useGlobalEmit('restart-countdown', slide)"
+          :class="[
+            'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
+          ]"
+          icon="i-tabler-refresh"
+          variant="ghost"
+        />
+      </UTooltip>
+    </div>
     <div
       v-if="slide?.type !== slideTypes?.media"
       class="button-group rounded-md p-1 flex items-center gap-1"

@@ -10,7 +10,7 @@ export interface Slide {
   title?: string // For hymn and song titles, also for scripture labels (e.g Ephesians 3:1)
   songId?: string // only for hymns/songs, could be [hymn.number] or [song.id]
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
-  data?: Song | Scripture | Hymn // for song/bible/hymn/file, Object mapped to Slide only on client
+  data?: Song | Scripture | Hymn | Countdown // for song/bible/hymn/file, Object mapped to Slide only on client
   slideStyle?: SlideStyle,
   createdAt?: string,
   updatedAt?: string
@@ -23,6 +23,14 @@ export interface Alert {
   style: string
   background: string
   // position: string // top, bottom
+}
+
+export interface Countdown {
+  id: string
+  time: string
+  timeLeft: string
+  content: string
+  // style: string
 }
 
 export interface QuickAction {
@@ -100,7 +108,7 @@ export interface SlideStyle {
   fontSizePercent?: number
   backgroundFillType?: string
   repeatMedia?: boolean
-  isMediaPlaying?: boolean
+  isMediaPlaying?: boolean // also used to check if countdown is paused or is beginning
   mediaSeekPosition?: number // 0 or -1, -1 means not at the beginning
   isMediaMuted?: boolean
 }

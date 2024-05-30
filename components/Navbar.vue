@@ -8,10 +8,10 @@
         <Logo class="w-[32px]" />
         <h1 class="text-md font-semibold">Cloud of Worshippers</h1>
         <UButton
-          class="version-chip flex text-xs font-semibold bg-primary-500 p-2 py-1 rounded-full border border-primary-500 hover:border-primary-900 transition-all"
+          class="version-chip flex text-xs font-semibold bg-primary-200 p-2 py-1 rounded-full border border-transparent hover:bg-primary-300 hover:border-primary-900 transition-all text-primary-900"
           @click="useGlobalEmit('show-changelog')"
         >
-          v{{ appVersion }}
+          Beta v{{ appVersion }}
         </UButton>
       </div>
       <div class="actions text-sm flex gap-2 items-center">

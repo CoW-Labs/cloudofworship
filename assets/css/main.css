@@ -398,6 +398,9 @@ body {
 .tiptap.live-content .song-content {
   font-weight: 600;
 }
+.tiptap.live-content .countdown-content {
+  font-weight: 600;
+}
 .tiptap.live-content:focus-within {
   outline-color: #e9d5ff;
 }
@@ -508,12 +511,18 @@ body {
   font-size: 1.5vw;
 }
 
+.tiptap.live-content .countdown-label {
+  margin-top: 5%;
+  font-size: 3vw;
+}
+
 .tiptap.live-content .copyright-content {
   font-size: 1vw;
   margin-top: 1%;
   max-width: 50%;
   color: #ffffff80;
 }
+
 .center-live-content .copyright-content {
   margin-right: auto;
   margin-left: auto;
@@ -536,12 +545,14 @@ body {
   line-height: 1.1vw;
 }
 .lg-preview .tiptap.live-content .scripture-content,
+.lg-preview .tiptap.live-content .countdown-content,
 .lg-preview .tiptap.live-content .song-content {
   font-size: 0.8vw !important;
   line-height: 1.1vw !important;
 }
 
 .lg-preview .tiptap.live-content .scripture-label,
+.lg-preview .tiptap.live-content .countdown-label,
 .lg-preview .tiptap.live-content .song-label {
   font-size: 0.5vw;
 }
@@ -593,6 +604,7 @@ body {
 }
 
 .md-preview .tiptap.live-content .scripture-label,
+.md-preview .tiptap.live-content .countdown-label,
 .md-preview .tiptap.live-content .song-label {
   font-size: 0.15vw;
 }
@@ -603,6 +615,7 @@ body {
 }
 
 .md-preview .tiptap.live-content .scripture-content,
+.md-preview .tiptap.live-content .countdown-content,
 .md-preview .tiptap.live-content .song-content {
   font-size: 0.4vw !important;
   line-height: 0.6vw !important;
@@ -646,12 +659,14 @@ body {
 }
 
 .sm-preview .tiptap.live-content .scripture-content,
+.sm-preview .tiptap.live-content .countdown-content,
 .sm-preview .tiptap.live-content .song-content {
   font-size: 0.2vw !important;
   line-height: 0.3vw !important;
 }
 
 .sm-preview .tiptap.live-content .scripture-label,
+.sm-preview .tiptap.live-content .countdown-label,
 .sm-preview .tiptap.live-content .song-label {
   font-size: 0.2vw;
 }

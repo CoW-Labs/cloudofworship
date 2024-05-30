@@ -108,7 +108,6 @@ const fileObjs = computed(() => {
   const tempArr: any[] = []
   files.value?.forEach((file: any) => {
     if (file) {
-      console.log(file)
       tempArr.push({
         blob: file,
         name: file?.name,

@@ -96,6 +96,9 @@
 
       <!-- LIBRARY SECTION-->
       <AddAlert v-else-if="page === 'alert'" @close="page = ''" />
+
+      <!-- COUNTDOWN SECTION-->
+      <AddCountdown v-else-if="page === 'countdown'" @close="page = ''" />
     </Transition>
   </AppSection>
 </template>
@@ -201,6 +204,10 @@ emitter.on("remove-alert", () => {
 emitter.on("add-song", () => {
   libraryPage.value = "add-song"
   page.value = "library"
+})
+
+emitter.on("new-countdown", () => {
+  page.value = "countdown"
 })
 
 onMounted(() => {

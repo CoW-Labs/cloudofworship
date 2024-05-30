@@ -30,6 +30,8 @@ const getIconBySlideType = (slideType) => {
       return "i-bx-image"
     case slideTypes.carousel:
       return "i-bx-carousel"
+    case slideTypes.countdown:
+      return "i-bx-time"
   }
   return ""
 }
@@ -60,6 +62,11 @@ const getBGBySlideType = (slideType) => {
         return "bg-orange-700 text-orange-100"
       }
       return "bg-orange-100 border border-orange-500 text-orange-700"
+    case slideTypes.countdown:
+      if (props.darkMode) {
+        return "bg-gray-700 text-gray-100"
+      }
+      return "bg-gray-100 border border-gray-500 text-gray-700"
   }
   return ""
 }

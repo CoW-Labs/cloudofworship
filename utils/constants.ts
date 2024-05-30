@@ -6,6 +6,7 @@ export const slideTypes = {
   media: 'media',
   sermon: 'sermon',
   carousel: 'carousel',
+  countdown: 'countdown',
 }
 
 export const libraryTypes = {
@@ -106,11 +107,11 @@ export const quickActionsArr = [
   {
     icon: "i-bx-time",
     name: "Add Countdown Timer",
-    desc: "Find scriptures with familiar words",
-    action: "new-timer",
+    desc: "Engage your church with countdown",
+    action: "new-countdown",
     meta: "",
-    unreleased: true,
-    type: slideTypes.text,
+    type: slideTypes.countdown,
+    // unreleased: true,
   },
   {
     icon: "i-ph-file-ppt",
@@ -155,6 +156,7 @@ export const slideLayoutTypes = {
   full_text: 'full-text',
   two_column: 'two-column',
   bible: 'bible',
+  countdown: 'countdown',
   empty: 'empty',
 }
 

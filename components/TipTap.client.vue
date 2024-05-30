@@ -49,6 +49,21 @@
     />
     <TiptapEditorContent :editor="uneditableEditorTwo" />
   </div>
+  <div
+    v-else-if="slide?.layout === slideLayoutTypes.countdown"
+    class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
+    :class="{
+      'center-live-content': slide?.slideStyle?.alignment === 'center',
+      'left-live-content': slide?.slideStyle?.alignment === 'left',
+      'right-live-content': slide?.slideStyle?.alignment === 'right',
+    }"
+  >
+    <TiptapEditorContent :editor="uneditableEditorOne" class="jost" />
+    <TiptapEditorContent
+      :editor="uneditableEditorTwo"
+      :class="useURLFriendlyString(slide?.slideStyle?.font || '')"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
