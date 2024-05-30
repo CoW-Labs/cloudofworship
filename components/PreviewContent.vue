@@ -141,6 +141,13 @@ emitter.on("new-bible", async (data: string) => {
   }
 })
 
+emitter.on("new-bible-whole-search", async (data: string) => {
+  const scripture = await useScripture(data)
+  if (scripture) {
+    createNewBibleSlide(scripture, { fromWholeBibleSearch: true })
+  }
+})
+
 emitter.on("new-hymn", async (data: string) => {
   const hymn = await useHymn(data)
   if (hymn) {
@@ -256,7 +263,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
   // Clear interval if slide is a countdown slide before deleting
   if (tempSlide?.type === slideTypes.countdown) {
-    console.log("clearing interval", activeCountdownInterval.value)
+    // console.log("clearing interval", activeCountdownInterval.value)
     clearInterval(activeCountdownInterval.value)
     countdownTimeLeft.value = 0
   }
@@ -307,7 +314,10 @@ const onUpdateSlide = (slide: Slide) => {
   }
 }
 
-const createNewBibleSlide = (scripture: Scripture) => {
+const createNewBibleSlide = (
+  scripture: Scripture,
+  options?: { fromWholeBibleSearch: boolean }
+) => {
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.bible
@@ -327,7 +337,7 @@ const createNewBibleSlide = (scripture: Scripture) => {
   tempSlide.contents = useSlideContent(tempSlide, scripture)
 
   slides.value?.push(tempSlide)
-  makeSlideActive(tempSlide, true)
+  makeSlideActive(tempSlide, !options?.fromWholeBibleSearch)
   toast.add({ title: "Bible slide created", icon: "i-bx-bible" })
 }
 
@@ -384,7 +394,7 @@ const createNewSongSlide = (song: Song) => {
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
-  console.log("called")
+  // console.log("called")
   toast.add({ title: "Song slide created", icon: "i-bx-music" })
 }
 
@@ -455,7 +465,7 @@ const removeExistingCountdownSlides = () => {
  * @param countdown
  */
 const createNewCountdownSlide = (countdown: Countdown) => {
-  console.log(activeSlide.value)
+  // console.log(activeSlide.value)
   // Only one countdown slide can be active, clear any active interval
   removeExistingCountdownSlides()
   clearInterval(activeCountdownInterval.value)
@@ -546,9 +556,8 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
         updateCountdownSlide(slide, countdownTimeLeft.value, false)
       }, countdownTimeout)
     } else {
-      const countdownTimeout = useTimeStringToMilli(slide.data?.timeLeft)
-      console.log("reached pause section", activeCountdownInterval.value)
-      console.log("reached pause section", countdownTimeLeft.value)
+      // console.log("reached pause section", activeCountdownInterval.value)
+      // console.log("reached pause section", countdownTimeLeft.value)
       clearInterval(activeCountdownInterval.value)
       activeCountdownInterval.value = null
       updateCountdownSlide(slide, countdownTimeLeft.value, false)

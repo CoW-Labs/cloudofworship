@@ -31,6 +31,7 @@
           :key="`verse ${index}`"
           :action="turnToBibleTypeAction(verse)"
           type="bible"
+          action-suffix="whole-search"
           :class="{
             'bg-primary-50 dark:bg-primary-800 rounded-md':
               index === focusedActionIndex,

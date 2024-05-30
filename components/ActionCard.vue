@@ -2,7 +2,12 @@
   <button
     class="action-card flex gap-3 p-2 py-4 border-t first:border-t-0 border-gray-100 dark:border-primary-950 hover:rounded-md hover:bg-primary-50 dark:hover:bg-primary-800 transition-all cursor-pointer text-left w-[100%]"
     :class="{ 'pointer-events-none opacity-30': action?.unreleased }"
-    @click="useGlobalEmit(action?.action, emitParameter)"
+    @click="
+      useGlobalEmit(
+        `${action?.action}${actionSuffix ? `-${actionSuffix}` : ''}`,
+        emitParameter
+      )
+    "
   >
     <IconWrapper
       :name="action?.icon"
@@ -33,6 +38,7 @@ import type { QuickAction } from "~/types"
 
 const props = defineProps<{
   action: QuickAction
+  actionSuffix: String
 }>()
 
 const emitParameter = computed(() => {
