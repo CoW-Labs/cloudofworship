@@ -630,10 +630,10 @@ const gotoScripture = async (title: string, version: string) => {
   }
 }
 
-const gotoHymnVerse = (title: string) => {
+const gotoHymnVerse = async (title: string) => {
   const tempSlide = { ...activeSlide.value } as Slide
   const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
-  const hymn = useHymn(tempSlide.songId as string)
+  const hymn = await useHymn(tempSlide.songId as string)
   const realTitle = title
 
   if (hymn) {
@@ -683,10 +683,10 @@ const gotoSongVerse = (title: string) => {
   }
 }
 
-const gotoChorus = () => {
+const gotoChorus = async () => {
   const tempSlide = { ...activeSlide.value } as Slide
   const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
-  const hymn = useHymn(tempSlide.songId as string)
+  const hymn = await useHymn(tempSlide.songId as string)
 
   if (hymn) {
     const chorus = hymn?.chorus as string

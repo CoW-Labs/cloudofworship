@@ -57,20 +57,7 @@ const props = defineProps<{
 }>()
 
 const allChapterVerses = ref<any[]>()
-
-// Return connected Hymn / Song object related
-const relatedData = computed(() => {
-  switch (props.slide?.type) {
-    case slideTypes.hymn:
-      const hymn = useHymn(props.slide?.songId)
-      return hymn
-    case slideTypes.song:
-      const song = useSong(props.slide?.data, 4)
-      return song
-  }
-  return {}
-})
-
+const relatedData = ref<any>({})
 const bibleChapter = computed(() => props.verse?.split(":")?.[0])
 
 const getAllChapterVerses = async () => {
@@ -78,10 +65,32 @@ const getAllChapterVerses = async () => {
   allChapterVerses.value = chapter?.content
 }
 
+// Return connected Hymn / Song object related
+const getSongOrHymnObj = async () => {
+  switch (props.slide?.type) {
+    case slideTypes.hymn:
+      const hymn = await useHymn(props.slide?.songId)
+      relatedData.value = hymn
+      break
+    case slideTypes.song:
+      const song = useSong(props.slide?.data, 4)
+      relatedData.value = song
+      break
+  }
+}
+
 watch(
   bibleChapter,
   () => {
     getAllChapterVerses()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => props.slide,
+  () => {
+    getSongOrHymnObj()
   },
   { immediate: true }
 )
