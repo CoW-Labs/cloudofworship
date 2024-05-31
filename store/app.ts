@@ -32,7 +32,8 @@ export const useAppStore = defineStore('app', {
         slideStyles: { blur: 0.5, brightness: 50 } as SlideStyle
       },
       backgroundVideos: [] as string[],
-      alert: null as Alert | null,
+      alerts: [] as Alert[],
+      activeAlert: null as Alert | null,
       copyrightContent: {
         'KJV': '',
         'NKJV': 'Scripture taken from the New King James Version®. Copyright © 1982 by Thomas Nelson. All rights reserved.',
@@ -70,8 +71,11 @@ export const useAppStore = defineStore('app', {
     setDefaultFont(font: string) {
       this.settings = { ...this.settings, defaultFont: font }
     },
-    setAlert(alert: Alert | null) {
-      this.alert = alert
+    setAlerts(alerts: Alert[]) {
+      this.alerts = alerts
+    },
+    setActiveAlert(alert: Alert | null) {
+      this.activeAlert = alert
     },
     setBackgroundVideos(bgVideos: string[]) {
       this.backgroundVideos = bgVideos

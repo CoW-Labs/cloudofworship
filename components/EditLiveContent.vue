@@ -104,7 +104,7 @@
               v-if="slide?.type === slideTypes?.bible"
               @change="$emit('update-bible-version', $event)"
             />
-            <UPopover
+            <!-- <UPopover
               v-if="slide?.layout !== slideLayoutTypes.bible"
               v-model:open="layoutPopoverOpen"
             >
@@ -121,7 +121,7 @@
                   @select="onSelectLayout"
                 />
               </template>
-            </UPopover>
+            </UPopover> -->
             <div
               v-show="
                 slide?.type !== slideTypes.media ||

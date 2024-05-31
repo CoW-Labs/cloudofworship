@@ -194,7 +194,7 @@ emitter.on("new-alert", () => {
 })
 
 emitter.on("remove-alert", () => {
-  appStore.setAlert(null)
+  appStore.setActiveAlert(null)
   useToast().add({
     icon: "i-bx-trash",
     title: "Active alert has been removed",

@@ -1,24 +1,53 @@
 <template>
   <div class="add-song-main mb-4">
     <div
-      v-if="alert"
-      class="active-alert rounded-md bg-primary-100 dark:bg-primary-900 p-4 mb-4"
+      v-if="alerts?.length > 0"
+      class="active-alert rounded-md bg-primary-100 dark:bg-primary-900 py-4 mb-4"
     >
-      <div class="text-sm font-semibold flex items-center gap-2">
-        <IconWrapper :name="alert?.icon" size="4"></IconWrapper>
-        Active Alert
-      </div>
-      <p class="opacity-60 mt-2">
-        {{ alert?.title }}
-      </p>
-      <UButton
-        block
-        variant="outline"
-        class="mt-4"
-        @click="appStore.setAlert(null)"
+      <div
+        class="text-sm font-semibold flex items-center gap-2 text-gray-500 px-4 pb-2"
       >
-        Remove Alert
-      </UButton>
+        <IconWrapper name="i-bx-info-circle" size="4"></IconWrapper>
+        Alert Schedule (Maximum of 3)
+      </div>
+      <div
+        class="alert-card-ctn flex items-center px-2"
+        v-for="alert in alerts"
+        :key="alert.id"
+      >
+        <UButton
+          class="alert-card flex items-start gap-1 justify-start mt-2 text-left hover:bg-primary-200 w-[calc(100%-0px)] relative"
+          :class="{ 'bg-primary-200': activeAlert?.id === alert?.id }"
+          variant="ghost"
+          :icon="
+            activeAlert?.id === alert?.id ? 'i-bx-check-circle' : 'i-bx-circle'
+          "
+          color="black"
+          block
+          @click="appStore.setActiveAlert(alert)"
+        >
+          <div class="text text-xs">
+            {{ alert.title }}
+          </div>
+          <UButton
+            class="absolute right-1 top-[2px] alert-delete bg-primary-200"
+            variant="ghost"
+            icon="i-bx-trash"
+            size="xs"
+            @click.stop.prevent="deleteAlert(alert)"
+          ></UButton>
+        </UButton>
+      </div>
+      <div class="button-ctn px-4">
+        <UButton
+          block
+          variant="outline"
+          class="mt-4"
+          @click="appStore.setActiveAlert(null)"
+        >
+          Remove Alert
+        </UButton>
+      </div>
     </div>
     <h2 class="font-semibold text-md">Add Alert</h2>
     <form class="flex flex-col gap-3 mt-2">
@@ -57,7 +86,7 @@
         <UTextarea
           placeholder="Your alert content goes here"
           variant="none"
-          rows="12"
+          rows="6"
           color="gray"
           resize="vertical"
           v-model="content"
@@ -87,7 +116,7 @@ const props = defineProps<{
 
 const appStore = useAppStore()
 
-const { alert } = storeToRefs(appStore)
+const { alerts, activeAlert } = storeToRefs(appStore)
 const loading = ref<boolean>(false)
 const content = ref<string>("")
 const position = ref<string>("Bottom")
@@ -95,16 +124,50 @@ const bgColor = ref<string>("#a855f7")
 const toast = useToast()
 const emit = defineEmits(["go-home"])
 
-const addAlert = async () => {
-  const alert: Alert = {
-    id: useID(),
-    title: content.value,
-    style: `${position.value.toLowerCase()}-0`,
-    icon: "i-bx-info-circle",
-    background: bgColor.value,
+const deleteAlert = (alert: Alert) => {
+  const tempAlerts = [...appStore.alerts]
+  const newAlertIndex = tempAlerts.findIndex((a) => a.id === alert.id)
+  tempAlerts.splice(newAlertIndex, 1)
+  appStore.setAlerts(tempAlerts)
+  if (alert?.id === activeAlert.value?.id) {
+    appStore.setActiveAlert(null)
   }
-  appStore.setAlert(alert)
-  toast.add({ icon: "i-bx-send", title: "Alert sent to live" })
-  emit("go-home")
+  toast.add({ icon: "i-bx-trash", title: "Deleted alert" })
+}
+
+const addAlert = async () => {
+  if (alerts.value?.length >= 3) {
+    toast.add({
+      icon: "i-bx-error-circle",
+      title: "Maximum alerts exceeded. Delete alert to add more.",
+      color: "red",
+    })
+  } else {
+    const alert: Alert = {
+      id: useID(),
+      title: content.value,
+      style: `${position.value.toLowerCase()}-0`,
+      icon: "i-bx-info-circle",
+      background: bgColor.value,
+    }
+    appStore.setAlerts([...appStore.alerts, alert])
+    appStore.setActiveAlert(alert)
+    toast.add({ icon: "i-bx-send", title: "Alert sent to live" })
+    emit("go-home")
+  }
 }
 </script>
+
+<style scoped>
+.alert-delete {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: 0.3s;
+}
+.alert-card:hover .alert-delete {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(0);
+}
+</style>
