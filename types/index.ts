@@ -79,6 +79,9 @@ export interface Song {
   cover?: string
   author?: string
   verses?: Array<string>
+  isPublic?: boolean
+  createdBy?: string
+  churchId?: string
   createdAt?: string
   updatedAt?: string
 }
