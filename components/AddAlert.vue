@@ -5,9 +5,9 @@
       class="active-alert rounded-md bg-primary-100 dark:bg-primary-900 py-4 mb-4"
     >
       <div
-        class="text-sm font-semibold flex items-center gap-2 text-gray-500 px-4 pb-2"
+        class="text-sm font-semibold flex items-center gap-2 text-primary-900 dark:text-primary-100 px-4 pb-3 border-b border-primary-200"
       >
-        <IconWrapper name="i-bx-info-circle" size="4"></IconWrapper>
+        <!-- <IconWrapper name="i-bx-info-circle" size="4"></IconWrapper> -->
         Alert Schedule (Maximum of 3)
       </div>
       <div

@@ -39,7 +39,8 @@ export const useAppStore = defineStore('app', {
         'NKJV': 'Scripture taken from the New King James Version®. Copyright © 1982 by Thomas Nelson. All rights reserved.',
         'NIV': 'Scriptures taken from the Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™ All rights reserved worldwide.',
         'AMP': 'All Scripture quotations, unless otherwise indicated, are taken from the Amplified Bible, Copyright © 2015 by The Lockman Foundation.'
-      }
+      },
+      recentBibleSearches: [] as string[]
     }
   },
   actions: {
@@ -82,6 +83,16 @@ export const useAppStore = defineStore('app', {
       this.settings.defaultBackground.hymn.background = bgVideos?.[0]
       this.settings.defaultBackground.bible.background = bgVideos?.[2]
       this.settings.defaultBackground.text.background = bgVideos?.[3]
+    },
+    setRecentBibleSearches(searchQuery: string) {
+      let tempArr = [...this.recentBibleSearches]
+      if (this.recentBibleSearches.length >= 20) {
+        tempArr.shift()
+        this.recentBibleSearches = tempArr
+      }
+      const tempSet = new Set(tempArr)
+      tempSet.add(searchQuery)
+      this.recentBibleSearches = Array.from(tempSet).reverse()
     }
   },
   persist: {

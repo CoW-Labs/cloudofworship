@@ -135,9 +135,12 @@ emitter.on("new-text", (slide: Slide) => {
 })
 
 emitter.on("new-bible", async (data: string) => {
-  const scripture = await useScripture(data)
-  if (scripture) {
-    createNewBibleSlide(scripture)
+  if (data) {
+    const scripture = await useScripture(data)
+    if (scripture) {
+      createNewBibleSlide(scripture)
+      appStore.setRecentBibleSearches(data)
+    }
   }
 })
 
@@ -145,6 +148,7 @@ emitter.on("new-bible-whole-search", async (data: string) => {
   const scripture = await useScripture(data)
   if (scripture) {
     createNewBibleSlide(scripture, { fromWholeBibleSearch: true })
+    appStore.setRecentBibleSearches(data)
   }
 })
 

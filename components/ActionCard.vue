@@ -44,9 +44,9 @@ const props = defineProps<{
 const emitParameter = computed(() => {
   switch (props.action?.type) {
     case slideTypes.bible:
-      return `${props.action?.bibleBookIndex}:${
-        props.action?.bibleChapterAndVerse || "1:1"
-      }`
+      return props.action?.bibleChapterAndVerse
+        ? `${props.action?.bibleBookIndex}:${props.action?.bibleChapterAndVerse}`
+        : ""
     case slideTypes.hymn:
       return `${props.action?.hymnIndex}`
     default:

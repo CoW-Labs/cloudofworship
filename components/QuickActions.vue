@@ -72,6 +72,13 @@
       </div>
 
       <!-- SONG SECTION -->
+      <BibleList
+        v-else-if="page === 'bible'"
+        :query="bibleSearchQuery"
+        @close="page = ''"
+      />
+
+      <!-- SONG SECTION -->
       <SongsList
         v-else-if="page === 'song'"
         :query="songSearchQuery"
@@ -117,8 +124,9 @@ const focusedActionIndex = ref<number>(0)
 const actions = ref<any[]>([])
 const quickActions = ref<HTMLDivElement | null>(null)
 const appStore = useAppStore()
-const page = ref<string>("") // song, search
+const page = ref<string>("") // song, search, bible, hymn...
 const songSearchQuery = ref<string>("")
+const bibleSearchQuery = ref<string>("")
 const hymns = ref<Hymn[]>([])
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const libraryPage = ref<string>("")
@@ -157,6 +165,22 @@ const getAllHymns = async () => {
 }
 
 getAllHymns()
+
+watch(page, () => {
+  if (page.value === "") {
+    bibleSearchQuery.value = ""
+  }
+})
+
+emitter.on("new-bible", (data) => {
+  if (data === "") {
+    page.value = "bible"
+  }
+})
+
+emitter.on("bible-search-demo", () => {
+  bibleSearchQuery.value = "Gen 1:1"
+})
 
 emitter.on("new-song", ({ fromSaved }) => {
   if (!fromSaved) {

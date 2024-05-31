@@ -1,8 +1,9 @@
 <template>
-  <div class="h-[88%] mt-4 flex flex-col items-center justify-center gap-4 text-gray-500">
+  <div
+    class="h-[88%] mt-4 flex flex-col items-center justify-center gap-4 text-gray-500"
+  >
     <IconWrapper :name="icon" size="14" />
     <div>
-
       <h2 class="text-md font-semibold max-w-[150px] text-center">
         {{ sub }}
       </h2>
