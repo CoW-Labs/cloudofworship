@@ -1,6 +1,8 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
-    <div class="bg-image-selection gap-2 grid grid-cols-3">
+    <div
+      class="bg-image-selection gap-2 grid grid-cols-3 max-h-[200px] overflow-y-auto"
+    >
       <UButton
         v-for="(video, index) in backgroundVideos"
         :key="video"

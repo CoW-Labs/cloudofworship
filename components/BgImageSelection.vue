@@ -1,6 +1,8 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
-    <div class="bg-image-selection gap-2 grid grid-cols-4">
+    <div
+      class="bg-image-selection gap-2 grid grid-cols-4 max-h-[190px] overflow-y-auto"
+    >
       <UButton
         v-for="image in backgroundImages"
         :key="image"
