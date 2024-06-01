@@ -1,6 +1,6 @@
 <template>
   <div
-    class="media-main min-h-[75vh] lg:min-h-[75vh] xl:min-h-[80vh] 2xl:min-h-[88vh] flex flex-col justify-between"
+    class="media-main min-h-[75vh] lg:min-h-[75vh] xl:min-h-[80vh] 2xl:min-h-[85vh] flex flex-col justify-between"
   >
     <label class="flex flex-col center text-center">
       <IconWrapper
