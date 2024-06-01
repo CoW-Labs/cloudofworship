@@ -58,7 +58,8 @@ const changelog = `
 - This one is exciting! We added a countdown timer for your convenience. Now you can let your congregation know what how soon an event starts or finish in an exciting manner.
 - Sharing is caring; now other people can use the songs you upload—but only if you want.
 - We don't want you to ever make a mistake taking slides LIVE. So we added a two-step feature to the "Display Bible" action on the quick actions pane.
-- Want to edit a live slide quickly, double tap the slide in the Live Output pane and make your quick adjustments ;)`
+- Want to edit a live slide quickly, double tap the slide in the Live Output pane and make your quick adjustments ;)
+- Fixed some issues to make your CoW experience smoother!`
 
 const appStore = useAppStore()
 
