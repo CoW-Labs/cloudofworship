@@ -83,8 +83,9 @@
 import type { Hymn, Song } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
+const db = useIndexedDB()
 
-const allHymns = useNuxtApp().$hymns as Hymn[]
+const allHymns = ref<Hymn[]>()
 const searchInput = ref<string>("")
 const loading = ref<boolean>(true)
 const hymns = ref<Hymn[]>()
@@ -120,22 +121,28 @@ onMounted(() => {
   })
 })
 
+const getAllHymns = async () => {
+  const hymns = await db.bibleAndHymns.get("hymns")
+  allHymns.value = hymns?.data as unknown as Hymn[]
+  getHymns()
+}
+
 const getHymns = (query: string = "") => {
   if (query?.length >= 2) {
     loading.value = true
-    let results = fuzzysort.go(query, allHymns, {
+    let results = fuzzysort.go(query, allHymns.value, {
       keys: ["title", "meta"],
     })
     results = results?.map((result) => result.obj)
     hymns.value = results.slice(0, 15)
   } else {
     const rand = Math.floor(Math.random() * 1115 + 15)
-    hymns.value = allHymns.slice(rand - 15, rand)
+    hymns.value = allHymns.value.slice(rand - 15, rand)
   }
   loading.value = false
 }
 
-getHymns()
+getAllHymns()
 
 const isHymnAvailable = computed(() => {
   const isHymnTitleInResult = !!hymns.value?.find((hymn) =>

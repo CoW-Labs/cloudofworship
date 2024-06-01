@@ -3,7 +3,7 @@
     <div class="flex gap-2">
       <UInput
         icon="i-bx-search"
-        placeholder="Search song titles"
+        placeholder="Search scripture"
         v-model="searchInput"
         class="w-[100%]"
         @input="onSearchInput"

@@ -14,7 +14,11 @@
               <h4 class="font-medium text-nowrap">
                 {{ useShortSlideName(slide, { longer: true }) }}
               </h4>
-              <SlideChip :slide-type="slide?.type" dark-mode />
+              <SlideChip
+                :slide-type="slide?.type"
+                :slide-sub-type="slide?.data?.type"
+                dark-mode
+              />
             </div>
           </TransitionGroup>
           <div class="actions flex items-center ml-6">
@@ -100,7 +104,7 @@
               v-if="slide?.type === slideTypes?.bible"
               @change="$emit('update-bible-version', $event)"
             />
-            <UPopover
+            <!-- <UPopover
               v-if="slide?.layout !== slideLayoutTypes.bible"
               v-model:open="layoutPopoverOpen"
             >
@@ -117,9 +121,13 @@
                   @select="onSelectLayout"
                 />
               </template>
-            </UPopover>
+            </UPopover> -->
             <div
-              v-show="slide?.type !== slideTypes.media"
+              v-show="
+                slide?.type !== slideTypes.media ||
+                (slide?.type === slideTypes.media &&
+                  slide?.data?.type?.includes('audio'))
+              "
               class="button-group flex rounded-md mx-1 p-1"
               :class="{
                 'bg-primary-200 dark:bg-primary-900':
@@ -155,7 +163,10 @@
                   />
                 </template>
               </UPopover>
-              <UPopover v-model:open="bgVideoPopoverOpen">
+              <UPopover
+                v-if="!slide?.data?.type?.includes('audio')"
+                v-model:open="bgVideoPopoverOpen"
+              >
                 <UTooltip text="Add background video" :popper="{ arrow: true }">
                   <UButton
                     variant="ghost"

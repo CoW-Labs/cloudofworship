@@ -14,6 +14,8 @@ const useSlideName = (slide: Slide) => {
       return slide.contents?.[1]?.trim()?.replaceAll('<br>', '\n')?.replaceAll('</h1>', '\n')?.replaceAll('</h2>', '\n')?.replaceAll('</h3>', '\n')?.replace(/<[^>]*>/g, '')?.split('\n')?.[0]
     case slideTypes.hymn:
       return `Hymn ${slide?.songId}`
+    case slideTypes.countdown:
+      return slide?.data?.time?.replace('00:', '')
     default:
       return `${slide?.title}`
   }

@@ -71,7 +71,7 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
-import type { Hymn, Scripture, Slide, Song } from "~/types"
+import type { Hymn, Scripture, Slide, Song, Countdown } from "~/types"
 const appStore = useAppStore()
 const toast = useToast()
 
@@ -84,6 +84,8 @@ const bulkActionLabel = ref<string>("Select Slides")
 const bulkActionIcon = ref<string>("")
 const bulkSelectSlides = ref<boolean>(false)
 const bulkSelectedSlides = ref<string[]>([])
+const activeCountdownInterval = ref<any>(null)
+const countdownTimeLeft = ref<number>(0)
 
 watch(
   slides,
@@ -109,7 +111,6 @@ watch(activeSlides, () => {
 
 const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
   activeSlide.value = slide
-
   if (goLive) {
     appStore.setActiveSlides(slides.value)
     appStore.setLiveSlide(activeSlide.value.id)
@@ -133,15 +134,26 @@ emitter.on("new-text", (slide: Slide) => {
   createNewSlide(slide)
 })
 
-emitter.on("new-bible", (data: string) => {
-  const scripture = useScripture(data)
-  if (scripture) {
-    createNewBibleSlide(scripture)
+emitter.on("new-bible", async (data: string) => {
+  if (data) {
+    const scripture = await useScripture(data)
+    if (scripture) {
+      createNewBibleSlide(scripture)
+      appStore.setRecentBibleSearches(data)
+    }
   }
 })
 
-emitter.on("new-hymn", (data: string) => {
-  const hymn = useHymn(data)
+emitter.on("new-bible-whole-search", async (data: string) => {
+  const scripture = await useScripture(data)
+  if (scripture) {
+    createNewBibleSlide(scripture, { fromWholeBibleSearch: true })
+    appStore.setRecentBibleSearches(data)
+  }
+})
+
+emitter.on("new-hymn", async (data: string) => {
+  const hymn = await useHymn(data)
   if (hymn) {
     createNewHymnSlide(hymn)
   }
@@ -172,6 +184,24 @@ emitter.on("new-media", (data: any) => {
 emitter.on("new-active-slide", (data: Slide) => {
   if (data) {
     makeSlideActive(data)
+  }
+})
+
+emitter.on("new-countdown", (data: Countdown) => {
+  if (data) {
+    createNewCountdownSlide(data)
+  }
+})
+
+// This can start and temporarily pause a countdown
+emitter.on("start-countdown", (data: Slide) => {
+  startCountdown(data)
+})
+
+emitter.on("restart-countdown", (data: Slide) => {
+  const countdown = data?.data as Countdown
+  if (countdown?.time) {
+    startCountdown(data, true)
   }
 })
 
@@ -234,6 +264,14 @@ const createNewSlide = (duplicateSlide?: Slide) => {
 
 const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   const tempSlide = appStore.activeSlides.find((s) => s.id === slideId)
+
+  // Clear interval if slide is a countdown slide before deleting
+  if (tempSlide?.type === slideTypes.countdown) {
+    // console.log("clearing interval", activeCountdownInterval.value)
+    clearInterval(activeCountdownInterval.value)
+    countdownTimeLeft.value = 0
+  }
+
   const slideIndex = slides.value.findIndex((s) => s.id === slideId)
   slides.value.splice(slideIndex, 1)
   appStore.setActiveSlides(slides.value)
@@ -263,6 +301,10 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 }
 
 const onUpdateSlide = (slide: Slide) => {
+  // Always pause countdown slide before updating it
+  if (slide.type === slideTypes.countdown) {
+    useGlobalEmit("start-countdown", slide)
+  }
   makeSlideActive(slide)
   const slideIndex = slides.value?.findIndex(
     (slideInner: Slide) => slide.id === slideInner.id
@@ -270,9 +312,16 @@ const onUpdateSlide = (slide: Slide) => {
   slides.value?.splice(slideIndex || 0, 1, slide)
 
   updateLiveOutput(slide)
+  // when updating of countdown slide is done, continue timer
+  if (slide.type === slideTypes.countdown) {
+    useGlobalEmit("start-countdown", slide)
+  }
 }
 
-const createNewBibleSlide = (scripture: Scripture) => {
+const createNewBibleSlide = (
+  scripture: Scripture,
+  options?: { fromWholeBibleSearch: boolean }
+) => {
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.bible
@@ -292,7 +341,7 @@ const createNewBibleSlide = (scripture: Scripture) => {
   tempSlide.contents = useSlideContent(tempSlide, scripture)
 
   slides.value?.push(tempSlide)
-  makeSlideActive(tempSlide, true)
+  makeSlideActive(tempSlide, !options?.fromWholeBibleSearch)
   toast.add({ title: "Bible slide created", icon: "i-bx-bible" })
 }
 
@@ -349,7 +398,7 @@ const createNewSongSlide = (song: Song) => {
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
-  console.log("called")
+  // console.log("called")
   toast.add({ title: "Song slide created", icon: "i-bx-music" })
 }
 
@@ -379,9 +428,12 @@ const createNewMediaSlide = async (
     })
   }
 
+  const randomImage =
+    "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740"
   tempSlide.type = slideTypes.media
-  tempSlide.backgroundType = file.type
-  tempSlide.background = file.url
+  tempSlide.slideStyle.backgroundFillType = backgroundFillTypes.crop
+  tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
+  tempSlide.background = file.type === "audio" ? randomImage : file.url
   tempSlide.data = file
   tempSlide.name = useSlideName(tempSlide)
 
@@ -403,6 +455,118 @@ const createMultipleNewMediaSlides = async (files: any[]) => {
   await Promise.all(multipleSlidesPromise)
   useGlobalEmit("app-loading", false)
   toast.add({ title: "Media slides created", icon: "i-bx-image" })
+}
+
+const removeExistingCountdownSlides = () => {
+  const tempSlides = slides.value?.filter(
+    (slide) => slide.type !== slideTypes.countdown
+  )
+  slides.value = tempSlides
+}
+
+/**
+ * This function updates any countdown slide that has been previously created rather than creating a new one
+ * @param countdown
+ */
+const createNewCountdownSlide = (countdown: Countdown) => {
+  // console.log(activeSlide.value)
+  // Only one countdown slide can be active, clear any active interval
+  removeExistingCountdownSlides()
+  clearInterval(activeCountdownInterval.value)
+  countdownTimeLeft.value = 0
+
+  const tempSlide = { ...preSlideCreation() }
+  tempSlide.layout = slideLayoutTypes.countdown
+  tempSlide.type = slideTypes.countdown
+  tempSlide.background = appStore.settings.defaultBackground.hymn.background
+  tempSlide.backgroundType =
+    appStore.settings.defaultBackground.hymn.backgroundType
+  ;(tempSlide.data = countdown),
+    (tempSlide.name = `${countdown.time?.replace("00:", "")}`)
+  tempSlide.contents = useSlideContent(tempSlide, countdown)
+
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: 17.5,
+    alignment: "center",
+    font: appStore.settings.defaultFont,
+  }
+
+  slides.value?.push(tempSlide)
+
+  // Take slide live if current active slide is a countdown
+  if (activeSlide.value?.type === slideTypes.countdown) {
+    makeSlideActive(tempSlide, true)
+  }
+  toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
+}
+
+const updateCountdownSlide = (
+  slide: Slide,
+  timeRemaining: number,
+  isPlaying: boolean = true
+) => {
+  const tempSlide = { ...slide }
+  const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
+  tempSlide.data = {
+    ...tempSlide.data,
+    timeLeft: useMilliToTimeString(timeRemaining),
+  }
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    isMediaPlaying: isPlaying,
+  }
+  // console.log("tempSlide", tempSlide.data)
+  tempSlide.contents = useSlideContent(tempSlide, tempSlide?.data!!)
+  // activeSlide.value = tempSlide
+  slides.value.splice(slideIndex, 1, tempSlide)
+  updateLiveOutput(tempSlide)
+}
+
+const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
+  const countdown = slide?.data as Countdown
+  if (countdown?.time) {
+    const countdownTimeout = useTimeStringToMilli(
+      restartCountdown ? slide.data?.time : slide.data?.timeLeft
+    )
+    if (activeCountdownInterval.value === null || restartCountdown) {
+      // console.log("play or restart")
+      if (restartCountdown) {
+        clearInterval(activeCountdownInterval.value)
+        countdownTimeLeft.value = countdownTimeout
+      } else {
+        countdownTimeLeft.value =
+          countdownTimeLeft.value === 0
+            ? countdownTimeout
+            : countdownTimeLeft.value
+      }
+      const countdownInterval = setInterval(() => {
+        // console.log("1 second gone", countdownTimeLeft.value)
+        if (countdownTimeLeft.value - 1000 < 1000) {
+          countdownTimeLeft.value = 0
+          clearInterval(activeCountdownInterval.value)
+        } else {
+          countdownTimeLeft.value = countdownTimeLeft.value - 1000
+        }
+
+        updateCountdownSlide(slide, countdownTimeLeft.value)
+        activeCountdownInterval.value = countdownInterval
+      }, 1000)
+      activeCountdownInterval.value = countdownInterval
+
+      setTimeout(() => {
+        clearInterval(countdownInterval)
+        activeCountdownInterval.value = null
+        updateCountdownSlide(slide, countdownTimeLeft.value, false)
+      }, countdownTimeout)
+    } else {
+      // console.log("reached pause section", activeCountdownInterval.value)
+      // console.log("reached pause section", countdownTimeLeft.value)
+      clearInterval(activeCountdownInterval.value)
+      activeCountdownInterval.value = null
+      updateCountdownSlide(slide, countdownTimeLeft.value, false)
+    }
+  }
 }
 
 const updateLiveOutput = (updatedSlide: Slide) => {
@@ -431,7 +595,7 @@ const gotoAction = (title: string, version: string) => {
   }
 }
 
-const gotoScripture = (title: string, version: string) => {
+const gotoScripture = async (title: string, version: string) => {
   // Check that [title] is not abbreviated or in short form
   // If it is, replace to long/unabbreviated form
   let bibleBook = title.substring(0, title?.lastIndexOf(" "))
@@ -451,7 +615,7 @@ const gotoScripture = (title: string, version: string) => {
   }:${scriptureSplitted?.[2]}`
   const scriptureShortLabel = `${scriptureSplitted?.[0]}:${scriptureSplitted?.[1]}:${scriptureSplitted?.[2]}`
 
-  const scripture = useScripture(scriptureShortLabel, version)
+  const scripture = await useScripture(scriptureShortLabel, version)
   if (scripture) {
     // Calculate font-size of scripture content
     tempSlide.title = scriptureLabel
@@ -470,10 +634,10 @@ const gotoScripture = (title: string, version: string) => {
   }
 }
 
-const gotoHymnVerse = (title: string) => {
+const gotoHymnVerse = async (title: string) => {
   const tempSlide = { ...activeSlide.value } as Slide
   const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
-  const hymn = useHymn(tempSlide.songId as string)
+  const hymn = await useHymn(tempSlide.songId as string)
   const realTitle = title
 
   if (hymn) {
@@ -523,10 +687,10 @@ const gotoSongVerse = (title: string) => {
   }
 }
 
-const gotoChorus = () => {
+const gotoChorus = async () => {
   const tempSlide = { ...activeSlide.value } as Slide
   const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
-  const hymn = useHymn(tempSlide.songId as string)
+  const hymn = await useHymn(tempSlide.songId as string)
 
   if (hymn) {
     const chorus = hymn?.chorus as string
@@ -640,6 +804,9 @@ const removeFromSelectedSlides = (slideId: string) => {
 </script>
 
 <style scoped>
+.slides-ctn {
+  scroll-behavior: smooth;
+}
 .slides-ctn-3-rows {
   height: 336px;
 }

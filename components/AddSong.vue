@@ -34,6 +34,12 @@
           v-model="lyrics"
         />
       </UFormGroup>
+      <UFormGroup size="lg">
+        <div class="flex gap-2 items-center">
+          <span>Share this song with other users?</span>
+          <UToggle size="lg" v-model="isSongPublic" />
+        </div>
+      </UFormGroup>
 
       <UButton
         block
@@ -50,6 +56,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { useAuthStore } from "~/store/auth"
 import type { Song } from "~/types"
 const props = defineProps<{
   song: Song
@@ -58,18 +65,20 @@ const loading = ref<boolean>(false)
 const artist = ref<string>(props.song?.artist || "")
 const title = ref<string>(props.song?.title || "")
 const lyrics = ref<string>(props.song?.lyrics || "")
+const isSongPublic = ref<boolean>(props.song?.isPublic || true)
 const toast = useToast()
 const emit = defineEmits(["go-home"])
+const authStore = useAuthStore()
 
 const addSong = async () => {
   const db = useIndexedDB()
-  const songId = useURLFriendlyString(`${artist.value} ${title.value}`)
+  const songId = useURLFriendlyString(`${title.value} ${artist.value}`)
   const song: Song = {
     id: songId,
     title: title.value,
     artist: artist.value,
     lyrics: lyrics.value,
-    author: "me",
+    createdBy: "me",
   }
   try {
     loading.value = true
@@ -112,7 +121,80 @@ const addSong = async () => {
     }
   } finally {
     loading.value = false
+    if (props.song) {
+      // updateSongInAPI()
+    } else {
+      uploadSongToAPI(song)
+    }
     emit("go-home")
   }
 }
+
+const uploadSongToAPI = async (song: Song) => {
+  try {
+    // loading.value = true
+    const { data, error } = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/songs`,
+      {
+        method: "POST",
+        body: {
+          ...song,
+          isPublic: isSongPublic.value,
+          createdBy: authStore.user?._id,
+          churchId: authStore.user?.churchId,
+        },
+      }
+    )
+
+    // If error occurred
+    if (error.value) {
+      toast.add({ icon: "i-bx-error", title: error.value })
+    } else {
+      // console.log("data", data.value)
+      loading.value = false
+      toast.add({ icon: "i-bx-save", title: "Song uploaded" })
+      emit("go-home")
+    }
+  } catch (err: any) {
+  } finally {
+    loading.value = false
+  }
+}
+
+// const updateSongInAPI = async () => {
+//   const songId = useURLFriendlyString(`${title.value} ${artist.value}`)
+//   const song: Song = {
+//     ...props.song,
+//     id: songId,
+//     title: title.value,
+//     artist: artist.value,
+//     lyrics: lyrics.value,
+//     isPublic: isSongPublic.value,
+//     createdBy: authStore.user?._id,
+//     churchId: authStore.user?.churchId,
+//   }
+//   try {
+//     // loading.value = true
+//     const { data, error } = await useAPIFetch(
+//       `/church/${authStore.user?.churchId}/songs/${props.song?._id}`,
+//       {
+//         method: "PUT",
+//         body: song,
+//       }
+//     )
+
+//     // If error occurred
+//     if (error.value) {
+//       toast.add({ icon: "i-bx-error", title: error.value })
+//     } else {
+//       // console.log("data", data.value)
+//       loading.value = false
+//       toast.add({ icon: "i-bx-save", title: "Song updated" })
+//       emit("go-home")
+//     }
+//   } catch (err: any) {
+//   } finally {
+//     loading.value = false
+//   }
+// }
 </script>

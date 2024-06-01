@@ -31,6 +31,7 @@
           :key="`verse ${index}`"
           :action="turnToBibleTypeAction(verse)"
           type="bible"
+          action-suffix="whole-search"
           :class="{
             'bg-primary-50 dark:bg-primary-800 rounded-md':
               index === focusedActionIndex,
@@ -45,8 +46,9 @@
 import type { QuickAction, BibleVerse } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
+const db = useIndexedDB()
 
-const kjvBible = useNuxtApp().$kjvBible as BibleVerse[]
+const kjvBible = ref<BibleVerse[]>([])
 const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const verses = ref<BibleVerse[]>()
@@ -67,6 +69,12 @@ const turnToBibleTypeAction = (bibleVerse: BibleVerse) => {
     type: slideTypes.bible,
     bibleChapterAndVerse,
   }
+}
+
+const getBible = async () => {
+  const bible = await db.bibleAndHymns.get("KJV")
+  kjvBible.value = bible?.data as unknown as BibleVerse[]
+  getVerses()
 }
 
 onMounted(() => {
@@ -100,19 +108,19 @@ onMounted(() => {
 const getVerses = (query: string = "") => {
   if (query?.length >= 2) {
     loading.value = true
-    let results = fuzzysort.go(query, kjvBible, {
+    let results = fuzzysort.go(query, kjvBible.value, {
       keys: ["scripture"],
     })
     results = results?.map((result) => result.obj) as BibleVerse[]
     verses.value = results.slice(0, 15)
   } else {
     const rand = Math.floor(Math.random() * 1115 + 15)
-    verses.value = kjvBible.slice(rand - 15, rand)
+    verses.value = kjvBible.value.slice(rand - 15, rand)
   }
   loading.value = false
 }
 
-getVerses()
+getBible()
 
 const onSearchInput = useDebounceFn(async () => {
   getVerses(searchInput.value)

@@ -56,25 +56,44 @@ const props = defineProps<{
   verse: string
 }>()
 
-// Return connected Hymn / Song object related
-const relatedData = computed(() => {
-  switch (props.slide?.type) {
-    case slideTypes.hymn:
-      const hymn = useHymn(props.slide?.songId)
-      return hymn
-    case slideTypes.song:
-      const song = useSong(props.slide?.data, 4)
-      return song
-  }
-  return {}
-})
-
+const allChapterVerses = ref<any[]>()
+const relatedData = ref<any>({})
 const bibleChapter = computed(() => props.verse?.split(":")?.[0])
 
-const allChapterVerses = () => {
-  const chapter = useScriptureChapter(props.verse)
-  return chapter?.content
+const getAllChapterVerses = async () => {
+  const chapter = await useScriptureChapter(props.verse)
+  allChapterVerses.value = chapter?.content
 }
+
+// Return connected Hymn / Song object related
+const getSongOrHymnObj = async () => {
+  switch (props.slide?.type) {
+    case slideTypes.hymn:
+      const hymn = await useHymn(props.slide?.songId)
+      relatedData.value = hymn
+      break
+    case slideTypes.song:
+      const song = useSong(props.slide?.data, 4)
+      relatedData.value = song
+      break
+  }
+}
+
+watch(
+  bibleChapter,
+  () => {
+    getAllChapterVerses()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => props.slide,
+  () => {
+    getSongOrHymnObj()
+  },
+  { immediate: true }
+)
 
 // Return bible verses in proximity to currentVerse
 const nearBibleVerses = computed(() => {
@@ -82,11 +101,10 @@ const nearBibleVerses = computed(() => {
     const verseLineup: Scripture[] = []
     const currentVerse = Number(props.verse?.split(":")?.[1])
     const verseNumbers = getNumberRange(currentVerse)
-    const chapterVerses = allChapterVerses()
 
     verseNumbers?.forEach((n) => {
-      if (chapterVerses?.[n]) {
-        verseLineup.push(chapterVerses?.[n])
+      if (allChapterVerses.value?.[n]) {
+        verseLineup.push(allChapterVerses.value?.[n])
       }
     })
 

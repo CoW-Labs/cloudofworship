@@ -1,12 +1,8 @@
 import { useAppStore } from '~/store/app'
-import { Scripture } from '~/types'
+import { BibleVerse, Scripture } from '~/types'
 
-const useScripture = (label: string = '1:1:1', version: string = ''): Scripture | null => {
-  const nuxtApp = useNuxtApp()
-  const kjvBible = nuxtApp.$kjvBible
-  const nkjvBible = nuxtApp.$nkjvBible
-  const nivBible = nuxtApp.$nivBible
-  const ampBible = nuxtApp.$ampBible
+const useScripture = async (label: string = '1:1:1', version: string = ''): Promise<Scripture | null> => {
+  const db = useIndexedDB()
 
   // set default version
   const appStore = useAppStore()
@@ -23,18 +19,22 @@ const useScripture = (label: string = '1:1:1', version: string = ''): Scripture 
   try {
     switch (version) {
       case 'NKJV':
+        const nkjvBible = (await db.bibleAndHymns.get('NKJV'))?.data as unknown as BibleVerse[]
         scripture = nkjvBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
         appStore.setDefaultBibleVersion(version)
         break
       case 'NIV':
+        const nivBible = (await db.bibleAndHymns.get('NIV'))?.data as unknown as BibleVerse[]
         scripture = nivBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
         appStore.setDefaultBibleVersion(version)
         break
       case 'AMP':
+        const ampBible = (await db.bibleAndHymns.get('AMP'))?.data as unknown as BibleVerse[]
         scripture = ampBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
         appStore.setDefaultBibleVersion(version)
         break
       default:
+        const kjvBible = (await db.bibleAndHymns.get('KJV'))?.data as unknown as BibleVerse[]
         scripture = kjvBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
         appStore.setDefaultBibleVersion(version)
         break

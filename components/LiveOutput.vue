@@ -42,6 +42,7 @@
               'bg-red-100 dark:bg-red-900': liveSlide?.id === slide?.id,
             }"
             @click="appStore.setLiveSlide(slide?.id || '0')"
+            @dblclick="useGlobalEmit('new-active-slide', slide)"
           >
             <div
               class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"

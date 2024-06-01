@@ -22,10 +22,10 @@ const useScreenFontSize = (content: string, fontSizePercent: number = 100) => {
    * where 525 is the highest content length and 4.8vw is the corresponding font size
    * and 125 is the lowest content length and 2.8vw is the corresponding font size
    */
-  let contentLength = content.length
+  let contentLength = content?.length
   const regex = /\n/g
   let newLineCharacters =
-    [...content.matchAll(regex)].length
+    [...content.matchAll(regex)]?.length
   contentLength += (newLineCharacters * 25)
   const fontSize = 4.9 + (contentLength - 125) * (2.8 - 5) / (525 - 125)
   let percentageIncrease = fontSizePercent / 100
