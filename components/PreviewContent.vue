@@ -804,6 +804,9 @@ const removeFromSelectedSlides = (slideId: string) => {
 </script>
 
 <style scoped>
+.slides-ctn {
+  scroll-behavior: smooth;
+}
 .slides-ctn-3-rows {
   height: 336px;
 }
