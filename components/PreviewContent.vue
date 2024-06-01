@@ -130,8 +130,8 @@ emitter.on("new-slide", () => {
   createNewSlide()
 })
 
-emitter.on("new-text", (slide: Slide) => {
-  createNewSlide(slide)
+emitter.on("new-text", (slide: Slide[]) => {
+  createNewSlide(slide?.[0])
 })
 
 emitter.on("new-bible", async (data: string) => {

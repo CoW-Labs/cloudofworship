@@ -73,7 +73,7 @@ definePageMeta({
 const authStore = useAuthStore()
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
-console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
+// console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()
 const email = ref("")
