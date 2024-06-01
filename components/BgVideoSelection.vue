@@ -95,7 +95,8 @@ const saveAndSelectVideo = async (file: any) => {
   db.cached.add(tempMedia)
   bgVideoToBeSelected.value = tempMedia.id
   await getAllLocallySavedVideos()
-  emit("select", bgVideoToBeSelected.value)
+  console.log(bgVideoToBeSelected.value, tempMedia.id)
+  emit("select", { video: bgVideoToBeSelected.value, key: tempMedia.id })
 }
 
 getAllLocallySavedVideos()

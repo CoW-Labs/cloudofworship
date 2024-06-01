@@ -258,6 +258,21 @@ const retrieveAllMediaFilesFromDB = async () => {
         }
         appStore.setActiveSlides(slides)
       }
+    } else {
+      // console.log(slide.name, slide.backgroundVideoKey)
+      // console.log(slide.name, slide.background)
+      if (slide?.backgroundVideoKey) {
+        const cachedBackgroundVideo = await db.cached.get(
+          slide?.backgroundVideoKey
+        )
+        // console.log(cachedBackgroundVideo)
+        const arrayBuffer: ArrayBuffer = cachedBackgroundVideo?.data!!
+        const blob = new Blob([arrayBuffer], {
+          type: cachedBackgroundVideo?.content?.type,
+        })
+        const fileUrl = URL.createObjectURL(blob)
+        slide.background = fileUrl
+      }
     }
   })
 
