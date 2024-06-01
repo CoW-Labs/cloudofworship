@@ -131,7 +131,7 @@ emitter.on("new-slide", () => {
 })
 
 emitter.on("new-text", (slide: Slide[]) => {
-  createNewSlide(slide?.[0])
+  createNewSlide(slide?.[0] || slide)
 })
 
 emitter.on("new-bible", async (data: string) => {
