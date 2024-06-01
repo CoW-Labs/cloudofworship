@@ -96,6 +96,7 @@ const saveAllBackgroundVideos = async () => {
     const tempMedia: Media = {
       id: `/video-bg-${index + 1}.mp4`,
       data: blob,
+      content: "video",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
