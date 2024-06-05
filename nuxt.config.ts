@@ -137,10 +137,13 @@ export default defineNuxtConfig({
       cleanupOutdatedCaches: true,
     },
     manifest: {
-      name: 'CTest',
-      short_name: 'CTest',
-      theme_color: '#a855f7',
-      icons: [
+      "name": "Cloud of Worshippers",
+      "short_name": "CoW",
+      "description": "Cloud of Worshippers",
+      "theme_color": "#a855f7",
+      "start_url": "/",
+      "display": "fullscreen",
+      "icons": [
         {
           "src": "/cloud-w-144.png",
           "sizes": "144x144",
@@ -156,7 +159,7 @@ export default defineNuxtConfig({
           "sizes": "512x512",
           "type": "image/png"
         }
-      ],
+      ]
     },
     registerWebManifestInRouteRules: true,
   }
