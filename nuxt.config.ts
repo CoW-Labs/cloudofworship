@@ -47,10 +47,10 @@ export default defineNuxtConfig({
         },
       ],
       link: [
-        {
-          rel: 'manifest',
-          href: '/manifest.json'
-        },
+        // {
+        //   rel: 'manifest',
+        //   href: '/manifest.json'
+        // },
         {
           rel: 'preconnect',
           crossorigin: 'anonymous',
@@ -87,6 +87,7 @@ export default defineNuxtConfig({
   },
   modules: [
     '@nuxt/ui',
+    '@vite-pwa/nuxt',
     'nuxt-tiptap-editor',
     '@pinia/nuxt',
     '@pinia-plugin-persistedstate/nuxt',
@@ -108,5 +109,55 @@ export default defineNuxtConfig({
   },
   pinia: {
     storesDirs: ['./stores/**']
+  },
+  pwa: {
+    registerType: 'autoUpdate',
+    workbox: {
+      navigateFallback: null,
+      globPatterns: ['**/*.{js,json,css,html,ico,svg,png,webp,ico,woff,woff2,ttf,eit,otf}', 'icons/*'],
+      globIgnores: ['manifest**.webmanifest'],
+      additionalManifestEntries: [
+        {
+          url: '/offline',
+          revision: Math.random().toString(32),
+        },
+      ],
+      navigationPreload: true,
+      runtimeCaching: [
+        {
+          urlPattern: ({ request }) => request.mode === 'navigate',
+          handler: 'NetworkOnly',
+          options: {
+            precacheFallback: {
+              fallbackURL: '/offline',
+            },
+          },
+        },
+      ],
+      cleanupOutdatedCaches: true,
+    },
+    manifest: {
+      name: 'CTest',
+      short_name: 'CTest',
+      theme_color: '#a855f7',
+      icons: [
+        {
+          "src": "/cloud-w-144.png",
+          "sizes": "144x144",
+          "type": "image/png"
+        },
+        {
+          "src": "/cloud-w-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        },
+        {
+          "src": "/cloud-w-512.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ],
+    },
+    registerWebManifestInRouteRules: true,
   }
 })

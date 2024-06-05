@@ -1,7 +1,7 @@
 <template>
   <div>
     <NuxtLoadingIndicator />
-
+    <VitePwaManifest />
     <NuxtLayout :app-version="appVersion">
       <NuxtPage />
       <UNotifications>
