@@ -65,10 +65,29 @@ export default defineNuxtConfig({
     },
 
     manifest: {
-      name: 'cow-reproduce',
-      short_name: 'cow-reproduce',
-      description: 'Reproduce',
-      theme_color: '#ffffff',
+      "name": "Cloud of Worshippers",
+      "short_name": "CoW",
+      "description": "Cloud of Worshippers",
+      "theme_color": "#a855f7",
+      "start_url": "/",
+      "display": "fullscreen",
+      "icons": [
+        {
+          "src": "/cloud-w-144.png",
+          "sizes": "144x144",
+          "type": "image/png"
+        },
+        {
+          "src": "/cloud-w-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        },
+        {
+          "src": "/cloud-w-512.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
     },
 
     workbox: {
