@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { Alert, AppSettings, Slide, SlideStyle } from '~/types/index'
+import type { Alert, AppSettings, BackgroundVideo, Slide, SlideStyle } from '~/types/index'
 import type { Emitter } from 'mitt'
 
 // console.log(usePinia())
@@ -31,7 +31,7 @@ export const useAppStore = defineStore('app', {
         },
         slideStyles: { blur: 0.5, brightness: 50 } as SlideStyle
       },
-      backgroundVideos: [] as string[],
+      backgroundVideos: [] as BackgroundVideo[],
       alerts: [] as Alert[],
       activeAlert: null as Alert | null,
       copyrightContent: {
@@ -78,11 +78,11 @@ export const useAppStore = defineStore('app', {
     setActiveAlert(alert: Alert | null) {
       this.activeAlert = alert
     },
-    setBackgroundVideos(bgVideos: string[]) {
+    setBackgroundVideos(bgVideos: BackgroundVideo[]) {
       this.backgroundVideos = bgVideos
-      this.settings.defaultBackground.hymn.background = bgVideos?.[0]
-      this.settings.defaultBackground.bible.background = bgVideos?.[2]
-      this.settings.defaultBackground.text.background = bgVideos?.[3]
+      this.settings.defaultBackground.hymn.background = bgVideos?.[0]?.url
+      this.settings.defaultBackground.bible.background = bgVideos?.[2]?.url
+      this.settings.defaultBackground.text.background = bgVideos?.[3]?.url
     },
     setRecentBibleSearches(searchQuery: string) {
       let tempArr = [...this.recentBibleSearches]

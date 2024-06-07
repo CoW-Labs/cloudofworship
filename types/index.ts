@@ -94,6 +94,11 @@ export interface Media {
   updatedAt?: string
 }
 
+export interface BackgroundVideo {
+  id: string
+  url: string
+}
+
 export interface LibraryItem {
   id: string
   type: String

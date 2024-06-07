@@ -82,7 +82,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
-import type { LibraryItem, Media } from "~/types"
+import type { LibraryItem, Media, BackgroundVideo } from "~/types"
 
 useHead({
   title: "Cloud of Worshippers",
@@ -227,10 +227,11 @@ const overrideAppSettings = () => {
       useGlobalEmit("show-changelog")
     }, 2000)
 
+    // Any setting added here overrides user and previous system setting
+    // Remove setting property here if it is defined by the user.
     appStore.setAppSettings({
       ...currentAppSettings,
       appVersion: props.appVersion,
-      defaultFont: "Inter",
       defaultBackground: {
         hymn: {
           backgroundType: "video",
@@ -351,12 +352,13 @@ const retrieveAllMediaFilesFromDB = async () => {
 
 const setCachedVideosURL = async () => {
   const cachedVideos = await useBackgroundVideos()
-  const tempCachedVideosURLs = cachedVideos?.map((blob) =>
-    URL.createObjectURL(blob)
-  )
-  cachedVideosURLs.value = tempCachedVideosURLs as string[]
+  const tempCachedVideos = cachedVideos?.map((cached: BackgroundVideo) => ({
+    id: cached?.id,
+    url: URL.createObjectURL(cached?.data),
+  }))
+  cachedVideosURLs.value = tempCachedVideos as BackgroundVideo[]
   // console.log(tempCachedVideosURLs)
-  appStore.setBackgroundVideos(tempCachedVideosURLs)
+  appStore.setBackgroundVideos(tempCachedVideos)
 }
 
 onMounted(async () => {

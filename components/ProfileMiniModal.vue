@@ -3,7 +3,7 @@
     <div class="profile-modal text-center w-52">
       <div class="avatar-ctn bg-primary-100 dark:bg-primary-800 p-4">
         <UAvatar
-          alt="Favour Felix"
+          :alt="user?.fullname?.split(' ')?.[0]"
           size="xl"
           class="border border-primary-200"
         />
