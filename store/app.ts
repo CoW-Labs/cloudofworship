@@ -92,7 +92,7 @@ export const useAppStore = defineStore('app', {
       }
       const tempSet = new Set(tempArr)
       tempSet.add(searchQuery)
-      this.recentBibleSearches = Array.from(tempSet).reverse()
+      this.recentBibleSearches = Array.from(tempSet)
     }
   },
   persist: {

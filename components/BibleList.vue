@@ -34,7 +34,7 @@
       class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]"
     >
       <BibleQueryCard
-        v-for="bibleQuery in recentBibleSearches"
+        v-for="bibleQuery in [...recentBibleSearches].reverse()"
         :key="bibleQuery"
         :bible-query="bibleQuery"
         type="song"

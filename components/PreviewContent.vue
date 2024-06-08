@@ -616,6 +616,7 @@ const gotoScripture = async (title: string, version: string) => {
   const scriptureShortLabel = `${scriptureSplitted?.[0]}:${scriptureSplitted?.[1]}:${scriptureSplitted?.[2]}`
 
   const scripture = await useScripture(scriptureShortLabel, version)
+  appStore.setRecentBibleSearches(scriptureShortLabel)
   if (scripture) {
     // Calculate font-size of scripture content
     tempSlide.title = scriptureLabel
