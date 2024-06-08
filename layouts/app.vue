@@ -4,42 +4,49 @@
     <slot />
     <FullScreenLoader v-if="fullScreenLoading" />
     <ClientOnly>
-      <div
-        v-if="$pwa?.offlineReady || $pwa?.needRefresh"
-        class="pwa-toast"
-        role="alert"
-        aria-labelledby="toast-message"
-      >
-        <div class="message">
-          <span id="toast-message">
-            {{
+      <Transition name="fade-sm">
+        <div
+          v-if="$pwa?.offlineReady || $pwa?.needRefresh"
+          class="ctn fixed z-100 right-4 bottom-4"
+          role="alert"
+          aria-labelledby="toast-message"
+        >
+          <NotFoundBanner
+            icon="i-tabler-refresh"
+            :sub="
               $pwa.offlineReady
-                ? "App ready to work offline"
-                : "New content available, click on reload button to update"
-            }}
-          </span>
+                ? 'App ready to work offline'
+                : 'New content available, click on reload button to update'
+            "
+            action="pwa-refresh"
+            action-text="Reload"
+            secondary-action="cancel-pwa-refresh"
+            secondary-action-text="Close"
+            is-wider
+          />
         </div>
-        <div class="buttons">
-          <button v-if="$pwa.needRefresh" @click="$pwa.updateServiceWorker()">
-            Reload
-          </button>
-          <button @click="$pwa.cancelPrompt()">Close</button>
+      </Transition>
+
+      <Transition name="fade-sm">
+        <div
+          v-if="
+            $pwa?.showInstallPrompt && !$pwa?.offlineReady && !$pwa?.needRefresh
+          "
+          class="ctn fixed z-100 right-4 bottom-4"
+          role="alert"
+          aria-labelledby="install-pwa"
+        >
+          <NotFoundBanner
+            icon="i-tabler-download"
+            sub="Install Cloud of Worshippers on your computer for easy access."
+            action="pwa-install"
+            action-text="Install"
+            secondary-action="cancel-pwa-install"
+            secondary-action-text="Cancel"
+            is-wider
+          />
         </div>
-      </div>
-      <div
-        v-if="
-          $pwa?.showInstallPrompt && !$pwa?.offlineReady && !$pwa?.needRefresh
-        "
-        class="pwa-toast"
-        role="alert"
-        aria-labelledby="install-pwa"
-      >
-        <div class="message">
-          <span id="install-pwa"> Install PWA </span>
-        </div>
-        <button @click="$pwa.install()">Install</button>
-        <button @click="$pwa.cancelInstall()">Cancel</button>
-      </div>
+      </Transition>
     </ClientOnly>
   </div>
   <div
@@ -100,9 +107,26 @@ const cachedVideosURLs = ref<string[]>()
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
+
 emitter.on("app-loading", (loading) => {
   // console.log("triggered", loading)
   fullScreenLoading.value = loading
+})
+
+emitter.on("pwa-install", () => {
+  useNuxtApp().$pwa?.install()
+})
+
+emitter.on("cancel-pwa-install", () => {
+  useNuxtApp().$pwa?.cancelInstall()
+})
+
+emitter.on("pwa-refresh", () => {
+  useNuxtApp().$pwa?.updateServiceWorker()
+})
+
+emitter.on("cancel-pwa-refresh", () => {
+  useNuxtApp().$pwa?.cancelPrompt()
 })
 
 const saveAllBackgroundVideos = async () => {
