@@ -20,19 +20,24 @@
     "@tiptap/extension-placeholder": "^2.2.4",
     "@tiptap/extension-text-align": "^2.2.4",
     "@tiptap/extension-text-style": "^2.4.0",
-    "@vueuse/core": "^10.9.0",
+    "@vite-pwa/assets-generator": "^0.2.4",
+    "@vite-pwa/nuxt": "^0.7.0",
+    "@vueuse/core": "^10.10.0",
     "@vueuse/rxjs": "^10.9.0",
     "dexie": "^4.0.4",
     "fuzzysort": "^2.0.4",
     "mitt": "^3.0.1",
-    "nuxt": "^3.10.3",
+    "nuxt": "^3.11.2",
     "nuxt-tiptap-editor": "^1.1.0",
     "pinia": "^2.1.7",
     "pinia-shared-state": "^0.5.1",
     "rxjs": "^7.8.1",
-    "vue": "^3.4.21",
-    "vue-router": "^4.3.0",
-    "vuedraggable": "^4.1.0"
+    "vite-plugin-pwa": "^0.20.0",
+    "vue": "^3.4.27",
+    "vue-router": "^4.3.2",
+    "vuedraggable": "^4.1.0",
+    "workbox-build": "^7.1.0",
+    "workbox-window": "^7.1.0"
   },
   "devDependencies": {
     "@iconify-json/bi": "^1.1.23",
@@ -43,6 +48,12 @@
     "@iconify-json/ph": "^1.1.12",
     "@iconify-json/tabler": "^1.1.110",
     "@pinia-plugin-persistedstate/nuxt": "^1.0.0",
-    "@tauri-apps/cli": "^1.5.14"
+    "@tauri-apps/cli": "^1.5.14",
+    "typescript": "^5.4.5",
+    "vue-tsc": "^2.0.16"
+  },
+  "overrides": {
+    "sharp": "0.32.6",
+    "sharp-ico": "0.1.5"
   }
 }

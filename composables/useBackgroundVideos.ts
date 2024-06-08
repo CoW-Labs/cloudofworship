@@ -6,7 +6,7 @@ const useBackgroundVideos = async (id?: string) => {
   } else {
     let allVideos = await db.cached.toArray()
     allVideos = allVideos?.filter(video => video.data?.type?.includes('video') && !video?.id?.includes('custom'))
-    return allVideos.map(video => video?.data)
+    return allVideos
   }
 }
 

@@ -1,6 +1,7 @@
 <template>
   <div
     class="h-[88%] p-4 py-6 mt-4 flex justify-center gap-6 bg-primary-100 rounded-lg text-primary-900 relative overflow-hidden"
+    :class="{ ' border shadow-xl': isWider }"
   >
     <IconWrapper :name="icon" size="16" />
     <IconWrapper
@@ -10,22 +11,36 @@
     />
     <div class="texts-action">
       <div>
-        <h2 class="text-md font-semibold max-w-[150px]">
+        <h2
+          class="text-md font-semibold max-w-[150px]"
+          :class="{ 'max-w-[220px]': isWider }"
+        >
           {{ sub }}
         </h2>
         <p class="text-xs max-w-[150px] mt-1">
           {{ desc }}
         </p>
       </div>
+      <div class="btn-row flex gap-2">
+        <UButton
+          v-if="action"
+          :icon="actionIcon"
+          @click="useGlobalEmit(action, query)"
+          class="mt-2 text-primary-100"
+        >
+          {{ actionText }}
+        </UButton>
 
-      <UButton
-        v-if="action"
-        :icon="actionIcon"
-        @click="useGlobalEmit(action, query)"
-        class="mt-2 text-primary-100"
-      >
-        {{ actionText }}
-      </UButton>
+        <UButton
+          v-if="secondaryAction"
+          :icon="actionIcon"
+          @click="useGlobalEmit(secondaryAction)"
+          variant="ghost"
+          class="mt-2"
+        >
+          {{ secondaryActionText }}
+        </UButton>
+      </div>
     </div>
   </div>
 </template>
@@ -38,6 +53,9 @@ const props = defineProps<{
   actionText: string
   action: string
   query: string
+  secondaryActionText: string
+  secondaryAction: string
+  isWider: boolean
 }>()
 
 const actionIcon = computed(() => {

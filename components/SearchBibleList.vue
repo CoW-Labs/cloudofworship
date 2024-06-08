@@ -3,7 +3,7 @@
     <div class="flex gap-2">
       <UInput
         icon="i-bx-search"
-        placeholder="Search the KJV Bible"
+        :placeholder="getPlaceholderByFilter()"
         v-model="searchInput"
         class="w-[100%]"
         @input="onSearchInput"
@@ -11,6 +11,60 @@
         @keyup.enter="getVerses($event.target.value)"
       />
       <UButton icon="i-bx-x" color="primary" @click="$emit('close')"></UButton>
+    </div>
+
+    <!-- CHIP GROUP -->
+    <div class="button-row flex flex-nowrap my-4 gap-1 pb-2">
+      <UButton
+        :variant="selectedFilter === 'old' ? 'solid' : 'outline'"
+        @click="selectedFilter = 'old'"
+      >
+        Old Test...
+      </UButton>
+      <UButton
+        :variant="selectedFilter === 'new' ? 'solid' : 'outline'"
+        @click="selectedFilter = 'new'"
+      >
+        New Test...
+      </UButton>
+      <USelectMenu
+        :variant="
+          selectedFilter === '' ||
+          selectedFilter === 'old' ||
+          selectedFilter === 'new'
+            ? 'outline'
+            : 'solid'
+        "
+        color="black"
+        placeholder="Bible book"
+        v-model="selectedFilter"
+        searchable
+        :ui="{
+          variant: {
+            outline:
+              'focus:ring-0 ring-0 text-primary font-medium border border-primary shadow-none',
+            solid:
+              'focus:ring-0 ring-0 text-white font-medium border-0 shadow-none bg-primary-500',
+          },
+        }"
+        :options="bibleBooks"
+      >
+        <template #label>
+          <span
+            v-if="
+              selectedFilter?.length &&
+              !(
+                selectedFilter === '' ||
+                selectedFilter === 'old' ||
+                selectedFilter === 'new'
+              )
+            "
+            class="truncate w-12 lg:max-w-20"
+            >{{ selectedFilter }}</span
+          >
+          <span v-else>Book</span>
+        </template>
+      </USelectMenu>
     </div>
 
     <div
@@ -55,6 +109,7 @@ const verses = ref<BibleVerse[]>()
 const searchedVerses = ref<BibleVerse[]>([])
 const focusedActionIndex = ref(0)
 const quickActions = ref<HTMLDivElement | null>(null)
+const selectedFilter = ref<string>("")
 
 const turnToBibleTypeAction = (bibleVerse: BibleVerse) => {
   const bibleChapterAndVerse = `${bibleVerse.chapter}:${bibleVerse.verse}`
@@ -76,6 +131,37 @@ const getBible = async () => {
   kjvBible.value = bible?.data as unknown as BibleVerse[]
   getVerses()
 }
+
+watch(selectedFilter, () => {
+  getVerses()
+  loading.value = true
+  onSearchInput(searchInput.value)
+})
+
+const oldTestamentBible = computed(() => {
+  return kjvBible.value.filter((b) => Number(b.book) <= 39)
+})
+
+const newTestamentBible = computed(() => {
+  return kjvBible.value.filter((b) => Number(b.book) > 39)
+})
+
+const formattedKjvBible = computed(() => {
+  if (selectedFilter.value === "old") {
+    return oldTestamentBible.value
+  } else if (selectedFilter.value === "new") {
+    return newTestamentBible.value
+  } else if (selectedFilter.value === "") {
+    return kjvBible.value
+  } else {
+    const bibleBookIndex =
+      bibleBooks.findIndex((b) => b === selectedFilter.value) + 1
+    const tempBible = kjvBible.value?.filter(
+      (b) => Number(b.book) === bibleBookIndex
+    )
+    return tempBible
+  }
+})
 
 onMounted(() => {
   quickActions.value?.addEventListener("keydown", (e) => {
@@ -108,16 +194,29 @@ onMounted(() => {
 const getVerses = (query: string = "") => {
   if (query?.length >= 2) {
     loading.value = true
-    let results = fuzzysort.go(query, kjvBible.value, {
+    let results = fuzzysort.go(query, formattedKjvBible.value, {
       keys: ["scripture"],
     })
     results = results?.map((result) => result.obj) as BibleVerse[]
     verses.value = results.slice(0, 15)
   } else {
     const rand = Math.floor(Math.random() * 1115 + 15)
-    verses.value = kjvBible.value.slice(rand - 15, rand)
+    verses.value = formattedKjvBible.value.slice(0, 15)
   }
   loading.value = false
+}
+
+const getPlaceholderByFilter = () => {
+  switch (selectedFilter.value) {
+    case "new":
+      return "Search the New Testament (KJV)"
+    case "old":
+      return "Search the Old Testament (KJV)"
+    case "":
+      return "Search the KJV Bible"
+    default:
+      return `Search ${selectedFilter.value} (KJV)`
+  }
 }
 
 getBible()

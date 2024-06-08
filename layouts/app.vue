@@ -3,6 +3,51 @@
     <Navbar :app-version="appVersion" />
     <slot />
     <FullScreenLoader v-if="fullScreenLoading" />
+    <ClientOnly>
+      <Transition name="fade-sm">
+        <div
+          v-if="$pwa?.offlineReady || $pwa?.needRefresh"
+          class="ctn fixed z-100 right-4 bottom-4"
+          role="alert"
+          aria-labelledby="toast-message"
+        >
+          <NotFoundBanner
+            icon="i-tabler-refresh"
+            :sub="
+              $pwa.offlineReady
+                ? 'App ready to work offline'
+                : 'New content available, click on reload button to update'
+            "
+            action="pwa-refresh"
+            action-text="Reload"
+            secondary-action="cancel-pwa-refresh"
+            secondary-action-text="Close"
+            is-wider
+          />
+        </div>
+      </Transition>
+
+      <Transition name="fade-sm">
+        <div
+          v-if="
+            $pwa?.showInstallPrompt && !$pwa?.offlineReady && !$pwa?.needRefresh
+          "
+          class="ctn fixed z-100 right-4 bottom-4"
+          role="alert"
+          aria-labelledby="install-pwa"
+        >
+          <NotFoundBanner
+            icon="i-tabler-download"
+            sub="Install Cloud of Worshippers on your computer for easy access."
+            action="pwa-install"
+            action-text="Install"
+            secondary-action="cancel-pwa-install"
+            secondary-action-text="Cancel"
+            is-wider
+          />
+        </div>
+      </Transition>
+    </ClientOnly>
   </div>
   <div
     v-else
@@ -44,7 +89,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
-import type { LibraryItem, Media } from "~/types"
+import type { LibraryItem, Media, BackgroundVideo } from "~/types"
 
 useHead({
   title: "Cloud of Worshippers",
@@ -62,9 +107,26 @@ const cachedVideosURLs = ref<string[]>()
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
+
 emitter.on("app-loading", (loading) => {
   // console.log("triggered", loading)
   fullScreenLoading.value = loading
+})
+
+emitter.on("pwa-install", () => {
+  useNuxtApp().$pwa?.install()
+})
+
+emitter.on("cancel-pwa-install", () => {
+  useNuxtApp().$pwa?.cancelInstall()
+})
+
+emitter.on("pwa-refresh", () => {
+  useNuxtApp().$pwa?.updateServiceWorker()
+})
+
+emitter.on("cancel-pwa-refresh", () => {
+  useNuxtApp().$pwa?.cancelPrompt()
 })
 
 const saveAllBackgroundVideos = async () => {
@@ -189,10 +251,11 @@ const overrideAppSettings = () => {
       useGlobalEmit("show-changelog")
     }, 2000)
 
+    // Any setting added here overrides user and previous system setting
+    // Remove setting property here if it is defined by the user.
     appStore.setAppSettings({
       ...currentAppSettings,
       appVersion: props.appVersion,
-      defaultFont: "Inter",
       defaultBackground: {
         hymn: {
           backgroundType: "video",
@@ -313,12 +376,13 @@ const retrieveAllMediaFilesFromDB = async () => {
 
 const setCachedVideosURL = async () => {
   const cachedVideos = await useBackgroundVideos()
-  const tempCachedVideosURLs = cachedVideos?.map((blob) =>
-    URL.createObjectURL(blob)
-  )
-  cachedVideosURLs.value = tempCachedVideosURLs as string[]
+  const tempCachedVideos = cachedVideos?.map((cached: BackgroundVideo) => ({
+    id: cached?.id,
+    url: URL.createObjectURL(cached?.data),
+  }))
+  cachedVideosURLs.value = tempCachedVideos as BackgroundVideo[]
   // console.log(tempCachedVideosURLs)
-  appStore.setBackgroundVideos(tempCachedVideosURLs)
+  appStore.setBackgroundVideos(tempCachedVideos)
 }
 
 onMounted(async () => {

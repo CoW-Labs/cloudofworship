@@ -1,13 +1,11 @@
 <template>
-  <div>
+  <main>
     <slot />
-  </div>
+  </main>
 </template>
 
-<script setup>
+<script setup lang="ts">
 useHead({
   title: "Cloud of Worshippers",
 })
 </script>
-
-<style scoped></style>

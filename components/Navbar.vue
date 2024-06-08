@@ -42,7 +42,7 @@
             class="p-1"
           >
             <UAvatar
-              :alt="user?.fullname"
+              :alt="user?.fullname?.split(' ')?.[0]"
               size="sm"
               class="border-primary-500"
               :ui="{
