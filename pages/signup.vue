@@ -202,7 +202,16 @@ definePageMeta({
   layout: "auth",
 })
 
-const token = useCookie("token")
+const runtimeConfig = useRuntimeConfig()
+const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
+
+const thirtyDaysAhead = new Date()
+thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
+const token = useCookie("token", {
+  secure: !isDevEnvironment,
+  sameSite: true,
+  expires: thirtyDaysAhead,
+})
 const authStore = useAuthStore()
 const route = useRoute()
 
