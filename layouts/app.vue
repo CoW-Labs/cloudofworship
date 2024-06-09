@@ -64,13 +64,14 @@
           class="text-center"
           :value="downloadProgress"
           :max="[
-            'Setting up environment...',
+            'Initializing...',
+            'Setting up resources...', // also loading bg videos
             'Loading KJV Bible...',
             'Loading NKJV Bible...',
             'Loading NIV Bible...',
             'Loading AMP Bible...',
             'Loading Hymns...',
-            'Loading background videos...',
+            // 'Loading background videos...',
             'Finishing up',
           ]"
         />
@@ -185,54 +186,56 @@ const downloadEssentialResources = async () => {
   const db = useIndexedDB()
 
   loadingResources.value = true
+  downloadProgress.value = 0
+
+  // Download background videos
   downloadProgress.value = 1
+  await saveAllBackgroundVideos()
 
   // Download KJV Bible
   let tempBible = await db.bibleAndHymns.get("KJV")
   if (!tempBible) {
+    downloadProgress.value = 2
     const kjvBible = await useS3File("kjv.json")
     db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
-    downloadProgress.value = 2
   }
 
   // Download NKJV Bible
   tempBible = await db.bibleAndHymns.get("NKJV")
   if (!tempBible) {
+    downloadProgress.value = 3
     const nkjvBible = await useS3File("nkjv.json")
     db.bibleAndHymns.add(tempBibleVersion("NKJV", nkjvBible))
-    downloadProgress.value = 3
   }
 
   // Download NIV Bible
   tempBible = await db.bibleAndHymns.get("NIV")
   if (!tempBible) {
+    downloadProgress.value = 4
     const nivBible = await useS3File("niv.json")
     db.bibleAndHymns.add(tempBibleVersion("NIV", nivBible))
-    downloadProgress.value = 4
   }
 
   // Download AMP Bible
   tempBible = await db.bibleAndHymns.get("AMP")
   if (!tempBible) {
+    downloadProgress.value = 5
     const ampBible = await useS3File("amp.json")
     db.bibleAndHymns.add(tempBibleVersion("AMP", ampBible))
-    downloadProgress.value = 5
   }
 
   // Download all hymns
   tempBible = await db.bibleAndHymns.get("hymns")
   if (!tempBible) {
+    downloadProgress.value = 6
     const hymns = await useS3File("hymns.json")
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
-    downloadProgress.value = 6
   }
 
-  // Download background videos
-  await saveAllBackgroundVideos()
+  // All computations completed
   downloadProgress.value = 7
 
   setTimeout(() => {
-    downloadProgress.value = 8
     loadingResources.value = false
   }, 100)
 }
