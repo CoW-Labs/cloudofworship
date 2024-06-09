@@ -10,7 +10,9 @@
   >
     <UIcon
       :name="name"
-      :class="`w-${size} h-${size} ${animate ? 'animate-ping' : ''}`"
+      :class="`w-${size} h-${size} ${animate ? 'animate-ping' : ''} ${
+        darkText ? 'dark:text-primary-900' : ''
+      }`"
       dynamic
     />
   </div>
@@ -25,5 +27,6 @@ const props = defineProps({
   name: String,
   roundedBg: Boolean,
   animate: Boolean,
+  darkText: Boolean,
 })
 </script>

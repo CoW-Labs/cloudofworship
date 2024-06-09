@@ -95,13 +95,13 @@
         <UInputMenu
           placeholder="Your church's name"
           variant="solid"
-          class="bg-gray-100 rounded-md text-black"
+          class="bg-gray-100 rounded-md"
           v-model="church"
           :options="churchesArr"
           searchable
           :ui="{
             variant: {
-              solid: 'focus:ring-0',
+              solid: 'focus:ring-0 dark:bg-primary-200',
             },
           }"
         >
@@ -139,7 +139,7 @@
             variant="ghost"
             color="black"
           >
-            <IconWrapper name="i-bx-info-circle" size="5" />
+            <IconWrapper name="i-bx-info-circle" size="5" dark-text />
           </UButton>
         </UTooltip>
       </UFormGroup>
@@ -168,7 +168,7 @@
             variant="ghost"
             color="black"
           >
-            <IconWrapper name="i-bx-info-circle" size="5" />
+            <IconWrapper name="i-bx-info-circle" size="5" dark-text />
           </UButton>
         </UTooltip>
 
