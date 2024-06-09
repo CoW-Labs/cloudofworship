@@ -80,9 +80,12 @@ const email = ref("")
 const password = ref("")
 const passwordType = ref("password")
 const loading = ref(false)
+const thirtyDaysAhead = new Date()
+thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
 const token = useCookie("token", {
   secure: !isDevEnvironment,
   sameSite: true,
+  expires: thirtyDaysAhead,
 })
 
 const login = async () => {
