@@ -15,20 +15,6 @@
         </UButton>
       </div>
       <div class="actions text-sm flex gap-2 items-center">
-        <ClientOnly>
-          <UButton
-            :icon="isDark ? 'i-tabler-moon-filled' : 'i-tabler-sun-filled'"
-            color="primary"
-            variant="ghost"
-            aria-label="Theme"
-            @click="isDark = !isDark"
-            >{{ isDark ? "Light" : "Dark" }}</UButton
-          >
-          <template #fallback>
-            <div class="w-8 h-8" />
-          </template>
-        </ClientOnly>
-
         <UPopover
           v-model:open="bgImagePopoverOpen"
           :ui="{
@@ -59,6 +45,19 @@
             />
           </template>
         </UPopover>
+        <ClientOnly>
+          <UButton
+            :icon="isDark ? 'i-tabler-moon-filled' : 'i-tabler-sun-filled'"
+            color="primary"
+            variant="ghost"
+            aria-label="Theme"
+            @click="isDark = !isDark"
+            >{{ isDark ? "Light" : "Dark" }}</UButton
+          >
+          <template #fallback>
+            <div class="w-8 h-8" />
+          </template>
+        </ClientOnly>
         <SettingsModal
           :is-open="settingsModalOpen"
           @close-modal="settingsModalOpen = false"

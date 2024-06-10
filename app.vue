@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="dark:bg-gray-900">
     <NuxtPwaAssets />
     <NuxtLoadingIndicator />
     <NuxtLayout :app-version="appVersion">

@@ -22,7 +22,7 @@
             @blur="passwordInputHover = false"
           />
           <UButton
-            class="absolute right-0 top-0 bottom-0"
+            class="absolute right-0 top-0 bottom-0 dark:hover:bg-primary-300"
             color="gray"
             variant="ghost"
             size="sm"
@@ -39,6 +39,7 @@
                   ? 'i-tabler-eye'
                   : 'i-tabler-eye-off'
               "
+              dark-text
             />
           </UButton>
         </div>
