@@ -15,6 +15,16 @@
         </UButton>
       </div>
       <div class="actions text-sm flex gap-2 items-center">
+        <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
+        <UTooltip :text="online ? 'You are online' : 'You are offline'">
+          <UButton variant="ghost" class="h-10 opacity-65">
+            <IconWrapper v-show="online" name="i-tabler-cloud"></IconWrapper>
+            <IconWrapper
+              v-show="!online"
+              name="i-tabler-cloud-off"
+            ></IconWrapper>
+          </UButton>
+        </UTooltip>
         <UPopover
           v-model:open="bgImagePopoverOpen"
           :ui="{
@@ -51,6 +61,7 @@
             color="primary"
             variant="ghost"
             aria-label="Theme"
+            class="h-10"
             @click="isDark = !isDark"
             >{{ isDark ? "Light" : "Dark" }}</UButton
           >
@@ -80,6 +91,7 @@ const authStore = useAuthStore()
 const { user, church } = storeToRefs(authStore)
 defineProps({
   appVersion: String,
+  online: Boolean,
 })
 const isDark = computed({
   get() {

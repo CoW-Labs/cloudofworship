@@ -1,6 +1,6 @@
 <template>
   <div v-if="!loadingResources" class="app-ctn max-h-[100vh] overflow-hidden">
-    <Navbar :app-version="appVersion" />
+    <Navbar :app-version="appVersion" :online="isAppOnline" />
     <slot />
     <FullScreenLoader v-if="fullScreenLoading" />
     <ClientOnly>
@@ -43,6 +43,24 @@
             action-text="Install"
             secondary-action="cancel-pwa-install"
             secondary-action-text="Cancel"
+            is-wider
+          />
+        </div>
+      </Transition>
+
+      <Transition name="fade-sm">
+        <div
+          v-show="isOfflineToastOpen"
+          class="ctn fixed z-100 right-4 bottom-4"
+          role="alert"
+          aria-labelledby="toast-message"
+        >
+          <NotFoundBanner
+            icon="i-tabler-cloud-off"
+            sub="You are offline"
+            desc="CoW will save your work until an internet connection returns."
+            action="close-offline-toast"
+            action-text="Ok, got it."
             is-wider
           />
         </div>
@@ -91,6 +109,7 @@ import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
 import type { LibraryItem, Media, BackgroundVideo } from "~/types"
+import { useOnline } from "@vueuse/core"
 
 useHead({
   title: "Cloud of Worshippers",
@@ -99,12 +118,21 @@ const props = defineProps({
   appVersion: String,
 })
 
+const online = useOnline()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const loadingResources = ref<boolean>(true)
 const downloadProgress = ref<number>(5)
 const fullScreenLoading = ref<boolean>(false)
 const cachedVideosURLs = ref<string[]>()
+const isOfflineToastOpen = ref<boolean>(false)
+
+const isAppOnline = computed(() => {
+  // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
+  // if() {}
+  isOfflineToastOpen.value = !online.value
+  return online.value
+})
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -128,6 +156,10 @@ emitter.on("pwa-refresh", () => {
 
 emitter.on("cancel-pwa-refresh", () => {
   useNuxtApp().$pwa?.cancelPrompt()
+})
+
+emitter.on("close-offline-toast", () => {
+  isOfflineToastOpen.value = false
 })
 
 const saveAllBackgroundVideos = async () => {

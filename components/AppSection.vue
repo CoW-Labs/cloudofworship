@@ -10,12 +10,14 @@
         :class="[secondaryButtons ? 'justify-between' : '', headingStyles]"
       >
         <template v-if="subHeading">
-          <UButton
-            variant="ghost"
-            class="p-1 px-2 text-black"
-            @click="$emit('header-click')"
-            >{{ heading }}</UButton
-          >
+          <UTooltip text="Go back">
+            <UButton
+              variant="ghost"
+              class="p-1 px-2 text-black"
+              @click="$emit('header-click')"
+              >{{ heading }}</UButton
+            >
+          </UTooltip>
           <IconWrapper name="i-bx-chevron-right" class="text-primary" />
           <span
             class="pl-2 text-gray-600 dark:text-primary-200 font-normal capitalize"
