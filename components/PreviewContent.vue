@@ -497,6 +497,8 @@ const createNewCountdownSlide = (countdown: Countdown) => {
   // Take slide live if current active slide is a countdown
   if (activeSlide.value?.type === slideTypes.countdown) {
     makeSlideActive(tempSlide, true)
+  } else {
+    makeSlideActive(tempSlide)
   }
   toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
 }

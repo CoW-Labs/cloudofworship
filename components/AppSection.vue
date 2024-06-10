@@ -22,7 +22,7 @@
             >{{ subHeading }}</span
           >
         </template>
-        <span v-else class="p-1 px-2">
+        <span v-else class="p-1 px-2 whitespace-nowrap truncate">
           {{ heading }}
         </span>
         <div class="actions flex flex-row-reverse items-center gap-1">
@@ -41,7 +41,7 @@
             </ConfirmDialog>
             <UButton
               v-if="secondaryButton.visible && !secondaryButton.confirmAction"
-              class="p-1 px-2"
+              class="p-1 px-2 whitespace-nowrap"
               size="md"
               :variant="secondaryButton?.variant || 'ghost'"
               :color="secondaryButton.color"

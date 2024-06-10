@@ -6,7 +6,7 @@ import type { Countdown, Hymn, Scripture, Slide, Song } from "~/types/index"
  * @param slide 
  * @param data 
  * @param nextVerse 
- * @returns 
+ * @returns an array of Strings representing content/text box for each slide
  */
 const useSlideContent = (slide: Slide, data: Scripture | Hymn | Song | Countdown, nextVerse: string = '') => {
   const appStore = useAppStore()
@@ -38,9 +38,9 @@ const useSlideContent = (slide: Slide, data: Scripture | Hymn | Song | Countdown
     case slideTypes.countdown:
       data = data as Countdown
       return [
+        '',
         `<p class="countdown-label" style="line-height: 0;">${data?.content}</p>`,
         `<p class="countdown-content opacity-75 leading-[1]">${data?.timeLeft?.replace('00:', '')}</>`,
-        // <p class="copyright-content">${appStore.copyrightContent[data?.version]}</p>`,
       ]
   }
 
