@@ -1,6 +1,6 @@
 <template>
   <AppSection
-    heading="Live Output"
+    heading="Slide Schedule"
     class="max-w-[400px]"
     :secondary-buttons="[
       {

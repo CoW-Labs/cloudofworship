@@ -572,7 +572,7 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
 const updateLiveOutput = (updatedSlide: Slide) => {
   appStore.setActiveSlides(slides.value || [])
 
-  // If the current slide in the live output is being edited, then update LiveOutput immediately
+  // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
   if (updatedSlide.id === appStore.liveSlideId) {
     appStore.setLiveSlide(updatedSlide.id)
   }
