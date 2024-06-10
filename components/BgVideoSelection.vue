@@ -7,7 +7,7 @@
         v-for="video in backgroundVideos"
         :key="video?.id"
         @click="$emit('select', { video: video?.url, key: video?.id })"
-        class="min-w-[80px] h-[60px] p-0 text-black bg-cover transition-all overflow-hidden relative"
+        class="w-[100px] h-[60px] p-0 text-black bg-cover transition-all overflow-hidden relative"
       >
         <video
           class="bg-image w-[100%] h-[100%] transition rounded-md opacity-100 hover:opacity-30 object-cover"

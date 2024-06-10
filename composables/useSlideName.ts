@@ -1,7 +1,10 @@
+import { useAppStore } from "~/store/app"
 import type { Slide } from "~/types/index"
-import { backgroundTypes } from "~/utils/constants"
+import { backgroundTypes, slideLayoutTypes, slideTypes } from "~/utils/constants"
 
 const useSlideName = (slide: Slide) => {
+  const appStore = useAppStore()
+
   switch (slide?.type) {
     case slideTypes.media:
       return slide?.data?.name
@@ -9,9 +12,9 @@ const useSlideName = (slide: Slide) => {
       return slide?.data?.title
     case slideTypes.text:
       if (slideLayoutTypes.heading_sub === slide.layout) {
-        return slide.contents?.[0]?.trim()?.replaceAll('<br>', '\n')?.replaceAll('</h1>', '\n')?.replaceAll('</h2>', '\n')?.replaceAll('</h3>', '\n')?.replace(/<[^>]*>/g, '')?.split('\n')?.[0]
+        return slide.contents?.[0]?.trim()?.replaceAll('<br>', '\n')?.replaceAll('</h1>', '\n')?.replaceAll('</h2>', '\n')?.replaceAll('</h3>', '\n')?.replace(/<[^>]*>/g, '')?.split('\n')?.[0] || (slide?.name?.startsWith('Untitled ') ? slide?.name : `Untitled ${appStore.activeSlides.length}`)
       }
-      return slide.contents?.[1]?.trim()?.replaceAll('<br>', '\n')?.replaceAll('</h1>', '\n')?.replaceAll('</h2>', '\n')?.replaceAll('</h3>', '\n')?.replace(/<[^>]*>/g, '')?.split('\n')?.[0]
+      return slide.contents?.[1]?.trim()?.replaceAll('<br>', '\n')?.replaceAll('</h1>', '\n')?.replaceAll('</h2>', '\n')?.replaceAll('</h3>', '\n')?.replace(/<[^>]*>/g, '')?.split('\n')?.[0] || (slide?.name?.startsWith('Untitled ') ? slide?.name : `Untitled ${appStore.activeSlides.length}`)
     case slideTypes.hymn:
       return `Hymn ${slide?.songId}`
     case slideTypes.countdown:

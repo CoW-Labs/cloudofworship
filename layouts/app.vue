@@ -51,7 +51,7 @@
   </div>
   <div
     v-else
-    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center"
+    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center dark:bg-gray-900"
   >
     <div class="wrapper flex flex-col gap-2">
       <div class="logo flex items-center justify-center mb-6 gap-2">
