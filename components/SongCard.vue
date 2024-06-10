@@ -1,6 +1,6 @@
 <template>
   <button
-    class="action-card flex gap-3 p-2 py-4 border-t first:border-t-0 border-gray-100 dark:border-primary-950 hover:rounded-md hover:bg-primary-50 dark:hover:bg-primary-800 transition-all cursor-pointer text-left w-[100%] relative"
+    class="action-card flex gap-3 p-2 py-4 border-t first:border-t-0 border-gray-100 dark:border-primary-950 hover:rounded-md hover:bg-primary-50 dark:hover:bg-primary-800 transition-all cursor-pointer text-left w-[100%]"
     @click="
       useGlobalEmit(
         `new-${type || slideTypes.song}`,
@@ -43,6 +43,12 @@
       >
       </ConfirmDialog>
     </div>
+    <div
+      class="song-excerpt text-xs absolute w-100 dark:bg-gray-800 bg-primary-100 border border-primary-500 dark:border-primary-800 p-4 py-3 rounded-lg w-[300px] max-h-[150px] overflow-hidden truncate whitespace-pre-line text-ellipsis z-50"
+    >
+      <h3 class="text-md font-semibold mb-1">Lyrics Preview</h3>
+      {{ song?.lyrics?.trim() }}
+    </div>
   </button>
 </template>
 <script setup lang="ts">
@@ -67,5 +73,18 @@ const props = defineProps<{
   visibility: visible;
   opacity: 1;
   transform: translateX(0);
+}
+.action-card:hover .song-excerpt {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(0px);
+}
+.song-excerpt {
+  visibility: hidden;
+  opacity: 0;
+  transition: 0.2s;
+  transform: translateX(-30px);
+  left: 350px;
+  top: 40%;
 }
 </style>

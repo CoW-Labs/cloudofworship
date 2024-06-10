@@ -25,6 +25,8 @@
             ></IconWrapper>
           </UButton>
         </UTooltip>
+
+        <!-- ACCOUNT PROFILE BUTTON -->
         <UPopover
           v-model:open="bgImagePopoverOpen"
           :ui="{
@@ -55,6 +57,15 @@
             />
           </template>
         </UPopover>
+
+        <!-- INVITE PEOPLE BUTTON -->
+        <UTooltip text="Invite church media team">
+          <UButton variant="outline" class="h-8" icon="i-bx-user-plus">
+            Invite
+          </UButton>
+        </UTooltip>
+
+        <!-- DARK / LIGHT MODE TOGGLE -->
         <ClientOnly>
           <UButton
             :icon="isDark ? 'i-tabler-moon-filled' : 'i-tabler-sun-filled'"
