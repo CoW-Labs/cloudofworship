@@ -71,11 +71,11 @@
       ((slide?.slideStyle?.fontSizePercent || 100) / 100)
     }vw`"
   >
-    <div class="content jost" v-html="slide?.contents?.[0]"></div>
+    <div class="content jost" v-html="slide?.contents?.[1]"></div>
     <div
       class="content"
       :class="[useURLFriendlyString(slide?.slideStyle?.font || 'Inter')]"
-      v-html="slide?.contents?.[1]"
+      v-html="slide?.contents?.[2]"
     ></div>
   </div>
 </template>
