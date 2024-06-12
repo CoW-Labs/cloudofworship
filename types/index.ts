@@ -4,6 +4,8 @@ export interface Slide {
   name: string
   type: string
   layout: string
+  userId: string
+  churchId: string
   contents: Array<string>
   backgroundType?: string
   background?: string

@@ -43,7 +43,8 @@ export const useAppStore = defineStore('app', {
         'NIV': 'Scriptures taken from the Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™ All rights reserved worldwide.',
         'AMP': 'All Scripture quotations, unless otherwise indicated, are taken from the Amplified Bible, Copyright © 2015 by The Lockman Foundation.'
       },
-      recentBibleSearches: [] as string[]
+      recentBibleSearches: [] as string[],
+      failedUploadRequests: [] as { path: string, options: any }[]
     }
   },
   actions: {
@@ -96,6 +97,9 @@ export const useAppStore = defineStore('app', {
       const tempSet = new Set(tempArr)
       tempSet.add(searchQuery)
       this.recentBibleSearches = Array.from(tempSet)
+    },
+    setFailedUploadRequests(failedRequest: { path: string, options: any }) {
+      this.failedUploadRequests.push()
     }
   },
   persist: {
