@@ -3,7 +3,7 @@
     class="flex-1 rounded-xl border border-primary-100 dark:border-primary-900 h-[100vh] max-h-[calc(100vh-80px)] overflow-hidden"
   >
     <div
-      class="heading p-2 px-3 bg-primary-100 dark:bg-primary-900 border dark:border-none"
+      class="heading p-2 px-3 bg-primary-100 dark:bg-primary-900 border dark:border-none rounded-t-lg"
     >
       <h2
         class="font-medium text-sm flex items-center top-0 bottom-[auto]"

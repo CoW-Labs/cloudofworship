@@ -15,10 +15,20 @@
         </UButton>
       </div>
       <div class="actions text-sm flex gap-2 items-center">
+        <SettingsModal
+          :is-open="settingsModalOpen"
+          @close-modal="settingsModalOpen = false"
+        />
+
+        <ChangelogModal :app-version="appVersion" />
+
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
         <UTooltip :text="online ? 'You are online' : 'You are offline'">
           <UButton variant="ghost" class="h-10 opacity-65">
-            <IconWrapper v-show="online" name="i-tabler-cloud"></IconWrapper>
+            <IconWrapper
+              v-show="online"
+              name="i-tabler-cloud-bolt"
+            ></IconWrapper>
             <IconWrapper
               v-show="!online"
               name="i-tabler-cloud-off"
@@ -80,11 +90,6 @@
             <div class="w-8 h-8" />
           </template>
         </ClientOnly>
-        <SettingsModal
-          :is-open="settingsModalOpen"
-          @close-modal="settingsModalOpen = false"
-        />
-        <ChangelogModal :app-version="appVersion" />
       </div>
     </div>
   </Transition>

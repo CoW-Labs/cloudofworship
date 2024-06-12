@@ -44,10 +44,17 @@
       </ConfirmDialog>
     </div>
     <div
-      class="song-excerpt text-xs absolute w-100 dark:bg-gray-800 bg-primary-100 border border-primary-500 dark:border-primary-800 p-4 py-3 rounded-lg w-[300px] max-h-[150px] overflow-hidden truncate whitespace-pre-line text-ellipsis z-50"
+      class="song-excerpt text-xs absolute w-100 rounded-xl bg-white dark:bg-gray-800 bg-primary-100rounded-lg w-[300px] max-h-[200px] overflow-hidden shadow-lg truncate whitespace-pre-line text-ellipsis z-50"
     >
-      <h3 class="text-md font-semibold mb-1">Lyrics Preview</h3>
-      {{ song?.lyrics?.trim() }}
+      <AppSection heading="Lyrics Preview">
+        <p class="px-2">{{ song?.lyrics?.trim() }}</p>
+      </AppSection>
+      <IconWrapper
+        name="i-bx-music"
+        size="24"
+        class="absolute -bottom-4 -right-4 text-primary-500 opacity-15"
+      />
+      <h3 class="font-semibold mb-1">Lyrics Preview</h3>
     </div>
   </button>
 </template>
@@ -85,6 +92,6 @@ const props = defineProps<{
   transition: 0.2s;
   transform: translateX(-30px);
   left: 350px;
-  top: 40%;
+  top: 30vh;
 }
 </style>

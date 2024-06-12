@@ -80,7 +80,7 @@ const getAllLocallySavedVideos = async () => {
     }
   })
   backgroundVideos.value = backgroundVideos.value.concat(locallySavedVideos)
-  console.log(backgroundVideos.value)
+  // console.log(backgroundVideos.value)
 }
 
 const saveAndSelectVideo = async (file: any) => {
@@ -96,7 +96,7 @@ const saveAndSelectVideo = async (file: any) => {
   db.cached.add(tempMedia)
   bgVideoToBeSelected.value = tempMedia.id
   await getAllLocallySavedVideos()
-  console.log(bgVideoToBeSelected.value, tempMedia.id)
+  // console.log(bgVideoToBeSelected.value, tempMedia.id)
   emit("select", { video: bgVideoToBeSelected.value, key: tempMedia.id })
 }
 

@@ -20,16 +20,16 @@ const getIconBySlideType = (slideType) => {
       return "i-bx-music"
     case slideTypes.hymn:
       return "i-bx-church"
-    case slideTypes.sermon:
-      return "i-bx-slideshow"
+    // case slideTypes.sermon:
+    //   return "i-bx-slideshow"
     case slideTypes.bible:
       return "i-bx-bible"
     case slideTypes.text:
       return "i-bx-text"
     case slideTypes.media:
       return "i-bx-image"
-    case slideTypes.carousel:
-      return "i-bx-carousel"
+    // case slideTypes.carousel:
+    //   return "i-bx-carousel"
     case slideTypes.countdown:
       return "i-bx-time"
   }

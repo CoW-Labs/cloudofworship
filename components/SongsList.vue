@@ -114,8 +114,8 @@ onMounted(() => {
 const getSongs = async (query: string = "") => {
   try {
     loading.value = true
-    const promise = await useAPIFetch(`/song?search=${query}`)
-    let songsData = promise.data.value.data?.map((song) => ({
+    const promise = await useAPIFetch(`/song?search=${query}&limit=20`)
+    let songsData = promise.data.value.data?.data?.map((song) => ({
       ...song,
       title: song.title.replaceAll("â", "'"),
     }))

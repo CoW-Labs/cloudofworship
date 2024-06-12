@@ -295,14 +295,17 @@ const overrideAppSettings = () => {
         hymn: {
           backgroundType: "video",
           background: cachedVideosURLs.value?.[0],
+          backgroundVideoKey: "/video-bg-1.mp4",
         },
         bible: {
           backgroundType: "video",
           background: cachedVideosURLs.value?.[2],
+          backgroundVideoKey: "/video-bg-3.mp4",
         },
         text: {
           backgroundType: "video",
           background: cachedVideosURLs.value?.[3],
+          backgroundVideoKey: "/video-bg-4.mp4",
         },
       },
     })

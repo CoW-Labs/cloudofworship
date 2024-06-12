@@ -4,9 +4,9 @@ export const slideTypes = {
   bible: 'bible',
   text: 'text',
   media: 'media',
-  sermon: 'sermon',
-  carousel: 'carousel',
   countdown: 'countdown',
+  // sermon: 'sermon',
+  // carousel: 'carousel',
 }
 
 export const libraryTypes = {
