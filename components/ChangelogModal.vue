@@ -52,6 +52,7 @@ defineProps<{
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const changelog = `
 - Added online/offline status
+- Added song preview when searching songs
 - New songs added
 - Fixed minor bugs and issues for improved experience`
 
