@@ -58,9 +58,9 @@
       'right-live-content': slide?.slideStyle?.alignment === 'right',
     }"
   >
-    <TiptapEditorContent :editor="uneditableEditorOne" class="jost" />
+    <TiptapEditorContent :editor="uneditableEditorTwo" class="jost" />
     <TiptapEditorContent
-      :editor="uneditableEditorTwo"
+      :editor="uneditableEditorThree"
       :class="useURLFriendlyString(slide?.slideStyle?.font || '')"
     />
   </div>
@@ -90,12 +90,14 @@ watch(
       editorThree.value?.commands.setContent(newVal?.contents[2])
       uneditableEditorOne.value?.commands.setContent(newVal?.contents[0])
       uneditableEditorTwo.value?.commands.setContent(newVal?.contents[1])
+      uneditableEditorThree.value?.commands.setContent(newVal?.contents[2])
     } else if (newVal.type !== slideTypes.text) {
       editorOne.value?.commands.setContent(newVal?.contents[0])
       editorTwo.value?.commands.setContent(newVal?.contents[1])
       editorThree.value?.commands.setContent(newVal?.contents[2])
       uneditableEditorOne.value?.commands.setContent(newVal?.contents[0])
       uneditableEditorTwo.value?.commands.setContent(newVal?.contents[1])
+      uneditableEditorThree.value?.commands.setContent(newVal?.contents[2])
     }
   }
 )
@@ -106,6 +108,7 @@ onBeforeUnmount(() => {
   editorThree.value?.destroy()
   uneditableEditorOne.value?.destroy()
   uneditableEditorTwo.value?.destroy()
+  uneditableEditorThree.value?.destroy()
 })
 
 const editorOne = ref(
@@ -229,6 +232,36 @@ const uneditableEditorOne = ref(
 )
 
 const uneditableEditorTwo = ref(
+  useEditor({
+    content: props.slide.contents[1] || "",
+    editable: false,
+    extensions: [
+      TiptapStarterKit,
+      TiptapTextAlign.configure({
+        types: ["heading", "paragraph"],
+      }),
+      TiptapPlaceholder.configure({
+        placeholder:
+          "Full (richtext) content goes here: \n- Apply text formatting options in toolbar above.\n- Textbox is expandable based on input",
+      }),
+      TipTapTextStyle,
+      TipTapFontFamily.configure({
+        types: ["textStyle"],
+      }),
+    ],
+    // onUpdate: ({ editor }) => {
+    //   emit("update", 2, editor.getHTML())
+    // },
+    onBlur: ({ editor }) => {
+      emit("update", 2, editor.getHTML())
+    },
+    onFocus: ({ editor }) => {
+      emit("change-focused-editor", editor)
+    },
+  })
+)
+
+const uneditableEditorThree = ref(
   useEditor({
     content: props.slide.contents[1] || "",
     editable: false,

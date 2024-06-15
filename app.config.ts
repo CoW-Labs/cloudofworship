@@ -20,7 +20,7 @@ export default defineAppConfig({
       base: 'bg-gray-100 dark:bg-primary-900 dark:text-primary-900',
       variant: {
         outline: 'shadow-none text-gray-900 dark:text-primary-900 ring-1 ring-inset ring-{color}-500 dark:ring-{color}-400 focus:ring-2 focus:ring-{color}-500 dark:focus:ring-{color}-400',
-        none: 'shadow-none bg-gray-100 dark:bg-primary-200 focus:ring-0 focus:shadow-none dark:text-primary-900',
+        none: 'shadow-none bg-gray-100 dark:bg-light-200 focus:ring-0 focus:shadow-none dark:text-primary-900',
       },
       default: {
         variant: 'none'
@@ -34,7 +34,7 @@ export default defineAppConfig({
     textarea: {
       color: {
         gray: {
-          none: ' bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white ring-0 focus:ring-0',
+          none: ' bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white ring-0 focus:ring-0',
         },
       }
     },

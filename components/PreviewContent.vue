@@ -249,6 +249,8 @@ const createNewSlide = (duplicateSlide?: Slide) => {
     tempSlide = { ...duplicateSlide }
   } else {
     tempSlide.background = appStore.settings.defaultBackground.text.background
+    tempSlide.backgroundVideoKey =
+      appStore.settings.defaultBackground.text.backgroundVideoKey
     tempSlide.backgroundType =
       appStore.settings.defaultBackground.text.backgroundType
   }
@@ -257,7 +259,7 @@ const createNewSlide = (duplicateSlide?: Slide) => {
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
   toast.add({
-    title: `${duplicateSlide?.name} duplicated`,
+    title: `${tempSlide?.name} created`,
     icon: "i-bx-slideshow",
   })
 }
@@ -326,6 +328,8 @@ const createNewBibleSlide = (
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.bible
   tempSlide.background = appStore.settings.defaultBackground.bible.background
+  tempSlide.backgroundVideoKey =
+    appStore.settings.defaultBackground.bible.backgroundVideoKey
   tempSlide.backgroundType =
     appStore.settings.defaultBackground.bible.backgroundType
   tempSlide.title = scripture?.label
@@ -350,6 +354,8 @@ const createNewHymnSlide = (hymn: Hymn) => {
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.hymn
   tempSlide.background = appStore.settings.defaultBackground.hymn.background
+  tempSlide.backgroundVideoKey =
+    appStore.settings.defaultBackground.hymn.backgroundVideoKey
   tempSlide.backgroundType =
     appStore.settings.defaultBackground.hymn.backgroundType
   tempSlide.songId = hymn.number
@@ -378,9 +384,11 @@ const createNewSongSlide = (song: Song) => {
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.song
   tempSlide.background = appStore.settings.defaultBackground.hymn.background
+  tempSlide.backgroundVideoKey =
+    appStore.settings.defaultBackground.hymn.backgroundVideoKey
   tempSlide.backgroundType =
     appStore.settings.defaultBackground.hymn.backgroundType
-  tempSlide.songId = song.id
+  tempSlide.songId = song._id || song.id
   tempSlide.title = "Verse 1"
 
   const currentSongVerse = song.verses?.[0].trim()
@@ -479,6 +487,8 @@ const createNewCountdownSlide = (countdown: Countdown) => {
   tempSlide.layout = slideLayoutTypes.countdown
   tempSlide.type = slideTypes.countdown
   tempSlide.background = appStore.settings.defaultBackground.hymn.background
+  tempSlide.backgroundVideoKey =
+    appStore.settings.defaultBackground.hymn.backgroundVideoKey
   tempSlide.backgroundType =
     appStore.settings.defaultBackground.hymn.backgroundType
   ;(tempSlide.data = countdown),
@@ -497,6 +507,8 @@ const createNewCountdownSlide = (countdown: Countdown) => {
   // Take slide live if current active slide is a countdown
   if (activeSlide.value?.type === slideTypes.countdown) {
     makeSlideActive(tempSlide, true)
+  } else {
+    makeSlideActive(tempSlide)
   }
   toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
 }
@@ -572,7 +584,7 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
 const updateLiveOutput = (updatedSlide: Slide) => {
   appStore.setActiveSlides(slides.value || [])
 
-  // If the current slide in the live output is being edited, then update LiveOutput immediately
+  // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
   if (updatedSlide.id === appStore.liveSlideId) {
     appStore.setLiveSlide(updatedSlide.id)
   }

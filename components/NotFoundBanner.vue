@@ -17,7 +17,11 @@
         >
           {{ sub }}
         </h2>
-        <p class="text-xs max-w-[150px] mt-1">
+        <p
+          v-show="desc"
+          class="text-sm max-w-[150px] mt-1 mb-2"
+          :class="{ 'max-w-[220px]': isWider }"
+        >
           {{ desc }}
         </p>
       </div>

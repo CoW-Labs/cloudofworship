@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="dark:bg-gray-900">
     <NuxtPwaAssets />
     <NuxtLoadingIndicator />
     <NuxtLayout :app-version="appVersion">
@@ -38,7 +38,7 @@ const appStore = useAppStore()
 nuxtApp.provide("emitter", emitter)
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("0.7.0")
+const appVersion = ref<string>("0.7.1")
 
 // const registerServiceWorker = async () => {
 //   if ("serviceWorker" in navigator) {

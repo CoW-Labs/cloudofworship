@@ -27,6 +27,7 @@
             { label: '10 minutes', value: '00:10:00' },
             { label: '15 minutes', value: '00:15:00' },
             { label: '30 minutes', value: '00:30:00' },
+            { label: '40 minutes', value: '00:40:00' },
             { label: '45 minutes', value: '00:45:00' },
           ]"
         >
@@ -42,7 +43,7 @@
         <UTextarea
           placeholder="Optional text above your countdown e.g 'Time before service starts:'"
           variant="none"
-          rows="4"
+          rows="6"
           color="gray"
           resize="vertical"
           v-model="content"

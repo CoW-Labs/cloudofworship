@@ -3,26 +3,28 @@
     class="flex-1 rounded-xl border border-primary-100 dark:border-primary-900 h-[100vh] max-h-[calc(100vh-80px)] overflow-hidden"
   >
     <div
-      class="heading p-2 px-3 bg-primary-100 dark:bg-primary-900 border dark:border-none"
+      class="heading p-2 px-3 bg-primary-100 dark:bg-primary-900 border dark:border-none rounded-t-lg"
     >
       <h2
         class="font-medium text-sm flex items-center top-0 bottom-[auto]"
         :class="[secondaryButtons ? 'justify-between' : '', headingStyles]"
       >
         <template v-if="subHeading">
-          <UButton
-            variant="ghost"
-            class="p-1 px-2 text-black"
-            @click="$emit('header-click')"
-            >{{ heading }}</UButton
-          >
+          <UTooltip text="Go back">
+            <UButton
+              variant="ghost"
+              class="p-1 px-2 text-black"
+              @click="$emit('header-click')"
+              >{{ heading }}</UButton
+            >
+          </UTooltip>
           <IconWrapper name="i-bx-chevron-right" class="text-primary" />
           <span
             class="pl-2 text-gray-600 dark:text-primary-200 font-normal capitalize"
             >{{ subHeading }}</span
           >
         </template>
-        <span v-else class="p-1 px-2">
+        <span v-else class="p-1 px-2 whitespace-nowrap truncate">
           {{ heading }}
         </span>
         <div class="actions flex flex-row-reverse items-center gap-1">
@@ -41,7 +43,7 @@
             </ConfirmDialog>
             <UButton
               v-if="secondaryButton.visible && !secondaryButton.confirmAction"
-              class="p-1 px-2"
+              class="p-1 px-2 whitespace-nowrap"
               size="md"
               :variant="secondaryButton?.variant || 'ghost'"
               :color="secondaryButton.color"

@@ -76,6 +76,7 @@ const props = defineProps<{
 }>()
 
 const searchInput = ref<string>(props.query || "")
+const toast = useToast()
 const loading = ref<boolean>(true)
 const songs = ref<Song[]>([])
 const searchedSongs = ref<Song[]>([])
@@ -111,14 +112,19 @@ onMounted(() => {
 })
 
 const getSongs = async (query: string = "") => {
-  loading.value = true
-  const promise = await useAPIFetch(`/song?search=${query}`)
-  let songsData = promise.data.value.data?.map((song) => ({
-    ...song,
-    title: song.title.replaceAll("â", "'"),
-  }))
-  songs.value = songsData
-  loading.value = false
+  try {
+    loading.value = true
+    const promise = await useAPIFetch(`/song?search=${query}&limit=20`)
+    let songsData = promise.data.value.data?.data?.map((song) => ({
+      ...song,
+      title: song.title.replaceAll("â", "'"),
+    }))
+    songs.value = songsData
+    loading.value = false
+  } catch (err) {
+    loading.value = false
+    toast.add({ title: "You are offline.", color: "red", icon: "i-bx-error" })
+  }
 }
 
 getSongs(props.query || "")

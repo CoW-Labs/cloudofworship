@@ -1,6 +1,7 @@
 <template>
   <button
-    class="action-card flex gap-3 p-2 py-4 border-t first:border-t-0 border-gray-100 dark:border-primary-950 hover:rounded-md hover:bg-primary-50 dark:hover:bg-primary-800 transition-all cursor-pointer text-left w-[100%] relative"
+    class="action-card flex gap-3 p-2 py-4 border-t first:border-t-0 border-gray-100 dark:border-primary-950 hover:rounded-md hover:bg-primary-50 dark:hover:bg-primary-800 transition-all cursor-pointer text-left w-[100%]"
+    :class="{ relative: saved }"
     @click="
       useGlobalEmit(
         `new-${type || slideTypes.song}`,
@@ -43,6 +44,19 @@
       >
       </ConfirmDialog>
     </div>
+    <div
+      class="song-excerpt text-xs absolute w-100 rounded-xl bg-white dark:bg-gray-800 bg-primary-100rounded-lg w-[300px] max-h-[200px] overflow-hidden shadow-lg truncate whitespace-pre-line text-ellipsis z-50"
+    >
+      <AppSection heading="Lyrics Preview">
+        <p class="px-2">{{ song?.lyrics?.trim() }}</p>
+      </AppSection>
+      <IconWrapper
+        name="i-bx-music"
+        size="24"
+        class="absolute -bottom-4 -right-4 text-primary-500 opacity-15"
+      />
+      <h3 class="font-semibold mb-1">Lyrics Preview</h3>
+    </div>
   </button>
 </template>
 <script setup lang="ts">
@@ -67,5 +81,18 @@ const props = defineProps<{
   visibility: visible;
   opacity: 1;
   transform: translateX(0);
+}
+.action-card:hover .song-excerpt {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(0px);
+}
+.song-excerpt {
+  visibility: hidden;
+  opacity: 0;
+  transition: 0.2s;
+  transform: translateX(-30px);
+  left: 350px;
+  top: 30vh;
 }
 </style>

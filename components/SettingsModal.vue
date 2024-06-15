@@ -32,7 +32,7 @@
             variant="ghost"
             block
             size="lg"
-            class="justify-start text-black"
+            class="justify-start text-black dark:text-white"
             :class="[
               {
                 'text-white bg-primary-500 hover:bg-primary-500':
@@ -44,9 +44,7 @@
             {{ tab?.name }}
           </UButton>
         </div>
-        <div
-          class="rhs w-[100%] border border-gray-100 rounded-lg p-6 min-h-[600px]"
-        >
+        <div class="rhs w-[100%] rounded-lg p-6 pt-2 min-h-[600px]">
           <!-- SUB-SETTINGS HEADER -->
           <h3 class="font-semibold text-lg mb-4">
             {{ activeTab }}

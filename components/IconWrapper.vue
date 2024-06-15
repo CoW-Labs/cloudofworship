@@ -4,13 +4,15 @@
       roundedBg
         ? `icon-bg bg-primary-50 dark:bg-primary-900 rounded-full flex items-center justify-center p-2 max-h-${
             size + 4
-          }`
+          } icon`
         : ''
     "
   >
     <UIcon
       :name="name"
-      :class="`w-${size} h-${size} ${animate ? 'animate-ping' : ''}`"
+      :class="`w-${size} h-${size} ${animate ? 'animate-ping' : ''} ${
+        darkText ? 'dark:text-primary-900' : ''
+      }`"
       dynamic
     />
   </div>
@@ -25,5 +27,6 @@ const props = defineProps({
   name: String,
   roundedBg: Boolean,
   animate: Boolean,
+  darkText: Boolean,
 })
 </script>

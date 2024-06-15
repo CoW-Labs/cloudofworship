@@ -1,14 +1,17 @@
 <template>
   <div
-    class="min-h-[100vh] w-[100%] bg-[radial-gradient(circle,#cd99ff,white,white)] dark:bg-[radial-gradient(circle,#31005f,black,black)] grid place-items-center"
+    class="min-h-[100vh] w-[100%] bg-[radial-gradient(circle,#cd99ff,white,white)] dark:bg-[radial-gradient(circle,#31005f,rgb(17,24,39),rgb(17,24,39))] grid place-items-center"
   >
     <h2
-      class="text-[6vw] text-center font-black stroke-current outlined-text w-[100%] text-transparent absolute bottom-[5%]"
+      class="text-[6vw] text-center font-black stroke-current w-[100%] text-transparent absolute bottom-[5%]"
+      :class="
+        $colorMode.value === 'dark' ? 'outlined-text-dark' : 'outlined-text'
+      "
     >
       Your church's power point.
     </h2>
     <div
-      class="auth-box bg-white dark:bg-black rounded-2xl shadow-xl dark:shadow-gray-950 p-[3rem] py-[5%] max-w-[450px] w-[100%] shadow-primary-200 relative"
+      class="auth-box bg-white dark:bg-gray-900 rounded-2xl shadow-xl dark:shadow-gray-950 p-[3rem] py-[5%] max-w-[450px] w-[100%] shadow-primary-200 relative"
     >
       <slot />
     </div>
@@ -30,5 +33,8 @@ useHead({
 }
 .outlined-text {
   -webkit-text-stroke: 1px #a855f760;
+}
+.outlined-text-dark {
+  -webkit-text-stroke: 1px #a855f7;
 }
 </style>

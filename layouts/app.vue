@@ -1,6 +1,6 @@
 <template>
   <div v-if="!loadingResources" class="app-ctn max-h-[100vh] overflow-hidden">
-    <Navbar :app-version="appVersion" />
+    <Navbar :app-version="appVersion" :online="isAppOnline" />
     <slot />
     <FullScreenLoader v-if="fullScreenLoading" />
     <ClientOnly>
@@ -47,11 +47,29 @@
           />
         </div>
       </Transition>
+
+      <Transition name="fade-sm">
+        <div
+          v-show="isOfflineToastOpen"
+          class="ctn fixed z-100 right-4 bottom-4"
+          role="alert"
+          aria-labelledby="toast-message"
+        >
+          <NotFoundBanner
+            icon="i-tabler-cloud-off"
+            sub="You are offline"
+            desc="CoW will save your work until an internet connection returns."
+            action="close-offline-toast"
+            action-text="Ok, got it."
+            is-wider
+          />
+        </div>
+      </Transition>
     </ClientOnly>
   </div>
   <div
     v-else
-    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center"
+    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center dark:bg-gray-900"
   >
     <div class="wrapper flex flex-col gap-2">
       <div class="logo flex items-center justify-center mb-6 gap-2">
@@ -64,13 +82,14 @@
           class="text-center"
           :value="downloadProgress"
           :max="[
-            'Setting up environment...',
+            'Initializing...',
+            'Setting up resources...', // also loading bg videos
             'Loading KJV Bible...',
             'Loading NKJV Bible...',
             'Loading NIV Bible...',
             'Loading AMP Bible...',
             'Loading Hymns...',
-            'Loading background videos...',
+            // 'Loading background videos...',
             'Finishing up',
           ]"
         />
@@ -90,6 +109,7 @@ import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
 import type { LibraryItem, Media, BackgroundVideo } from "~/types"
+import { useOnline } from "@vueuse/core"
 
 useHead({
   title: "Cloud of Worshippers",
@@ -98,12 +118,21 @@ const props = defineProps({
   appVersion: String,
 })
 
+const online = useOnline()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const loadingResources = ref<boolean>(true)
 const downloadProgress = ref<number>(5)
 const fullScreenLoading = ref<boolean>(false)
 const cachedVideosURLs = ref<string[]>()
+const isOfflineToastOpen = ref<boolean>(false)
+
+const isAppOnline = computed(() => {
+  // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
+  // if() {}
+  isOfflineToastOpen.value = !online.value
+  return online.value
+})
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -127,6 +156,10 @@ emitter.on("pwa-refresh", () => {
 
 emitter.on("cancel-pwa-refresh", () => {
   useNuxtApp().$pwa?.cancelPrompt()
+})
+
+emitter.on("close-offline-toast", () => {
+  isOfflineToastOpen.value = false
 })
 
 const saveAllBackgroundVideos = async () => {
@@ -185,54 +218,56 @@ const downloadEssentialResources = async () => {
   const db = useIndexedDB()
 
   loadingResources.value = true
+  downloadProgress.value = 0
+
+  // Download background videos
   downloadProgress.value = 1
+  await saveAllBackgroundVideos()
 
   // Download KJV Bible
   let tempBible = await db.bibleAndHymns.get("KJV")
   if (!tempBible) {
+    downloadProgress.value = 2
     const kjvBible = await useS3File("kjv.json")
     db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
-    downloadProgress.value = 2
   }
 
   // Download NKJV Bible
   tempBible = await db.bibleAndHymns.get("NKJV")
   if (!tempBible) {
+    downloadProgress.value = 3
     const nkjvBible = await useS3File("nkjv.json")
     db.bibleAndHymns.add(tempBibleVersion("NKJV", nkjvBible))
-    downloadProgress.value = 3
   }
 
   // Download NIV Bible
   tempBible = await db.bibleAndHymns.get("NIV")
   if (!tempBible) {
+    downloadProgress.value = 4
     const nivBible = await useS3File("niv.json")
     db.bibleAndHymns.add(tempBibleVersion("NIV", nivBible))
-    downloadProgress.value = 4
   }
 
   // Download AMP Bible
   tempBible = await db.bibleAndHymns.get("AMP")
   if (!tempBible) {
+    downloadProgress.value = 5
     const ampBible = await useS3File("amp.json")
     db.bibleAndHymns.add(tempBibleVersion("AMP", ampBible))
-    downloadProgress.value = 5
   }
 
   // Download all hymns
   tempBible = await db.bibleAndHymns.get("hymns")
   if (!tempBible) {
+    downloadProgress.value = 6
     const hymns = await useS3File("hymns.json")
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
-    downloadProgress.value = 6
   }
 
-  // Download background videos
-  await saveAllBackgroundVideos()
+  // All computations completed
   downloadProgress.value = 7
 
   setTimeout(() => {
-    downloadProgress.value = 8
     loadingResources.value = false
   }, 100)
 }
@@ -260,14 +295,17 @@ const overrideAppSettings = () => {
         hymn: {
           backgroundType: "video",
           background: cachedVideosURLs.value?.[0],
+          backgroundVideoKey: "/video-bg-1.mp4",
         },
         bible: {
           backgroundType: "video",
           background: cachedVideosURLs.value?.[2],
+          backgroundVideoKey: "/video-bg-3.mp4",
         },
         text: {
           backgroundType: "video",
           background: cachedVideosURLs.value?.[3],
+          backgroundVideoKey: "/video-bg-4.mp4",
         },
       },
     })

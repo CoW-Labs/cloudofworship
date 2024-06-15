@@ -15,20 +15,28 @@
         </UButton>
       </div>
       <div class="actions text-sm flex gap-2 items-center">
-        <ClientOnly>
-          <UButton
-            :icon="isDark ? 'i-tabler-moon-filled' : 'i-tabler-sun-filled'"
-            color="primary"
-            variant="ghost"
-            aria-label="Theme"
-            @click="isDark = !isDark"
-            >{{ isDark ? "Light" : "Dark" }}</UButton
-          >
-          <template #fallback>
-            <div class="w-8 h-8" />
-          </template>
-        </ClientOnly>
+        <SettingsModal
+          :is-open="settingsModalOpen"
+          @close-modal="settingsModalOpen = false"
+        />
 
+        <ChangelogModal :app-version="appVersion" />
+
+        <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
+        <UTooltip :text="online ? 'You are online' : 'You are offline'">
+          <UButton variant="ghost" class="h-10 opacity-65">
+            <IconWrapper
+              v-show="online"
+              name="i-tabler-cloud-bolt"
+            ></IconWrapper>
+            <IconWrapper
+              v-show="!online"
+              name="i-tabler-cloud-off"
+            ></IconWrapper>
+          </UButton>
+        </UTooltip>
+
+        <!-- ACCOUNT PROFILE BUTTON -->
         <UPopover
           v-model:open="bgImagePopoverOpen"
           :ui="{
@@ -59,11 +67,29 @@
             />
           </template>
         </UPopover>
-        <SettingsModal
-          :is-open="settingsModalOpen"
-          @close-modal="settingsModalOpen = false"
-        />
-        <ChangelogModal :app-version="appVersion" />
+
+        <!-- INVITE PEOPLE BUTTON -->
+        <!-- <UTooltip text="Invite church media team">
+          <UButton variant="outline" class="h-8" icon="i-bx-user-plus">
+            Invite
+          </UButton>
+        </UTooltip> -->
+
+        <!-- DARK / LIGHT MODE TOGGLE -->
+        <ClientOnly>
+          <UButton
+            :icon="isDark ? 'i-tabler-moon-filled' : 'i-tabler-sun-filled'"
+            color="primary"
+            variant="ghost"
+            aria-label="Theme"
+            class="h-10"
+            @click="isDark = !isDark"
+            >{{ isDark ? "Light" : "Dark" }}</UButton
+          >
+          <template #fallback>
+            <div class="w-8 h-8" />
+          </template>
+        </ClientOnly>
       </div>
     </div>
   </Transition>
@@ -81,6 +107,7 @@ const authStore = useAuthStore()
 const { user, church } = storeToRefs(authStore)
 defineProps({
   appVersion: String,
+  online: Boolean,
 })
 const isDark = computed({
   get() {
