@@ -51,11 +51,8 @@ defineProps<{
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const changelog = `
-- Full offline and PWA support
-- New and improved Bible search with filters
-- Fixed Disappearing slide background videos
+- Added online/offline status
 - New songs added
-- Added recently opened Bible verses in “Display Bible” action
 - Fixed minor bugs and issues for improved experience`
 
 const appStore = useAppStore()
