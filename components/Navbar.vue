@@ -69,11 +69,11 @@
         </UPopover>
 
         <!-- INVITE PEOPLE BUTTON -->
-        <UTooltip text="Invite church media team">
+        <!-- <UTooltip text="Invite church media team">
           <UButton variant="outline" class="h-8" icon="i-bx-user-plus">
             Invite
           </UButton>
-        </UTooltip>
+        </UTooltip> -->
 
         <!-- DARK / LIGHT MODE TOGGLE -->
         <ClientOnly>
