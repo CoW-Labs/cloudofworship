@@ -1,3 +1,4 @@
+import { useAuthStore } from '~/store/auth'
 import type { Song } from '~/types'
 import songsObj from '../public/songs.json'
 import useURLFriendlyString from './useURLFriendlyString'
@@ -9,10 +10,22 @@ const addIdToReturnedSongs = (songs: Array<Song>) => {
   }))
 }
 
-const useSong = (song: Song, linesPerDisplay: number = 4): Song | null => {
+const useSong = async (song: Song | string, linesPerDisplay: number = 4): Promise<Song | null> => {
   const toast = useToast()
+  const authStore = useAuthStore()
 
   try {
+    // If [song] param comes as an ID, retrieve song obj from backend first
+    if (typeof song === 'string') {
+      const { data, error } = await useAPIFetch(`/church/${authStore?.user?.churchId}/song/${song}`)
+      if (error.value) {
+        throw new Error(error.value?.message)
+      } else {
+        song = (data.value as Song)
+      }
+    }
+
+    // If [song] param, comes as an object, begin division process immediately
     // Divide songs into verses
     const verses = []
     let tempVerse = ''
@@ -55,6 +68,7 @@ const useSong = (song: Song, linesPerDisplay: number = 4): Song | null => {
     song.verses = verses?.filter(verse => verse !== '')
     return song
   } catch (err) {
+    console.log(err)
     toast.add({ title: 'Song not found', icon: 'i-bx-music', color: 'red' })
   }
   return null
