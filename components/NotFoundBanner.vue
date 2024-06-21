@@ -12,15 +12,15 @@
     <div class="texts-action">
       <div>
         <h2
+          :class="{ 'max-w-[220px]': isWider, 'max-w-300px': isCenter }"
           class="text-md font-semibold max-w-[150px]"
-          :class="{ 'max-w-[220px]': isWider }"
         >
           {{ sub }}
         </h2>
         <p
           v-show="desc"
+          :class="{ 'max-w-[220px]': isWider, 'max-w-300px': isCenter }"
           class="text-sm max-w-[150px] mt-1 mb-2"
-          :class="{ 'max-w-[220px]': isWider }"
         >
           {{ desc }}
         </p>
@@ -60,6 +60,7 @@ const props = defineProps<{
   secondaryActionText: string
   secondaryAction: string
   isWider: boolean
+  isCenter: boolean
 }>()
 
 const actionIcon = computed(() => {

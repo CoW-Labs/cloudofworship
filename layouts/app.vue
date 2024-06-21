@@ -327,7 +327,7 @@ const getChurch = async () => {
   // console.log(authStore.user)
   const churchId = authStore.user?.churchId
   if (churchId) {
-    const promise = useAPIFetch(`/church/${churchId}`)
+    const promise = useAPIFetch(`/church/${churchId}?teammates=true`)
     authStore.setChurch(promise.data as unknown as Church)
   } else {
     navigateTo("/signup?registerChurch=1")

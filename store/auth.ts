@@ -16,6 +16,8 @@ export interface Church {
   type: string
   address: string
   pastor: string
+  userIds?: string[]
+  users: User[]
 }
 
 export const useAuthStore = defineStore('auth', {
