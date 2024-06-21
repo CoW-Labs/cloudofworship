@@ -70,7 +70,7 @@
           </div>
         </div>
         <div
-          class="h-[88%] p-4 py-6 mt-8 flex justify-center gap-6 bg-primary-100 rounded-lg text-primary-900 relative overflow-hidden"
+          class="h-[88%] p-4 py-6 mt-8 flex justify-center gap-6 bg-primary-100 dark:bg-primary-950 rounded-lg text-primary-900 relative overflow-hidden"
         >
           <!-- <IconWrapper name="i-tabler-rocket" size="16" /> -->
           <IconWrapper
@@ -78,7 +78,7 @@
             size="24"
             class="absolute opacity-10 -bottom-3 -left-3"
           />
-          <div class="texts-action text-center max-w-[300px]">
+          <div class="texts-action text-center max-w-[300px] dark:text-primary">
             <div>
               <h2 class="text-md font-semibold">The more, the merrier.</h2>
               <p class="text-sm mt-1 mb-2">

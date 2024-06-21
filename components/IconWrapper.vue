@@ -11,7 +11,7 @@
     <UIcon
       :name="name"
       :class="`w-${size} h-${size} ${animate ? 'animate-ping' : ''} ${
-        darkText ? 'dark:text-primary-900' : ''
+        darkText ? 'dark:text-primary-950' : ''
       }`"
       dynamic
     />
