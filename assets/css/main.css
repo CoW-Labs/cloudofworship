@@ -167,10 +167,12 @@ body {
   -moz-transition: all 0.7s ease;
   -ms-transition: all 0.7s ease;
   -o-transition: all 0.7s ease;
+  position: absolute;
 }
 
 .fade-list-leave-to {
   opacity: 0;
+  position: absolute;
   transition: 0.5s ease;
   -webkit-transition: 0.5s ease;
   -moz-transition: 0.5s ease;
@@ -181,6 +183,8 @@ body {
 .fade-list-enter-from {
   opacity: 0;
   position: absolute;
+  /* transition: 0.1s ease; */
+ 
 }
 .fade-list-leave-active {
   position: absolute;

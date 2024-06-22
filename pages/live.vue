@@ -3,12 +3,13 @@
     class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
     :id="liveSlideId"
   >
+    <!-- :content-visible="liveSlide?.id === liveSlideId" -->
     <TransitionGroup name="fade-list">
       <LiveProjectionOnly
         v-for="liveSlide in activeSlides"
         :key="liveSlide.id"
         v-show="liveSlide?.id === liveSlideId"
-        :content-visible="liveSlide?.id === liveSlideId"
+        :content-visible="true"
         :id="liveSlideId"
         :full-screen="true"
         :slide="liveSlide"
