@@ -73,7 +73,7 @@ const getSongOrHymnObj = async () => {
       relatedData.value = hymn
       break
     case slideTypes.song:
-      const song = useSong(props.slide?.data, 4)
+      const song = await useSong(props.slide?.data || props.slide?.songId, 4)
       relatedData.value = song
       break
   }

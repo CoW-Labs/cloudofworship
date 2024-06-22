@@ -69,10 +69,14 @@
 </template>
 
 <script setup lang="ts">
+import { useDebounceFn } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
 import type { Hymn, Scripture, Slide, Song, Countdown } from "~/types"
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const churchId = authStore.user?.churchId
 const toast = useToast()
 
 const windowHeight = ref<number>(0)
@@ -122,6 +126,7 @@ onMounted(() => {
   addEventListener("resize", () => {
     windowHeight.value = document.documentElement.offsetHeight
   })
+  uploadOfflineSlides()
 })
 
 // LISTEN TO EVENTS
@@ -159,9 +164,10 @@ emitter.on("new-hymn", async (data: string) => {
   }
 })
 
-emitter.on("new-song", (data: Song) => {
+emitter.on("new-song", async (data: Song) => {
+  // console.log("hello")
   if (data) {
-    const song = useSong(data)
+    const song = await useSong(data)
     if (song) {
       createNewSongSlide(song)
     }
@@ -243,10 +249,135 @@ const preSlideCreation = (): Slide => {
   return tempSlide
 }
 
+const mergeSlides = (
+  offlineSlides: Slide[],
+  uploadedSlides: Slide[]
+): Slide[] => {
+  // Create a Map from uploadedSlides with id as the key
+  const uploadedMap = new Map(
+    uploadedSlides.map((slide) => [slide.id, slide._id])
+  )
+  // console.log("uploadedMap", uploadedMap)
+
+  // Iterate over offlineSlides and merge special_id where ids match
+  const tempOfflineSlides = [...offlineSlides]
+  for (let offlineSlide of tempOfflineSlides) {
+    if (uploadedMap.has(offlineSlide.id)) {
+      offlineSlide._id = uploadedMap.get(offlineSlide.id)
+    }
+  }
+
+  return tempOfflineSlides
+}
+
+const uploadOfflineSlides = async () => {
+  // Retrieve all offline slides
+  const offlineSlides = appStore.activeSlides.filter(
+    (slide) => slide._id === undefined
+  )
+  if (offlineSlides.length > 0) {
+    const uploadedSlides = await batchCreateSlideOnline(offlineSlides)
+    // console.log("uploadedSlides", uploadedSlides)
+
+    const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
+    console.log("merged slides", mergedSlides)
+    appStore.setActiveSlides(mergedSlides)
+  }
+}
+
+// const createSlideOnline = async (slide: Slide) => {
+//   // Find song slide and update
+//   const tempSlide = { ...slide }
+//   tempSlide.userId = authStore.user?._id!!
+//   tempSlide.churchId = churchId!!
+//   if (tempSlide.type === slideTypes.song) {
+//     tempSlide.songId = (tempSlide.data as Song)?._id
+//     delete tempSlide.data
+//   }
+
+//   const { data, error } = await useAPIFetch(`/church/${churchId}/slides`, {
+//     method: "POST",
+//     body: tempSlide,
+//   })
+//   if (!error.value) {
+//     return data.value
+//   } else {
+//     throw new Error(error.value?.message)
+//   }
+// }
+
+const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
+  // Find song slides and update
+  const tempSlides = [...slides]
+  tempSlides.forEach((slide) => {
+    slide.userId = authStore.user?._id!!
+    slide.churchId = churchId!!
+    if (slide.type === slideTypes.song) {
+      slide.songId = (slide.data as Song)?._id
+      delete slide.data
+    }
+  })
+
+  const { data, error } = await useAPIFetch(
+    `/church/${churchId}/slides/batch`,
+    {
+      method: "POST",
+      body: tempSlides,
+      key: "batch-create-slides",
+      dedupe: "defer",
+    }
+  )
+  if (!error.value) {
+    return data.value
+  } else {
+    throw new Error(error.value?.message)
+  }
+}
+
+const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
+  const tempSlide = { ...slide }
+  delete tempSlide._id
+  delete tempSlide.id
+  delete tempSlide.churchId
+  delete tempSlide.type
+
+  if (slide?._id) {
+    const { data, error } = await useAPIFetch(
+      `/church/${churchId}/slides/${slide?._id}`,
+      {
+        method: "PUT",
+        body: tempSlide,
+      }
+    )
+    if (!error.value) {
+      return data.value
+    } else {
+      throw new Error(error.value?.message)
+    }
+  }
+}, 2000)
+
+const deleteSlideOnline = async (slide: Slide) => {
+  if (slide?._id) {
+    const { data, error } = await useAPIFetch(
+      `/church/${churchId}/slides/${slide?._id}`,
+      {
+        method: "DELETE",
+      }
+    )
+    if (!error.value) {
+      return data.value
+    } else {
+      throw new Error(error.value?.message)
+    }
+  }
+}
+
 const createNewSlide = (duplicateSlide?: Slide) => {
   let tempSlide = { ...preSlideCreation() }
   if (duplicateSlide) {
     tempSlide = { ...duplicateSlide }
+    delete tempSlide._id
   } else {
     tempSlide.background = appStore.settings.defaultBackground.text.background
     tempSlide.backgroundVideoKey =
@@ -262,10 +393,11 @@ const createNewSlide = (duplicateSlide?: Slide) => {
     title: `${tempSlide?.name} created`,
     icon: "i-bx-slideshow",
   })
+  uploadOfflineSlides()
 }
 
 const deleteSlide = async (slideId: string, addToast: boolean = true) => {
-  const tempSlide = appStore.activeSlides.find((s) => s.id === slideId)
+  const tempSlide = appStore.activeSlides.find((s) => s.id === slideId) as Slide
 
   // Clear interval if slide is a countdown slide before deleting
   if (tempSlide?.type === slideTypes.countdown) {
@@ -277,6 +409,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   const slideIndex = slides.value.findIndex((s) => s.id === slideId)
   slides.value.splice(slideIndex, 1)
   appStore.setActiveSlides(slides.value)
+  deleteSlideOnline(tempSlide)
 
   // Delete Probable Media files linked in DB (as long as they are not saved in Library)
   const db = useIndexedDB()
@@ -303,6 +436,7 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 }
 
 const onUpdateSlide = (slide: Slide) => {
+  console.log("updated", slide)
   // Always pause countdown slide before updating it
   if (slide.type === slideTypes.countdown) {
     useGlobalEmit("start-countdown", slide)
@@ -313,7 +447,12 @@ const onUpdateSlide = (slide: Slide) => {
   )
   slides.value?.splice(slideIndex || 0, 1, slide)
 
+  // Every 3 seconds
+  // const debouncedTextSlideUpdate = useDebounceFn(updateSlideOnline, 3000)
+  updateSlideOnline(slide)
+
   updateLiveOutput(slide)
+
   // when updating of countdown slide is done, continue timer
   if (slide.type === slideTypes.countdown) {
     useGlobalEmit("start-countdown", slide)
@@ -347,6 +486,7 @@ const createNewBibleSlide = (
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide, !options?.fromWholeBibleSearch)
   toast.add({ title: "Bible slide created", icon: "i-bx-bible" })
+  uploadOfflineSlides()
 }
 
 const createNewHymnSlide = (hymn: Hymn) => {
@@ -377,9 +517,11 @@ const createNewHymnSlide = (hymn: Hymn) => {
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
   toast.add({ title: "Hymn slide created", icon: "i-bx-church" })
+  uploadOfflineSlides()
 }
 
 const createNewSongSlide = (song: Song) => {
+  // console.log("song", song)
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.song
@@ -408,6 +550,7 @@ const createNewSongSlide = (song: Song) => {
   makeSlideActive(tempSlide)
   // console.log("called")
   toast.add({ title: "Song slide created", icon: "i-bx-music" })
+  uploadOfflineSlides()
 }
 
 const createNewMediaSlide = async (
@@ -450,6 +593,7 @@ const createNewMediaSlide = async (
   if (!options?.oneOfManySlides) {
     toast.add({ title: "Media slide created", icon: "i-bx-image" })
   }
+  uploadOfflineSlides()
 }
 
 const createMultipleNewMediaSlides = async (files: any[]) => {
@@ -511,6 +655,7 @@ const createNewCountdownSlide = (countdown: Countdown) => {
     makeSlideActive(tempSlide)
   }
   toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
+  uploadOfflineSlides()
 }
 
 const updateCountdownSlide = (
@@ -643,6 +788,10 @@ const gotoScripture = async (title: string, version: string) => {
     tempSlide.name = useSlideName(tempSlide)
     activeSlide.value = tempSlide
     slides.value.splice(slideIndex, 1, tempSlide)
+
+    // Every 10 seconds
+    // const debouncedSlideUpdate = useDebounceFn(updateSlideOnline, 10000)
+    updateSlideOnline(activeSlide.value)
     updateLiveOutput(activeSlide.value)
   }
 }
@@ -668,15 +817,22 @@ const gotoHymnVerse = async (title: string) => {
       tempSlide.contents = useSlideContent(tempSlide, hymn, nextVerse)
       activeSlide.value = tempSlide
       slides.value.splice(slideIndex, 1, tempSlide)
+
+      // Every 10 seconds
+      // const debouncedSlideUpdate = useDebounceFn(updateSlideOnline, 10000)
+      updateSlideOnline(activeSlide.value)
       updateLiveOutput(activeSlide.value)
     }
   }
 }
 
-const gotoSongVerse = (title: string) => {
+const gotoSongVerse = async (title: string) => {
   const tempSlide = { ...activeSlide.value } as Slide
   const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
-  const song = useSong(activeSlide.value?.data as Song)
+  console.log("slide", activeSlide.value)
+  const song = await useSong(
+    (activeSlide.value?.data as Song) || activeSlide?.value?.songId
+  )
   const realTitle = title // fake title is the one with the 0th index, but that is what is displayed in UI
 
   if (song) {
@@ -695,6 +851,10 @@ const gotoSongVerse = (title: string) => {
       tempSlide.contents = useSlideContent(tempSlide, song, nextVerse)
       activeSlide.value = tempSlide
       slides.value.splice(slideIndex, 1, tempSlide)
+
+      // Every 10 seconds
+      // const debouncedSlideUpdate = useDebounceFn(updateSlideOnline, 10000)
+      updateSlideOnline(activeSlide.value)
       updateLiveOutput(activeSlide.value)
     }
   }

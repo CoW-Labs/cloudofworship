@@ -35,6 +35,8 @@
     "vite-plugin-pwa": "^0.20.0",
     "vue": "^3.4.27",
     "vue-router": "^4.3.2",
+    "vue-virtual-scroll-list": "^2.3.5",
+    "vue-virtual-scroller": "^2.0.0-beta.8",
     "vuedraggable": "^4.1.0",
     "workbox-build": "^7.1.0",
     "workbox-window": "^7.1.0"

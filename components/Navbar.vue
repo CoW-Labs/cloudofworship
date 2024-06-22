@@ -20,6 +20,11 @@
           @close-modal="settingsModalOpen = false"
         />
 
+        <InviteUsersModal
+          :visible="inviteModalVisible"
+          @close="inviteModalVisible = false"
+        />
+
         <ChangelogModal :app-version="appVersion" />
 
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
@@ -69,11 +74,16 @@
         </UPopover>
 
         <!-- INVITE PEOPLE BUTTON -->
-        <!-- <UTooltip text="Invite church media team">
-          <UButton variant="outline" class="h-8" icon="i-bx-user-plus">
+        <UTooltip text="Invite church media team">
+          <UButton
+            variant="outline"
+            class="h-8"
+            icon="i-bx-user-plus"
+            @click="inviteModalVisible = true"
+          >
             Invite
           </UButton>
-        </UTooltip> -->
+        </UTooltip>
 
         <!-- DARK / LIGHT MODE TOGGLE -->
         <ClientOnly>
@@ -103,6 +113,7 @@ const darkMode = ref(false)
 const settingsModalOpen = ref(false)
 const colorMode = useColorMode()
 const authStore = useAuthStore()
+const inviteModalVisible = ref(false)
 
 const { user, church } = storeToRefs(authStore)
 defineProps({

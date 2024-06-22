@@ -46,7 +46,7 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
     } else if (response.status === 500 && (options.method === 'POST' || options.method === 'PUT')) {
       addErrorInDevEnvironment(`${path}: Failed with 500`)
       // Track failed POST/PUT requests
-      console.log(response)
+      // console.log(response)
     }
     // console.log(response.status)
   }
