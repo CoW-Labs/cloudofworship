@@ -42,10 +42,19 @@
         <div class="invite-content">
           <div class="flex invite-input gap-2 mb-2">
             <UFormGroup size="lg" class="w-[100%]">
-              <UInput placeholder="member@mail.com" v-model="emailInput" />
+              <UInput
+                placeholder="Enter email addresses"
+                v-model="emailInput"
+              />
+              <!-- <p>jhjdhjkh</p> -->
             </UFormGroup>
-            <UButton class="px-4"> Send Invite </UButton>
+            <UButton :loading="loading" class="px-4" @click="sendEmailInvite">
+              Send Invite
+            </UButton>
           </div>
+          <p class="text-sm text-gray-400">
+            Use commas to separate email addresses
+          </p>
           <div class="members flex-col flex gap-4 mt-6">
             <div
               v-for="(member, index) in authStore.church?.users"
@@ -113,10 +122,7 @@ const props = defineProps<{
 
 const visible = ref<boolean>(props.visible)
 const emailInput = ref<string>("")
-const members = ref<User[]>([
-  { fullname: "Favour Felix", role: "owner" },
-  { fullname: "Inioluwa Adeniyi", role: "owner" },
-])
+const loading = ref<boolean>(false)
 const copied = ref<boolean>(false)
 
 watch(
@@ -137,5 +143,37 @@ const copyToClipboard = () => {
     copied.value = null
   }, 2000)
   document.body.removeChild(input)
+}
+
+const sendEmailInvite = async () => {
+  loading.value = true
+  const { data, error } = await useAPIFetch(
+    `/church/${authStore.user?.churchId}/emailinvite`,
+    {
+      method: "POST",
+      body: {
+        churchId: authStore.user?.churchId,
+        recipients: emailInput.value
+          .split(",")
+          ?.map((email) => ({ email: email.trim() })),
+      },
+    }
+  )
+  if (error.value) {
+    useToast().add({
+      title: "Error sending email.",
+      color: "red",
+      icon: "i-bx-error",
+    })
+  } else {
+    useToast().add({
+      title: `Emails sent to ${
+        emailInput.value?.split(",").length
+      } recipients! 🎉`,
+      color: "green",
+    })
+    emit("close")
+  }
+  loading.value = false
 }
 </script>
