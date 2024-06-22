@@ -51,8 +51,9 @@ defineProps<{
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const changelog = `
-- Added online/offline status
-- Added song preview when searching songs
+- Added teams; you can invite others to join your church media team and work together.
+- Added hymn preview when searching hymns
+- Added fade transitions between slides
 - New songs added
 - Fixed minor bugs and issues for improved experience`
 
