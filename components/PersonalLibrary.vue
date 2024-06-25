@@ -1,5 +1,5 @@
 <template>
-  <div class="personal-library-main min-h-[90vh]" ref="quickActions">
+  <div class="personal-library-main min-h-[80vh] h-[100%]" ref="quickActions">
     <UTabs :items="libraryTabs" @change="activeLibraryTab = $event">
       <template #default="{ item }">
         <div class="flex gap-2 capitalize">
@@ -36,7 +36,7 @@
     </div>
     <div
       v-if="loading"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]"
+      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
     >
       <USkeleton
         v-for="i in 15"
