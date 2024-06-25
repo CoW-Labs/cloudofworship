@@ -63,6 +63,8 @@
         v-if="!loading && songs?.length === 0"
         icon="i-tabler-cloud-search"
         sub="We couldn't find that song"
+        desc="Try searching for a portion of the lyrics, or the song title and artist together."
+        is-wider
       />
     </template>
   </div>

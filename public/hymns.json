@@ -18838,17 +18838,31 @@
         "meta": "Gracious Spirit, dwell with me:"
     },
     {
-        "number": "1342",
-        "title": "God Give us Christian Homes",
+        "number": "1343",
+        "title": "Immortal, Invisible, God Only Wise",
         "chorus": false,
         "verses": [
-            "God, give us Christian homes!\nHomes where the Bible is loved and taught,\nHomes where the Master's will is sought,\nHomes crowned with beauty Your love has wrought;\nGod, give us Christian homes;\nGod, give us Christian homes!",
-            "God, give us Christian homes!\nHomes where the father is true and strong,\nHomes that are free from the blight of wrong,\nHomes that are joyous with love and song;\nGod, give us Christian homes;\nGod, give us Christian homes!",
-            "God, give us Christian homes!\nHomes where the mother, in caring quest,\nStrives to show others Your way is best,\nHomes where the Lord is an honored guest;\nGod, give us Christian homes;\nGod, give us Christian homes!",
-            "God, give us Christian homes!\nHomes where the children are led to know\nChrist in His beauty who loves them so,\nHomes where the altar fires burn and glow;\nGod, give us Christian homes;\nGod, give us Christian homes!"
+            "Immortal, invisible, God only wise,\nin light inaccessible hid from our eyes,\nmost blessed, most glorious, the Ancient of Days,\nalmighty, victorious, thy great name we praise.",
+            "Unresting, unhasting, and silent as light,\nnor wanting, nor wasting, thou rulest in might;\nthy justice like mountains high soaring above\nthy clouds, which are fountains of goodness and love.",
+            "To all life thou givest, to both great and small;\nin all life thou livest, the true life of all;\nwe blossom and flourish as leaves on the tree,\nand wither and perish but naught changeth thee.",
+            "Great Father of glory, pure Father of light,\nthine angels adore thee, all veiling their sight;\nall praise we would render, O help us to see\n'tis only the splendor of light hideth thee."
         ],
-        "author": "B. B. McKinney",
-        "source": "Baptist Hymnal 1991 #504",
-        "meta": "God Give us Christian Homes Homes where the Bible is"
+        "author": "Walter C. Smith",
+        "source": "undefined - ",
+        "meta": "Immortal, invisible, God only wise"
+    },
+    {
+        "number": "1344",
+        "title": "The Christian's Goodnight",
+        "chorus": false,
+        "verses": [
+            "Sleep on, beloved, sleep, and take thy rest;\nLay down thy head upon thy\nSaviour's breast;\nWe love thee well, but Jesus loves thee best--\nGood-night! Good-night! Good-night!",
+            "Calm is thy slumber as an infant's sleep;\nBut thou shalt wake no more to toil and weep:\nThine is a perfect rest, secure and deep--\nGood-night! Good-night! Good-night!",
+            "Until the shadows from this earth are cast,\nUntil He gathers in His sheaves at last,\nUntil the twilight gloom be over past--\nGood-night! Good-night! Good-night!",
+            "Until the Easter glory lights the skies,\nUntil the dead in Jesus shall arise,\nAnd He shall come, but not in lowly guise--\nGood-night! Good-night! Good-night!"
+        ],
+        "author": "Sarah Doudney",
+        "source": "undefined - ",
+        "meta": "Sleep on, beloved, sleep, and take thy rest"
     }
 ]
