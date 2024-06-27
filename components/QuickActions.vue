@@ -199,7 +199,8 @@ emitter.on("new-hymn", (data) => {
   }
 })
 
-emitter.on("new-media", ({ fromSaved }) => {
+emitter.on("new-media", (data) => {
+  const fromSaved = data?.[0]?.fromSaved
   if (!fromSaved) {
     page.value = "media"
   }
