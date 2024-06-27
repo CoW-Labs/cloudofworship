@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { Alert, AppSettings, BackgroundVideo, Slide, SlideStyle } from '~/types/index'
+import type { Alert, AppSettings, BackgroundVideo, Schedule, Slide, SlideStyle } from '~/types/index'
 import type { Emitter } from 'mitt'
 
 // console.log(usePinia())
@@ -7,6 +7,8 @@ import type { Emitter } from 'mitt'
 export const useAppStore = defineStore('app', {
   state: () => {
     return {
+      schedules: [] as Array<Schedule>,
+      activeSchedule: null as Schedule | null,
       activeSlides: [] as Array<Slide>,
       liveOutputSlidesId: null as Array<string> | null,
       liveSlideId: null as string | null,
@@ -48,6 +50,12 @@ export const useAppStore = defineStore('app', {
     }
   },
   actions: {
+    setSchedules(schedules: Schedule[]) {
+      this.schedules = schedules
+    },
+    setActiveSchedule(schedule: Schedule) {
+      this.activeSchedule = schedule
+    },
     setActiveSlides(slides: Array<Slide>) {
       this.activeSlides = slides
       this.liveOutputSlidesId = slides?.map(slide => slide.id)

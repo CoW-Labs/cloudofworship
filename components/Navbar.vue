@@ -4,7 +4,7 @@
       class="navbar-ctn h-[50px] w-[100%] border-b border-gray-100 dark:border-primary-950 flex justify-between items-center px-4 dark:border-primary-900"
       v-if="route.name !== 'live'"
     >
-      <div class="logo flex items-center gap-2">
+      <div class="logo flex items-center gap-2 w-[310px]">
         <Logo class="w-[32px]" />
         <h1 class="text-md font-semibold">Cloud of Worshippers</h1>
         <UButton
@@ -14,10 +14,28 @@
           Beta v{{ appVersion }}
         </UButton>
       </div>
-      <div class="actions text-sm flex gap-2 items-center">
+      <div class="projects-ctn">
+        <UButton
+          variant="ghost"
+          color="gray"
+          size="xs"
+          trailing-icon="i-bx-chevron-down"
+          @click="scheduleModalVisible = true"
+        >
+          {{ activeSchedule?.name || "Untitled" }}
+        </UButton>
+      </div>
+      <div
+        class="actions text-sm flex gap-2 items-center justify-end w-[310px]"
+      >
         <SettingsModal
           :is-open="settingsModalOpen"
           @close-modal="settingsModalOpen = false"
+        />
+
+        <ScheduleModal
+          :visible="scheduleModalVisible"
+          @close="scheduleModalVisible = false"
         />
 
         <InviteUsersModal
@@ -30,10 +48,10 @@
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
         <UTooltip :text="online ? 'You are online' : 'You are offline'">
           <UButton variant="ghost" class="h-10 opacity-65">
-            <IconWrapper
+            <!-- <IconWrapper
               v-show="online"
               name="i-tabler-cloud-bolt"
-            ></IconWrapper>
+            ></IconWrapper> -->
             <IconWrapper
               v-show="!online"
               name="i-tabler-cloud-off"
@@ -113,9 +131,12 @@ const darkMode = ref(false)
 const settingsModalOpen = ref(false)
 const colorMode = useColorMode()
 const authStore = useAuthStore()
+const appStore = useAppStore()
 const inviteModalVisible = ref(false)
+const scheduleModalVisible = ref(false)
 
 const { user, church } = storeToRefs(authStore)
+const { activeSchedule } = storeToRefs(appStore)
 defineProps({
   appVersion: String,
   online: Boolean,
