@@ -132,12 +132,12 @@ const liveOutputSlides = computed({
   },
 })
 
-const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
-  if (goLive) {
-    appStore.setActiveSlides(slides.value)
-    appStore.setLiveSlide(activeSlide.value.id)
-  }
-}
+// const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
+//   if (goLive) {
+//     appStore.setActiveSlides(slides.value)
+//     appStore.setLiveSlide(activeSlide.value.id)
+//   }
+// }
 
 const deleteSlide = (slideId: string) => {
   const slides = appStore.activeSlides || []

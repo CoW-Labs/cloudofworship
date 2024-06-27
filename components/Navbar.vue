@@ -1,9 +1,14 @@
 <template>
   <Transition>
     <div
-      class="navbar-ctn h-[50px] w-[100%] border-b border-gray-100 dark:border-primary-950 flex justify-between items-center px-4 dark:border-primary-900"
+      class="navbar-ctn relative h-[50px] w-[100%] border-b border-gray-100 dark:border-primary-950 flex justify-between items-center px-4 dark:border-primary-900"
       v-if="route.name !== 'live'"
     >
+      <UProgress
+        v-if="slidesAndScheduleLoading"
+        class="absolute inset-0 top-auto rounded-none"
+        size="xs"
+      />
       <div class="logo flex items-center gap-2 w-[310px]">
         <Logo class="w-[32px]" />
         <h1 class="text-md font-semibold">Cloud of Worshippers</h1>
@@ -35,6 +40,7 @@
 
         <ScheduleModal
           :visible="scheduleModalVisible"
+          :active-schedule="activeSchedule"
           @close="scheduleModalVisible = false"
         />
 
@@ -134,13 +140,16 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 const inviteModalVisible = ref(false)
 const scheduleModalVisible = ref(false)
+const slidesAndScheduleLoading = ref(false)
 
 const { user, church } = storeToRefs(authStore)
 const { activeSchedule } = storeToRefs(appStore)
+
 defineProps({
   appVersion: String,
   online: Boolean,
 })
+
 const isDark = computed({
   get() {
     return colorMode.value === "dark"
@@ -148,6 +157,12 @@ const isDark = computed({
   set() {
     colorMode.preference = colorMode.value === "dark" ? "light" : "dark"
   },
+})
+
+onMounted(() => {
+  if (!activeSchedule.value) {
+    scheduleModalVisible.value = true
+  }
 })
 
 useAppStore().emitter.on("close-modal", () => {

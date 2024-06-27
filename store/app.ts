@@ -9,7 +9,7 @@ export const useAppStore = defineStore('app', {
     return {
       schedules: [] as Array<Schedule>,
       activeSchedule: null as Schedule | null,
-      activeSlides: [] as Array<Slide>,
+      activeSlides: [] as Array<Slide>, // Returns all slides on CoW
       liveOutputSlidesId: null as Array<string> | null,
       liveSlideId: null as string | null,
       emitter: null as Emitter | null,
@@ -49,12 +49,20 @@ export const useAppStore = defineStore('app', {
       failedUploadRequests: [] as { path: string, options: any }[]
     }
   },
+  getters: {
+    activeScheduleSlides: (state) => state.activeSlides?.filter(slide => slide.scheduleId === (state.activeSchedule?._id || state.activeSchedule?.id))
+  },
   actions: {
     setSchedules(schedules: Schedule[]) {
       this.schedules = schedules
     },
     setActiveSchedule(schedule: Schedule) {
       this.activeSchedule = schedule
+      const existingSchedule = this.schedules.find(sch => sch.id === schedule.id)
+      console.log('existingSchedule', existingSchedule)
+      if (!existingSchedule) {
+        this.schedules.push(schedule)
+      }
     },
     setActiveSlides(slides: Array<Slide>) {
       this.activeSlides = slides

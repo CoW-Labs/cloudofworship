@@ -1,12 +1,14 @@
 <template>
-  <div
-    class="schedule-card flex items-center justify-between border-b border-gray-100 pb-4 last:border-0"
+  <UButton
+    variant="ghost"
+    class="schedule-card flex items-center justify-between border-b border-gray-100 py-4 last:border-0 text-black"
+    @click="$emit('select', schedule)"
   >
     <div class="title-and-date">
-      <div class="title font-medium">Father’s Day Sunday - A lovely father</div>
+      <div class="title font-medium text-start">{{ schedule?.name }}</div>
       <div class="flex items-center gap-2 mt-1">
         <UAvatar
-          alt="Favour Felix"
+          alt="Favour "
           size="xs"
           class="border-primary-500 relative l-[20px]"
           :ui="{
@@ -14,14 +16,17 @@
             wrapper: 'bg-red-500',
           }"
         />
-        <span class="text-sm text-gray-500">Updated 4 days ago</span>
+        <span class="text-xs text-gray-500"
+          >Updated
+          {{ format(new Date(schedule?.updatedAt as string).getTime()) }}</span
+        >
       </div>
     </div>
     <div class="col-2 flex items-center gap-4">
       <div class="editors w-[130px]">
         <UAvatarGroup class="mb-2" max="3" size="sm">
           <UAvatar
-            alt="Favour Felix"
+            alt="Favour "
             class="border-primary-500 relative l-[20px]"
             :ui="{
               background: 'bg-primary-100 ring-0',
@@ -29,7 +34,7 @@
             }"
           />
           <UAvatar
-            alt="John Felix"
+            alt="John "
             class="border-primary-500 relative l-[20px]"
             :ui="{
               background: 'bg-primary-100 ring-0',
@@ -37,7 +42,7 @@
             }"
           />
           <UAvatar
-            alt="Favour Felix"
+            alt="Favour"
             class="border-primary-500 relative l-[20px]"
             :ui="{
               background: 'bg-primary-100 ring-0',
@@ -45,7 +50,7 @@
             }"
           />
           <UAvatar
-            alt="John Felix"
+            alt="John "
             class="border-primary-500 relative l-[20px]"
             :ui="{
               background: 'bg-primary-100 ring-0',
@@ -79,14 +84,15 @@
                 no-tooltip
                 header="Delete schedule"
                 button-styles="justify-start"
-                label="Are you sure you want to delete this schedule? This process is irreversible."
-                @confirm="deleteSchedule()"
+                label="Are you sure you want to delete this schedule and all it's slides? This process is irreversible."
+                @confirm="$emit('delete', schedule?.id)"
               />
               <UButton
                 variant="ghost"
                 color="gray"
                 icon="i-bx-copy"
                 class="justify-start"
+                disabled
                 size="sm"
                 block
                 @click="duplicateSchedule()"
@@ -98,10 +104,11 @@
         </UPopover>
       </div>
     </div>
-  </div>
+  </UButton>
 </template>
 <script setup lang="ts">
 import type { Schedule } from "~/types"
+import { format } from "timeago.js"
 
 const props = defineProps<{
   schedule: Schedule

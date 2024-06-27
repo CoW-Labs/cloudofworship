@@ -239,6 +239,9 @@ const preSlideCreation = (): Slide => {
     type: slideTypes.text,
     layout: slideLayoutTypes.full_text,
     contents: [],
+    userId: authStore.user?._id as string,
+    churchId: authStore?.user?.churchId as string,
+    scheduleId: appStore.activeSchedule?.id as string,
     slideStyle: {
       alignment: "left",
       fontSizePercent: 100,
@@ -327,7 +330,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     }
   )
   if (!error.value) {
-    return data.value
+    return data.value as Slide[]
   } else {
     throw new Error(error.value?.message)
   }
@@ -535,7 +538,7 @@ const createNewSongSlide = (song: Song) => {
   const currentSongVerse = song.verses?.[0].trim()
 
   // Calculate font-size of scripture content
-  let fontSize = useScreenFontSize(currentSongVerse)
+  let fontSize = useScreenFontSize(currentSongVerse as string)
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
     fontSize: Number(fontSize),
@@ -581,7 +584,10 @@ const createNewMediaSlide = async (
   const randomImage =
     "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740"
   tempSlide.type = slideTypes.media
-  tempSlide.slideStyle.backgroundFillType = backgroundFillTypes.crop
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    backgroundFillType: backgroundFillTypes.crop,
+  }
   tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
   tempSlide.background = file.type === "audio" ? randomImage : file.url
   tempSlide.data = file
@@ -667,7 +673,7 @@ const updateCountdownSlide = (
   tempSlide.data = {
     ...tempSlide.data,
     timeLeft: useMilliToTimeString(timeRemaining),
-  }
+  } as Countdown
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
     isMediaPlaying: isPlaying,
@@ -683,7 +689,9 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
   const countdown = slide?.data as Countdown
   if (countdown?.time) {
     const countdownTimeout = useTimeStringToMilli(
-      restartCountdown ? slide.data?.time : slide.data?.timeLeft
+      restartCountdown
+        ? (slide.data as Countdown)?.time
+        : (slide.data as Countdown)?.timeLeft
     )
     if (activeCountdownInterval.value === null || restartCountdown) {
       // console.log("play or restart")
@@ -889,7 +897,7 @@ const saveSlide = async (item: Slide) => {
   tempItem.data = { ...tempItem.data } as any
   try {
     if (tempItem.type === slideTypes.song) {
-      tempSong.verses = [...tempSong?.verses] as []
+      tempSong.verses = [...tempSong?.verses!!] as []
       await db.library.add(
         {
           id: tempSong.id,

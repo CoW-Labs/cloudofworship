@@ -5,7 +5,8 @@
       :ui="{
         base: 'min-w-[700px]',
       }"
-      @close="emit('close')"
+      :prevent-close="true"
+      @close="activeSchedule ? emit('close') : null"
     >
       <UCard
         :ui="{
@@ -21,6 +22,7 @@
             <div class="actions flex items-center gap-2">
               <UButton
                 icon="i-bx-search"
+                v-if="schedules.length > 0"
                 color="primary"
                 :variant="searchVisible ? 'outline' : 'ghost'"
                 @click="searchVisible = !searchVisible"
@@ -32,8 +34,10 @@
                 variant="ghost"
                 @click="
                   () => {
-                    visible = false
-                    emit('close')
+                    if (activeSchedule) {
+                      visible = false
+                      emit('close')
+                    }
                   }
                 "
               ></UButton>
@@ -55,6 +59,7 @@
           <UButton
             block
             class="h-[170px] bg-primary-100 border border-primary-100 hover:bg-primary-100 hover:border-primary-500 transition-all flex-col gap-4 text-primary-500"
+            @click="createNewSchedule()"
           >
             <PlusIcon />
             <div>New Schedule</div>
@@ -63,8 +68,25 @@
           <div class="schedules-ctn mt-6">
             <p class="text-sm text-gray-400">Recent schedules</p>
 
-            <div class="schedules flex-col flex gap-4 mt-4">
-              <ScheduleCard v-for="i in 4" :key="i" />
+            <div class="schedules flex-col flex mt-4 h-[40vh] overflow-auto">
+              <EmptyState
+                v-if="schedules.length === 0"
+                icon="i-bx-calendar"
+                sub="No schedules yet"
+                desc="Click the button above to create a new schedule and start using Cloud of Worshippers."
+                is-wider
+              />
+              <ScheduleCard
+                v-else
+                v-for="schedule in schedules"
+                :key="schedule.id"
+                :schedule="schedule"
+                @select="(schedule: Schedule) => {
+                  appStore.setActiveSchedule(schedule)
+                  $emit('close')
+                }"
+                @delete="deleteSchedule($event)"
+              />
             </div>
           </div>
         </div>
@@ -78,13 +100,16 @@ import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import type { Church, User } from "~/store/auth"
 import { useAuthStore } from "~/store/auth"
+import type { Schedule } from "~/types"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const { schedules } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
 
 const props = defineProps<{
   visible: boolean
+  activeSchedule: Schedule
 }>()
 
 const visible = ref<boolean>(props.visible)
@@ -99,4 +124,39 @@ watch(
     visible.value = props.visible
   }
 )
+
+const createNewSchedule = () => {
+  const schedule: Schedule = {
+    id: useID(),
+    name: `CoW Untitled Schedule ${appStore.schedules.length + 1}`,
+    author: authStore?.user?._id as string,
+    editors: [],
+    churchId: authStore?.user?.churchId as string,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  // TODO: network call to create schedule on BE
+
+  appStore.setActiveSchedule(schedule)
+
+  emit("close")
+}
+
+const deleteSchedule = (scheduleId: string) => {
+  let updatedScheduleList: Schedule[] = [...appStore.schedules]
+  updatedScheduleList = updatedScheduleList.filter(
+    (sch) => sch.id !== scheduleId
+  )
+
+  if (scheduleId === appStore.activeSchedule?.id) {
+    appStore.setActiveSchedule(updatedScheduleList?.at(-1))
+  }
+  appStore.setSchedules(updatedScheduleList)
+
+  // TODO: network call to delete schedule on BE
+  useGlobalEmit("delete-schedule-slides", scheduleId)
+
+  emit("close")
+}
 </script>
