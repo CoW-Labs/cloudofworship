@@ -165,7 +165,6 @@ emitter.on("new-hymn", async (data: string) => {
 })
 
 emitter.on("new-song", async (data: Song) => {
-  // console.log("hello")
   if (data) {
     const song = await useSong(data)
     if (song) {
@@ -313,7 +312,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     slide.userId = authStore.user?._id!!
     slide.churchId = churchId!!
     if (slide.type === slideTypes.song) {
-      slide.songId = (slide.data as Song)?._id
+      slide.songId = (slide.data as Song)?._id || (slide.data as Song)?.id
       delete slide.data
     }
   })
