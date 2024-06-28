@@ -59,7 +59,6 @@ export const useAppStore = defineStore('app', {
     setActiveSchedule(schedule: Schedule) {
       this.activeSchedule = schedule
       const existingSchedule = this.schedules.find(sch => sch.id === schedule.id)
-      console.log('existingSchedule', existingSchedule)
       if (!existingSchedule) {
         this.schedules.push(schedule)
       }

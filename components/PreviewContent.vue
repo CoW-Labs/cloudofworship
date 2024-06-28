@@ -82,7 +82,7 @@ const toast = useToast()
 const windowHeight = ref<number>(0)
 const slides = ref<Array<Slide>>(appStore.activeSlides || [])
 const activeSlide = ref<Slide>()
-const { activeSlides } = storeToRefs(appStore)
+const { activeSlides, activeSchedule } = storeToRefs(appStore)
 const slidesGrid = ref<HTMLDivElement | null>(null)
 const bulkActionLabel = ref<string>("Select Slides")
 const bulkActionIcon = ref<string>("")
@@ -94,7 +94,7 @@ const countdownTimeLeft = ref<number>(0)
 watch(
   slides,
   (newVal, oldVal) => {
-    appStore.setActiveSlides(slides.value)
+    // appStore.setActiveSlides(slides.value)
 
     setTimeout(() => {
       // Scroll down to newest slide on slide create
@@ -105,12 +105,28 @@ watch(
       newestSlide?.scrollIntoView()
     }, 100)
   },
-  { deep: true }
+  { deep: true, immediate: true }
+)
+
+// Set slides to slides based on scheduler
+watch(
+  activeSchedule,
+  () => {
+    slides.value = activeSlides.value?.filter(
+      (slide) => slide.scheduleId === appStore.activeSchedule?.id
+    )
+  }
+  // { deep: true, immediate: true }
 )
 
 // Update Slides order when they are updated in live content
 watch(activeSlides, () => {
-  slides.value = activeSlides.value
+  const tempSlides = activeSlides.value?.filter(
+    (slide) => slide.scheduleId === appStore.activeSchedule?.id
+  )
+  if (tempSlides.length > 0) {
+    slides.value = tempSlides
+  }
 })
 
 const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
