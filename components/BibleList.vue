@@ -1,5 +1,5 @@
 <template>
-  <div class="song-main min-h-[90vh]" ref="quickActions">
+  <div class="bible-main min-h-[80vh] h-[100%]" ref="quickActions">
     <div class="flex gap-2">
       <UInput
         icon="i-bx-search"
@@ -7,7 +7,6 @@
         v-model="searchInput"
         class="w-[100%]"
         @input="onSearchInput"
-        @keyup.enter="getSongs($event.target.value)"
       />
       <UButton icon="i-bx-x" color="primary" @click="$emit('close')"></UButton>
     </div>
@@ -15,7 +14,7 @@
     <!-- SEARCHING BIBLE VERSES -->
     <div
       v-if="searchInput.length >= 2"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]"
+      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
     >
       <ActionCard
         v-for="(action, index) in searchedActions"
@@ -31,7 +30,7 @@
     <!-- RECENTLY OPENED SCRIPTURES -->
     <div
       v-if="recentBibleSearches.length > 0 && searchInput.length < 2"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]"
+      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
     >
       <BibleQueryCard
         v-for="bibleQuery in [...recentBibleSearches].reverse()"

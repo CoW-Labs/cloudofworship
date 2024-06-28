@@ -1,5 +1,5 @@
 <template>
-  <div class="personal-library-main min-h-[90vh]" ref="quickActions">
+  <div class="personal-library-main min-h-[80vh] h-[100%]" ref="quickActions">
     <UTabs :items="libraryTabs" @change="activeLibraryTab = $event">
       <template #default="{ item }">
         <div class="flex gap-2 capitalize">
@@ -36,7 +36,7 @@
     </div>
     <div
       v-if="loading"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]"
+      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-350px)]"
     >
       <USkeleton
         v-for="i in 15"
@@ -49,7 +49,7 @@
         <!-- SAVED SONGS -->
         <div
           v-if="activeLibraryTab === 0"
-          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
         >
           <AddSong
             v-if="page === 'add-song'"
@@ -64,7 +64,7 @@
               desc="Click the save icon on the Slide card to start saving"
             />
             <SongCard
-              v-for="(song, index) in savedSongs"
+              v-for="(song, index) in savedSongs?.slice(0, 15)"
               saved
               :key="song.content.id"
               :song="song.content"
@@ -76,7 +76,7 @@
         <!-- SAVED SLIDES -->
         <div
           v-if="activeLibraryTab === 1"
-          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
         >
           <EmptyState
             v-if="savedSlides?.length === 0"
@@ -97,7 +97,7 @@
         <!-- SAVED SONGS -->
         <div
           v-if="activeLibraryTab === 0"
-          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
         >
           <AddSong
             v-if="page === 'add-song'"
@@ -123,7 +123,7 @@
         <!-- SAVED SLIDES -->
         <div
           v-if="activeLibraryTab === 1"
-          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)] come-up-1"
+          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
         >
           <EmptyState
             v-if="savedSlidesSearchResults?.length === 0"

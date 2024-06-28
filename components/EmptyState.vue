@@ -4,10 +4,16 @@
   >
     <IconWrapper :name="icon" size="14" />
     <div>
-      <h2 class="text-md font-semibold max-w-[150px] text-center">
+      <h2
+        class="text-md font-semibold max-w-[150px] text-center mx-auto"
+        :class="{ 'max-w-[200px]': isWider }"
+      >
         {{ sub }}
       </h2>
-      <p class="text-xs max-w-[150px] text-center mt-1">
+      <p
+        class="text-xs max-w-[150px] text-center mt-1 mx-auto"
+        :class="{ 'max-w-[220px]': isWider }"
+      >
         {{ desc }}
       </p>
     </div>
@@ -25,6 +31,7 @@ const props = defineProps<{
   desc: string
   actionText: string
   action: string
+  isWider: boolean
 }>()
 
 const actionIcon = computed(() => {
