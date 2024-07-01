@@ -293,6 +293,7 @@ const signup = async () => {
         type: churchIdentity.value,
         address: churchAddress.value,
         pastor: churchPastor.value,
+        userId: authStore.user?._id,
       },
     })
     if (error.value) {

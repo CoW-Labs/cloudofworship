@@ -1,5 +1,5 @@
 <template>
-  <div class="search-bible-main min-h-[90vh]" ref="quickActions">
+  <div class="search-bible-main min-h-[80vh] h-[100%]" ref="quickActions">
     <div class="flex gap-2">
       <UInput
         icon="i-bx-search"
@@ -69,7 +69,7 @@
 
     <div
       v-if="loading"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]"
+      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-260px)]"
     >
       <USkeleton
         v-for="i in 15"
@@ -79,7 +79,7 @@
     </div>
     <template v-else>
       <!-- SEARCHING BIBLE VERSES -->
-      <div class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]">
+      <div class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-260px)]">
         <ActionCard
           v-for="(verse, index) in verses"
           :key="`verse ${index}`"

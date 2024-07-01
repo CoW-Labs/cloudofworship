@@ -1,5 +1,5 @@
 <template>
-  <div class="hymn-main min-h-[90vh]" ref="quickActions">
+  <div class="hymn-main min-h-[80vh] h-[100%]" ref="quickActions">
     <div class="flex gap-2">
       <UInput
         icon="i-bx-search"
@@ -26,7 +26,7 @@
 
     <div
       v-if="loading"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]"
+      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
     >
       <USkeleton
         v-for="i in 15"
@@ -38,7 +38,7 @@
       <!-- BASIC SONGS -->
       <div
         v-if="searchInput.length < 2"
-        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]"
+        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
       >
         <SongCard
           v-for="(hymn, index) in hymns"
@@ -56,7 +56,7 @@
       <!-- SEARCHING SONGS -->
       <div
         v-else
-        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-180px)]"
+        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
       >
         <SongCard
           v-for="(hymn, index) in hymns"
