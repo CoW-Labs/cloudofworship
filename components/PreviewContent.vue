@@ -314,7 +314,8 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     if (slide.type === slideTypes.song) {
       // console.log("song-data", slide?.data)
       slide.songId = (slide.data as Song)?._id || (slide.data as Song)?.id
-      delete slide.data
+      // delete slide.data
+      console.log("new-slide", slide)
     }
   })
 
