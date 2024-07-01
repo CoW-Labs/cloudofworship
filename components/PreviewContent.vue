@@ -312,6 +312,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     slide.userId = authStore.user?._id!!
     slide.churchId = churchId!!
     if (slide.type === slideTypes.song) {
+      // console.log("song-data", slide?.data)
       slide.songId = (slide.data as Song)?._id || (slide.data as Song)?.id
       delete slide.data
     }
@@ -828,7 +829,7 @@ const gotoHymnVerse = async (title: string) => {
 const gotoSongVerse = async (title: string) => {
   const tempSlide = { ...activeSlide.value } as Slide
   const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
-  console.log("slide", activeSlide.value)
+  // console.log("slide", activeSlide.value)
   const song = await useSong(
     (activeSlide.value?.data as Song) || activeSlide?.value?.songId
   )
