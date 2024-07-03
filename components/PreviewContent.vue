@@ -94,8 +94,6 @@ const countdownTimeLeft = ref<number>(0)
 watch(
   slides,
   (newVal, oldVal) => {
-    // appStore.setActiveSlides(slides.value)
-
     setTimeout(() => {
       // Scroll down to newest slide on slide create
       const slideId = activeSlide.value?.id
@@ -115,8 +113,8 @@ watch(
     slides.value = activeSlides.value?.filter(
       (slide) => slide.scheduleId === appStore.activeSchedule?.id
     )
-  }
-  // { deep: true, immediate: true }
+  },
+  { immediate: true }
 )
 
 // Update Slides order when they are updated in live content
@@ -130,9 +128,10 @@ watch(activeSlides, () => {
 })
 
 const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
+  // console.log(goLive, slide)
+  appStore.appendActiveSlide(slide)
   activeSlide.value = slide
   if (goLive) {
-    appStore.setActiveSlides(slides.value)
     appStore.setLiveSlide(activeSlide.value.id)
   }
 }
@@ -299,7 +298,7 @@ const uploadOfflineSlides = async () => {
 
     const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
     // console.log("merged slides", mergedSlides)
-    appStore.setActiveSlides(mergedSlides)
+    appStore.replaceScheduleActiveSlides(mergedSlides)
   }
 }
 
@@ -428,7 +427,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
   const slideIndex = slides.value.findIndex((s) => s.id === slideId)
   slides.value.splice(slideIndex, 1)
-  appStore.setActiveSlides(slides.value)
+  appStore.removeActiveSlide(tempSlide)
   deleteSlideOnline(tempSlide)
 
   // Delete Probable Media files linked in DB (as long as they are not saved in Library)
@@ -752,7 +751,7 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
 }
 
 const updateLiveOutput = (updatedSlide: Slide) => {
-  appStore.setActiveSlides(slides.value || [])
+  appStore.replaceScheduleActiveSlides(slides.value || [])
 
   // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
   if (updatedSlide.id === appStore.liveSlideId) {

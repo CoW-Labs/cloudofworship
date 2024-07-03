@@ -131,7 +131,7 @@ const liveOutputSlides = computed({
     )
   },
   set(newVal) {
-    appStore.setActiveSlides(newVal)
+    appStore.replaceScheduleActiveSlides(newVal)
     toast.add({ icon: "i-bx-slideshow", title: "Slide order has been updated" })
   },
 })
@@ -148,7 +148,7 @@ const deleteSlide = (slideId: string) => {
   const tempSlide = appStore.activeSlides.find((s) => s.id === slideId)
   const slideIndex = slides.findIndex((s) => s.id === slideId)
   slides.splice(slideIndex, 1)
-  appStore.setActiveSlides(slides)
+  appStore.removeActiveSlide(tempSlide!!)
   toast.add({ title: `${tempSlide?.name} deleted`, icon: "i-tabler-trash" })
 }
 </script>

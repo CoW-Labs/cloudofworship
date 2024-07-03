@@ -3,6 +3,17 @@ import type { Alert, AppSettings, BackgroundVideo, Schedule, Slide, SlideStyle }
 import type { Emitter } from 'mitt'
 
 // console.log(usePinia())
+function ensureUniqueIds(arr: Slide[]): Slide[] {
+  const seenIds = new Set();
+  return arr.filter(obj => {
+    if (seenIds.has(obj.id)) {
+      return false;
+    } else {
+      seenIds.add(obj.id);
+      return true;
+    }
+  });
+}
 
 export const useAppStore = defineStore('app', {
   state: () => {
@@ -63,15 +74,32 @@ export const useAppStore = defineStore('app', {
         this.schedules.push(schedule)
       }
     },
+    appendActiveSlide(slide: Slide) {
+      if (!this.activeSlides.find(s => s.id === slide.id)) {
+        this.activeSlides.push(slide)
+        this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+      }
+    },
+    removeActiveSlide(slide: Slide) {
+      this.activeSlides.splice(this.activeSlides.findIndex(s => s.id === slide.id), 1)
+      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+    },
+    replaceScheduleActiveSlides(slides: Array<Slide>) {
+      let tempSlides = [...this.activeSlides]
+      tempSlides = tempSlides.filter(slide => slide.scheduleId !== (this.activeSchedule?._id || this.activeSchedule?.id))
+      tempSlides.push(...slides)
+      this.activeSlides = ensureUniqueIds(tempSlides)
+      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+    },
     setActiveSlides(slides: Array<Slide>) {
-      this.activeSlides = slides
-      this.liveOutputSlidesId = slides?.map(slide => slide.id)
+      this.activeSlides = ensureUniqueIds(slides)
+      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     // setActiveSlideId(slideId: string) {
     //   this.activeSlideId = slideId
     // },
     setLiveOutputSlidesId(slides: Array<string>) {
-      this.liveOutputSlidesId = slides
+      this.liveOutputSlidesId = Array.from(new Set(slides))
     },
     setLiveSlide(slide: string) {
       this.liveSlideId = slide
