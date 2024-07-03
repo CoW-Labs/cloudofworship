@@ -64,8 +64,10 @@
                 <UAvatar
                   :text="member?.fullname?.split(' ')?.[0]?.[0]"
                   size="sm"
-                  :ui="{ text: `text-[${member?.theme}] font-semibold` }"
-                  :class="` border-[${member?.theme}] bg-[${member?.theme}20]`"
+                  :ui="{
+                    text: `text-[${member?.theme}] dark:text-[${member?.theme}] font-semibold`,
+                  }"
+                  :class="`border-[${member?.theme}] bg-[${member?.theme}20] dark:bg-[${member?.theme}20]`"
                 />
                 {{ member?.fullname }}
               </div>

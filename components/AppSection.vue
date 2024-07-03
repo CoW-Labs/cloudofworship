@@ -48,8 +48,6 @@
               :variant="secondaryButton?.variant || 'ghost'"
               :color="secondaryButton.color"
               :icon="secondaryButton.icon"
-              :target="secondaryButton.action === 'go-live' ? '_target' : false"
-              :to="secondaryButton.action === 'go-live' ? '/live' : '#'"
               @click="useGlobalEmit(secondaryButton.action)"
               >{{ secondaryButton.label }}</UButton
             >

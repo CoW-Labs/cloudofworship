@@ -81,8 +81,10 @@
             <UAvatar
               :text="user?.fullname?.split(' ')?.[0]?.[0]"
               size="sm"
-              :ui="{ text: `text-[${user?.theme}] font-semibold` }"
-              :class="` bg-[${user?.theme}20]`"
+              :ui="{
+                text: `text-[${user?.theme}] dark:text-[${user?.theme}] font-semibold`,
+              }"
+              :class="`border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
             />
           </UButton>
           <template #panel>

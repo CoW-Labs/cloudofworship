@@ -1,12 +1,14 @@
 <template>
   <div class="profile-modal-ctn flex">
     <div class="profile-modal text-center w-52">
-      <div class="avatar-ctn bg-primary-100 dark:bg-primary-800 p-4">
+      <div class="avatar-ctn bg-primary-100 dark:bg-primary-900 p-4">
         <UAvatar
           :text="user?.fullname?.split(' ')?.[0]?.[0]"
           size="xl"
-          :ui="{ text: `text-[${user?.theme}] font-semibold` }"
-          :class="`border border-primary-200 bg-[${user?.theme}20]`"
+          :ui="{
+            text: `text-[${user?.theme}] dark:text-[${user?.theme}] font-semibold`,
+          }"
+          :class="`dark:border border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
         />
 
         <h5 class="name font-medium text-md mt-4">{{ user?.fullname }}</h5>

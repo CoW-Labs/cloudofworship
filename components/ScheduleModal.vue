@@ -58,7 +58,7 @@
           </Transition>
           <UButton
             block
-            class="h-[170px] bg-primary-100 border border-primary-100 hover:bg-primary-100 hover:border-primary-500 transition-all flex-col gap-4 text-primary-500"
+            class="h-[170px] bg-primary-100 dark:bg-primary-300 border border-primary-100 dark:border-primary-500 hover:bg-primary-100 dark:hover:bg-primary-400 hover:border-primary-500 transition-all flex-col gap-4 text-primary-500"
             @click="createNewSchedule()"
           >
             <PlusIcon />
@@ -129,8 +129,8 @@ const createNewSchedule = () => {
   const schedule: Schedule = {
     id: useID(),
     name: `CoW Untitled Schedule ${appStore.schedules.length + 1}`,
-    author: authStore?.user?._id as string,
-    editors: [],
+    authorId: authStore?.user?._id as string,
+    editorIds: [],
     churchId: authStore?.user?.churchId as string,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

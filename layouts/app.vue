@@ -162,6 +162,14 @@ emitter.on("close-offline-toast", () => {
   isOfflineToastOpen.value = false
 })
 
+emitter.on("go-live", () => {
+  window.open(
+    `${window.location.host}/live`,
+    "_blank",
+    " width=1024, height=768"
+  )
+})
+
 const saveAllBackgroundVideos = async () => {
   const db = useIndexedDB()
   const savedBgVideos = await db.cached.count()
