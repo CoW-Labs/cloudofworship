@@ -327,8 +327,15 @@ const getChurch = async () => {
   // console.log(authStore.user)
   const churchId = authStore.user?.churchId
   if (churchId) {
-    const promise = useAPIFetch(`/church/${churchId}?teammates=true`)
-    authStore.setChurch(promise.data as unknown as Church)
+    const { data, error } = await useAPIFetch(
+      `/church/${churchId}?teammates=true`
+    )
+    const church = data.value as unknown as Church
+    authStore.setChurch(church)
+    authStore.setUser({ ...authStore.user, ...church.users[0] })
+    if (error.value) {
+      throw new Error(error.value?.message)
+    }
   } else {
     navigateTo("/signup?registerChurch=1")
     useToast().add({

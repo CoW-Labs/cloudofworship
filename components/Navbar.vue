@@ -79,13 +79,10 @@
             class="p-1"
           >
             <UAvatar
-              :alt="user?.fullname?.split(' ')?.[0]"
+              :text="user?.fullname?.split(' ')?.[0]?.[0]"
               size="sm"
-              class="border-primary-500"
-              :ui="{
-                background: 'bg-primary-100 ring-0',
-                wrapper: 'bg-red-500',
-              }"
+              :ui="{ text: `text-[${user?.theme}] font-semibold` }"
+              :class="` bg-[${user?.theme}20]`"
             />
           </UButton>
           <template #panel>

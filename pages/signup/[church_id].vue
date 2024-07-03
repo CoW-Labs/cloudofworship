@@ -13,13 +13,10 @@
         <UAvatarGroup class="mb-2" max="3">
           <UAvatar
             v-for="(user, index) in church?.users?.slice(0, 4)"
-            :alt="user?.fullname?.split(' ')?.[0]"
+            :text="user?.fullname?.split(' ')?.[0]?.[0]"
             size="lg"
-            class="border-primary-500 relative l-[20px]"
-            :ui="{
-              background: 'bg-primary-100 ring-0',
-              wrapper: 'bg-red-500',
-            }"
+            :ui="{ text: `text-[${user?.theme}] font-semibold` }"
+            :class="`border-[${user?.theme}] bg-[${user?.theme}20]`"
           />
         </UAvatarGroup>
         <div class="label text-sm">

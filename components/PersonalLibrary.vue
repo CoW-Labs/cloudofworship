@@ -235,7 +235,7 @@ const searchLibraryItems = (query: string = "") => {
     ],
   })
   results = results?.map((result) => result.obj)
-  console.log(results)
+  // console.log(results)
   searchedLibraryItems.value = results
   loading.value = false
 }

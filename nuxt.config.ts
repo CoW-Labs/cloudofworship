@@ -165,7 +165,7 @@ export default defineNuxtConfig({
     },
 
     devOptions: {
-      enabled: true,
+      enabled: false,
       suppressWarnings: true,
       navigateFallback: '/',
       navigateFallbackAllowlist: [/^\/$/],

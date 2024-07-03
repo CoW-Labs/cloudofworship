@@ -117,7 +117,7 @@ const addSong = async () => {
     } else if (err.name === "DataCloneError") {
       // toast.add({ icon: 'i-bx-save', title: 'Item added to Library' })
     } else {
-      console.log(err)
+      // console.log(err)
     }
   } finally {
     loading.value = false

@@ -298,7 +298,7 @@ const uploadOfflineSlides = async () => {
     // console.log("uploadedSlides", uploadedSlides)
 
     const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
-    console.log("merged slides", mergedSlides)
+    // console.log("merged slides", mergedSlides)
     appStore.setActiveSlides(mergedSlides)
   }
 }
@@ -334,7 +334,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
       // console.log("song-data", slide?.data)
       slide.songId = (slide.data as Song)?._id || (slide.data as Song)?.id
       // delete slide.data
-      console.log("new-slide", slide)
+      // console.log("new-slide", slide)
     }
   })
 
@@ -456,7 +456,7 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 }
 
 const onUpdateSlide = (slide: Slide) => {
-  console.log("updated", slide)
+  // console.log("updated", slide)
   // Always pause countdown slide before updating it
   if (slide.type === slideTypes.countdown) {
     useGlobalEmit("start-countdown", slide)
