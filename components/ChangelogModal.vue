@@ -54,7 +54,10 @@ const changelog = `
 - Added teams; you can invite others to join your church media team and work together.
 - Added hymn preview when searching hymns
 - Added fade transitions between slides
+- Added hymn preview when searching hymns
+- Fixed issue with layout shift
 - New songs added
+- New hymns added (#1343, #1344)
 - Fixed minor bugs and issues for improved experience`
 
 const appStore = useAppStore()
