@@ -127,16 +127,13 @@ watch(
 
 const createNewSchedule = () => {
   const schedule: Schedule = {
-    id: useID(),
+    _id: useObjectID(),
     name: `CoW Untitled Schedule ${appStore.schedules.length + 1}`,
     authorId: authStore?.user?._id as string,
     editorIds: [],
     churchId: authStore?.user?.churchId as string,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   }
-
-  // TODO: network call to create schedule on BE
 
   appStore.setActiveSchedule(schedule)
 
@@ -149,7 +146,7 @@ const deleteSchedule = (scheduleId: string) => {
     (sch) => sch.id !== scheduleId
   )
 
-  if (scheduleId === appStore.activeSchedule?.id) {
+  if (scheduleId === appStore.activeSchedule?._id) {
     appStore.setActiveSchedule(updatedScheduleList?.at(-1))
   }
   appStore.setSchedules(updatedScheduleList)

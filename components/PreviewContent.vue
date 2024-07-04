@@ -25,7 +25,9 @@
   >
     <div
       class="slides-ctn overflow-y-scroll mb-4 rounded-md transition h-[50%]"
-      :class="[slides?.length === 0 ? 'bg-primary-100' : '']"
+      :class="[
+        slides?.length === 0 ? 'bg-primary-100 dark:bg-primary-900' : '',
+      ]"
     >
       <div
         v-if="slides?.length > 0"
@@ -52,6 +54,7 @@
       <EmptyState
         v-else
         icon="i-tabler-device-desktop-plus"
+        class="dark:text-white"
         sub="No slides yet"
         action="new-slide"
         action-text="Create new slide"
@@ -71,9 +74,10 @@
 <script setup lang="ts">
 import { useDebounceFn } from "@vueuse/core"
 import type { Emitter } from "mitt"
+import { merge } from "rxjs"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import type { Hymn, Scripture, Slide, Song, Countdown } from "~/types"
+import type { Hymn, Scripture, Slide, Song, Countdown, Schedule } from "~/types"
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const churchId = authStore.user?.churchId
@@ -106,21 +110,10 @@ watch(
   { deep: true, immediate: true }
 )
 
-// Set slides to slides based on scheduler
-watch(
-  activeSchedule,
-  () => {
-    slides.value = activeSlides.value?.filter(
-      (slide) => slide.scheduleId === appStore.activeSchedule?.id
-    )
-  },
-  { immediate: true }
-)
-
 // Update Slides order when they are updated in live content
 watch(activeSlides, () => {
   const tempSlides = activeSlides.value?.filter(
-    (slide) => slide.scheduleId === appStore.activeSchedule?.id
+    (slide) => slide.scheduleId === appStore.activeSchedule?._id
   )
   if (tempSlides.length > 0) {
     slides.value = tempSlides
@@ -129,8 +122,8 @@ watch(activeSlides, () => {
 
 const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
   // console.log(goLive, slide)
-  appStore.appendActiveSlide(slide)
   activeSlide.value = slide
+  appStore.appendActiveSlide(slide)
   if (goLive) {
     appStore.setLiveSlide(activeSlide.value.id)
   }
@@ -256,7 +249,7 @@ const preSlideCreation = (): Slide => {
     contents: [],
     userId: authStore.user?._id as string,
     churchId: authStore?.user?.churchId as string,
-    scheduleId: appStore.activeSchedule?.id as string,
+    scheduleId: appStore.activeSchedule?._id as string,
     slideStyle: {
       alignment: "left",
       fontSizePercent: 100,
@@ -298,28 +291,84 @@ const uploadOfflineSlides = async () => {
 
     const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
     // console.log("merged slides", mergedSlides)
-    appStore.replaceScheduleActiveSlides(mergedSlides)
+    appStore.appendActiveSlides(mergedSlides)
   }
 }
 
-// const createSlideOnline = async (slide: Slide) => {
-//   // Find song slide and update
-//   const tempSlide = { ...slide }
-//   tempSlide.userId = authStore.user?._id!!
-//   tempSlide.churchId = churchId!!
-//   if (tempSlide.type === slideTypes.song) {
-//     tempSlide.songId = (tempSlide.data as Song)?._id
-//     delete tempSlide.data
+const createScheduleOnline = async (schedule: Schedule) => {
+  // console.log("createScheduleOnline", schedule)
+  const { data, error } = await useAPIFetch(`/church/${churchId}/schedules`, {
+    method: "POST",
+    body: schedule,
+  })
+  if (!error.value) {
+    const tempSchedule = data.value as Schedule
+    console.log("tempSchedule", tempSchedule)
+    appStore.setActiveSchedule(tempSchedule)
+    return tempSchedule
+  } else {
+    throw new Error(error.value?.message)
+  }
+}
+
+// Set slides to slides based on scheduler
+watch(
+  activeSchedule,
+  () => {
+    slides.value = activeSlides.value?.filter(
+      (slide) => slide.scheduleId === appStore.activeSchedule?._id
+    )
+
+    // Check if activeSchedule is remote object
+    if (!activeSchedule.value?.updatedAt) {
+      createScheduleOnline(activeSchedule.value as Schedule)
+    }
+  },
+  { immediate: true }
+)
+
+// const mergeSchedules = (
+//   offlineSchedules: Schedule[],
+//   uploadedSchedules: Schedule[]
+// ): Schedule[] => {
+//   // Create a Map from uploadedSchedules with id as the key
+//   const uploadedMap = new Map(
+//     uploadedSchedules.map((schedule) => [schedule.id, schedule._id])
+//   )
+//   // console.log("uploadedMap", uploadedMap)
+
+//   // Iterate over offlineSchedules and merge special_id where ids match
+//   const tempOfflineSchedules = [...offlineSchedules]
+//   for (let offlineSchedule of tempOfflineSchedules) {
+//     if (uploadedMap.has(offlineSchedule.id)) {
+//       offlineSchedule._id = uploadedMap.get(offlineSchedule.id)
+//     }
 //   }
 
-//   const { data, error } = await useAPIFetch(`/church/${churchId}/slides`, {
-//     method: "POST",
-//     body: tempSlide,
-//   })
-//   if (!error.value) {
-//     return data.value
-//   } else {
-//     throw new Error(error.value?.message)
+//   return tempOfflineSchedules
+// }
+
+// const batchUploadOfflineSchedules = async () => {
+//   // Retrieve all offline schedules
+//   const offlineSchedules = appStore.schedules.filter(
+//     (schedule) => schedule.updatedAt === undefined
+//   )
+//   if (offlineSchedules.length > 0) {
+//     console.log("offlineSchedules", offlineSchedules)
+//     const uploadedSchedules = await Promise.all(
+//       offlineSchedules.map((schedule) => {
+//         return createScheduleOnline(schedule)
+//       })
+//     )
+
+//     const mergedSchedules = mergeSchedules(
+//       [...offlineSchedules],
+//       [...uploadedSchedules]
+//     )
+//     console.log("offlineSchedules", offlineSchedules)
+//     console.log("uploadedSchedules", uploadedSchedules)
+//     console.log("mergedSchedules", mergedSchedules)
+//     appStore.setSchedules(mergedSchedules)
 //   }
 // }
 
@@ -338,7 +387,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
   })
 
   const { data, error } = await useAPIFetch(
-    `/church/${churchId}/slides/batch`,
+    `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/batch`,
     {
       method: "POST",
       body: tempSlides,
@@ -362,7 +411,7 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
 
   if (slide?._id) {
     const { data, error } = await useAPIFetch(
-      `/church/${churchId}/slides/${slide?._id}`,
+      `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/${slide?._id}`,
       {
         method: "PUT",
         body: tempSlide,
@@ -455,7 +504,7 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 }
 
 const onUpdateSlide = (slide: Slide) => {
-  // console.log("updated", slide)
+  console.log("updated", slide)
   // Always pause countdown slide before updating it
   if (slide.type === slideTypes.countdown) {
     useGlobalEmit("start-countdown", slide)

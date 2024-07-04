@@ -61,24 +61,41 @@ export const useAppStore = defineStore('app', {
     }
   },
   getters: {
-    activeScheduleSlides: (state) => state.activeSlides?.filter(slide => slide.scheduleId === (state.activeSchedule?._id || state.activeSchedule?.id))
+    activeScheduleSlides: (state) => state.activeSlides?.filter(slide => slide.scheduleId === (state.activeSchedule?._id))
   },
   actions: {
     setSchedules(schedules: Schedule[]) {
       this.schedules = schedules
+      if (this.activeSchedule) {
+        const tempSchedule = schedules.find(sch => sch._id === this.activeSchedule?._id) as Schedule
+        // console.log("tempSchedule", tempSchedule)
+        this.activeSchedule = tempSchedule
+      }
     },
     setActiveSchedule(schedule: Schedule) {
       this.activeSchedule = schedule
-      const existingSchedule = this.schedules.find(sch => sch.id === schedule.id)
+      const existingSchedule = this.schedules.find(sch => sch._id === schedule._id)
       if (!existingSchedule) {
         this.schedules.push(schedule)
+      } else {
+        this.schedules.splice(this.schedules.findIndex(sch => sch._id === schedule._id), 1, schedule)
       }
     },
-    appendActiveSlide(slide: Slide) {
+    appendActiveSlide(slide: Slide, position?: number) {
       if (!this.activeSlides.find(s => s.id === slide.id)) {
-        this.activeSlides.push(slide)
+        if (position && position >= 0) {
+          this.activeSlides.splice(position, 0, slide)
+        } else {
+          this.activeSlides.push(slide)
+        }
         this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
       }
+    },
+    appendActiveSlides(slides: Array<Slide>) {
+      let tempSlides = [...this.activeSlides]
+      tempSlides.push(...slides)
+      this.activeSlides = ensureUniqueIds(tempSlides)
+      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     removeActiveSlide(slide: Slide) {
       this.activeSlides.splice(this.activeSlides.findIndex(s => s.id === slide.id), 1)
@@ -86,12 +103,14 @@ export const useAppStore = defineStore('app', {
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
       let tempSlides = [...this.activeSlides]
-      tempSlides = tempSlides.filter(slide => slide.scheduleId !== (this.activeSchedule?._id || this.activeSchedule?.id))
+      tempSlides = tempSlides.filter(slide => slide.scheduleId !== (this.activeSchedule?._id))
+      console.log("tempSlides", tempSlides)
       tempSlides.push(...slides)
       this.activeSlides = ensureUniqueIds(tempSlides)
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     setActiveSlides(slides: Array<Slide>) {
+      console.log("setActiveSlides", slides)
       this.activeSlides = ensureUniqueIds(slides)
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },

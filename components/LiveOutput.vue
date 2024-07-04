@@ -127,7 +127,7 @@ const liveOutputSlides = computed({
 
     // Filter by current active schedule
     return tempSlides?.filter(
-      (slide) => slide.scheduleId === appStore.activeSchedule?.id
+      (slide) => slide.scheduleId === appStore.activeSchedule?._id
     )
   },
   set(newVal) {
