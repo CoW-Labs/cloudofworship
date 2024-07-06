@@ -142,14 +142,22 @@ const searchedSchedules = computed(() => {
 })
 
 const createNewSchedule = () => {
+  const scheduleId = useObjectID()
   const schedule: Schedule = {
-    _id: useObjectID(),
+    _id: scheduleId,
     name: `CoW Untitled Schedule ${appStore.schedules.length + 1}`,
     authorId: authStore?.user?._id as string,
     editorIds: [],
     churchId: authStore?.user?.churchId as string,
     createdAt: new Date().toISOString(),
   }
+
+  // Find all slides without a scheduleId and add the new scheduleId
+  appStore.activeSlides.forEach((slide) => {
+    if (!slide.scheduleId) {
+      slide.scheduleId = scheduleId
+    }
+  })
 
   appStore.setActiveSchedule(schedule)
 
