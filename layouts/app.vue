@@ -164,7 +164,7 @@ emitter.on("close-offline-toast", () => {
 
 emitter.on("go-live", () => {
   window.open(
-    `${window.location.host}/live`,
+    `http://${window.location.host}/live`,
     "_blank",
     " width=1024, height=768"
   )
