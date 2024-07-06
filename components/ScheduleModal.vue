@@ -25,7 +25,14 @@
                 v-if="schedules.length > 0"
                 color="primary"
                 :variant="searchVisible ? 'outline' : 'ghost'"
-                @click="searchVisible = !searchVisible"
+                @click="
+                  () => {
+                    searchVisible = !searchVisible
+                    if (!searchVisible) {
+                      searchInput = ''
+                    }
+                  }
+                "
                 >Search</UButton
               >
 
@@ -51,7 +58,7 @@
                 <UInput
                   icon="i-bx-search"
                   placeholder="Search for schedules"
-                  v-model="emailInput"
+                  v-model="searchInput"
                 />
               </UFormGroup>
             </div>
@@ -78,7 +85,7 @@
               />
               <ScheduleCard
                 v-else
-                v-for="schedule in schedules"
+                v-for="schedule in searchedSchedules"
                 :key="schedule.id"
                 :schedule="schedule"
                 @select="(schedule: Schedule) => {
@@ -114,7 +121,7 @@ const props = defineProps<{
 
 const visible = ref<boolean>(props.visible)
 const searchVisible = ref<boolean>(false)
-const emailInput = ref<string>("")
+const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const copied = ref<boolean>(false)
 
@@ -124,6 +131,15 @@ watch(
     visible.value = props.visible
   }
 )
+
+const searchedSchedules = computed(() => {
+  if (searchInput.value.length === 0) {
+    return appStore.schedules
+  }
+  return appStore.schedules.filter((schedule) => {
+    return schedule.name.toLowerCase().includes(searchInput.value.toLowerCase())
+  })
+})
 
 const createNewSchedule = () => {
   const schedule: Schedule = {

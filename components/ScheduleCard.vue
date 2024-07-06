@@ -8,13 +8,12 @@
       <div class="title font-medium text-start">{{ schedule?.name }}</div>
       <div class="flex items-center gap-2 mt-1">
         <UAvatar
-          alt="Favour "
+          :text="scheduleAuthor?.fullname?.split(' ')?.[0]?.[0]"
           size="xs"
-          class="border-primary-500 relative l-[20px]"
           :ui="{
-            background: 'bg-primary-100 ring-0',
-            wrapper: 'bg-red-500',
+            text: `text-[${scheduleAuthor?.theme}] dark:text-[${scheduleAuthor?.theme}] font-semibold`,
           }"
+          :class="`dark:border border-[${scheduleAuthor?.theme}] bg-[${scheduleAuthor?.theme}20] dark:bg-[${scheduleAuthor?.theme}20]`"
         />
         <span class="text-xs text-gray-500"
           >Updated
@@ -24,7 +23,8 @@
     </div>
     <div class="col-2 flex items-center gap-4">
       <div class="editors w-[130px]">
-        <UAvatarGroup class="mb-2" max="3" size="sm">
+        <span class="text-sm">Shared project</span>
+        <!-- <UAvatarGroup class="mb-2" max="3" size="sm">
           <UAvatar
             alt="Favour "
             class="border-primary-500 relative l-[20px]"
@@ -57,7 +57,7 @@
               wrapper: 'bg-red-500',
             }"
           />
-        </UAvatarGroup>
+        </UAvatarGroup> -->
       </div>
       <div class="more-ctn w-[50px] flex justify-end">
         <UPopover
@@ -108,11 +108,24 @@
 </template>
 <script setup lang="ts">
 import type { Schedule } from "~/types"
+import type { User } from "~/store/auth"
 import { format } from "timeago.js"
+import { useAuthStore } from "~/store/auth"
 
 const props = defineProps<{
   schedule: Schedule
 }>()
+
+const authStore = useAuthStore()
+
+const scheduleAuthor: User | null = computed(() => {
+  if (props.schedule.authorId) {
+    return authStore.church?.users?.find(
+      (user) => user._id === props.schedule.authorId
+    )
+  }
+  return null
+})
 
 const duplicateSchedule = () => {}
 
