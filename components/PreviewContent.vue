@@ -25,7 +25,9 @@
   >
     <div
       class="slides-ctn overflow-y-scroll mb-4 rounded-md transition h-[50%]"
-      :class="[slides?.length === 0 ? 'bg-primary-100' : '']"
+      :class="[
+        slides?.length === 0 ? 'bg-primary-100 dark:bg-primary-900' : '',
+      ]"
     >
       <div
         v-if="slides?.length > 0"
@@ -52,6 +54,7 @@
       <EmptyState
         v-else
         icon="i-tabler-device-desktop-plus"
+        class="dark:text-white"
         sub="No slides yet"
         action="new-slide"
         action-text="Create new slide"
@@ -71,9 +74,10 @@
 <script setup lang="ts">
 import { useDebounceFn } from "@vueuse/core"
 import type { Emitter } from "mitt"
+import { merge } from "rxjs"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import type { Hymn, Scripture, Slide, Song, Countdown } from "~/types"
+import type { Hymn, Scripture, Slide, Song, Countdown, Schedule } from "~/types"
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const churchId = authStore.user?.churchId
@@ -82,7 +86,7 @@ const toast = useToast()
 const windowHeight = ref<number>(0)
 const slides = ref<Array<Slide>>(appStore.activeSlides || [])
 const activeSlide = ref<Slide>()
-const { activeSlides } = storeToRefs(appStore)
+const { activeSlides, activeSchedule } = storeToRefs(appStore)
 const slidesGrid = ref<HTMLDivElement | null>(null)
 const bulkActionLabel = ref<string>("Select Slides")
 const bulkActionIcon = ref<string>("")
@@ -94,8 +98,6 @@ const countdownTimeLeft = ref<number>(0)
 watch(
   slides,
   (newVal, oldVal) => {
-    appStore.setActiveSlides(slides.value)
-
     setTimeout(() => {
       // Scroll down to newest slide on slide create
       const slideId = activeSlide.value?.id
@@ -105,18 +107,24 @@ watch(
       newestSlide?.scrollIntoView()
     }, 100)
   },
-  { deep: true }
+  { deep: true, immediate: true }
 )
 
 // Update Slides order when they are updated in live content
 watch(activeSlides, () => {
-  slides.value = activeSlides.value
+  const tempSlides = activeSlides.value?.filter(
+    (slide) => slide.scheduleId === appStore.activeSchedule?._id
+  )
+  if (tempSlides.length > 0) {
+    slides.value = tempSlides
+  }
 })
 
 const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
+  // console.log(goLive, slide)
   activeSlide.value = slide
+  appStore.appendActiveSlide(slide)
   if (goLive) {
-    appStore.setActiveSlides(slides.value)
     appStore.setLiveSlide(activeSlide.value.id)
   }
 }
@@ -239,6 +247,9 @@ const preSlideCreation = (): Slide => {
     type: slideTypes.text,
     layout: slideLayoutTypes.full_text,
     contents: [],
+    userId: authStore.user?._id as string,
+    churchId: authStore?.user?.churchId as string,
+    scheduleId: appStore.activeSchedule?._id as string,
     slideStyle: {
       alignment: "left",
       fontSizePercent: 100,
@@ -279,29 +290,85 @@ const uploadOfflineSlides = async () => {
     // console.log("uploadedSlides", uploadedSlides)
 
     const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
-    console.log("merged slides", mergedSlides)
-    appStore.setActiveSlides(mergedSlides)
+    // console.log("merged slides", mergedSlides)
+    appStore.appendActiveSlides(mergedSlides)
   }
 }
 
-// const createSlideOnline = async (slide: Slide) => {
-//   // Find song slide and update
-//   const tempSlide = { ...slide }
-//   tempSlide.userId = authStore.user?._id!!
-//   tempSlide.churchId = churchId!!
-//   if (tempSlide.type === slideTypes.song) {
-//     tempSlide.songId = (tempSlide.data as Song)?._id
-//     delete tempSlide.data
+const createScheduleOnline = async (schedule: Schedule) => {
+  // console.log("createScheduleOnline", schedule)
+  const { data, error } = await useAPIFetch(`/church/${churchId}/schedules`, {
+    method: "POST",
+    body: schedule,
+  })
+  if (!error.value) {
+    const tempSchedule = data.value as Schedule
+    console.log("tempSchedule", tempSchedule)
+    appStore.setActiveSchedule(tempSchedule)
+    return tempSchedule
+  } else {
+    throw new Error(error.value?.message)
+  }
+}
+
+// Set slides to slides based on scheduler
+watch(
+  activeSchedule,
+  () => {
+    slides.value = activeSlides.value?.filter(
+      (slide) => slide.scheduleId === appStore.activeSchedule?._id
+    )
+
+    // Check if activeSchedule is remote object
+    if (!activeSchedule.value?.updatedAt) {
+      createScheduleOnline(activeSchedule.value as Schedule)
+    }
+  },
+  { immediate: true }
+)
+
+// const mergeSchedules = (
+//   offlineSchedules: Schedule[],
+//   uploadedSchedules: Schedule[]
+// ): Schedule[] => {
+//   // Create a Map from uploadedSchedules with id as the key
+//   const uploadedMap = new Map(
+//     uploadedSchedules.map((schedule) => [schedule.id, schedule._id])
+//   )
+//   // console.log("uploadedMap", uploadedMap)
+
+//   // Iterate over offlineSchedules and merge special_id where ids match
+//   const tempOfflineSchedules = [...offlineSchedules]
+//   for (let offlineSchedule of tempOfflineSchedules) {
+//     if (uploadedMap.has(offlineSchedule.id)) {
+//       offlineSchedule._id = uploadedMap.get(offlineSchedule.id)
+//     }
 //   }
 
-//   const { data, error } = await useAPIFetch(`/church/${churchId}/slides`, {
-//     method: "POST",
-//     body: tempSlide,
-//   })
-//   if (!error.value) {
-//     return data.value
-//   } else {
-//     throw new Error(error.value?.message)
+//   return tempOfflineSchedules
+// }
+
+// const batchUploadOfflineSchedules = async () => {
+//   // Retrieve all offline schedules
+//   const offlineSchedules = appStore.schedules.filter(
+//     (schedule) => schedule.updatedAt === undefined
+//   )
+//   if (offlineSchedules.length > 0) {
+//     console.log("offlineSchedules", offlineSchedules)
+//     const uploadedSchedules = await Promise.all(
+//       offlineSchedules.map((schedule) => {
+//         return createScheduleOnline(schedule)
+//       })
+//     )
+
+//     const mergedSchedules = mergeSchedules(
+//       [...offlineSchedules],
+//       [...uploadedSchedules]
+//     )
+//     console.log("offlineSchedules", offlineSchedules)
+//     console.log("uploadedSchedules", uploadedSchedules)
+//     console.log("mergedSchedules", mergedSchedules)
+//     appStore.setSchedules(mergedSchedules)
 //   }
 // }
 
@@ -315,12 +382,12 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
       // console.log("song-data", slide?.data)
       slide.songId = (slide.data as Song)?._id || (slide.data as Song)?.id
       // delete slide.data
-      console.log("new-slide", slide)
+      // console.log("new-slide", slide)
     }
   })
 
   const { data, error } = await useAPIFetch(
-    `/church/${churchId}/slides/batch`,
+    `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/batch`,
     {
       method: "POST",
       body: tempSlides,
@@ -329,7 +396,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     }
   )
   if (!error.value) {
-    return data.value
+    return data.value as Slide[]
   } else {
     throw new Error(error.value?.message)
   }
@@ -344,7 +411,7 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
 
   if (slide?._id) {
     const { data, error } = await useAPIFetch(
-      `/church/${churchId}/slides/${slide?._id}`,
+      `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/${slide?._id}`,
       {
         method: "PUT",
         body: tempSlide,
@@ -409,7 +476,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
   const slideIndex = slides.value.findIndex((s) => s.id === slideId)
   slides.value.splice(slideIndex, 1)
-  appStore.setActiveSlides(slides.value)
+  appStore.removeActiveSlide(tempSlide)
   deleteSlideOnline(tempSlide)
 
   // Delete Probable Media files linked in DB (as long as they are not saved in Library)
@@ -537,7 +604,7 @@ const createNewSongSlide = (song: Song) => {
   const currentSongVerse = song.verses?.[0].trim()
 
   // Calculate font-size of scripture content
-  let fontSize = useScreenFontSize(currentSongVerse)
+  let fontSize = useScreenFontSize(currentSongVerse as string)
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
     fontSize: Number(fontSize),
@@ -583,7 +650,10 @@ const createNewMediaSlide = async (
   const randomImage =
     "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740"
   tempSlide.type = slideTypes.media
-  tempSlide.slideStyle.backgroundFillType = backgroundFillTypes.crop
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    backgroundFillType: backgroundFillTypes.crop,
+  }
   tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
   tempSlide.background = file.type === "audio" ? randomImage : file.url
   tempSlide.data = file
@@ -669,7 +739,7 @@ const updateCountdownSlide = (
   tempSlide.data = {
     ...tempSlide.data,
     timeLeft: useMilliToTimeString(timeRemaining),
-  }
+  } as Countdown
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
     isMediaPlaying: isPlaying,
@@ -685,7 +755,9 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
   const countdown = slide?.data as Countdown
   if (countdown?.time) {
     const countdownTimeout = useTimeStringToMilli(
-      restartCountdown ? slide.data?.time : slide.data?.timeLeft
+      restartCountdown
+        ? (slide.data as Countdown)?.time
+        : (slide.data as Countdown)?.timeLeft
     )
     if (activeCountdownInterval.value === null || restartCountdown) {
       // console.log("play or restart")
@@ -728,7 +800,7 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
 }
 
 const updateLiveOutput = (updatedSlide: Slide) => {
-  appStore.setActiveSlides(slides.value || [])
+  appStore.replaceScheduleActiveSlides(slides.value || [])
 
   // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
   if (updatedSlide.id === appStore.liveSlideId) {
@@ -891,7 +963,7 @@ const saveSlide = async (item: Slide) => {
   tempItem.data = { ...tempItem.data } as any
   try {
     if (tempItem.type === slideTypes.song) {
-      tempSong.verses = [...tempSong?.verses] as []
+      tempSong.verses = [...tempSong?.verses!!] as []
       await db.library.add(
         {
           id: tempSong.id,

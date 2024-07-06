@@ -62,13 +62,12 @@
             >
               <div class="photo-name flex gap-4 items-center font-medium">
                 <UAvatar
-                  :alt="member?.fullname?.split(' ')?.[0]"
+                  :text="member?.fullname?.split(' ')?.[0]?.[0]"
                   size="sm"
-                  class="border-primary-500"
                   :ui="{
-                    background: 'bg-primary-100 ring-0',
-                    wrapper: 'bg-red-500',
+                    text: `text-[${member?.theme}] dark:text-[${member?.theme}] font-semibold`,
                   }"
+                  :class="`border-[${member?.theme}] bg-[${member?.theme}20] dark:bg-[${member?.theme}20]`"
                 />
                 {{ member?.fullname }}
               </div>

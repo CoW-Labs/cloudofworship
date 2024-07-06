@@ -31,7 +31,7 @@ const useSong = async (song: Song | string, linesPerDisplay: number = 4): Promis
         song = (data.value as Song)
       }
     }
-    console.log('song', song)
+    // console.log('song', song)
 
     // If [song] param, comes as an object, begin division process immediately
     // Divide songs into verses
@@ -76,7 +76,7 @@ const useSong = async (song: Song | string, linesPerDisplay: number = 4): Promis
     song.verses = verses?.filter(verse => verse !== '')
     return song
   } catch (err) {
-    console.log(err)
+    // console.log(err)
     toast.add({ title: 'Song not found', icon: 'i-bx-music', color: 'red' })
   }
   return null

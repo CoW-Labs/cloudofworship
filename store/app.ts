@@ -1,13 +1,26 @@
 import { defineStore } from 'pinia'
-import type { Alert, AppSettings, BackgroundVideo, Slide, SlideStyle } from '~/types/index'
+import type { Alert, AppSettings, BackgroundVideo, Schedule, Slide, SlideStyle } from '~/types/index'
 import type { Emitter } from 'mitt'
 
 // console.log(usePinia())
+function ensureUniqueIds(arr: Slide[]): Slide[] {
+  const seenIds = new Set();
+  return arr.filter(obj => {
+    if (seenIds.has(obj.id)) {
+      return false;
+    } else {
+      seenIds.add(obj.id);
+      return true;
+    }
+  });
+}
 
 export const useAppStore = defineStore('app', {
   state: () => {
     return {
-      activeSlides: [] as Array<Slide>,
+      schedules: [] as Array<Schedule>,
+      activeSchedule: null as Schedule | null,
+      activeSlides: [] as Array<Slide>, // Returns all slides on CoW
       liveOutputSlidesId: null as Array<string> | null,
       liveSlideId: null as string | null,
       emitter: null as Emitter | null,
@@ -47,16 +60,65 @@ export const useAppStore = defineStore('app', {
       failedUploadRequests: [] as { path: string, options: any }[]
     }
   },
+  getters: {
+    activeScheduleSlides: (state) => state.activeSlides?.filter(slide => slide.scheduleId === (state.activeSchedule?._id))
+  },
   actions: {
+    setSchedules(schedules: Schedule[]) {
+      this.schedules = schedules
+      if (this.activeSchedule) {
+        const tempSchedule = schedules.find(sch => sch._id === this.activeSchedule?._id) as Schedule
+        // console.log("tempSchedule", tempSchedule)
+        this.activeSchedule = tempSchedule
+      }
+    },
+    setActiveSchedule(schedule: Schedule) {
+      this.activeSchedule = schedule
+      const existingSchedule = this.schedules.find(sch => sch._id === schedule._id)
+      if (!existingSchedule) {
+        this.schedules.push(schedule)
+      } else {
+        this.schedules.splice(this.schedules.findIndex(sch => sch._id === schedule._id), 1, schedule)
+      }
+    },
+    appendActiveSlide(slide: Slide, position?: number) {
+      if (!this.activeSlides.find(s => s.id === slide.id)) {
+        if (position && position >= 0) {
+          this.activeSlides.splice(position, 0, slide)
+        } else {
+          this.activeSlides.push(slide)
+        }
+        this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+      }
+    },
+    appendActiveSlides(slides: Array<Slide>) {
+      let tempSlides = [...this.activeSlides]
+      tempSlides.push(...slides)
+      this.activeSlides = ensureUniqueIds(tempSlides)
+      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+    },
+    removeActiveSlide(slide: Slide) {
+      this.activeSlides.splice(this.activeSlides.findIndex(s => s.id === slide.id), 1)
+      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+    },
+    replaceScheduleActiveSlides(slides: Array<Slide>) {
+      let tempSlides = [...this.activeSlides]
+      tempSlides = tempSlides.filter(slide => slide.scheduleId !== (this.activeSchedule?._id))
+      console.log("tempSlides", tempSlides)
+      tempSlides.push(...slides)
+      this.activeSlides = ensureUniqueIds(tempSlides)
+      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+    },
     setActiveSlides(slides: Array<Slide>) {
-      this.activeSlides = slides
-      this.liveOutputSlidesId = slides?.map(slide => slide.id)
+      console.log("setActiveSlides", slides)
+      this.activeSlides = ensureUniqueIds(slides)
+      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     // setActiveSlideId(slideId: string) {
     //   this.activeSlideId = slideId
     // },
     setLiveOutputSlidesId(slides: Array<string>) {
-      this.liveOutputSlidesId = slides
+      this.liveOutputSlidesId = Array.from(new Set(slides))
     },
     setLiveSlide(slide: string) {
       this.liveSlideId = slide

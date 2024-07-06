@@ -122,24 +122,24 @@ export const quickActionsArr = [
     unreleased: true,
     // type: slideTypes.text
   },
-  {
-    icon: "i-bx-carousel",
-    name: "Add Slideshow/Carousel",
-    desc: "Find scriptures with familiar words",
-    action: "new-carousel",
-    meta: "",
-    unreleased: true,
-    type: slideTypes.text,
-  },
-  {
-    icon: "i-material-symbols-speech-to-text",
-    name: "Transcribe Sermon",
-    desc: "Start transcribing preacher sermons",
-    action: "new-transcribe",
-    meta: "",
-    unreleased: true,
-    // type: slideTypes.text
-  },
+  // {
+  //   icon: "i-bx-carousel",
+  //   name: "Add Slideshow/Carousel",
+  //   desc: "Find scriptures with familiar words",
+  //   action: "new-carousel",
+  //   meta: "",
+  //   unreleased: true,
+  //   type: slideTypes.text,
+  // },
+  // {
+  //   icon: "i-material-symbols-speech-to-text",
+  //   name: "Transcribe Sermon",
+  //   desc: "Start transcribing preacher sermons",
+  //   action: "new-transcribe",
+  //   meta: "",
+  //   unreleased: true,
+  //   // type: slideTypes.text
+  // },
   // {
   //   icon: "i-carbon-overlay",
   //   name: "Add Overlay",
