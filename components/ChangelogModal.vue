@@ -51,13 +51,10 @@ defineProps<{
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const changelog = `
-- Added teams; you can invite others to join your church media team and work together.
-- Added hymn preview when searching hymns
-- Added fade transitions between slides
-- Added hymn preview when searching hymns
-- Fixed issue with layout shift
-- New songs added
-- New hymns added (#1343, #1344)
+- Schedules! You can now create and manage your own schedules, and share them with your church media/tech team.
+- Updated teams feature; you can now invite others to join your church media team and work together.
+- Fixed issue with songs not loading
+- New song added
 - Fixed minor bugs and issues for improved experience`
 
 const appStore = useAppStore()
