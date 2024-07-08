@@ -397,6 +397,7 @@ body {
 /* LIVE CONTENT */
 .live-output {
   color: #ffffff;
+  user-select: none;
   /* background-color: #000000; */
 }
 .left-live-content {

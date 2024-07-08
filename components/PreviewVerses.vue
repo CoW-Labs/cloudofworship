@@ -12,7 +12,7 @@
           : verseTemp?.trim()
       "
       v-for="(verseTemp, index) in slide?.type === slideTypes.bible
-        ? nearBibleVerses
+        ? allChapterVerses
         : relatedData?.verses"
       :key="`verse-${index}`"
       class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-300 dark:hover:bg-primary-900 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
@@ -80,13 +80,16 @@ const getSongOrHymnObj = async () => {
   }
 }
 
-watch(
-  bibleChapter,
-  () => {
+onMounted(() => {
+  if (props.verse?.includes(":")) {
     getAllChapterVerses()
-  },
-  { immediate: true }
-)
+  }
+})
+
+watch(bibleChapter, () => {
+  getAllChapterVerses()
+  // console.log(bibleChapter.value)
+})
 
 watch(
   () => props.slide,
@@ -97,22 +100,22 @@ watch(
 )
 
 // Return bible verses in proximity to currentVerse
-const nearBibleVerses = computed(() => {
-  if (props.slide?.type === slideTypes.bible) {
-    const verseLineup: Scripture[] = []
-    const currentVerse = Number(props.verse?.split(":")?.[1])
-    const verseNumbers = getNumberRange(currentVerse)
+// const nearBibleVerses = computed(() => {
+//   if (props.slide?.type === slideTypes.bible) {
+//     const verseLineup: Scripture[] = []
+//     const currentVerse = Number(props.verse?.split(":")?.[1])
+//     const verseNumbers = getNumberRange(currentVerse)
 
-    verseNumbers?.forEach((n) => {
-      if (allChapterVerses.value?.[n]) {
-        verseLineup.push(allChapterVerses.value?.[n])
-      }
-    })
+//     verseNumbers?.forEach((n) => {
+//       if (allChapterVerses.value?.[n]) {
+//         verseLineup.push(allChapterVerses.value?.[n])
+//       }
+//     })
 
-    return verseLineup
-  }
-  return []
-})
+//     return verseLineup
+//   }
+//   return []
+// })
 
 const getNumberRange = (number: number, rangeBound = 20) => {
   const lowerRange = []
