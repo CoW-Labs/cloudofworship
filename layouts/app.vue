@@ -163,11 +163,11 @@ emitter.on("close-offline-toast", () => {
 })
 
 emitter.on("go-live", () => {
-  window.open(
-    `http://${window.location.host}/live`,
-    "_blank",
-    " width=1024, height=768"
-  )
+  // window.open(
+  //   `http://${window.location.host}/live`,
+  //   "_blank",
+  //   " width=1024, height=768"
+  // )
 })
 
 const saveAllBackgroundVideos = async () => {
