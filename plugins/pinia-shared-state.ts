@@ -7,6 +7,7 @@ export default defineNuxtPlugin(nuxtApp => {
   pinia.use(
     PiniaSharedState({
       enable: true,
+      initialize: true
     })
   )
 })
