@@ -27,9 +27,9 @@
                 :variant="searchVisible ? 'outline' : 'ghost'"
                 @click="
                   () => {
-                    searchVisible = !searchVisible
+                    searchVisible = !searchVisible;
                     if (!searchVisible) {
-                      searchInput = ''
+                      searchInput = '';
                     }
                   }
                 "
@@ -42,8 +42,8 @@
                 @click="
                   () => {
                     if (activeSchedule) {
-                      visible = false
-                      emit('close')
+                      visible = false;
+                      emit('close');
                     }
                   }
                 "
@@ -103,46 +103,48 @@
 </template>
 
 <script setup lang="ts">
-import type { Emitter } from "mitt"
-import { useAppStore } from "~/store/app"
-import type { Church, User } from "~/store/auth"
-import { useAuthStore } from "~/store/auth"
-import type { Schedule } from "~/types"
+import type {Emitter} from "mitt";
+import {useAppStore} from "~/store/app";
+import type {Church, User} from "~/store/auth";
+import {useAuthStore} from "~/store/auth";
+import type {Schedule} from "~/types";
 
-const appStore = useAppStore()
-const authStore = useAuthStore()
-const { schedules } = storeToRefs(appStore)
-const emit = defineEmits(["close"])
+const appStore = useAppStore();
+const authStore = useAuthStore();
+const {schedules} = storeToRefs(appStore);
+const emit = defineEmits(["close"]);
 
 const props = defineProps<{
-  visible: boolean
-  activeSchedule: Schedule
-}>()
+  visible: boolean;
+  activeSchedule: Schedule;
+}>();
 
-const visible = ref<boolean>(props.visible)
-const searchVisible = ref<boolean>(false)
-const searchInput = ref<string>("")
-const loading = ref<boolean>(false)
-const copied = ref<boolean>(false)
+const visible = ref<boolean>(props.visible);
+const searchVisible = ref<boolean>(false);
+const searchInput = ref<string>("");
+const loading = ref<boolean>(false);
+const copied = ref<boolean>(false);
 
 watch(
   () => props.visible,
   () => {
-    visible.value = props.visible
+    visible.value = props.visible;
   }
-)
+);
 
 const searchedSchedules = computed(() => {
   if (searchInput.value.length === 0) {
-    return appStore.schedules
+    return appStore.schedules;
   }
   return appStore.schedules.filter((schedule) => {
-    return schedule.name.toLowerCase().includes(searchInput.value.toLowerCase())
-  })
-})
+    return schedule.name
+      .toLowerCase()
+      .includes(searchInput.value.toLowerCase());
+  });
+});
 
 const createNewSchedule = () => {
-  const scheduleId = useObjectID()
+  const scheduleId = useObjectID();
   const schedule: Schedule = {
     _id: scheduleId,
     name: `CoW Untitled Schedule ${appStore.schedules.length + 1}`,
@@ -150,34 +152,34 @@ const createNewSchedule = () => {
     editorIds: [],
     churchId: authStore?.user?.churchId as string,
     createdAt: new Date().toISOString(),
-  }
+  };
 
   // Find all slides without a scheduleId and add the new scheduleId
   appStore.activeSlides.forEach((slide) => {
     if (!slide.scheduleId) {
-      slide.scheduleId = scheduleId
+      slide.scheduleId = scheduleId;
     }
-  })
+  });
 
-  appStore.setActiveSchedule(schedule)
+  appStore.setActiveSchedule(schedule);
 
-  emit("close")
-}
+  emit("close");
+};
 
 const deleteSchedule = (scheduleId: string) => {
-  let updatedScheduleList: Schedule[] = [...appStore.schedules]
+  let updatedScheduleList: Schedule[] = [...appStore.schedules];
   updatedScheduleList = updatedScheduleList.filter(
     (sch) => sch.id !== scheduleId
-  )
+  );
 
   if (scheduleId === appStore.activeSchedule?._id) {
-    appStore.setActiveSchedule(updatedScheduleList?.at(-1))
+    appStore.setActiveSchedule(updatedScheduleList?.at(-1));
   }
-  appStore.setSchedules(updatedScheduleList)
+  appStore.setSchedules(updatedScheduleList);
 
   // TODO: network call to delete schedule on BE
-  useGlobalEmit("delete-schedule-slides", scheduleId)
+  useGlobalEmit("delete-schedule-slides", scheduleId);
 
-  emit("close")
-}
+  emit("close");
+};
 </script>

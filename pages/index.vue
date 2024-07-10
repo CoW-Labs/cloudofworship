@@ -5,10 +5,11 @@
     <LiveOutput />
   </div>
 </template>
+
 <script setup>
 definePageMeta({
   layout: "app",
-})
+});
 useHead({
   link: [
     {
@@ -16,7 +17,23 @@ useHead({
       href: "/live-manifest.json",
     },
   ],
-})
-</script>
+});
+import {useAppStore} from "~/store/app";
+import useScheduleWebsocket from "~/composables/useScheduleWebsocket";
+import {ref, watchEffect} from "vue";
+import {storeToRefs} from "pinia";
 
-<style scoped></style>
+const appStore = useAppStore();
+const {activeSchedule} = storeToRefs(appStore);
+
+const scheduleId = ref(undefined);
+
+watch(
+  activeSchedule,
+  (newSchedule) => {
+    scheduleId.value = newSchedule ? newSchedule._id : undefined;
+    useScheduleWebsocket("http://localhost:4500", scheduleId);
+  },
+  {immediate: true}
+);
+</script>
