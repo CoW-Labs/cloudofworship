@@ -66,7 +66,7 @@
         header="Delete slide"
         button-styles="px-1.5 text-white hover:bg-primary"
         label="Are you sure you want to delete this slide? This action is not reversible"
-        @confirm="$emit('delete', slide?.id)"
+        @confirm="useGlobalEmit('delete-slide', slide)"
       >
       </ConfirmDialog>
     </div>

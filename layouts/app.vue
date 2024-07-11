@@ -84,6 +84,7 @@
           :max="[
             'Initializing...',
             'Setting up resources...', // also loading bg videos
+            'Compiling slides and schedules...',
             'Loading KJV Bible...',
             'Loading NKJV Bible...',
             'Loading NIV Bible...',
@@ -108,7 +109,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
-import type { LibraryItem, Media, BackgroundVideo } from "~/types"
+import type { LibraryItem, Media, BackgroundVideo, Schedule } from "~/types"
 import { useOnline } from "@vueuse/core"
 
 useHead({
@@ -163,11 +164,11 @@ emitter.on("close-offline-toast", () => {
 })
 
 emitter.on("go-live", () => {
-  window.open(
-    `http://${window.location.host}/live`,
-    "_blank",
-    " width=1024, height=768"
-  )
+  // window.open(
+  //   `http://${window.location.host}/live`,
+  //   "_blank",
+  //   " width=1024, height=768"
+  // )
 })
 
 const saveAllBackgroundVideos = async () => {
@@ -232,10 +233,14 @@ const downloadEssentialResources = async () => {
   downloadProgress.value = 1
   await saveAllBackgroundVideos()
 
+  // Download background videos
+  downloadProgress.value = 2
+  await retrieveSchedules()
+
   // Download KJV Bible
   let tempBible = await db.bibleAndHymns.get("KJV")
   if (!tempBible) {
-    downloadProgress.value = 2
+    downloadProgress.value = 3
     const kjvBible = await useS3File("kjv.json")
     db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
   }
@@ -243,7 +248,7 @@ const downloadEssentialResources = async () => {
   // Download NKJV Bible
   tempBible = await db.bibleAndHymns.get("NKJV")
   if (!tempBible) {
-    downloadProgress.value = 3
+    downloadProgress.value = 4
     const nkjvBible = await useS3File("nkjv.json")
     db.bibleAndHymns.add(tempBibleVersion("NKJV", nkjvBible))
   }
@@ -251,7 +256,7 @@ const downloadEssentialResources = async () => {
   // Download NIV Bible
   tempBible = await db.bibleAndHymns.get("NIV")
   if (!tempBible) {
-    downloadProgress.value = 4
+    downloadProgress.value = 5
     const nivBible = await useS3File("niv.json")
     db.bibleAndHymns.add(tempBibleVersion("NIV", nivBible))
   }
@@ -259,7 +264,7 @@ const downloadEssentialResources = async () => {
   // Download AMP Bible
   tempBible = await db.bibleAndHymns.get("AMP")
   if (!tempBible) {
-    downloadProgress.value = 5
+    downloadProgress.value = 6
     const ampBible = await useS3File("amp.json")
     db.bibleAndHymns.add(tempBibleVersion("AMP", ampBible))
   }
@@ -267,13 +272,13 @@ const downloadEssentialResources = async () => {
   // Download all hymns
   tempBible = await db.bibleAndHymns.get("hymns")
   if (!tempBible) {
-    downloadProgress.value = 6
+    downloadProgress.value = 7
     const hymns = await useS3File("hymns.json")
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
   }
 
   // All computations completed
-  downloadProgress.value = 7
+  downloadProgress.value = 8
 
   setTimeout(() => {
     loadingResources.value = false
@@ -351,6 +356,24 @@ const getChurch = async () => {
       title: "Add your church in less than 1 minute to continue.",
     })
   }
+}
+
+const retrieveSchedules = async () => {
+  const schedulesPromise = await useAPIFetch(
+    `/church/${authStore.user?.churchId}/schedules`
+  )
+  const schedules = schedulesPromise.data.value as unknown as Schedule[]
+  const mergedSchedules = useMergeObjectArray(
+    [...schedules],
+    appStore.schedules
+  )
+
+  mergedSchedules?.sort((scheduleA, scheduleB) => {
+    const dateA = new Date(scheduleA.updatedAt)
+    const dateB = new Date(scheduleB.updatedAt)
+    return dateB.getTime() - dateA.getTime()
+  })
+  appStore.setSchedules(mergedSchedules)
 }
 
 const retrieveAllMediaFilesFromDB = async () => {
