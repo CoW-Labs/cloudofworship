@@ -85,7 +85,7 @@
                 header="Delete schedule"
                 button-styles="justify-start"
                 label="Are you sure you want to delete this schedule and all it's slides? This process is irreversible."
-                @confirm="$emit('delete', schedule?.id)"
+                @confirm="$emit('delete', schedule?._id)"
               />
               <UButton
                 variant="ghost"
@@ -128,6 +128,4 @@ const scheduleAuthor: User | null = computed(() => {
 })
 
 const duplicateSchedule = () => {}
-
-const deleteSchedule = () => {}
 </script>

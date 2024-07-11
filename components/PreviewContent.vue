@@ -331,51 +331,6 @@ watch(
   { immediate: true }
 )
 
-// const mergeSchedules = (
-//   offlineSchedules: Schedule[],
-//   uploadedSchedules: Schedule[]
-// ): Schedule[] => {
-//   // Create a Map from uploadedSchedules with id as the key
-//   const uploadedMap = new Map(
-//     uploadedSchedules.map((schedule) => [schedule.id, schedule._id])
-//   )
-//   // console.log("uploadedMap", uploadedMap)
-
-//   // Iterate over offlineSchedules and merge special_id where ids match
-//   const tempOfflineSchedules = [...offlineSchedules]
-//   for (let offlineSchedule of tempOfflineSchedules) {
-//     if (uploadedMap.has(offlineSchedule.id)) {
-//       offlineSchedule._id = uploadedMap.get(offlineSchedule.id)
-//     }
-//   }
-
-//   return tempOfflineSchedules
-// }
-
-// const batchUploadOfflineSchedules = async () => {
-//   // Retrieve all offline schedules
-//   const offlineSchedules = appStore.schedules.filter(
-//     (schedule) => schedule.updatedAt === undefined
-//   )
-//   if (offlineSchedules.length > 0) {
-//     console.log("offlineSchedules", offlineSchedules)
-//     const uploadedSchedules = await Promise.all(
-//       offlineSchedules.map((schedule) => {
-//         return createScheduleOnline(schedule)
-//       })
-//     )
-
-//     const mergedSchedules = mergeSchedules(
-//       [...offlineSchedules],
-//       [...uploadedSchedules]
-//     )
-//     console.log("offlineSchedules", offlineSchedules)
-//     console.log("uploadedSchedules", uploadedSchedules)
-//     console.log("mergedSchedules", mergedSchedules)
-//     appStore.setSchedules(mergedSchedules)
-//   }
-// }
-
 const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
   // Find song slides and update
   const tempSlides = [...slides]
