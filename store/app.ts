@@ -99,14 +99,16 @@ export const useAppStore = defineStore('app', {
     },
     removeActiveSlide(slide: Slide) {
       this.activeSlides.splice(this.activeSlides.findIndex(s => s.id === slide.id), 1)
+      console.log("removing active slide", this.activeSlides)
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
       let tempSlides = [...this.activeSlides]
       tempSlides = tempSlides.filter(slide => slide.scheduleId !== (this.activeSchedule?._id))
-      console.log("tempSlides", tempSlides)
+      // console.log("tempSlides", tempSlides)
       tempSlides.push(...slides)
       this.activeSlides = ensureUniqueIds(tempSlides)
+      // console.log("replacing schedule active slides - p2", this.activeSlides)
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     setActiveSlides(slides: Array<Slide>) {
@@ -169,6 +171,5 @@ export const useAppStore = defineStore('app', {
   },
   share: {
     enable: true,
-    initialize: true
   }
 }) 

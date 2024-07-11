@@ -218,6 +218,10 @@ emitter.on("restart-countdown", (data: Slide) => {
   }
 })
 
+emitter.on("delete-slide", (data: Slide) => {
+  deleteSlide(data?.id)
+})
+
 emitter.on("select-slides", () => {
   if (bulkActionLabel.value === "Select Slides") {
     bulkSelectSlides.value = !bulkSelectSlides.value
@@ -809,6 +813,7 @@ const updateLiveOutput = (updatedSlide: Slide) => {
 }
 
 const gotoAction = (title: string, version: string) => {
+  useGlobalEmit("goto-verse", title)
   title = title
     .replaceAll("  ", " ")
     .replaceAll(" :", ":")
