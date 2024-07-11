@@ -118,6 +118,11 @@ watch(activeSlides, () => {
   if (tempSlides.length > 0) {
     slides.value = tempSlides
   }
+  if (tempSlides?.find((slide) => slide.id === activeSlide.value?.id)) {
+    activeSlide.value = tempSlides?.find(
+      (slide) => slide.id === activeSlide.value?.id
+    )
+  }
 })
 
 const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
@@ -222,6 +227,10 @@ emitter.on("delete-slide", (data: Slide) => {
   deleteSlide(data?.id)
 })
 
+emitter.on("refresh-slides", () => {
+  retrieveSlidesOnline(appStore.activeSchedule?._id!!)
+})
+
 emitter.on("select-slides", () => {
   if (bulkActionLabel.value === "Select Slides") {
     bulkSelectSlides.value = !bulkSelectSlides.value
@@ -301,6 +310,7 @@ const uploadOfflineSlides = async () => {
 
 const createScheduleOnline = async (schedule: Schedule) => {
   // console.log("createScheduleOnline", schedule)
+  appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(`/church/${churchId}/schedules`, {
     method: "POST",
     body: schedule,
@@ -309,7 +319,26 @@ const createScheduleOnline = async (schedule: Schedule) => {
     const tempSchedule = data.value as Schedule
     console.log("tempSchedule", tempSchedule)
     appStore.setActiveSchedule(tempSchedule)
+    appStore.setSlidesLoading(false)
+    appStore.setLastSynced(new Date().toISOString())
     return tempSchedule
+  } else {
+    throw new Error(error.value?.message)
+  }
+}
+
+const retrieveSlidesOnline = async (scheduleId: string) => {
+  appStore.setSlidesLoading(true)
+  const { data, error } = await useAPIFetch(
+    `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
+  )
+  if (!error.value) {
+    const tempSlides = data.value as Slide[]
+    appStore.setActiveSlides(
+      useMergeObjectArray(tempSlides, [...appStore.activeSlides])
+    )
+    appStore.setSlidesLoading(false)
+    appStore.setLastSynced(new Date().toISOString())
   } else {
     throw new Error(error.value?.message)
   }
@@ -326,6 +355,9 @@ watch(
     // Check if activeSchedule is remote object
     if (!activeSchedule.value?.updatedAt) {
       createScheduleOnline(activeSchedule.value as Schedule)
+    } else {
+      // retrieve all slides online
+      retrieveSlidesOnline(activeSchedule.value?._id)
     }
   },
   { immediate: true }
@@ -345,6 +377,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     }
   })
 
+  appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(
     `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/batch`,
     {
@@ -355,6 +388,8 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     }
   )
   if (!error.value) {
+    appStore.setSlidesLoading(false)
+    appStore.setLastSynced(new Date().toISOString())
     return data.value as Slide[]
   } else {
     throw new Error(error.value?.message)
@@ -369,6 +404,7 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
   delete tempSlide.type
 
   if (slide?._id) {
+    appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
       `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/${slide?._id}`,
       {
@@ -377,6 +413,8 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
       }
     )
     if (!error.value) {
+      appStore.setSlidesLoading(false)
+      appStore.setLastSynced(new Date().toISOString())
       return data.value
     } else {
       throw new Error(error.value?.message)
@@ -386,13 +424,16 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
 
 const deleteSlideOnline = async (slide: Slide) => {
   if (slide?._id) {
+    appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
-      `/church/${churchId}/slides/${slide?._id}`,
+      `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/${slide?._id}`,
       {
         method: "DELETE",
       }
     )
     if (!error.value) {
+      appStore.setSlidesLoading(false)
+      appStore.setLastSynced(new Date().toISOString())
       return data.value
     } else {
       throw new Error(error.value?.message)

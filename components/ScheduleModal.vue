@@ -166,6 +166,7 @@ const createNewSchedule = () => {
 }
 
 const retrieveSchedules = async () => {
+  appStore.setSlidesLoading(true)
   const schedulesPromise = await useAPIFetch(
     `/church/${authStore.user?.churchId}/schedules`
   )
@@ -181,6 +182,7 @@ const retrieveSchedules = async () => {
     return dateB.getTime() - dateA.getTime()
   })
   appStore.setSchedules(mergedSchedules)
+  appStore.setSlidesLoading(false)
 }
 
 const deleteScheduleOnline = async (scheduleId: string) => {

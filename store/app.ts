@@ -57,7 +57,9 @@ export const useAppStore = defineStore('app', {
         'AMP': 'All Scripture quotations, unless otherwise indicated, are taken from the Amplified Bible, Copyright © 2015 by The Lockman Foundation.'
       },
       recentBibleSearches: [] as string[],
-      failedUploadRequests: [] as { path: string, options: any }[]
+      failedUploadRequests: [] as { path: string, options: any }[],
+      slidesLoading: false as boolean,
+      lastSynced: new Date().toISOString() as string
     }
   },
   getters: {
@@ -164,6 +166,12 @@ export const useAppStore = defineStore('app', {
     },
     setFailedUploadRequests(failedRequest: { path: string, options: any }) {
       this.failedUploadRequests.push()
+    },
+    setSlidesLoading(loading: boolean) {
+      this.slidesLoading = loading
+    },
+    setLastSynced(lastSynced: string) {
+      this.lastSynced = lastSynced
     }
   },
   persist: {
