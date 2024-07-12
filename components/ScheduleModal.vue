@@ -129,6 +129,9 @@ watch(
   () => props.visible,
   () => {
     visible.value = props.visible
+    if (visible.value) {
+      retrieveSchedules()
+    }
   }
 )
 

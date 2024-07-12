@@ -345,7 +345,6 @@ const getChurch = async () => {
     )
     const church = data.value as unknown as Church
     authStore.setChurch(church)
-    authStore.setUser({ ...authStore.user, ...church.users[0] })
     if (error.value) {
       throw new Error(error.value?.message)
     }

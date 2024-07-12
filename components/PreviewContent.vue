@@ -334,6 +334,14 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
   )
   if (!error.value) {
     const tempSlides = data.value as Slide[]
+    tempSlides.forEach((slide) => {
+      if (slide.backgroundType === backgroundTypes.video) {
+        slide.background = appStore.backgroundVideos?.find(
+          (bg) => bg.id === slide.backgroundVideoKey
+        )?.url
+      } else {
+      }
+    })
     appStore.setActiveSlides(
       useMergeObjectArray(tempSlides, [...appStore.activeSlides])
     )
@@ -402,6 +410,10 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
   delete tempSlide.id
   delete tempSlide.churchId
   delete tempSlide.type
+
+  if (tempSlide.backgroundType !== backgroundTypes.video) {
+    tempSlide.backgroundVideoKey = ""
+  }
 
   if (slide?._id) {
     appStore.setSlidesLoading(true)
