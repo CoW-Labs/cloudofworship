@@ -53,6 +53,7 @@
     "@iconify-json/tabler": "^1.1.110",
     "@pinia-plugin-persistedstate/nuxt": "^1.0.0",
     "@tauri-apps/cli": "^1.5.14",
+    "@types/socket.io-client": "^3.0.0",
     "typescript": "^5.4.5",
     "vue-tsc": "^2.0.16"
   },

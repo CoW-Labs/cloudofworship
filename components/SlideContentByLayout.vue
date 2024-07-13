@@ -81,11 +81,11 @@
 </template>
 
 <script setup lang="ts">
-import type { Slide } from "~/types"
+import type {Slide} from "~/types";
 
 const props = defineProps<{
-  slide: Slide
-  padding: string
-  contentVisible: boolean
-}>()
+  slide: Slide;
+  padding: string;
+  contentVisible: boolean;
+}>();
 </script>
