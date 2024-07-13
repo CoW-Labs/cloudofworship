@@ -317,7 +317,6 @@ const createScheduleOnline = async (schedule: Schedule) => {
   })
   if (!error.value) {
     const tempSchedule = data.value as Schedule
-    console.log("tempSchedule", tempSchedule)
     appStore.setActiveSchedule(tempSchedule)
     appStore.setSlidesLoading(false)
     appStore.setLastSynced(new Date().toISOString())
@@ -516,7 +515,7 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 }
 
 const onUpdateSlide = (slide: Slide) => {
-  console.log("updated", slide)
+  // console.log("updated", slide)
   // Always pause countdown slide before updating it
   if (slide.type === slideTypes.countdown) {
     useGlobalEmit("start-countdown", slide)

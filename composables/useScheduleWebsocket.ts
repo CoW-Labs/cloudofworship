@@ -1,5 +1,5 @@
-import {ref, onMounted, onBeforeUnmount, watch, type Ref} from "vue";
-import {io, Socket} from "socket.io-client";
+import { ref, onMounted, onBeforeUnmount, watch, type Ref } from "vue";
+import { io, Socket } from "socket.io-client";
 
 const useScheduleWebsocket = (
   url: string,
@@ -34,9 +34,9 @@ const useScheduleWebsocket = (
     }
   };
 
-  onMounted(() => {
-    initializeSocket();
-  });
+  // onMounted(() => {
+  //   initializeSocket();
+  // });
 
   onBeforeUnmount(() => {
     if (currentScheduleId.value && socket.value) {
@@ -62,7 +62,7 @@ const useScheduleWebsocket = (
       }
       currentScheduleId.value = newScheduleId;
     },
-    {immediate: true}
+    { immediate: true }
   );
 };
 

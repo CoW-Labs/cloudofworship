@@ -45,7 +45,7 @@ useHead({
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
 emitter.on("goto-verse", (data: any) => {
-  console.log("goto-verse", 1)
+  // console.log("goto-verse", 1)
 })
 
 onMounted(() => {

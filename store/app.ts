@@ -101,7 +101,7 @@ export const useAppStore = defineStore('app', {
     },
     removeActiveSlide(slide: Slide) {
       this.activeSlides.splice(this.activeSlides.findIndex(s => s.id === slide.id), 1)
-      console.log("removing active slide", this.activeSlides)
+      // console.log("removing active slide", this.activeSlides)
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
@@ -114,7 +114,7 @@ export const useAppStore = defineStore('app', {
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     setActiveSlides(slides: Array<Slide>) {
-      console.log("setActiveSlides", slides)
+      // console.log("setActiveSlides", slides)
       this.activeSlides = ensureUniqueIds(slides)
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
