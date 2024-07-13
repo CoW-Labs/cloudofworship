@@ -86,7 +86,7 @@
               <ScheduleCard
                 v-else
                 v-for="schedule in searchedSchedules"
-                :key="schedule.id"
+                :key="schedule?._id"
                 :schedule="schedule"
                 @select="(schedule: Schedule) => {
                   appStore.setActiveSchedule(schedule)
@@ -129,6 +129,9 @@ watch(
   () => props.visible,
   () => {
     visible.value = props.visible
+    if (visible.value) {
+      retrieveSchedules()
+    }
   }
 )
 
@@ -136,7 +139,8 @@ const searchedSchedules = computed(() => {
   if (searchInput.value.length === 0) {
     return appStore.schedules
   }
-  return appStore.schedules.filter((schedule) => {
+  const tempSchedules = [...appStore.schedules]
+  return tempSchedules.filter((schedule) => {
     return schedule.name.toLowerCase().includes(searchInput.value.toLowerCase())
   })
 })
@@ -164,10 +168,42 @@ const createNewSchedule = () => {
   emit("close")
 }
 
+const retrieveSchedules = async () => {
+  appStore.setSlidesLoading(true)
+  const schedulesPromise = await useAPIFetch(
+    `/church/${authStore.user?.churchId}/schedules`
+  )
+  const schedules = schedulesPromise.data.value as unknown as Schedule[]
+  const mergedSchedules = useMergeObjectArray(
+    [...schedules],
+    appStore.schedules
+  )
+
+  mergedSchedules?.sort((scheduleA, scheduleB) => {
+    const dateA = new Date(scheduleA.updatedAt)
+    const dateB = new Date(scheduleB.updatedAt)
+    return dateB.getTime() - dateA.getTime()
+  })
+  appStore.setSchedules(mergedSchedules)
+  appStore.setSlidesLoading(false)
+}
+
+const deleteScheduleOnline = async (scheduleId: string) => {
+  const { data, error } = await useAPIFetch(
+    `/church/${authStore.user?.churchId}/schedules/${scheduleId}`,
+    {
+      method: "DELETE",
+    }
+  )
+  if (error.value) {
+    throw new Error(error.value?.message)
+  }
+}
+
 const deleteSchedule = (scheduleId: string) => {
   let updatedScheduleList: Schedule[] = [...appStore.schedules]
   updatedScheduleList = updatedScheduleList.filter(
-    (sch) => sch.id !== scheduleId
+    (sch) => sch._id !== scheduleId
   )
 
   if (scheduleId === appStore.activeSchedule?._id) {
@@ -176,8 +212,11 @@ const deleteSchedule = (scheduleId: string) => {
   appStore.setSchedules(updatedScheduleList)
 
   // TODO: network call to delete schedule on BE
+  deleteScheduleOnline(scheduleId)
   useGlobalEmit("delete-schedule-slides", scheduleId)
 
   emit("close")
 }
+
+retrieveSchedules()
 </script>

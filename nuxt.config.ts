@@ -1,6 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  devtools: { enabled: true },
+  devtools: {enabled: true},
 
   app: {
     head: {
@@ -16,9 +16,13 @@ export default defineNuxtConfig({
           content:
             "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worshippers is your church's power point.",
         },
-        { name: "format-detection", content: "telephone=no" },
-        { hid: "og:type", property: "og:type", content: "website" },
-        { hid: "og-url", name: "og:url", content: "https://cloudofworshippers.com" },
+        {name: "format-detection", content: "telephone=no"},
+        {hid: "og:type", property: "og:type", content: "website"},
+        {
+          hid: "og-url",
+          name: "og:url",
+          content: "https://cloudofworshippers.com",
+        },
         {
           hid: "og:image",
           property: "og:image",
@@ -48,71 +52,73 @@ export default defineNuxtConfig({
       ],
       link: [
         {
-          rel: 'preconnect',
-          crossorigin: 'anonymous',
-          href: 'https://fonts.googleapis.com'
+          rel: "preconnect",
+          crossorigin: "anonymous",
+          href: "https://fonts.googleapis.com",
         },
         {
-          rel: 'preconnect',
-          crossorigin: 'anonymous',
-          href: 'https://fonts.gstatic.com'
+          rel: "preconnect",
+          crossorigin: "anonymous",
+          href: "https://fonts.gstatic.com",
         },
         {
-          rel: 'stylesheet',
-          crossorigin: 'anonymous',
-          href: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Great+Vibes&family=IBM+Plex+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Serif:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@100..900&family=Jersey+25&family=Jost:ital,wght@0,100..900;1,100..900&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Overpass:wght@100..900&family=Playball&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Raleway:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Saira+Extra+Condensed:wght@100;200;300;400;500;600;700;800;900&family=Sedan:ital@0;1&family=Slabo+27px&display=swap'
-        }
-      ]
+          rel: "stylesheet",
+          crossorigin: "anonymous",
+          href: "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Dancing+Script:wght@400..700&family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Great+Vibes&family=IBM+Plex+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Serif:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@100..900&family=Jersey+25&family=Jost:ital,wght@0,100..900;1,100..900&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Overpass:wght@100..900&family=Playball&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Raleway:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Saira+Extra+Condensed:wght@100;200;300;400;500;600;700;800;900&family=Sedan:ital@0;1&family=Slabo+27px&display=swap",
+        },
+      ],
     },
-    pageTransition: { name: 'page', mode: 'out-in' },
-    layoutTransition: { name: 'layout', mode: 'out-in' }
+    pageTransition: {name: "page", mode: "out-in"},
+    layoutTransition: {name: "layout", mode: "out-in"},
   },
 
   ssr: false,
 
   nitro: {
     prerender: {
-      routes: ['/'],
+      routes: ["/"],
     },
   },
 
   runtimeConfig: {
     public: {
-      BASE_URL: process.env.BASE_URL || 'https://worshipcloud-api-6xak8.ondigitalocean.app/api/v1',
-      ASSETS_BASE_URL: process.env.ASSETS_BASE_URL || 'https://worshipcloud.favourfelix.com',
+      BASE_URL: process.env.BASE_URL || "http://localhost:4500/api/v1",
+      // BASE_URL:
+      //   process.env.BASE_URL ||
+      //   "https://worshipcloud-api-6xak8.ondigitalocean.app/api/v1",
+      ASSETS_BASE_URL:
+        process.env.ASSETS_BASE_URL || "https://worshipcloud.favourfelix.com",
       AWS_BUCKET_NAME: process.env.CLOUD_AWS_BUCKET_NAME,
       AWS_BUCKET_REGION: process.env.CLOUD_AWS_BUCKET_REGION,
       AWS_ACCESS_KEY_ID: process.env.CLOUD_AWS_ACCESS_KEY_ID,
-      AWS_SECRET_ACCESS_KEY: process.env.CLOUD_AWS_SECRET_ACCESS_KEY
-    }
+      AWS_SECRET_ACCESS_KEY: process.env.CLOUD_AWS_SECRET_ACCESS_KEY,
+    },
   },
 
-  css: [
-    '~/assets/css/main.css',
-  ],
+  css: ["~/assets/css/main.css"],
 
   modules: [
-    '@nuxt/ui',
-    '@vite-pwa/nuxt',
-    'nuxt-tiptap-editor',
-    '@pinia/nuxt',
-    '@pinia-plugin-persistedstate/nuxt',
+    "@nuxt/ui",
+    "@vite-pwa/nuxt",
+    "nuxt-tiptap-editor",
+    "@pinia/nuxt",
+    "@pinia-plugin-persistedstate/nuxt",
   ],
 
   ui: {
     global: true,
-    icons: ['mdi', 'bx', 'bxs', 'bi', 'mingcute', 'tabler', 'ph'],
+    icons: ["mdi", "bx", "bxs", "bi", "mingcute", "tabler", "ph"],
   },
 
   colorMode: {
-    preference: 'system',
-    fallback: 'light'
+    preference: "system",
+    fallback: "light",
   },
 
   vue: {
     compilerOptions: {
-      isCustomElement: (tag: string) => false
-    }
+      isCustomElement: (tag: string) => false,
+    },
   },
 
   tiptap: {
@@ -120,11 +126,11 @@ export default defineNuxtConfig({
   },
 
   pinia: {
-    storesDirs: ['./stores/**']
+    storesDirs: ["./stores/**"],
   },
 
   pwa: {
-    registerType: 'prompt',
+    registerType: "prompt",
     injectRegister: false,
 
     pwaAssets: {
@@ -133,33 +139,33 @@ export default defineNuxtConfig({
     },
 
     manifest: {
-      "name": "Cloud of Worshippers",
-      "short_name": "CoW",
-      "description": "Cloud of Worshippers",
-      "theme_color": "#a855f7",
-      "start_url": "/",
-      "display": "fullscreen",
-      "icons": [
+      name: "Cloud of Worshippers",
+      short_name: "CoW",
+      description: "Cloud of Worshippers",
+      theme_color: "#a855f7",
+      start_url: "/",
+      display: "fullscreen",
+      icons: [
         {
-          "src": "/cloud-w-144.png",
-          "sizes": "144x144",
-          "type": "image/png"
+          src: "/cloud-w-144.png",
+          sizes: "144x144",
+          type: "image/png",
         },
         {
-          "src": "/cloud-w-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
+          src: "/cloud-w-192.png",
+          sizes: "192x192",
+          type: "image/png",
         },
         {
-          "src": "/cloud-w-512.png",
-          "sizes": "512x512",
-          "type": "image/png"
-        }
-      ]
+          src: "/cloud-w-512.png",
+          sizes: "512x512",
+          type: "image/png",
+        },
+      ],
     },
 
     workbox: {
-      globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+      globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
       cleanupOutdatedCaches: true,
       clientsClaim: true,
     },
@@ -167,9 +173,9 @@ export default defineNuxtConfig({
     devOptions: {
       enabled: false,
       suppressWarnings: true,
-      navigateFallback: '/',
+      navigateFallback: "/",
       navigateFallbackAllowlist: [/^\/$/],
-      type: 'module',
+      type: "module",
     },
 
     registerWebManifestInRouteRules: true,
@@ -178,4 +184,4 @@ export default defineNuxtConfig({
       installPrompt: true,
     },
   },
-})
+});

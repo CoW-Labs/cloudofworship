@@ -118,6 +118,11 @@ watch(activeSlides, () => {
   if (tempSlides.length > 0) {
     slides.value = tempSlides
   }
+  if (tempSlides?.find((slide) => slide.id === activeSlide.value?.id)) {
+    activeSlide.value = tempSlides?.find(
+      (slide) => slide.id === activeSlide.value?.id
+    )
+  }
 })
 
 const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
@@ -218,6 +223,14 @@ emitter.on("restart-countdown", (data: Slide) => {
   }
 })
 
+emitter.on("delete-slide", (data: Slide) => {
+  deleteSlide(data?.id)
+})
+
+emitter.on("refresh-slides", () => {
+  retrieveSlidesOnline(appStore.activeSchedule?._id!!)
+})
+
 emitter.on("select-slides", () => {
   if (bulkActionLabel.value === "Select Slides") {
     bulkSelectSlides.value = !bulkSelectSlides.value
@@ -297,15 +310,42 @@ const uploadOfflineSlides = async () => {
 
 const createScheduleOnline = async (schedule: Schedule) => {
   // console.log("createScheduleOnline", schedule)
+  appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(`/church/${churchId}/schedules`, {
     method: "POST",
     body: schedule,
   })
   if (!error.value) {
     const tempSchedule = data.value as Schedule
-    console.log("tempSchedule", tempSchedule)
     appStore.setActiveSchedule(tempSchedule)
+    appStore.setSlidesLoading(false)
+    appStore.setLastSynced(new Date().toISOString())
     return tempSchedule
+  } else {
+    throw new Error(error.value?.message)
+  }
+}
+
+const retrieveSlidesOnline = async (scheduleId: string) => {
+  appStore.setSlidesLoading(true)
+  const { data, error } = await useAPIFetch(
+    `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
+  )
+  if (!error.value) {
+    const tempSlides = data.value as Slide[]
+    tempSlides.forEach((slide) => {
+      if (slide.backgroundType === backgroundTypes.video) {
+        slide.background = appStore.backgroundVideos?.find(
+          (bg) => bg.id === slide.backgroundVideoKey
+        )?.url
+      } else {
+      }
+    })
+    appStore.setActiveSlides(
+      useMergeObjectArray(tempSlides, [...appStore.activeSlides])
+    )
+    appStore.setSlidesLoading(false)
+    appStore.setLastSynced(new Date().toISOString())
   } else {
     throw new Error(error.value?.message)
   }
@@ -322,55 +362,13 @@ watch(
     // Check if activeSchedule is remote object
     if (!activeSchedule.value?.updatedAt) {
       createScheduleOnline(activeSchedule.value as Schedule)
+    } else {
+      // retrieve all slides online
+      retrieveSlidesOnline(activeSchedule.value?._id)
     }
   },
   { immediate: true }
 )
-
-// const mergeSchedules = (
-//   offlineSchedules: Schedule[],
-//   uploadedSchedules: Schedule[]
-// ): Schedule[] => {
-//   // Create a Map from uploadedSchedules with id as the key
-//   const uploadedMap = new Map(
-//     uploadedSchedules.map((schedule) => [schedule.id, schedule._id])
-//   )
-//   // console.log("uploadedMap", uploadedMap)
-
-//   // Iterate over offlineSchedules and merge special_id where ids match
-//   const tempOfflineSchedules = [...offlineSchedules]
-//   for (let offlineSchedule of tempOfflineSchedules) {
-//     if (uploadedMap.has(offlineSchedule.id)) {
-//       offlineSchedule._id = uploadedMap.get(offlineSchedule.id)
-//     }
-//   }
-
-//   return tempOfflineSchedules
-// }
-
-// const batchUploadOfflineSchedules = async () => {
-//   // Retrieve all offline schedules
-//   const offlineSchedules = appStore.schedules.filter(
-//     (schedule) => schedule.updatedAt === undefined
-//   )
-//   if (offlineSchedules.length > 0) {
-//     console.log("offlineSchedules", offlineSchedules)
-//     const uploadedSchedules = await Promise.all(
-//       offlineSchedules.map((schedule) => {
-//         return createScheduleOnline(schedule)
-//       })
-//     )
-
-//     const mergedSchedules = mergeSchedules(
-//       [...offlineSchedules],
-//       [...uploadedSchedules]
-//     )
-//     console.log("offlineSchedules", offlineSchedules)
-//     console.log("uploadedSchedules", uploadedSchedules)
-//     console.log("mergedSchedules", mergedSchedules)
-//     appStore.setSchedules(mergedSchedules)
-//   }
-// }
 
 const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
   // Find song slides and update
@@ -386,6 +384,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     }
   })
 
+  appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(
     `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/batch`,
     {
@@ -396,6 +395,8 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     }
   )
   if (!error.value) {
+    appStore.setSlidesLoading(false)
+    appStore.setLastSynced(new Date().toISOString())
     return data.value as Slide[]
   } else {
     throw new Error(error.value?.message)
@@ -409,7 +410,12 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
   delete tempSlide.churchId
   delete tempSlide.type
 
+  if (tempSlide.backgroundType !== backgroundTypes.video) {
+    tempSlide.backgroundVideoKey = ""
+  }
+
   if (slide?._id) {
+    appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
       `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/${slide?._id}`,
       {
@@ -418,6 +424,8 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
       }
     )
     if (!error.value) {
+      appStore.setSlidesLoading(false)
+      appStore.setLastSynced(new Date().toISOString())
       return data.value
     } else {
       throw new Error(error.value?.message)
@@ -427,13 +435,16 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
 
 const deleteSlideOnline = async (slide: Slide) => {
   if (slide?._id) {
+    appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
-      `/church/${churchId}/slides/${slide?._id}`,
+      `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/${slide?._id}`,
       {
         method: "DELETE",
       }
     )
     if (!error.value) {
+      appStore.setSlidesLoading(false)
+      appStore.setLastSynced(new Date().toISOString())
       return data.value
     } else {
       throw new Error(error.value?.message)
@@ -504,7 +515,7 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 }
 
 const onUpdateSlide = (slide: Slide) => {
-  console.log("updated", slide)
+  // console.log("updated", slide)
   // Always pause countdown slide before updating it
   if (slide.type === slideTypes.countdown) {
     useGlobalEmit("start-countdown", slide)
@@ -809,6 +820,7 @@ const updateLiveOutput = (updatedSlide: Slide) => {
 }
 
 const gotoAction = (title: string, version: string) => {
+  useGlobalEmit("goto-verse", title)
   title = title
     .replaceAll("  ", " ")
     .replaceAll(" :", ":")

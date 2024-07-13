@@ -20,7 +20,8 @@
     </TransitionGroup>
   </div>
 </template>
-<script setup>
+<script setup lang="ts">
+import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 const appStore = useAppStore()
 const { liveSlideId, activeSlide, activeSlides, settings } =
@@ -41,10 +42,11 @@ useHead({
   ],
 })
 
-// watch(liveSlide, (newVal, oldVal) => {
-//   console.log(newVal)
-//   console.log(oldVal)
-// })
+// LISTEN TO EVENTS
+const emitter = useNuxtApp().$emitter as Emitter<any>
+emitter.on("goto-verse", (data: any) => {
+  // console.log("goto-verse", 1)
+})
 
 onMounted(() => {
   const toast = useToast()

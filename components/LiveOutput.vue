@@ -87,7 +87,7 @@
                 button-color="red"
                 header="Delete slide"
                 label="Are you sure you want to delete this slide? This action is not reversible"
-                @confirm="deleteSlide(slide?.id)"
+                @confirm="useGlobalEmit('delete-slide', slide)"
               >
               </ConfirmDialog>
             </div>
@@ -142,15 +142,6 @@ const liveOutputSlides = computed({
 //     appStore.setLiveSlide(activeSlide.value.id)
 //   }
 // }
-
-const deleteSlide = (slideId: string) => {
-  const slides = appStore.activeSlides || []
-  const tempSlide = appStore.activeSlides.find((s) => s.id === slideId)
-  const slideIndex = slides.findIndex((s) => s.id === slideId)
-  slides.splice(slideIndex, 1)
-  appStore.removeActiveSlide(tempSlide!!)
-  toast.add({ title: `${tempSlide?.name} deleted`, icon: "i-tabler-trash" })
-}
 </script>
 
 <style scoped>

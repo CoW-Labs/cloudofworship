@@ -57,7 +57,9 @@ export const useAppStore = defineStore('app', {
         'AMP': 'All Scripture quotations, unless otherwise indicated, are taken from the Amplified Bible, Copyright © 2015 by The Lockman Foundation.'
       },
       recentBibleSearches: [] as string[],
-      failedUploadRequests: [] as { path: string, options: any }[]
+      failedUploadRequests: [] as { path: string, options: any }[],
+      slidesLoading: false as boolean,
+      lastSynced: new Date().toISOString() as string
     }
   },
   getters: {
@@ -99,18 +101,20 @@ export const useAppStore = defineStore('app', {
     },
     removeActiveSlide(slide: Slide) {
       this.activeSlides.splice(this.activeSlides.findIndex(s => s.id === slide.id), 1)
+      // console.log("removing active slide", this.activeSlides)
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
       let tempSlides = [...this.activeSlides]
       tempSlides = tempSlides.filter(slide => slide.scheduleId !== (this.activeSchedule?._id))
-      console.log("tempSlides", tempSlides)
+      // console.log("tempSlides", tempSlides)
       tempSlides.push(...slides)
       this.activeSlides = ensureUniqueIds(tempSlides)
+      // console.log("replacing schedule active slides - p2", this.activeSlides)
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
     setActiveSlides(slides: Array<Slide>) {
-      console.log("setActiveSlides", slides)
+      // console.log("setActiveSlides", slides)
       this.activeSlides = ensureUniqueIds(slides)
       this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
     },
@@ -162,6 +166,12 @@ export const useAppStore = defineStore('app', {
     },
     setFailedUploadRequests(failedRequest: { path: string, options: any }) {
       this.failedUploadRequests.push()
+    },
+    setSlidesLoading(loading: boolean) {
+      this.slidesLoading = loading
+    },
+    setLastSynced(lastSynced: string) {
+      this.lastSynced = lastSynced
     }
   },
   persist: {
@@ -169,6 +179,5 @@ export const useAppStore = defineStore('app', {
   },
   share: {
     enable: true,
-    initialize: true
   }
 }) 

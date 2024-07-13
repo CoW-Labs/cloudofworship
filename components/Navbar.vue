@@ -5,8 +5,8 @@
       v-if="route.name !== 'live'"
     >
       <UProgress
-        v-if="slidesAndScheduleLoading"
-        class="absolute inset-0 top-auto rounded-none"
+        class="absolute inset-0 top-auto rounded-none opacity-0"
+        :class="{ 'opacity-1': slidesLoading }"
         size="xs"
       />
       <div class="logo flex items-center gap-2 w-[310px]">
@@ -20,6 +20,7 @@
         </UButton>
       </div>
       <div class="projects-ctn">
+        <IconWrapper name="i-bx-spinner-dots" v-if="slidesAndScheduleLoading" />
         <UButton
           variant="ghost"
           color="gray"
@@ -52,12 +53,26 @@
         <ChangelogModal :app-version="appVersion" />
 
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
-        <UTooltip :text="online ? 'You are online' : 'You are offline'">
-          <UButton variant="ghost" class="h-10 opacity-65">
-            <!-- <IconWrapper
-              v-show="online"
-              name="i-tabler-cloud-bolt"
-            ></IconWrapper> -->
+        <UTooltip :text="online ? 'Force sync' : 'You are offline'">
+          <UButton
+            variant="ghost"
+            class="h-10 w-48 opacity-65"
+            @click="useGlobalEmit('refresh-slides')"
+          >
+            <div v-show="online" class="last-synced-ctn flex">
+              <UButton variant="ghost" class="h-10">
+                <IconWrapper
+                  name="i-tabler-refresh"
+                  :class="{ 'animate-spin': appStore.slidesLoading }"
+                />
+                <span class="text-xs">
+                  Last sync:
+                  <span class="font-bold capitalize">
+                    {{ new Date(appStore.lastSynced).toLocaleTimeString() }}
+                  </span>
+                </span>
+              </UButton>
+            </div>
             <IconWrapper
               v-show="!online"
               name="i-tabler-cloud-off"
@@ -131,6 +146,7 @@
 <script setup>
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
+import { format } from "timeago.js"
 const route = useRoute()
 const darkMode = ref(false)
 const settingsModalOpen = ref(false)
@@ -139,10 +155,9 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 const inviteModalVisible = ref(false)
 const scheduleModalVisible = ref(false)
-const slidesAndScheduleLoading = ref(false)
 
 const { user, church } = storeToRefs(authStore)
-const { activeSchedule } = storeToRefs(appStore)
+const { activeSchedule, slidesLoading } = storeToRefs(appStore)
 
 defineProps({
   appVersion: String,

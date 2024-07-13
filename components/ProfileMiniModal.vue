@@ -1,7 +1,7 @@
 <template>
   <div class="profile-modal-ctn flex">
     <div class="profile-modal text-center w-52">
-      <div class="avatar-ctn bg-primary-100 dark:bg-primary-900 p-4">
+      <div class="avatar-ctn bg-primary-100 dark:bg-slate-800 p-4">
         <UAvatar
           :text="user?.fullname?.split(' ')?.[0]?.[0]"
           size="xl"
@@ -15,7 +15,7 @@
       </div>
       <div
         v-if="church?.name && church?.type"
-        class="texts text-center p-4 border-t dark:border-primary-950"
+        class="texts text-center p-4 dark:border-primary-950"
       >
         <div class="church flex gap-2">
           <div class="text-left">
@@ -29,7 +29,7 @@
         </div>
       </div>
 
-      <div class="actions flex flex-col border-t dark:border-primary-950">
+      <div class="actions flex flex-col border-t dark:border-slate-800">
         <UButton
           to="https://cloudofworshippers.featurebase.app"
           target="_blank"
@@ -57,7 +57,7 @@
           button-size="xl"
           no-tooltip
           header="Sign out"
-          button-styles="py-4 px-6 text-md rounded-none border-t dark:border-primary-950"
+          button-styles="py-4 px-6 text-md rounded-none border-t dark:border-slate-800"
           label="Are you sure you want to sign out of your account?"
           @confirm="authStore.signOut()"
         />
