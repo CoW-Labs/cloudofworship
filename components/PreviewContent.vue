@@ -334,7 +334,15 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
   if (!error.value) {
     const tempSlides = data.value as Slide[]
     tempSlides.forEach((slide) => {
-      if (slide.backgroundType === backgroundTypes.video) {
+      if (
+        slide.backgroundType === backgroundTypes.video &&
+        (slide.backgroundVideoKey === "video-bg-1" ||
+          slide.backgroundVideoKey === "video-bg-2" ||
+          slide.backgroundVideoKey === "video-bg-3" ||
+          slide.backgroundVideoKey === "video-bg-4" ||
+          slide.backgroundVideoKey === "video-bg-5" ||
+          slide.backgroundVideoKey === "video-bg-6")
+      ) {
         slide.background = appStore.backgroundVideos?.find(
           (bg) => bg.id === slide.backgroundVideoKey
         )?.url

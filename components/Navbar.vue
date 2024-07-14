@@ -6,7 +6,7 @@
     >
       <UProgress
         class="absolute inset-0 top-auto rounded-none opacity-0"
-        :class="{ 'opacity-1': slidesLoading }"
+        :class="{ 'opacity-1': slidesLoading && online }"
         size="xs"
       />
       <div class="logo flex items-center gap-2 w-[310px]">
@@ -56,7 +56,8 @@
         <UTooltip :text="online ? 'Force sync' : 'You are offline'">
           <UButton
             variant="ghost"
-            class="h-10 w-48 opacity-65"
+            class="h-10 w-48 opacity-65 transition-all"
+            :class="{ 'w-12': !online }"
             @click="useGlobalEmit('refresh-slides')"
           >
             <div v-show="online" class="last-synced-ctn flex">
