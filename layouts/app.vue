@@ -283,6 +283,19 @@ const downloadEssentialResources = async () => {
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
   }
 
+  // tempBible = await db.bibleAndHymns.get("hymns")
+  // if (!tempBible) {
+  //   downloadProgress.value = 7
+  //   const isHymn1346Available = await useHymn("1346")
+  //   console.log(isHymn1346Available)
+
+  //   if (!isHymn1346Available) {
+  //     await db.bibleAndHymns.delete("hymns")
+  //     const hymns = await useS3File("hymns.json")
+  //     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
+  //   }
+  // }
+
   // All computations completed
   downloadProgress.value = 8
 
@@ -364,21 +377,23 @@ const getChurch = async () => {
 }
 
 const retrieveSchedules = async () => {
-  const schedulesPromise = await useAPIFetch(
-    `/church/${authStore.user?.churchId}/schedules`
-  )
-  const schedules = schedulesPromise.data.value as unknown as Schedule[]
-  const mergedSchedules = useMergeObjectArray(
-    [...schedules],
-    appStore.schedules
-  )
+  if (isAppOnline) {
+    const schedulesPromise = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/schedules`
+    )
+    const schedules = schedulesPromise.data.value as unknown as Schedule[]
+    const mergedSchedules = useMergeObjectArray(
+      [...schedules],
+      appStore.schedules
+    )
 
-  mergedSchedules?.sort((scheduleA, scheduleB) => {
-    const dateA = new Date(scheduleA.updatedAt)
-    const dateB = new Date(scheduleB.updatedAt)
-    return dateB.getTime() - dateA.getTime()
-  })
-  appStore.setSchedules(mergedSchedules)
+    mergedSchedules?.sort((scheduleA, scheduleB) => {
+      const dateA = new Date(scheduleA.updatedAt)
+      const dateB = new Date(scheduleB.updatedAt)
+      return dateB.getTime() - dateA.getTime()
+    })
+    appStore.setSchedules(mergedSchedules)
+  }
 }
 
 const retrieveAllMediaFilesFromDB = async () => {
