@@ -229,12 +229,6 @@ const downloadEssentialResources = async () => {
   loadingResources.value = true
   downloadProgress.value = 0
 
-  // TODO: Delete soon after v0.7.6 release
-  const currentAppSettings = appStore.settings
-  if (currentAppSettings.appVersion === "0.7.5") {
-    db.bibleAndHymns.delete("hymns")
-  }
-
   // Download background videos
   downloadProgress.value = 1
   await saveAllBackgroundVideos()
@@ -377,7 +371,7 @@ const getChurch = async () => {
 }
 
 const retrieveSchedules = async () => {
-  if (isAppOnline) {
+  if (isAppOnline.value) {
     const schedulesPromise = await useAPIFetch(
       `/church/${authStore.user?.churchId}/schedules`
     )
