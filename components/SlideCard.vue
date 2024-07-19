@@ -36,7 +36,10 @@
 
     <!-- DELETE AND DUPLICATE SLIDE BUTTON -->
     <div class="actions absolute bottom-2 right-2 flex gap-1">
-      <UTooltip v-if="slide.type === slideTypes.text" text="Duplicate Slide">
+      <UTooltip
+        v-if="slide.type === slideTypes.text || slide.type === slideTypes.bible"
+        text="Duplicate Slide"
+      >
         <UButton
           icon="i-bx-copy"
           size="xs"
