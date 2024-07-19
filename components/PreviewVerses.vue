@@ -1,6 +1,7 @@
 <template>
   <div
-    class="verse-preview absolute bg-primary-100 dark:bg-primary-800 right-0 left-0 top-12 z-20 py-2 overflow-auto shadow-lg rounded-b-md"
+    ref="versesPreview"
+    class="verse-preview behavior-smooth absolute bg-primary-100 dark:bg-primary-800 right-0 left-0 top-12 z-20 py-2 overflow-auto shadow-lg rounded-b-md"
   >
     <!-- <div class="border border-primary"></div> -->
     <UButton
@@ -15,6 +16,14 @@
         ? allChapterVerses
         : relatedData?.verses"
       :key="`verse-${index}`"
+      :id="
+        slide?.type === slideTypes.bible
+          ? `${(bibleChapter + '-' + verseTemp?.verse)
+              ?.toLowerCase()
+              .replaceAll(' ', '-')
+              .replaceAll(':', '-')}`
+          : `${verse?.toLowerCase().replaceAll(' ', '-').replace(/\d+/g, '')}`
+      "
       class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-300 dark:hover:bg-primary-900 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
       :class="{
         'bg-primary-300 dark:bg-primary-900':
@@ -49,6 +58,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { useAppStore } from "~/store/app"
 import type { Scripture, Slide } from "~/types"
 
 const props = defineProps<{
@@ -59,6 +69,7 @@ const props = defineProps<{
 const allChapterVerses = ref<any[]>()
 const relatedData = ref<any>({})
 const bibleChapter = computed(() => props.verse?.split(":")?.[0])
+const versesPreview = ref<HTMLDivElement | null>(null)
 
 const getAllChapterVerses = async () => {
   const chapter = await useScriptureChapter(props.verse)
@@ -85,6 +96,28 @@ onMounted(() => {
     getAllChapterVerses()
   }
 })
+
+watch(
+  () => props.slide,
+  (newVal, oldVal) => {
+    setTimeout(() => {
+      // Scroll down to selected verse
+      const activeVerse =
+        props.slide.type === slideTypes.bible
+          ? versesPreview.value?.querySelector(
+              `#${props.verse
+                ?.toLowerCase()
+                .replaceAll(" ", "-")
+                .replaceAll(":", "-")}`
+            )
+          : versesPreview.value?.querySelector(
+              `#${props.verse?.replace(" ", "-")?.toLowerCase()}`
+            )
+      activeVerse?.scrollIntoView()
+    }, 100)
+  },
+  { deep: true, immediate: true }
+)
 
 watch(bibleChapter, () => {
   getAllChapterVerses()

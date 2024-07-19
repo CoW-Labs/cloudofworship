@@ -1,6 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  devtools: {enabled: true},
+  devtools: { enabled: false },
 
   app: {
     head: {
@@ -16,12 +16,12 @@ export default defineNuxtConfig({
           content:
             "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worshippers is your church's power point.",
         },
-        {name: "format-detection", content: "telephone=no"},
-        {hid: "og:type", property: "og:type", content: "website"},
+        { name: "format-detection", content: "telephone=no" },
+        { hid: "og:type", property: "og:type", content: "website" },
         {
           hid: "og-url",
           name: "og:url",
-          content: "https://cloudofworshippers.com",
+          content: "https://cloudofworship.com",
         },
         {
           hid: "og:image",
@@ -36,7 +36,7 @@ export default defineNuxtConfig({
         {
           hid: "twitter:domain",
           name: "twitter:domain",
-          content: "cloudofworshippers.com",
+          content: "cloudofworship.com",
         },
         {
           hid: "twitter:description",
@@ -47,7 +47,7 @@ export default defineNuxtConfig({
         {
           hid: "twitter:url",
           name: "twitter:url",
-          content: "https://cloudofworshippers.com",
+          content: "https://cloudofworship.com",
         },
       ],
       link: [
@@ -68,8 +68,8 @@ export default defineNuxtConfig({
         },
       ],
     },
-    pageTransition: {name: "page", mode: "out-in"},
-    layoutTransition: {name: "layout", mode: "out-in"},
+    pageTransition: { name: "page", mode: "out-in" },
+    layoutTransition: { name: "layout", mode: "out-in" },
   },
 
   ssr: false,

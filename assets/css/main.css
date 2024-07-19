@@ -99,6 +99,9 @@ body {
 }
 
 /* TRANSITIONS START */
+.smooth-behavior {
+  scroll-behavior: smooth;
+}
 .fade-sm-enter-active,
 .fade-sm-leave-active {
   transition: opacity 0.3s ease;
