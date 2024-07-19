@@ -51,9 +51,9 @@ defineProps<{
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const changelog = `
-- You can now access all your slides and schedules from another device
-- Have just one computer? No problem! You can now sync your slides and schedules across other devices in your tech team. Just ensure those accounts are linked to the same church.
-- Added new hymns for your convenience. Enjoy!
+- You can now duplicate Bible slides.
+- Section to preview verses maintain scroll position of selected verse.
+- Added new songs for your convenience. Enjoy!
 - Fixed plausible issue with Bible version lag—might reoccur. Please report if you see this.
 - Fixed minor bugs and issues for improved experience`
 
