@@ -7,7 +7,7 @@
     "distDir": "../.output/public"
   },
   "package": {
-    "productName": "Cloud of Worshippers",
+    "productName": "Cloud of Worship",
     "version": "0.1.0"
   },
   "tauri": {
@@ -59,7 +59,7 @@
         "fullscreen": false,
         "height": 600,
         "resizable": true,
-        "title": "Cloud of Worshippers",
+        "title": "Cloud of Worship",
         "width": 800,
         "url": "/"
       },
@@ -68,7 +68,7 @@
         "fullscreen": true,
         "height": 600,
         "resizable": true,
-        "title": "🔴 LIVE - Cloud of Worshippers",
+        "title": "🔴 LIVE - Cloud of Worship",
         "width": 800,
         "url": "/live"
       }

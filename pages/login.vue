@@ -4,7 +4,7 @@
       <Logo class="w-24 h-24" />
       <p class="max-w-[200px] mx-auto">
         Log in to continue with
-        <span class="font-semibold">Cloud of Worshippers</span>
+        <span class="font-semibold">Cloud of Worship</span>
       </p>
     </div>
     <form class="flex flex-col gap-3 max-w-[325px] mx-auto" @submit="login()">

@@ -6,7 +6,7 @@
         Join
         <span class="text-primary font-semibold">{{ church?.type }}</span> on
         <br />
-        <span class="font-semibold">Cloud of Worshippers</span>
+        <span class="font-semibold">Cloud of Worship</span>
       </p>
 
       <div class="people-info mt-4 text-center">
@@ -148,7 +148,7 @@ onMounted(() => {
       title: "Still not convinced?",
       color: "red",
       description:
-        "Watch this video to see why we think Cloud of Worshippers is your church's literal power point.",
+        "Watch this video to see why we think Cloud of Worship is your church's literal power point.",
       timeout: 0,
       actions: [
         {
