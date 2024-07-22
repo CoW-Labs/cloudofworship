@@ -6,6 +6,6 @@
 
 <script setup lang="ts">
 useHead({
-  title: "Cloud of Worshippers",
+  title: "Cloud of Worship",
 })
 </script>

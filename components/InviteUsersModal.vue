@@ -90,7 +90,7 @@
             <div>
               <h2 class="text-md font-semibold">The more, the merrier.</h2>
               <p class="text-sm mt-1 mb-2">
-                Invite more people to try out Cloud of Worshippers.
+                Invite more people to try out Cloud of Worship.
               </p>
             </div>
             <!-- <div class="btn-row flex gap-2 justify-center">

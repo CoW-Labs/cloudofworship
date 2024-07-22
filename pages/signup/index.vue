@@ -4,7 +4,7 @@
       <Logo class="w-24 h-24" />
       <p v-show="step === 1" class="max-w-[200px] mx-auto come-up-1">
         Sign up to start using
-        <span class="font-semibold">Cloud of Worshippers</span>
+        <span class="font-semibold">Cloud of Worship</span>
       </p>
       <p v-show="step === 2" class="max-w-[200px] mx-auto come-up-1">
         <span class="font-semibold"
@@ -192,7 +192,7 @@
         :loading="loading"
         @click="signup"
       >
-        Start using Cloud of Worshippers
+        Start using Cloud of Worship
       </UButton>
     </form>
   </div>
@@ -242,7 +242,7 @@ onMounted(() => {
       title: "Still not convinced?",
       color: "red",
       description:
-        "Watch this video to see why we think Cloud of Worshippers is your church's literal power point.",
+        "Watch this video to see why we think Cloud of Worship is your church's literal power point.",
       timeout: 0,
       actions: [
         {

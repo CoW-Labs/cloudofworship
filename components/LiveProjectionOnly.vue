@@ -112,8 +112,8 @@
           <UCard>
             <div class="flex items-center justify-between h-[60px] mb-4">
               <div class="logo flex items-center gap-2 w-[250px]">
-                <Logo class="w-[32px]" />
-                <h1 class="text-sm font-semibold">Cloud of Worshippers</h1>
+                <Logo class="w-[24px]" />
+                <h1 class="text-sm font-semibold">Cloud of Worship</h1>
               </div>
               <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                 Large Preview

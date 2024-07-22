@@ -80,7 +80,7 @@
                 v-if="schedules.length === 0"
                 icon="i-bx-calendar"
                 sub="No schedules yet"
-                desc="Click the button above to create a new schedule and start using Cloud of Worshippers."
+                desc="Click the button above to create a new schedule and start using Cloud of Worship."
                 is-wider
               />
               <ScheduleCard

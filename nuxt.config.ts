@@ -9,12 +9,12 @@ export default defineNuxtConfig({
         lang: "en",
       },
       viewport: "initial-scale=1",
-      title: "Cloud of Worshippers - Your church's powerpoint",
+      title: "Cloud of Worship - Your church's powerpoint",
       meta: [
         {
           name: "description",
           content:
-            "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worshippers is your church's power point.",
+            "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worship is your church's power point.",
         },
         { name: "format-detection", content: "telephone=no" },
         { hid: "og:type", property: "og:type", content: "website" },
@@ -42,7 +42,7 @@ export default defineNuxtConfig({
           hid: "twitter:description",
           name: "twitter:description",
           content:
-            "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worshippers is your church's power point.",
+            "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worship is your church's power point.",
         },
         {
           hid: "twitter:url",
@@ -139,9 +139,9 @@ export default defineNuxtConfig({
     },
 
     manifest: {
-      name: "Cloud of Worshippers",
+      name: "Cloud of Worship",
       short_name: "CoW",
-      description: "Cloud of Worshippers",
+      description: "Cloud of Worship",
       theme_color: "#a855f7",
       start_url: "/",
       display: "fullscreen",
