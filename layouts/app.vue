@@ -38,7 +38,7 @@
         >
           <NotFoundBanner
             icon="i-tabler-download"
-            sub="Install Cloud of Worshippers on your computer for easy access."
+            sub="Install Cloud of Worship on your computer for easy access."
             action="pwa-install"
             action-text="Install"
             secondary-action="cancel-pwa-install"
@@ -74,7 +74,7 @@
     <div class="wrapper flex flex-col gap-2">
       <div class="logo flex items-center justify-center mb-6 gap-2">
         <Logo class="w-[48px]" />
-        <h1 class="text-2xl font-semibold">Cloud of Worshippers</h1>
+        <h1 class="text-2xl font-semibold">Cloud of Worship</h1>
       </div>
       <div class="progress-wrapper text-center">
         <UProgress
@@ -113,7 +113,7 @@ import type { LibraryItem, Media, BackgroundVideo, Schedule } from "~/types"
 import { useOnline } from "@vueuse/core"
 
 useHead({
-  title: "Cloud of Worshippers",
+  title: "Cloud of Worship",
 })
 const props = defineProps({
   appVersion: String,

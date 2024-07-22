@@ -20,7 +20,7 @@
 
 <script setup>
 useHead({
-  title: "Cloud of Worshippers",
+  title: "Cloud of Worship",
 })
 </script>
 

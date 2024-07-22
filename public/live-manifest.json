@@ -1,7 +1,7 @@
 {
   "name": "CoW Live",
   "short_name": "CoW",
-  "description": "Cloud of Worshippers",
+  "description": "Cloud of Worship",
   "theme_color": "#480000",
   "start_url": "/live",
   "display": "fullscreen",
