@@ -1,7 +1,7 @@
 <template>
   <div class="login-main section">
     <div class="header flex flex-col items-center text-center mb-12">
-      <Logo class="w-24 h-24" />
+      <Logo class="w-28 h-28" />
       <p v-show="step === 1" class="max-w-[200px] mx-auto come-up-1">
         Sign up to start using
         <span class="font-semibold">Cloud of Worship</span>
