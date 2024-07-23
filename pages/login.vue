@@ -1,7 +1,7 @@
 <template>
   <div class="login-main section">
     <div class="header flex flex-col items-center text-center mb-12">
-      <Logo class="w-24 h-24" />
+      <Logo class="w-28 h-28" />
       <p class="max-w-[200px] mx-auto">
         Log in to continue with
         <span class="font-semibold">Cloud of Worship</span>
