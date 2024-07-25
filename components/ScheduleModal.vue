@@ -180,9 +180,9 @@ const retrieveSchedules = async () => {
   )
 
   mergedSchedules?.sort((scheduleA, scheduleB) => {
-    const dateA = new Date(scheduleA.updatedAt)
-    const dateB = new Date(scheduleB.updatedAt)
-    return dateB.getTime() - dateA.getTime()
+    const dateA = new Date(scheduleA?.updatedAt)
+    const dateB = new Date(scheduleB?.updatedAt)
+    return dateB?.getTime() - dateA?.getTime()
   })
   appStore.setSchedules(mergedSchedules)
   appStore.setSlidesLoading(false)
@@ -203,7 +203,7 @@ const deleteScheduleOnline = async (scheduleId: string) => {
 const deleteSchedule = (scheduleId: string) => {
   let updatedScheduleList: Schedule[] = [...appStore.schedules]
   updatedScheduleList = updatedScheduleList.filter(
-    (sch) => sch._id !== scheduleId
+    (sch) => sch?._id !== scheduleId
   )
 
   if (scheduleId === appStore.activeSchedule?._id) {

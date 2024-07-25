@@ -119,9 +119,9 @@ const props = defineProps<{
 const authStore = useAuthStore()
 
 const scheduleAuthor: User | null = computed(() => {
-  if (props.schedule.authorId) {
+  if (props.schedule?.authorId) {
     return authStore.church?.users?.find(
-      (user) => user._id === props.schedule.authorId
+      (user) => user._id === props.schedule?.authorId
     )
   }
   return null

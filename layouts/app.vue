@@ -382,9 +382,9 @@ const retrieveSchedules = async () => {
     )
 
     mergedSchedules?.sort((scheduleA, scheduleB) => {
-      const dateA = new Date(scheduleA.updatedAt)
-      const dateB = new Date(scheduleB.updatedAt)
-      return dateB.getTime() - dateA.getTime()
+      const dateA = new Date(scheduleA?.updatedAt)
+      const dateB = new Date(scheduleB?.updatedAt)
+      return dateB?.getTime() - dateA?.getTime()
     })
     appStore.setSchedules(mergedSchedules)
   }
