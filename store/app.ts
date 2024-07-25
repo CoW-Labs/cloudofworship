@@ -172,6 +172,45 @@ export const useAppStore = defineStore('app', {
     },
     setLastSynced(lastSynced: string) {
       this.lastSynced = lastSynced
+    },
+    signOut() {
+      console.log("signout on app store")
+      this.setSchedules([])
+      this.setActiveSchedule(null)
+      this.setActiveSlides([])
+      this.setLiveOutputSlidesId([])
+      this.setLiveSlide('')
+      this.setEmitter(null)
+      this.setAppSettings({
+        appVersion: '0.1.0',
+        defaultBibleVersion: 'KJV',
+        defaultFont: 'Inter',
+        defaultBackground: {
+          hymn: {
+            backgroundType: "video",
+            background: '/video-bg-1.mp4',
+            backgroundVideoKey: '/video-bg-1.mp4'
+          },
+          bible: {
+            backgroundType: "video",
+            background: '/video-bg-3.mp4',
+            backgroundVideoKey: '/video-bg-3.mp4'
+          },
+          text: {
+            backgroundType: "video",
+            background: '/video-bg-4.mp4',
+            backgroundVideoKey: '/video-bg-4.mp4'
+          }
+        },
+        slideStyles: { blur: 0.5, brightness: 50 } as SlideStyle
+      })
+      this.setBackgroundVideos([])
+      this.setAlerts([])
+      this.setActiveAlert(null)
+      this.setRecentBibleSearches([])
+      this.setFailedUploadRequests([])
+      this.setSlidesLoading(false)
+      this.setLastSynced(new Date().toISOString())
     }
   },
   persist: {

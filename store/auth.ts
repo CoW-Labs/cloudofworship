@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { useAppStore } from './app'
 
 export interface User {
   _id: string
@@ -37,11 +38,15 @@ export const useAuthStore = defineStore('auth', {
       this.church = church
     },
     signOut() {
+      const appStore = useAppStore()
       const cookie = useCookie('token')
       cookie.value = undefined
       this.user = null
       this.church = null
       navigateTo('/login')
+      setTimeout(() => {
+        appStore.signOut()
+      }, 1000)
     }
   },
   persist: {
