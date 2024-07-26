@@ -24,7 +24,7 @@
               .replaceAll(':', '-')}`
           : `${verse?.toLowerCase().replaceAll(' ', '-').replace(/\d+/g, '')}`
       "
-      class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-300 dark:hover:bg-primary-900 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
+      class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-200 dark:hover:bg-primary-600 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
       :class="{
         'bg-primary-300 dark:bg-primary-900':
           slide?.type === slideTypes.bible

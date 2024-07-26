@@ -98,6 +98,13 @@ const countdownTimeLeft = ref<number>(0)
 watch(
   slides,
   (newVal, oldVal) => {
+    const isActiveSlideInActiveSchedule = activeSlides.value
+      ?.filter((slide) => slide.scheduleId === appStore.activeSchedule?._id)
+      ?.find((slide) => slide.id === activeSlide.value?.id)
+    if (!isActiveSlideInActiveSchedule) {
+      activeSlide.value = undefined
+    }
+
     setTimeout(() => {
       // Scroll down to newest slide on slide create
       const slideId = activeSlide.value?.id
@@ -368,7 +375,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
           slide.background = previousBackground
         }
       } else {
-        console.log("not found")
+        // console.log("not found")
       }
     })
     appStore.setActiveSlides(
