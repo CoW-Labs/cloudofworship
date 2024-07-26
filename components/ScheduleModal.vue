@@ -139,7 +139,7 @@ const { schedules } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
 const scheduleName = ref<string>("")
 const testScheduleName = ref<string>(
-  `CoW Schedule ${new Date().toLocaleDateString("en-GB")}`
+  `CoW Schedule ${new Date().toLocaleDateString("en-GB")?.replaceAll("/", "-")}`
 )
 
 const props = defineProps<{
@@ -237,7 +237,7 @@ const deleteSchedule = (scheduleId: string) => {
   )
 
   if (scheduleId === appStore.activeSchedule?._id) {
-    appStore.setActiveSchedule(updatedScheduleList?.at(-1))
+    appStore.setActiveSchedule(updatedScheduleList?.at(0))
   }
   appStore.setSchedules(updatedScheduleList)
 

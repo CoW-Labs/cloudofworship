@@ -100,6 +100,7 @@ onMounted(() => {
 watch(
   () => props.slide,
   (newVal, oldVal) => {
+    // console.log("slide updated")
     setTimeout(() => {
       // Scroll down to selected verse
       const activeVerse =

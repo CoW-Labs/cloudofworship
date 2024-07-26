@@ -254,6 +254,28 @@
         />
       </UTooltip>
     </div>
+    <!-- SONG CONTROLS -->
+    <div
+      v-if="slide?.type === slideTypes.song"
+      class="button-group song-controls bg-primary-100 dark:bg-primary-900 rounded-md mx-1 p-1 px-0 h-[36px] mt-[2px] flex items-center gap-1"
+    >
+      <UTooltip text="Refresh song lyrics" :popper="{ placement: 'top' }">
+        <UButton
+          @click="refreshSongLyrics(slide?.songId || '')"
+          :class="[
+            'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
+          ]"
+          variant="ghost"
+        >
+          <IconWrapper
+            size="5"
+            name="i-tabler-refresh"
+            :class="{ 'animate-spin': isLoading }"
+          />
+          Song</UButton
+        >
+      </UTooltip>
+    </div>
   </div>
 </template>
 
@@ -267,6 +289,8 @@ const props = defineProps<{
 }>()
 const backgroundFillType = ref<string>("")
 const slideFontSize = ref<number>(0)
+const isLoading = ref<boolean>(false)
+const emit = defineEmits(["update-song-lyrics"])
 
 watch(
   () => props.slide,
@@ -277,6 +301,14 @@ watch(
   },
   { immediate: true }
 )
+
+const refreshSongLyrics = async (songId: string) => {
+  isLoading.value = true
+  const song = await useSong(songId)
+  emit("update-song-lyrics", song)
+  isLoading.value = false
+  // console.log(song)
+}
 </script>
 
 <style scoped></style>
