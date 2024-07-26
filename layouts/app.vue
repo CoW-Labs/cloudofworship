@@ -73,7 +73,7 @@
   >
     <div class="wrapper flex flex-col gap-2">
       <div class="logo flex items-center justify-center mb-6 gap-2">
-        <Logo class="w-[48px]" />
+        <Logo class="w-[64px]" />
         <h1 class="text-2xl font-semibold">Cloud of Worship</h1>
       </div>
       <div class="progress-wrapper text-center">

@@ -35,7 +35,7 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
   };
 
   options.onResponseError = ({ response }) => {
-    console.log(response)
+    appStore.setSlidesLoading(false);
     if (response.status === 401) {
       authStore.signOut();
       toast.add({
@@ -60,8 +60,8 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
       appStore.setFailedUploadRequests({ path: path as string, options });
       addErrorInDevEnvironment(`, ${path}: Failed, cause: offline`);
     }
+    appStore.setSlidesLoading(false);
     throw new Error("No internet connection");
-    appStore.setSlidesLoading(false)
   }
 
   return useFetch(path, options);

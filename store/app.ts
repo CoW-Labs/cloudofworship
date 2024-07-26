@@ -174,7 +174,6 @@ export const useAppStore = defineStore('app', {
       this.lastSynced = lastSynced
     },
     signOut() {
-      console.log("signout on app store")
       this.setSchedules([])
       this.setActiveSchedule(null)
       this.setActiveSlides([])

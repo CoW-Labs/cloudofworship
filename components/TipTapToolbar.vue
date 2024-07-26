@@ -47,9 +47,7 @@
       <UButton
         v-for="headingSize in 3"
         :key="`heading-size-${headingSize}`"
-        @click="
-          editor.chain().focus().toggleHeading({ level: headingSize }).run()
-        "
+        @click="toggleHeading(headingSize).run()"
         class="dark:text-primary-400 dark:hover:text-primary-500 gap-0 items-end"
         :class="{
           'bg-primary text-white dark:text-primary-900': editor.isActive(
@@ -65,7 +63,7 @@
       </UButton>
     </div>
     <UButton
-      @click="editor.chain().focus().setParagraph().run()"
+      @click="setParagraph()"
       :class="{
         'bg-primary text-white dark:text-primary-900':
           editor.isActive('paragraph'),
@@ -157,6 +155,40 @@
 const props = defineProps({
   editor: Object,
 })
+
+const isEmpty = (obj) => Object.keys(obj).length === 0
+
+const toggleHeading = (level) => {
+  let otherAttributes = props.editor?.getAttributes("heading")
+  if (isEmpty(otherAttributes)) {
+    otherAttributes = props.editor?.getAttributes("paragraph")
+  }
+
+  props.editor
+    ?.chain()
+    .focus()
+    .toggleHeading({
+      ...otherAttributes,
+      level,
+    })
+    .run()
+}
+
+const setParagraph = () => {
+  let otherAttributes = props.editor?.getAttributes("paragraph")
+  if (isEmpty(otherAttributes)) {
+    otherAttributes = props.editor?.getAttributes("heading")
+  }
+  console.log(otherAttributes)
+
+  props.editor
+    ?.chain()
+    .focus()
+    .setParagraph({ ...otherAttributes })
+    .run()
+
+  props.editor?.commands.updateAttributes("paragraph", otherAttributes)
+}
 </script>
 
 <style scoped></style>
