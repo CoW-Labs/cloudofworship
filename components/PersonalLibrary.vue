@@ -10,7 +10,7 @@
     </UTabs>
     <UButton
       v-if="activeLibraryTab === 0"
-      class="mb-2 capitalize come-up-1 transition-all"
+      class="mb-2 capitalize transition-all"
       size="lg"
       block
       :icon="page === 'add-song' ? 'i-bx-chevron-left' : 'i-bx-plus'"

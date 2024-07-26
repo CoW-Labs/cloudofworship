@@ -5,108 +5,129 @@
     class="max-w-[330px] relative overflow-visible"
     @header-click="searchInput.length < 2 ? (page = '') : (searchInput = '')"
   >
-    <Transition name="fade-sm">
-      <!-- ACTIONS HOME SECTION -->
-      <div v-if="page === ''" class="main min-h-[100%]" ref="quickActions">
-        <div class="flex gap-2">
-          <UInput
-            icon="i-bx-search"
-            placeholder="Search scripture, hymns, actions"
-            v-model="searchInput"
-            color="black"
-            class="w-[100%]"
-          />
-          <UButton
-            v-if="searchInput.length >= 2"
-            icon="i-bx-x"
-            color="primary"
-            @click="searchInput = ''"
-          ></UButton>
-        </div>
-
-        <Transition name="fade-sm">
-          <NotFoundBanner
-            v-if="searchInput.length >= 4"
-            icon="i-bx-music"
-            sub="Are you looking for contemporary songs and not hymns?"
-            action="new-song-search"
-            :query="searchInput"
-            action-text="Search here"
-          />
-        </Transition>
-
-        <!-- BASIC ACTIONS -->
-        <div
-          v-if="searchInput.length < 2"
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
-        >
-          <ActionCard
-            v-for="(action, index) in actions?.filter(
-              (a) => !a?.searchableOnly
-            )"
-            :key="action?.name"
-            :action="action"
-            :class="{
-              'bg-primary-50 dark:bg-primary-800 rounded-md':
-                index === focusedActionIndex,
-            }"
-            @click="focusedActionIndex = index"
-          />
-        </div>
-
-        <!-- SEARCHING ACTIONS -->
-        <div
-          v-else
-          class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
-        >
-          <ActionCard
-            v-for="(action, index) in searchedActions"
-            :key="action?.name"
-            :action="{ ...action, bibleChapterAndVerse }"
-            :class="{
-              'bg-primary-50 dark:bg-primary-800 rounded-md':
-                index === focusedActionIndex,
-            }"
-          />
-        </div>
+    <!-- <Transition name="fade-sm" -->
+    <!-- ACTIONS HOME SECTION -->
+    <div v-if="page === ''" class="main come-up-1" ref="quickActions">
+      <div class="flex gap-2">
+        <UInput
+          icon="i-bx-search"
+          placeholder="Search scripture, hymns, actions"
+          v-model="searchInput"
+          color="black"
+          class="w-[100%]"
+        />
+        <UButton
+          v-if="searchInput.length >= 2"
+          icon="i-bx-x"
+          color="primary"
+          @click="searchInput = ''"
+        ></UButton>
       </div>
 
-      <!-- SONG SECTION -->
-      <BibleList
-        v-else-if="page === 'bible'"
-        :query="bibleSearchQuery"
-        @close="page = ''"
-      />
+      <Transition name="fade-sm">
+        <NotFoundBanner
+          v-if="searchInput.length >= 4"
+          icon="i-bx-music"
+          sub="Are you looking for contemporary songs and not hymns?"
+          action="new-song-search"
+          :query="searchInput"
+          action-text="Search here"
+        />
+      </Transition>
 
-      <!-- SONG SECTION -->
-      <SongsList
-        v-else-if="page === 'song'"
-        :query="songSearchQuery"
-        @close="page = ''"
-      />
+      <!-- BASIC ACTIONS -->
+      <div
+        v-if="searchInput.length < 2"
+        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+      >
+        <ActionCard
+          v-for="(action, index) in actions?.filter((a) => !a?.searchableOnly)"
+          :key="action?.name"
+          :action="action"
+          :class="{
+            'bg-primary-50 dark:bg-primary-800 rounded-md':
+              index === focusedActionIndex,
+          }"
+          @click="focusedActionIndex = index"
+        />
+      </div>
 
-      <!-- HYMN SECTION -->
-      <HymnList v-else-if="page === 'hymn'" @close="page = ''" />
+      <!-- SEARCHING ACTIONS -->
+      <div
+        v-else
+        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+      >
+        <ActionCard
+          v-for="(action, index) in searchedActions"
+          :key="action?.name"
+          :action="{ ...action, bibleChapterAndVerse }"
+          :class="{
+            'bg-primary-50 dark:bg-primary-800 rounded-md':
+              index === focusedActionIndex,
+          }"
+        />
+      </div>
+    </div>
 
-      <!-- MEDIA(IMAGE/VIDEO) SECTION-->
-      <AddMedia v-else-if="page === 'media'" @close="page = ''" />
+    <!-- SONG SECTION -->
+    <BibleList
+      v-else-if="page === 'bible'"
+      :query="bibleSearchQuery"
+      class="come-up-1"
+      @close="page = ''"
+    />
 
-      <!-- SEARCH BIBLE SECTION-->
-      <SearchBibleList v-else-if="page === 'search-bible'" @close="page = ''" />
+    <!-- SONG SECTION -->
+    <SongsList
+      v-else-if="page === 'song'"
+      :query="songSearchQuery"
+      class="come-up-1"
+      @close="page = ''"
+    />
 
-      <!-- LIBRARY SECTION-->
-      <PersonalLibrary
-        v-else-if="page === 'library'"
-        :page="libraryPage"
-        @close="page = ''"
-      />
+    <!-- HYMN SECTION -->
+    <HymnList
+      v-else-if="page === 'hymn'"
+      class="come-up-1"
+      @close="page = ''"
+    />
 
-      <!-- LIBRARY SECTION-->
-      <AddAlert v-else-if="page === 'alert'" @close="page = ''" />
+    <!-- MEDIA(IMAGE/VIDEO) SECTION-->
+    <AddMedia
+      v-else-if="page === 'media'"
+      class="come-up-1"
+      @close="page = ''"
+    />
 
-      <!-- COUNTDOWN SECTION-->
-      <AddCountdown v-else-if="page === 'countdown'" @close="page = ''" />
-    </Transition>
+    <!-- SEARCH BIBLE SECTION-->
+    <SearchBibleList
+      v-else-if="page === 'search-bible'"
+      class="come-up-1"
+      @close="page = ''"
+    />
+
+    <!-- LIBRARY SECTION-->
+    <PersonalLibrary
+      v-else-if="page === 'library'"
+      class="come-up-1"
+      :page="libraryPage"
+      @close="page = ''"
+    />
+
+    <!-- LIBRARY SECTION-->
+    <AddAlert
+      v-else-if="page === 'alert'"
+      class="come-up-1"
+      @close="page = ''"
+    />
+
+    <!-- COUNTDOWN SECTION-->
+    <AddCountdown
+      v-else-if="page === 'countdown'"
+      class="come-up-1"
+      @close="page = ''"
+    />
+    <!-- </Transition> -->
   </AppSection>
 </template>
 
