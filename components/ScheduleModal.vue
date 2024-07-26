@@ -66,11 +66,35 @@
           <UButton
             block
             class="h-[170px] bg-primary-100 dark:bg-primary-300 border border-primary-100 dark:border-primary-500 hover:bg-primary-100 dark:hover:bg-primary-400 hover:border-primary-500 transition-all flex-col gap-4 text-primary-500"
-            @click="createNewSchedule()"
+            @click="newScheduleVisible = !newScheduleVisible"
           >
             <PlusIcon />
             <div>New Schedule</div>
           </UButton>
+
+          <Transition name="fade-sm">
+            <div v-if="newScheduleVisible" class="schedules-ctn mt-2 mb-8">
+              <form
+                class="schedules flex items-end mt-4 overflow-auto gap-2"
+                @submit.prevent="createNewSchedule()"
+              >
+                <UFormGroup label="New Schedule Name" size="lg" class="flex-1">
+                  <UInput
+                    :placeholder="testScheduleName"
+                    v-model="scheduleName"
+                  />
+                </UFormGroup>
+                <UButton
+                  type="submit"
+                  class="h-[40px]"
+                  size="sm"
+                  icon="i-bx-save"
+                >
+                  Save Schedule
+                </UButton>
+              </form>
+            </div>
+          </Transition>
 
           <div class="schedules-ctn mt-6">
             <p class="text-sm text-gray-400">Recent schedules</p>
@@ -113,6 +137,10 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const { schedules } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
+const scheduleName = ref<string>("")
+const testScheduleName = ref<string>(
+  `CoW Schedule ${new Date().toLocaleDateString("en-GB")}`
+)
 
 const props = defineProps<{
   visible: boolean
@@ -121,6 +149,7 @@ const props = defineProps<{
 
 const visible = ref<boolean>(props.visible)
 const searchVisible = ref<boolean>(false)
+const newScheduleVisible = ref<boolean>(true)
 const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const copied = ref<boolean>(false)
@@ -149,7 +178,7 @@ const createNewSchedule = () => {
   const scheduleId = useObjectID()
   const schedule: Schedule = {
     _id: scheduleId,
-    name: `CoW Untitled Schedule ${appStore.schedules.length + 1}`,
+    name: scheduleName.value?.trim() || testScheduleName.value,
     authorId: authStore?.user?._id as string,
     editorIds: [],
     churchId: authStore?.user?.churchId as string,
@@ -164,6 +193,7 @@ const createNewSchedule = () => {
   })
 
   appStore.setActiveSchedule(schedule)
+  scheduleName.value = ""
 
   emit("close")
 }
