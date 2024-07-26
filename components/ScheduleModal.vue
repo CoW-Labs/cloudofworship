@@ -159,6 +159,7 @@ watch(
   () => {
     visible.value = props.visible
     if (visible.value) {
+      uploadBatchSchedules()
       retrieveSchedules()
     }
   }
@@ -173,6 +174,13 @@ const searchedSchedules = computed(() => {
     return schedule.name.toLowerCase().includes(searchInput.value.toLowerCase())
   })
 })
+
+const createScheduleOnline = async (schedule: Schedule) => {
+  return useAPIFetch(`/church/${authStore.user?.churchId}/schedules`, {
+    method: "POST",
+    body: schedule,
+  })
+}
 
 const createNewSchedule = () => {
   const scheduleId = useObjectID()
@@ -198,6 +206,20 @@ const createNewSchedule = () => {
   emit("close")
 }
 
+const uploadBatchSchedules = async () => {
+  const schedules = appStore.schedules
+  const tempSchedules = schedules.filter((schedule) => !schedule.lastUpdated)
+  if (tempSchedules.length === 0) {
+    return
+  }
+  appStore.setSlidesLoading(true)
+  await Promise.all(
+    tempSchedules.map((schedule) => createScheduleOnline(schedule))
+  )
+  appStore.setSlidesLoading(false)
+  retrieveSchedules()
+}
+
 const retrieveSchedules = async () => {
   appStore.setSlidesLoading(true)
   const schedulesPromise = await useAPIFetch(
@@ -213,6 +235,12 @@ const retrieveSchedules = async () => {
     const dateA = new Date(scheduleA?.updatedAt)
     const dateB = new Date(scheduleB?.updatedAt)
     return dateB?.getTime() - dateA?.getTime()
+  })
+
+  mergedSchedules?.sort((scheduleA, scheduleB) => {
+    const containsScheduleA = Number(!!scheduleA?.lastUpdated)
+    const containsScheduleB = Number(!!scheduleB?.lastUpdated)
+    return containsScheduleA - containsScheduleB
   })
   appStore.setSchedules(mergedSchedules)
   appStore.setSlidesLoading(false)
