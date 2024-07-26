@@ -244,7 +244,22 @@
     />
     <div
       v-else
-      class="h-[100%] relative text-white bg-primary-900 bg-cover bg-no-repeat transition-all rounded-b-md overflow-hidden"
+      class="h-[100%] relative text-white bg-primary-900 bg-no-repeat transition-all rounded-b-md overflow-hidden"
+      :class="{
+        'bg-center bg-cover':
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
+        'bg-top bg-cover':
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.cropTop,
+        'bg-bottom bg-cover':
+          slide?.slideStyle?.backgroundFillType ===
+          backgroundFillTypes.cropBottom,
+        'bg-center bg-contain':
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
+        'bg-center bg-stretch':
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.stretch,
+        // 'bg-center':
+        //   slide?.slideStyle?.backgroundFillType === backgroundFillTypes.center,
+      }"
       :style="useSlideBackground(slide)"
     >
       <!-- VIDEO BACKGROUND -->

@@ -169,9 +169,11 @@ export const backgroundTypes = {
 
 export const backgroundFillTypes = {
   fit: 'Fit',
-  crop: 'Crop',
   stretch: 'Stretch',
-  center: 'Center',
+  crop: 'Crop',
+  cropTop: 'Crop (Top)',
+  cropBottom: 'Crop (Bottom)',
+  // center: 'Center',
 }
 
 export const bibleBooks = [
