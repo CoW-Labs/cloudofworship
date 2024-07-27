@@ -7,8 +7,8 @@
     :ui="{
       base: 'bg-green-500 z-1000',
       ring: 'ring-0',
-      background: 'bg-red-500 border-0',
-      wrapper: 'bg-red-500',
+      background:
+        'border-0 px-6 py-4 bg-transparent dark:bg-transparent shadow-none',
     }"
   >
     <button
