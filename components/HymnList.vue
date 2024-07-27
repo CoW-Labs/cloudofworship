@@ -150,6 +150,9 @@ const getHymns = (query: string = "") => {
 getAllHymns()
 
 const isHymnAvailable = computed(() => {
+  if (searchInput.value?.trim() === "") {
+    return true
+  }
   const isHymnTitleInResult = !!hymns.value?.find((hymn) =>
     hymn.title.toLowerCase().includes(searchInput.value.toLowerCase())
   )

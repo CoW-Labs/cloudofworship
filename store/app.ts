@@ -76,21 +76,21 @@ export const useAppStore = defineStore('app', {
     },
     setActiveSchedule(schedule: Schedule) {
       this.activeSchedule = schedule
-      const existingSchedule = this.schedules.find(sch => sch._id === schedule._id)
+      const existingSchedule = this.schedules.find(sch => sch?._id === schedule?._id)
       if (!existingSchedule) {
         this.schedules.push(schedule)
       } else {
-        this.schedules.splice(this.schedules.findIndex(sch => sch._id === schedule._id), 1, schedule)
+        this.schedules.splice(this.schedules.findIndex(sch => sch?._id === schedule?._id), 1, schedule)
       }
     },
     appendActiveSlide(slide: Slide, position?: number) {
-      if (!this.activeSlides.find(s => s.id === slide.id)) {
+      if (!this.activeSlides.find(s => s?.id === slide?.id)) {
         if (position && position >= 0) {
           this.activeSlides.splice(position, 0, slide)
         } else {
           this.activeSlides.push(slide)
         }
-        this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+        this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide?.id)))
       }
     },
     appendActiveSlides(slides: Array<Slide>) {

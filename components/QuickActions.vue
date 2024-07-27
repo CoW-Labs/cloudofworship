@@ -2,7 +2,7 @@
   <AppSection
     heading="Quick Actions"
     :sub-heading="searchInput.length < 2 ? page?.replace('-', ' ') : 'Search'"
-    class="max-w-[330px] relative overflow-visible"
+    class="max-w-[330px] relative overflow-visible z-20"
     @header-click="searchInput.length < 2 ? (page = '') : (searchInput = '')"
   >
     <!-- <Transition name="fade-sm" -->
