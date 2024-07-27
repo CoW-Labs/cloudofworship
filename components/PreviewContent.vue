@@ -98,6 +98,13 @@ const countdownTimeLeft = ref<number>(0)
 watch(
   slides,
   (newVal, oldVal) => {
+    const isActiveSlideInActiveSchedule = activeSlides.value
+      ?.filter((slide) => slide.scheduleId === appStore.activeSchedule?._id)
+      ?.find((slide) => slide.id === activeSlide.value?.id)
+    if (!isActiveSlideInActiveSchedule) {
+      activeSlide.value = undefined
+    }
+
     setTimeout(() => {
       // Scroll down to newest slide on slide create
       const slideId = activeSlide.value?.id
@@ -337,16 +344,38 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
       if (
         slide.backgroundType === backgroundTypes.video &&
         (slide.backgroundVideoKey === "video-bg-1" ||
+          slide.backgroundVideoKey === "/video-bg-1.mp4" ||
           slide.backgroundVideoKey === "video-bg-2" ||
+          slide.backgroundVideoKey === "/video-bg-2.mp4" ||
           slide.backgroundVideoKey === "video-bg-3" ||
+          slide.backgroundVideoKey === "/video-bg-3.mp4" ||
           slide.backgroundVideoKey === "video-bg-4" ||
+          slide.backgroundVideoKey === "/video-bg-4.mp4" ||
           slide.backgroundVideoKey === "video-bg-5" ||
-          slide.backgroundVideoKey === "video-bg-6")
+          slide.backgroundVideoKey === "/video-bg-5.mp4" ||
+          slide.backgroundVideoKey === "video-bg-6" ||
+          slide.backgroundVideoKey === "/video-bg-6.mp4")
       ) {
         slide.background = appStore.backgroundVideos?.find(
           (bg) => bg.id === slide.backgroundVideoKey
         )?.url
+        // console.log(
+        //   appStore.backgroundVideos?.find(
+        //     (bg) => bg.id === slide.backgroundVideoKey
+        //   )?.url
+        // )
+      } else if (
+        slide.backgroundType === backgroundTypes.image &&
+        slide.background?.includes("blob:")
+      ) {
+        const previousBackground = appStore.activeSlides.find(
+          (s) => s.id === slide.id
+        )?.background
+        if (previousBackground) {
+          slide.background = previousBackground
+        }
       } else {
+        // console.log("not found")
       }
     })
     appStore.setActiveSlides(
@@ -1073,6 +1102,9 @@ const removeFromSelectedSlides = (slideId: string) => {
 .slides-ctn {
   scroll-behavior: smooth;
 }
+/* .slides-ctn * {
+  position: static;
+} */
 .slides-ctn-3-rows {
   height: 336px;
 }

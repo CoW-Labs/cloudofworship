@@ -66,11 +66,35 @@
           <UButton
             block
             class="h-[170px] bg-primary-100 dark:bg-primary-300 border border-primary-100 dark:border-primary-500 hover:bg-primary-100 dark:hover:bg-primary-400 hover:border-primary-500 transition-all flex-col gap-4 text-primary-500"
-            @click="createNewSchedule()"
+            @click="newScheduleVisible = !newScheduleVisible"
           >
             <PlusIcon />
             <div>New Schedule</div>
           </UButton>
+
+          <Transition name="fade-sm">
+            <div v-if="newScheduleVisible" class="schedules-ctn mt-2 mb-8">
+              <form
+                class="schedules flex items-end mt-4 overflow-auto gap-2"
+                @submit.prevent="createNewSchedule()"
+              >
+                <UFormGroup label="New Schedule Name" size="lg" class="flex-1">
+                  <UInput
+                    :placeholder="testScheduleName"
+                    v-model="scheduleName"
+                  />
+                </UFormGroup>
+                <UButton
+                  type="submit"
+                  class="h-[40px]"
+                  size="sm"
+                  icon="i-bx-save"
+                >
+                  Save Schedule
+                </UButton>
+              </form>
+            </div>
+          </Transition>
 
           <div class="schedules-ctn mt-6">
             <p class="text-sm text-gray-400">Recent schedules</p>
@@ -113,6 +137,10 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const { schedules } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
+const scheduleName = ref<string>("")
+const testScheduleName = ref<string>(
+  `CoW Schedule ${new Date().toLocaleDateString("en-GB")?.replaceAll("/", "-")}`
+)
 
 const props = defineProps<{
   visible: boolean
@@ -121,6 +149,7 @@ const props = defineProps<{
 
 const visible = ref<boolean>(props.visible)
 const searchVisible = ref<boolean>(false)
+const newScheduleVisible = ref<boolean>(true)
 const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const copied = ref<boolean>(false)
@@ -130,6 +159,7 @@ watch(
   () => {
     visible.value = props.visible
     if (visible.value) {
+      uploadBatchSchedules()
       retrieveSchedules()
     }
   }
@@ -145,11 +175,18 @@ const searchedSchedules = computed(() => {
   })
 })
 
+const createScheduleOnline = async (schedule: Schedule) => {
+  return useAPIFetch(`/church/${authStore.user?.churchId}/schedules`, {
+    method: "POST",
+    body: schedule,
+  })
+}
+
 const createNewSchedule = () => {
   const scheduleId = useObjectID()
   const schedule: Schedule = {
     _id: scheduleId,
-    name: `CoW Untitled Schedule ${appStore.schedules.length + 1}`,
+    name: scheduleName.value?.trim() || testScheduleName.value,
     authorId: authStore?.user?._id as string,
     editorIds: [],
     churchId: authStore?.user?.churchId as string,
@@ -164,8 +201,23 @@ const createNewSchedule = () => {
   })
 
   appStore.setActiveSchedule(schedule)
+  scheduleName.value = ""
 
   emit("close")
+}
+
+const uploadBatchSchedules = async () => {
+  const schedules = appStore.schedules
+  const tempSchedules = schedules.filter((schedule) => !schedule.lastUpdated)
+  if (tempSchedules.length === 0) {
+    return
+  }
+  appStore.setSlidesLoading(true)
+  await Promise.all(
+    tempSchedules.map((schedule) => createScheduleOnline(schedule))
+  )
+  appStore.setSlidesLoading(false)
+  retrieveSchedules()
 }
 
 const retrieveSchedules = async () => {
@@ -180,9 +232,15 @@ const retrieveSchedules = async () => {
   )
 
   mergedSchedules?.sort((scheduleA, scheduleB) => {
-    const dateA = new Date(scheduleA.updatedAt)
-    const dateB = new Date(scheduleB.updatedAt)
-    return dateB.getTime() - dateA.getTime()
+    const dateA = new Date(scheduleA?.updatedAt)
+    const dateB = new Date(scheduleB?.updatedAt)
+    return dateB?.getTime() - dateA?.getTime()
+  })
+
+  mergedSchedules?.sort((scheduleA, scheduleB) => {
+    const containsScheduleA = Number(!!scheduleA?.lastUpdated)
+    const containsScheduleB = Number(!!scheduleB?.lastUpdated)
+    return containsScheduleA - containsScheduleB
   })
   appStore.setSchedules(mergedSchedules)
   appStore.setSlidesLoading(false)
@@ -203,11 +261,11 @@ const deleteScheduleOnline = async (scheduleId: string) => {
 const deleteSchedule = (scheduleId: string) => {
   let updatedScheduleList: Schedule[] = [...appStore.schedules]
   updatedScheduleList = updatedScheduleList.filter(
-    (sch) => sch._id !== scheduleId
+    (sch) => sch?._id !== scheduleId
   )
 
   if (scheduleId === appStore.activeSchedule?._id) {
-    appStore.setActiveSchedule(updatedScheduleList?.at(-1))
+    appStore.setActiveSchedule(updatedScheduleList?.at(0))
   }
   appStore.setSchedules(updatedScheduleList)
 

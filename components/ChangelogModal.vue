@@ -50,12 +50,16 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `
-- You can now duplicate Bible slides.
-- Section to preview verses maintain scroll position of selected verse.
-- Added new songs for your convenience. Enjoy!
-- Fixed plausible issue with Bible version lag—might reoccur. Please report if you see this.
-- Fixed minor bugs and issues for improved experience`
+const changelog = `- Increased Default Alert Count
+	- Resolved various issues affecting the text slide editor for a smoother editing experience.
+	- Added a feature to allow custom titles in schedules, enhancing personalization and organization.
+	- Implemented functionality to refresh songs from local or remote databases, ensuring up-to-date content.
+	- Addressed issues with jittery layouts when adding new slides, particularly media slides, for a more stable user interface.
+	- Made visible changes to background fill types in previews to improve visual feedback.
+	- Fixed issues with missing backgrounds upon reload or refresh, ensuring consistent presentation design.
+	- Enhanced the preview feature to make previewing verses more intuitive and user-friendly.
+	- Introduced the ability to upload batch schedules when online, streamlining the scheduling process.
+	- Corrected layout shifts occurring when the “not found” banner is active, maintaining layout integrity.`
 
 const appStore = useAppStore()
 

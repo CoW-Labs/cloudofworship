@@ -217,6 +217,7 @@
         v-else-if="slide"
         :slide="slide"
         @update-style="onUpdateSlideStyle"
+        @update-song-lyrics="onUpdateSongLyrics($event)"
         @update-font="onUpdateSlideStyle({ ...slide.slideStyle, font: $event })"
         @update-media-seek-position="
           onUpdateMediaSeekPosition({
@@ -243,7 +244,22 @@
     />
     <div
       v-else
-      class="h-[100%] relative text-white bg-primary-900 bg-cover bg-no-repeat transition-all rounded-b-md overflow-hidden"
+      class="h-[100%] relative text-white bg-primary-900 bg-no-repeat transition-all rounded-b-md overflow-hidden"
+      :class="{
+        'bg-center bg-cover':
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
+        'bg-top bg-cover':
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.cropTop,
+        'bg-bottom bg-cover':
+          slide?.slideStyle?.backgroundFillType ===
+          backgroundFillTypes.cropBottom,
+        'bg-center bg-contain':
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
+        'bg-center bg-stretch':
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.stretch,
+        // 'bg-center':
+        //   slide?.slideStyle?.backgroundFillType === backgroundFillTypes.center,
+      }"
       :style="useSlideBackground(slide)"
     >
       <!-- VIDEO BACKGROUND -->
@@ -268,7 +284,7 @@
 
 <script setup lang="ts">
 import type { Editor } from "@tiptap/core"
-import type { Slide, SlideStyle } from "~/types"
+import type { Slide, SlideStyle, Song } from "~/types"
 
 const props = defineProps<{
   slide: Slide
@@ -382,6 +398,31 @@ const onUpdateMediaSeekPosition = (slideStyle: SlideStyle) => {
   setTimeout(() => {
     onUpdateSlideStyle({ ...slideStyle, mediaSeekPosition: -1 })
   }, 5000)
+}
+
+const onUpdateSongLyrics = (song: Song) => {
+  const tempSlide: Slide = {
+    title: song.title,
+    ...props.slide,
+    data: song,
+  }
+  const currentSongVerseNumber = Number(verse.value?.split(" ")?.[1])
+  const currentSongVerse = song.verses?.[currentSongVerseNumber - 1]
+
+  tempSlide.name = useSlideName(tempSlide)
+  let fontSize = useScreenFontSize(currentSongVerse || "")
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: Number(fontSize),
+  }
+  tempSlide.data = song
+  tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
+  emit("slide-update", tempSlide)
+  // console.log(verse.value)
+  useToast().add({
+    icon: "i-bx-music",
+    title: "Song lyrics updated",
+  })
 }
 </script>
 

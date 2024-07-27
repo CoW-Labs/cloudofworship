@@ -9,12 +9,15 @@
         'bg-cover': slide?.type !== slideTypes.media,
         'bg-center bg-cover':
           slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
+        'bg-top bg-cover':
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.cropTop,
+        'bg-bottom bg-cover':
+          slide?.slideStyle?.backgroundFillType ===
+          backgroundFillTypes.cropBottom,
         'bg-center bg-contain':
           slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
-        'bg-center bg-fixed bg-stretch':
+        'bg-center bg-stretch':
           slide?.slideStyle?.backgroundFillType === backgroundFillTypes.stretch,
-        'bg-center bg-repeat':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.center,
       }"
       @dblclick="activateFullScreen()"
       :style="useSlideBackground(slide)"

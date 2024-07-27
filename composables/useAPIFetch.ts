@@ -1,7 +1,7 @@
-import {useFetch} from "#app";
-import {UseFetchOptions, useOnline, useDebounceFn} from "@vueuse/core";
-import {useAuthStore} from "~/store/auth";
-import {useAppStore} from "~/store/app";
+import { useFetch } from "#app";
+import { UseFetchOptions, useOnline, useDebounceFn } from "@vueuse/core";
+import { useAuthStore } from "~/store/auth";
+import { useAppStore } from "~/store/app";
 
 type useFetchType = typeof useFetch;
 
@@ -34,7 +34,8 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
     Authorization: `Bearer ${token.value}`,
   };
 
-  options.onResponseError = ({response}) => {
+  options.onResponseError = ({ response }) => {
+    appStore.setSlidesLoading(false);
     if (response.status === 401) {
       authStore.signOut();
       toast.add({
@@ -56,9 +57,10 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
   if (!online.value) {
     // Track failed POST/PUT requests
     if (options.method === "POST" || options.method === "PUT") {
-      appStore.setFailedUploadRequests({path: path as string, options});
+      appStore.setFailedUploadRequests({ path: path as string, options });
       addErrorInDevEnvironment(`, ${path}: Failed, cause: offline`);
     }
+    appStore.setSlidesLoading(false);
     throw new Error("No internet connection");
   }
 

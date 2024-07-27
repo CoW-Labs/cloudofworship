@@ -56,7 +56,12 @@
       <!-- SEARCHING SONGS -->
       <div
         v-else
-        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+        class="actions-ctn mt-2 overflow-y-auto"
+        :class="
+          searchInput.length >= 4
+            ? 'max-h-[calc(100vh-350px)]'
+            : 'max-h-[calc(100vh-190px)]'
+        "
       >
         <SongCard
           v-for="(hymn, index) in hymns"
@@ -145,6 +150,9 @@ const getHymns = (query: string = "") => {
 getAllHymns()
 
 const isHymnAvailable = computed(() => {
+  if (searchInput.value?.trim() === "") {
+    return true
+  }
   const isHymnTitleInResult = !!hymns.value?.find((hymn) =>
     hymn.title.toLowerCase().includes(searchInput.value.toLowerCase())
   )

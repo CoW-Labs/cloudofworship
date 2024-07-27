@@ -5,7 +5,12 @@
     @click="$emit('select', schedule)"
   >
     <div class="title-and-date">
-      <div class="title font-medium text-start">{{ schedule?.name }}</div>
+      <div class="title font-medium text-start flex items-center gap-2">
+        {{ schedule?.name }}
+        <UTooltip v-if="!schedule?.lastUpdated" text="Offline. Yet to sync">
+          <Icon name="i-tabler-cloud-off" class="w-4 h-4 text-gray-500" />
+        </UTooltip>
+      </div>
       <div class="flex items-center gap-2 mt-1">
         <UAvatar
           :text="scheduleAuthor?.fullname?.split(' ')?.[0]?.[0]"
@@ -119,9 +124,9 @@ const props = defineProps<{
 const authStore = useAuthStore()
 
 const scheduleAuthor: User | null = computed(() => {
-  if (props.schedule.authorId) {
+  if (props.schedule?.authorId) {
     return authStore.church?.users?.find(
-      (user) => user._id === props.schedule.authorId
+      (user) => user._id === props.schedule?.authorId
     )
   }
   return null

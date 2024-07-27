@@ -122,6 +122,7 @@ const fileObjs = computed(() => {
 
 const addMediaEmitter = () => {
   emitter.emit("new-media", fileObjs.value)
+  files.value = []
   emit("close")
 }
 </script>

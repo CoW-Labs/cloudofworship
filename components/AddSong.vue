@@ -72,7 +72,8 @@ const authStore = useAuthStore()
 
 const addSong = async () => {
   const db = useIndexedDB()
-  const songId = useURLFriendlyString(`${title.value} ${artist.value}`)
+  const songId =
+    props?.song?.id || useURLFriendlyString(`${title.value} ${artist.value}`)
   const song: Song = {
     id: songId,
     title: title.value,

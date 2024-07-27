@@ -76,21 +76,21 @@ export const useAppStore = defineStore('app', {
     },
     setActiveSchedule(schedule: Schedule) {
       this.activeSchedule = schedule
-      const existingSchedule = this.schedules.find(sch => sch._id === schedule._id)
+      const existingSchedule = this.schedules.find(sch => sch?._id === schedule?._id)
       if (!existingSchedule) {
         this.schedules.push(schedule)
       } else {
-        this.schedules.splice(this.schedules.findIndex(sch => sch._id === schedule._id), 1, schedule)
+        this.schedules.splice(this.schedules.findIndex(sch => sch?._id === schedule?._id), 1, schedule)
       }
     },
     appendActiveSlide(slide: Slide, position?: number) {
-      if (!this.activeSlides.find(s => s.id === slide.id)) {
+      if (!this.activeSlides.find(s => s?.id === slide?.id)) {
         if (position && position >= 0) {
           this.activeSlides.splice(position, 0, slide)
         } else {
           this.activeSlides.push(slide)
         }
-        this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+        this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide?.id)))
       }
     },
     appendActiveSlides(slides: Array<Slide>) {
@@ -172,6 +172,44 @@ export const useAppStore = defineStore('app', {
     },
     setLastSynced(lastSynced: string) {
       this.lastSynced = lastSynced
+    },
+    signOut() {
+      this.setSchedules([])
+      this.setActiveSchedule(null)
+      this.setActiveSlides([])
+      this.setLiveOutputSlidesId([])
+      this.setLiveSlide('')
+      this.setEmitter(null)
+      this.setAppSettings({
+        appVersion: '0.1.0',
+        defaultBibleVersion: 'KJV',
+        defaultFont: 'Inter',
+        defaultBackground: {
+          hymn: {
+            backgroundType: "video",
+            background: '/video-bg-1.mp4',
+            backgroundVideoKey: '/video-bg-1.mp4'
+          },
+          bible: {
+            backgroundType: "video",
+            background: '/video-bg-3.mp4',
+            backgroundVideoKey: '/video-bg-3.mp4'
+          },
+          text: {
+            backgroundType: "video",
+            background: '/video-bg-4.mp4',
+            backgroundVideoKey: '/video-bg-4.mp4'
+          }
+        },
+        slideStyles: { blur: 0.5, brightness: 50 } as SlideStyle
+      })
+      this.setBackgroundVideos([])
+      this.setAlerts([])
+      this.setActiveAlert(null)
+      this.setRecentBibleSearches([])
+      this.setFailedUploadRequests([])
+      this.setSlidesLoading(false)
+      this.setLastSynced(new Date().toISOString())
     }
   },
   persist: {

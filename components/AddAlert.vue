@@ -136,7 +136,7 @@ const deleteAlert = (alert: Alert) => {
 }
 
 const addAlert = async () => {
-  if (alerts.value?.length >= 3) {
+  if (alerts.value?.length >= 5) {
     toast.add({
       icon: "i-bx-error-circle",
       title: "Maximum alerts exceeded. Delete alert to add more.",

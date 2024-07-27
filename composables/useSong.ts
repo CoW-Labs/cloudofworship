@@ -10,6 +10,12 @@ const addIdToReturnedSongs = (songs: Array<Song>) => {
   }))
 }
 
+/**
+ * 
+ * @param song 
+ * @param linesPerDisplay 
+ * @returns 
+ */
 const useSong = async (song: Song | string, linesPerDisplay: number = 4): Promise<Song | null> => {
   const toast = useToast()
   const authStore = useAuthStore()
@@ -24,7 +30,7 @@ const useSong = async (song: Song | string, linesPerDisplay: number = 4): Promis
       song = (data?.content as Song)
     } else if (typeof song === 'string') {
       // If [song] param comes as an ID, retrieve song obj from remote backend first
-      const { data, error } = await useAPIFetch(`/church/${authStore?.user?.churchId}/song/${song}`)
+      const { data, error } = await useAPIFetch(`/church/${authStore?.user?.churchId}/songs/${song}`)
       if (error.value) {
         throw new Error(error.value?.message)
       } else {
