@@ -1,5 +1,39 @@
 <template>
-  <div v-if="!loadingResources" class="app-ctn max-h-[100vh] overflow-hidden">
+  <div
+    v-if="!loadingResources"
+    class="app-ctn max-h-[100vh] overflow-hidden text"
+  >
+    <!-- TODO: Remove this banner after 0.7.9 and make it a component -->
+    <div
+      v-if="
+        appStore.bannerVisible &&
+        (appVersion === '0.7.6' ||
+          appVersion === '0.7.7' ||
+          appVersion === '0.7.8')
+      "
+      class="banner text-center text-sm h-[40px] bg-[#FF8980] text-black items-center flex justify-between gap-1"
+    >
+      <UButton variant="ghost" class="pointer-events-none opacity-0 w-8 h-8">
+        <IconWrapper name="i-mdi-close" class="w-4 h-4" />
+      </UButton>
+      <div class="text">
+        Cloud of Worship is moving to
+        <a
+          class="border-b font-bold border-black"
+          href="http://app.cloudofworship.com"
+          >app.cloudofworship.com</a
+        >. All your synced slides and schedules will be migrated to the new
+        domain.
+      </div>
+      <UButton
+        variant="ghost"
+        @click="appStore.setBannerVisible(false)"
+        color="black"
+        class="p-0 flex items-center justify-center w-8 h-8 mb-2 mr-2"
+      >
+        <IconWrapper name="i-mdi-close" class="w-4 h-4 text-black p-0" />
+      </UButton>
+    </div>
     <Navbar :app-version="appVersion" :online="isAppOnline" />
     <slot />
     <FullScreenLoader v-if="fullScreenLoading" />
