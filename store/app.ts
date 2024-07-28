@@ -59,7 +59,8 @@ export const useAppStore = defineStore('app', {
       recentBibleSearches: [] as string[],
       failedUploadRequests: [] as { path: string, options: any }[],
       slidesLoading: false as boolean,
-      lastSynced: new Date().toISOString() as string
+      lastSynced: new Date().toISOString() as string,
+      bannerVisible: true as boolean,
     }
   },
   getters: {
@@ -69,7 +70,7 @@ export const useAppStore = defineStore('app', {
     setSchedules(schedules: Schedule[]) {
       this.schedules = schedules
       if (this.activeSchedule) {
-        const tempSchedule = schedules.find(sch => sch._id === this.activeSchedule?._id) as Schedule
+        const tempSchedule = schedules.find(sch => sch?._id === this.activeSchedule?._id) as Schedule
         // console.log("tempSchedule", tempSchedule)
         this.activeSchedule = tempSchedule
       }
@@ -172,6 +173,9 @@ export const useAppStore = defineStore('app', {
     },
     setLastSynced(lastSynced: string) {
       this.lastSynced = lastSynced
+    },
+    setBannerVisible(bannerVisible: boolean) {
+      this.bannerVisible = bannerVisible
     },
     signOut() {
       this.setSchedules([])
