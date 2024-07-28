@@ -6,7 +6,6 @@
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     data-v-inspector="components/Logo.vue:2:3"
-    class="w-[38px]"
   >
     <path
       fill-rule="evenodd"

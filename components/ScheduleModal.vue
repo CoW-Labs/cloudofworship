@@ -109,7 +109,9 @@
               />
               <ScheduleCard
                 v-else
-                v-for="schedule in searchedSchedules"
+                v-for="schedule in searchedSchedules?.filter(
+                  (schedule) => schedule?.name?.trim().length > 0
+                )"
                 :key="schedule?._id"
                 :schedule="schedule"
                 @select="(schedule: Schedule) => {
@@ -208,7 +210,7 @@ const createNewSchedule = () => {
 
 const uploadBatchSchedules = async () => {
   const schedules = appStore.schedules
-  const tempSchedules = schedules.filter((schedule) => !schedule.lastUpdated)
+  const tempSchedules = schedules.filter((schedule) => !schedule?.lastUpdated)
   if (tempSchedules.length === 0) {
     return
   }
