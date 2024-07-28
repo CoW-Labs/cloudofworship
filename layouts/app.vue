@@ -20,6 +20,7 @@
         Cloud of Worship is moving to
         <a
           class="border-b font-bold border-black"
+          target="_blank"
           href="http://app.cloudofworship.com"
           >app.cloudofworship.com</a
         >. All your synced slides and schedules will be migrated to the new
