@@ -26,6 +26,6 @@ logs
 !.env.example
 
 # local large assets
-# large_assets
+large_assets
 
 bible-json-converter.ts

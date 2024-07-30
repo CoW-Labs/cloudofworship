@@ -124,6 +124,7 @@
             'Loading NKJV Bible...',
             'Loading NIV Bible...',
             'Loading AMP Bible...',
+            'Loading NLT Bible...',
             'Loading Hymns...',
             // 'Loading background videos...',
             'Finishing up',
@@ -304,10 +305,18 @@ const downloadEssentialResources = async () => {
     db.bibleAndHymns.add(tempBibleVersion("AMP", ampBible))
   }
 
+  // Download NLT Bible
+  tempBible = await db.bibleAndHymns.get("NLT")
+  if (!tempBible) {
+    downloadProgress.value = 7
+    const nltBible = await useS3File("nlt.json")
+    db.bibleAndHymns.add(tempBibleVersion("NLT", nltBible))
+  }
+
   // Download all hymns
   tempBible = await db.bibleAndHymns.get("hymns")
   if (!tempBible) {
-    downloadProgress.value = 7
+    downloadProgress.value = 8
     const hymns = await useS3File("hymns.json")
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
   }
@@ -326,7 +335,7 @@ const downloadEssentialResources = async () => {
   // }
 
   // All computations completed
-  downloadProgress.value = 8
+  downloadProgress.value = 9
 
   setTimeout(() => {
     loadingResources.value = false

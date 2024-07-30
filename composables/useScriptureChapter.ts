@@ -33,6 +33,11 @@ const useScriptureChapter = async (label: string = '1:1', version: string = ''):
         verses = ampBible?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter)
         appStore.setDefaultBibleVersion(version)
         break
+      case 'NLT':
+        const nltBible = (await db.bibleAndHymns.get('NLT'))?.data as unknown as BibleVerse[]
+        verses = nltBible?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter)
+        appStore.setDefaultBibleVersion(version)
+        break
       default:
         const kjvBible = (await db.bibleAndHymns.get('KJV'))?.data as unknown as BibleVerse[]
         verses = kjvBible?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter)
