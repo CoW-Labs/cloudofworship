@@ -7,7 +7,12 @@
   >
     <!-- <Transition name="fade-sm" -->
     <!-- ACTIONS HOME SECTION -->
-    <div v-if="page === ''" class="main come-up-1" ref="quickActions">
+    <div
+      v-if="page === ''"
+      class="main come-up-1"
+      ref="quickActions"
+      tabindex="1"
+    >
       <div class="flex gap-2">
         <UInput
           icon="i-bx-search"
@@ -262,6 +267,7 @@ emitter.on("new-countdown", () => {
 })
 
 onMounted(() => {
+  // console.log("mounted", quickActions.value)
   quickActions.value?.addEventListener("keydown", (e) => {
     if (e.defaultPrevented) {
       e.preventDefault()
@@ -269,18 +275,26 @@ onMounted(() => {
     }
     switch (e.key) {
       case "ArrowDown":
+        // console.log("down")
         focusedActionIndex.value < searchedActions.value.length - 1
           ? (focusedActionIndex.value += 1)
           : null
         break
       case "ArrowUp":
+        // console.log("up")
         focusedActionIndex.value > 0 ? (focusedActionIndex.value -= 1) : null
         break
       case "Enter":
-        const action = searchedActions.value?.[focusedActionIndex.value]
+        const action = searchedActions.value?.[
+          focusedActionIndex.value
+        ] as unknown as QuickAction
         useGlobalEmit(
           action?.action,
-          `${action?.bibleBookIndex}:${bibleChapterAndVerse.value}`
+          action?.type === slideTypes.bible
+            ? `${action?.bibleBookIndex}:${bibleChapterAndVerse.value}`
+            : action?.type === slideTypes.hymn
+            ? action?.hymnIndex
+            : ""
         )
         break
       default:
