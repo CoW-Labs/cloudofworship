@@ -301,10 +301,10 @@ const mergeSlides = (
 }
 
 const uploadOfflineSlides = async () => {
-  // Retrieve all offline slides
-  const offlineSlides = appStore.activeSlides.filter(
-    (slide) => slide._id === undefined
-  )
+  // Retrieve all offline slides (with a scheduleId)
+  const offlineSlides = appStore.activeSlides
+    .filter((slide) => slide._id === undefined)
+    ?.filter((slide) => slide.scheduleId)
   if (offlineSlides.length > 0) {
     const uploadedSlides = await batchCreateSlideOnline(offlineSlides)
     // console.log("uploadedSlides", uploadedSlides)
