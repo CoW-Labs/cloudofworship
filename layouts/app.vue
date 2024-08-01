@@ -106,29 +106,44 @@
     v-else
     class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center dark:bg-gray-900"
   >
-    <div class="wrapper flex flex-col gap-2">
+    <div class="wrapper flex flex-col gap-6">
       <div class="logo flex items-center justify-center mb-6 gap-2">
         <Logo class="w-[64px]" />
         <h1 class="text-2xl font-semibold">Cloud of Worship</h1>
       </div>
-      <div class="progress-wrapper text-center">
+      <div class="progress-wrapper text-center relative">
         <UProgress
           size="2xl"
           class="text-center"
-          :value="downloadProgress"
-          :max="[
-            'Initializing...',
-            'Setting up resources...', // also loading bg videos
-            'Compiling slides and schedules...',
-            'Loading KJV Bible...',
-            'Loading NKJV Bible...',
-            'Loading NIV Bible...',
-            'Loading AMP Bible...',
-            'Loading Hymns...',
-            // 'Loading background videos...',
-            'Finishing up',
-          ]"
+          :value="parseInt(downloadProgress)"
+          :max="100"
         />
+        <UProgress
+          v-show="downloadStep === 2"
+          size="2xl"
+          class="text-center absolute top-0 left-0 opacity-50"
+          color="white"
+        />
+        <div
+          v-if="downloadStep !== 9"
+          class="text-md font-semibold w-[300px] flex items-center justify-between mt-4"
+        >
+          <span class="font-normal">
+            <div class="text-left">Loading {{ downloadResource }}</div>
+            <div class="opacity-50 text-left">
+              This might take a while
+            </div></span
+          >
+          <span>{{ parseInt(downloadProgress) }}%</span>
+        </div>
+        <div
+          v-else
+          class="text-md font-semibold w-[300px] flex items-center justify-center mt-4"
+        >
+          <span class="font-normal">
+            {{ downloadResource }}
+          </span>
+        </div>
       </div>
     </div>
   </div>
@@ -158,7 +173,9 @@ const online = useOnline()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const loadingResources = ref<boolean>(true)
-const downloadProgress = ref<number>(5)
+const downloadStep = ref<number>(0)
+const downloadResource = ref<string>("")
+const downloadProgress = ref<string>("0")
 const fullScreenLoading = ref<boolean>(false)
 const cachedVideosURLs = ref<string[]>()
 const isOfflineToastOpen = ref<boolean>(false)
@@ -209,28 +226,58 @@ emitter.on("go-live", () => {
 const saveAllBackgroundVideos = async () => {
   const db = useIndexedDB()
   const savedBgVideos = await db.cached.count()
+
   if (savedBgVideos >= 6) {
     return
   }
-  const bgVideoPromise = await Promise.all([
-    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-1.mp4`),
-    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`),
-    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`),
-    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`),
-    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`),
-    fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`),
-    // fetch(`https://revaise.s3.us-east-2.amazonaws.com/video-bg-7.mp4`),
-  ])
-  // console.log("values", bgVideoPromise)
+
+  downloadResource.value = "background videos"
+  let bgVideoPromise1 = await useDetailedFetch(
+    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-1.mp4`,
+    downloadProgress
+  )
+  bgVideoPromise1 = await bgVideoPromise1.blob()
+
+  let bgVideoPromise2 = await useDetailedFetch(
+    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`,
+    downloadProgress
+  )
+  bgVideoPromise2 = await bgVideoPromise2.blob()
+
+  let bgVideoPromise3 = await useDetailedFetch(
+    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`,
+    downloadProgress
+  )
+  bgVideoPromise3 = await bgVideoPromise3.blob()
+
+  let bgVideoPromise4 = await useDetailedFetch(
+    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`,
+    downloadProgress
+  )
+  bgVideoPromise4 = await bgVideoPromise4.blob()
+
+  let bgVideoPromise5 = await useDetailedFetch(
+    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`,
+    downloadProgress
+  )
+  bgVideoPromise5 = await bgVideoPromise5.blob
+
+  let bgVideoPromise6 = await useDetailedFetch(
+    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`,
+    downloadProgress
+  )
+  bgVideoPromise6 = await bgVideoPromise6.blob()
+
   const bgVideoResponse = await Promise.all([
-    bgVideoPromise[0].blob(),
-    bgVideoPromise[1].blob(),
-    bgVideoPromise[2].blob(),
-    bgVideoPromise[3].blob(),
-    bgVideoPromise[4].blob(),
-    bgVideoPromise[5].blob(),
+    bgVideoPromise1,
+    bgVideoPromise2,
+    bgVideoPromise3,
+    bgVideoPromise4,
+    bgVideoPromise5,
+    bgVideoPromise6,
     // bgVideoPromise[6].blob(),
   ])
+
   bgVideoResponse.forEach((blob, index) => {
     const tempMedia: Media = {
       id: `/video-bg-${index + 1}.mp4`,
@@ -262,53 +309,67 @@ const downloadEssentialResources = async () => {
   const db = useIndexedDB()
 
   loadingResources.value = true
-  downloadProgress.value = 0
+  downloadStep.value = 0
 
   // Download background videos
-  downloadProgress.value = 1
+  downloadStep.value = 1
   await saveAllBackgroundVideos()
 
   // Download background videos
-  downloadProgress.value = 2
+  downloadStep.value = 2
   await retrieveSchedules()
 
   // Download KJV Bible
   let tempBible = await db.bibleAndHymns.get("KJV")
   if (!tempBible) {
-    downloadProgress.value = 3
-    const kjvBible = await useS3File("kjv.json")
+    downloadResource.value = "KJV Bible"
+    downloadStep.value = 3
+    const kjvBible = await useS3File("kjv.json", downloadProgress)
     db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
   }
 
   // Download NKJV Bible
   tempBible = await db.bibleAndHymns.get("NKJV")
   if (!tempBible) {
-    downloadProgress.value = 4
-    const nkjvBible = await useS3File("nkjv.json")
+    downloadResource.value = "NKJV Bible"
+    downloadStep.value = 4
+    const nkjvBible = await useS3File("nkjv.json", downloadProgress)
     db.bibleAndHymns.add(tempBibleVersion("NKJV", nkjvBible))
   }
 
   // Download NIV Bible
   tempBible = await db.bibleAndHymns.get("NIV")
   if (!tempBible) {
-    downloadProgress.value = 5
-    const nivBible = await useS3File("niv.json")
+    downloadResource.value = "NIV Bible"
+    downloadStep.value = 5
+    const nivBible = await useS3File("niv.json", downloadProgress)
     db.bibleAndHymns.add(tempBibleVersion("NIV", nivBible))
   }
 
   // Download AMP Bible
   tempBible = await db.bibleAndHymns.get("AMP")
   if (!tempBible) {
-    downloadProgress.value = 6
-    const ampBible = await useS3File("amp.json")
+    downloadResource.value = "AMP Bible"
+    downloadStep.value = 6
+    const ampBible = await useS3File("amp.json", downloadProgress)
     db.bibleAndHymns.add(tempBibleVersion("AMP", ampBible))
+  }
+
+  // Download NLT Bible
+  tempBible = await db.bibleAndHymns.get("NLT")
+  if (!tempBible) {
+    downloadResource.value = "NLT Bible"
+    downloadStep.value = 7
+    const nltBible = await useS3File("nlt.json", downloadProgress)
+    db.bibleAndHymns.add(tempBibleVersion("NLT", nltBible))
   }
 
   // Download all hymns
   tempBible = await db.bibleAndHymns.get("hymns")
   if (!tempBible) {
-    downloadProgress.value = 7
-    const hymns = await useS3File("hymns.json")
+    downloadResource.value = "hymns"
+    downloadStep.value = 8
+    const hymns = await useS3File("hymns.json", downloadProgress)
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
   }
 
@@ -326,7 +387,8 @@ const downloadEssentialResources = async () => {
   // }
 
   // All computations completed
-  downloadProgress.value = 8
+  downloadStep.value = 9
+  downloadResource.value = "All resources downloaded"
 
   setTimeout(() => {
     loadingResources.value = false
@@ -407,6 +469,8 @@ const getChurch = async () => {
 
 const retrieveSchedules = async () => {
   if (isAppOnline.value) {
+    downloadProgress.value = "0"
+    downloadResource.value = "schedules and slides"
     const schedulesPromise = await useAPIFetch(
       `/church/${authStore.user?.churchId}/schedules`
     )
@@ -422,6 +486,7 @@ const retrieveSchedules = async () => {
       return dateB?.getTime() - dateA?.getTime()
     })
     appStore.setSchedules(mergedSchedules)
+    downloadProgress.value = "100"
   }
 }
 

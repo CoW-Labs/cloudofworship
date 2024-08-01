@@ -54,7 +54,8 @@ export const useAppStore = defineStore('app', {
         'KJV': '',
         'NKJV': 'Scripture taken from the New King James Version®. Copyright © 1982 by Thomas Nelson. All rights reserved.',
         'NIV': 'Scriptures taken from the Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™ All rights reserved worldwide.',
-        'AMP': 'All Scripture quotations, unless otherwise indicated, are taken from the Amplified Bible, Copyright © 2015 by The Lockman Foundation.'
+        'AMP': 'All Scripture quotations, unless otherwise indicated, are taken from the Amplified Bible, Copyright © 2015 by The Lockman Foundation.',
+        'NLT': 'Scripture quotations marked (NLT) are taken from the Holy Bible, New Living Translation, copyright ©1996, 2004, 2015 by Tyndale House Foundation.'
       },
       recentBibleSearches: [] as string[],
       failedUploadRequests: [] as { path: string, options: any }[],

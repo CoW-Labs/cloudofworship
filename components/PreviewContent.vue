@@ -301,10 +301,10 @@ const mergeSlides = (
 }
 
 const uploadOfflineSlides = async () => {
-  // Retrieve all offline slides
-  const offlineSlides = appStore.activeSlides.filter(
-    (slide) => slide._id === undefined
-  )
+  // Retrieve all offline slides (with a scheduleId)
+  const offlineSlides = appStore.activeSlides
+    .filter((slide) => slide._id === undefined)
+    ?.filter((slide) => slide.scheduleId)
   if (offlineSlides.length > 0) {
     const uploadedSlides = await batchCreateSlideOnline(offlineSlides)
     // console.log("uploadedSlides", uploadedSlides)
@@ -711,8 +711,8 @@ const createNewMediaSlide = async (
   makeSlideActive(tempSlide)
   if (!options?.oneOfManySlides) {
     toast.add({ title: "Media slide created", icon: "i-bx-image" })
+    uploadOfflineSlides()
   }
-  uploadOfflineSlides()
 }
 
 const createMultipleNewMediaSlides = async (files: any[]) => {
@@ -724,6 +724,7 @@ const createMultipleNewMediaSlides = async (files: any[]) => {
     )
   })
   await Promise.all(multipleSlidesPromise)
+  uploadOfflineSlides()
   useGlobalEmit("app-loading", false)
   toast.add({ title: "Media slides created", icon: "i-bx-image" })
 }

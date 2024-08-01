@@ -5,8 +5,8 @@
     @click="
       useGlobalEmit(`new-${slide?.type}`, [
         slide?.type === slideTypes.media
-          ? { ...slide?.data, fromSaved: true }
-          : { ...slide, fromSaved: true },
+          ? { ...slide?.data, fromSaved: true, scheduleId: activeSchedule?._id }
+          : { ...slide, fromSaved: true, scheduleId: activeSchedule?._id },
       ])
     "
   >
@@ -43,7 +43,7 @@ import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
 
 const appStore = useAppStore()
-const { settings } = storeToRefs(appStore)
+const { settings, activeSchedule } = storeToRefs(appStore)
 
 const emit = defineEmits(["delete-slide"])
 
