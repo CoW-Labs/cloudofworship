@@ -50,16 +50,14 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Increased Default Alert Count
-	- Resolved various issues affecting the text slide editor for a smoother editing experience.
-	- Added a feature to allow custom titles in schedules, enhancing personalization and organization.
-	- Implemented functionality to refresh songs from local or remote databases, ensuring up-to-date content.
-	- Addressed issues with jittery layouts when adding new slides, particularly media slides, for a more stable user interface.
-	- Made visible changes to background fill types in previews to improve visual feedback.
-	- Fixed issues with missing backgrounds upon reload or refresh, ensuring consistent presentation design.
-	- Enhanced the preview feature to make previewing verses more intuitive and user-friendly.
-	- Introduced the ability to upload batch schedules when online, streamlining the scheduling process.
-	- Corrected layout shifts occurring when the “not found” banner is active, maintaining layout integrity.`
+const changelog = `- Added a feature to display download percentages during the initial setup, providing users with progress feedback.
+- Fixed issues with keyboard arrow actions in QuickActions for smoother navigation and control.
+- Resolved problems where users remained on saved slides unintentionally.
+- Fixed the clearing of saved slides after they have been added, ensuring they remain accessible.
+- Fixed an issue preventing the upload of batch media slides, improving the media management workflow.
+- Introduced the New Living Translation (NLT) Bible version, expanding scripture options for users.
+- Fixed an issue where banner links incorrectly opened in new tabs, ensuring proper link behavior.
+- Resolved slight issues related to banner notifications, enhancing overall user experience and reliability.`
 
 const appStore = useAppStore()
 
