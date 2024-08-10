@@ -172,8 +172,10 @@ const searchedSchedules = computed(() => {
     return appStore.schedules
   }
   const tempSchedules = [...appStore.schedules]
-  return tempSchedules.filter((schedule) => {
-    return schedule.name.toLowerCase().includes(searchInput.value.toLowerCase())
+  return tempSchedules?.filter((schedule) => {
+    return schedule?.name
+      ?.toLowerCase()
+      .includes(searchInput.value.toLowerCase())
   })
 })
 
@@ -210,7 +212,7 @@ const createNewSchedule = () => {
 
 const uploadBatchSchedules = async () => {
   const schedules = appStore.schedules
-  const tempSchedules = schedules.filter((schedule) => !schedule?.lastUpdated)
+  const tempSchedules = schedules?.filter((schedule) => !schedule?.lastUpdated)
   if (tempSchedules.length === 0) {
     return
   }
