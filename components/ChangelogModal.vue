@@ -9,9 +9,17 @@
       >
         <template #header>
           <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-md">
-              What's new in Version {{ appVersion }} 🎉
-            </h2>
+            <div class="text-and-link">
+              <h2 class="font-semibold text-md">
+                What's new in Version {{ appVersion }} 🎉
+              </h2>
+              <a
+                href="https://www.cloudofworship.com/changelog"
+                target="_blank"
+                class="border-b border-primary-200 text-primary-900 dark:text-primary-100 hover:text-primary-700 dark:hover:text-primary-300"
+                >View full changelog</a
+              >
+            </div>
             <UButton
               icon="i-mdi-close"
               variant="ghost"

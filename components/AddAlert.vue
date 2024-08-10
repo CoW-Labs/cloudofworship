@@ -8,7 +8,7 @@
         class="text-sm font-semibold flex items-center gap-2 text-primary-900 dark:text-primary-100 px-4 pb-3 border-b border-primary-200"
       >
         <!-- <IconWrapper name="i-bx-info-circle" size="4"></IconWrapper> -->
-        Alert Schedule (Maximum of 3)
+        Alert Schedule (Maximum of 5)
       </div>
       <div
         class="alert-card-ctn flex items-center px-2"
