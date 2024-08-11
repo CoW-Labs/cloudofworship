@@ -9,9 +9,17 @@
       >
         <template #header>
           <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-md">
-              What's new in Version {{ appVersion }} 🎉
-            </h2>
+            <div class="text-and-link">
+              <h2 class="font-semibold text-md">
+                What's new in Version {{ appVersion }} 🎉
+              </h2>
+              <a
+                href="https://www.cloudofworship.com/changelog"
+                target="_blank"
+                class="border-b border-primary-200 text-primary-900 dark:text-primary-100 hover:text-primary-700 dark:hover:text-primary-300"
+                >View full changelog</a
+              >
+            </div>
             <UButton
               icon="i-mdi-close"
               variant="ghost"
@@ -50,14 +58,11 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added a feature to display download percentages during the initial setup, providing users with progress feedback.
-- Fixed issues with keyboard arrow actions in QuickActions for smoother navigation and control.
-- Resolved problems where users remained on saved slides unintentionally.
-- Fixed the clearing of saved slides after they have been added, ensuring they remain accessible.
-- Fixed an issue preventing the upload of batch media slides, improving the media management workflow.
-- Introduced the New Living Translation (NLT) Bible version, expanding scripture options for users.
-- Fixed an issue where banner links incorrectly opened in new tabs, ensuring proper link behavior.
-- Resolved slight issues related to banner notifications, enhancing overall user experience and reliability.`
+const changelog = `- Added new UI features for performance benefits.
+- Increased alert count to 5 items (copy/content)
+- Added changelog link to modal
+- Fixed minor bugs and issues
+- Modified remote songs library`
 
 const appStore = useAppStore()
 

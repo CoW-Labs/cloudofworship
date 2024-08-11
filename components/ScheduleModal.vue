@@ -109,9 +109,9 @@
               />
               <ScheduleCard
                 v-else
-                v-for="schedule in searchedSchedules?.filter(
-                  (schedule) => schedule?.name?.trim().length > 0
-                )"
+                v-for="schedule in searchedSchedules
+                  ?.filter((schedule) => schedule?.name?.trim().length > 0)
+                  ?.slice(0, scheduleListLimit)"
                 :key="schedule?._id"
                 :schedule="schedule"
                 @select="(schedule: Schedule) => {
@@ -120,6 +120,16 @@
                 }"
                 @delete="deleteSchedule($event)"
               />
+              <UButton
+                v-if="searchedSchedules?.length > scheduleListLimit"
+                variant="ghost"
+                trailing-icon="i-bx-chevron-down"
+                size="lg"
+                class="justify-center mt-4"
+                @click="scheduleListLimit += 5"
+              >
+                See more schedules
+              </UButton>
             </div>
           </div>
         </div>
@@ -140,6 +150,7 @@ const authStore = useAuthStore()
 const { schedules } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
 const scheduleName = ref<string>("")
+const scheduleListLimit = ref<number>(5)
 const testScheduleName = ref<string>(
   `CoW Schedule ${new Date().toLocaleDateString("en-GB")?.replaceAll("/", "-")}`
 )
@@ -172,8 +183,10 @@ const searchedSchedules = computed(() => {
     return appStore.schedules
   }
   const tempSchedules = [...appStore.schedules]
-  return tempSchedules.filter((schedule) => {
-    return schedule.name.toLowerCase().includes(searchInput.value.toLowerCase())
+  return tempSchedules?.filter((schedule) => {
+    return schedule?.name
+      ?.toLowerCase()
+      .includes(searchInput.value.toLowerCase())
   })
 })
 
@@ -210,7 +223,7 @@ const createNewSchedule = () => {
 
 const uploadBatchSchedules = async () => {
   const schedules = appStore.schedules
-  const tempSchedules = schedules.filter((schedule) => !schedule?.lastUpdated)
+  const tempSchedules = schedules?.filter((schedule) => !schedule?.lastUpdated)
   if (tempSchedules.length === 0) {
     return
   }
