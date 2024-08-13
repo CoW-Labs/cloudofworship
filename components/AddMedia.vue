@@ -2,7 +2,7 @@
   <div
     class="media-main min-h-[75vh] lg:min-h-[75vh] xl:min-h-[80vh] 2xl:min-h-[85vh] flex flex-col justify-between"
   >
-    <label class="flex flex-col center text-center">
+    <!-- <label class="flex flex-col center text-center">
       <IconWrapper
         name="i-bx-image"
         size="12"
@@ -23,7 +23,28 @@
         multiple
         @change="files = $event.target?.files"
       />
-    </label>
+    </label> -->
+    <div class="collector-ctn flex flex-col gap-3">
+      <div
+        class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
+      >
+        <IconWrapper
+          name="i-bx-info-circle"
+          size="4"
+          class="text-primary-500"
+        />
+        <div class="flex-1">
+          <h4 class="text-md font-semibold">
+            Add image, video or audio slides
+          </h4>
+          <p class="text-sm">
+            You can now add files by dragging and dropping them here or by
+            copying and pasting them from your file explorer.
+          </p>
+        </div>
+      </div>
+      <FileDropzone @change="files = $event" />
+    </div>
     <div
       v-if="fileObjs?.length > 0"
       class="preview-ctn flex flex-col justify-end"
