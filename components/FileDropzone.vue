@@ -1,6 +1,6 @@
 <template>
   <div
-    class="dropzone text-center py-8 p-6 min-h-[200px] flex flex-col justify-center items-center rounded-lg border-dashed border-2 border-primary-200"
+    class="dropzone text-center py-8 p-6 min-h-[200px] flex flex-col justify-center items-center rounded-lg border-dashed border-2 border-primary-200 cursor-pointer"
     @dragover.prevent="onDragOver"
     @dragleave.prevent="onDragLeave"
     @drop.prevent="onDrop"
@@ -16,8 +16,8 @@
     ></IconWrapper>
     <div class="texts">
       <p class="mb font-medium">
-        <span class="text-lg">Drag & Drop</span> or
-        <span class="text-lg">Copy & Paste</span>
+        <span class="text-md">Drag & Drop</span> or
+        <span class="text-md">Copy & Paste</span>
       </p>
       <p class="text-sm mb-6">image, video or audio files.</p>
     </div>

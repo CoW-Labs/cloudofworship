@@ -61,20 +61,21 @@
       </h3>
       <Transition name="fade-sm">
         <div
-          class="grid gap-1 max-h-[200px] overflow-auto rounded-md"
+          class="grid gap-1 max-h-[200px] overflow-auto rounded-md overflow-x-hidden"
           :class="fileObjs?.length === 1 ? 'grid-cols-1' : 'grid-cols-3'"
         >
           <div
-            v-for="fileObj in fileObjs"
+            v-for="(fileObj, index) in fileObjs"
             :key="fileObj.name"
             v-show="fileObj"
-            class="file-preview relative"
+            class="file-preview relative border-2 border-primary-100 rounded-md flex min-h-[100px] cursor-pointer group group-hover:border-primary-500"
+            @click="removeFile(index)"
           >
             <img
               v-if="fileObj?.type === 'image'"
               :src="fileObj.url"
               alt="previewed slide image"
-              class="rounded-md max-h-[40vh] 2xl:max-h-[100%] bg-primary-950"
+              class="rounded-md max-h-[40vh] 2xl:max-h-[100%] bg-primary-950 object-contain"
             />
             <audio
               v-if="fileObj?.type === 'audio'"
@@ -105,6 +106,11 @@
                 size="4"
                 class="text-white"
               />
+            </div>
+            <div
+              class="bg-primary-800 opacity-0 absolute inset-0 flex items-center justify-center rounded-md group-hover:opacity-90"
+            >
+              <IconWrapper name="i-bx-trash" size="8" class="text-white" />
             </div>
           </div>
         </div>
@@ -145,5 +151,10 @@ const addMediaEmitter = () => {
   emitter.emit("new-media", fileObjs.value)
   files.value = []
   emit("close")
+}
+
+const removeFile = (index: number) => {
+  // console.log(index)
+  files.value.splice(index, 1)
 }
 </script>
