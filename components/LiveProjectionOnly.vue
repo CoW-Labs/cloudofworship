@@ -31,7 +31,13 @@
         :loop="
           slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
         "
-        :muted="fullScreen ? slide?.slideStyle?.isMediaMuted : true"
+        :muted="
+          audioMuted
+            ? true
+            : fullScreen
+            ? slide?.slideStyle?.isMediaMuted
+            : true
+        "
         playsinline="true"
         crossorigin="anonymous"
       ></audio>
@@ -44,7 +50,13 @@
         :loop="
           slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
         "
-        :muted="fullScreen ? slide?.slideStyle?.isMediaMuted : true"
+        :muted="
+          audioMuted
+            ? true
+            : fullScreen
+            ? slide?.slideStyle?.isMediaMuted
+            : true
+        "
         playsinline="true"
         :class="[
           'h-[100%] w-[100%] absolute inset-0',
@@ -157,6 +169,8 @@ const foregroundContentVisible = ref<boolean>(true)
 const isLargePreviewOpen = ref<boolean>(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
+// const previousSlideVideo = ref<HTMLVideoElement | null>(null)
+const { liveSlideId } = storeToRefs(appStore)
 
 const props = defineProps<{
   slideLabel: Boolean
@@ -168,12 +182,32 @@ const props = defineProps<{
   audioMuted: Boolean
 }>()
 
+// TODO: Listen to slide.id and pause video if it is no longer the current live slide, using the Global Emitter on EditLiveContent component and passing ot here
+// Listen to liveSlideId and pause video if it is no longer the current live slide
+watch(liveSlideId, (newVal, oldVal) => {
+  // console.log("liveSlideId", newVal)
+})
+
+watch(
+  () => props.audioMuted,
+  (newVal, oldVal) => {
+    if (props.audioMuted) {
+      // video.value?.pause()
+    }
+  }
+)
+
 watch(
   () => props.slide,
   (newVal, oldVal) => {
     try {
-      if (appMounted && props.slide.id === appStore.liveSlideId) {
+      if (appMounted && props.slide.id === liveSlideId.value) {
         // console.log(video.value)
+        // if (newVal.type === slideTypes.media) {
+        //   previousSlideVideo.value = video.value
+        //   console.log(video.value)
+        //   // video.value?.pause()
+        // }
         video.value?.play()
         if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
           foregroundContentVisible.value = false

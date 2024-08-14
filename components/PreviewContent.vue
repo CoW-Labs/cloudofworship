@@ -63,6 +63,7 @@
     <EditLiveContent
       :slide="activeSlide"
       @slide-update="onUpdateSlide"
+      @inactive-slide-update="onUpdateInactiveSlide"
       @goto-verse="gotoAction"
       @goto-chorus="gotoChorus"
       @update-bible-version="gotoScripture(activeSlide?.title!!, $event)"
@@ -274,6 +275,8 @@ const preSlideCreation = (): Slide => {
       alignment: "left",
       fontSizePercent: 100,
       font: "Inter",
+      isMediaMuted: true,
+      isMediaPlaying: false,
     },
   }
   return tempSlide
@@ -573,6 +576,19 @@ const onUpdateSlide = (slide: Slide) => {
   if (slide.type === slideTypes.countdown) {
     useGlobalEmit("start-countdown", slide)
   }
+}
+
+// This function updates specific slide that is not active
+const onUpdateInactiveSlide = (slide: Slide) => {
+  const slideIndex = slides.value?.findIndex(
+    (slideInner: Slide) => slide.id === slideInner.id
+  )
+  slides.value?.splice(slideIndex || 0, 1, slide)
+
+  // Every 3 seconds
+  // const debouncedTextSlideUpdate = useDebounceFn(updateSlideOnline, 3000)
+  updateSlideOnline(slide)
+  updateLiveOutput(slide)
 }
 
 const createNewBibleSlide = (

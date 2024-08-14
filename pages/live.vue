@@ -15,7 +15,9 @@
         :slide="liveSlide"
         :slide-label="false"
         :slide-styles="settings.slideStyles"
-        :audio-muted="liveSlide?.slideStyle?.isMediaMuted"
+        :audio-muted="
+          liveSlide?.id !== liveSlideId || liveSlide?.slideStyle?.isMediaMuted
+        "
       />
     </TransitionGroup>
   </div>

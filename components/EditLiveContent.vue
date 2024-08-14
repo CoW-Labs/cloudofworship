@@ -216,7 +216,7 @@
       <SlideContentToolbar
         v-else-if="slide"
         :slide="slide"
-        @update-style="onUpdateSlideStyle"
+        @update-style="onUpdateSlideStyle($event, false)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
         @update-font="onUpdateSlideStyle({ ...slide.slideStyle, font: $event })"
         @update-media-seek-position="
@@ -284,6 +284,7 @@
 
 <script setup lang="ts">
 import type { Editor } from "@tiptap/core"
+import type { Emitter } from "mitt"
 import type { Slide, SlideStyle, Song } from "~/types"
 
 const props = defineProps<{
@@ -292,6 +293,7 @@ const props = defineProps<{
 
 const emit = defineEmits([
   "slide-update",
+  "inactive-slide-update",
   "update-live-output-slides",
   "goto-verse",
   "goto-chorus",
@@ -345,6 +347,14 @@ watch(
   { immediate: true }
 )
 
+// LISTEN TO EVENTS
+const emitter = useNuxtApp().$emitter as Emitter<any>
+emitter.on("pause-inactive-slide-video", () => {
+  if (props.slide?.type === slideTypes.media) {
+    console.log("pausing video")
+  }
+})
+
 const onSelectLayout = (data: string) => {
   layoutPopoverOpen.value = false
   const tempSlide: Slide = {
@@ -383,13 +393,17 @@ const onUpdateSlideContent = (editorIndex: number, content: string) => {
   // emit("update-live-output-slides")
 }
 
-const onUpdateSlideStyle = (slideStyle: SlideStyle) => {
+// Function to update style of slide that is either active or inactive
+const onUpdateSlideStyle = (
+  slideStyle: SlideStyle,
+  isSlideActive: boolean = true
+) => {
   const tempSlide: Slide = {
     ...props.slide,
     slideStyle,
   }
   tempSlide.name = useSlideName(tempSlide)
-  emit("slide-update", tempSlide)
+  emit(isSlideActive ? "slide-update" : "inactive-slide-update", tempSlide)
 }
 
 const onUpdateMediaSeekPosition = (slideStyle: SlideStyle) => {

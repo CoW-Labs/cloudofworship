@@ -108,7 +108,7 @@
               />
             </div>
             <div
-              class="bg-primary-800 opacity-0 absolute inset-0 flex items-center justify-center rounded-md group-hover:opacity-90"
+              class="bg-primary-800 opacity-0 absolute inset-0 flex items-center justify-center rounded-md group-hover:opacity-90 transition-all"
             >
               <IconWrapper name="i-bx-trash" size="8" class="text-white" />
             </div>
