@@ -83,7 +83,7 @@
 
         <!-- ACCOUNT PROFILE BUTTON -->
         <UPopover
-          mode="hover"
+          mode="click"
           v-model:open="bgImagePopoverOpen"
           :ui="{
             ring: 'ring-0',
