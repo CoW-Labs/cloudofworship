@@ -58,11 +58,12 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added new UI features for performance benefits.
-- Increased alert count to 5 items (copy/content)
-- Added changelog link to modal
-- Fixed minor bugs and issues
-- Modified remote songs library`
+const changelog = `- Added a feature to adjust the number of lines per slide for song slides, enhancing customization options.
+	- Fixed an issue with the navbar affecting the signout process, ensuring smoother user signouts.
+	- Resolved an issue with church signup to improve the registration flow.
+	- Fixed the problem of inactive videos playing and cleared video slide tools for better video control.
+	- Added the ability to delete media files, giving users more control over their media library.
+	- Introduced a drag-and-copy feature to simplify adding media to slides.`
 
 const appStore = useAppStore()
 
