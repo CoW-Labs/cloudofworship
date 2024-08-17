@@ -1,4 +1,5 @@
 import { useAuthStore } from '~/store/auth'
+import { useAppStore } from '~/store/app'
 import type { Song } from '~/types'
 import songsObj from '../public/songs.json'
 import useURLFriendlyString from './useURLFriendlyString'
@@ -10,15 +11,24 @@ const addIdToReturnedSongs = (songs: Array<Song>) => {
   }))
 }
 
+
 /**
  * 
  * @param song 
  * @param linesPerDisplay 
  * @returns 
  */
-const useSong = async (song: Song | string, linesPerDisplay: number = 4): Promise<Song | null> => {
+const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<Song | null> => {
+  // console.log(linesPerDisplay)
   const toast = useToast()
   const authStore = useAuthStore()
+  const appStore = useAppStore()
+
+  if (!linesPerDisplay) {
+    linesPerDisplay = appStore.settings.slideStyles.linesPerSlide
+  }
+  linesPerDisplay = Number(linesPerDisplay)
+  appStore.setSlideStyles({ ...appStore.settings.slideStyles, linesPerSlide: linesPerDisplay })
 
   try {
     // console.log('song', song)

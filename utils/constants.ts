@@ -225,7 +225,7 @@ export const appFonts = [
 ]
 
 export const churchesArr = [
-  // "Other Church",
+  "Other Church (not included)",
   "Redeemed Christian Church of God (RCCG)",
   "Living Faith Church Worldwide (Winners' Chapel)",
   "Deeper Christian Life Ministry (DCLM)",
@@ -317,4 +317,5 @@ export const churchesArr = [
   "Dunamis International Gospel Centre",
   "Believers Loveworld",
   "Pentecostal Fellowship of Nigeria (PFN)",
+  "Life Foundation Church",
 ]

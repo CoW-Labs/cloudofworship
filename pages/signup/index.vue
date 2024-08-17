@@ -93,13 +93,13 @@
       @submit="signup()"
     >
       <UFormGroup size="lg">
-        <UInputMenu
-          placeholder="Your church's name"
+        <USelectMenu
+          placeholder="Select your church's name"
           variant="solid"
           class="bg-gray-100 rounded-md"
           v-model="church"
           :options="churchesArr"
-          searchable
+          searchable="true"
           :ui="{
             variant: {
               solid: 'focus:ring-0 dark:bg-primary-200',
@@ -110,10 +110,13 @@
             <span v-if="church?.length" class="truncate text-black">{{
               church
             }}</span>
-            <span v-else>Your church</span>
+            <span v-else class="text-gray-600">Select your church</span>
           </template>
-        </UInputMenu>
-        <div v-if="church === 'Other Church'" class="come-up-1 mt-1">
+        </USelectMenu>
+        <div
+          v-if="church === 'Other Church (not included)'"
+          class="come-up-1 mt-1"
+        >
           <UInput placeholder="Your church" v-model="otherChurch" />
           <div class="help text-gray-400 text-xs mt-2 flex gap-1 come-up-1">
             <IconWrapper name="i-bx-info-circle" size="3" />
@@ -186,7 +189,7 @@
             church &&
             churchIdentity &&
             churchPastor &&
-            (church === 'Other Church' ? otherChurch : true)
+            (church === 'Other Church (not included)' ? otherChurch : true)
           )
         "
         :loading="loading"
@@ -289,7 +292,10 @@ const signup = async () => {
     const { data, error } = await useAPIFetch("/church", {
       method: "POST",
       body: {
-        name: church.value,
+        name:
+          church.value === "Other Church (not included)"
+            ? otherChurch.value
+            : church.value,
         type: churchIdentity.value,
         address: churchAddress.value,
         pastor: churchPastor.value,

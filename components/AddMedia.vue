@@ -2,7 +2,7 @@
   <div
     class="media-main min-h-[75vh] lg:min-h-[75vh] xl:min-h-[80vh] 2xl:min-h-[85vh] flex flex-col justify-between"
   >
-    <label class="flex flex-col center text-center">
+    <!-- <label class="flex flex-col center text-center">
       <IconWrapper
         name="i-bx-image"
         size="12"
@@ -23,7 +23,28 @@
         multiple
         @change="files = $event.target?.files"
       />
-    </label>
+    </label> -->
+    <div class="collector-ctn flex flex-col gap-3">
+      <div
+        class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
+      >
+        <IconWrapper
+          name="i-bx-info-circle"
+          size="4"
+          class="text-primary-500"
+        />
+        <div class="flex-1">
+          <h4 class="text-md font-semibold">
+            Add image, video or audio slides
+          </h4>
+          <p class="text-sm">
+            You can now add files by dragging and dropping them here or by
+            copying and pasting them from your file explorer.
+          </p>
+        </div>
+      </div>
+      <FileDropzone @change="files = $event" />
+    </div>
     <div
       v-if="fileObjs?.length > 0"
       class="preview-ctn flex flex-col justify-end"
@@ -40,20 +61,21 @@
       </h3>
       <Transition name="fade-sm">
         <div
-          class="grid gap-1 max-h-[200px] overflow-auto rounded-md"
+          class="grid gap-1 max-h-[200px] overflow-auto rounded-md overflow-x-hidden"
           :class="fileObjs?.length === 1 ? 'grid-cols-1' : 'grid-cols-3'"
         >
           <div
-            v-for="fileObj in fileObjs"
+            v-for="(fileObj, index) in fileObjs"
             :key="fileObj.name"
             v-show="fileObj"
-            class="file-preview relative"
+            class="file-preview relative border-2 border-primary-100 rounded-md flex min-h-[100px] cursor-pointer group group-hover:border-primary-500"
+            @click="removeFile(index)"
           >
             <img
               v-if="fileObj?.type === 'image'"
               :src="fileObj.url"
               alt="previewed slide image"
-              class="rounded-md max-h-[40vh] 2xl:max-h-[100%] bg-primary-950"
+              class="rounded-md max-h-[40vh] 2xl:max-h-[100%] bg-primary-950 object-contain"
             />
             <audio
               v-if="fileObj?.type === 'audio'"
@@ -84,6 +106,11 @@
                 size="4"
                 class="text-white"
               />
+            </div>
+            <div
+              class="bg-primary-800 opacity-0 absolute inset-0 flex items-center justify-center rounded-md group-hover:opacity-90 transition-all"
+            >
+              <IconWrapper name="i-bx-trash" size="8" class="text-white" />
             </div>
           </div>
         </div>
@@ -124,5 +151,10 @@ const addMediaEmitter = () => {
   emitter.emit("new-media", fileObjs.value)
   files.value = []
   emit("close")
+}
+
+const removeFile = (index: number) => {
+  // console.log(index)
+  files.value.splice(index, 1)
 }
 </script>

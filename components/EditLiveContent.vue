@@ -216,9 +216,10 @@
       <SlideContentToolbar
         v-else-if="slide"
         :slide="slide"
-        @update-style="onUpdateSlideStyle"
+        @update-style="onUpdateSlideStyle($event, false)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
         @update-font="onUpdateSlideStyle({ ...slide.slideStyle, font: $event })"
+        @update-lines-per-slide="onUpdateSongLines($event)"
         @update-media-seek-position="
           onUpdateMediaSeekPosition({
             ...slide.slideStyle,
@@ -284,6 +285,7 @@
 
 <script setup lang="ts">
 import type { Editor } from "@tiptap/core"
+import type { Emitter } from "mitt"
 import type { Slide, SlideStyle, Song } from "~/types"
 
 const props = defineProps<{
@@ -292,10 +294,12 @@ const props = defineProps<{
 
 const emit = defineEmits([
   "slide-update",
+  "inactive-slide-update",
   "update-live-output-slides",
   "goto-verse",
   "goto-chorus",
   "update-bible-version",
+  "update-lines-per-slide",
   "take-live",
 ])
 
@@ -345,6 +349,14 @@ watch(
   { immediate: true }
 )
 
+// LISTEN TO EVENTS
+const emitter = useNuxtApp().$emitter as Emitter<any>
+emitter.on("pause-inactive-slide-video", () => {
+  if (props.slide?.type === slideTypes.media) {
+    console.log("pausing video")
+  }
+})
+
 const onSelectLayout = (data: string) => {
   layoutPopoverOpen.value = false
   const tempSlide: Slide = {
@@ -383,13 +395,17 @@ const onUpdateSlideContent = (editorIndex: number, content: string) => {
   // emit("update-live-output-slides")
 }
 
-const onUpdateSlideStyle = (slideStyle: SlideStyle) => {
+// Function to update style of slide that is either active or inactive
+const onUpdateSlideStyle = (
+  slideStyle: SlideStyle,
+  isSlideActive: boolean = true
+) => {
   const tempSlide: Slide = {
     ...props.slide,
     slideStyle,
   }
   tempSlide.name = useSlideName(tempSlide)
-  emit("slide-update", tempSlide)
+  emit(isSlideActive ? "slide-update" : "inactive-slide-update", tempSlide)
 }
 
 const onUpdateMediaSeekPosition = (slideStyle: SlideStyle) => {
@@ -423,6 +439,37 @@ const onUpdateSongLyrics = (song: Song) => {
     icon: "i-bx-music",
     title: "Song lyrics updated",
   })
+}
+
+const onUpdateSongLines = async (linesPerSlide: number) => {
+  // console.log("updating song lines", linesPerSlide)
+  const song = (props.slide?.data as Song) || props.slide?.songId
+  const tempSong: Song | null = await useSong(song, linesPerSlide)
+  // console.log(tempSong)
+  if (tempSong) {
+    const tempSlide: Slide = {
+      title: tempSong.title,
+      ...props.slide,
+      data: tempSong,
+    }
+    const currentSongVerseNumber = Number(verse.value?.split(" ")?.[1])
+    const currentSongVerse = song.verses?.[currentSongVerseNumber - 1]
+
+    tempSlide.name = useSlideName(tempSlide)
+    let fontSize = useScreenFontSize(currentSongVerse || "")
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: Number(fontSize),
+    }
+    tempSlide.data = tempSong
+    tempSlide.contents = useSlideContent(tempSlide, tempSong, currentSongVerse)
+    emit("slide-update", tempSlide)
+    // console.log(verse.value)
+    useToast().add({
+      icon: "i-tabler-list-numbers",
+      title: "Lines per slide updated",
+    })
+  }
 }
 </script>
 

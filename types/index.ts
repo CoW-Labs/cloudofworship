@@ -133,6 +133,7 @@ export interface SlideStyle {
   brightness?: number
   alignment?: string
   font?: string
+  linesPerSlide?: number
   fontSize?: number // size in vw[viewportWidth]
   fontSizePercent?: number
   backgroundFillType?: string

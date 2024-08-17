@@ -4,7 +4,7 @@
     class="app-ctn max-h-[100vh] overflow-hidden text"
   >
     <!-- TODO: Remove this banner after 0.7.9 and make it a component -->
-    <div
+    <!-- <div
       v-if="
         appStore.bannerVisible &&
         (appVersion === '0.7.6' ||
@@ -34,7 +34,7 @@
       >
         <IconWrapper name="i-mdi-close" class="w-4 h-4 text-black p-0" />
       </UButton>
-    </div>
+    </div> -->
     <Navbar :app-version="appVersion" :online="isAppOnline" />
     <slot />
     <FullScreenLoader v-if="fullScreenLoading" />
@@ -53,8 +53,8 @@
                 ? 'App ready to work offline'
                 : 'New content available, click on reload button to update'
             "
-            action="pwa-refresh"
-            action-text="Reload"
+            :action="$pwa.offlineReady ? 'cancel-pwa-refresh' : 'pwa-refresh'"
+            :action-text="$pwa.offlineReady ? 'Got it' : 'Reload'"
             secondary-action="cancel-pwa-refresh"
             secondary-action-text="Close"
             is-wider

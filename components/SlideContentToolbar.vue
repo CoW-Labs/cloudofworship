@@ -72,7 +72,8 @@
               : 'i-tabler-volume-off'
           "
           variant="ghost"
-        />
+          >{{ slide.slideStyle?.isMediaMuted ? "Unmute" : "Mute" }}</UButton
+        >
       </UTooltip>
       <UTooltip text="Repeat media" :popper="{ placement: 'top' }">
         <UButton
@@ -91,7 +92,8 @@
           ]"
           icon="i-tabler-repeat"
           variant="ghost"
-        />
+          >Loop</UButton
+        >
       </UTooltip>
       <UTooltip text="Play/pause media" :popper="{ placement: 'top' }">
         <UButton
@@ -110,7 +112,8 @@
               : 'i-tabler-play'
           "
           variant="ghost"
-        />
+          >{{ slide.slideStyle?.isMediaPlaying ? "Pause" : "Play" }}</UButton
+        >
       </UTooltip>
       <UTooltip text="Restart media" :popper="{ placement: 'top' }">
         <UButton
@@ -125,7 +128,8 @@
           ]"
           icon="i-tabler-skip-back"
           variant="ghost"
-        />
+          >Restart</UButton
+        >
       </UTooltip>
     </template>
     <FontSelect
@@ -133,6 +137,11 @@
       size="lg"
       :selected-font="slide?.slideStyle?.font"
       @change="$emit('update-font', $event)"
+    />
+    <SlideMaxLinesSelect
+      v-if="slide?.type === slideTypes?.song"
+      :selected-line="slide?.slideStyle?.linesPerSlide"
+      @change="$emit('update-lines-per-slide', $event)"
     />
     <div
       v-if="slide?.type !== slideTypes?.media"

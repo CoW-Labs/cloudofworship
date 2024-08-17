@@ -31,16 +31,6 @@
 
       <div class="actions flex flex-col border-t dark:border-slate-800">
         <UButton
-          to="https://cloudofworshippers.featurebase.app"
-          target="_blank"
-          size="xl"
-          variant="ghost"
-          class="px-5 py-3 text-md rounded-none justify-start items-start"
-          color="gray"
-          block
-          >Share Feedback 💜
-        </UButton>
-        <UButton
           size="xl"
           variant="ghost"
           color="gray"
@@ -48,6 +38,16 @@
           block
           @click="$emit('open-settings')"
           >App Settings
+        </UButton>
+        <UButton
+          to="https://chat.whatsapp.com/DeQX11igCSU6YaOoTqY7GY"
+          target="_blank"
+          size="xl"
+          variant="ghost"
+          class="px-5 py-3 text-md rounded-none justify-start items-start"
+          color="gray"
+          block
+          >Join the Community 💜
         </UButton>
         <ConfirmDialog
           button-label="Sign out"
