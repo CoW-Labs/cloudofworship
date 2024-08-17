@@ -45,7 +45,7 @@ export const useAppStore = defineStore('app', {
             backgroundVideoKey: '/video-bg-4.mp4'
           }
         },
-        slideStyles: { blur: 0.5, brightness: 50 } as SlideStyle
+        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4 } as SlideStyle
       },
       backgroundVideos: [] as BackgroundVideo[],
       alerts: [] as Alert[],

@@ -138,6 +138,13 @@
       :selected-font="slide?.slideStyle?.font"
       @change="$emit('update-font', $event)"
     />
+    <SlideMaxLinesSelect
+      v-if="
+        slide?.type === slideTypes?.song || slide?.type === slideTypes?.hymn
+      "
+      :selected-line="slide?.slideStyle?.linesPerSlide"
+      @change="$emit('update-lines-per-slide', $event)"
+    />
     <div
       v-if="slide?.type !== slideTypes?.media"
       class="button-group rounded-md p-1 flex items-center gap-1"

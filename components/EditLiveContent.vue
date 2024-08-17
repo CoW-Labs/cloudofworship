@@ -219,6 +219,7 @@
         @update-style="onUpdateSlideStyle($event, false)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
         @update-font="onUpdateSlideStyle({ ...slide.slideStyle, font: $event })"
+        @update-lines-per-slide="onUpdateSongLines($event)"
         @update-media-seek-position="
           onUpdateMediaSeekPosition({
             ...slide.slideStyle,
@@ -298,6 +299,7 @@ const emit = defineEmits([
   "goto-verse",
   "goto-chorus",
   "update-bible-version",
+  "update-lines-per-slide",
   "take-live",
 ])
 
@@ -437,6 +439,37 @@ const onUpdateSongLyrics = (song: Song) => {
     icon: "i-bx-music",
     title: "Song lyrics updated",
   })
+}
+
+const onUpdateSongLines = async (linesPerSlide: number) => {
+  // console.log("updating song lines", linesPerSlide)
+  const song = (props.slide?.data as Song) || props.slide?.songId
+  const tempSong: Song | null = await useSong(song, linesPerSlide)
+  // console.log(tempSong)
+  if (tempSong) {
+    const tempSlide: Slide = {
+      title: tempSong.title,
+      ...props.slide,
+      data: tempSong,
+    }
+    const currentSongVerseNumber = Number(verse.value?.split(" ")?.[1])
+    const currentSongVerse = song.verses?.[currentSongVerseNumber - 1]
+
+    tempSlide.name = useSlideName(tempSlide)
+    let fontSize = useScreenFontSize(currentSongVerse || "")
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: Number(fontSize),
+    }
+    tempSlide.data = tempSong
+    tempSlide.contents = useSlideContent(tempSlide, tempSong, currentSongVerse)
+    emit("slide-update", tempSlide)
+    // console.log(verse.value)
+    useToast().add({
+      icon: "i-tabler-list-numbers",
+      title: "Lines per slide updated",
+    })
+  }
 }
 </script>
 
