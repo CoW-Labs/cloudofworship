@@ -139,9 +139,7 @@
       @change="$emit('update-font', $event)"
     />
     <SlideMaxLinesSelect
-      v-if="
-        slide?.type === slideTypes?.song || slide?.type === slideTypes?.hymn
-      "
+      v-if="slide?.type === slideTypes?.song"
       :selected-line="slide?.slideStyle?.linesPerSlide"
       @change="$emit('update-lines-per-slide', $event)"
     />
