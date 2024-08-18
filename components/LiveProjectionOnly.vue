@@ -227,7 +227,8 @@ watch(
           video.value?.play()
         } else if (
           !newVal.slideStyle?.isMediaPlaying &&
-          newVal.slideStyle?.isMediaPlaying !== undefined
+          newVal.slideStyle?.isMediaPlaying !== undefined &&
+          newVal.type === slideTypes.media
         ) {
           // console.log("triggered pause")
           video.value?.pause()
