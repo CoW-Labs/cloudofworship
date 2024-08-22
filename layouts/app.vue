@@ -225,69 +225,129 @@ emitter.on("go-live", () => {
 
 const saveAllBackgroundVideos = async () => {
   const db = useIndexedDB()
-  const savedBgVideos = await db.cached.count()
+  const savedBgVideo1 = await db.cached.get("/video-bg-1.mp4")
+  const savedBgVideo2 = await db.cached.get("/video-bg-2.mp4")
+  const savedBgVideo3 = await db.cached.get("/video-bg-3.mp4")
+  const savedBgVideo4 = await db.cached.get("/video-bg-4.mp4")
+  const savedBgVideo5 = await db.cached.get("/video-bg-5.mp4")
+  const savedBgVideo6 = await db.cached.get("/video-bg-6.mp4")
 
-  if (savedBgVideos >= 6) {
-    return
-  }
-
-  downloadResource.value = "background videos"
-  let bgVideoPromise1 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-1.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise1 = await bgVideoPromise1.blob()
-
-  let bgVideoPromise2 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise2 = await bgVideoPromise2.blob()
-
-  let bgVideoPromise3 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise3 = await bgVideoPromise3.blob()
-
-  let bgVideoPromise4 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise4 = await bgVideoPromise4.blob()
-
-  let bgVideoPromise5 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise5 = await bgVideoPromise5.blob
-
-  let bgVideoPromise6 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise6 = await bgVideoPromise6.blob()
-
-  const bgVideoResponse = await Promise.all([
-    bgVideoPromise1,
-    bgVideoPromise2,
-    bgVideoPromise3,
-    bgVideoPromise4,
-    bgVideoPromise5,
-    bgVideoPromise6,
-    // bgVideoPromise[6].blob(),
-  ])
-
-  bgVideoResponse.forEach((blob, index) => {
+  const saveBackground = (blob: any, index: number) => {
     const tempMedia: Media = {
-      id: `/video-bg-${index + 1}.mp4`,
+      id: `/video-bg-${index}.mp4`,
       data: blob,
       content: "video",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
     db.cached.add(tempMedia)
-  })
+  }
+
+  downloadResource.value = "background videos"
+  if (!savedBgVideo1) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-1.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 1)
+  }
+
+  if (!savedBgVideo2) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 2)
+  }
+
+  if (!savedBgVideo3) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 3)
+  }
+
+  if (!savedBgVideo4) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 4)
+  }
+
+  if (!savedBgVideo5) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 5)
+  }
+
+  if (!savedBgVideo6) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 6)
+  }
+
+  // let bgVideoPromise2 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise2 = await bgVideoPromise2.blob()
+
+  // let bgVideoPromise3 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise3 = await bgVideoPromise3.blob()
+
+  // let bgVideoPromise4 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise4 = await bgVideoPromise4.blob()
+
+  // let bgVideoPromise5 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise5 = await bgVideoPromise5.blob
+
+  // let bgVideoPromise6 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise6 = await bgVideoPromise6.blob()
+
+  // const bgVideoResponse = await Promise.all([
+  //   bgVideoPromise1,
+  //   bgVideoPromise2,
+  //   bgVideoPromise3,
+  //   bgVideoPromise4,
+  //   bgVideoPromise5,
+  //   bgVideoPromise6,
+  //   // bgVideoPromise[6].blob(),
+  // ])
+
+  // bgVideoResponse.forEach((blob, index) => {
+  //   const tempMedia: Media = {
+  //     id: `/video-bg-${index + 1}.mp4`,
+  //     data: blob,
+  //     content: "video",
+  //     createdAt: new Date().toISOString(),
+  //     updatedAt: new Date().toISOString(),
+  //   }
+  //   db.cached.add(tempMedia)
+  // })
 
   // console.log("values", bgVideoResponse.values())
   // const blobData = await bgVideoPromise.blob()
