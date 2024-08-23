@@ -1,5 +1,5 @@
-async function useDetailedFetch(url: string, progressRef: Ref<string>) {
-  const response = await fetch(url);
+async function useDetailedFetch(url: string, progressRef: Ref<string>, options?: RequestInit) {
+  const response = await fetch(url, options);
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -19,7 +19,7 @@ async function useDetailedFetch(url: string, progressRef: Ref<string>) {
           }
           loadedBytes += value.length;
           progressRef.value = ((loadedBytes / totalBytes) * 100).toFixed(2)
-          // console.log(`Downloaded ${loadedBytes} of ${totalBytes} bytes (${((loadedBytes / totalBytes) * 100).toFixed(2)}%)`);
+          console.log(`Downloaded ${loadedBytes} of ${totalBytes} bytes (${((loadedBytes / totalBytes) * 100).toFixed(2)}%)`);
           controller.enqueue(value);
           push();
         }).catch(error => {

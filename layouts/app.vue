@@ -124,8 +124,14 @@
           class="text-center absolute top-0 left-0 opacity-50"
           color="white"
         />
+        <UProgress
+          v-show="downloadStep === 4"
+          size="2xl"
+          class="text-center absolute top-0 left-0 opacity-50"
+          color="white"
+        />
         <div
-          v-if="downloadStep !== 9"
+          v-if="downloadStep !== 5"
           class="text-md font-semibold w-[300px] flex items-center justify-between mt-4"
         >
           <span class="font-normal">
@@ -179,6 +185,8 @@ const downloadProgress = ref<string>("0")
 const fullScreenLoading = ref<boolean>(false)
 const cachedVideosURLs = ref<string[]>()
 const isOfflineToastOpen = ref<boolean>(false)
+const config = useRuntimeConfig()
+const token = useCookie("token")
 
 const isAppOnline = computed(() => {
   // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
@@ -186,6 +194,14 @@ const isAppOnline = computed(() => {
   isOfflineToastOpen.value = !online.value
   return online.value
 })
+
+// Get hymn count
+let hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
+  headers: {
+    Authorization: `Bearer ${token.value}`,
+  },
+})
+hymnCount = await hymnCount.json()
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -406,24 +422,21 @@ const downloadEssentialResources = async () => {
 
   // Download all hymns
   tempBible = await db.bibleAndHymns.get("hymns")
-  if (!tempBible) {
+  if (tempBible?.data?.length !== hymnCount) {
+    db.bibleAndHymns.delete("hymns")
     downloadResource.value = "hymns"
     downloadStep.value = 4
-    const hymns = await useS3File("hymns.json", downloadProgress)
+    let hymns = await useDetailedFetch(
+      `${config.public.BASE_URL}/hymn`,
+      downloadProgress,
+      {
+        headers: {
+          Authorization: `Bearer ${token.value}`,
+        },
+      }
+    )
+    hymns = await hymns.json()
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
-  }
-
-  tempBible = await db.bibleAndHymns.get("hymns")
-  if (!tempBible) {
-    downloadProgress.value = 4
-    const isHymn1346Available = await useHymn("1347")
-    // console.log(isHymn1346Available)
-
-    if (!isHymn1346Available) {
-      await db.bibleAndHymns.delete("hymns")
-      const hymns = await useS3File("hymns.json")
-      db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
-    }
   }
 
   // All computations completed
