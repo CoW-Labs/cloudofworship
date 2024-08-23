@@ -141,6 +141,45 @@
                 </UFormGroup>
               </UForm>
             </div>
+            <!-- BIBLE VERSION SETTINGS -->
+            <div v-else-if="activeTab === 'Bible Version Settings'">
+              <div
+                v-for="bibleVersion in bibleVersionOptions"
+                :key="bibleVersion"
+                class="bible-version-card relative pb-4 mb-4 border-b border-gray-200 last:border-0 dark:border-gray-700 flex items-center justify-between gap-4"
+              >
+                <UProgress
+                  class="absolute inset-0 top-auto rounded-none opacity-0"
+                  :class="{
+                    'opacity-1': bibleVersionLoading === bibleVersion?.id,
+                  }"
+                  :value="parseInt(bibleDownloadProgress)"
+                  :max="100"
+                  size="xs"
+                />
+                <div class="col">
+                  <div class="text-md">{{ bibleVersion?.id }}</div>
+                  <div class="text-sm text-gray-400">
+                    {{ bibleVersion?.name }}
+                  </div>
+                </div>
+                <div class="col">
+                  <UButton
+                    :icon="
+                      bibleVersion?.isDownloaded
+                        ? 'i-bx-check'
+                        : 'i-bx-download'
+                    "
+                    color="primary"
+                    :variant="bibleVersion?.isDownloaded ? 'ghost' : 'outline'"
+                    :disabled="bibleVersion?.isDownloaded"
+                    @click="downloadBibleVersion(bibleVersion?.id)"
+                  >
+                    {{ bibleVersion?.isDownloaded ? "Saved" : "Save" }}
+                  </UButton>
+                </div>
+              </div>
+            </div>
             <!-- STORAGE SETTINGS -->
             <div
               class="settings-ctn h-[100%]"
@@ -168,19 +207,28 @@ import { useAuthStore } from "~/store/auth"
 
 const props = defineProps<{
   isOpen: boolean
+  page: string
 }>()
 
 const appStore = useAppStore()
+const db = useIndexedDB()
 const settingsModalOpen = ref(props.isOpen)
 const tabs = [
   { name: "Account Settings", active: false },
   { name: "Profile Settings", active: false },
   { name: "Slide Settings", active: false },
+  { name: "Bible Version Settings", active: false },
   { name: "Storage Settings", active: false },
 ]
-const activeTab = ref("Slide Settings")
+const activeTab = ref(props.page || "Slide Settings")
 const font = ref(appStore.settings.defaultFont)
+
+const bibleDownloadProgress = ref<string>("0")
 const bibleVersion = ref(appStore.settings.defaultBibleVersion)
+const bibleVersionLoading = ref<boolean | string>(false)
+const { bibleVersions } = storeToRefs(appStore)
+const bibleVersionOptions = ref<Array<any>>(bibleVersions.value)
+
 const selectUI = {
   base: "bg-primary-500",
   input: "bg-primary-500",
@@ -203,6 +251,39 @@ watch(
   () => props.isOpen,
   () => {
     settingsModalOpen.value = props.isOpen
+    if (props.isOpen) {
+      populateBibleVersionOptions()
+      activeTab.value = props.page || "Slide Settings"
+    }
   }
 )
+
+const isBibleVersionDownloaded = async (bibleVersion: string) => {
+  return (await db.bibleAndHymns.where("id").equals(bibleVersion).count()) > 0
+}
+
+const populateBibleVersionOptions = async () => {
+  const tempBibleVersions = [...bibleVersions.value]
+  for (const bibleVersion of tempBibleVersions) {
+    bibleVersion.isDownloaded = await isBibleVersionDownloaded(bibleVersion.id)
+  }
+  bibleVersionOptions.value = tempBibleVersions
+}
+
+const downloadBibleVersion = async (bibleVersion: string) => {
+  const tempBibleVersion = (version: string, data: any) => ({
+    id: version,
+    data,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })
+  bibleVersionLoading.value = bibleVersion
+  const bibleResponse = await useS3File(
+    `${bibleVersion?.toLowerCase()}.json`,
+    bibleDownloadProgress
+  )
+  await db.bibleAndHymns.add(tempBibleVersion(bibleVersion, bibleResponse))
+  bibleVersionLoading.value = false
+  populateBibleVersionOptions()
+}
 </script>

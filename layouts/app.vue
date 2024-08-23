@@ -388,66 +388,46 @@ const downloadEssentialResources = async () => {
     db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
   }
 
-  // Download NKJV Bible
-  tempBible = await db.bibleAndHymns.get("NKJV")
-  if (!tempBible) {
-    downloadResource.value = "NKJV Bible"
-    downloadStep.value = 4
-    const nkjvBible = await useS3File("nkjv.json", downloadProgress)
-    db.bibleAndHymns.add(tempBibleVersion("NKJV", nkjvBible))
+  const isBibleVersionDownloaded = async (bibleVersion: string) => {
+    return (await db.bibleAndHymns.where("id").equals(bibleVersion).count()) > 0
   }
 
-  // Download NIV Bible
-  tempBible = await db.bibleAndHymns.get("NIV")
-  if (!tempBible) {
-    downloadResource.value = "NIV Bible"
-    downloadStep.value = 5
-    const nivBible = await useS3File("niv.json", downloadProgress)
-    db.bibleAndHymns.add(tempBibleVersion("NIV", nivBible))
+  const populateBibleVersionOptions = async () => {
+    const tempBibleVersions = [...appStore.bibleVersions]
+    for (const bibleVersion of tempBibleVersions) {
+      bibleVersion.isDownloaded = await isBibleVersionDownloaded(
+        bibleVersion.id
+      )
+    }
+    appStore.setBibleVersions(tempBibleVersions)
   }
 
-  // Download AMP Bible
-  tempBible = await db.bibleAndHymns.get("AMP")
-  if (!tempBible) {
-    downloadResource.value = "AMP Bible"
-    downloadStep.value = 6
-    const ampBible = await useS3File("amp.json", downloadProgress)
-    db.bibleAndHymns.add(tempBibleVersion("AMP", ampBible))
-  }
-
-  // Download NLT Bible
-  tempBible = await db.bibleAndHymns.get("NLT")
-  if (!tempBible) {
-    downloadResource.value = "NLT Bible"
-    downloadStep.value = 7
-    const nltBible = await useS3File("nlt.json", downloadProgress)
-    db.bibleAndHymns.add(tempBibleVersion("NLT", nltBible))
-  }
+  populateBibleVersionOptions()
 
   // Download all hymns
   tempBible = await db.bibleAndHymns.get("hymns")
   if (!tempBible) {
     downloadResource.value = "hymns"
-    downloadStep.value = 8
+    downloadStep.value = 4
     const hymns = await useS3File("hymns.json", downloadProgress)
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
   }
 
-  // tempBible = await db.bibleAndHymns.get("hymns")
-  // if (!tempBible) {
-  //   downloadProgress.value = 7
-  //   const isHymn1346Available = await useHymn("1346")
-  //   console.log(isHymn1346Available)
+  tempBible = await db.bibleAndHymns.get("hymns")
+  if (!tempBible) {
+    downloadProgress.value = 4
+    const isHymn1346Available = await useHymn("1347")
+    // console.log(isHymn1346Available)
 
-  //   if (!isHymn1346Available) {
-  //     await db.bibleAndHymns.delete("hymns")
-  //     const hymns = await useS3File("hymns.json")
-  //     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
-  //   }
-  // }
+    if (!isHymn1346Available) {
+      await db.bibleAndHymns.delete("hymns")
+      const hymns = await useS3File("hymns.json")
+      db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
+    }
+  }
 
   // All computations completed
-  downloadStep.value = 9
+  downloadStep.value = 5
   downloadResource.value = "All resources downloaded"
 
   setTimeout(() => {
