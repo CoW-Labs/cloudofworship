@@ -4,6 +4,7 @@ import { useAuthStore } from "~/store/auth";
 import { useAppStore } from "~/store/app";
 
 type useFetchType = typeof useFetch;
+const lastSlidesRequest = null
 
 // wrap useFetch with configuration needed to talk to our API
 export const useAPIFetch: useFetchType = (path, options = {}) => {
@@ -32,6 +33,11 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
   options.baseURL = config.public.BASE_URL as string;
   options.headers = {
     Authorization: `Bearer ${token.value}`,
+  };
+
+  options.onRequest = ({ request }) => {
+    // console.log(request)
+    // console.log(options.body)
   };
 
   options.onResponseError = ({ response }) => {

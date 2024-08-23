@@ -29,6 +29,7 @@
             { label: '30 minutes', value: '00:30:00' },
             { label: '40 minutes', value: '00:40:00' },
             { label: '45 minutes', value: '00:45:00' },
+            { label: '60 minutes', value: '00:60:00' },
           ]"
         >
           <template #label>

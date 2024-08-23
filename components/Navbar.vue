@@ -36,6 +36,7 @@
       >
         <SettingsModal
           :is-open="settingsModalOpen"
+          :page="settingsPage"
           @close-modal="settingsModalOpen = false"
         />
 
@@ -152,6 +153,7 @@ import { format } from "timeago.js"
 const route = useRoute()
 const darkMode = ref(false)
 const settingsModalOpen = ref(false)
+const settingsPage = ref("")
 const colorMode = useColorMode()
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -181,8 +183,14 @@ onMounted(() => {
   }
 })
 
-useAppStore().emitter.on("close-modal", () => {
+appStore.emitter.on("close-modal", () => {
   settingsModalOpen.value = false
+  settingsPage.value = ""
+})
+
+appStore.emitter.on("open-settings", (data) => {
+  settingsModalOpen.value = true
+  settingsPage.value = data
 })
 </script>
 

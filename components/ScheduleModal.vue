@@ -39,14 +39,7 @@
               <UButton
                 icon="i-mdi-close"
                 variant="ghost"
-                @click="
-                  () => {
-                    if (activeSchedule) {
-                      visible = false
-                      emit('close')
-                    }
-                  }
-                "
+                @click="closeScheduleModal"
               ></UButton>
             </div>
           </div>
@@ -164,6 +157,7 @@ const visible = ref<boolean>(props.visible)
 const searchVisible = ref<boolean>(false)
 const newScheduleVisible = ref<boolean>(true)
 const searchInput = ref<string>("")
+const toast = useToast()
 const loading = ref<boolean>(false)
 const copied = ref<boolean>(false)
 
@@ -177,6 +171,18 @@ watch(
     }
   }
 )
+
+const closeScheduleModal = () => {
+  if (props.activeSchedule) {
+    visible.value = false
+    emit("close")
+  } else {
+    toast.add({
+      description: "Please select a schedule to continue.",
+      icon: "i-bx-info-circle",
+    })
+  }
+}
 
 const searchedSchedules = computed(() => {
   if (searchInput.value.length === 0) {

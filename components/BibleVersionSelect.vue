@@ -6,8 +6,8 @@
       searchable-placeholder="Search version"
       select-class="bg-white dark:bg-primary-800 border-3 shadow-none outline-none w-[16ch] text-center"
       size="xs"
-      :options="bibleVersions"
-      v-model="bibleVersion"
+      :options="bibleVersionOptions"
+      :model-value="bibleVersion"
       variant="none"
       color="primary"
       clear-search-on-close
@@ -21,15 +21,32 @@
         },
       }"
       :ui-menu="{
-        width: 'min-w-[120px]',
+        width: 'min-w-[140px]',
         input: 'text-xs',
         empty: 'text-xs',
         option: {
           size: 'text-xs',
         },
       }"
-      @change="$emit('change', $event)"
-    />
+      @change="
+        $event === '+ More Versions'
+          ? useGlobalEmit('open-settings', 'Bible Version Settings')
+          : (bibleVersion = $event)
+      "
+    >
+      <template #option="{ option: version }">
+        <span v-if="version === '+ More Versions'" class="pb-5">
+          <UButton
+            size="xs"
+            class="w-full h-[30px] whitespace-nowrap absolute bottom-0 right-0 left-0"
+            @click="useGlobalEmit('open-settings', 'bible-version')"
+          >
+            <IconWrapper name="i-bx-plus" size="4" /> Add more
+          </UButton>
+        </span>
+        <span v-else class="truncate">{{ version }}</span>
+      </template>
+    </USelectMenu>
   </div>
 </template>
 
@@ -37,6 +54,25 @@
 import { useAppStore } from "~/store/app"
 
 const appStore = useAppStore()
-const { settings } = storeToRefs(appStore)
+const { settings, bibleVersions } = storeToRefs(appStore)
 const bibleVersion = ref<string>(settings.value.defaultBibleVersion)
+const emit = defineEmits(["change"])
+const bibleVersionOptions = computed(() =>
+  [
+    ...bibleVersions.value,
+    bibleVersions.value?.find((version) => !version?.isDownloaded)
+      ? { id: "+ More Versions", name: "Add more versions", isDownloaded: true }
+      : null,
+  ]
+    ?.filter((version) => version?.isDownloaded)
+    ?.map((version) => version?.id)
+)
+
+watch(bibleVersion, (newValue, oldValue) => {
+  if (newValue === "+ More Versions") {
+    useGlobalEmit("open-settings", "Bible Version Settings")
+    bibleVersion.value = oldValue
+  }
+  emit("change", newValue)
+})
 </script>

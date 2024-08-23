@@ -58,12 +58,13 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added a feature to adjust the number of lines per slide for song slides, enhancing customization options.
-	- Fixed an issue with the navbar affecting the signout process, ensuring smoother user signouts.
-	- Resolved an issue with church signup to improve the registration flow.
-	- Fixed the problem of inactive videos playing and cleared video slide tools for better video control.
-	- Added the ability to delete media files, giving users more control over their media library.
-	- Introduced a drag-and-copy feature to simplify adding media to slides.`
+const changelog = `- Updated the hymns loading structure to now load via API, improving data management and performance.
+- Added a Bible version settings feature and removed versions from the initial load to streamline the startup process.
+- Added yoruba hymns to the hymns library.
+- Updated the hymns to include recent changes and improvements.
+- Fixed an issue where the user prompt schedule modal was not closing, ensuring proper functionality.
+- Resolved an issue with reloading background videos, enhancing media stability.
+- Added a 1-hour limit to the timer feature, providing better control over timed events.`
 
 const appStore = useAppStore()
 

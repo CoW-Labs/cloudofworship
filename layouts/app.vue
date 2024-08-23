@@ -124,8 +124,14 @@
           class="text-center absolute top-0 left-0 opacity-50"
           color="white"
         />
+        <UProgress
+          v-show="downloadStep === 4"
+          size="2xl"
+          class="text-center absolute top-0 left-0 opacity-50"
+          color="white"
+        />
         <div
-          v-if="downloadStep !== 9"
+          v-if="downloadStep !== 5"
           class="text-md font-semibold w-[300px] flex items-center justify-between mt-4"
         >
           <span class="font-normal">
@@ -179,6 +185,8 @@ const downloadProgress = ref<string>("0")
 const fullScreenLoading = ref<boolean>(false)
 const cachedVideosURLs = ref<string[]>()
 const isOfflineToastOpen = ref<boolean>(false)
+const config = useRuntimeConfig()
+const token = useCookie("token")
 
 const isAppOnline = computed(() => {
   // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
@@ -186,6 +194,14 @@ const isAppOnline = computed(() => {
   isOfflineToastOpen.value = !online.value
   return online.value
 })
+
+// Get hymn count
+let hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
+  headers: {
+    Authorization: `Bearer ${token.value}`,
+  },
+})
+hymnCount = await hymnCount.json()
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -225,69 +241,129 @@ emitter.on("go-live", () => {
 
 const saveAllBackgroundVideos = async () => {
   const db = useIndexedDB()
-  const savedBgVideos = await db.cached.count()
+  const savedBgVideo1 = await db.cached.get("/video-bg-1.mp4")
+  const savedBgVideo2 = await db.cached.get("/video-bg-2.mp4")
+  const savedBgVideo3 = await db.cached.get("/video-bg-3.mp4")
+  const savedBgVideo4 = await db.cached.get("/video-bg-4.mp4")
+  const savedBgVideo5 = await db.cached.get("/video-bg-5.mp4")
+  const savedBgVideo6 = await db.cached.get("/video-bg-6.mp4")
 
-  if (savedBgVideos >= 6) {
-    return
-  }
-
-  downloadResource.value = "background videos"
-  let bgVideoPromise1 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-1.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise1 = await bgVideoPromise1.blob()
-
-  let bgVideoPromise2 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise2 = await bgVideoPromise2.blob()
-
-  let bgVideoPromise3 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise3 = await bgVideoPromise3.blob()
-
-  let bgVideoPromise4 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise4 = await bgVideoPromise4.blob()
-
-  let bgVideoPromise5 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise5 = await bgVideoPromise5.blob
-
-  let bgVideoPromise6 = await useDetailedFetch(
-    `https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`,
-    downloadProgress
-  )
-  bgVideoPromise6 = await bgVideoPromise6.blob()
-
-  const bgVideoResponse = await Promise.all([
-    bgVideoPromise1,
-    bgVideoPromise2,
-    bgVideoPromise3,
-    bgVideoPromise4,
-    bgVideoPromise5,
-    bgVideoPromise6,
-    // bgVideoPromise[6].blob(),
-  ])
-
-  bgVideoResponse.forEach((blob, index) => {
+  const saveBackground = (blob: any, index: number) => {
     const tempMedia: Media = {
-      id: `/video-bg-${index + 1}.mp4`,
+      id: `/video-bg-${index}.mp4`,
       data: blob,
       content: "video",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
     db.cached.add(tempMedia)
-  })
+  }
+
+  downloadResource.value = "background videos"
+  if (!savedBgVideo1) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-1.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 1)
+  }
+
+  if (!savedBgVideo2) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 2)
+  }
+
+  if (!savedBgVideo3) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 3)
+  }
+
+  if (!savedBgVideo4) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 4)
+  }
+
+  if (!savedBgVideo5) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 5)
+  }
+
+  if (!savedBgVideo6) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 6)
+  }
+
+  // let bgVideoPromise2 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise2 = await bgVideoPromise2.blob()
+
+  // let bgVideoPromise3 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise3 = await bgVideoPromise3.blob()
+
+  // let bgVideoPromise4 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise4 = await bgVideoPromise4.blob()
+
+  // let bgVideoPromise5 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise5 = await bgVideoPromise5.blob
+
+  // let bgVideoPromise6 = await useDetailedFetch(
+  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`,
+  //   downloadProgress
+  // )
+  // bgVideoPromise6 = await bgVideoPromise6.blob()
+
+  // const bgVideoResponse = await Promise.all([
+  //   bgVideoPromise1,
+  //   bgVideoPromise2,
+  //   bgVideoPromise3,
+  //   bgVideoPromise4,
+  //   bgVideoPromise5,
+  //   bgVideoPromise6,
+  //   // bgVideoPromise[6].blob(),
+  // ])
+
+  // bgVideoResponse.forEach((blob, index) => {
+  //   const tempMedia: Media = {
+  //     id: `/video-bg-${index + 1}.mp4`,
+  //     data: blob,
+  //     content: "video",
+  //     createdAt: new Date().toISOString(),
+  //     updatedAt: new Date().toISOString(),
+  //   }
+  //   db.cached.add(tempMedia)
+  // })
 
   // console.log("values", bgVideoResponse.values())
   // const blobData = await bgVideoPromise.blob()
@@ -328,66 +404,43 @@ const downloadEssentialResources = async () => {
     db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
   }
 
-  // Download NKJV Bible
-  tempBible = await db.bibleAndHymns.get("NKJV")
-  if (!tempBible) {
-    downloadResource.value = "NKJV Bible"
-    downloadStep.value = 4
-    const nkjvBible = await useS3File("nkjv.json", downloadProgress)
-    db.bibleAndHymns.add(tempBibleVersion("NKJV", nkjvBible))
+  const isBibleVersionDownloaded = async (bibleVersion: string) => {
+    return (await db.bibleAndHymns.where("id").equals(bibleVersion).count()) > 0
   }
 
-  // Download NIV Bible
-  tempBible = await db.bibleAndHymns.get("NIV")
-  if (!tempBible) {
-    downloadResource.value = "NIV Bible"
-    downloadStep.value = 5
-    const nivBible = await useS3File("niv.json", downloadProgress)
-    db.bibleAndHymns.add(tempBibleVersion("NIV", nivBible))
+  const populateBibleVersionOptions = async () => {
+    const tempBibleVersions = [...appStore.bibleVersions]
+    for (const bibleVersion of tempBibleVersions) {
+      bibleVersion.isDownloaded = await isBibleVersionDownloaded(
+        bibleVersion.id
+      )
+    }
+    appStore.setBibleVersions(tempBibleVersions)
   }
 
-  // Download AMP Bible
-  tempBible = await db.bibleAndHymns.get("AMP")
-  if (!tempBible) {
-    downloadResource.value = "AMP Bible"
-    downloadStep.value = 6
-    const ampBible = await useS3File("amp.json", downloadProgress)
-    db.bibleAndHymns.add(tempBibleVersion("AMP", ampBible))
-  }
-
-  // Download NLT Bible
-  tempBible = await db.bibleAndHymns.get("NLT")
-  if (!tempBible) {
-    downloadResource.value = "NLT Bible"
-    downloadStep.value = 7
-    const nltBible = await useS3File("nlt.json", downloadProgress)
-    db.bibleAndHymns.add(tempBibleVersion("NLT", nltBible))
-  }
+  populateBibleVersionOptions()
 
   // Download all hymns
   tempBible = await db.bibleAndHymns.get("hymns")
-  if (!tempBible) {
+  if (tempBible?.data?.length !== hymnCount) {
+    db.bibleAndHymns.delete("hymns")
     downloadResource.value = "hymns"
-    downloadStep.value = 8
-    const hymns = await useS3File("hymns.json", downloadProgress)
+    downloadStep.value = 4
+    let hymns = await useDetailedFetch(
+      `${config.public.BASE_URL}/hymn`,
+      downloadProgress,
+      {
+        headers: {
+          Authorization: `Bearer ${token.value}`,
+        },
+      }
+    )
+    hymns = await hymns.json()
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
   }
 
-  // tempBible = await db.bibleAndHymns.get("hymns")
-  // if (!tempBible) {
-  //   downloadProgress.value = 7
-  //   const isHymn1346Available = await useHymn("1346")
-  //   console.log(isHymn1346Available)
-
-  //   if (!isHymn1346Available) {
-  //     await db.bibleAndHymns.delete("hymns")
-  //     const hymns = await useS3File("hymns.json")
-  //     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
-  //   }
-  // }
-
   // All computations completed
-  downloadStep.value = 9
+  downloadStep.value = 5
   downloadResource.value = "All resources downloaded"
 
   setTimeout(() => {
