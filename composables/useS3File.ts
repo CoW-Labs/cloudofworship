@@ -14,7 +14,7 @@ const useS3File = async (fileName: string, progressRef: Ref<string>) => {
 
   const command = new GetObjectCommand({
     Bucket: runtimeConfig.public.AWS_BUCKET_NAME,
-    Key: fileName
+    Key: `bible-versions/${fileName}`,
   })
 
   progressRef.value = "0"
@@ -27,7 +27,7 @@ const useS3File = async (fileName: string, progressRef: Ref<string>) => {
 
   const stream = new ReadableStream({
     start(controller) {
-      console.log('starting')
+      // console.log('starting')
       function push() {
         reader?.read().then(({ done, value }) => {
           if (done) {

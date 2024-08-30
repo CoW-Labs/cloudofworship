@@ -262,7 +262,7 @@ const saveAllBackgroundVideos = async () => {
   downloadResource.value = "background videos"
   if (!savedBgVideo1) {
     const bgVideoPromise = await useDetailedFetch(
-      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-1.mp4`,
+      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-1.mp4`,
       downloadProgress
     )
     const bgVideoBlob = await bgVideoPromise.blob()
@@ -271,7 +271,7 @@ const saveAllBackgroundVideos = async () => {
 
   if (!savedBgVideo2) {
     const bgVideoPromise = await useDetailedFetch(
-      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`,
+      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-2.mp4`,
       downloadProgress
     )
     const bgVideoBlob = await bgVideoPromise.blob()
@@ -280,7 +280,7 @@ const saveAllBackgroundVideos = async () => {
 
   if (!savedBgVideo3) {
     const bgVideoPromise = await useDetailedFetch(
-      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`,
+      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-3.mp4`,
       downloadProgress
     )
     const bgVideoBlob = await bgVideoPromise.blob()
@@ -289,7 +289,7 @@ const saveAllBackgroundVideos = async () => {
 
   if (!savedBgVideo4) {
     const bgVideoPromise = await useDetailedFetch(
-      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`,
+      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-4.mp4`,
       downloadProgress
     )
     const bgVideoBlob = await bgVideoPromise.blob()
@@ -298,7 +298,7 @@ const saveAllBackgroundVideos = async () => {
 
   if (!savedBgVideo5) {
     const bgVideoPromise = await useDetailedFetch(
-      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`,
+      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-5.mp4`,
       downloadProgress
     )
     const bgVideoBlob = await bgVideoPromise.blob()
@@ -307,7 +307,7 @@ const saveAllBackgroundVideos = async () => {
 
   if (!savedBgVideo6) {
     const bgVideoPromise = await useDetailedFetch(
-      `https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`,
+      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-6.mp4`,
       downloadProgress
     )
     const bgVideoBlob = await bgVideoPromise.blob()
@@ -315,31 +315,31 @@ const saveAllBackgroundVideos = async () => {
   }
 
   // let bgVideoPromise2 = await useDetailedFetch(
-  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-2.mp4`,
+  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-2.mp4`,
   //   downloadProgress
   // )
   // bgVideoPromise2 = await bgVideoPromise2.blob()
 
   // let bgVideoPromise3 = await useDetailedFetch(
-  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-3.mp4`,
+  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-3.mp4`,
   //   downloadProgress
   // )
   // bgVideoPromise3 = await bgVideoPromise3.blob()
 
   // let bgVideoPromise4 = await useDetailedFetch(
-  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-4.mp4`,
+  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-4.mp4`,
   //   downloadProgress
   // )
   // bgVideoPromise4 = await bgVideoPromise4.blob()
 
   // let bgVideoPromise5 = await useDetailedFetch(
-  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-5.mp4`,
+  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-5.mp4`,
   //   downloadProgress
   // )
   // bgVideoPromise5 = await bgVideoPromise5.blob
 
   // let bgVideoPromise6 = await useDetailedFetch(
-  //   `https://revaise.s3.us-east-2.amazonaws.com/video-bg-6.mp4`,
+  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-6.mp4`,
   //   downloadProgress
   // )
   // bgVideoPromise6 = await bgVideoPromise6.blob()
@@ -400,7 +400,12 @@ const downloadEssentialResources = async () => {
   if (!tempBible) {
     downloadResource.value = "KJV Bible"
     downloadStep.value = 3
-    const kjvBible = await useS3File("kjv.json", downloadProgress)
+
+    let kjvBible = await useDetailedFetch(
+      `https://d37gopmfkl2m2z.cloudfront.net/open/kjv.json`,
+      downloadProgress
+    )
+    kjvBible = await kjvBible.json()
     db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
   }
 
@@ -484,6 +489,51 @@ const overrideAppSettings = () => {
           backgroundVideoKey: "/video-bg-4.mp4",
         },
       },
+      bibleVersions: [
+        {
+          id: "KJV",
+          name: "King James Version",
+          isDownloaded: false,
+          copyrightContent: "",
+        },
+        {
+          id: "NKJV",
+          name: "New King James Version",
+          isDownloaded: false,
+          copyrightContent:
+            "Scripture taken from the New King James Version®. Copyright © 1982 by Thomas Nelson. All rights reserved.",
+        },
+        {
+          id: "NIV",
+          name: "New International Version",
+          isDownloaded: false,
+          copyrightContent:
+            "Scriptures taken from the Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™ All rights reserved worldwide.",
+        },
+        {
+          id: "AMP",
+          name: "Amplified Bible",
+          isDownloaded: false,
+          copyrightContent:
+            "All Scripture quotations, unless otherwise indicated, are taken from the Amplified Bible, Copyright © 2015 by The Lockman Foundation.",
+        },
+        {
+          id: "NLT",
+          name: "New Living Translation",
+          isDownloaded: false,
+          copyrightContent:
+            "Scripture quotations marked (NLT) are taken from the Holy Bible, New Living Translation, copyright ©1996, 2004, 2015 by Tyndale House Foundation.",
+        },
+        // { id: 'TPT', name: 'The Passion Translation', isDownloaded: false, copyrightContent: '' },
+        // { id: 'GNT', name: 'Good News Translation', isDownloaded: false, copyrightContent: '' },
+        {
+          id: "CEV",
+          name: "Contemporary English Version",
+          isDownloaded: false,
+          copyrightContent:
+            "Scripture quotations marked (CEV) are from the Contemporary English Version Copyright © 1991, 1992, 1995 by American Bible Society.",
+        },
+      ],
     })
   }
 }
