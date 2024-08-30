@@ -38,6 +38,11 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
         scripture = nltBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
         appStore.setDefaultBibleVersion(version)
         break
+      case 'CEV':
+        const cevBible = (await db.bibleAndHymns.get('CEV'))?.data as unknown as BibleVerse[]
+        scripture = cevBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
+        appStore.setDefaultBibleVersion(version)
+        break
       default:
         const kjvBible = (await db.bibleAndHymns.get('KJV'))?.data as unknown as BibleVerse[]
         scripture = kjvBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture

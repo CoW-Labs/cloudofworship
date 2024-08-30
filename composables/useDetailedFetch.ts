@@ -19,7 +19,7 @@ async function useDetailedFetch(url: string, progressRef: Ref<string>, options?:
           }
           loadedBytes += value.length;
           progressRef.value = ((loadedBytes / totalBytes) * 100).toFixed(2)
-          console.log(`Downloaded ${loadedBytes} of ${totalBytes} bytes (${((loadedBytes / totalBytes) * 100).toFixed(2)}%)`);
+          // console.log(`Downloaded ${loadedBytes} of ${totalBytes} bytes (${((loadedBytes / totalBytes) * 100).toFixed(2)}%)`);
           controller.enqueue(value);
           push();
         }).catch(error => {

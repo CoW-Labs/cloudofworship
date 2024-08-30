@@ -3,6 +3,20 @@
 body {
   font-family: Inter;
 }
+.hotkey {
+  font-size: 0.6rem;
+  color: #000000;
+  background-color: #cecece;
+  font-weight: bold;
+  padding: 0 0.5rem;
+  height: 20px;
+  border-radius: 0.25rem;
+  font-family: monospace;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 0.2rem;
+}
 
 /* PWA TOAST STYLES */
 .pwa-toast {

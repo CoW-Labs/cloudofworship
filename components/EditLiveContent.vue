@@ -60,6 +60,7 @@
                 placeholder="Verse"
                 size="xs"
                 variant="none"
+                id="bible-verse-input"
                 v-model="verse"
                 :inputClass="`bg-white border-0 shadow-none outline-none text-center dark:text-primary-900 transition-all ${
                   verse?.length > 20 ? 'px-1' : ''
@@ -69,6 +70,9 @@
                     ? (verse?.replaceAll(' ', '').length || 10) + 3
                     : (verse?.length || 10) + 2
                 }ch`"
+                @focus="$event.target.select()"
+                @keydown.tab.prevent="predictVerseInput"
+                @keydown.arrow-right.prevent="predictVerseInput"
                 @keydown.enter="$emit('goto-verse', verse)"
               />
               <UTooltip text="Next verse" :popper="{ arrow: true }">
@@ -88,6 +92,13 @@
                 Chorus
               </UButton>
             </div>
+            <!-- Component to Auto complete Bible Books while typing -->
+            <BibleAutoComplete
+              v-if="slide?.type === slideTypes.bible && !verse?.includes(':')"
+              :verse="verse"
+              @goto-book="predictVerseInput($event)"
+              @book-options="searchedBibleBookOptions = $event"
+            />
             <PreviewVerses
               v-if="
                 slide?.type === slideTypes.hymn ||
@@ -311,6 +322,7 @@ const bgVideoPopoverOpen = ref<boolean>(false)
 const bgColorPopoverOpen = ref<boolean>(false)
 const slideContents = ref<Array<string>>([])
 const verse = ref<string | undefined>(props.slide?.title)
+const searchedBibleBookOptions = ref<string[]>([])
 
 const animatedSlides = computed(() => {
   if (props.slide) {
@@ -471,16 +483,41 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
     })
   }
 }
+
+const predictVerseInput = (specificBook?: string) => {
+  if (verse.value?.trim()) {
+    const bibleVerseInput = document.getElementById("bible-verse-input")
+    if (typeof specificBook === "string") {
+      verse.value = `${specificBook} `
+    } else if (verse.value.endsWith(" ")) {
+      verse.value = `${verse.value?.trim()} 1:`
+    } else if (searchedBibleBookOptions.value?.[0]) {
+      verse.value = `${searchedBibleBookOptions.value?.[0]} `
+    } else if (!verse.value?.includes(":")) {
+      verse.value = `${verse.value?.trim()}:1`
+    } else {
+      // do nothing
+    }
+    bibleVerseInput?.focus()
+  }
+}
 </script>
 
 <style scoped>
-.verse-preview {
+.verse-preview,
+.books-preview {
   visibility: hidden;
   max-height: 0px;
   transition: 0.2s;
 }
+/* .books-preview {
+  visibility: visible;
+  max-height: 1400px;
+} */
 .verse-switch:hover + .verse-preview,
-.verse-preview:hover {
+.verse-switch:focus-within + .books-preview,
+.verse-preview:hover,
+.books-preview:hover {
   opacity: 1;
   visibility: visible;
   max-height: 350px;
