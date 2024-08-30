@@ -63,7 +63,7 @@ export const useAppStore = defineStore('app', {
         { id: 'NLT', name: 'New Living Translation', isDownloaded: false, copyrightContent: 'Scripture quotations marked (NLT) are taken from the Holy Bible, New Living Translation, copyright ©1996, 2004, 2015 by Tyndale House Foundation.' },
         // { id: 'TPT', name: 'The Passion Translation', isDownloaded: false, copyrightContent: '' },
         // { id: 'GNT', name: 'Good News Translation', isDownloaded: false, copyrightContent: '' },
-        // { id: 'CEV', name: 'Contemporary English Version', isDownloaded: false, copyrightContent: '' },
+        { id: 'CEV', name: 'Contemporary English Version', isDownloaded: false, copyrightContent: 'Scripture quotations marked (CEV) are from the Contemporary English Version Copyright © 1991, 1992, 1995 by American Bible Society.' },
       ]
     }
   },
