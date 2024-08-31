@@ -26,15 +26,6 @@ export const quickActionsArr = [
     type: slideTypes.bible,
   },
   {
-    icon: "i-bx-search",
-    name: "Search Whole Bible",
-    desc: "Find scriptures with familiar words",
-    action: "new-search-bible",
-    meta: "",
-    unreleased: false,
-    type: slideTypes.bible,
-  },
-  {
     icon: "i-bx-church",
     name: "Display Hymns",
     desc: "Find verses and chorus to all hymns",
@@ -112,6 +103,15 @@ export const quickActionsArr = [
     meta: "",
     type: slideTypes.countdown,
     // unreleased: true,
+  },
+  {
+    icon: "i-bx-search",
+    name: "Search Whole Bible",
+    desc: "Find scriptures with familiar words",
+    action: "new-search-bible",
+    meta: "",
+    unreleased: false,
+    type: slideTypes.bible,
   },
   {
     icon: "i-ph-file-ppt",
