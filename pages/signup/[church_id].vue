@@ -81,7 +81,7 @@
         >
           <IconWrapper name="i-bx-info-circle" size="3" />
           Password must be at least 8 characters, including upper and lowercase
-          characters, one number, and a special character
+          characters, and a number.
         </div>
       </UFormGroup>
       <UButton
@@ -137,8 +137,7 @@ const church = ref(null)
 // const churchPastor = ref("")
 
 const passwordValid = computed(() => {
-  const regex =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]{8,}$/
+  const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+]{8,}$/
   return regex.test(password.value)
 })
 
