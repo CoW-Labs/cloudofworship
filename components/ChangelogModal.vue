@@ -58,13 +58,12 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Updated the hymns loading structure to now load via API, improving data management and performance.
-- Added a Bible version settings feature and removed versions from the initial load to streamline the startup process.
-- Added yoruba hymns to the hymns library.
-- Updated the hymns to include recent changes and improvements.
-- Fixed an issue where the user prompt schedule modal was not closing, ensuring proper functionality.
-- Resolved an issue with reloading background videos, enhancing media stability.
-- Added a 1-hour limit to the timer feature, providing better control over timed events.`
+const changelog = `- Fixed issues related to signup, improving the registration experience.
+- Optimized asset loading for faster performance by leveraging CloudFront.
+- Improved the Bible search functionality for more accurate and efficient results.
+- Improved signup experience for new users.
+- Added new songs to library.
+- Made minor fixes and improvements.`
 
 const appStore = useAppStore()
 
