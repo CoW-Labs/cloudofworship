@@ -140,7 +140,7 @@
               This might take a while
             </div></span
           >
-          <span>{{ parseInt(downloadProgress) }}%</span>
+          <span>{{ parseInt(downloadProgress) || 0 }}%</span>
         </div>
         <div
           v-else
