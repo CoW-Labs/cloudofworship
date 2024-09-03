@@ -187,6 +187,7 @@ const cachedVideosURLs = ref<string[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const config = useRuntimeConfig()
 const token = useCookie("token")
+const windowRefs = ref<any[]>([])
 
 const isAppOnline = computed(() => {
   // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
@@ -194,6 +195,8 @@ const isAppOnline = computed(() => {
   isOfflineToastOpen.value = !online.value
   return online.value
 })
+
+provide("windowRefs", windowRefs)
 
 // Get hymn count
 let hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
@@ -232,11 +235,7 @@ emitter.on("close-offline-toast", () => {
 })
 
 emitter.on("go-live", () => {
-  // window.open(
-  //   `http://${window.location.host}/live`,
-  //   "_blank",
-  //   " width=1024, height=768"
-  // )
+  openWindows()
 })
 
 const saveAllBackgroundVideos = async () => {
@@ -685,6 +684,98 @@ onMounted(async () => {
 
 getChurch()
 retrieveAllMediaFilesFromDB()
+
+// WINDOW MANAGEMENT CODE STARTS HERE
+function openWindow(
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  url: string
+) {
+  const windowFeatures = `left=${left},top=${top},width=${width},height=${height}`
+  const windowRef = window.open(
+    url,
+    "_blank", // needed for it to open in a new window
+    windowFeatures
+  )
+
+  if (windowRef === null) {
+    // If the browser is blocking popups, clear out any windows that were able to open
+    useToast().add({
+      title:
+        "Popups are blocked. Ensure you are not blocking popups for this site.",
+      icon: "i-bx-info-circle",
+      color: "red",
+    })
+    closeAllWindows()
+  } else {
+    const tempWindowRefs = windowRefs.value
+    tempWindowRefs.push(windowRef)
+    windowRefs.value = tempWindowRefs
+  }
+}
+
+function closeAllWindows() {
+  windowRefs.value.forEach((windowRef: any) => {
+    windowRef.close()
+  })
+  windowRefs.value = []
+}
+
+async function openWindows() {
+  const screenDetails = await window.getScreenDetails()
+  const noOfScreens = screenDetails.screens.length
+
+  if (noOfScreens === 1) {
+    useToast().add({
+      title:
+        "Only one screen detected. Connect a second screen to project on another display",
+      icon: "i-bx-info-circle",
+    })
+
+    // Two screens or more
+    const screen1 = screenDetails.screens[0]
+    openWindow(
+      screen1.availLeft,
+      screen1.availTop,
+      screen1.availWidth,
+      screen1.availHeight,
+      `http://${window.location.host}/live`
+    )
+  } else {
+    // Two screens or more
+    const screen1 = screenDetails.screens[0]
+    const screen2 = screenDetails.screens[1]
+    openWindow(
+      screen1.availLeft,
+      screen1.availTop,
+      screen2.availWidth,
+      screen2.availHeight,
+      `http://${window.location.host}/live`
+    )
+  }
+
+  const closeMonitor = setInterval(checkWindowClose, 250)
+
+  function checkWindowClose() {
+    if (windowRefs.value.some((windowRef: any) => windowRef.closed)) {
+      closeAllWindows()
+      clearInterval(closeMonitor)
+    }
+  }
+
+  // Also close our popup windows if the main app window is closed
+  window.addEventListener("beforeunload", () => {
+    closeAllWindows()
+  })
+
+  screenDetails.addEventListener("screenschange", () => {
+    // TODO: Action when screen count changes
+  })
+}
+
+// WINDOW MANAGEMENT CODE ENDS HERE
 </script>
 
 <style scoped></style>

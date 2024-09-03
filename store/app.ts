@@ -64,7 +64,8 @@ export const useAppStore = defineStore('app', {
         // { id: 'TPT', name: 'The Passion Translation', isDownloaded: false, copyrightContent: '' },
         // { id: 'GNT', name: 'Good News Translation', isDownloaded: false, copyrightContent: '' },
         { id: 'CEV', name: 'Contemporary English Version', isDownloaded: false, copyrightContent: 'Scripture quotations marked (CEV) are from the Contemporary English Version Copyright © 1991, 1992, 1995 by American Bible Society.' },
-      ]
+      ],
+      // activeLiveWindows: [] as any[]
     }
   },
   getters: {
@@ -184,6 +185,9 @@ export const useAppStore = defineStore('app', {
     setBibleVersions(bibleVersions: Array<any>) {
       this.bibleVersions = bibleVersions
     },
+    // setActiveLiveWindows(windows: any[]) {
+    //   this.activeLiveWindows = JSON.stringify(windows)
+    // },
     signOut() {
       this.setSchedules([])
       this.setActiveSchedule(null)

@@ -13,6 +13,7 @@
         variant: 'solid',
       },
     ]"
+    :is-live-window-active="windowRefs?.length > 0"
   >
     <div class="main">
       <div
@@ -114,6 +115,14 @@ import type { Slide } from "~/types"
 const appStore = useAppStore()
 const toast = useToast()
 const { liveOutputSlidesId, liveSlideId, settings } = storeToRefs(appStore)
+const windowRefs = inject("windowRefs")
+
+watch(
+  () => windowRefs,
+  () => {
+    console.log("windowRefs", windowRefs.value)
+  }
+)
 
 const liveSlide = computed(() => {
   return appStore.activeSlides.find((slide) => slide.id === liveSlideId.value)

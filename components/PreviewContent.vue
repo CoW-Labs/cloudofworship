@@ -304,18 +304,19 @@ const mergeSlides = (
 }
 
 const uploadOfflineSlides = async () => {
+  console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
-  const offlineSlides = appStore.activeSlides
-    .filter((slide) => slide._id === undefined)
-    ?.filter((slide) => slide.scheduleId)
-  if (offlineSlides.length > 0) {
-    const uploadedSlides = await batchCreateSlideOnline(offlineSlides)
-    // console.log("uploadedSlides", uploadedSlides)
+  // const offlineSlides = appStore.activeSlides
+  //   .filter((slide) => slide._id === undefined)
+  //   ?.filter((slide) => slide.scheduleId)
+  // if (offlineSlides.length > 0) {
+  //   const uploadedSlides = await batchCreateSlideOnline(offlineSlides)
+  //   // console.log("uploadedSlides", uploadedSlides)
 
-    const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
-    // console.log("merged slides", mergedSlides)
-    appStore.appendActiveSlides(mergedSlides)
-  }
+  //   const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
+  //   // console.log("merged slides", mergedSlides)
+  //   appStore.appendActiveSlides(mergedSlides)
+  // }
 }
 
 const createScheduleOnline = async (schedule: Schedule) => {

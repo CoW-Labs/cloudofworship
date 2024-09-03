@@ -31,6 +31,7 @@ const { liveSlideId, activeSlide, activeSlides, settings } =
 
 const liveSlide = computed(() => {
   // console.log(activeSlides.value)
+  console.log(liveSlideId.value)
   return activeSlides.value.find((slide) => slide.id === liveSlideId.value)
 })
 
