@@ -188,6 +188,7 @@ const isOfflineToastOpen = ref<boolean>(false)
 const config = useRuntimeConfig()
 const token = useCookie("token")
 const windowRefs = ref<any[]>([])
+const db = useIndexedDB()
 
 const isAppOnline = computed(() => {
   // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
@@ -199,12 +200,20 @@ const isAppOnline = computed(() => {
 provide("windowRefs", windowRefs)
 
 // Get hymn count
-let hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
-  headers: {
-    Authorization: `Bearer ${token.value}`,
-  },
-})
-hymnCount = await hymnCount.json()
+let hymnCount: any
+const hymns = await db.bibleAndHymns.get("hymns")
+if (isAppOnline.value) {
+  hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
+    headers: {
+      Authorization: `Bearer ${token.value}`,
+    },
+  })
+  hymnCount = await hymnCount.json()
+} else {
+  // Handle offline hymn count
+  hymnCount = hymns?.data?.length
+  console.log("hymnCount", hymnCount)
+}
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -239,7 +248,6 @@ emitter.on("go-live", () => {
 })
 
 const saveAllBackgroundVideos = async () => {
-  const db = useIndexedDB()
   const savedBgVideo1 = await db.cached.get("/video-bg-1.mp4")
   const savedBgVideo2 = await db.cached.get("/video-bg-2.mp4")
   const savedBgVideo3 = await db.cached.get("/video-bg-3.mp4")
@@ -425,8 +433,7 @@ const downloadEssentialResources = async () => {
   populateBibleVersionOptions()
 
   // Download all hymns
-  tempBible = await db.bibleAndHymns.get("hymns")
-  if (tempBible?.data?.length !== hymnCount) {
+  if (hymns?.data?.length !== hymnCount) {
     db.bibleAndHymns.delete("hymns")
     downloadResource.value = "hymns"
     downloadStep.value = 4
