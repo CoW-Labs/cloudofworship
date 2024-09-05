@@ -56,30 +56,40 @@
               </UFormGroup>
             </div>
           </Transition>
-          <UButton
+          <!-- <UButton
             block
             class="h-[170px] bg-primary-100 dark:bg-primary-300 border border-primary-100 dark:border-primary-500 hover:bg-primary-100 dark:hover:bg-primary-400 hover:border-primary-500 transition-all flex-col gap-4 text-primary-500"
             @click="newScheduleVisible = !newScheduleVisible"
           >
             <PlusIcon />
             <div>New Schedule</div>
-          </UButton>
+          </UButton> -->
 
           <Transition name="fade-sm">
-            <div v-if="newScheduleVisible" class="schedules-ctn mt-2 mb-8">
+            <div v-if="newScheduleVisible" class="schedules-ctn mb-8">
               <form
-                class="schedules flex items-end mt-4 overflow-auto gap-2"
+                class="schedules flex items-end overflow-auto gap-2 bg-primary-100 dark:bg-primary-900 p-6 rounded-lg"
                 @submit.prevent="createNewSchedule()"
               >
-                <UFormGroup label="New Schedule Name" size="lg" class="flex-1">
+                <UFormGroup
+                  label="Create New Schedule"
+                  size="lg"
+                  class="flex-1"
+                >
                   <UInput
-                    :placeholder="testScheduleName"
+                    placeholder="Enter your schedule name"
                     v-model="scheduleName"
+                    class="mt-3"
                   />
+                  <div class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Leave field blank to create schedule with name "{{
+                      testScheduleName
+                    }}"
+                  </div>
                 </UFormGroup>
                 <UButton
                   type="submit"
-                  class="h-[40px]"
+                  class="h-[40px] mb-6"
                   size="sm"
                   icon="i-bx-save"
                 >
@@ -143,7 +153,7 @@ const authStore = useAuthStore()
 const { schedules } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
 const scheduleName = ref<string>("")
-const scheduleListLimit = ref<number>(5)
+const scheduleListLimit = ref<number>(6)
 const testScheduleName = ref<string>(
   `CoW Schedule ${new Date().toLocaleDateString("en-GB")?.replaceAll("/", "-")}`
 )
