@@ -10,12 +10,21 @@
       <div class="banner-text text-lg flex items-center gap-6">
         <span
           ><span class="font-bold">Double click</span> the display below to
-          toggle full screen mode</span
+          toggle full screen and remove this banner</span
         >
         •
         <span class="flex items-center gap-2 font-bold"
           ><Logo class="w-[34px] mb-2" /> Cloud of Worship</span
         >
+        •
+        <UButton
+          size="lg"
+          color="black"
+          class="font-bold"
+          @click="transmitScreenCapture"
+        >
+          Stream via NDI
+        </UButton>
       </div>
     </div>
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
@@ -44,6 +53,9 @@ const appStore = useAppStore()
 const { liveSlideId, activeSlide, activeSlides, settings } =
   storeToRefs(appStore)
 const isFullScreen = ref(false)
+const mediaRecorder = ref<MediaRecorder | null>(null)
+const mediaRecorderInterval = ref()
+const FPS = 10
 
 const liveSlide = computed(() => {
   // console.log(activeSlides.value)
@@ -60,6 +72,20 @@ useHead({
     },
   ],
 })
+
+const displayMediaOptions: DisplayMediaStreamConstraints = {
+  video: {
+    displaySurface: "tab",
+  },
+  audio: {
+    suppressLocalAudioPlayback: true,
+  },
+  preferCurrentTab: true,
+  selfBrowserSurface: "include",
+  systemAudio: "include",
+  surfaceSwitching: "exclude",
+  monitorTypeSurfaces: "exclude",
+}
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -88,7 +114,70 @@ onMounted(() => {
   window.addEventListener("MSFullscreenChange", checkFullScreen)
 
   checkFullScreen()
+
+  //  Capture screen on load
+  // transmitScreenCapture()
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener("fullscreenchange", checkFullScreen)
+  window.removeEventListener("webkitfullscreenchange", checkFullScreen)
+  window.removeEventListener("mozfullscreenchange", checkFullScreen)
+  window.removeEventListener("MSFullscreenChange", checkFullScreen)
+  stopScreenCapture()
+})
+
+const startScreenCapture = async () => {
+  let captureStream = null
+  try {
+    captureStream = await navigator.mediaDevices.getDisplayMedia(
+      displayMediaOptions
+    )
+  } catch (err) {
+    console.log("Error getting screen capture stream", err)
+  }
+  return captureStream
+}
+
+const transmitScreenCapture = async () => {
+  const captureStream = await startScreenCapture()
+  if (captureStream !== null) {
+    mediaRecorder.value = new MediaRecorder(captureStream, {
+      mimeType: "video/webm",
+    })
+    mediaRecorder.value.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        console.log("data available", event.data)
+      }
+    }
+    mediaRecorder.value.onstop = (event) => {
+      console.log("stopped", event)
+    }
+    mediaRecorder.value.start()
+
+    mediaRecorderInterval.value = setInterval(() => {
+      if (mediaRecorder.value?.state !== "inactive") {
+        mediaRecorder.value?.requestData()
+      }
+    }, 1000 / FPS)
+    console.log("mediaRecorder", mediaRecorder.value)
+  } else {
+    console.log("No capture stream")
+  }
+}
+
+const stopScreenCapture = async () => {
+  try {
+    if (mediaRecorder.value) {
+      mediaRecorder.value.stop()
+      mediaRecorder.value.ondataavailable = null
+      mediaRecorder.value = null
+    }
+    clearInterval(mediaRecorderInterval.value)
+  } catch (err) {
+    console.log("Error stopping screen capture", err)
+  }
+}
 </script>
 
 <style>
