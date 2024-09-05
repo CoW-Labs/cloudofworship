@@ -563,41 +563,29 @@ function base64ToBlobURL(base64String: string, mimeType: string) {
 
 const retrieveChurchSongs = async () => {
   try {
-    const promise = await useAPIFetch(
-      `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
+    const countPromise = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
     )
-    const data: Song[] = (await promise.data.value) as unknown as Song[]
-    const libraryData: LibraryItem[] = data?.map((song) => ({
-      id: song.id,
-      type: "song",
-      content: JSON.parse(JSON.stringify(song)),
-      createdAt: song.createdAt,
-      updatedAt: song.updatedAt,
-    }))
-    // const db = useIndexedDB()
-    // const songId =
-    //   props?.song?.id || useURLFriendlyString(`${title.value} ${artist.value}`)
-    // const song: Song = {
-    //   id: songId,
-    //   title: title.value,
-    //   artist: artist.value,
-    //   lyrics: lyrics.value,
-    //   createdBy: "me",
-    // }
+    const onlineCount = countPromise.data.value as unknown as number
+    const offlineCount = await db.library.where("type").equals("song").count()
+    if (onlineCount > offlineCount) {
+      // Delete songs that are not in the online database
+      db.library.where("type").equals("song").delete()
 
-    // await db.library.add(
-    //   {
-    //     id: songId,
-    //     type: "song",
-    //     content: song,
-    //     createdAt: props.song?.createdAt || new Date().toISOString(),
-    //     updatedAt: new Date().toISOString(),
-    //   },
-    //   songId
-    // )
-    // Save all church songs to IndexedDB
-    console.log("data", libraryData)
-    await db.library.bulkAdd(libraryData)
+      // Add online songs
+      const promise = await useAPIFetch(
+        `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
+      )
+      const data: Song[] = (await promise.data.value) as unknown as Song[]
+      const libraryData: LibraryItem[] = data?.map((song) => ({
+        id: song.id,
+        type: "song",
+        content: JSON.parse(JSON.stringify(song)),
+        createdAt: song.createdAt,
+        updatedAt: song.updatedAt,
+      }))
+      await db.library.bulkAdd(libraryData)
+    }
   } catch (err: any) {
     console.log(err)
   }

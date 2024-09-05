@@ -5,14 +5,14 @@
   >
     <div
       v-if="!isFullScreen"
-      class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center"
+      class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center bg-opacity-70"
     >
       <div class="banner-text text-lg flex items-center gap-6">
         <span
           ><span class="font-bold">Double click</span> the display below to
           toggle full screen mode</span
         >
-        -
+        •
         <span class="flex items-center gap-2 font-bold"
           ><Logo class="w-[34px] mb-2" /> Cloud of Worship</span
         >
