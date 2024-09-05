@@ -165,7 +165,13 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
-import type { LibraryItem, Media, BackgroundVideo, Schedule } from "~/types"
+import type {
+  LibraryItem,
+  Media,
+  BackgroundVideo,
+  Schedule,
+  Song,
+} from "~/types"
 import { useOnline } from "@vueuse/core"
 
 useHead({
@@ -555,6 +561,48 @@ function base64ToBlobURL(base64String: string, mimeType: string) {
   return URL.createObjectURL(blob)
 }
 
+const retrieveChurchSongs = async () => {
+  try {
+    const promise = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
+    )
+    const data: Song[] = (await promise.data.value) as unknown as Song[]
+    const libraryData: LibraryItem[] = data?.map((song) => ({
+      id: song.id,
+      type: "song",
+      content: JSON.parse(JSON.stringify(song)),
+      createdAt: song.createdAt,
+      updatedAt: song.updatedAt,
+    }))
+    // const db = useIndexedDB()
+    // const songId =
+    //   props?.song?.id || useURLFriendlyString(`${title.value} ${artist.value}`)
+    // const song: Song = {
+    //   id: songId,
+    //   title: title.value,
+    //   artist: artist.value,
+    //   lyrics: lyrics.value,
+    //   createdBy: "me",
+    // }
+
+    // await db.library.add(
+    //   {
+    //     id: songId,
+    //     type: "song",
+    //     content: song,
+    //     createdAt: props.song?.createdAt || new Date().toISOString(),
+    //     updatedAt: new Date().toISOString(),
+    //   },
+    //   songId
+    // )
+    // Save all church songs to IndexedDB
+    console.log("data", libraryData)
+    await db.library.bulkAdd(libraryData)
+  } catch (err: any) {
+    console.log(err)
+  }
+}
+
 const getChurch = async () => {
   // console.log(authStore.user)
   const churchId = authStore.user?.churchId
@@ -564,6 +612,7 @@ const getChurch = async () => {
     )
     const church = data.value as unknown as Church
     authStore.setChurch(church)
+    retrieveChurchSongs()
     if (error.value) {
       throw new Error(error.value?.message)
     }
@@ -781,7 +830,6 @@ async function openWindows() {
     // TODO: Action when screen count changes
   })
 }
-
 // WINDOW MANAGEMENT CODE ENDS HERE
 </script>
 
