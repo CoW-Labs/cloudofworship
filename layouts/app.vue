@@ -165,7 +165,13 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
-import type { LibraryItem, Media, BackgroundVideo, Schedule } from "~/types"
+import type {
+  LibraryItem,
+  Media,
+  BackgroundVideo,
+  Schedule,
+  Song,
+} from "~/types"
 import { useOnline } from "@vueuse/core"
 
 useHead({
@@ -187,6 +193,8 @@ const cachedVideosURLs = ref<string[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const config = useRuntimeConfig()
 const token = useCookie("token")
+const windowRefs = ref<any[]>([])
+const db = useIndexedDB()
 
 const isAppOnline = computed(() => {
   // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
@@ -195,13 +203,23 @@ const isAppOnline = computed(() => {
   return online.value
 })
 
+provide("windowRefs", windowRefs)
+
 // Get hymn count
-let hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
-  headers: {
-    Authorization: `Bearer ${token.value}`,
-  },
-})
-hymnCount = await hymnCount.json()
+let hymnCount: any
+const hymns = await db.bibleAndHymns.get("hymns")
+if (isAppOnline.value) {
+  hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
+    headers: {
+      Authorization: `Bearer ${token.value}`,
+    },
+  })
+  hymnCount = await hymnCount.json()
+} else {
+  // Handle offline hymn count
+  hymnCount = hymns?.data?.length
+  console.log("hymnCount", hymnCount)
+}
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -232,15 +250,10 @@ emitter.on("close-offline-toast", () => {
 })
 
 emitter.on("go-live", () => {
-  // window.open(
-  //   `http://${window.location.host}/live`,
-  //   "_blank",
-  //   " width=1024, height=768"
-  // )
+  openWindows()
 })
 
 const saveAllBackgroundVideos = async () => {
-  const db = useIndexedDB()
   const savedBgVideo1 = await db.cached.get("/video-bg-1.mp4")
   const savedBgVideo2 = await db.cached.get("/video-bg-2.mp4")
   const savedBgVideo3 = await db.cached.get("/video-bg-3.mp4")
@@ -426,8 +439,7 @@ const downloadEssentialResources = async () => {
   populateBibleVersionOptions()
 
   // Download all hymns
-  tempBible = await db.bibleAndHymns.get("hymns")
-  if (tempBible?.data?.length !== hymnCount) {
+  if (hymns?.data?.length !== hymnCount) {
     db.bibleAndHymns.delete("hymns")
     downloadResource.value = "hymns"
     downloadStep.value = 4
@@ -549,6 +561,36 @@ function base64ToBlobURL(base64String: string, mimeType: string) {
   return URL.createObjectURL(blob)
 }
 
+const retrieveChurchSongs = async () => {
+  try {
+    const countPromise = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
+    )
+    const onlineCount = countPromise.data.value as unknown as number
+    const offlineCount = await db.library.where("type").equals("song").count()
+    if (onlineCount > offlineCount) {
+      // Delete songs that are not in the online database
+      db.library.where("type").equals("song").delete()
+
+      // Add online songs
+      const promise = await useAPIFetch(
+        `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
+      )
+      const data: Song[] = (await promise.data.value) as unknown as Song[]
+      const libraryData: LibraryItem[] = data?.map((song) => ({
+        id: song.id,
+        type: "song",
+        content: JSON.parse(JSON.stringify(song)),
+        createdAt: song.createdAt,
+        updatedAt: song.updatedAt,
+      }))
+      await db.library.bulkAdd(libraryData)
+    }
+  } catch (err: any) {
+    console.log(err)
+  }
+}
+
 const getChurch = async () => {
   // console.log(authStore.user)
   const churchId = authStore.user?.churchId
@@ -558,6 +600,7 @@ const getChurch = async () => {
     )
     const church = data.value as unknown as Church
     authStore.setChurch(church)
+    retrieveChurchSongs()
     if (error.value) {
       throw new Error(error.value?.message)
     }
@@ -685,6 +728,97 @@ onMounted(async () => {
 
 getChurch()
 retrieveAllMediaFilesFromDB()
+
+// WINDOW MANAGEMENT CODE STARTS HERE
+function openWindow(
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  url: string
+) {
+  const windowFeatures = `left=${left},top=${top},width=${width},height=${height}`
+  const windowRef = window.open(
+    url,
+    "_blank", // needed for it to open in a new window
+    windowFeatures
+  )
+
+  if (windowRef === null) {
+    // If the browser is blocking popups, clear out any windows that were able to open
+    useToast().add({
+      title:
+        "Popups are blocked. Ensure you are not blocking popups for this site.",
+      icon: "i-bx-info-circle",
+      color: "red",
+    })
+    closeAllWindows()
+  } else {
+    const tempWindowRefs = windowRefs.value
+    tempWindowRefs.push(windowRef)
+    windowRefs.value = tempWindowRefs
+  }
+}
+
+function closeAllWindows() {
+  windowRefs.value.forEach((windowRef: any) => {
+    windowRef.close()
+  })
+  windowRefs.value = []
+}
+
+async function openWindows() {
+  const screenDetails = await window.getScreenDetails()
+  const noOfScreens = screenDetails.screens.length
+
+  if (noOfScreens === 1) {
+    useToast().add({
+      title:
+        "Only one screen detected. Connect a second screen to project on another display",
+      icon: "i-bx-info-circle",
+    })
+
+    // Two screens or more
+    const screen1 = screenDetails.screens[0]
+    openWindow(
+      screen1.availLeft,
+      screen1.availTop,
+      screen1.availWidth,
+      screen1.availHeight,
+      `http://${window.location.host}/live`
+    )
+  } else {
+    // Two screens or more
+    const screen1 = screenDetails.screens[0]
+    const screen2 = screenDetails.screens[1]
+    openWindow(
+      screen1.availLeft,
+      screen1.availTop,
+      screen2.availWidth,
+      screen2.availHeight,
+      `http://${window.location.host}/live`
+    )
+  }
+
+  const closeMonitor = setInterval(checkWindowClose, 250)
+
+  function checkWindowClose() {
+    if (windowRefs.value.some((windowRef: any) => windowRef.closed)) {
+      closeAllWindows()
+      clearInterval(closeMonitor)
+    }
+  }
+
+  // Also close our popup windows if the main app window is closed
+  window.addEventListener("beforeunload", () => {
+    closeAllWindows()
+  })
+
+  screenDetails.addEventListener("screenschange", () => {
+    // TODO: Action when screen count changes
+  })
+}
+// WINDOW MANAGEMENT CODE ENDS HERE
 </script>
 
 <style scoped></style>

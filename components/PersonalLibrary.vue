@@ -25,7 +25,7 @@
     <div v-if="page !== 'add-song'" class="flex gap-2 come-up-1">
       <UInput
         icon="i-bx-search"
-        :placeholder="`Search saved ${libraryTabs[activeLibraryTab].label}s`"
+        :placeholder="`Search all saved ${libraryTabs[activeLibraryTab].label}s`"
         v-model="searchInput"
         class="w-[100%]"
         @input="onSearchInput"
@@ -64,13 +64,24 @@
               desc="Click the save icon on the Slide card to start saving"
             />
             <SongCard
-              v-for="(song, index) in savedSongs?.slice(0, 15)"
+              v-for="(song, index) in savedSongs?.slice(0, libraryEndIndex)"
               saved
               :key="song.content.id"
               :song="song.content"
               @edit-song="editSong($event)"
               @delete-song="deleteSong($event)"
             />
+
+            <UButton
+              @click="libraryEndIndex = libraryEndIndex + 15"
+              :disabled="libraryEndIndex >= savedSongs?.length"
+              class="mt-2"
+              size="lg"
+              variant="outline"
+              block
+            >
+              See more saved songs
+            </UButton>
           </template>
         </div>
         <!-- SAVED SLIDES -->
@@ -162,6 +173,7 @@ const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const page = ref<string>(props.page || "")
 const songToEdit = ref<Song>()
+const libraryEndIndex = ref<number>(15)
 const libraryItems = useObservable<LibraryItem[]>(
   liveQuery(async () => {
     const data = await useIndexedDB()

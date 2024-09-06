@@ -263,17 +263,13 @@ onMounted(() => {
 })
 
 const activateFullScreen = () => {
-  const toast = useToast()
+  // const toast = useToast()
   const route = useRoute()
   if (props.fullScreen && route.name === "live") {
     if (document.fullscreenElement) {
       document.exitFullscreen()
     } else {
       document.documentElement.requestFullscreen()
-      toast.add({
-        icon: "i-bx-info-circle",
-        title: "Double tap display to exit full screen",
-      })
     }
   }
 }

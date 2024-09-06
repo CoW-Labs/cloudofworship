@@ -58,12 +58,12 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Fixed issues related to signup, improving the registration experience.
-- Optimized asset loading for faster performance by leveraging CloudFront.
-- Improved the Bible search functionality for more accurate and efficient results.
-- Improved signup experience for new users.
-- Added new songs to library.
-- Made minor fixes and improvements.`
+const changelog = `- Added the first stage of media stream recording via NDI, introducing new streaming capabilities.
+- Fixed various issues and made UI changes for a better user experience.
+- Updated the schedule modal to improve its design and functionality.
+- Added pagination for saved songs, making it easier to navigate large song lists.
+- Enabled saving a user’s songs from other devices for seamless access across platforms.
+- Updated the copy and style of the fullscreen prompt for improved clarity and aesthetics.`
 
 const appStore = useAppStore()
 

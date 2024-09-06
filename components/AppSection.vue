@@ -44,14 +44,29 @@
             <UButton
               v-if="secondaryButton.visible && !secondaryButton.confirmAction"
               class="p-1 px-2 whitespace-nowrap"
+              :class="
+                isLiveWindowActive && secondaryButton.action === 'go-live'
+                  ? 'opacity-50 cursor-not-allowed'
+                  : ''
+              "
               size="md"
               :variant="secondaryButton?.variant || 'ghost'"
               :color="secondaryButton.color"
               :icon="secondaryButton.icon"
-              :target="secondaryButton.action === 'go-live' ? '_target' : false"
-              :to="secondaryButton.action === 'go-live' ? '/live' : '#'"
-              @click="useGlobalEmit(secondaryButton.action)"
-              >{{ secondaryButton.label }}</UButton
+              :target="secondaryButton.action === 'go-live' ? false : false"
+              :to="secondaryButton.action === 'go-live' ? '#' : '#'"
+              @click="
+                useGlobalEmit(
+                  isLiveWindowActive && secondaryButton.action === 'go-live'
+                    ? ''
+                    : secondaryButton.action
+                )
+              "
+              >{{
+                isLiveWindowActive && secondaryButton.action === "go-live"
+                  ? "You are live"
+                  : secondaryButton.label
+              }}</UButton
             >
           </div>
         </div>
@@ -64,13 +79,17 @@
 </template>
 
 <script setup>
+import { useAppStore } from "@/store/app"
 const props = defineProps({
   heading: String,
   subHeading: String,
   slotCtnStyles: String,
   headingStyles: String,
   secondaryButtons: Array,
+  isLiveWindowActive: Boolean,
 })
+const appStore = useAppStore()
+const { activeLiveWindows } = storeToRefs(appStore)
 </script>
 
 <style scoped></style>

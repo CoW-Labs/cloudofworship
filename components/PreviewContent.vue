@@ -304,6 +304,7 @@ const mergeSlides = (
 }
 
 const uploadOfflineSlides = async () => {
+  // console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
   const offlineSlides = appStore.activeSlides
     .filter((slide) => slide._id === undefined)
@@ -471,7 +472,7 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
       throw new Error(error.value?.message)
     }
   }
-}, 2000)
+}, 100)
 
 const deleteSlideOnline = async (slide: Slide) => {
   if (slide?._id) {
@@ -928,10 +929,11 @@ const gotoScripture = async (title: string, version: string) => {
     activeSlide.value = tempSlide
     slides.value.splice(slideIndex, 1, tempSlide)
 
+    updateLiveOutput(activeSlide.value)
+
     // Every 10 seconds
     // const debouncedSlideUpdate = useDebounceFn(updateSlideOnline, 10000)
     updateSlideOnline(activeSlide.value)
-    updateLiveOutput(activeSlide.value)
   }
 }
 
