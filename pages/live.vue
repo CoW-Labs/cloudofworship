@@ -16,7 +16,7 @@
         <span class="flex items-center gap-2 font-bold"
           ><Logo class="w-[34px] mb-2" /> Cloud of Worship</span
         >
-        •
+        <!-- •
         <UButton
           size="lg"
           color="black"
@@ -24,7 +24,7 @@
           @click="transmitScreenCapture"
         >
           Stream via NDI
-        </UButton>
+        </UButton> -->
       </div>
     </div>
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
@@ -140,6 +140,7 @@ const startScreenCapture = async () => {
 }
 
 const transmitScreenCapture = async () => {
+  const socket = new WebSocket("ws://localhost:6787/ndi-livestream")
   const captureStream = await startScreenCapture()
   if (captureStream !== null) {
     mediaRecorder.value = new MediaRecorder(captureStream, {
@@ -147,11 +148,12 @@ const transmitScreenCapture = async () => {
     })
     mediaRecorder.value.ondataavailable = (event) => {
       if (event.data.size > 0) {
-        console.log("data available", event.data)
+        socket.send(event.data)
+        // console.log("data available", event.data)
       }
     }
     mediaRecorder.value.onstop = (event) => {
-      console.log("stopped", event)
+      // console.log("stopped", event)
     }
     mediaRecorder.value.start()
 
@@ -160,7 +162,7 @@ const transmitScreenCapture = async () => {
         mediaRecorder.value?.requestData()
       }
     }, 1000 / FPS)
-    console.log("mediaRecorder", mediaRecorder.value)
+    // console.log("mediaRecorder", mediaRecorder.value)
   } else {
     console.log("No capture stream")
   }
