@@ -29,6 +29,7 @@
     "fuzzysort": "^2.0.4",
     "mitt": "^3.0.1",
     "nuxt": "^3.11.2",
+    "nuxt-gtag": "^3.0.1",
     "nuxt-tiptap-editor": "^1.1.0",
     "pinia": "^2.1.7",
     "pinia-shared-state": "^0.5.1",
