@@ -724,6 +724,9 @@ const setCachedVideosURL = async () => {
 onMounted(async () => {
   await downloadEssentialResources()
   overrideAppSettings()
+  if (location.hostname !== "localhost") {
+    useGtag()
+  }
 })
 
 getChurch()
