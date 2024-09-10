@@ -97,13 +97,7 @@ export default defineNuxtConfig({
 
   css: ["~/assets/css/main.css"],
 
-  modules: [
-    "@nuxt/ui",
-    "@vite-pwa/nuxt",
-    "nuxt-tiptap-editor",
-    "@pinia/nuxt",
-    "@pinia-plugin-persistedstate/nuxt",
-  ],
+  modules: ["@nuxt/ui", "@vite-pwa/nuxt", "nuxt-tiptap-editor", "@pinia/nuxt", "@pinia-plugin-persistedstate/nuxt", "nuxt-gtag"],
 
   ui: {
     global: true,
@@ -127,6 +121,10 @@ export default defineNuxtConfig({
 
   pinia: {
     storesDirs: ["./stores/**"],
+  },
+
+  gtag: {
+    id: 'G-Z23FTMP6WE'
   },
 
   pwa: {
