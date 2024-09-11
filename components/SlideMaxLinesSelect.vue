@@ -27,6 +27,8 @@
         },
       }"
       :disabled="disabled"
+      @open="$emit('open')"
+      @close="$emit('close')"
       @change="$emit('change', $event)"
     >
       <template #label>

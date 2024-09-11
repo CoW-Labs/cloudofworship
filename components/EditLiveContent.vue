@@ -1,8 +1,11 @@
 <template>
-  <div class="main relative min-h-[300px] h-[45vh]">
+  <div
+    class="main relative min-h-[300px] h-[45vh]"
+    :class="containerOverflow === 'overflow-x-auto' ? '' : 'overflow-hidden'"
+  >
     <div>
       <div
-        class="toolbar w-[100%] p-2 px-4 min-h-[56px] bg-primary-100 dark:bg-primary-800 rounded-t-md flex items-center justify-between overflow-hidden"
+        class="toolbar w-[100%] p-2 px-4 min-h-[56px] bg-primary-100 dark:bg-primary-800 rounded-t-md flex items-center justify-between"
       >
         <template v-if="slide">
           <TransitionGroup name="list">
@@ -21,7 +24,10 @@
               />
             </div>
           </TransitionGroup>
-          <div class="actions flex items-center ml-6">
+          <div
+            class="actions flex items-center ml-6"
+            :class="containerOverflow"
+          >
             <!-- <FontSelect
             v-if="slide?.type === slideTypes?.text"
             size="sm"
@@ -46,7 +52,7 @@
                 slide?.type === slideTypes?.hymn ||
                 slide?.type === slideTypes?.song
               "
-              class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-1 mr-0"
+              class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-1 mr-0 relative"
             >
               <UTooltip text="Previous verse" :popper="{ arrow: true }">
                 <UButton
@@ -111,8 +117,10 @@
               @goto-verse="$emit('goto-verse', $event)"
             />
             <BibleVersionSelect
-              class="bg-primary-200 dark:bg-primary-900 rounded-r-md mr-1 flex items-center gap-1 h-[36px]"
               v-if="slide?.type === slideTypes?.bible"
+              class="bg-primary-200 dark:bg-primary-900 rounded-r-md mr-1 flex items-center gap-1 h-[36px] relative min-w-[80px]"
+              @open="containerOverflow = ''"
+              @close="containerOverflow = 'overflow-x-auto'"
               @change="$emit('update-bible-version', $event)"
             />
             <!-- <UPopover
@@ -323,6 +331,7 @@ const bgColorPopoverOpen = ref<boolean>(false)
 const slideContents = ref<Array<string>>([])
 const verse = ref<string | undefined>(props.slide?.title)
 const searchedBibleBookOptions = ref<string[]>([])
+const containerOverflow = ref<string>("overflow-x-auto")
 
 const animatedSlides = computed(() => {
   if (props.slide) {

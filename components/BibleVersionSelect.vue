@@ -1,7 +1,7 @@
 <template>
   <div class="select-menu-ctn w-[80px]">
     <USelectMenu
-      class="absolute top-[14px] border-0 shadow-none max-w-[80px] pr-1"
+      class="absolute border-0 shadow-none max-w-[80px] pr-1"
       searchable
       searchable-placeholder="Search version"
       select-class="bg-white dark:bg-primary-800 border-3 shadow-none outline-none w-[16ch] text-center"
@@ -28,6 +28,8 @@
           size: 'text-xs',
         },
       }"
+      @open="$emit('open')"
+      @close="$emit('close')"
       @change="
         $event === '+ More Versions'
           ? useGlobalEmit('open-settings', 'Bible Version Settings')
