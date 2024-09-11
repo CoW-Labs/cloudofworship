@@ -25,7 +25,12 @@
     </div>
   </div>
   <div class="button-ctn p-2 pt-0">
-    <label class="relative">
+    <FileDropzone
+      size="sm"
+      @change="saveAndSelectImage($event?.[0])"
+      class="max-w-[200px]"
+    />
+    <!-- <label class="relative">
       <input
         type="file"
         name=""
@@ -37,7 +42,7 @@
       <UButton class="z-1" block variant="outline" icon="i-bx-plus" size="xs"
         >Add from device</UButton
       >
-    </label>
+    </label> -->
   </div>
 </template>
 
@@ -89,6 +94,7 @@ const getAllLocallySavedImages = async () => {
 }
 
 const saveAndSelectImage = async (file: any) => {
+  console.log("file", file)
   const db = useIndexedDB()
   const randomId = useID(6)
   const tempMedia: Media = {
