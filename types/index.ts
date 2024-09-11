@@ -148,9 +148,9 @@ export interface AppSettings {
   defaultBibleVersion: string,
   defaultFont: string,
   defaultBackground: {
-    hymn: { backgroundType: string, background: string },
-    bible: { backgroundType: string, background: string },
-    text: { backgroundType: string, background: string },
+    hymn: { backgroundType: string, background: string, backgroundVideoKey: string },
+    bible: { backgroundType: string, background: string, backgroundVideoKey: string },
+    text: { backgroundType: string, background: string, backgroundVideoKey: string },
   },
   slideStyles: SlideStyle
 }

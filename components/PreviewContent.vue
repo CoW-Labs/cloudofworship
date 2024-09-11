@@ -272,9 +272,9 @@ const preSlideCreation = (): Slide => {
     churchId: authStore?.user?.churchId as string,
     scheduleId: appStore.activeSchedule?._id as string,
     slideStyle: {
-      alignment: "left",
+      alignment: appStore.settings.slideStyles.alignment,
       fontSizePercent: 100,
-      font: "Inter",
+      font: appStore.settings.defaultFont,
       isMediaMuted: true,
       isMediaPlaying: false,
     },
