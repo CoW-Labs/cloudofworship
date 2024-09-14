@@ -58,12 +58,11 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added the first stage of media stream recording via NDI, introducing new streaming capabilities.
-- Fixed various issues and made UI changes for a better user experience.
-- Updated the schedule modal to improve its design and functionality.
-- Added pagination for saved songs, making it easier to navigate large song lists.
-- Enabled saving a user’s songs from other devices for seamless access across platforms.
-- Updated the copy and style of the fullscreen prompt for improved clarity and aesthetics.`
+const changelog = `- Added more app settings to give users greater control and customization options.
+- Fixed issues with scrollable slide toolbars for smoother navigation.
+- Added a file dropzone feature to background selection, simplifying media uploads.
+- Resolved layout and playback issues for a more stable user experience.
+- Updated app icons to enhance the visual appearance and branding.`
 
 const appStore = useAppStore()
 

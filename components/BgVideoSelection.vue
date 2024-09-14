@@ -27,7 +27,12 @@
       </UButton>
     </div>
     <div class="button-ctn pt-2">
-      <label class="relative">
+      <FileDropzone
+        size="sm"
+        icon="i-bx-film"
+        @change="saveAndSelectVideo($event?.[0])"
+      />
+      <!-- <label class="relative">
         <input
           type="file"
           name=""
@@ -39,7 +44,7 @@
         <UButton class="z-1" block variant="outline" icon="i-bx-plus" size="xs"
           >Add from device</UButton
         >
-      </label>
+      </label> -->
     </div>
   </div>
 </template>

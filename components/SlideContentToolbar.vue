@@ -1,6 +1,7 @@
 <template>
   <div
     class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] py-1 right-0 left-0 top-[45px]"
+    :class="containerOverflow"
   >
     <UTooltip
       v-if="slide?.type === slideTypes.media"
@@ -136,12 +137,10 @@
       v-if="slide?.type !== slideTypes?.media"
       size="lg"
       :selected-font="slide?.slideStyle?.font"
+      class="min-w-[170px] top-[-4px]"
+      @open="containerOverflow = ''"
+      @close="containerOverflow = 'overflow-x-auto'"
       @change="$emit('update-font', $event)"
-    />
-    <SlideMaxLinesSelect
-      v-if="slide?.type === slideTypes?.song"
-      :selected-line="slide?.slideStyle?.linesPerSlide"
-      @change="$emit('update-lines-per-slide', $event)"
     />
     <div
       v-if="slide?.type !== slideTypes?.media"
@@ -187,6 +186,14 @@
         />
       </UTooltip>
     </div>
+    <SlideMaxLinesSelect
+      v-if="slide?.type === slideTypes?.song"
+      :selected-line="slide?.slideStyle?.linesPerSlide"
+      class="min-w-[120px] top-[-4px]"
+      @open="containerOverflow = ''"
+      @close="containerOverflow = 'overflow-x-auto'"
+      @change="$emit('update-lines-per-slide', $event)"
+    />
     <!-- COUNTDOWN SLIDE CONTROLS -->
     <div
       v-if="slide?.type === slideTypes.countdown"
@@ -299,6 +306,7 @@ const props = defineProps<{
 const backgroundFillType = ref<string>("")
 const slideFontSize = ref<number>(0)
 const isLoading = ref<boolean>(false)
+const containerOverflow = ref<string>("overflow-x-auto")
 const emit = defineEmits(["update-song-lyrics"])
 
 watch(

@@ -272,9 +272,9 @@ const preSlideCreation = (): Slide => {
     churchId: authStore?.user?.churchId as string,
     scheduleId: appStore.activeSchedule?._id as string,
     slideStyle: {
-      alignment: "left",
+      alignment: appStore.settings.slideStyles.alignment,
       fontSizePercent: 100,
-      font: "Inter",
+      font: appStore.settings.defaultFont,
       isMediaMuted: true,
       isMediaPlaying: false,
     },
@@ -304,7 +304,7 @@ const mergeSlides = (
 }
 
 const uploadOfflineSlides = async () => {
-  // console.log("uploading offline slides")
+  console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
   const offlineSlides = appStore.activeSlides
     .filter((slide) => slide._id === undefined)
@@ -455,7 +455,14 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
     tempSlide.backgroundVideoKey = ""
   }
 
-  if (slide?._id) {
+  // If slide is a media (video) slide, do not update it
+  if (
+    slide?._id &&
+    !(
+      slide.type === slideTypes.media &&
+      slide.backgroundType === backgroundTypes.video
+    )
+  ) {
     appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
       `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/${slide?._id}`,

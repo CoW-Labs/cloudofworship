@@ -4,14 +4,17 @@
     @dragover.prevent="onDragOver"
     @dragleave.prevent="onDragLeave"
     @drop.prevent="onDrop"
-    :class="{ 'border-primary-500': isDragOver }"
+    :class="{
+      'border-primary-500': isDragOver,
+      'p-2 min-h-[100px]': size === 'sm',
+    }"
   >
     <input type="file" ref="fileInput" @change="onFileSelect" multiple hidden />
 
     <IconWrapper
-      name="i-bx-image"
-      size="12"
-      class="py-6 mb-8 w-full"
+      :name="icon"
+      :size="size === 'sm' ? '7' : '12'"
+      :class="[size === 'sm' ? 'w-[100px] mb-4 py-4' : 'py-6 mb-8 w-full']"
       rounded-bg
     ></IconWrapper>
     <div class="texts">
@@ -19,7 +22,13 @@
         <span class="text-md">Drag & Drop</span> or
         <span class="text-md">Copy & Paste</span>
       </p>
-      <p class="text-sm mb-6">image, video or audio files.</p>
+      <p
+        v-if="size !== 'sm'"
+        class="text-sm mb-6"
+        :class="{ 'text-xs': size === 'sm' }"
+      >
+        image, video or audio files.
+      </p>
     </div>
 
     <!-- <UButton icon="i-bx-plus" @click.prevent="openFileDialog"
@@ -31,6 +40,16 @@
 <script setup>
 import { ref, reactive } from "vue"
 
+const props = defineProps({
+  size: {
+    type: String,
+    default: "lg",
+  },
+  icon: {
+    type: String,
+    default: "i-bx-image",
+  },
+})
 const toast = useToast()
 const fileInput = ref(null)
 const isDragOver = ref(false)
@@ -59,6 +78,25 @@ const openFileDialog = () => {
 }
 
 const handleFiles = (selectedFiles) => {
+  console.log("selectedFiles", selectedFiles)
+  if (props.size === "sm" && props.icon === "i-bx-image") {
+    if (!selectedFiles?.[0]?.type.startsWith("image")) {
+      return toast.add({
+        title: "Please select only images",
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+    }
+  }
+  if (props.size === "sm" && props.icon === "i-bx-film") {
+    if (!selectedFiles?.[0]?.type.startsWith("video")) {
+      return toast.add({
+        title: "Please select only videos",
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+    }
+  }
   for (let i = 0; i < selectedFiles.length; i++) {
     files.push(selectedFiles[i])
   }

@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="editor"
-    class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] p-1 right-0 left-0 top-[45px]"
+    class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] p-1 right-0 left-0 top-[45px] overflow-x-auto"
   >
     <UButton
       @click="editor.chain().focus().toggleBold().run()"
