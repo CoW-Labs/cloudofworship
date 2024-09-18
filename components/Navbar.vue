@@ -198,6 +198,14 @@ emitter?.on("open-settings", (data) => {
 emitter?.on("open-schedule-modal", (data) => {
   scheduleModalVisible.value = true
 })
+
+emitter?.on("open-invite-modal", () => {
+  inviteModalVisible.value = true
+})
+
+emitter?.on("toggle-dark-mode", () => {
+  isDark.value = !isDark.value
+})
 </script>
 
 <style scoped></style>
