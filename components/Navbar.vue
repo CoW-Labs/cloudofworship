@@ -149,7 +149,6 @@
 <script setup>
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import { format } from "timeago.js"
 const route = useRoute()
 const darkMode = ref(false)
 const settingsModalOpen = ref(false)
@@ -183,14 +182,20 @@ onMounted(() => {
   }
 })
 
-appStore.emitter.on("close-modal", () => {
+const emitter = useNuxtApp().$emitter || appStore.emitter
+
+emitter?.on("close-modal", () => {
   settingsModalOpen.value = false
   settingsPage.value = ""
 })
 
-appStore.emitter.on("open-settings", (data) => {
+emitter?.on("open-settings", (data) => {
   settingsModalOpen.value = true
   settingsPage.value = data
+})
+
+emitter?.on("open-schedule-modal", (data) => {
+  scheduleModalVisible.value = true
 })
 </script>
 

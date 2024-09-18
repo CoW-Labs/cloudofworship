@@ -51,7 +51,7 @@
             :sub="
               $pwa.offlineReady
                 ? 'App ready to work offline'
-                : 'New content available, click on reload button to update'
+                : 'New version available, click on reload button to update'
             "
             :action="$pwa.offlineReady ? 'cancel-pwa-refresh' : 'pwa-refresh'"
             :action-text="$pwa.offlineReady ? 'Got it' : 'Reload'"

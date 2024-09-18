@@ -40,6 +40,12 @@ appStore.setEmitter(emitter)
 
 const appVersion = ref<string>("0.8.4")
 
+onMounted(() => {
+  setTimeout(() => {
+    emitter.emit("open-schedule-modal")
+  }, 2000)
+})
+
 // const registerServiceWorker = async () => {
 //   if ("serviceWorker" in navigator) {
 //     try {

@@ -176,9 +176,9 @@ export const useAppStore = defineStore('app', {
       this.bannerVisible = bannerVisible
     },
     setBibleVersions(bibleVersions: Array<any>) {
-      this.bibleVersions = []
-      this.bibleVersions = bibleVersions
-      this.settings.bibleVersions = bibleVersions
+      // this.bibleVersions = []
+      // this.bibleVersions = [...bibleVersions]
+      this.settings = { ...this.settings, bibleVersions: bibleVersions }
     },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)
