@@ -40,6 +40,9 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
         appStore.setDefaultBibleVersion('KJV');
         break;
     }
+    if (!scripture) {
+      throw new Error('Scripture not found')
+    }
 
     return {
       label: `${bibleBooks?.[Number(book) - 1]} ${chapter}:${verse}`,
