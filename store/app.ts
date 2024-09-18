@@ -45,7 +45,8 @@ export const useAppStore = defineStore('app', {
             backgroundVideoKey: '/video-bg-4.mp4'
           }
         },
-        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4 } as SlideStyle
+        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4 } as SlideStyle,
+        bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
       },
       backgroundVideos: [] as BackgroundVideo[],
       alerts: [] as Alert[],
@@ -55,21 +56,13 @@ export const useAppStore = defineStore('app', {
       slidesLoading: false as boolean,
       lastSynced: new Date().toISOString() as string,
       bannerVisible: true as boolean,
-      bibleVersions: [
-        { id: 'KJV', name: 'King James Version', isDownloaded: false, copyrightContent: '' },
-        { id: 'NKJV', name: 'New King James Version', isDownloaded: false, copyrightContent: 'Scripture taken from the New King James Version®. Copyright © 1982 by Thomas Nelson. All rights reserved.' },
-        { id: 'NIV', name: 'New International Version', isDownloaded: false, copyrightContent: 'Scriptures taken from the Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.™ All rights reserved worldwide.' },
-        { id: 'AMP', name: 'Amplified Bible', isDownloaded: false, copyrightContent: 'All Scripture quotations, unless otherwise indicated, are taken from the Amplified Bible, Copyright © 2015 by The Lockman Foundation.' },
-        { id: 'NLT', name: 'New Living Translation', isDownloaded: false, copyrightContent: 'Scripture quotations marked (NLT) are taken from the Holy Bible, New Living Translation, copyright ©1996, 2004, 2015 by Tyndale House Foundation.' },
-        // { id: 'TPT', name: 'The Passion Translation', isDownloaded: false, copyrightContent: '' },
-        // { id: 'GNT', name: 'Good News Translation', isDownloaded: false, copyrightContent: '' },
-        { id: 'CEV', name: 'Contemporary English Version', isDownloaded: false, copyrightContent: 'Scripture quotations marked (CEV) are from the Contemporary English Version Copyright © 1991, 1992, 1995 by American Bible Society.' },
-      ],
+      bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
       // activeLiveWindows: [] as any[]
     }
   },
   getters: {
-    activeScheduleSlides: (state) => state.activeSlides?.filter(slide => slide.scheduleId === (state.activeSchedule?._id))
+    activeScheduleSlides: (state) => state.activeSlides?.filter(slide => slide.scheduleId === (state.activeSchedule?._id)),
+    bibleVersions: (state) => state.settings.bibleVersions
   },
   actions: {
     setSchedules(schedules: Schedule[]) {
@@ -183,7 +176,9 @@ export const useAppStore = defineStore('app', {
       this.bannerVisible = bannerVisible
     },
     setBibleVersions(bibleVersions: Array<any>) {
+      this.bibleVersions = []
       this.bibleVersions = bibleVersions
+      this.settings.bibleVersions = bibleVersions
     },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)

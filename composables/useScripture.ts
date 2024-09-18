@@ -17,37 +17,28 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
   let scripture = ''
 
   try {
+    async function fetchScripture(version: string, db: any, book: number, chapter: number, verse: number): Promise<string | undefined> {
+      const bibleData = (await db.bibleAndHymns.get(version))?.data as unknown as BibleVerse[];
+      return bibleData?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse)?.scripture;
+    }
+
     switch (version) {
       case 'NKJV':
-        const nkjvBible = (await db.bibleAndHymns.get('NKJV'))?.data as unknown as BibleVerse[]
-        scripture = nkjvBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
-        appStore.setDefaultBibleVersion(version)
-        break
       case 'NIV':
-        const nivBible = (await db.bibleAndHymns.get('NIV'))?.data as unknown as BibleVerse[]
-        scripture = nivBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
-        appStore.setDefaultBibleVersion(version)
-        break
       case 'AMP':
-        const ampBible = (await db.bibleAndHymns.get('AMP'))?.data as unknown as BibleVerse[]
-        scripture = ampBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
-        appStore.setDefaultBibleVersion(version)
-        break
       case 'NLT':
-        const nltBible = (await db.bibleAndHymns.get('NLT'))?.data as unknown as BibleVerse[]
-        scripture = nltBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
-        appStore.setDefaultBibleVersion(version)
-        break
       case 'CEV':
-        const cevBible = (await db.bibleAndHymns.get('CEV'))?.data as unknown as BibleVerse[]
-        scripture = cevBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
-        appStore.setDefaultBibleVersion(version)
-        break
+      case 'YLT':
+      case 'ASV':
+      case 'MSG':
+      case 'WEB':
+        scripture = await fetchScripture(version, db, book, chapter, verse) as string;
+        appStore.setDefaultBibleVersion(version);
+        break;
       default:
-        const kjvBible = (await db.bibleAndHymns.get('KJV'))?.data as unknown as BibleVerse[]
-        scripture = kjvBible?.find((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter && Number(scripture.verse) === verse).scripture
-        appStore.setDefaultBibleVersion(version)
-        break
+        scripture = await fetchScripture('KJV', db, book, chapter, verse) as string;
+        appStore.setDefaultBibleVersion('KJV');
+        break;
     }
 
     return {

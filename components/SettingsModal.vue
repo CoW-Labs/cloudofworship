@@ -265,6 +265,7 @@ const bibleDownloadProgress = ref<string>("0")
 const bibleVersion = ref(appStore.settings.defaultBibleVersion)
 const bibleVersionLoading = ref<boolean | string>(false)
 const { bibleVersions } = storeToRefs(appStore)
+console.log("bibleVersions", bibleVersions.value)
 const bibleVersionOptions = ref<Array<any>>(bibleVersions.value)
 const bibleVersionSelectOptions = computed(() =>
   [
