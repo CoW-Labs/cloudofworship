@@ -14,6 +14,34 @@ export const libraryTypes = {
   slide: 'slide',
 }
 
+export const appWideActions = {
+  newBible: 'new-bible',
+  newHymn: 'new-hymn',
+  newSong: 'new-song',
+  newSlide: 'new-slide',
+  newMedia: 'new-media',
+  newLibrary: 'new-library',
+  newAlert: 'new-alert',
+  addSong: 'add-song',
+  removeAlert: 'remove-alert',
+  newCountdown: 'new-countdown',
+  newSearchBible: 'new-search-bible',
+  goLive: 'go-live',
+  openSettings: 'open-settings',
+  newActiveSlide: 'new-active-slide',
+  deleteSlide: 'delete-slide',
+  showChangelog: 'show-changelog',
+  refreshSlides: 'refresh-slides',
+  startCountdown: 'start-countdown',
+  restartCountdown: 'restart-countdown',
+  stopCountdown: 'stop-countdown',
+  mediaSeek: 'media-seek',
+  appLoading: 'app-loading',
+  gotoVerse: 'goto-verse',
+  deleteScheduleSlides: 'delete-schedule-slides',
+  openScheduleModal: 'open-schedule-modal',
+}
+
 export const quickActionsArr = [
   {
     icon: "i-bx-bible",
@@ -117,7 +145,7 @@ export const quickActionsArr = [
     icon: "i-ph-file-ppt",
     name: "Import Slides",
     desc: "Extract from other apps like PowerPoint",
-    action: "new-transcribe",
+    action: "new-ppt",
     meta: "power point Google slides",
     unreleased: true,
     // type: slideTypes.text

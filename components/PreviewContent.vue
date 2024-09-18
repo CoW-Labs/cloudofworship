@@ -79,6 +79,7 @@ import { merge } from "rxjs"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Hymn, Scripture, Slide, Song, Countdown, Schedule } from "~/types"
+import { appWideActions } from "~/utils/constants"
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const churchId = authStore.user?.churchId
@@ -566,7 +567,7 @@ const onUpdateSlide = (slide: Slide) => {
   // console.log("updated", slide)
   // Always pause countdown slide before updating it
   if (slide.type === slideTypes.countdown) {
-    useGlobalEmit("start-countdown", slide)
+    useGlobalEmit(appWideActions.startCountdown, slide)
   }
   makeSlideActive(slide)
   const slideIndex = slides.value?.findIndex(
@@ -582,7 +583,7 @@ const onUpdateSlide = (slide: Slide) => {
 
   // when updating of countdown slide is done, continue timer
   if (slide.type === slideTypes.countdown) {
-    useGlobalEmit("start-countdown", slide)
+    useGlobalEmit(appWideActions.startCountdown, slide)
   }
 }
 
@@ -740,7 +741,7 @@ const createNewMediaSlide = async (
 }
 
 const createMultipleNewMediaSlides = async (files: any[]) => {
-  useGlobalEmit("app-loading", true)
+  useGlobalEmit(appWideActions.appLoading, true)
   const multipleSlidesPromise: Promise<any>[] = []
   files?.forEach((file) => {
     multipleSlidesPromise.push(
@@ -749,7 +750,7 @@ const createMultipleNewMediaSlides = async (files: any[]) => {
   })
   await Promise.all(multipleSlidesPromise)
   uploadOfflineSlides()
-  useGlobalEmit("app-loading", false)
+  useGlobalEmit(appWideActions.appLoading, false)
   toast.add({ title: "Media slides created", icon: "i-bx-image" })
 }
 
@@ -882,7 +883,7 @@ const updateLiveOutput = (updatedSlide: Slide) => {
 }
 
 const gotoAction = (title: string, version: string) => {
-  useGlobalEmit("goto-verse", title)
+  useGlobalEmit(appWideActions.gotoVerse, title)
   title = title
     .replaceAll("  ", " ")
     .replaceAll(" :", ":")

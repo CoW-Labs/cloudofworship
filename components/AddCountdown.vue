@@ -67,6 +67,7 @@
 </template>
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+import { appWideActions } from "~/utils/constants"
 import type { Countdown } from "~/types"
 import type { Emitter } from "mitt"
 
@@ -86,6 +87,6 @@ const createCountdown = async () => {
     time: time.value,
     timeLeft: time.value,
   }
-  emitter.emit("new-countdown", countdown)
+  useGlobalEmit(appWideActions.newCountdown, countdown)
 }
 </script>

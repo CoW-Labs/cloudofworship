@@ -32,7 +32,7 @@
       @close="$emit('close')"
       @change="
         $event === '+ More Versions'
-          ? useGlobalEmit('open-settings', 'Bible Version Settings')
+          ? useGlobalEmit(appWideActions.openSettings, 'Bible Version Settings')
           : (bibleVersion = $event)
       "
     >
@@ -41,7 +41,7 @@
           <UButton
             size="xs"
             class="w-full h-[30px] whitespace-nowrap absolute bottom-0 right-0 left-0"
-            @click="useGlobalEmit('open-settings', 'bible-version')"
+            @click="useGlobalEmit(appWideActions.openSettings, 'bible-version')"
           >
             <IconWrapper name="i-bx-plus" size="4" /> Add more
           </UButton>
@@ -54,6 +54,7 @@
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+import { appWideActions } from "~/utils/constants"
 
 const appStore = useAppStore()
 const { settings, bibleVersions } = storeToRefs(appStore)
@@ -72,7 +73,7 @@ const bibleVersionOptions = computed(() =>
 
 watch(bibleVersion, (newValue, oldValue) => {
   if (newValue === "+ More Versions") {
-    useGlobalEmit("open-settings", "Bible Version Settings")
+    useGlobalEmit(appWideActions.openSettings, "Bible Version Settings")
     bibleVersion.value = oldValue
   }
   emit("change", newValue)

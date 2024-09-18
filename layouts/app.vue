@@ -173,6 +173,7 @@ import type {
   Song,
 } from "~/types"
 import { useOnline } from "@vueuse/core"
+import { appWideActions } from "~/utils/constants"
 
 useHead({
   title: "Cloud of Worship",
@@ -476,7 +477,7 @@ const overrideAppSettings = () => {
 
     // console.log("calling again")
     setTimeout(() => {
-      useGlobalEmit("show-changelog")
+      useGlobalEmit(appWideActions.showChangelog)
     }, 2000)
 
     // Any setting added here overrides user and previous system setting

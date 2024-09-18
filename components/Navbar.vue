@@ -14,7 +14,7 @@
         <h1 class="text-md font-semibold">Cloud of Worship</h1>
         <UButton
           class="version-chip flex text-xs font-semibold bg-primary-200 p-2 py-1 rounded-full border border-transparent hover:bg-primary-300 hover:border-primary-900 transition-all text-primary-900"
-          @click="useGlobalEmit('show-changelog')"
+          @click="useGlobalEmit(appWideActions.showChangelog)"
         >
           Beta v{{ appVersion }}
         </UButton>
@@ -59,7 +59,7 @@
             variant="ghost"
             class="h-10 w-48 opacity-65 transition-all"
             :class="{ 'w-12': !online }"
-            @click="useGlobalEmit('refresh-slides')"
+            @click="useGlobalEmit(appWideActions.refreshSlides)"
           >
             <div v-show="online" class="last-synced-ctn flex">
               <UButton variant="ghost" class="h-10">
@@ -149,6 +149,7 @@
 <script setup>
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
+import { appWideActions } from "~/utils/constants"
 const route = useRoute()
 const darkMode = ref(false)
 const settingsModalOpen = ref(false)

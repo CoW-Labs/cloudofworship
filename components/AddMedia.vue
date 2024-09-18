@@ -125,6 +125,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { appWideActions } from "~/utils/constants"
 import type { Emitter } from "mitt"
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -148,7 +149,7 @@ const fileObjs = computed(() => {
 })
 
 const addMediaEmitter = () => {
-  emitter.emit("new-media", fileObjs.value)
+  useGlobalEmit(appWideActions.newMedia, fileObjs.value)
   files.value = []
   emit("close")
 }

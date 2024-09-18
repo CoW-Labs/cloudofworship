@@ -169,8 +169,10 @@ const foregroundContentVisible = ref<boolean>(true)
 const isLargePreviewOpen = ref<boolean>(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
+const route = useRoute()
 // const previousSlideVideo = ref<HTMLVideoElement | null>(null)
 const { liveSlideId } = storeToRefs(appStore)
+const emit = defineEmits(["activate-fullscreen"])
 
 const props = defineProps<{
   slideLabel: Boolean
@@ -201,6 +203,9 @@ watch(
   () => props.slide,
   (newVal, oldVal) => {
     try {
+      if (process.client && props.fullScreen && route.name === "live") {
+        document.documentElement.requestFullscreen()
+      }
       if (appMounted && props.slide.id === liveSlideId.value) {
         // console.log(video.value)
         // if (newVal.type === slideTypes.media) {
@@ -248,11 +253,18 @@ watch(
   }
 )
 
+onBeforeMount(() => {
+  // if (props.fullScreen) {
+  //   document.addEventListener("mouseover", () => {
+  //     document.documentElement.requestFullscreen()
+  //   })
+  // }
+})
+
 onMounted(() => {
   appMounted.value = true
   // try {
   video.value?.play()
-  // } catch (err) {}
 
   // emitter.on("media-seek", (seekPosition: string) => {
   //   // video.value?.fastSeek(Number(seekPosition))
@@ -270,6 +282,7 @@ const activateFullScreen = () => {
       document.exitFullscreen()
     } else {
       document.documentElement.requestFullscreen()
+      emit("activate-fullscreen")
     }
   }
 }

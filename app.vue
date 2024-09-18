@@ -31,6 +31,7 @@
 import mitt from "mitt"
 import type { AppSettings } from "./types"
 import { useAppStore } from "./store/app"
+import { appWideActions } from "./utils/constants"
 
 const nuxtApp = useNuxtApp()
 const emitter = mitt()
@@ -42,7 +43,7 @@ const appVersion = ref<string>("0.8.4")
 
 onMounted(() => {
   setTimeout(() => {
-    emitter.emit("open-schedule-modal")
+    useGlobalEmit(appWideActions.openScheduleModal)
   }, 2000)
 })
 

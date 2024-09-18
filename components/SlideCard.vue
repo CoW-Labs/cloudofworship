@@ -69,7 +69,7 @@
         header="Delete slide"
         button-styles="px-1.5 text-white hover:bg-primary"
         label="Are you sure you want to delete this slide? This action is not reversible"
-        @confirm="useGlobalEmit('delete-slide', slide)"
+        @confirm="useGlobalEmit(appWideActions.deleteSlide, slide)"
       >
       </ConfirmDialog>
     </div>
@@ -112,7 +112,9 @@
           size="xs"
           variant="ghost"
           class="px-1 text-primary-500 hover:bg-primary-white"
-          @click.stop.prevent="useGlobalEmit('new-active-slide', slide)"
+          @click.stop.prevent="
+            useGlobalEmit(appWideActions.newActiveSlide, slide)
+          "
         />
       </UTooltip>
     </div>
@@ -120,6 +122,7 @@
 </template>
 
 <script setup lang="ts">
+import { appWideActions } from "~/utils/constants"
 import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
 

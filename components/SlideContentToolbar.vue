@@ -120,7 +120,7 @@
         <UButton
           @click="
             () => {
-              useGlobalEmit('media-seek', '0')
+              useGlobalEmit(appWideActions.mediaSeek, '0')
               $emit('update-media-seek-position')
             }
           "
@@ -201,7 +201,7 @@
     >
       <UTooltip text="Start/pause countdown" :popper="{ placement: 'top' }">
         <UButton
-          @click="useGlobalEmit('start-countdown', slide)"
+          @click="useGlobalEmit(appWideActions.startCountdown, slide)"
           :class="[
             'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
           ]"
@@ -214,7 +214,7 @@
       </UTooltip>
       <UTooltip text="Restart countdown" :popper="{ placement: 'top' }">
         <UButton
-          @click="useGlobalEmit('restart-countdown', slide)"
+          @click="useGlobalEmit(appWideActions.restartCountdown, slide)"
           :class="[
             'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
           ]"
@@ -297,6 +297,7 @@
 
 <script setup lang="ts">
 import type { Slide } from "~/types"
+import { appWideActions } from "~/utils/constants"
 
 const MAX_FONT_SIZE = 125
 const MIN_FONT_SIZE = 80

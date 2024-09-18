@@ -1,7 +1,7 @@
 <template>
   <button
     class="action-card flex gap-3 p-2 py-4 border-t first:border-t-0 border-gray-100 dark:border-primary-950 hover:rounded-md hover:bg-primary-50 dark:hover:bg-primary-800 transition-all cursor-pointer text-left w-[100%]"
-    @click="useGlobalEmit('new-bible', bibleQuery)"
+    @click="useGlobalEmit(appWideActions.newBible, bibleQuery)"
   >
     <IconWrapper
       name="i-bx-history"
@@ -18,6 +18,7 @@
 </template>
 <script setup lang="ts">
 import type { QuickAction } from "~/types"
+import { appWideActions } from "~/utils/constants"
 
 const props = defineProps<{
   bibleQuery: string
