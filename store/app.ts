@@ -57,6 +57,7 @@ export const useAppStore = defineStore('app', {
       lastSynced: new Date().toISOString() as string,
       bannerVisible: true as boolean,
       bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
+      activeSocket: null as WebSocket | null,
       // activeLiveWindows: [] as any[]
     }
   },
@@ -179,6 +180,9 @@ export const useAppStore = defineStore('app', {
       // this.bibleVersions = []
       // this.bibleVersions = [...bibleVersions]
       this.settings = { ...this.settings, bibleVersions: bibleVersions }
+    },
+    setActiveSocket(socket: WebSocket) {
+      this.activeSocket = socket
     },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)

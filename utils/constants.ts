@@ -15,6 +15,7 @@ export const libraryTypes = {
 }
 
 export const appWideActions = {
+  liveTransfer: 'live-transfer',
   newBible: 'new-bible',
   newHymn: 'new-hymn',
   newSong: 'new-song',
@@ -43,6 +44,9 @@ export const appWideActions = {
   toggleDarkMode: 'toggle-dark-mode',
   joinCommunity: 'join-community',
   openInviteModal: 'open-invite-modal',
+  liveSlideIdTransfer: 'live-slide-id-transfer',
+  liveActiveSlidesTransfer: 'live-active-slides-transfer',
+  liveSettingsTransfer: 'live-settings-transfer',
 }
 
 export const quickActionsArr = [

@@ -63,6 +63,46 @@ const liveSlide = computed(() => {
   return activeSlides.value.find((slide) => slide.id === liveSlideId.value)
 })
 
+// LISTEN TO STATE CHANGES FOR SOCKET BROADCAST
+const socket = await useSocket()
+watch(liveSlideId, (newVal, oldVal) => {
+  console.log("liveSlideId", newVal)
+  socket.send(
+    JSON.stringify({
+      type: appWideActions.liveSlideIdTransfer,
+      data: newVal,
+    })
+  )
+})
+
+watch(
+  activeSlides,
+  (newVal, oldVal) => {
+    console.log("activeSlides", newVal)
+    socket.send(
+      JSON.stringify({
+        type: appWideActions.liveActiveSlidesTransfer,
+        data: newVal,
+      })
+    )
+  },
+  { deep: true }
+)
+
+watch(
+  settings,
+  (newVal, oldVal) => {
+    console.log("settings", newVal)
+    socket.send(
+      JSON.stringify({
+        type: appWideActions.liveSettingsTransfer,
+        data: newVal,
+      })
+    )
+  },
+  { deep: true }
+)
+
 useHead({
   title: "CoW Live",
   link: [
@@ -113,6 +153,11 @@ onMounted(() => {
   window.addEventListener("mozfullscreenchange", checkFullScreen)
   window.addEventListener("MSFullscreenChange", checkFullScreen)
 
+  window.addEventListener("DOMContentLoaded", () => {
+    console.log("DOMContentLoaded")
+    // document.documentElement.requestFullscreen()
+  })
+
   checkFullScreen()
 
   //  Capture screen on load
@@ -140,7 +185,7 @@ const startScreenCapture = async () => {
 }
 
 const transmitScreenCapture = async () => {
-  const socket = new WebSocket("ws://localhost:6787/ndi-livestream")
+  const socket = await useSocket()
   const captureStream = await startScreenCapture()
   if (captureStream !== null) {
     mediaRecorder.value = new MediaRecorder(captureStream, {
