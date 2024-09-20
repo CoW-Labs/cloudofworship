@@ -39,7 +39,7 @@ const appStore = useAppStore()
 nuxtApp.provide("emitter", emitter)
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("0.8.4")
+const appVersion = ref<string>("0.8.5")
 
 onMounted(() => {
   setTimeout(() => {
