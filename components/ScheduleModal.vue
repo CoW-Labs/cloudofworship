@@ -147,6 +147,7 @@ import { useAppStore } from "~/store/app"
 import type { Church, User } from "~/store/auth"
 import { useAuthStore } from "~/store/auth"
 import type { Schedule } from "~/types"
+import { appWideActions } from "~/utils/constants"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -302,7 +303,7 @@ const deleteSchedule = (scheduleId: string) => {
 
   // TODO: network call to delete schedule on BE
   deleteScheduleOnline(scheduleId)
-  useGlobalEmit("delete-schedule-slides", scheduleId)
+  useGlobalEmit(appWideActions.deleteScheduleSlides, scheduleId)
 
   emit("close")
 }

@@ -43,7 +43,7 @@
               'bg-red-100 dark:bg-red-900': liveSlide?.id === slide?.id,
             }"
             @click="appStore.setLiveSlide(slide?.id || '0')"
-            @dblclick="useGlobalEmit('new-active-slide', slide)"
+            @dblclick="useGlobalEmit(appWideActions.newActiveSlide, slide)"
           >
             <div
               class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
@@ -78,7 +78,9 @@
                   size="xs"
                   variant="ghost"
                   class="px-1 text-primary-500 hover:bg-primary-white"
-                  @click.stop.prevent="useGlobalEmit('new-active-slide', slide)"
+                  @click.stop.prevent="
+                    useGlobalEmit(appWideActions.newActiveSlide, slide)
+                  "
                 />
               </UTooltip>
 
@@ -88,7 +90,7 @@
                 button-color="red"
                 header="Delete slide"
                 label="Are you sure you want to delete this slide? This action is not reversible"
-                @confirm="useGlobalEmit('delete-slide', slide)"
+                @confirm="useGlobalEmit(appWideActions.deleteSlide, slide)"
               >
               </ConfirmDialog>
             </div>
@@ -110,6 +112,7 @@
 <script setup lang="ts">
 import draggable from "vuedraggable"
 import { useAppStore } from "~/store/app"
+import { appWideActions } from "~/utils/constants"
 import type { Slide } from "~/types"
 
 const appStore = useAppStore()

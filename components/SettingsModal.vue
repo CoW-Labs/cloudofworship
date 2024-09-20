@@ -140,7 +140,7 @@
                       @change="
                         $event === '+ More Versions'
                           ? useGlobalEmit(
-                              'open-settings',
+                              appWideActions.openSettings,
                               'Bible Version Settings'
                             )
                           : appStore.setDefaultBibleVersion($event)
@@ -240,6 +240,7 @@
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+import { appWideActions } from "~/utils/constants"
 import type { Church, User } from "~/store/auth"
 import { useAuthStore } from "~/store/auth"
 

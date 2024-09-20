@@ -57,13 +57,15 @@
               :to="secondaryButton.action === 'go-live' ? '#' : '#'"
               @click="
                 useGlobalEmit(
-                  isLiveWindowActive && secondaryButton.action === 'go-live'
+                  isLiveWindowActive &&
+                    secondaryButton.action === appWideActions.goLive
                     ? ''
                     : secondaryButton.action
                 )
               "
               >{{
-                isLiveWindowActive && secondaryButton.action === "go-live"
+                isLiveWindowActive &&
+                secondaryButton.action === appWideActions.goLive
                   ? "You are live"
                   : secondaryButton.label
               }}</UButton
@@ -80,6 +82,7 @@
 
 <script setup>
 import { useAppStore } from "@/store/app"
+import { appWideActions } from "~/utils/constants"
 const props = defineProps({
   heading: String,
   subHeading: String,

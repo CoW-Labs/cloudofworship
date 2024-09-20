@@ -17,32 +17,28 @@ const useScriptureChapter = async (label: string = '1:1', version: string = ''):
   let verses = []
 
   try {
+    async function fetchVerses(version: string, db: any, book: number, chapter: number): Promise<any[]> {
+      const bibleData = (await db.bibleAndHymns.get(version))?.data as unknown as BibleVerse[];
+      return bibleData?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter);
+    }
+
     switch (version) {
       case 'NKJV':
-        const nkjvBible = (await db.bibleAndHymns.get('NKJV'))?.data as unknown as BibleVerse[]
-        verses = nkjvBible?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter)
-        appStore.setDefaultBibleVersion(version)
-        break
       case 'NIV':
-        const nivBible = (await db.bibleAndHymns.get('NIV'))?.data as unknown as BibleVerse[]
-        verses = nivBible?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter)
-        appStore.setDefaultBibleVersion(version)
-        break
       case 'AMP':
-        const ampBible = (await db.bibleAndHymns.get('AMP'))?.data as unknown as BibleVerse[]
-        verses = ampBible?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter)
-        appStore.setDefaultBibleVersion(version)
-        break
       case 'NLT':
-        const nltBible = (await db.bibleAndHymns.get('NLT'))?.data as unknown as BibleVerse[]
-        verses = nltBible?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter)
-        appStore.setDefaultBibleVersion(version)
-        break
+      case 'CEV':
+      case 'YLT':
+      case 'ASV':
+      case 'MSG':
+      case 'WEB':
+        verses = await fetchVerses(version, db, book, chapter) as any[];
+        appStore.setDefaultBibleVersion(version);
+        break;
       default:
-        const kjvBible = (await db.bibleAndHymns.get('KJV'))?.data as unknown as BibleVerse[]
-        verses = kjvBible?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter)
-        appStore.setDefaultBibleVersion(version)
-        break
+        verses = await fetchVerses('KJV', db, book, chapter) as any[];
+        appStore.setDefaultBibleVersion('KJV');
+        break;
     }
 
     return {

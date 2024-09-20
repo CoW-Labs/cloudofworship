@@ -77,8 +77,8 @@
                     : (verse?.length || 10) + 2
                 }ch`"
                 @focus="$event.target.select()"
-                @keydown.tab.prevent="predictVerseInput"
-                @keydown.arrow-right.prevent="predictVerseInput"
+                @keydown.tab.prevent="predictVerseInput($event.target)"
+                @keydown.arrow-right.prevent="predictVerseInput($event.target)"
                 @keydown.enter="$emit('goto-verse', verse)"
               />
               <UTooltip text="Next verse" :popper="{ arrow: true }">
@@ -102,7 +102,7 @@
             <BibleAutoComplete
               v-if="slide?.type === slideTypes.bible && !verse?.includes(':')"
               :verse="verse"
-              @goto-book="predictVerseInput($event)"
+              @goto-book="predictVerseInput(undefined, $event)"
               @book-options="searchedBibleBookOptions = $event"
             />
             <PreviewVerses
@@ -493,17 +493,42 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
   }
 }
 
-const predictVerseInput = (specificBook?: string) => {
+const predictVerseInput = (
+  element: HTMLElement | undefined,
+  specificBook?: string
+) => {
   if (verse.value?.trim()) {
+    console.log(specificBook)
     const bibleVerseInput = document.getElementById("bible-verse-input")
     if (typeof specificBook === "string") {
-      verse.value = `${specificBook} `
+      verse.value = `${specificBook} 1:1`
+      setTimeout(() => {
+        bibleVerseInput?.setSelectionRange(
+          specificBook.length + 1,
+          specificBook.length + 2
+        )
+        bibleVerseInput?.focus()
+      }, 1000)
     } else if (verse.value.endsWith(" ")) {
-      verse.value = `${verse.value?.trim()} 1:`
+      // verse.value = `${verse.value?.trim()} 1:`
+      // DO nothing
+    } else if (verse.value?.includes(":")) {
+      setTimeout(() => {
+        element?.setSelectionRange(
+          verse.value?.indexOf(":") + 1,
+          verse.value?.indexOf(":") + 2
+        )
+        element?.focus()
+      }, 100)
     } else if (searchedBibleBookOptions.value?.[0]) {
-      verse.value = `${searchedBibleBookOptions.value?.[0]} `
-    } else if (!verse.value?.includes(":")) {
-      verse.value = `${verse.value?.trim()}:1`
+      verse.value = `${searchedBibleBookOptions.value?.[0]} 1:1`
+      setTimeout(() => {
+        element?.setSelectionRange(
+          searchedBibleBookOptions.value?.[0].length + 1,
+          searchedBibleBookOptions.value?.[0].length + 2
+        )
+        element?.focus()
+      }, 100)
     } else {
       // do nothing
     }

@@ -58,11 +58,11 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added more app settings to give users greater control and customization options.
-- Fixed issues with scrollable slide toolbars for smoother navigation.
-- Added a file dropzone feature to background selection, simplifying media uploads.
-- Resolved layout and playback issues for a more stable user experience.
-- Updated app icons to enhance the visual appearance and branding.`
+const changelog = `- Added support for public domain Bible verses and the MSG translation.
+- Added more quick actions for easier navigation.
+- Improved access to scriptures for better performance.
+- Implemented clear labeling and structure for app-wide actions.
+- The schedule modal now opens on load, with various fixes.`
 
 const appStore = useAppStore()
 

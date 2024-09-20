@@ -31,6 +31,7 @@
 import mitt from "mitt"
 import type { AppSettings } from "./types"
 import { useAppStore } from "./store/app"
+import { appWideActions } from "./utils/constants"
 
 const nuxtApp = useNuxtApp()
 const emitter = mitt()
@@ -38,7 +39,13 @@ const appStore = useAppStore()
 nuxtApp.provide("emitter", emitter)
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("0.8.4")
+const appVersion = ref<string>("0.8.5")
+
+onMounted(() => {
+  setTimeout(() => {
+    useGlobalEmit(appWideActions.openScheduleModal)
+  }, 2000)
+})
 
 // const registerServiceWorker = async () => {
 //   if ("serviceWorker" in navigator) {
