@@ -64,44 +64,44 @@ const liveSlide = computed(() => {
 })
 
 // LISTEN TO STATE CHANGES FOR SOCKET BROADCAST
-const socket = await useSocket()
-watch(liveSlideId, (newVal, oldVal) => {
-  console.log("liveSlideId", newVal)
-  socket.send(
-    JSON.stringify({
-      type: appWideActions.liveSlideIdTransfer,
-      data: newVal,
-    })
-  )
-})
+// const socket = await useSocket()
+// watch(liveSlideId, (newVal, oldVal) => {
+//   console.log("liveSlideId", newVal)
+//   socket.send(
+//     JSON.stringify({
+//       type: appWideActions.liveSlideIdTransfer,
+//       data: newVal,
+//     })
+//   )
+// })
 
-watch(
-  activeSlides,
-  (newVal, oldVal) => {
-    console.log("activeSlides", newVal)
-    socket.send(
-      JSON.stringify({
-        type: appWideActions.liveActiveSlidesTransfer,
-        data: newVal,
-      })
-    )
-  },
-  { deep: true }
-)
+// watch(
+//   activeSlides,
+//   (newVal, oldVal) => {
+//     console.log("activeSlides", newVal)
+//     socket.send(
+//       JSON.stringify({
+//         type: appWideActions.liveActiveSlidesTransfer,
+//         data: newVal,
+//       })
+//     )
+//   },
+//   { deep: true }
+// )
 
-watch(
-  settings,
-  (newVal, oldVal) => {
-    console.log("settings", newVal)
-    socket.send(
-      JSON.stringify({
-        type: appWideActions.liveSettingsTransfer,
-        data: newVal,
-      })
-    )
-  },
-  { deep: true }
-)
+// watch(
+//   settings,
+//   (newVal, oldVal) => {
+//     console.log("settings", newVal)
+//     socket.send(
+//       JSON.stringify({
+//         type: appWideActions.liveSettingsTransfer,
+//         data: newVal,
+//       })
+//     )
+//   },
+//   { deep: true }
+// )
 
 useHead({
   title: "CoW Live",
