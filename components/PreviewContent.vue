@@ -640,7 +640,7 @@ const createNewHymnSlide = (hymn: Hymn) => {
   tempSlide.backgroundType =
     appStore.settings.defaultBackground.hymn.backgroundType
   tempSlide.songId = hymn.number
-  tempSlide.hasChorus = !!hymn.chorus
+  tempSlide.hasChorus = hymn.chorus === "false" ? false : !!hymn.chorus
   tempSlide.title = "Verse 1"
   tempSlide.name = useSlideName(tempSlide)
 
@@ -1033,13 +1033,46 @@ const gotoChorus = async () => {
 const saveSlide = async (item: Slide) => {
   const db = useIndexedDB()
   const tempItem = { ...item }
-  const tempSong = { ...tempItem?.data } as Song
+  let tempSong = { ...tempItem?.data } as Song
+
+  // If slide is a hymn slide, convert it to a song
+  if (tempItem.type === slideTypes.hymn) {
+    const hymn = await useHymn(tempItem.songId as string)
+    const verses = [...hymn?.verses]
+    if (hymn?.chorus !== "false") {
+      verses.splice(1, 0, hymn?.chorus)
+    }
+    const lyrics = verses.join("\n")
+    verses.push(verses[0])
+    tempSong = {
+      id: useID(),
+      title: hymn?.title || "",
+      artist: hymn?.author || "",
+      lyrics: lyrics || "",
+      createdBy: "me",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+  }
+
   tempItem.slideStyle = { ...tempItem?.slideStyle }
   tempItem.contents = [...tempItem?.contents]
   tempItem.data = { ...tempItem.data } as any
   try {
     if (tempItem.type === slideTypes.song) {
       tempSong.verses = [...tempSong?.verses!!] as []
+      await db.library.add(
+        {
+          id: tempSong.id,
+          type: "song",
+          content: tempSong,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        tempSong.id
+      )
+      toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
+    } else if (tempItem.type === slideTypes.hymn) {
       await db.library.add(
         {
           id: tempSong.id,
