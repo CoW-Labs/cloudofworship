@@ -640,7 +640,7 @@ const createNewHymnSlide = (hymn: Hymn) => {
   tempSlide.backgroundType =
     appStore.settings.defaultBackground.hymn.backgroundType
   tempSlide.songId = hymn.number
-  tempSlide.hasChorus = !!hymn.chorus
+  tempSlide.hasChorus = hymn.chorus === "false" ? false : !!hymn.chorus
   tempSlide.title = "Verse 1"
   tempSlide.name = useSlideName(tempSlide)
 
