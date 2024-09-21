@@ -54,12 +54,21 @@
         v-if="
           slide?.type === slideTypes.text ||
           slide?.type === slideTypes.media ||
+          slide?.type === slideTypes.hymn ||
           slide?.type === slideTypes.song
         "
         button-icon="i-bx-save"
-        header="Save to Library"
+        :header="
+          slide?.type === slideTypes.hymn
+            ? 'Save Hymn as Song'
+            : 'Save to Library'
+        "
         button-styles="px-1.5 text-white hover:bg-primary"
-        label="You are about to save this slide to your library for quick and easy access in the future. Continue?"
+        :label="
+          slide?.type === slideTypes.hymn
+            ? 'You are about to save this hymn as a song for easy update, song slide benefits and future access. Continue?'
+            : 'You are about to save this slide to your library for quick and easy access in the future. Continue?'
+        "
         @confirm="$emit('save-slide', slide?.id)"
       >
       </ConfirmDialog>

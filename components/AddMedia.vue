@@ -59,6 +59,12 @@
           }})</span
         >
       </h3>
+      <UButton
+        class="mb-2 w-[100%] flex justify-between"
+        trailing-icon="i-bx-chevron-right"
+        @click="addMediaEmitter"
+        >Create Slides</UButton
+      >
       <Transition name="fade-sm">
         <div
           class="grid gap-1 max-h-[200px] overflow-auto rounded-md overflow-x-hidden"
@@ -115,12 +121,6 @@
           </div>
         </div>
       </Transition>
-      <UButton
-        class="mt-2 w-[100%] flex justify-between"
-        trailing-icon="i-bx-chevron-right"
-        @click="addMediaEmitter"
-        >Create Slides</UButton
-      >
     </div>
   </div>
 </template>

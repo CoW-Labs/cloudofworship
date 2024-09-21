@@ -58,9 +58,10 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added support for public domain Bible verses and the MSG translation.
+const changelog = `- Added support for public domain Bible verses and the MSG translation (log out to enable).
 - Added more quick actions for easier navigation.
 - Improved access to scriptures for better performance.
+- Convert hymn slides to song slides for song slide benefits.
 - Implemented clear labeling and structure for app-wide actions.
 - The schedule modal now opens on load, with various fixes.`
 
