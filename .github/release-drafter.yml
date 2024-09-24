@@ -1,0 +1,12 @@
+name: 'Release {{tagName}}'
+
+categories:
+  - 'Bug Fixes':
+      label: 'bug'
+      title: 'Bug Fixes'
+  - 'Features':
+      label: 'enhancement'
+      title: 'New Features'
+  - 'Performance Improvements':
+      label: 'chore'
+      title: 'Performance Improvements'
