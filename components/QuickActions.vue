@@ -304,8 +304,9 @@ onMounted(() => {
 })
 
 const bibleChapterAndVerse = computed(() => {
-  const regex = /\b\d+\s*:\s*\d+\b/g
-  return searchInput.value.match(regex)?.[0]?.replaceAll(" ", "")
+  const regex = /\b\d+\s*:\s*\d+\b|\b\d+\s\d+\b/g
+  const match = searchInput.value.match(regex)?.[0]?.replaceAll(" ", ":")
+  return match?.trim()
 })
 
 const searchedActions = computed(() => {

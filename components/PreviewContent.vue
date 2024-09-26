@@ -901,6 +901,12 @@ const gotoAction = (title: string, version: string) => {
 }
 
 const gotoScripture = async (title: string, version: string) => {
+  // Check whether title format uses colon or not as delimiter, and replace if not
+  const regex = /\b\d+\s*:\s*\d+\b|\b\d+\s\d+\b/g
+  const match = title.match(regex)?.[0]?.replaceAll(" ", ":")
+  if (match) {
+    title = title.replace(regex, match)
+  }
   // Check that [title] is not abbreviated or in short form
   // If it is, replace to long/unabbreviated form
   let bibleBook = title.substring(0, title?.lastIndexOf(" "))
