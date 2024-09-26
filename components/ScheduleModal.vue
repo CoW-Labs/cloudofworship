@@ -119,6 +119,7 @@
                 :schedule="schedule"
                 @select="(schedule: Schedule) => {
                   appStore.setActiveSchedule(schedule)
+                  useGlobalEmit(appWideActions.selectedSchedule, schedule)
                   $emit('close')
                 }"
                 @delete="deleteSchedule($event)"

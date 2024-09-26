@@ -40,6 +40,7 @@ export const appWideActions = {
   appLoading: 'app-loading',
   gotoVerse: 'goto-verse',
   deleteScheduleSlides: 'delete-schedule-slides',
+  selectedSchedule: 'selected-schedule',
   openScheduleModal: 'open-schedule-modal',
   toggleDarkMode: 'toggle-dark-mode',
   joinCommunity: 'join-community',

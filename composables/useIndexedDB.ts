@@ -29,20 +29,7 @@ class WorshipCloudDatabase extends Dexie {
     })
   }
 
-  // LAST UPDATED: When [createdAt, updatedAt] was added to tables
-  // TODO: Remove code by June 2024
-  public async newSchemaUpdate() {
-    const date = '2024-05-01T00:00:00.000Z'
-    // Update library tables
-    const newLibraryRows = await this.library.where('createdAt').startsWithIgnoreCase('2024').primaryKeys()
-    const oldLibraryRows = await this.library.where('id').noneOf(newLibraryRows).primaryKeys()
-    this.library.bulkUpdate(oldLibraryRows?.map(row => ({ key: row, changes: { createdAt: date, updatedAt: date } })))
-
-    // Update media tables
-    const newMediaRows = await this.media.where('createdAt').startsWithIgnoreCase('2024').primaryKeys()
-    const oldMediaRows = await this.media.where('id').noneOf(newMediaRows).primaryKeys()
-    this.media.bulkUpdate(oldMediaRows?.map(row => ({ key: row, changes: { createdAt: date, updatedAt: date } })))
-  }
+  // REMOVED A CODE BLOCK FROM HERE IN SEPTEMBER 2024, GOD IS GOOD, REMEMBER :)
 }
 
 const useIndexedDB = () => {

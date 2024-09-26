@@ -545,7 +545,6 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   if (!itemSaved) {
     await db.media.delete(slideId)
   }
-  // await db.media.delete(slideId)
 
   if (addToast) {
     toast.add({ title: `${tempSlide?.name} deleted`, icon: "i-tabler-trash" })

@@ -251,6 +251,12 @@ emitter.on("close-offline-toast", () => {
   isOfflineToastOpen.value = false
 })
 
+emitter.on("selected-schedule", (schedule: Schedule) => {
+  setTimeout(() => {
+    retrieveAllMediaFilesFromDB()
+  }, 1000)
+})
+
 emitter.on("go-live", () => {
   openWindows()
 })
