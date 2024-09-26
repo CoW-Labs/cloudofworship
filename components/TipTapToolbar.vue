@@ -1,7 +1,8 @@
 <template>
   <div
     v-if="editor"
-    class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] p-1 right-0 left-0 top-[45px] overflow-x-auto"
+    class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] p-1 right-0 left-0 top-[45px]"
+    :class="containerOverflow"
   >
     <UButton
       @click="editor.chain().focus().toggleBold().run()"
@@ -127,8 +128,10 @@
       />
     </div>
     <TipTapFontSelect
-      @change="editor.chain().focus().setFontFamily($event).run()"
       :editor="editor"
+      @change="editor.chain().focus().setFontFamily($event).run()"
+      @open="containerOverflow = ''"
+      @close="containerOverflow = 'overflow-x-auto'"
     />
     <UButton
       @click="editor.chain().focus().toggleBlockquote().run()"
@@ -155,7 +158,7 @@
 const props = defineProps({
   editor: Object,
 })
-
+const containerOverflow = ref("overflow-x-auto")
 const isEmpty = (obj) => Object.keys(obj).length === 0
 
 const toggleHeading = (level) => {

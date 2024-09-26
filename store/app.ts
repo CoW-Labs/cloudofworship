@@ -45,7 +45,7 @@ export const useAppStore = defineStore('app', {
             backgroundVideoKey: '/video-bg-4.mp4'
           }
         },
-        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4 } as SlideStyle,
+        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center' } as SlideStyle,
         bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
       },
       backgroundVideos: [] as BackgroundVideo[],

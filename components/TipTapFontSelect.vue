@@ -30,6 +30,8 @@
       }"
       :disabled="disabled"
       @change="$emit('change', $event)"
+      @open="$emit('open')"
+      @close="$emit('close')"
     >
       <template #label>
         <IconWrapper name="i-bx-font-family" size="4"> </IconWrapper>

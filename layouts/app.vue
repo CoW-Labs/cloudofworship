@@ -171,6 +171,7 @@ import type {
   BackgroundVideo,
   Schedule,
   Song,
+  SlideStyle,
 } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { appWideActions } from "~/utils/constants"
@@ -502,6 +503,13 @@ const overrideAppSettings = () => {
           backgroundVideoKey: "/video-bg-4.mp4",
         },
       },
+      slideStyles: {
+        blur: 0.5,
+        brightness: 50,
+        linesPerSlide: 4,
+        alignment: "center",
+      } as SlideStyle,
+      bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
     })
 
     // console.log("calling setBibleVersions")
