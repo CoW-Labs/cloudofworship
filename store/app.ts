@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import type { Alert, AppSettings, BackgroundVideo, Schedule, Slide, SlideStyle } from '~/types/index'
 import type { Emitter } from 'mitt'
+import { bibleVersionObjects } from '~/utils/constants';
 
 // console.log(usePinia())
 function ensureUniqueIds(arr: Slide[]): Slide[] {
@@ -45,7 +46,7 @@ export const useAppStore = defineStore('app', {
             backgroundVideoKey: '/video-bg-4.mp4'
           }
         },
-        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4 } as SlideStyle,
+        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center' } as SlideStyle,
         bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
       },
       backgroundVideos: [] as BackgroundVideo[],
@@ -56,7 +57,7 @@ export const useAppStore = defineStore('app', {
       slidesLoading: false as boolean,
       lastSynced: new Date().toISOString() as string,
       bannerVisible: true as boolean,
-      bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
+      bibleVersions: bibleVersionObjects as Array<any>, // Check app.vue for bible versions array in a list
       activeSocket: null as WebSocket | null,
       // activeLiveWindows: [] as any[]
     }
@@ -215,7 +216,8 @@ export const useAppStore = defineStore('app', {
             backgroundVideoKey: '/video-bg-4.mp4'
           }
         },
-        slideStyles: { blur: 0.5, brightness: 50 } as SlideStyle
+        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center' } as SlideStyle,
+        bibleVersions: bibleVersionObjects, // Check app.vue for bible versions array in a list
       })
       this.setBackgroundVideos([])
       this.setAlerts([])

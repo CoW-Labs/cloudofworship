@@ -34,6 +34,8 @@
         }"
         :options="Object.values(backgroundFillTypes)"
         @change="$emit('update-bg-fill-type', $event)"
+        @open="containerOverflow = ''"
+        @close="containerOverflow = 'overflow-x-auto'"
       >
         <template #label>
           <IconWrapper name="i-mdi-arrow-expand-vertical" size="4">
