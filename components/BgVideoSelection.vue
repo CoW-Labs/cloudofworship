@@ -74,17 +74,50 @@ const backgroundVideos = ref<BackgroundVideo[]>(appStore.backgroundVideos)
 const getAllLocallySavedVideos = async () => {
   const db = useIndexedDB()
   const videos = await db.cached.where({ content: "video" }).toArray()
+  const videoTypes = [
+    ".mp4",
+    ".webm",
+    ".mov",
+    ".wmv",
+    ".avi",
+    ".mkv",
+    ".ogg",
+    ".flv",
+  ]
 
   // Create Object URLs from locally saved images
   const locallySavedVideos: BackgroundVideo[] = []
   videos.forEach((video) => {
     const blobURL = URL.createObjectURL(video.data as unknown as Blob)
-    locallySavedVideos.push({ id: video.id, url: blobURL })
-    if (video.id === bgVideoToBeSelected.value) {
-      bgVideoToBeSelected.value = blobURL
+    if (
+      video.id?.includes(videoTypes[0]) ||
+      video.id?.includes(videoTypes[1]) ||
+      video.id?.includes(videoTypes[2]) ||
+      video.id?.includes(videoTypes[3]) ||
+      video.id?.includes(videoTypes[4]) ||
+      video.id?.includes(videoTypes[5])
+    ) {
+      locallySavedVideos.push({ id: video.id, url: blobURL })
+      if (video.id === bgVideoToBeSelected.value) {
+        bgVideoToBeSelected.value = blobURL
+      }
+    } else {
+      return // Ignore non-video files
     }
   })
-  backgroundVideos.value = backgroundVideos.value.concat(locallySavedVideos)
+  console.log("locallySavedVideos", locallySavedVideos)
+  console.log("backgroundVideos", backgroundVideos.value)
+  // if (backgroundVideos.value.length > 0) {
+  //   backgroundVideos.value = backgroundVideos.value.concat(locallySavedVideos)
+  // } else {
+  //   backgroundVideos.value = locallySavedVideos
+  // }
+  locallySavedVideos.forEach((video) => {
+    if (backgroundVideos.value.find((bgVideo) => bgVideo.id === video.id)) {
+      return
+    }
+    backgroundVideos.value.push(video)
+  })
   // console.log(backgroundVideos.value)
 }
 
