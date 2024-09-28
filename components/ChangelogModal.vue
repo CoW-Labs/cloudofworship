@@ -58,12 +58,12 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added support for public domain Bible verses and the MSG translation (log out to enable).
-- Added more quick actions for easier navigation.
-- Improved access to scriptures for better performance.
-- Convert hymn slides to song slides for song slide benefits.
-- Implemented clear labeling and structure for app-wide actions.
-- The schedule modal now opens on load, with various fixes.`
+const changelog = `- Feature for users to convert hymn and song slides for hymn features
+- Fix issue with duplicate images/videos on background media selection modal.
+- Fixed issue with slide backgrounds not loading after selecting schedule.
+- Added 600+ native yoruba hymns
+- Added multiple text content to help and support users on cloudofworship.com/blog
+- Made minor fixes and changes to enhance user experience.`
 
 const appStore = useAppStore()
 
