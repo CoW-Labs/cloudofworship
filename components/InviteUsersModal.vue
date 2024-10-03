@@ -62,6 +62,7 @@
             >
               <div class="photo-name flex gap-4 items-center font-medium">
                 <UAvatar
+                  :src="member?.avatar"
                   :text="member?.fullname?.split(' ')?.[0]?.[0]"
                   size="sm"
                   :ui="{

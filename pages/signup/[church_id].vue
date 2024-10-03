@@ -237,6 +237,9 @@ const handleGoogleSignUp = async () => {
   const { data, error } = await useAPIFetch("/auth/signup/google", {
     method: "POST",
     headers: { "x-access-token": `Bearer ${user?.accessToken}` },
+    body: {
+      churchId,
+    },
   })
   if (error.value) {
     useToast().add({
