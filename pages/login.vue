@@ -55,6 +55,17 @@
       >
         Log In
       </UButton>
+      <UButton
+        block
+        size="lg"
+        class="mt-0"
+        color="white"
+        :loading="loading"
+        @click="handleGoogleSignIn"
+      >
+        <GoogleIcon />
+        Sign in with Google
+      </UButton>
       <p class="text-sm flex items-center justify-center gap-0">
         I don't have an account.
         <UButton size="sm" class="p-1" variant="link" to="/signup"
@@ -74,6 +85,7 @@ definePageMeta({
 const authStore = useAuthStore()
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
+const googleSignIn = inject("handleGoogleSignIn")
 // console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()
@@ -117,6 +129,33 @@ const login = async () => {
     navigateTo("/")
   }
   loading.value = false
+}
+
+const handleGoogleSignIn = async () => {
+  const { user } = await googleSignIn()
+  // console.log(user)
+
+  const { data, error } = await useAPIFetch("/auth/login/google", {
+    method: "POST",
+    headers: { "x-access-token": `Bearer ${user?.accessToken}` },
+  })
+
+  if (error.value) {
+    toast.add({
+      title: error.value?.data?.message,
+      color: "red",
+      icon: "i-bx-error",
+    })
+  } else {
+    token.value = data.value.token
+    authStore.setUser(data.value?.data?.user)
+    toast.add({
+      title: `Successful login as ${user?.email}`,
+      color: "green",
+      icon: "i-bx-check-circle",
+    })
+    navigateTo("/")
+  }
 }
 </script>
 

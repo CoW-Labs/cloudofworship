@@ -207,6 +207,30 @@ const isAppOnline = computed(() => {
 
 provide("windowRefs", windowRefs)
 
+// Get Church Info and see if registered
+const getChurch = async () => {
+  // console.log(authStore.user)
+  const churchId = authStore.user?.churchId
+  if (churchId) {
+    const { data, error } = await useAPIFetch(
+      `/church/${churchId}?teammates=true`
+    )
+    const church = data.value as unknown as Church
+    authStore.setChurch(church)
+    retrieveChurchSongs()
+    if (error.value) {
+      throw new Error(error.value?.message)
+    }
+  } else {
+    navigateTo("/signup?registerChurch=1")
+    useToast().add({
+      icon: "i-bx-church",
+      title: "Add your church in less than 1 minute to continue.",
+    })
+  }
+}
+getChurch()
+
 // Get hymn count
 let hymnCount: any
 const hymns = await db.bibleAndHymns.get("hymns")
@@ -564,28 +588,6 @@ const retrieveChurchSongs = async () => {
   }
 }
 
-const getChurch = async () => {
-  // console.log(authStore.user)
-  const churchId = authStore.user?.churchId
-  if (churchId) {
-    const { data, error } = await useAPIFetch(
-      `/church/${churchId}?teammates=true`
-    )
-    const church = data.value as unknown as Church
-    authStore.setChurch(church)
-    retrieveChurchSongs()
-    if (error.value) {
-      throw new Error(error.value?.message)
-    }
-  } else {
-    navigateTo("/signup?registerChurch=1")
-    useToast().add({
-      icon: "i-bx-church",
-      title: "Add your church in less than 1 minute to continue.",
-    })
-  }
-}
-
 const retrieveSchedules = async () => {
   if (isAppOnline.value) {
     downloadProgress.value = "0"
@@ -702,7 +704,6 @@ onMounted(async () => {
   }
 })
 
-getChurch()
 retrieveAllMediaFilesFromDB()
 
 // WINDOW MANAGEMENT CODE STARTS HERE
