@@ -62,6 +62,7 @@
       <UButton
         class="mb-2 w-[100%] flex justify-between"
         trailing-icon="i-bx-chevron-right"
+        :loading="imageCompressionLoading"
         @click="addMediaEmitter"
         >Create Slides</UButton
       >
@@ -128,6 +129,7 @@
 import { appWideActions } from "~/utils/constants"
 import type { Emitter } from "mitt"
 
+const imageCompressionLoading = ref(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const files = ref()
 const emit = defineEmits(["close"])
@@ -148,8 +150,26 @@ const fileObjs = computed(() => {
   return tempArr
 })
 
-const addMediaEmitter = () => {
-  useGlobalEmit(appWideActions.newMedia, fileObjs.value)
+const addMediaEmitter = async () => {
+  imageCompressionLoading.value = true
+  // console.log("uncompressedFiles", fileObjs.value)
+  const compressedFiles = await Promise.all(
+    fileObjs.value.map(async (fileObj) => {
+      let compressedFile = fileObj.blob
+      if (fileObj.type.includes("image")) {
+        compressedFile = await useCompressedImage(fileObj.blob)
+      }
+      URL.revokeObjectURL(fileObj.url)
+      return {
+        ...fileObj,
+        blob: compressedFile,
+        url: URL.createObjectURL(compressedFile),
+      }
+    })
+  )
+  // console.log("compressedFiles", compressedFiles)
+  imageCompressionLoading.value = false
+  useGlobalEmit(appWideActions.newMedia, compressedFiles)
   files.value = []
   emit("close")
 }

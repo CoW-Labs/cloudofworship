@@ -504,7 +504,7 @@ const overrideAppSettings = () => {
   // console.log(currentAppSettings.appVersion, props.appVersion)
   if (currentAppSettings.appVersion !== props.appVersion) {
     const db = useIndexedDB()
-    db.newSchemaUpdate()
+    // db.newSchemaUpdate()
 
     // console.log("calling again")
     setTimeout(() => {

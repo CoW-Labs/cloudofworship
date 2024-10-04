@@ -45,6 +45,10 @@ const props = defineProps({
     type: String,
     default: "lg",
   },
+  maxFileSize: {
+    type: Number,
+    default: 3, // Currently only for images
+  },
   icon: {
     type: String,
     default: "i-bx-image",
@@ -98,9 +102,27 @@ const handleFiles = (selectedFiles) => {
     }
   }
   for (let i = 0; i < selectedFiles.length; i++) {
-    files.push(selectedFiles[i])
+    if (isFileSizeExceeded(selectedFiles[i])) {
+      files.push(selectedFiles[i])
+    }
   }
   emit("change", files)
+}
+
+// Currently only for images
+const isFileSizeExceeded = (file) => {
+  if (
+    file.size > props.maxFileSize * 1024 * 1024 &&
+    file.type.startsWith("image")
+  ) {
+    toast.add({
+      title: `File size exceeds ${props.maxFileSize}MB`,
+      icon: "i-bx-info-circle",
+      color: "red",
+    })
+    return false
+  }
+  return true
 }
 
 const handlePaste = (event) => {
@@ -115,11 +137,13 @@ const handlePaste = (event) => {
       }
     }
   }
-  toast.add({
-    icon: "i-bx-check-circle",
-    title: `Pasted ${filesFromClipboard.length} files`,
-  })
-  handleFiles(filesFromClipboard)
+  if (filesFromClipboard.length > 0) {
+    toast.add({
+      icon: "i-bx-check-circle",
+      title: `Pasted ${filesFromClipboard.length} files`,
+    })
+    handleFiles(filesFromClipboard)
+  }
 }
 
 onMounted(() => {
