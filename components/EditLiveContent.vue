@@ -389,7 +389,7 @@ const onSelectLayout = (data: string) => {
 
 const onSelectBackground = (
   backgroundType: string,
-  data: { video: string; key: string } // could be an object or just a [data] string containing image_url/color
+  data: { video: string; key: string } // type of { imageUrl: string; file: any } for image, or { videoUrl: string; key: string } for video
 ) => {
   bgImagePopoverOpen.value = false
   bgVideoPopoverOpen.value = false

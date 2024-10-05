@@ -54,6 +54,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits(["select"])
+const imageCompressionLoading = ref(false)
 
 const bgImageToBeSelected = ref<string | null>(null)
 const backgroundImages = ref<string[]>([
@@ -94,12 +95,14 @@ const getAllLocallySavedImages = async () => {
 }
 
 const saveAndSelectImage = async (file: any) => {
-  console.log("file", file)
+  imageCompressionLoading.value = true
+  const compressedFile = await useCompressedImage(file)
+  // console.log("file", file)
   const db = useIndexedDB()
   const randomId = useID(6)
   const tempMedia: Media = {
     id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
-    data: file,
+    data: compressedFile,
     content: "image",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -107,6 +110,7 @@ const saveAndSelectImage = async (file: any) => {
   db.cached.add(tempMedia)
   bgImageToBeSelected.value = tempMedia.id
   await getAllLocallySavedImages()
+  imageCompressionLoading.value = false
   emit("select", bgImageToBeSelected.value)
 }
 

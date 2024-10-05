@@ -110,6 +110,7 @@ export interface Song {
 export interface Media {
   id: string
   content?: any
+  remoteUrl?: string
   data?: ArrayBuffer
   createdAt?: string
   updatedAt?: string

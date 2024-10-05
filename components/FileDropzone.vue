@@ -82,7 +82,7 @@ const openFileDialog = () => {
 }
 
 const handleFiles = (selectedFiles) => {
-  console.log("selectedFiles", selectedFiles)
+  // console.log("selectedFiles", selectedFiles)
   if (props.size === "sm" && props.icon === "i-bx-image") {
     if (!selectedFiles?.[0]?.type.startsWith("image")) {
       return toast.add({
