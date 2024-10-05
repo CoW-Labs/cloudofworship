@@ -32,6 +32,7 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
   const token = useCookie("token");
   options.baseURL = config.public.BASE_URL as string;
   options.headers = {
+    ...options.headers,
     Authorization: `Bearer ${token.value}`,
   };
 
@@ -42,7 +43,7 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
 
   options.onResponseError = ({ response }) => {
     appStore.setSlidesLoading(false);
-    if (response.status === 401) {
+    if (response.status === 401 && !path.includes("/auth")) {
       authStore.signOut();
       toast.add({
         title: "Your session has expired",

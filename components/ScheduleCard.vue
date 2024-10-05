@@ -14,6 +14,7 @@
       <div class="flex items-center gap-2 mt-1">
         <UAvatar
           :text="scheduleAuthor?.fullname?.split(' ')?.[0]?.[0]"
+          :src="scheduleAuthor?.avatar"
           size="xs"
           :ui="{
             text: `text-[${scheduleAuthor?.theme}] dark:text-[${scheduleAuthor?.theme}] font-semibold`,
@@ -21,7 +22,7 @@
           :class="`dark:border border-[${scheduleAuthor?.theme}] bg-[${scheduleAuthor?.theme}20] dark:bg-[${scheduleAuthor?.theme}20]`"
         />
         <span class="text-xs text-gray-500"
-          >Updated
+          >Created
           {{ format(new Date(schedule?.updatedAt as string).getTime()) }}</span
         >
       </div>

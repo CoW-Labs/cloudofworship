@@ -3,6 +3,7 @@
     <div class="profile-modal text-center w-52">
       <div class="avatar-ctn bg-primary-100 dark:bg-slate-800 p-4">
         <UAvatar
+          :src="user?.avatar"
           :text="user?.fullname?.split(' ')?.[0]?.[0]"
           size="xl"
           :ui="{

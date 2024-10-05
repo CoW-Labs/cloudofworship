@@ -94,6 +94,17 @@
       >
         Create your account
       </UButton>
+      <UButton
+        block
+        size="lg"
+        class="mt-0"
+        color="white"
+        :loading="loading"
+        @click="handleGoogleSignUp"
+      >
+        <GoogleIcon />
+        Sign up with Google
+      </UButton>
       <p class="text-sm flex items-center justify-center gap-0">
         I already have an account.
         <UButton size="sm" class="p-1" variant="link" to="/login"
@@ -112,6 +123,7 @@ definePageMeta({
 
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
+const googleSignIn = inject("handleGoogleSignIn")
 
 const thirtyDaysAhead = new Date()
 thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
@@ -198,6 +210,41 @@ const signup = async () => {
     useToast().add({
       title: error.value?.data?.error?.includes("E11000")
         ? "Email linked to an account"
+        : error.value?.data?.message,
+      color: "red",
+      icon: "i-bx-error",
+    })
+  } else {
+    token.value = data.value?.token
+    authStore.setUser(data?.value?.data.newUser)
+    authStore.setUser({ ...authStore.user, churchId })
+    useToast().add({
+      title: "You are all set! 🎉",
+      color: "green",
+    })
+    navigateTo("/?newUser=1")
+  }
+  loading.value = false
+}
+
+const handleGoogleSignUp = async () => {
+  const churchId = route.params.church_id
+  loading.value = true
+  const { user } = await googleSignIn()
+  // console.log(user)
+  // console.log(user?.accessToken)
+
+  const { data, error } = await useAPIFetch("/auth/signup/google", {
+    method: "POST",
+    headers: { "x-access-token": `Bearer ${user?.accessToken}` },
+    body: {
+      churchId,
+    },
+  })
+  if (error.value) {
+    useToast().add({
+      title: error.value?.data?.error?.includes("E11000")
+        ? "Email linked to an account. Sign in instead."
         : error.value?.data?.message,
       color: "red",
       icon: "i-bx-error",

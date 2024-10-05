@@ -97,6 +97,7 @@
             class="p-1"
           >
             <UAvatar
+              :src="user?.avatar"
               :text="user?.fullname?.split(' ')?.[0]?.[0]"
               size="sm"
               :ui="{

@@ -19,9 +19,17 @@
 </template>
 
 <script setup>
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth"
 useHead({
   title: "Cloud of Worship",
 })
+
+const handleGoogleSignIn = async () => {
+  const provider = new GoogleAuthProvider()
+  return await signInWithPopup(useFirebaseAuth(), provider)
+}
+
+provide("handleGoogleSignIn", handleGoogleSignIn)
 </script>
 
 <style scoped>

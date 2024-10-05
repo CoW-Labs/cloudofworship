@@ -58,12 +58,11 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Feature for users to convert hymn and song slides for hymn features
-- Fix issue with duplicate images/videos on background media selection modal.
-- Fixed issue with slide backgrounds not loading after selecting schedule.
-- Added 600+ native yoruba hymns
-- Added multiple text content to help and support users on cloudofworship.com/blog
-- Made minor fixes and changes to enhance user experience.`
+const changelog = `- You can now upload media slide images to the cloud!
+- Enjoy improved image compression and file upload limits!
+- You can now display your profile avatar!
+- Sign in effortlessly with Google Authentication!
+- Made minor fixes and improvements`
 
 const appStore = useAppStore()
 

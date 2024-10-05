@@ -207,6 +207,30 @@ const isAppOnline = computed(() => {
 
 provide("windowRefs", windowRefs)
 
+// Get Church Info and see if registered
+const getChurch = async () => {
+  // console.log(authStore.user)
+  const churchId = authStore.user?.churchId
+  if (churchId) {
+    const { data, error } = await useAPIFetch(
+      `/church/${churchId}?teammates=true`
+    )
+    const church = data.value as unknown as Church
+    authStore.setChurch(church)
+    retrieveChurchSongs()
+    if (error.value) {
+      throw new Error(error.value?.message)
+    }
+  } else {
+    navigateTo("/signup?registerChurch=1")
+    useToast().add({
+      icon: "i-bx-church",
+      title: "Add your church in less than 1 minute to continue.",
+    })
+  }
+}
+getChurch()
+
 // Get hymn count
 let hymnCount: any
 const hymns = await db.bibleAndHymns.get("hymns")
@@ -480,7 +504,7 @@ const overrideAppSettings = () => {
   // console.log(currentAppSettings.appVersion, props.appVersion)
   if (currentAppSettings.appVersion !== props.appVersion) {
     const db = useIndexedDB()
-    db.newSchemaUpdate()
+    // db.newSchemaUpdate()
 
     // console.log("calling again")
     setTimeout(() => {
@@ -561,28 +585,6 @@ const retrieveChurchSongs = async () => {
     }
   } catch (err: any) {
     console.log(err)
-  }
-}
-
-const getChurch = async () => {
-  // console.log(authStore.user)
-  const churchId = authStore.user?.churchId
-  if (churchId) {
-    const { data, error } = await useAPIFetch(
-      `/church/${churchId}?teammates=true`
-    )
-    const church = data.value as unknown as Church
-    authStore.setChurch(church)
-    retrieveChurchSongs()
-    if (error.value) {
-      throw new Error(error.value?.message)
-    }
-  } else {
-    navigateTo("/signup?registerChurch=1")
-    useToast().add({
-      icon: "i-bx-church",
-      title: "Add your church in less than 1 minute to continue.",
-    })
   }
 }
 
@@ -702,7 +704,6 @@ onMounted(async () => {
   }
 })
 
-getChurch()
 retrieveAllMediaFilesFromDB()
 
 // WINDOW MANAGEMENT CODE STARTS HERE

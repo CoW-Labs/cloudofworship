@@ -199,11 +199,11 @@ emitter.on("new-song-search", (query: string) => {
   // Do nothing
 })
 
-emitter.on("new-media", (data: any) => {
+emitter.on("new-media", async (data: any) => {
   if (data) {
     // console.log("media-data", data)
     if (data?.length > 0) {
-      createMultipleNewMediaSlides(data)
+      await createMultipleNewMediaSlides(data)
     }
   }
 })
@@ -264,7 +264,7 @@ emitter.on("select-slides", () => {
 
 const preSlideCreation = (): Slide => {
   const tempSlide: Slide = {
-    id: useID(),
+    id: useObjectID(),
     name: "Untitled",
     type: slideTypes.text,
     layout: slideLayoutTypes.full_text,
@@ -305,7 +305,7 @@ const mergeSlides = (
 }
 
 const uploadOfflineSlides = async () => {
-  console.log("uploading offline slides")
+  // console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
   const offlineSlides = appStore.activeSlides
     .filter((slide) => slide._id === undefined)
@@ -317,6 +317,7 @@ const uploadOfflineSlides = async () => {
     const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
     // console.log("merged slides", mergedSlides)
     appStore.appendActiveSlides(mergedSlides)
+    return uploadedSlides
   }
 }
 
@@ -445,6 +446,26 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
   }
 }
 
+const batchUpdateSlideOnline = async (slides: Slide[]) => {
+  appStore.setSlidesLoading(true)
+  const { data, error } = await useAPIFetch(
+    `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/batch`,
+    {
+      method: "PUT",
+      body: slides,
+      key: "batch-update-slides",
+      dedupe: "defer",
+    }
+  )
+  if (!error.value) {
+    appStore.setSlidesLoading(false)
+    appStore.setLastSynced(new Date().toISOString())
+    return data.value as Slide[]
+  } else {
+    throw new Error(error.value?.message)
+  }
+}
+
 const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
   const tempSlide = { ...slide }
   delete tempSlide._id
@@ -513,7 +534,7 @@ const createNewSlide = (duplicateSlide?: Slide) => {
     tempSlide.backgroundType =
       appStore.settings.defaultBackground.text.backgroundType
   }
-  tempSlide.id = useID()
+  tempSlide.id = useObjectID()
 
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
@@ -700,6 +721,19 @@ const createNewMediaSlide = async (
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.empty
   let data = null
+  const blob = { ...file.blob }
+
+  const randomImage =
+    "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740"
+  tempSlide.type = slideTypes.media
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    backgroundFillType: backgroundFillTypes.crop,
+  }
+  tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
+  tempSlide.background = file.type === "audio" ? randomImage : file.url
+  tempSlide.data = file
+  tempSlide.name = useSlideName(tempSlide)
 
   // Read Blob as array buffer
   const fileReader = new FileReader()
@@ -719,27 +753,17 @@ const createNewMediaSlide = async (
     })
   }
 
-  const randomImage =
-    "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740"
-  tempSlide.type = slideTypes.media
-  tempSlide.slideStyle = {
-    ...tempSlide.slideStyle,
-    backgroundFillType: backgroundFillTypes.crop,
-  }
-  tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
-  tempSlide.background = file.type === "audio" ? randomImage : file.url
-  tempSlide.data = file
-  tempSlide.name = useSlideName(tempSlide)
-
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide)
   if (!options?.oneOfManySlides) {
     toast.add({ title: "Media slide created", icon: "i-bx-image" })
-    uploadOfflineSlides()
+    // uploadOfflineSlides()
   }
+  return { ...tempSlide, blob }
 }
 
 const createMultipleNewMediaSlides = async (files: any[]) => {
+  console.log("files", files)
   useGlobalEmit(appWideActions.appLoading, true)
   const multipleSlidesPromise: Promise<any>[] = []
   files?.forEach((file) => {
@@ -747,10 +771,43 @@ const createMultipleNewMediaSlides = async (files: any[]) => {
       createNewMediaSlide(file, { oneOfManySlides: true })
     )
   })
-  await Promise.all(multipleSlidesPromise)
-  uploadOfflineSlides()
+
   useGlobalEmit(appWideActions.appLoading, false)
   toast.add({ title: "Media slides created", icon: "i-bx-image" })
+
+  // Network call to create multiple slides
+  let newSlides = await Promise.all(multipleSlidesPromise)
+
+  // Upload image files as backgrounds
+  newSlides = newSlides.filter((slide) => slide.backgroundType === "image")
+
+  const uploadedImages = files.map((file) =>
+    file.blob.type.includes("image") ? useUploadImage(file.blob) : null
+  )
+  const uploadedImagesResp = await Promise.all(uploadedImages)
+  // console.log("files", files)
+  // console.log("uploadedImages", uploadedImagesResp)
+  newSlides.forEach((slide, index) => {
+    const imageObject = uploadedImagesResp[index]
+    // console.log("imageObject", imageObject)
+    slide.background = imageObject?.file?.url
+  })
+
+  // update [slides] with new slides
+  const updatedSlides = useMergeObjectArray(newSlides, [
+    ...appStore.activeSlides,
+  ])
+  // sort updated slides by createdAt
+  updatedSlides.sort((a, b) => {
+    if (!a.createdAt) return 1
+    if (!b.createdAt) return -1
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+  // console.log("updatedSlides", updatedSlides)
+  appStore.setActiveSlides(updatedSlides)
+
+  // uploadImageFileAsBackground(file.blob, tempSlide.id)
+  uploadOfflineSlides()
 }
 
 const removeExistingCountdownSlides = () => {
