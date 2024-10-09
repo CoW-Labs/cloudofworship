@@ -68,13 +68,31 @@
               class="settings-ctn h-[100%]"
               v-else-if="activeTab === 'Profile Settings'"
             >
-              <EmptyState
-                icon="i-mdi-timer-sand-empty"
-                sub="Nothing to see for now"
-                action=""
-                action-text=""
-                class="pb-4"
-              />
+              <UFormGroup label="Full Name">
+                <UInput
+                  class="border-0 shadow-none max-w-[250px]"
+                  size="md"
+                  v-model="fullName"
+                />
+              </UFormGroup>
+              <UFormGroup label="Email" class="mt-4">
+                <UInput
+                  class="border-0 shadow-none max-w-[250px]"
+                  size="md"
+                  v-model="email"
+                />
+              </UFormGroup>
+              <UButton
+                @click="updateProfile()"
+                variant="outline"
+                :disabled="
+                  email === authStore.user?.email &&
+                  fullName === authStore.user?.fullname
+                "
+                class="mt-6 w-full max-w-[250px] justify-center"
+              >
+                Update Profile
+              </UButton>
             </div>
             <!-- SLIDE SETTINGS -->
             <div
@@ -249,7 +267,9 @@ const props = defineProps<{
   page: string
 }>()
 
+const toast = useToast()
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const db = useIndexedDB()
 const settingsModalOpen = ref(props.isOpen)
 const tabs = [
@@ -263,6 +283,8 @@ const activeTab = ref(props.page || "Slide Settings")
 const font = ref(appStore.settings.defaultFont)
 
 const bibleDownloadProgress = ref<string>("0")
+const fullName = ref<string>(authStore.user?.fullname)
+const email = ref<string>(authStore.user?.email)
 const bibleVersion = ref(appStore.settings.defaultBibleVersion)
 const bibleVersionLoading = ref<boolean | string>(false)
 const { bibleVersions } = storeToRefs(appStore)
@@ -314,6 +336,30 @@ watch(
     }
   }
 )
+
+const updateProfile = async () => {
+  const { data, error } = await useAPIFetch("/user/update", {
+    method: "PUT",
+    body: {
+      fullname: fullName.value,
+      email: email.value,
+    },
+  })
+  if (error.value) {
+    toast.add({
+      color: "red",
+      title: "Error updating profile",
+      icon: "i-bx-alert-circle",
+    })
+  } else {
+    authStore.setUser(data.value as unknown as User)
+    toast.add({
+      color: "green",
+      title: "Profile updated",
+      icon: "i-bx-check-circle",
+    })
+  }
+}
 
 const isBibleVersionDownloaded = async (bibleVersion: string) => {
   return (await db.bibleAndHymns.where("id").equals(bibleVersion).count()) > 0

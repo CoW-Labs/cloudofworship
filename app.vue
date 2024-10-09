@@ -41,12 +41,6 @@ appStore.setEmitter(emitter)
 
 const appVersion = ref<string>("0.8.7")
 
-onMounted(() => {
-  setTimeout(() => {
-    useGlobalEmit(appWideActions.openScheduleModal)
-  }, 2000)
-})
-
 // const registerServiceWorker = async () => {
 //   if ("serviceWorker" in navigator) {
 //     try {

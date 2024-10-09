@@ -28,6 +28,21 @@ const { activeSchedule } = storeToRefs(appStore)
 
 const scheduleId = ref(undefined)
 
+onMounted(() => {
+  const emailChange = useRoute().query.email_change
+
+  console.log("emailChange", emailChange)
+  if (emailChange) {
+    setTimeout(() => {
+      useGlobalEmit(appWideActions.openSettings, "Profile Settings")
+    }, 1000)
+  } else {
+    setTimeout(() => {
+      useGlobalEmit(appWideActions.openScheduleModal)
+    }, 2000)
+  }
+})
+
 // watch(
 //   activeSchedule,
 //   (newSchedule) => {
