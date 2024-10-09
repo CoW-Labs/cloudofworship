@@ -274,6 +274,15 @@ onMounted(() => {
   }, 1500)
 })
 
+const goToVerify = () => {
+  useToast().add({
+    title: "Please verify your email to proceed",
+    icon: "i-bx-circle",
+    color: "primary",
+  })
+  navigateTo("/verify?newUser=1")
+}
+
 const signup = async () => {
   if (step.value === 1) {
     loading.value = true
@@ -323,11 +332,12 @@ const signup = async () => {
     } else {
       authStore.setChurch(data?.value)
       authStore.setUser({ ...authStore.user, churchId: data?.value?._id })
+      goToVerify()
       useToast().add({
         title: "You are all set! 🎉",
         color: "green",
       })
-      navigateTo("/?newUser=1")
+      // navigateTo("/?newUser=1")
     }
     loading.value = false
   }
