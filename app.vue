@@ -39,13 +39,7 @@ const appStore = useAppStore()
 nuxtApp.provide("emitter", emitter)
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("0.8.7")
-
-onMounted(() => {
-  setTimeout(() => {
-    useGlobalEmit(appWideActions.openScheduleModal)
-  }, 2000)
-})
+const appVersion = ref<string>("0.8.8")
 
 // const registerServiceWorker = async () => {
 //   if ("serviceWorker" in navigator) {

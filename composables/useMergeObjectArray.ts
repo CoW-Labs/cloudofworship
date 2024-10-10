@@ -3,9 +3,10 @@ function mergeArrays(arr1: any[], arr2: any[]): any[] {
   const idSet: Set<string> = new Set(arr1.map(item => item?._id));
 
   for (const item of arr2) {
-    if (!idSet.has(item?._id)) {
+    const itemId = item?._id || item?.id;
+    if (!idSet.has(itemId)) {
       mergedArray.push(item);
-      idSet.add(item?._id);
+      idSet.add(item?.itemId);
     }
   }
 

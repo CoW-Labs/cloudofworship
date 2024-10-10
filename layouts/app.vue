@@ -4,37 +4,30 @@
     class="app-ctn max-h-[100vh] overflow-hidden text"
   >
     <!-- TODO: Remove this banner after 0.7.9 and make it a component -->
-    <!-- <div
-      v-if="
-        appStore.bannerVisible &&
-        (appVersion === '0.7.6' ||
-          appVersion === '0.7.7' ||
-          appVersion === '0.7.8')
-      "
-      class="banner text-center text-sm h-[40px] bg-[#FF8980] text-black items-center flex justify-between gap-1"
+    <div
+      v-if="!authStore.user?.emailVerified && authStore.user?.email"
+      class="banner text-center text-sm px-4 h-[50px] bg-[#FF8980] text-black items-center flex justify-between gap-1 fixed inset-0 z-10"
     >
-      <UButton variant="ghost" class="pointer-events-none opacity-0 w-8 h-8">
+      <!-- <UButton variant="ghost" class="pointer-events-none opacity-0 w-8 h-8">
         <IconWrapper name="i-mdi-close" class="w-4 h-4" />
-      </UButton>
+      </UButton> -->
+      <div class="logo flex items-center gap-2 w-[40px]">
+        <Logo class="w-[38px]" />
+      </div>
       <div class="text">
-        Cloud of Worship is moving to
-        <a
-          class="border-b font-bold border-black"
-          target="_blank"
-          href="http://app.cloudofworship.com"
-          >app.cloudofworship.com</a
-        >. All your synced slides and schedules will be migrated to the new
-        domain.
+        Your email is not verified, please verify
+        <a class="border-b font-bold border-black" href="/verify">here</a>.
+        Unverified accounts will be deactivated after 60 days.
       </div>
       <UButton
         variant="ghost"
         @click="appStore.setBannerVisible(false)"
         color="black"
-        class="p-0 flex items-center justify-center w-8 h-8 mb-2 mr-2"
+        class="p-0 flex items-center justify-center w-[40px] h-8 mb-2 mr-2"
       >
-        <IconWrapper name="i-mdi-close" class="w-4 h-4 text-black p-0" />
+        <!-- <IconWrapper name="i-mdi-close" class="w-4 h-4 text-black p-0" /> -->
       </UButton>
-    </div> -->
+    </div>
     <Navbar :app-version="appVersion" :online="isAppOnline" />
     <slot />
     <FullScreenLoader v-if="fullScreenLoading" />
@@ -165,6 +158,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
+import type { User } from "~/store/auth"
 import type {
   LibraryItem,
   Media,
@@ -183,6 +177,7 @@ const props = defineProps({
   appVersion: String,
 })
 
+const inaccessibleDate = new Date("2024-12-11T00:00:00.000Z")
 const online = useOnline()
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -197,6 +192,7 @@ const config = useRuntimeConfig()
 const token = useCookie("token")
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
+const route = useRoute()
 
 const isAppOnline = computed(() => {
   // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
@@ -206,6 +202,13 @@ const isAppOnline = computed(() => {
 })
 
 provide("windowRefs", windowRefs)
+
+const getUser = async () => {
+  const { data, error } = await useAPIFetch(`/user/auth`)
+  const user = data.value as unknown as User
+  authStore.setUser(user)
+}
+getUser()
 
 // Get Church Info and see if registered
 const getChurch = async () => {

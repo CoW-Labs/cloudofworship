@@ -190,7 +190,7 @@ const closeScheduleModal = () => {
     emit("close")
   } else {
     toast.add({
-      description: "Please select a schedule to continue.",
+      description: "Please select or create a schedule to continue.",
       icon: "i-bx-info-circle",
     })
   }

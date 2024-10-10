@@ -11,6 +11,7 @@ export interface User {
   createdAt: string
   updatedAt: string
   churchId: string
+  emailVerified?: boolean
 }
 
 export interface Church {

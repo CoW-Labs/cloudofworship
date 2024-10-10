@@ -58,10 +58,10 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- You can now upload media slide images to the cloud!
-- Enjoy improved image compression and file upload limits!
-- You can now display your profile avatar!
-- Sign in effortlessly with Google Authentication!
+const changelog = `- Added profile settings.
+- You can now change your email address.
+- Added compulsory email verification for new users.
+- Fixed slides automatically being deleted when they are synced on occasions.
 - Made minor fixes and improvements`
 
 const appStore = useAppStore()

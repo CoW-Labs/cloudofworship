@@ -126,9 +126,23 @@ const login = async () => {
       color: "green",
       icon: "i-bx-check-circle",
     })
+    if (data.value?.data?.user?.emailVerified) {
+      navigateTo("/")
+    } else {
+      goToVerify()
+    }
     navigateTo("/")
   }
   loading.value = false
+}
+
+const goToVerify = () => {
+  toast.add({
+    title: "Please verify your email to proceed",
+    icon: "i-bx-circle",
+    color: "primary",
+  })
+  navigateTo("/verify")
 }
 
 const handleGoogleSignIn = async () => {
