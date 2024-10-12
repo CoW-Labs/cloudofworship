@@ -17,7 +17,8 @@
       <div class="text">
         Your email is not verified, please verify
         <a class="border-b font-bold border-black" href="/verify">here</a>.
-        Unverified accounts will be deactivated after 60 days.
+        Unverified accounts will be deactivated after
+        {{ inaccessibleDateRemaining }} days.
       </div>
       <UButton
         variant="ghost"
@@ -177,7 +178,6 @@ const props = defineProps({
   appVersion: String,
 })
 
-const inaccessibleDate = new Date("2024-12-11T00:00:00.000Z")
 const online = useOnline()
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -199,6 +199,13 @@ const isAppOnline = computed(() => {
   // if() {}
   isOfflineToastOpen.value = !online.value
   return online.value
+})
+
+const inaccessibleDateRemaining = computed(() => {
+  const inaccessibleDate = new Date("2024-12-13T00:00:00.000Z")
+  const now = new Date()
+  const diff = inaccessibleDate.getTime() - now.getTime()
+  return Math.floor(diff / (1000 * 60 * 60 * 24))
 })
 
 provide("windowRefs", windowRefs)
