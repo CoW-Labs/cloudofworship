@@ -81,7 +81,7 @@ import { useAuthStore } from "~/store/auth"
 definePageMeta({
   layout: "auth",
 })
-
+const inaccessibleDate = new Date("2024-12-13T00:00:00.000Z")
 const authStore = useAuthStore()
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
@@ -119,19 +119,32 @@ const login = async () => {
       icon: "i-bx-error",
     })
   } else {
-    token.value = data.value.token
-    authStore.setUser(data.value?.data?.user)
-    toast.add({
-      title: `Successful login as ${email.value}`,
-      color: "green",
-      icon: "i-bx-check-circle",
-    })
-    if (data.value?.data?.user?.emailVerified) {
-      navigateTo("/")
+    if (
+      !data.value?.data?.user?.emailVerified &&
+      new Date().getTime() > new Date(inaccessibleDate).getTime()
+    ) {
+      // If account is no longer accessible and user is not verified
+      toast.add({
+        title: "Account is no longer accessible. Verify your email to proceed",
+        color: "red",
+        icon: "i-bx-error",
+      })
+      navigateTo("/verify")
     } else {
-      goToVerify()
+      token.value = data.value.token
+      authStore.setUser(data.value?.data?.user)
+      toast.add({
+        title: `Successful login as ${email.value}`,
+        color: "green",
+        icon: "i-bx-check-circle",
+      })
+      if (data.value?.data?.user?.emailVerified) {
+        navigateTo("/")
+      } else {
+        goToVerify()
+      }
+      navigateTo("/")
     }
-    navigateTo("/")
   }
   loading.value = false
 }
