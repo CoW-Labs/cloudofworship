@@ -60,7 +60,7 @@
         size="lg"
         class="mt-0"
         color="white"
-        :loading="loading"
+        :loading="googleLoading"
         @click="handleGoogleSignIn"
       >
         <GoogleIcon />
@@ -93,6 +93,7 @@ const email = ref("")
 const password = ref("")
 const passwordType = ref("password")
 const loading = ref(false)
+const googleLoading = ref(false)
 const thirtyDaysAhead = new Date()
 thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
 const token = useCookie("token", {
@@ -159,6 +160,7 @@ const goToVerify = () => {
 }
 
 const handleGoogleSignIn = async () => {
+  googleLoading.value = true
   const { user } = await googleSignIn()
   // console.log(user)
 
@@ -183,6 +185,7 @@ const handleGoogleSignIn = async () => {
     })
     navigateTo("/")
   }
+  googleLoading.value = false
 }
 </script>
 

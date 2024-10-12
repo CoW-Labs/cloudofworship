@@ -83,7 +83,7 @@
         size="lg"
         class="mt-0"
         color="white"
-        :loading="loading"
+        :loading="googleLoading"
         @click="handleGoogleSignUp"
       >
         <GoogleIcon />
@@ -239,6 +239,7 @@ const password = ref("")
 const passwordType = ref("password")
 const passwordInputHover = ref(false)
 const loading = ref(false)
+const googleLoading = ref(false)
 const church = ref("")
 const otherChurch = ref("")
 const churchIdentity = ref("")
@@ -344,7 +345,7 @@ const signup = async () => {
 }
 
 const handleGoogleSignUp = async () => {
-  loading.value = true
+  googleLoading.value = true
   const { user } = await googleSignIn()
   // console.log(user)
   // console.log(user?.accessToken)
@@ -366,7 +367,7 @@ const handleGoogleSignUp = async () => {
     authStore.setUser(data?.value?.data.newUser)
     step.value = 2
   }
-  loading.value = false
+  googleLoading.value = false
 }
 </script>
 
