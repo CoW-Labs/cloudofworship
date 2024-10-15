@@ -31,7 +31,7 @@ const scheduleId = ref(undefined)
 onMounted(() => {
   const emailChange = useRoute().query.email_change
 
-  console.log("emailChange", emailChange)
+  // console.log("emailChange", emailChange)
   if (emailChange) {
     setTimeout(() => {
       useGlobalEmit(appWideActions.openSettings, "Profile Settings")

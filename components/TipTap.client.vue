@@ -68,6 +68,7 @@
 
 <script setup lang="ts">
 import type { Slide } from "~/types"
+import { useAppStore } from "~/store/app"
 import TiptapHighlight from "@tiptap/extension-highlight"
 import TiptapTextAlign from "@tiptap/extension-text-align"
 import TiptapPlaceholder from "@tiptap/extension-placeholder"
@@ -80,6 +81,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits(["update", "change-focused-editor"])
+const appStore = useAppStore()
 
 watch(
   () => props.slide,
@@ -155,18 +157,22 @@ const editorTwo = ref(
       TiptapHighlight,
       TiptapPlaceholder.configure({
         placeholder:
-          "Full (richtext) content goes here: \n- Apply text formatting options in toolbar above.\n- Textbox is expandable based on input",
+          "Write anything, use text formatting options in toolbar above.",
       }),
       TipTapTextStyle,
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
     ],
+    onCreate: ({ editor }) => {
+      // editor.commands.setFontFamily(appStore.settings.defaultFont)
+    },
     onBlur: ({ editor }) => {
       emit("update", 1, editor.getHTML())
     },
     onFocus: ({ editor }) => {
       emit("change-focused-editor", editor)
+      // editor.commands.setFontFamily(appStore.settings.defaultFont)
     },
   })
 )
