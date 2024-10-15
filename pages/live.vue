@@ -44,6 +44,8 @@
         "
       />
     </TransitionGroup>
+
+    <AlertView />
   </div>
 </template>
 <script setup lang="ts">
