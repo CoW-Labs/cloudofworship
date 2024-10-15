@@ -23,6 +23,8 @@
             },
           }"
           :options="[
+            { label: '1 minute', value: '00:01:00' },
+            { label: '3 minutes', value: '00:03:00' },
             { label: '5 minutes', value: '00:05:00' },
             { label: '10 minutes', value: '00:10:00' },
             { label: '15 minutes', value: '00:15:00' },
