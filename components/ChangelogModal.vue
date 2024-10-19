@@ -58,10 +58,9 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added profile settings.
-- You can now change your email address.
-- Added compulsory email verification for new users.
-- Fixed slides automatically being deleted when they are synced on occasions.
+const changelog = `- Added new durations for countdown slides - 1 min & 2 mins.
+- Fixed issue when deleting multiple slides with delete all functionality.
+- Fix issue where alert/banner restarts when slide changes.
 - Made minor fixes and improvements`
 
 const appStore = useAppStore()
