@@ -546,7 +546,7 @@ const createNewSlide = (duplicateSlide?: Slide) => {
 }
 
 const deleteSlide = async (slideId: string, addToast: boolean = true) => {
-  const tempSlide = appStore.activeSlides.find((s) => s.id === slideId) as Slide
+  const tempSlide = slides.value.find((s) => s.id === slideId) as Slide
 
   // Clear interval if slide is a countdown slide before deleting
   if (tempSlide?.type === slideTypes.countdown) {

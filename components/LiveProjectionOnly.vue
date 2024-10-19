@@ -154,7 +154,6 @@
           </UCard>
         </UModal>
       </template>
-      <AlertView v-if="fullScreen" />
     </div>
   </div>
 </template>
