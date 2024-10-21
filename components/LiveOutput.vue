@@ -148,6 +148,45 @@ const liveOutputSlides = computed({
   },
 })
 
+const nextSlide = computed(() => {
+  const liveSlideIndex = liveOutputSlides.value?.findIndex(
+    (slide: Slide) => slide.id === liveSlideId.value
+  )
+  // const tempSlides = liveOutputSlidesId.value?.map((id) =>
+  //   appStore.activeSlides.find((slide) => slide.id === id)
+  // ) as Slide[]
+  const gotoSlideIndex = (liveSlideIndex as number) + 1
+  if (gotoSlideIndex < liveOutputSlides.value?.length) {
+    return liveOutputSlides.value[gotoSlideIndex]
+  }
+})
+
+const previousSlide = computed(() => {
+  const liveSlideIndex = liveOutputSlides.value?.findIndex(
+    (slide: Slide) => slide.id === liveSlideId.value
+  )
+  // const tempSlides = liveOutputSlidesId.value?.map((id) =>
+  //   appStore.activeSlides.find((slide) => slide.id === id)
+  // ) as Slide[]
+  const gotoSlideIndex = (liveSlideIndex as number) - 1 || 0
+  if (gotoSlideIndex < liveOutputSlides.value?.length) {
+    return liveOutputSlides.value[gotoSlideIndex]
+  }
+})
+
+onMounted(() => {
+  useCreateShortcut("ArrowDown", () => {
+    if (nextSlide.value) {
+      appStore.setLiveSlide(nextSlide.value.id)
+    }
+  })
+  useCreateShortcut("ArrowUp", () => {
+    if (previousSlide.value) {
+      appStore.setLiveSlide(previousSlide.value.id)
+    }
+  })
+})
+
 // const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
 //   if (goLive) {
 //     appStore.setActiveSlides(slides.value)

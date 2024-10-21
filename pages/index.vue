@@ -41,6 +41,8 @@ onMounted(() => {
       useGlobalEmit(appWideActions.openScheduleModal)
     }, 2000)
   }
+
+  useCreateShortcut("/", () => useGlobalEmit(appWideActions.quickActionsFocus))
 })
 
 // watch(

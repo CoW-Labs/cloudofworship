@@ -105,8 +105,8 @@ const getAllLocallySavedVideos = async () => {
       return // Ignore non-video files
     }
   })
-  console.log("locallySavedVideos", locallySavedVideos)
-  console.log("backgroundVideos", backgroundVideos.value)
+  // console.log("locallySavedVideos", locallySavedVideos)
+  // console.log("backgroundVideos", backgroundVideos.value)
   // if (backgroundVideos.value.length > 0) {
   //   backgroundVideos.value = backgroundVideos.value.concat(locallySavedVideos)
   // } else {

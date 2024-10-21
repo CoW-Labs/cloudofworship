@@ -48,6 +48,7 @@ export const appWideActions = {
   liveSlideIdTransfer: 'live-slide-id-transfer',
   liveActiveSlidesTransfer: 'live-active-slides-transfer',
   liveSettingsTransfer: 'live-settings-transfer',
+  quickActionsFocus: 'quick-actions-focus'
 }
 
 export const quickActionsArr = [

@@ -20,6 +20,7 @@
           v-model="searchInput"
           color="black"
           class="w-[100%]"
+          ref="searchInputEl"
         />
         <UButton
           v-if="searchInput.length >= 2"
@@ -150,6 +151,7 @@ import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
 
 let searchInputBeforeTwoDigitNumbers = ""
+const searchInputEl = ref<HTMLInputElement>()
 const searchInput = ref<string>("")
 const focusedActionIndex = ref<number>(0)
 const actions = ref<any[]>([])
@@ -200,6 +202,12 @@ getAllHymns()
 watch(page, () => {
   if (page.value === "") {
     bibleSearchQuery.value = ""
+  }
+})
+
+watch(searchInput, () => {
+  if (searchInput.value.startsWith("/") && searchInput.value.length > 1) {
+    searchInput.value = searchInput.value.replaceAll("/", "")
   }
 })
 
@@ -268,6 +276,10 @@ emitter.on("new-countdown", () => {
 
 onMounted(() => {
   // console.log("mounted", quickActions.value)
+
+  emitter.on(appWideActions.quickActionsFocus, () => {
+    searchInputEl.value?.input?.focus()
+  })
   quickActions.value?.addEventListener("keydown", (e) => {
     if (e.defaultPrevented) {
       e.preventDefault()
@@ -305,12 +317,17 @@ onMounted(() => {
 
 const bibleChapterAndVerse = computed(() => {
   const regex = /\b\d+\s*:\s*\d+\b|\b\d+\s\d+\b/g
-  const match = searchInput.value.match(regex)?.[0]?.replaceAll(" ", ":")
+  const match = searchInput.value
+    ?.replace("/", "")
+    .match(regex)?.[0]
+    ?.replaceAll(" ", ":")
   return match?.trim()
 })
 
 const searchedActions = computed(() => {
-  const twoDigitNumbers = searchInput.value?.match(/\b\d{2}\b/g)
+  const twoDigitNumbers = searchInput.value
+    ?.replace("/", "")
+    ?.match(/\b\d{2}\b/g)
 
   // Stop search if input includes two digit number
   if (!twoDigitNumbers) {
