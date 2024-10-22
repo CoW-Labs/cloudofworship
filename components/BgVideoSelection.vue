@@ -69,7 +69,9 @@ const emit = defineEmits(["select"])
 //   "/video-bg-6.mp4",
 // ]
 const bgVideoToBeSelected = ref<string | null>(null)
-const backgroundVideos = ref<BackgroundVideo[]>(appStore.backgroundVideos)
+const backgroundVideos = ref<BackgroundVideo[]>(
+  appStore.currentState.backgroundVideos
+)
 
 const getAllLocallySavedVideos = async () => {
   const db = useIndexedDB()

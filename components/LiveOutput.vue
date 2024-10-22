@@ -51,7 +51,7 @@
               <LiveContentWithBackground
                 :slide="slide"
                 :slide-label="slide?.name"
-                :slide-styles="settings.slideStyles"
+                :slide-styles="currentState.settings.slideStyles"
               />
             </div>
             <div class="texts flex-col justify-between">
@@ -102,7 +102,7 @@
         :slide="liveSlide"
         :full-screen="false"
         :content-visible="true"
-        :slide-styles="settings.slideStyles"
+        :slide-styles="currentState.settings.slideStyles"
         class="lg-preview"
       />
     </div>
@@ -117,29 +117,31 @@ import type { Slide } from "~/types"
 
 const appStore = useAppStore()
 const toast = useToast()
-const { liveOutputSlidesId, liveSlideId, settings } = storeToRefs(appStore)
-const windowRefs = inject("windowRefs")
+const { currentState } = storeToRefs(appStore)
+const windowRefs = inject("windowRefs") as any[]
 
 watch(
   () => windowRefs,
   () => {
-    console.log("windowRefs", windowRefs.value)
+    // console.log("windowRefs", windowRefs.value)
   }
 )
 
 const liveSlide = computed(() => {
-  return appStore.activeSlides.find((slide) => slide.id === liveSlideId.value)
+  return currentState.value?.activeSlides.find(
+    (slide) => slide.id === currentState.value.liveSlideId
+  )
 })
 
 const liveOutputSlides = computed({
   get() {
-    const tempSlides = liveOutputSlidesId.value?.map((id) =>
-      appStore.activeSlides.find((slide) => slide.id === id)
+    const tempSlides = currentState.value?.liveOutputSlidesId?.map((id) =>
+      currentState.value?.activeSlides.find((slide) => slide.id === id)
     ) as Slide[]
 
     // Filter by current active schedule
     return tempSlides?.filter(
-      (slide) => slide.scheduleId === appStore.activeSchedule?._id
+      (slide) => slide.scheduleId === currentState.value?.activeSchedule?._id
     )
   },
   set(newVal) {
@@ -150,7 +152,7 @@ const liveOutputSlides = computed({
 
 const nextSlide = computed(() => {
   const liveSlideIndex = liveOutputSlides.value?.findIndex(
-    (slide: Slide) => slide.id === liveSlideId.value
+    (slide: Slide) => slide.id === currentState.value.liveSlideId
   )
   // const tempSlides = liveOutputSlidesId.value?.map((id) =>
   //   appStore.activeSlides.find((slide) => slide.id === id)
@@ -163,7 +165,7 @@ const nextSlide = computed(() => {
 
 const previousSlide = computed(() => {
   const liveSlideIndex = liveOutputSlides.value?.findIndex(
-    (slide: Slide) => slide.id === liveSlideId.value
+    (slide: Slide) => slide.id === currentState.value?.liveSlideId
   )
   // const tempSlides = liveOutputSlidesId.value?.map((id) =>
   //   appStore.activeSlides.find((slide) => slide.id === id)

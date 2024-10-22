@@ -43,6 +43,12 @@ onMounted(() => {
   }
 
   useCreateShortcut("/", () => useGlobalEmit(appWideActions.quickActionsFocus))
+
+  useCreateShortcut("z", () => appStore.undo(), { ctrlOrMeta: true })
+
+  useCreateShortcut("y", () => appStore.redo(), {
+    ctrlOrMeta: true,
+  })
 })
 
 // watch(

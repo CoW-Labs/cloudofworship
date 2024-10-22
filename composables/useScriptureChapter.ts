@@ -6,7 +6,7 @@ const useScriptureChapter = async (label: string = '1:1', version: string = ''):
 
   // set default version
   const appStore = useAppStore()
-  version = version || appStore.settings.defaultBibleVersion
+  version = version || appStore.currentState.settings.defaultBibleVersion
 
   const toast = useToast()
 

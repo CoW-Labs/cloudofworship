@@ -217,6 +217,36 @@ const getUser = async () => {
 }
 getUser()
 
+const retrieveChurchSongs = async () => {
+  try {
+    const countPromise = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
+    )
+    const onlineCount = countPromise.data.value as unknown as number
+    const offlineCount = await db.library.where("type").equals("song").count()
+    if (onlineCount > offlineCount) {
+      // Delete songs that are not in the online database
+      db.library.where("type").equals("song").delete()
+
+      // Add online songs
+      const promise = await useAPIFetch(
+        `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
+      )
+      const data: Song[] = (await promise.data.value) as unknown as Song[]
+      const libraryData: LibraryItem[] = data?.map((song) => ({
+        id: song.id,
+        type: "song",
+        content: JSON.parse(JSON.stringify(song)),
+        createdAt: song.createdAt,
+        updatedAt: song.updatedAt,
+      }))
+      await db.library.bulkAdd(libraryData)
+    }
+  } catch (err: any) {
+    console.log(err)
+  }
+}
+
 // Get Church Info and see if registered
 const getChurch = async () => {
   // console.log(authStore.user)
@@ -469,7 +499,7 @@ const downloadEssentialResources = async () => {
   }
 
   const populateBibleVersionOptions = async () => {
-    const tempBibleVersions = [...appStore.bibleVersions]
+    const tempBibleVersions = [...appStore.currentState.bibleVersions]
     for (const bibleVersion of tempBibleVersions) {
       bibleVersion.isDownloaded = await isBibleVersionDownloaded(
         bibleVersion.id
@@ -508,7 +538,7 @@ const downloadEssentialResources = async () => {
 }
 
 const overrideAppSettings = () => {
-  const currentAppSettings = appStore.settings
+  const currentAppSettings = appStore.currentState.settings
   // Override App Settings if current app version mismatches appVersion in state
   // TODO: When appSettings is editable by user, it must take preference over system settings and override
   // console.log(currentAppSettings.appVersion, props.appVersion)
@@ -568,36 +598,6 @@ function base64ToBlobURL(base64String: string, mimeType: string) {
   return URL.createObjectURL(blob)
 }
 
-const retrieveChurchSongs = async () => {
-  try {
-    const countPromise = await useAPIFetch(
-      `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
-    )
-    const onlineCount = countPromise.data.value as unknown as number
-    const offlineCount = await db.library.where("type").equals("song").count()
-    if (onlineCount > offlineCount) {
-      // Delete songs that are not in the online database
-      db.library.where("type").equals("song").delete()
-
-      // Add online songs
-      const promise = await useAPIFetch(
-        `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
-      )
-      const data: Song[] = (await promise.data.value) as unknown as Song[]
-      const libraryData: LibraryItem[] = data?.map((song) => ({
-        id: song.id,
-        type: "song",
-        content: JSON.parse(JSON.stringify(song)),
-        createdAt: song.createdAt,
-        updatedAt: song.updatedAt,
-      }))
-      await db.library.bulkAdd(libraryData)
-    }
-  } catch (err: any) {
-    console.log(err)
-  }
-}
-
 const retrieveSchedules = async () => {
   if (isAppOnline.value) {
     downloadProgress.value = "0"
@@ -608,7 +608,7 @@ const retrieveSchedules = async () => {
     const schedules = schedulesPromise.data.value as unknown as Schedule[]
     const mergedSchedules = useMergeObjectArray(
       [...schedules],
-      appStore.schedules
+      appStore.currentState.schedules
     )
 
     mergedSchedules?.sort((scheduleA, scheduleB) => {
@@ -625,7 +625,7 @@ const retrieveAllMediaFilesFromDB = async () => {
   const db = useIndexedDB()
 
   // For active slides
-  const slides = [...appStore.activeSlides]
+  const slides = [...appStore.currentState.activeSlides]
   slides.forEach(async (slide) => {
     if (slide.type === slideTypes.media) {
       const mediaObj = await db.media.where({ id: slide.id }).toArray()
@@ -709,6 +709,7 @@ const setCachedVideosURL = async () => {
 onMounted(async () => {
   await downloadEssentialResources()
   overrideAppSettings()
+  appStore.refreshAppActionsStack()
   if (location.hostname !== "localhost") {
     useGtag()
   }

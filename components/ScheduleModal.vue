@@ -22,7 +22,7 @@
             <div class="actions flex items-center gap-2">
               <UButton
                 icon="i-bx-search"
-                v-if="schedules.length > 0"
+                v-if="currentState.schedules.length > 0"
                 color="primary"
                 :variant="searchVisible ? 'outline' : 'ghost'"
                 @click="
@@ -104,7 +104,7 @@
 
             <div class="schedules flex-col flex mt-4 h-[40vh] overflow-auto">
               <EmptyState
-                v-if="schedules.length === 0"
+                v-if="currentState.schedules.length === 0"
                 icon="i-bx-calendar"
                 sub="No schedules yet"
                 desc="Click the button above to create a new schedule and start using Cloud of Worship."
@@ -152,7 +152,7 @@ import { appWideActions } from "~/utils/constants"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
-const { schedules } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
 const scheduleName = ref<string>("")
 const scheduleListLimit = ref<number>(6)
@@ -198,9 +198,9 @@ const closeScheduleModal = () => {
 
 const searchedSchedules = computed(() => {
   if (searchInput.value.length === 0) {
-    return appStore.schedules
+    return appStore.currentState.schedules
   }
-  const tempSchedules = [...appStore.schedules]
+  const tempSchedules = [...appStore.currentState.schedules]
   return tempSchedules?.filter((schedule) => {
     return schedule?.name
       ?.toLowerCase()
@@ -227,7 +227,7 @@ const createNewSchedule = () => {
   }
 
   // Find all slides without a scheduleId and add the new scheduleId
-  appStore.activeSlides.forEach((slide) => {
+  appStore.currentState.activeSlides.forEach((slide) => {
     if (!slide.scheduleId) {
       slide.scheduleId = scheduleId
     }
@@ -240,7 +240,7 @@ const createNewSchedule = () => {
 }
 
 const uploadBatchSchedules = async () => {
-  const schedules = appStore.schedules
+  const schedules = appStore.currentState.schedules
   const tempSchedules = schedules?.filter((schedule) => !schedule?.lastUpdated)
   if (tempSchedules.length === 0) {
     return
@@ -261,7 +261,7 @@ const retrieveSchedules = async () => {
   const schedules = schedulesPromise.data.value as unknown as Schedule[]
   const mergedSchedules = useMergeObjectArray(
     [...schedules],
-    appStore.schedules
+    appStore.currentState.schedules
   )
 
   mergedSchedules?.sort((scheduleA, scheduleB) => {
@@ -292,12 +292,12 @@ const deleteScheduleOnline = async (scheduleId: string) => {
 }
 
 const deleteSchedule = (scheduleId: string) => {
-  let updatedScheduleList: Schedule[] = [...appStore.schedules]
+  let updatedScheduleList: Schedule[] = [...appStore.currentState.schedules]
   updatedScheduleList = updatedScheduleList.filter(
     (sch) => sch?._id !== scheduleId
   )
 
-  if (scheduleId === appStore.activeSchedule?._id) {
+  if (scheduleId === appStore.currentState.activeSchedule?._id) {
     appStore.setActiveSchedule(updatedScheduleList?.at(0))
   }
   appStore.setSchedules(updatedScheduleList)

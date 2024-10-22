@@ -41,7 +41,7 @@ const appStore = useAppStore()
 const db = useIndexedDB()
 
 const bibleDownloadProgress = ref<string>("0")
-const bibleVersion = ref(appStore.settings.defaultBibleVersion)
+const bibleVersion = ref(appStore.currentState.settings.defaultBibleVersion)
 const bibleVersionLoading = ref<boolean | string>(false)
 const { bibleVersions } = storeToRefs(appStore)
 const bibleVersionOptions = ref<Array<any>>(bibleVersions.value)

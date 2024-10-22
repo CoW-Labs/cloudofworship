@@ -1,11 +1,22 @@
-const useCreateShortcut = (commandKey: string, action: () => void) => {
+const useCreateShortcut = (commandKey: string, action: () => void, options?: { ctrlOrMeta: boolean, shift: boolean }) => {
   window.addEventListener("keydown", (e) => {
     const activeElement = document.activeElement;
-    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) {
-      action();
-      return
+    if (options?.ctrlOrMeta && options?.shift) {
+      // e.preventDefault()
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === commandKey) {
+        action();
+        e.stopImmediatePropagation()
+        return
+      }
+    } else if (options?.ctrlOrMeta) {
+      // e.preventDefault()
+      if ((e.ctrlKey || e.metaKey) && e.key === commandKey) {
+        action();
+        e.stopImmediatePropagation()
+        return
+      }
     }
-    if (
+    else if (
       activeElement?.tagName !== 'INPUT' &&
       activeElement?.tagName !== 'TEXTAREA' &&
       activeElement?.contentEditable !== 'true'
@@ -13,6 +24,7 @@ const useCreateShortcut = (commandKey: string, action: () => void) => {
       if (e.key === commandKey) {
         // console.log("keypress", activeElement)
         action();
+        e.stopImmediatePropagation()
       }
     }
   })

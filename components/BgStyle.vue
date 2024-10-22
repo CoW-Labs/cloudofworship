@@ -17,11 +17,13 @@
 import { useAppStore } from "~/store/app"
 
 const appStore = useAppStore()
-const blur = ref(appStore.settings.slideStyles.blur || 0)
-const brightness = ref(appStore.settings.slideStyles.brightness || 0)
+const blur = ref(appStore.currentState.settings.slideStyles.blur || 0)
+const brightness = ref(
+  appStore.currentState.settings.slideStyles.brightness || 0
+)
 
 watchEffect(() => {
-  const tempSlideStyle = { ...appStore.settings.slideStyles }
+  const tempSlideStyle = { ...appStore.currentState.settings.slideStyles }
   tempSlideStyle.blur = blur.value
   tempSlideStyle.brightness = brightness.value
 

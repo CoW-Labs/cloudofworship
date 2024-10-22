@@ -86,9 +86,9 @@ const churchId = authStore.user?.churchId
 const toast = useToast()
 
 const windowHeight = ref<number>(0)
-const slides = ref<Array<Slide>>(appStore.activeSlides || [])
+const slides = ref<Array<Slide>>(appStore.currentState.activeSlides || [])
 const activeSlide = ref<Slide>()
-const { activeSlides, activeSchedule } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 const slidesGrid = ref<HTMLDivElement | null>(null)
 const bulkActionLabel = ref<string>("Select Slides")
 const bulkActionIcon = ref<string>("")
@@ -100,8 +100,11 @@ const countdownTimeLeft = ref<number>(0)
 watch(
   slides,
   (newVal, oldVal) => {
-    const isActiveSlideInActiveSchedule = activeSlides.value
-      ?.filter((slide) => slide.scheduleId === appStore.activeSchedule?._id)
+    const isActiveSlideInActiveSchedule = currentState.value.activeSlides
+      ?.filter(
+        (slide) =>
+          slide.scheduleId === appStore.currentState.activeSchedule?._id
+      )
       ?.find((slide) => slide.id === activeSlide.value?.id)
     if (!isActiveSlideInActiveSchedule) {
       activeSlide.value = undefined
@@ -120,19 +123,23 @@ watch(
 )
 
 // Update Slides order when they are updated in live content
-watch(activeSlides, () => {
-  const tempSlides = activeSlides.value?.filter(
-    (slide) => slide.scheduleId === appStore.activeSchedule?._id
-  )
-  if (tempSlides.length > 0) {
-    slides.value = tempSlides
-  }
-  if (tempSlides?.find((slide) => slide.id === activeSlide.value?.id)) {
-    activeSlide.value = tempSlides?.find(
-      (slide) => slide.id === activeSlide.value?.id
+watch(
+  () => currentState.value.activeSlides,
+  () => {
+    console.log("slide order updated")
+    const tempSlides = currentState.value.activeSlides?.filter(
+      (slide) => slide.scheduleId === appStore.currentState.activeSchedule?._id
     )
+    if (tempSlides.length > 0) {
+      slides.value = tempSlides
+    }
+    if (tempSlides?.find((slide) => slide.id === activeSlide.value?.id)) {
+      activeSlide.value = tempSlides?.find(
+        (slide) => slide.id === activeSlide.value?.id
+      )
+    }
   }
-})
+)
 
 const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
   // console.log(goLive, slide)
@@ -237,7 +244,7 @@ emitter.on("delete-slide", (data: Slide) => {
 })
 
 emitter.on("refresh-slides", () => {
-  retrieveSlidesOnline(appStore.activeSchedule?._id!!)
+  retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!)
 })
 
 emitter.on("select-slides", () => {
@@ -271,11 +278,11 @@ const preSlideCreation = (): Slide => {
     contents: [],
     userId: authStore.user?._id as string,
     churchId: authStore?.user?.churchId as string,
-    scheduleId: appStore.activeSchedule?._id as string,
+    scheduleId: appStore.currentState.activeSchedule?._id as string,
     slideStyle: {
-      alignment: appStore.settings.slideStyles.alignment,
+      alignment: appStore.currentState.settings.slideStyles.alignment,
       fontSizePercent: 100,
-      font: appStore.settings.defaultFont,
+      font: appStore.currentState.settings.defaultFont,
       isMediaMuted: true,
       isMediaPlaying: false,
     },
@@ -307,7 +314,7 @@ const mergeSlides = (
 const uploadOfflineSlides = async () => {
   // console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
-  const offlineSlides = appStore.activeSlides
+  const offlineSlides = appStore.currentState.activeSlides
     .filter((slide) => slide._id === undefined)
     ?.filter((slide) => slide.scheduleId)
   if (offlineSlides.length > 0) {
@@ -362,11 +369,11 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
           slide.backgroundVideoKey === "video-bg-6" ||
           slide.backgroundVideoKey === "/video-bg-6.mp4")
       ) {
-        slide.background = appStore.backgroundVideos?.find(
+        slide.background = appStore.currentState.backgroundVideos?.find(
           (bg) => bg.id === slide.backgroundVideoKey
         )?.url
         // console.log(
-        //   appStore.backgroundVideos?.find(
+        //   appStore.currentState.backgroundVideos?.find(
         //     (bg) => bg.id === slide.backgroundVideoKey
         //   )?.url
         // )
@@ -374,7 +381,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
         slide.backgroundType === backgroundTypes.image &&
         slide.background?.includes("blob:")
       ) {
-        const previousBackground = appStore.activeSlides.find(
+        const previousBackground = appStore.currentState.activeSlides.find(
           (s) => s.id === slide.id
         )?.background
         if (previousBackground) {
@@ -385,7 +392,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
       }
     })
     appStore.setActiveSlides(
-      useMergeObjectArray(tempSlides, [...appStore.activeSlides])
+      useMergeObjectArray(tempSlides, [...appStore.currentState.activeSlides])
     )
     appStore.setSlidesLoading(false)
     appStore.setLastSynced(new Date().toISOString())
@@ -396,18 +403,18 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
 
 // Set slides to slides based on scheduler
 watch(
-  activeSchedule,
+  () => currentState.value.activeSchedule,
   () => {
-    slides.value = activeSlides.value?.filter(
-      (slide) => slide.scheduleId === appStore.activeSchedule?._id
+    slides.value = currentState.value.activeSlides?.filter(
+      (slide) => slide.scheduleId === appStore.currentState.activeSchedule?._id
     )
 
     // Check if activeSchedule is remote object
-    if (!activeSchedule.value?.updatedAt) {
-      createScheduleOnline(activeSchedule.value as Schedule)
+    if (!currentState.value.activeSchedule?.updatedAt) {
+      createScheduleOnline(currentState.value.activeSchedule as Schedule)
     } else {
       // retrieve all slides online
-      retrieveSlidesOnline(activeSchedule.value?._id)
+      retrieveSlidesOnline(currentState.value.activeSchedule?._id)
     }
   },
   { immediate: true }
@@ -429,7 +436,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
 
   appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(
-    `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/batch`,
+    `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/batch`,
     {
       method: "POST",
       body: tempSlides,
@@ -449,7 +456,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
 const batchUpdateSlideOnline = async (slides: Slide[]) => {
   appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(
-    `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/batch`,
+    `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/batch`,
     {
       method: "PUT",
       body: slides,
@@ -487,7 +494,7 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
   ) {
     appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
-      `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/${slide?._id}`,
+      `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
       {
         method: "PUT",
         body: tempSlide,
@@ -507,7 +514,7 @@ const deleteSlideOnline = async (slide: Slide) => {
   if (slide?._id) {
     appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
-      `/church/${churchId}/schedules/${appStore.activeSchedule?._id}/slides/${slide?._id}`,
+      `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
       {
         method: "DELETE",
       }
@@ -528,11 +535,12 @@ const createNewSlide = (duplicateSlide?: Slide) => {
     tempSlide = { ...duplicateSlide }
     delete tempSlide._id
   } else {
-    tempSlide.background = appStore.settings.defaultBackground.text.background
+    tempSlide.background =
+      appStore.currentState.settings.defaultBackground.text.background
     tempSlide.backgroundVideoKey =
-      appStore.settings.defaultBackground.text.backgroundVideoKey
+      appStore.currentState.settings.defaultBackground.text.backgroundVideoKey
     tempSlide.backgroundType =
-      appStore.settings.defaultBackground.text.backgroundType
+      appStore.currentState.settings.defaultBackground.text.backgroundType
   }
   tempSlide.id = useObjectID()
 
@@ -627,11 +635,12 @@ const createNewBibleSlide = (
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.bible
-  tempSlide.background = appStore.settings.defaultBackground.bible.background
+  tempSlide.background =
+    appStore.currentState.settings.defaultBackground.bible.background
   tempSlide.backgroundVideoKey =
-    appStore.settings.defaultBackground.bible.backgroundVideoKey
+    appStore.currentState.settings.defaultBackground.bible.backgroundVideoKey
   tempSlide.backgroundType =
-    appStore.settings.defaultBackground.bible.backgroundType
+    appStore.currentState.settings.defaultBackground.bible.backgroundType
   tempSlide.title = scripture?.label
   tempSlide.name = useSlideName(tempSlide)
 
@@ -640,7 +649,7 @@ const createNewBibleSlide = (
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
     fontSize: Number(fontSize),
-    font: appStore.settings.defaultFont,
+    font: appStore.currentState.settings.defaultFont,
   }
   tempSlide.contents = useSlideContent(tempSlide, scripture)
 
@@ -654,11 +663,12 @@ const createNewHymnSlide = (hymn: Hymn) => {
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.hymn
-  tempSlide.background = appStore.settings.defaultBackground.hymn.background
+  tempSlide.background =
+    appStore.currentState.settings.defaultBackground.hymn.background
   tempSlide.backgroundVideoKey =
-    appStore.settings.defaultBackground.hymn.backgroundVideoKey
+    appStore.currentState.settings.defaultBackground.hymn.backgroundVideoKey
   tempSlide.backgroundType =
-    appStore.settings.defaultBackground.hymn.backgroundType
+    appStore.currentState.settings.defaultBackground.hymn.backgroundType
   tempSlide.songId = hymn.number
   tempSlide.hasChorus = hymn.chorus === "false" ? false : !!hymn.chorus
   tempSlide.title = "Verse 1"
@@ -671,7 +681,7 @@ const createNewHymnSlide = (hymn: Hymn) => {
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
     fontSize: Number(fontSize),
-    font: appStore.settings.defaultFont,
+    font: appStore.currentState.settings.defaultFont,
   }
   tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
 
@@ -686,11 +696,12 @@ const createNewSongSlide = (song: Song) => {
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.song
-  tempSlide.background = appStore.settings.defaultBackground.hymn.background
+  tempSlide.background =
+    appStore.currentState.settings.defaultBackground.hymn.background
   tempSlide.backgroundVideoKey =
-    appStore.settings.defaultBackground.hymn.backgroundVideoKey
+    appStore.currentState.settings.defaultBackground.hymn.backgroundVideoKey
   tempSlide.backgroundType =
-    appStore.settings.defaultBackground.hymn.backgroundType
+    appStore.currentState.settings.defaultBackground.hymn.backgroundType
   tempSlide.songId = song._id || song.id
   tempSlide.title = "Verse 1"
 
@@ -701,7 +712,7 @@ const createNewSongSlide = (song: Song) => {
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
     fontSize: Number(fontSize),
-    font: appStore.settings.defaultFont,
+    font: appStore.currentState.settings.defaultFont,
   }
   tempSlide.data = song
   tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
@@ -795,7 +806,7 @@ const createMultipleNewMediaSlides = async (files: any[]) => {
 
   // update [slides] with new slides
   const updatedSlides = useMergeObjectArray(newSlides, [
-    ...appStore.activeSlides,
+    ...appStore.currentState.activeSlides,
   ])
   // sort updated slides by createdAt
   updatedSlides.sort((a, b) => {
@@ -831,11 +842,12 @@ const createNewCountdownSlide = (countdown: Countdown) => {
   const tempSlide = { ...preSlideCreation() }
   tempSlide.layout = slideLayoutTypes.countdown
   tempSlide.type = slideTypes.countdown
-  tempSlide.background = appStore.settings.defaultBackground.hymn.background
+  tempSlide.background =
+    appStore.currentState.settings.defaultBackground.hymn.background
   tempSlide.backgroundVideoKey =
-    appStore.settings.defaultBackground.hymn.backgroundVideoKey
+    appStore.currentState.settings.defaultBackground.hymn.backgroundVideoKey
   tempSlide.backgroundType =
-    appStore.settings.defaultBackground.hymn.backgroundType
+    appStore.currentState.settings.defaultBackground.hymn.backgroundType
   ;(tempSlide.data = countdown),
     (tempSlide.name = `${countdown.time?.replace("00:", "")}`)
   tempSlide.contents = useSlideContent(tempSlide, countdown)
@@ -844,7 +856,7 @@ const createNewCountdownSlide = (countdown: Countdown) => {
     ...tempSlide.slideStyle,
     fontSize: 17.5,
     alignment: "center",
-    font: appStore.settings.defaultFont,
+    font: appStore.currentState.settings.defaultFont,
   }
 
   slides.value?.push(tempSlide)
@@ -933,7 +945,7 @@ const updateLiveOutput = (updatedSlide: Slide) => {
   appStore.replaceScheduleActiveSlides(slides.value || [])
 
   // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
-  if (updatedSlide.id === appStore.liveSlideId) {
+  if (updatedSlide.id === appStore.currentState.liveSlideId) {
     appStore.setLiveSlide(updatedSlide.id)
   }
 }
@@ -1194,7 +1206,9 @@ const saveSlide = async (item: Slide) => {
 }
 
 const addAllSlidesToSelectedSlides = () => {
-  bulkSelectedSlides.value = activeSlides.value.map((slide) => slide?.id)
+  bulkSelectedSlides.value = currentState.value.activeSlides.map(
+    (slide) => slide?.id
+  )
 }
 
 const removeAllSelectedSlides = () => {

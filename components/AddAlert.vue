@@ -1,7 +1,7 @@
 <template>
   <div class="add-song-main mb-4">
     <div
-      v-if="alerts?.length > 0"
+      v-if="currentState.alerts?.length > 0"
       class="active-alert rounded-md bg-primary-100 dark:bg-primary-900 py-4 mb-4"
     >
       <div
@@ -12,15 +12,19 @@
       </div>
       <div
         class="alert-card-ctn flex items-center px-2"
-        v-for="alert in alerts"
+        v-for="alert in currentState.alerts"
         :key="alert.id"
       >
         <UButton
           class="alert-card flex items-start gap-1 justify-start mt-2 text-left hover:bg-primary-200 w-[calc(100%-0px)] relative"
-          :class="{ 'bg-primary-200': activeAlert?.id === alert?.id }"
+          :class="{
+            'bg-primary-200': currentState.activeAlert?.id === alert?.id,
+          }"
           variant="ghost"
           :icon="
-            activeAlert?.id === alert?.id ? 'i-bx-check-circle' : 'i-bx-circle'
+            currentState.activeAlert?.id === alert?.id
+              ? 'i-bx-check-circle'
+              : 'i-bx-circle'
           "
           color="black"
           block
@@ -116,7 +120,7 @@ const props = defineProps<{
 
 const appStore = useAppStore()
 
-const { alerts, activeAlert } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 const loading = ref<boolean>(false)
 const content = ref<string>("")
 const position = ref<string>("Bottom")
@@ -125,18 +129,18 @@ const toast = useToast()
 const emit = defineEmits(["go-home"])
 
 const deleteAlert = (alert: Alert) => {
-  const tempAlerts = [...appStore.alerts]
+  const tempAlerts = [...currentState.value?.alerts]
   const newAlertIndex = tempAlerts.findIndex((a) => a.id === alert.id)
   tempAlerts.splice(newAlertIndex, 1)
   appStore.setAlerts(tempAlerts)
-  if (alert?.id === activeAlert.value?.id) {
+  if (alert?.id === currentState.value?.activeAlert?.id) {
     appStore.setActiveAlert(null)
   }
   toast.add({ icon: "i-bx-trash", title: "Deleted alert" })
 }
 
 const addAlert = async () => {
-  if (alerts.value?.length >= 5) {
+  if (currentState.value?.alerts?.length >= 5) {
     toast.add({
       icon: "i-bx-error-circle",
       title: "Maximum alerts exceeded. Delete alert to add more.",
@@ -150,7 +154,7 @@ const addAlert = async () => {
       icon: "i-bx-info-circle",
       background: bgColor.value,
     }
-    appStore.setAlerts([...appStore.alerts, alert])
+    appStore.setAlerts([...currentState.value?.alerts, alert])
     appStore.setActiveAlert(alert)
     toast.add({ icon: "i-bx-send", title: "Alert sent to live" })
     emit("go-home")

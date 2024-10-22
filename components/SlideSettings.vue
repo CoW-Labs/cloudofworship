@@ -9,7 +9,7 @@
           select-class="w-[200px] bg-primary-100 dark:bg-primary-800 dark:text-white"
           size="md"
           :options="appFonts"
-          :model-value="appStore.settings.defaultFont"
+          :model-value="appStore.currentState.settings.defaultFont"
           variant="none"
           color="primary"
           clear-search-on-close
@@ -22,8 +22,10 @@
             <span
               v-if="font?.length"
               class="truncate"
-              :class="useURLFriendlyString(appStore.settings.defaultFont)"
-              >{{ appStore.settings.defaultFont }}</span
+              :class="
+                useURLFriendlyString(appStore.currentState.settings.defaultFont)
+              "
+              >{{ appStore.currentState.settings.defaultFont }}</span
             >
             <span v-else>Select font</span>
           </template>
@@ -47,7 +49,7 @@
             select-class="w-[200px] bg-primary-100 dark:bg-primary-800 dark:text-white"
             size="md"
             :options="bibleVersionSelectOptions"
-            :model-value="appStore.settings.defaultBibleVersion"
+            :model-value="appStore.currentState.settings.defaultBibleVersion"
             variant="none"
             color="primary"
             clear-search-on-close
@@ -79,7 +81,7 @@
           select-class="w-[200px] bg-primary-100 dark:bg-primary-800 dark:text-white capitalize"
           size="md"
           :options="['left', 'center', 'right']"
-          :model-value="appStore.settings.slideStyles.alignment"
+          :model-value="appStore.currentState.settings.slideStyles.alignment"
           variant="none"
           color="primary"
           clear-search-on-close
@@ -87,7 +89,7 @@
           :ui-menu="selectMenuUI"
           @change="
             appStore.setSlideStyles({
-              ...appStore.settings.slideStyles,
+              ...appStore.currentState.settings.slideStyles,
               alignment: $event,
             })
           "
@@ -101,7 +103,7 @@
 import { useAppStore } from "~/store/app"
 const appStore = useAppStore()
 
-const font = ref(appStore.settings.defaultFont)
+const font = ref(appStore.currentState.settings.defaultFont)
 const { bibleVersions } = storeToRefs(appStore)
 const bibleVersionSelectOptions = computed(() =>
   [

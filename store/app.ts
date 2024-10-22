@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import type { Alert, AppSettings, BackgroundVideo, Schedule, Slide, SlideStyle } from '~/types/index'
 import type { Emitter } from 'mitt'
 import { bibleVersionObjects } from '~/utils/constants';
+import { useThrottleFn } from '@vueuse/core';
 
 // console.log(usePinia())
 function ensureUniqueIds(arr: Slide[]): Slide[] {
@@ -16,174 +17,196 @@ function ensureUniqueIds(arr: Slide[]): Slide[] {
   });
 }
 
+const onAppStateChange = useThrottleFn((pastStates: [], currentState: any) => {
+  console.log('added to Stack')
+  pastStates.push({ ...currentState })
+}, 500)
+
 export const useAppStore = defineStore('app', {
   state: () => {
     return {
-      schedules: [] as Array<Schedule>,
-      activeSchedule: null as Schedule | null,
-      activeSlides: [] as Array<Slide>, // Returns all slides on CoW
-      liveOutputSlidesId: null as Array<string> | null,
-      liveSlideId: null as string | null,
-      emitter: null as Emitter | null,
-      settings: {
-        appVersion: '0.1.0',
-        defaultBibleVersion: 'KJV',
-        defaultFont: 'Inter',
-        defaultBackground: {
-          hymn: {
-            backgroundType: "video",
-            background: '/video-bg-1.mp4',
-            backgroundVideoKey: '/video-bg-1.mp4'
+      currentState: {
+        schedules: [] as Array<Schedule>,
+        activeSchedule: null as Schedule | null,
+        activeSlides: [] as Array<Slide>, // Returns all slides on CoW
+        liveOutputSlidesId: null as Array<string> | null,
+        liveSlideId: null as string | null,
+        emitter: null as Emitter | null,
+        settings: {
+          appVersion: '0.1.0',
+          defaultBibleVersion: 'KJV',
+          defaultFont: 'Inter',
+          defaultBackground: {
+            hymn: {
+              backgroundType: "video",
+              background: '/video-bg-1.mp4',
+              backgroundVideoKey: '/video-bg-1.mp4'
+            },
+            bible: {
+              backgroundType: "video",
+              background: '/video-bg-3.mp4',
+              backgroundVideoKey: '/video-bg-3.mp4'
+            },
+            text: {
+              backgroundType: "video",
+              background: '/video-bg-4.mp4',
+              backgroundVideoKey: '/video-bg-4.mp4'
+            }
           },
-          bible: {
-            backgroundType: "video",
-            background: '/video-bg-3.mp4',
-            backgroundVideoKey: '/video-bg-3.mp4'
-          },
-          text: {
-            backgroundType: "video",
-            background: '/video-bg-4.mp4',
-            backgroundVideoKey: '/video-bg-4.mp4'
-          }
+          slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center' } as SlideStyle,
+          bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
         },
-        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center' } as SlideStyle,
-        bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
+        backgroundVideos: [] as BackgroundVideo[],
+        alerts: [] as Alert[],
+        activeAlert: null as Alert | null,
+        recentBibleSearches: [] as string[],
+        failedUploadRequests: [] as { path: string, options: any }[],
+        slidesLoading: false as boolean,
+        lastSynced: new Date().toISOString() as string,
+        bannerVisible: true as boolean,
+        bibleVersions: bibleVersionObjects as Array<any>, // Check app.vue for bible versions array in a list
+        activeSocket: null as WebSocket | null,
+        // activeLiveWindows: [] as any[]
       },
-      backgroundVideos: [] as BackgroundVideo[],
-      alerts: [] as Alert[],
-      activeAlert: null as Alert | null,
-      recentBibleSearches: [] as string[],
-      failedUploadRequests: [] as { path: string, options: any }[],
-      slidesLoading: false as boolean,
-      lastSynced: new Date().toISOString() as string,
-      bannerVisible: true as boolean,
-      bibleVersions: bibleVersionObjects as Array<any>, // Check app.vue for bible versions array in a list
-      activeSocket: null as WebSocket | null,
-      // activeLiveWindows: [] as any[]
+      // Undo/Redo stacks
+      pastStates: [],
+      futureStates: [],
     }
   },
   getters: {
-    activeScheduleSlides: (state) => state.activeSlides?.filter(slide => slide.scheduleId === (state.activeSchedule?._id)),
-    bibleVersions: (state) => state.settings.bibleVersions
+    activeScheduleSlides: (state) => state.currentState.activeSlides?.filter(slide => slide.scheduleId === (state.currentState.activeSchedule?._id)),
+    bibleVersions: (state) => state.currentState.settings.bibleVersions
   },
   actions: {
     setSchedules(schedules: Schedule[]) {
-      this.schedules = schedules
-      if (this.activeSchedule) {
-        const tempSchedule = schedules.find(sch => sch?._id === this.activeSchedule?._id) as Schedule
+      // onAppStateChange(this.pastStates, this.currentState)
+      this.currentState.schedules = schedules
+      if (this.currentState.activeSchedule) {
+        const tempSchedule = schedules.find(sch => sch?._id === this.currentState.activeSchedule?._id) as Schedule
         // console.log("tempSchedule", tempSchedule)
-        this.activeSchedule = tempSchedule
+        this.currentState.activeSchedule = tempSchedule
       }
+      this.futureStates = []
     },
     setActiveSchedule(schedule: Schedule) {
-      this.activeSchedule = schedule
-      const existingSchedule = this.schedules.find(sch => sch?._id === schedule?._id)
+      this.currentState.activeSchedule = schedule
+      const existingSchedule = this.currentState.schedules.find(sch => sch?._id === schedule?._id)
       if (!existingSchedule) {
-        this.schedules.push(schedule)
+        this.currentState.schedules.push(schedule)
       } else {
-        this.schedules.splice(this.schedules.findIndex(sch => sch?._id === schedule?._id), 1, schedule)
+        this.currentState.schedules.splice(this.currentState.schedules.findIndex(sch => sch?._id === schedule?._id), 1, schedule)
       }
     },
     appendActiveSlide(slide: Slide, position?: number) {
-      if (!this.activeSlides.find(s => s?.id === slide?.id)) {
+      onAppStateChange(this.pastStates, this.currentState)
+      if (!this.currentState.activeSlides.find(s => s?.id === slide?.id)) {
         if (position && position >= 0) {
-          this.activeSlides.splice(position, 0, slide)
+          this.currentState.activeSlides.splice(position, 0, slide)
         } else {
-          this.activeSlides.push(slide)
+          this.currentState.activeSlides.push(slide)
         }
-        this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide?.id)))
+        this.currentState.liveOutputSlidesId = Array.from(new Set(this.currentState.activeSlides.map(slide => slide?.id)))
       }
+      this.futureStates = []
     },
     appendActiveSlides(slides: Array<Slide>) {
-      let tempSlides = [...this.activeSlides]
+      onAppStateChange(this.pastStates, this.currentState)
+      let tempSlides = [...this.currentState.activeSlides]
       tempSlides.push(...slides)
-      this.activeSlides = ensureUniqueIds(tempSlides)
-      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+      this.currentState.activeSlides = ensureUniqueIds(tempSlides)
+      this.currentState.liveOutputSlidesId = Array.from(new Set(this.currentState.activeSlides.map(slide => slide.id)))
+      this.futureStates = []
     },
     removeActiveSlide(slide: Slide) {
-      this.activeSlides.splice(this.activeSlides.findIndex(s => s.id === slide.id), 1)
-      // console.log("removing active slide", this.activeSlides)
-      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+      onAppStateChange(this.pastStates, this.currentState)
+      this.currentState.activeSlides.splice(this.currentState.activeSlides.findIndex(s => s.id === slide.id), 1)
+      // console.log("removing active slide", this.currentState.activeSlides)
+      this.currentState.liveOutputSlidesId = Array.from(new Set(this.currentState.activeSlides.map(slide => slide.id)))
+      this.futureStates = []
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
-      let tempSlides = [...this.activeSlides]
-      tempSlides = tempSlides.filter(slide => slide.scheduleId !== (this.activeSchedule?._id))
+      onAppStateChange(this.pastStates, this.currentState)
+      let tempSlides = [...this.currentState.activeSlides]
+      tempSlides = tempSlides.filter(slide => slide.scheduleId !== (this.currentState.activeSchedule?._id))
       // console.log("tempSlides", tempSlides)
       tempSlides.push(...slides)
-      this.activeSlides = ensureUniqueIds(tempSlides)
-      // console.log("replacing schedule active slides - p2", this.activeSlides)
-      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+      this.currentState.activeSlides = ensureUniqueIds(tempSlides)
+      // console.log("replacing schedule active slides - p2", this.currentState.activeSlides)
+      this.currentState.liveOutputSlidesId = Array.from(new Set(this.currentState.activeSlides.map(slide => slide.id)))
+      this.futureStates = []
     },
     setActiveSlides(slides: Array<Slide>) {
+      onAppStateChange(this.pastStates, this.currentState)
       // console.log("setActiveSlides", slides)
-      this.activeSlides = ensureUniqueIds(slides)
-      this.liveOutputSlidesId = Array.from(new Set(this.activeSlides.map(slide => slide.id)))
+      this.currentState.activeSlides = ensureUniqueIds(slides)
+      this.currentState.liveOutputSlidesId = Array.from(new Set(this.currentState.activeSlides.map(slide => slide.id)))
+      this.futureStates = []
     },
     // setActiveSlideId(slideId: string) {
-    //   this.activeSlideId = slideId
+    //   this.currentState.activeSlideId = slideId
     // },
     setLiveOutputSlidesId(slides: Array<string>) {
-      this.liveOutputSlidesId = Array.from(new Set(slides))
+      this.currentState.liveOutputSlidesId = Array.from(new Set(slides))
     },
     setLiveSlide(slide: string) {
-      this.liveSlideId = slide
+      this.currentState.liveSlideId = slide
     },
     setEmitter(emitter: Emitter) {
-      this.emitter = emitter
+      this.currentState.emitter = emitter
     },
     setAppSettings(settings: AppSettings) {
-      this.settings = settings
+      this.currentState.settings = settings
     },
     setSlideStyles(styles: SlideStyle) {
-      this.settings = { ...this.settings, slideStyles: styles }
+      this.currentState.settings = { ...this.currentState.settings, slideStyles: styles }
     },
     setDefaultBibleVersion(version: string) {
-      this.settings = { ...this.settings, defaultBibleVersion: version }
+      this.currentState.settings = { ...this.currentState.settings, defaultBibleVersion: version }
     },
     setDefaultFont(font: string) {
-      this.settings = { ...this.settings, defaultFont: font }
+      this.currentState.settings = { ...this.currentState.settings, defaultFont: font }
     },
     setAlerts(alerts: Alert[]) {
-      this.alerts = alerts
+      this.currentState.alerts = alerts
     },
     setActiveAlert(alert: Alert | null) {
-      this.activeAlert = alert
+      this.currentState.activeAlert = alert
     },
     setBackgroundVideos(bgVideos: BackgroundVideo[]) {
-      this.backgroundVideos = bgVideos
-      this.settings.defaultBackground.hymn.background = bgVideos?.[0]?.url
-      this.settings.defaultBackground.bible.background = bgVideos?.[2]?.url
-      this.settings.defaultBackground.text.background = bgVideos?.[3]?.url
+      this.currentState.backgroundVideos = bgVideos
+      this.currentState.settings.defaultBackground.hymn.background = bgVideos?.[0]?.url
+      this.currentState.settings.defaultBackground.bible.background = bgVideos?.[2]?.url
+      this.currentState.settings.defaultBackground.text.background = bgVideos?.[3]?.url
     },
     setRecentBibleSearches(searchQuery: string) {
-      let tempArr = [...this.recentBibleSearches]
-      if (this.recentBibleSearches.length >= 20) {
+      let tempArr = [...this.currentState.recentBibleSearches]
+      if (this.currentState.recentBibleSearches.length >= 20) {
         tempArr.shift()
-        this.recentBibleSearches = tempArr
+        this.currentState.recentBibleSearches = tempArr
       }
       const tempSet = new Set(tempArr)
       tempSet.add(searchQuery)
-      this.recentBibleSearches = Array.from(tempSet)
+      this.currentState.recentBibleSearches = Array.from(tempSet)
     },
     setFailedUploadRequests(failedRequest: { path: string, options: any }) {
-      this.failedUploadRequests.push()
+      this.currentState.failedUploadRequests.push()
     },
     setSlidesLoading(loading: boolean) {
-      this.slidesLoading = loading
+      this.currentState.slidesLoading = loading
     },
     setLastSynced(lastSynced: string) {
-      this.lastSynced = lastSynced
+      this.currentState.lastSynced = lastSynced
     },
     setBannerVisible(bannerVisible: boolean) {
-      this.bannerVisible = bannerVisible
+      this.currentState.bannerVisible = bannerVisible
     },
     setBibleVersions(bibleVersions: Array<any>) {
-      // this.bibleVersions = []
-      // this.bibleVersions = [...bibleVersions]
-      this.settings = { ...this.settings, bibleVersions: bibleVersions }
+      // this.currentState.bibleVersions = []
+      // this.currentState.bibleVersions = [...bibleVersions]
+      this.currentState.settings = { ...this.currentState.settings, bibleVersions: bibleVersions }
     },
     setActiveSocket(socket: WebSocket) {
-      this.activeSocket = socket
+      this.currentState.activeSocket = socket
     },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)
@@ -226,6 +249,28 @@ export const useAppStore = defineStore('app', {
       this.setFailedUploadRequests([])
       this.setSlidesLoading(false)
       this.setLastSynced(new Date().toISOString())
+    },
+    // Undo/Redo Actions
+    setCurrentState(state: any) {
+      this.currentState = { ...state }
+    },
+    undo() {
+      console.log('undo action')
+      if (this.pastStates.length) {
+        this.futureStates.push({ ...this.currentState })
+        this.setCurrentState({ ...this.pastStates.pop() })
+      }
+    },
+    redo() {
+      console.log('redo action')
+      if (this.futureStates.length) {
+        onAppStateChange(this.pastStates, this.currentState)
+        this.currentState = { ...this.futureStates.pop() }
+      }
+    },
+    refreshAppActionsStack() {
+      this.pastStates = []
+      this.futureStates = []
     }
   },
   persist: {
