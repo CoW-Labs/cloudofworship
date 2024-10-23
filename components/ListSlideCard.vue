@@ -16,7 +16,7 @@
       <LiveContentWithBackground
         :slide="slide"
         :slide-label="slide?.name"
-        :slide-styles="settings.slideStyles"
+        :slide-styles="settings?.slideStyles"
       />
     </div>
     <div class="texts flex-col justify-between">

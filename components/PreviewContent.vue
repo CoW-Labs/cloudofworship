@@ -44,7 +44,14 @@
           :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
           grid-type
           :selected="activeSlide?.id === slide?.id"
-          @click="bulkSelectSlides ? null : makeSlideActive(slide)"
+          @click="
+            bulkSelectSlides
+              ? null
+              : makeSlideActive(slide, {
+                  goLive: false,
+                  newlyCreated: false,
+                })
+          "
           @duplicate="createNewSlide(slide)"
           @delete="deleteSlide"
           @save-slide="saveSlide(slide)"
@@ -67,13 +74,19 @@
       @goto-verse="gotoAction"
       @goto-chorus="gotoChorus"
       @update-bible-version="gotoScripture(activeSlide?.title!!, $event)"
-      @take-live="makeSlideActive(activeSlide!!, true)"
+      @take-live="
+        makeSlideActive(activeSlide!!, {
+          goLive: true,
+          newlyCreated: false,
+        })
+      "
     />
   </AppSection>
 </template>
 
 <script setup lang="ts">
 import { useDebounceFn } from "@vueuse/core"
+import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { merge } from "rxjs"
 import { useAppStore } from "~/store/app"
@@ -97,6 +110,7 @@ const bulkSelectedSlides = ref<string[]>([])
 const activeCountdownInterval = ref<any>(null)
 const countdownTimeLeft = ref<number>(0)
 
+// Listen to see if active slide is in active schedule, and to scroll to newest slide if in active schedule
 watch(
   slides,
   (newVal, oldVal) => {
@@ -126,7 +140,7 @@ watch(
 watch(
   () => currentState.value.activeSlides,
   () => {
-    console.log("slide order updated")
+    console.log("slide has been updated", appStore.activeScheduleSlides)
     const tempSlides = currentState.value.activeSlides?.filter(
       (slide) => slide.scheduleId === appStore.currentState.activeSchedule?._id
     )
@@ -138,14 +152,24 @@ watch(
         (slide) => slide.id === activeSlide.value?.id
       )
     }
-  }
+  },
+  { deep: true, immediate: true }
 )
 
-const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
+const makeSlideActive = (
+  slide: Slide,
+  options?: {
+    goLive: boolean
+    newlyCreated: boolean
+  }
+) => {
+  console.log("make slide active")
   // console.log(goLive, slide)
   activeSlide.value = slide
-  appStore.appendActiveSlide(slide)
-  if (goLive) {
+  if (options?.newlyCreated) {
+    appStore.appendActiveSlide(slide)
+  }
+  if (options?.goLive) {
     appStore.setLiveSlide(activeSlide.value.id)
   }
 }
@@ -217,7 +241,7 @@ emitter.on("new-media", async (data: any) => {
 
 emitter.on("new-active-slide", (data: Slide) => {
   if (data) {
-    makeSlideActive(data)
+    makeSlideActive(data, { goLive: false, newlyCreated: true })
   }
 })
 
@@ -312,7 +336,7 @@ const mergeSlides = (
 }
 
 const uploadOfflineSlides = async () => {
-  // console.log("uploading offline slides")
+  console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
   const offlineSlides = appStore.currentState.activeSlides
     .filter((slide) => slide._id === undefined)
@@ -545,7 +569,7 @@ const createNewSlide = (duplicateSlide?: Slide) => {
   tempSlide.id = useObjectID()
 
   slides.value?.push(tempSlide)
-  makeSlideActive(tempSlide)
+  makeSlideActive(tempSlide, { goLive: false, newlyCreated: true })
   toast.add({
     title: `${tempSlide?.name} created`,
     icon: "i-bx-slideshow",
@@ -654,7 +678,10 @@ const createNewBibleSlide = (
   tempSlide.contents = useSlideContent(tempSlide, scripture)
 
   slides.value?.push(tempSlide)
-  makeSlideActive(tempSlide, !options?.fromWholeBibleSearch)
+  makeSlideActive(tempSlide, {
+    goLive: !options?.fromWholeBibleSearch,
+    newlyCreated: true,
+  })
   toast.add({ title: "Bible slide created", icon: "i-bx-bible" })
   uploadOfflineSlides()
 }
@@ -686,7 +713,7 @@ const createNewHymnSlide = (hymn: Hymn) => {
   tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
 
   slides.value?.push(tempSlide)
-  makeSlideActive(tempSlide)
+  makeSlideActive(tempSlide, { goLive: false, newlyCreated: true })
   toast.add({ title: "Hymn slide created", icon: "i-bx-church" })
   uploadOfflineSlides()
 }
@@ -719,7 +746,7 @@ const createNewSongSlide = (song: Song) => {
   tempSlide.name = useSlideName(tempSlide)
 
   slides.value?.push(tempSlide)
-  makeSlideActive(tempSlide)
+  makeSlideActive(tempSlide, { goLive: false, newlyCreated: true })
   // console.log("called")
   toast.add({ title: "Song slide created", icon: "i-bx-music" })
   uploadOfflineSlides()
@@ -765,7 +792,7 @@ const createNewMediaSlide = async (
   }
 
   slides.value?.push(tempSlide)
-  makeSlideActive(tempSlide)
+  makeSlideActive(tempSlide, { goLive: false, newlyCreated: true })
   if (!options?.oneOfManySlides) {
     toast.add({ title: "Media slide created", icon: "i-bx-image" })
     // uploadOfflineSlides()
@@ -863,9 +890,9 @@ const createNewCountdownSlide = (countdown: Countdown) => {
 
   // Take slide live if current active slide is a countdown
   if (activeSlide.value?.type === slideTypes.countdown) {
-    makeSlideActive(tempSlide, true)
+    makeSlideActive(tempSlide, { goLive: true, newlyCreated: true })
   } else {
-    makeSlideActive(tempSlide)
+    makeSlideActive(tempSlide, { goLive: false, newlyCreated: true })
   }
   toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
   uploadOfflineSlides()

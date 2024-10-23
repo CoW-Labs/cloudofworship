@@ -4,8 +4,9 @@ const useCreateShortcut = (commandKey: string, action: () => void, options?: { c
     if (options?.ctrlOrMeta && options?.shift) {
       // e.preventDefault()
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === commandKey) {
+        e.preventDefault();
+        e.stopPropagation();
         action();
-        e.stopImmediatePropagation()
         return
       }
     } else if (options?.ctrlOrMeta) {

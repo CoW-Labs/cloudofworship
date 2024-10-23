@@ -17,10 +17,23 @@ function ensureUniqueIds(arr: Slide[]): Slide[] {
   });
 }
 
-const onAppStateChange = useThrottleFn((pastStates: [], currentState: any) => {
+/**
+ * This function is used to throttle the amount of times the app state is updated
+ * in relation to the past states (undo/redo stack)
+ * The key/value approach for updating is used to ensure reactivity of the app state
+ * @param pastStates
+ * @param currentState
+ * @param key
+ * @param value
+ */
+const onAppStateChange = useThrottleFn((pastStates: [], currentState: any, key: string, value: any) => {
   console.log('added to Stack')
-  pastStates.push({ ...currentState })
-}, 500)
+  const tempCurrentState = { ...currentState }
+  if (key) {
+    tempCurrentState[key] = value
+  }
+  pastStates.push({ ...tempCurrentState })
+}, 1500)
 
 export const useAppStore = defineStore('app', {
   state: () => {
@@ -98,7 +111,8 @@ export const useAppStore = defineStore('app', {
       }
     },
     appendActiveSlide(slide: Slide, position?: number) {
-      onAppStateChange(this.pastStates, this.currentState)
+      onAppStateChange(this.pastStates, this.currentState, 'activeSlides', [...this.currentState.activeSlides])
+      // console.log('appending active slide', [...this.currentState.activeSlides])
       if (!this.currentState.activeSlides.find(s => s?.id === slide?.id)) {
         if (position && position >= 0) {
           this.currentState.activeSlides.splice(position, 0, slide)
@@ -110,7 +124,8 @@ export const useAppStore = defineStore('app', {
       this.futureStates = []
     },
     appendActiveSlides(slides: Array<Slide>) {
-      onAppStateChange(this.pastStates, this.currentState)
+      // console.log('appending active slides', this.currentState.activeSlides?.length)
+      // onAppStateChange(this.pastStates, this.currentState)
       let tempSlides = [...this.currentState.activeSlides]
       tempSlides.push(...slides)
       this.currentState.activeSlides = ensureUniqueIds(tempSlides)
@@ -118,14 +133,17 @@ export const useAppStore = defineStore('app', {
       this.futureStates = []
     },
     removeActiveSlide(slide: Slide) {
-      onAppStateChange(this.pastStates, this.currentState)
+      // console.log('removing active slides', this.currentState.activeSlides?.length)
+      onAppStateChange(this.pastStates, this.currentState, 'activeSlides', [...this.currentState.activeSlides])
+      // onAppStateChange(this.pastStates, this.currentState)
       this.currentState.activeSlides.splice(this.currentState.activeSlides.findIndex(s => s.id === slide.id), 1)
       // console.log("removing active slide", this.currentState.activeSlides)
       this.currentState.liveOutputSlidesId = Array.from(new Set(this.currentState.activeSlides.map(slide => slide.id)))
       this.futureStates = []
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
-      onAppStateChange(this.pastStates, this.currentState)
+      // console.log('replacing schedule active slides', this.currentState.activeSlides?.length)
+      // onAppStateChange(this.pastStates, this.currentState)
       let tempSlides = [...this.currentState.activeSlides]
       tempSlides = tempSlides.filter(slide => slide.scheduleId !== (this.currentState.activeSchedule?._id))
       // console.log("tempSlides", tempSlides)
@@ -136,7 +154,8 @@ export const useAppStore = defineStore('app', {
       this.futureStates = []
     },
     setActiveSlides(slides: Array<Slide>) {
-      onAppStateChange(this.pastStates, this.currentState)
+      // console.log('setting active slides', this.currentState.activeSlides?.length)
+      // onAppStateChange(this.pastStates, this.currentState)
       // console.log("setActiveSlides", slides)
       this.currentState.activeSlides = ensureUniqueIds(slides)
       this.currentState.liveOutputSlidesId = Array.from(new Set(this.currentState.activeSlides.map(slide => slide.id)))
@@ -253,19 +272,20 @@ export const useAppStore = defineStore('app', {
     // Undo/Redo Actions
     setCurrentState(state: any) {
       this.currentState = { ...state }
+      console.log('updated current state', this.currentState)
     },
     undo() {
       console.log('undo action')
       if (this.pastStates.length) {
-        this.futureStates.push({ ...this.currentState })
-        this.setCurrentState({ ...this.pastStates.pop() })
+        this.futureStates.push(this.currentState)
+        this.setCurrentState(this.pastStates.pop())
       }
     },
     redo() {
       console.log('redo action')
       if (this.futureStates.length) {
-        onAppStateChange(this.pastStates, this.currentState)
-        this.currentState = { ...this.futureStates.pop() }
+        this.pastStates.push(this.currentState)
+        this.setCurrentState(this.futureStates.pop())
       }
     },
     refreshAppActionsStack() {
