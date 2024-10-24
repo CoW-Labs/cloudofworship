@@ -10,7 +10,7 @@
     />
     <div class="texts">
       <h4 class="font-semibold">
-        {{ useScriptureLabel(bibleQuery, { toLongForm: true }) }}
+        {{ useScriptureLabel(bibleQuery || "", { toLongForm: true }) }}
       </h4>
       <p class="font-light text-xs mt-1">Recently opened</p>
     </div>

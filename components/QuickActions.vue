@@ -13,21 +13,44 @@
       ref="quickActions"
       tabindex="1"
     >
-      <div class="flex gap-2">
-        <UInput
-          icon="i-bx-search"
-          placeholder="Search scripture, hymns, actions"
-          v-model="searchInput"
-          color="black"
-          class="w-[100%]"
-          ref="searchInputEl"
-        />
-        <UButton
-          v-if="searchInput.length >= 2"
-          icon="i-bx-x"
-          color="primary"
-          @click="searchInput = ''"
-        ></UButton>
+      <div
+        class="group search-focus transition-all rounded-md focus-within:p-2 focus-within:bg-primary-100 focus-within:dark:bg-primary-800"
+      >
+        <div class="flex gap-2">
+          <UInput
+            icon="i-bx-search"
+            placeholder="Search actions, scripture, hymns..."
+            v-model="searchInput"
+            color="black"
+            class="w-[100%]"
+            ref="searchInputEl"
+          />
+          <UButton
+            v-if="searchInput.length >= 2"
+            icon="i-bx-x"
+            color="primary"
+            @click="searchInput = ''"
+          ></UButton>
+        </div>
+        <div
+          class="hidden max-w-[100%] group-focus-within:flex items-center gap-2 whitespace-nowrap text-md pl-1 pt-3 come-up-1"
+        >
+          <div>Search anything</div>
+          <div class="flex overflow-x-auto">
+            <SlideChip
+              v-for="slideType in [
+                slideTypes.bible,
+                slideTypes.hymn,
+                slideTypes.song,
+              ]"
+              :key="slideType"
+              :slide-type="slideType"
+              class="mr-1"
+              :dark-mode="useColorMode().value === 'dark'"
+            />
+            & more
+          </div>
+        </div>
       </div>
 
       <Transition name="fade-sm">
@@ -278,7 +301,16 @@ onMounted(() => {
   // console.log("mounted", quickActions.value)
 
   emitter.on(appWideActions.quickActionsFocus, () => {
-    searchInputEl.value?.input?.focus()
+    // Focus on Quick actions search bar input
+    if (page.value !== "") {
+      setTimeout(() => {
+        searchInputEl.value?.input?.focus()
+      }, 300)
+      // Go to Quick actions home
+      page.value = ""
+    } else {
+      searchInputEl.value?.input?.focus()
+    }
   })
   quickActions.value?.addEventListener("keydown", (e) => {
     if (e.defaultPrevented) {
