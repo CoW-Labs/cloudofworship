@@ -187,6 +187,24 @@ onMounted(() => {
       appStore.setLiveSlide(previousSlide.value.id)
     }
   })
+  useCreateShortcut(
+    "0",
+    () => {
+      if (liveOutputSlides.value?.at(-1)?._id) {
+        appStore.setLiveSlide(liveOutputSlides.value?.at(-1)?._id!!)
+      }
+    },
+    { ctrlOrMeta: true, shift: false }
+  )
+  useCreateShortcut(
+    "1",
+    () => {
+      if (liveOutputSlides.value?.at(0)?._id) {
+        appStore.setLiveSlide(liveOutputSlides.value?.at(0)?._id!!)
+      }
+    },
+    { ctrlOrMeta: true, shift: false }
+  )
 })
 
 // const makeSlideActive = (slide: Slide, goLive: boolean = false) => {

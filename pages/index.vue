@@ -40,14 +40,25 @@ onMounted(() => {
     setTimeout(() => {
       useGlobalEmit(appWideActions.openSettings, "Profile Settings")
     }, 1000)
-  } else {
-    setTimeout(() => {
-      useGlobalEmit(appWideActions.openScheduleModal)
-    }, 2000)
   }
+  // else {
+  //   setTimeout(() => {
+  //     useGlobalEmit(appWideActions.openScheduleModal)
+  //   }, 2000)
+  // }
 
   // APP-WIDE SHORTCUTS
   useCreateShortcut("/", () => useGlobalEmit(appWideActions.quickActionsFocus))
+
+  // Prevent default action on specific keys
+  document.addEventListener("keydown", function (event) {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      (event.key === "y" || event.key === "Y" || event.key === "?")
+    ) {
+      event.preventDefault()
+    }
+  })
 
   useCreateShortcut(
     "z",
@@ -63,6 +74,26 @@ onMounted(() => {
     () => {
       appStore.redo()
       uploadOfflineSlides()
+    },
+    {
+      ctrlOrMeta: true,
+    }
+  )
+
+  useCreateShortcut(
+    "p",
+    () => {
+      useGlobalEmit("promote-active-slide-live")
+    },
+    {
+      ctrlOrMeta: true,
+    }
+  )
+
+  useCreateShortcut(
+    "h",
+    () => {
+      useGlobalEmit("open-shortcuts")
     },
     {
       ctrlOrMeta: true,

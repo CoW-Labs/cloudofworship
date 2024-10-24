@@ -12,7 +12,6 @@ const useCreateShortcut = (commandKey: string, action: () => void, options?: { c
     if (options?.ctrlOrMeta) {
       if (isCommandKeyPressed && isCtrlOrMetaPressed) {
         action();
-        e.stopImmediatePropagation();
         e.preventDefault();
       }
     } else if (isCommandKeyPressed) {

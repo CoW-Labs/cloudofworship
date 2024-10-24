@@ -542,6 +542,10 @@ const downloadEssentialResources = async () => {
 
   setTimeout(() => {
     loadingResources.value = false
+    useGlobalEmit(
+      appWideActions.selectedSchedule,
+      appStore.currentState.activeSchedule?._id
+    )
   }, 100)
 }
 

@@ -92,7 +92,7 @@ const props = defineProps({
   isLiveWindowActive: Boolean,
 })
 const appStore = useAppStore()
-const { activeLiveWindows } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 </script>
 
 <style scoped></style>

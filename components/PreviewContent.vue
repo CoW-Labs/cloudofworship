@@ -297,6 +297,15 @@ emitter.on("select-slides", () => {
   }
 })
 
+emitter.on("promote-active-slide-live", () => {
+  if (activeSlide.value) {
+    makeSlideActive(activeSlide.value!!, {
+      goLive: true,
+      newlyCreated: false,
+    })
+  }
+})
+
 const preSlideCreation = (): Slide => {
   const tempSlide: Slide = {
     id: useObjectID(),

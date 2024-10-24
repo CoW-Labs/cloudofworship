@@ -53,6 +53,11 @@
 
         <ChangelogModal :app-version="appVersion" />
 
+        <ShortcutsModal
+          :visible="shortcutsModalVisible"
+          @close="shortcutsModalVisible = false"
+        />
+
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
         <UTooltip :text="online ? 'Force sync' : 'You are offline'">
           <UButton
@@ -160,6 +165,7 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 const inviteModalVisible = ref(false)
 const scheduleModalVisible = ref(false)
+const shortcutsModalVisible = ref(false)
 
 const { user, church } = storeToRefs(authStore)
 const { currentState } = storeToRefs(appStore)
@@ -194,6 +200,10 @@ emitter?.on("close-modal", () => {
 emitter?.on("open-settings", (data) => {
   settingsModalOpen.value = true
   settingsPage.value = data
+})
+
+emitter?.on("open-shortcuts", (data) => {
+  shortcutsModalVisible.value = true
 })
 
 emitter?.on("open-schedule-modal", (data) => {

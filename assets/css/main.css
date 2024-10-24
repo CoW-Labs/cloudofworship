@@ -372,6 +372,10 @@ body {
   border-radius: 0.5rem;
 }
 
+.mono {
+  font-family: "JetBrainsMono", monospace;
+}
+
 .tiptap pre code {
   color: inherit;
   padding: 0;
