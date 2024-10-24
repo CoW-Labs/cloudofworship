@@ -271,6 +271,10 @@ emitter.on("refresh-slides", () => {
   retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!)
 })
 
+emitter.on("upload-offline-slides", () => {
+  uploadOfflineSlides()
+})
+
 emitter.on("select-slides", () => {
   if (bulkActionLabel.value === "Select Slides") {
     bulkSelectSlides.value = !bulkSelectSlides.value

@@ -22,11 +22,16 @@ import { useAppStore } from "~/store/app"
 // import useScheduleWebsocket from "~/composables/useScheduleWebsocket";
 import { ref, watchEffect } from "vue"
 import { storeToRefs } from "pinia"
+import { useDebounce } from "@vueuse/core"
 
 const appStore = useAppStore()
 const { activeSchedule } = storeToRefs(appStore)
 
 const scheduleId = ref(undefined)
+
+const uploadOfflineSlides = useDebounce(() => {
+  useGlobalEmit(appWideActions.uploadOfflineSlides)
+}, 2000)
 
 onMounted(() => {
   const emailChange = useRoute().query.email_change
@@ -42,13 +47,28 @@ onMounted(() => {
     }, 2000)
   }
 
+  // APP-WIDE SHORTCUTS
   useCreateShortcut("/", () => useGlobalEmit(appWideActions.quickActionsFocus))
 
-  useCreateShortcut("z", () => appStore.undo(), { ctrlOrMeta: true })
+  useCreateShortcut(
+    "z",
+    () => {
+      appStore.undo()
+      uploadOfflineSlides()
+    },
+    { ctrlOrMeta: true }
+  )
 
-  useCreateShortcut("y", () => appStore.redo(), {
-    ctrlOrMeta: true,
-  })
+  useCreateShortcut(
+    "y",
+    () => {
+      appStore.redo()
+      uploadOfflineSlides()
+    },
+    {
+      ctrlOrMeta: true,
+    }
+  )
 })
 
 // watch(
