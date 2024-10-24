@@ -29,11 +29,13 @@
 
     <!-- RECENTLY OPENED SCRIPTURES -->
     <div
-      v-if="recentBibleSearches.length > 0 && searchInput.length < 2"
+      v-if="
+        currentState.recentBibleSearches.length > 0 && searchInput.length < 2
+      "
       class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
     >
       <BibleQueryCard
-        v-for="bibleQuery in [...recentBibleSearches].reverse()"
+        v-for="bibleQuery in [...currentState.recentBibleSearches].reverse()"
         :key="bibleQuery"
         :bible-query="bibleQuery"
         type="song"
@@ -41,7 +43,9 @@
     </div>
 
     <EmptyState
-      v-if="recentBibleSearches?.length === 0 && searchInput.length < 2"
+      v-if="
+        currentState.recentBibleSearches?.length === 0 && searchInput.length < 2
+      "
       icon="i-tabler-cloud-search"
       sub="You haven't opened any scriptures yet"
       action-text="Open Genesis 1"
@@ -60,7 +64,8 @@ const props = defineProps<{
   query: string
 }>()
 
-const { recentBibleSearches } = storeToRefs(useAppStore())
+const appStore = useAppStore()
+const { currentState } = storeToRefs(appStore)
 const searchInput = ref<string>(props.query || "")
 const focusedActionIndex = ref(0)
 const quickActions = ref<HTMLDivElement | null>(null)

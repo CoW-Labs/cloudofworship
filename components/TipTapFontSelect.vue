@@ -69,7 +69,7 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
-const { settings } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 const fonts = ref<string[]>(appFonts)
 const font = ref<string>("Inter")
 

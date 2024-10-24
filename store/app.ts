@@ -220,6 +220,7 @@ export const useAppStore = defineStore('app', {
       this.currentState.bannerVisible = bannerVisible
     },
     setBibleVersions(bibleVersions: Array<any>) {
+      console.log(bibleVersions)
       // this.currentState.bibleVersions = []
       // this.currentState.bibleVersions = [...bibleVersions]
       this.currentState.settings = { ...this.currentState.settings, bibleVersions: bibleVersions }

@@ -104,11 +104,13 @@ import { useAppStore } from "~/store/app"
 const appStore = useAppStore()
 
 const font = ref(appStore.currentState.settings.defaultFont)
-const { bibleVersions } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 const bibleVersionSelectOptions = computed(() =>
   [
-    ...bibleVersions.value,
-    bibleVersions.value?.find((version) => !version?.isDownloaded)
+    ...currentState.value.settings.bibleVersions,
+    currentState.value.settings.bibleVersions?.find(
+      (version) => !version?.isDownloaded
+    )
       ? {
           id: "+ More Versions",
           name: "Add more versions",

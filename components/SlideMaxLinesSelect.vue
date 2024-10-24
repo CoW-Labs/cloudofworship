@@ -58,7 +58,7 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
-const { settings } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 const lines = ref<number>(props.selectedLine || 4)
 
 watch(

@@ -192,6 +192,7 @@ const config = useRuntimeConfig()
 const token = useCookie("token")
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
+const appInfo = ref({})
 const route = useRoute()
 
 const isAppOnline = computed(() => {
@@ -480,6 +481,11 @@ const downloadEssentialResources = async () => {
   downloadStep.value = 2
   await retrieveSchedules()
 
+  // Download app info
+  const { data } = await useAPIFetch("/app-config/info")
+  appInfo.value = data.value as any
+  appStore.setBibleVersions(data.value?.bibleVersions)
+
   // Download KJV Bible
   let tempBible = await db.bibleAndHymns.get("KJV")
   if (!tempBible) {
@@ -499,7 +505,9 @@ const downloadEssentialResources = async () => {
   }
 
   const populateBibleVersionOptions = async () => {
-    const tempBibleVersions = [...appStore.currentState.bibleVersions]
+    const tempBibleVersions = appInfo.value.bibleVersions?.length
+      ? appInfo.value.bibleVersions
+      : [...appStore.currentState.bibleVersions]
     for (const bibleVersion of tempBibleVersions) {
       bibleVersion.isDownloaded = await isBibleVersionDownloaded(
         bibleVersion.id
@@ -537,7 +545,7 @@ const downloadEssentialResources = async () => {
   }, 100)
 }
 
-const overrideAppSettings = () => {
+const overrideAppSettings = async () => {
   const currentAppSettings = appStore.currentState.settings
   // Override App Settings if current app version mismatches appVersion in state
   // TODO: When appSettings is editable by user, it must take preference over system settings and override
@@ -579,11 +587,11 @@ const overrideAppSettings = () => {
         linesPerSlide: 4,
         alignment: "center",
       } as SlideStyle,
-      bibleVersions: bibleVersionObjects as Array<any>, // Check app.vue for bible versions array in a list
+      bibleVersions: appInfo.value.bibleVersions as Array<any>, // Check app.vue for bible versions array in a list
     })
 
     // console.log("calling setBibleVersions")
-    appStore.setBibleVersions(bibleVersionObjects)
+    appStore.setBibleVersions(appInfo.value.bibleVersions)
   }
 }
 

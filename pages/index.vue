@@ -25,7 +25,6 @@ import { storeToRefs } from "pinia"
 import { useDebounce } from "@vueuse/core"
 
 const appStore = useAppStore()
-const { activeSchedule } = storeToRefs(appStore)
 
 const scheduleId = ref(undefined)
 
