@@ -350,6 +350,20 @@ export const bibleVersionObjects = [
     copyrightContent:
       "Scripture taken from THE MESSAGE. Copyright © 1993, 1994, 1995, 1996, 2000, 2001, 2002.",
   },
+  {
+    id: "NASB",
+    name: "New American Standard Bible",
+    isDownloaded: false,
+    copyrightContent:
+      "Scripture quotations taken from the (NASB®) New American Standard Bible®, Copyright © 1960, 1971 by The Lockman Foundation",
+  },
+  {
+    id: "TPT",
+    name: "The Passion Translation",
+    isDownloaded: false,
+    copyrightContent:
+      "Scripture quotations marked TPT are from The Passion Translation®. Copyright © 2017, 2018, 2020 by Passion & Fire Ministries, Inc.",
+  },
 ]
 
 export const appFonts = [
