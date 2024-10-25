@@ -152,8 +152,8 @@
               :slide-styles="slideStyles"
             />
           </UCard>
-        </UModal>
-      </template>
+        </UModal> </template
+      ><AlertView :size="fullScreen ? '' : 'sm'" />
     </div>
   </div>
 </template>

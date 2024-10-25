@@ -18,7 +18,8 @@
         <UButton
           class="alert-card flex items-start gap-1 justify-start mt-2 text-left hover:bg-primary-200 w-[calc(100%-0px)] relative"
           :class="{
-            'bg-primary-200': currentState.activeAlert?.id === alert?.id,
+            'bg-primary-200 dark:bg-primary-500':
+              currentState.activeAlert?.id === alert?.id,
           }"
           variant="ghost"
           :icon="
