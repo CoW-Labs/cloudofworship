@@ -7,6 +7,7 @@
         slide?.type === slideTypes.media
           ? {
               ...slide?.data,
+              url: slide.background,
               fromSaved: true,
               scheduleId: currentState?.activeSchedule?._id,
             }

@@ -1200,6 +1200,8 @@ const saveSlide = async (item: Slide) => {
       toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
     } else {
       delete tempItem.data.blob
+      delete tempItem.blob
+      console.log("tempItem", tempItem)
       await db.library.add(
         {
           id: tempItem.id,

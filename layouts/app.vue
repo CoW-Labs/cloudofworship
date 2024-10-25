@@ -639,7 +639,10 @@ const retrieveAllMediaFilesFromDB = async () => {
   // For active slides
   const slides = [...appStore.currentState.activeSlides]
   slides.forEach(async (slide) => {
-    if (slide.type === slideTypes.media) {
+    if (
+      slide.type === slideTypes.media &&
+      slide.background?.startsWith("blob:")
+    ) {
       const mediaObj = await db.media.where({ id: slide.id }).toArray()
       if (mediaObj[0]) {
         let b64 = null
@@ -675,33 +678,35 @@ const retrieveAllMediaFilesFromDB = async () => {
 
   // For saved slides
   const savedSlides = await db.library.where("type").equals("slide").toArray()
-  const slidesChanges = await savedSlides?.map((slide) => {
-    db.media.get(slide.id).then((resp) => {
-      const media = resp
+  savedSlides?.map((slide) => {
+    if (slide.content?.background?.startsWith("blob:")) {
+      db.media.get(slide.id).then((resp) => {
+        const media = resp
 
-      const arrayBuffer: ArrayBuffer = media?.data as ArrayBuffer
-      const blob = new Blob([arrayBuffer], {
-        type: media?.content?.type,
+        const arrayBuffer: ArrayBuffer = media?.data as ArrayBuffer
+        const blob = new Blob([arrayBuffer], {
+          type: media?.content?.type,
+        })
+        const fileUrl = URL.createObjectURL(blob)
+        // console.log(fileUrl)
+        // console.log({
+        //   key: slide.id,
+        //   changes: {
+        //     "content.data": { ...slide.content.data, url: fileUrl },
+        //   },
+        // })
+        const updatedLibraryItem = {
+          ...slide,
+          content: {
+            ...slide.content,
+            background: fileUrl,
+            data: { ...slide.content.data, url: fileUrl },
+          },
+        }
+        // console.log(updatedLibraryItem)
+        db.library.update(slide.id, updatedLibraryItem)
       })
-      const fileUrl = URL.createObjectURL(blob)
-      // console.log(fileUrl)
-      // console.log({
-      //   key: slide.id,
-      //   changes: {
-      //     "content.data": { ...slide.content.data, url: fileUrl },
-      //   },
-      // })
-      const updatedLibraryItem = {
-        ...slide,
-        content: {
-          ...slide.content,
-          background: fileUrl,
-          data: { ...slide.content.data, url: fileUrl },
-        },
-      }
-      // console.log(updatedLibraryItem)
-      db.library.update(slide.id, updatedLibraryItem)
-    })
+    }
   })
 
   setCachedVideosURL()

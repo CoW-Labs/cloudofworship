@@ -36,7 +36,7 @@
           class="hidden max-w-[100%] group-focus-within:flex items-center gap-2 whitespace-nowrap text-md pl-1 pt-3 come-up-1"
         >
           <div>Search anything</div>
-          <div class="flex overflow-x-auto">
+          <div class="flex overflow-x-auto scrollbar-none">
             <SlideChip
               v-for="slideType in [
                 slideTypes.bible,

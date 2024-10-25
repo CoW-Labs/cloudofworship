@@ -111,6 +111,16 @@ body {
 .bg-stretch {
   background-size: 100% 100%;
 }
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
 
 /* TRANSITIONS START */
 .smooth-behavior {
