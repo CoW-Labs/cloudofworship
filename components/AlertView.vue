@@ -14,7 +14,8 @@
     >
       <IconWrapper
         :name="currentState?.activeAlert.icon"
-        class="bg-primary-900 z-10 px-[1.5vw]"
+        class="bg-primary-900 z-10"
+        :class="props.size === 'sm' ? 'px-2' : 'px-[1.5vw]'"
         :size="props.size === 'sm' ? 2 : 8"
       />
       <div

@@ -507,7 +507,7 @@ const downloadEssentialResources = async () => {
   const populateBibleVersionOptions = async () => {
     const tempBibleVersions = appInfo.value.bibleVersions?.length
       ? appInfo.value.bibleVersions
-      : [...appStore.currentState.bibleVersions]
+      : [...appStore.currentState.settings.bibleVersions]
     for (const bibleVersion of tempBibleVersions) {
       bibleVersion.isDownloaded = await isBibleVersionDownloaded(
         bibleVersion.id

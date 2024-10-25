@@ -64,8 +64,10 @@ const bibleVersion = ref<string>(
 const emit = defineEmits(["change"])
 const bibleVersionOptions = computed(() =>
   [
-    ...currentState.value.bibleVersions,
-    currentState.value.bibleVersions?.find((version) => !version?.isDownloaded)
+    ...currentState.value.settings.bibleVersions,
+    currentState.value.settings.bibleVersions?.find(
+      (version) => !version?.isDownloaded
+    )
       ? { id: "+ More Versions", name: "Add more versions", isDownloaded: true }
       : null,
   ]
