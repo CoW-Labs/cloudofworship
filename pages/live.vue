@@ -1,7 +1,7 @@
 <template>
   <div
     class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
-    :id="liveSlideId"
+    :id="currentState.liveSlideId"
   >
     <div
       v-if="!isFullScreen"
@@ -30,17 +30,18 @@
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
     <TransitionGroup name="fade-list">
       <LiveProjectionOnly
-        v-for="liveSlide in activeSlides"
+        v-for="liveSlide in currentState.activeSlides"
         :key="liveSlide.id"
-        v-show="liveSlide?.id === liveSlideId"
+        v-show="liveSlide?.id === currentState.liveSlideId"
         :content-visible="true"
-        :id="liveSlideId"
+        :id="currentState.liveSlideId"
         :full-screen="true"
         :slide="liveSlide"
         :slide-label="false"
-        :slide-styles="settings.slideStyles"
+        :slide-styles="currentState.settings.slideStyles"
         :audio-muted="
-          liveSlide?.id !== liveSlideId || liveSlide?.slideStyle?.isMediaMuted
+          liveSlide?.id !== currentState.liveSlideId ||
+          liveSlide?.slideStyle?.isMediaMuted
         "
       />
     </TransitionGroup>
@@ -52,8 +53,7 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 const appStore = useAppStore()
-const { liveSlideId, activeSlide, activeSlides, settings } =
-  storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 const isFullScreen = ref(false)
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
@@ -61,8 +61,10 @@ const FPS = 10
 
 const liveSlide = computed(() => {
   // console.log(activeSlides.value)
-  console.log(liveSlideId.value)
-  return activeSlides.value.find((slide) => slide.id === liveSlideId.value)
+  console.log(currentState.value.liveSlideId)
+  return currentState.value.activeSlides.find(
+    (slide) => slide.id === currentState.value.liveSlideId
+  )
 })
 
 // LISTEN TO STATE CHANGES FOR SOCKET BROADCAST
