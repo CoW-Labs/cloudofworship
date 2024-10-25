@@ -263,6 +263,9 @@ const getChurch = async () => {
       throw new Error(error.value?.message)
     }
   } else {
+    if (!authStore.user?._id) {
+      navigateTo("/login")
+    }
     navigateTo("/signup?registerChurch=1")
     useToast().add({
       icon: "i-bx-church",
