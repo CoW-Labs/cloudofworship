@@ -140,7 +140,7 @@ watch(
 watch(
   () => currentState.value.activeSlides,
   () => {
-    console.log("slide has been updated", appStore.activeScheduleSlides)
+    // console.log("slide has been updated", appStore.activeScheduleSlides)
     const tempSlides = currentState.value.activeSlides?.filter(
       (slide) => slide.scheduleId === appStore.currentState.activeSchedule?._id
     )
@@ -163,7 +163,7 @@ const makeSlideActive = (
     newlyCreated: boolean
   }
 ) => {
-  console.log("make slide active")
+  // console.log("make slide active")
   // console.log(goLive, slide)
   activeSlide.value = slide
   if (options?.newlyCreated) {
@@ -349,7 +349,7 @@ const mergeSlides = (
 }
 
 const uploadOfflineSlides = async () => {
-  console.log("uploading offline slides")
+  // console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
   const offlineSlides = appStore.currentState.activeSlides
     .filter((slide) => slide._id === undefined)

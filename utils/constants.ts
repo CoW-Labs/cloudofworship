@@ -49,7 +49,8 @@ export const appWideActions = {
   liveActiveSlidesTransfer: 'live-active-slides-transfer',
   liveSettingsTransfer: 'live-settings-transfer',
   quickActionsFocus: 'quick-actions-focus',
-  uploadOfflineSlides: 'upload-offline-slides'
+  uploadOfflineSlides: 'upload-offline-slides',
+  openShortcutsModal: 'open-shortcuts'
 }
 
 export const quickActionsArr = [
@@ -185,6 +186,16 @@ export const quickActionsArr = [
     desc: "Invite teammates to your workspace",
     action: appWideActions.openInviteModal,
     meta: "teammates share link invite workspace",
+    searchableOnly: true,
+    // unreleased: true,
+    // type: slideTypes.text
+  },
+  {
+    icon: "i-bxs-keyboard",
+    name: "Shortcuts & Hotkeys",
+    desc: "Open shortcuts and hotkeys modal",
+    action: appWideActions.openShortcutsModal,
+    meta: "shortcut Cmd Ctrl hotkey keyboard mouse",
     searchableOnly: true,
     // unreleased: true,
     // type: slideTypes.text
