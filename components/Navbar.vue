@@ -6,7 +6,7 @@
     >
       <UProgress
         class="absolute inset-0 top-auto rounded-none opacity-0"
-        :class="{ 'opacity-1': slidesLoading && online }"
+        :class="{ 'opacity-1': currentState.slidesLoading && online }"
         size="xs"
       />
       <div class="logo flex items-center gap-2 w-[310px]">
@@ -20,7 +20,7 @@
         </UButton>
       </div>
       <div class="projects-ctn">
-        <IconWrapper name="i-bx-spinner-dots" v-if="slidesAndScheduleLoading" />
+        <!-- <IconWrapper name="i-bx-spinner-dots" v-if="slidesAndScheduleLoading" /> -->
         <UButton
           variant="ghost"
           color="gray"
@@ -28,7 +28,7 @@
           trailing-icon="i-bx-chevron-down"
           @click="scheduleModalVisible = true"
         >
-          {{ activeSchedule?.name || "Untitled" }}
+          {{ currentState.activeSchedule?.name || "Untitled" }}
         </UButton>
       </div>
       <div
@@ -42,7 +42,7 @@
 
         <ScheduleModal
           :visible="scheduleModalVisible"
-          :active-schedule="activeSchedule"
+          :active-schedule="currentState.activeSchedule"
           @close="scheduleModalVisible = false"
         />
 
@@ -52,6 +52,11 @@
         />
 
         <ChangelogModal :app-version="appVersion" />
+
+        <ShortcutsModal
+          :visible="shortcutsModalVisible"
+          @close="shortcutsModalVisible = false"
+        />
 
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
         <UTooltip :text="online ? 'Force sync' : 'You are offline'">
@@ -65,12 +70,12 @@
               <UButton variant="ghost" class="h-10">
                 <IconWrapper
                   name="i-tabler-refresh"
-                  :class="{ 'animate-spin': appStore.slidesLoading }"
+                  :class="{ 'animate-spin': currentState.slidesLoading }"
                 />
                 <span class="text-xs">
                   Last sync:
                   <span class="font-bold capitalize">
-                    {{ new Date(appStore.lastSynced).toLocaleTimeString() }}
+                    {{ new Date(currentState.lastSynced).toLocaleTimeString() }}
                   </span>
                 </span>
               </UButton>
@@ -160,9 +165,10 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 const inviteModalVisible = ref(false)
 const scheduleModalVisible = ref(false)
+const shortcutsModalVisible = ref(false)
 
 const { user, church } = storeToRefs(authStore)
-const { activeSchedule, slidesLoading } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 
 defineProps({
   appVersion: String,
@@ -179,12 +185,12 @@ const isDark = computed({
 })
 
 onMounted(() => {
-  if (!activeSchedule.value) {
+  if (!currentState.value?.activeSchedule) {
     scheduleModalVisible.value = true
   }
 })
 
-const emitter = useNuxtApp().$emitter || appStore.emitter
+const emitter = useNuxtApp().$emitter || appStore.currentState.emitter
 
 emitter?.on("close-modal", () => {
   settingsModalOpen.value = false
@@ -194,6 +200,10 @@ emitter?.on("close-modal", () => {
 emitter?.on("open-settings", (data) => {
   settingsModalOpen.value = true
   settingsPage.value = data
+})
+
+emitter?.on("open-shortcuts", (data) => {
+  shortcutsModalVisible.value = true
 })
 
 emitter?.on("open-schedule-modal", (data) => {

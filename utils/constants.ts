@@ -48,6 +48,9 @@ export const appWideActions = {
   liveSlideIdTransfer: 'live-slide-id-transfer',
   liveActiveSlidesTransfer: 'live-active-slides-transfer',
   liveSettingsTransfer: 'live-settings-transfer',
+  quickActionsFocus: 'quick-actions-focus',
+  uploadOfflineSlides: 'upload-offline-slides',
+  openShortcutsModal: 'open-shortcuts'
 }
 
 export const quickActionsArr = [
@@ -183,6 +186,16 @@ export const quickActionsArr = [
     desc: "Invite teammates to your workspace",
     action: appWideActions.openInviteModal,
     meta: "teammates share link invite workspace",
+    searchableOnly: true,
+    // unreleased: true,
+    // type: slideTypes.text
+  },
+  {
+    icon: "i-bxs-keyboard",
+    name: "Shortcuts & Hotkeys",
+    desc: "Open shortcuts and hotkeys modal",
+    action: appWideActions.openShortcutsModal,
+    meta: "shortcut Cmd Ctrl hotkey keyboard mouse",
     searchableOnly: true,
     // unreleased: true,
     // type: slideTypes.text
@@ -347,6 +360,20 @@ export const bibleVersionObjects = [
     isDownloaded: false,
     copyrightContent:
       "Scripture taken from THE MESSAGE. Copyright © 1993, 1994, 1995, 1996, 2000, 2001, 2002.",
+  },
+  {
+    id: "NASB",
+    name: "New American Standard Bible",
+    isDownloaded: false,
+    copyrightContent:
+      "Scripture quotations taken from the (NASB®) New American Standard Bible®, Copyright © 1960, 1971 by The Lockman Foundation",
+  },
+  {
+    id: "TPT",
+    name: "The Passion Translation",
+    isDownloaded: false,
+    copyrightContent:
+      "Scripture quotations marked TPT are from The Passion Translation®. Copyright © 2017, 2018, 2020 by Passion & Fire Ministries, Inc.",
   },
 ]
 

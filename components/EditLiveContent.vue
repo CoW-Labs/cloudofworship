@@ -341,7 +341,7 @@ const animatedSlides = computed(() => {
 })
 
 const nextVerse = computed(() => {
-  if (props.slide.type === slideTypes.bible) {
+  if (props.slide?.type === slideTypes.bible) {
     const tempVerse = Number(verse.value?.split(":")?.[1]) + 1
     return `${verse.value?.split(":")?.[0]}:${tempVerse}`
   }
@@ -349,7 +349,7 @@ const nextVerse = computed(() => {
 })
 
 const previousVerse = computed(() => {
-  if (props.slide.type === slideTypes.bible) {
+  if (props.slide?.type === slideTypes.bible) {
     const tempVerse = Number(verse.value?.split(":")?.[1]) - 1
     return `${verse.value?.split(":")?.[0]}:${tempVerse < 1 ? 1 : tempVerse}`
   }
@@ -369,6 +369,19 @@ watch(
   },
   { immediate: true }
 )
+
+onMounted(() => {
+  useCreateShortcut("ArrowRight", () => {
+    if (nextVerse.value) {
+      emit("goto-verse", nextVerse.value)
+    }
+  })
+  useCreateShortcut("ArrowLeft", () => {
+    if (previousVerse.value) {
+      emit("goto-verse", previousVerse.value)
+    }
+  })
+})
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>

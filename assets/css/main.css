@@ -111,6 +111,16 @@ body {
 .bg-stretch {
   background-size: 100% 100%;
 }
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
 
 /* TRANSITIONS START */
 .smooth-behavior {
@@ -370,6 +380,10 @@ body {
   font-family: "JetBrainsMono", monospace;
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
+}
+
+.mono {
+  font-family: "JetBrainsMono", monospace;
 }
 
 .tiptap pre code {

@@ -20,7 +20,7 @@ const useSlideContent = (slide: Slide, data: Scripture | Hymn | Song | Countdown
       return [
         `<p class="scripture-content">${data?.content}</>`,
         `<p class="scripture-label"><b>${data?.label}</b> • ${data?.version}</p>
-        <p class="copyright-content">${appStore.bibleVersions?.find(version => version.id === data?.version)?.copyrightContent}</p>`,
+        <p class="copyright-content">${appStore.currentState.settings.bibleVersions?.find(version => version.id === data?.version)?.copyrightContent}</p>`,
       ]
     case slideTypes.hymn:
       data = data as Hymn

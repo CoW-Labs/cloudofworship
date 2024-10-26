@@ -152,8 +152,8 @@
               :slide-styles="slideStyles"
             />
           </UCard>
-        </UModal>
-      </template>
+        </UModal> </template
+      ><AlertView :size="fullScreen ? '' : 'sm'" />
     </div>
   </div>
 </template>
@@ -170,7 +170,7 @@ const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
 const route = useRoute()
 // const previousSlideVideo = ref<HTMLVideoElement | null>(null)
-const { liveSlideId } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["activate-fullscreen"])
 
 const props = defineProps<{
@@ -185,9 +185,12 @@ const props = defineProps<{
 
 // TODO: Listen to slide.id and pause video if it is no longer the current live slide, using the Global Emitter on EditLiveContent component and passing ot here
 // Listen to liveSlideId and pause video if it is no longer the current live slide
-watch(liveSlideId, (newVal, oldVal) => {
-  // console.log("liveSlideId", newVal)
-})
+watch(
+  () => currentState.value?.liveSlideId,
+  (newVal, oldVal) => {
+    // console.log("liveSlideId", newVal)
+  }
+)
 
 watch(
   () => props.audioMuted,
@@ -205,7 +208,7 @@ watch(
       if (process.client && props.fullScreen && route.name === "live") {
         document.documentElement.requestFullscreen()
       }
-      if (appMounted && props.slide.id === liveSlideId.value) {
+      if (appMounted && props.slide.id === currentState.value?.liveSlideId) {
         // console.log(video.value)
         // if (newVal.type === slideTypes.media) {
         //   previousSlideVideo.value = video.value

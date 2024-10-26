@@ -54,36 +54,16 @@ const resendLoading = ref(false)
 const codeResentTimes = ref(0)
 
 onMounted(() => {
-  resendCode()
+  updateApp()
 })
 
 const updateApp = () => {
   loading.value = true
   useNuxtApp().$pwa.updateServiceWorker()
-}
 
-const resendCode = async () => {
-  resendLoading.value = true
-  const { data, error } = await useAPIFetch("/auth/send-verify-email", {
-    method: "POST",
-    body: {
-      email: email.value,
-    },
-  })
-  if (data.value) {
-    toast.add({
-      title: `Code sent to ${email.value}`,
-      color: "green",
-      icon: "i-bx-check-circle",
-    })
-  }
-  toast.add({
-    title: error.value,
-    color: "red",
-    icon: "i-bx-error",
-  })
-  resendLoading.value = false
-  codeResentTimes.value += 1
+  setTimeout(() => {
+    loading.value = false
+  }, 5000)
 }
 
 // If error occurred

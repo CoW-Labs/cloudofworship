@@ -192,6 +192,7 @@ const config = useRuntimeConfig()
 const token = useCookie("token")
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
+const appInfo = ref({})
 const route = useRoute()
 
 const isAppOnline = computed(() => {
@@ -217,6 +218,36 @@ const getUser = async () => {
 }
 getUser()
 
+const retrieveChurchSongs = async () => {
+  try {
+    const countPromise = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
+    )
+    const onlineCount = countPromise.data.value as unknown as number
+    const offlineCount = await db.library.where("type").equals("song").count()
+    if (onlineCount > offlineCount) {
+      // Delete songs that are not in the online database
+      db.library.where("type").equals("song").delete()
+
+      // Add online songs
+      const promise = await useAPIFetch(
+        `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
+      )
+      const data: Song[] = (await promise.data.value) as unknown as Song[]
+      const libraryData: LibraryItem[] = data?.map((song) => ({
+        id: song.id,
+        type: "song",
+        content: JSON.parse(JSON.stringify(song)),
+        createdAt: song.createdAt,
+        updatedAt: song.updatedAt,
+      }))
+      await db.library.bulkAdd(libraryData)
+    }
+  } catch (err: any) {
+    console.log(err)
+  }
+}
+
 // Get Church Info and see if registered
 const getChurch = async () => {
   // console.log(authStore.user)
@@ -232,6 +263,9 @@ const getChurch = async () => {
       throw new Error(error.value?.message)
     }
   } else {
+    if (!authStore.user?._id) {
+      navigateTo("/login")
+    }
     navigateTo("/signup?registerChurch=1")
     useToast().add({
       icon: "i-bx-church",
@@ -450,6 +484,11 @@ const downloadEssentialResources = async () => {
   downloadStep.value = 2
   await retrieveSchedules()
 
+  // Download app info
+  const { data } = await useAPIFetch("/app-config/info")
+  appInfo.value = data.value as any
+  appStore.setBibleVersions(data.value?.bibleVersions)
+
   // Download KJV Bible
   let tempBible = await db.bibleAndHymns.get("KJV")
   if (!tempBible) {
@@ -469,7 +508,9 @@ const downloadEssentialResources = async () => {
   }
 
   const populateBibleVersionOptions = async () => {
-    const tempBibleVersions = [...appStore.bibleVersions]
+    const tempBibleVersions = appInfo.value.bibleVersions?.length
+      ? appInfo.value.bibleVersions
+      : [...appStore.currentState.settings.bibleVersions]
     for (const bibleVersion of tempBibleVersions) {
       bibleVersion.isDownloaded = await isBibleVersionDownloaded(
         bibleVersion.id
@@ -504,11 +545,15 @@ const downloadEssentialResources = async () => {
 
   setTimeout(() => {
     loadingResources.value = false
+    useGlobalEmit(
+      appWideActions.selectedSchedule,
+      appStore.currentState.activeSchedule?._id
+    )
   }, 100)
 }
 
-const overrideAppSettings = () => {
-  const currentAppSettings = appStore.settings
+const overrideAppSettings = async () => {
+  const currentAppSettings = appStore.currentState.settings
   // Override App Settings if current app version mismatches appVersion in state
   // TODO: When appSettings is editable by user, it must take preference over system settings and override
   // console.log(currentAppSettings.appVersion, props.appVersion)
@@ -549,11 +594,11 @@ const overrideAppSettings = () => {
         linesPerSlide: 4,
         alignment: "center",
       } as SlideStyle,
-      bibleVersions: bibleVersionObjects as Array<any>, // Check app.vue for bible versions array in a list
+      bibleVersions: appInfo.value.bibleVersions as Array<any>, // Check app.vue for bible versions array in a list
     })
 
     // console.log("calling setBibleVersions")
-    appStore.setBibleVersions(bibleVersionObjects)
+    appStore.setBibleVersions(appInfo.value.bibleVersions)
   }
 }
 
@@ -568,36 +613,6 @@ function base64ToBlobURL(base64String: string, mimeType: string) {
   return URL.createObjectURL(blob)
 }
 
-const retrieveChurchSongs = async () => {
-  try {
-    const countPromise = await useAPIFetch(
-      `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
-    )
-    const onlineCount = countPromise.data.value as unknown as number
-    const offlineCount = await db.library.where("type").equals("song").count()
-    if (onlineCount > offlineCount) {
-      // Delete songs that are not in the online database
-      db.library.where("type").equals("song").delete()
-
-      // Add online songs
-      const promise = await useAPIFetch(
-        `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
-      )
-      const data: Song[] = (await promise.data.value) as unknown as Song[]
-      const libraryData: LibraryItem[] = data?.map((song) => ({
-        id: song.id,
-        type: "song",
-        content: JSON.parse(JSON.stringify(song)),
-        createdAt: song.createdAt,
-        updatedAt: song.updatedAt,
-      }))
-      await db.library.bulkAdd(libraryData)
-    }
-  } catch (err: any) {
-    console.log(err)
-  }
-}
-
 const retrieveSchedules = async () => {
   if (isAppOnline.value) {
     downloadProgress.value = "0"
@@ -608,7 +623,7 @@ const retrieveSchedules = async () => {
     const schedules = schedulesPromise.data.value as unknown as Schedule[]
     const mergedSchedules = useMergeObjectArray(
       [...schedules],
-      appStore.schedules
+      appStore.currentState.schedules
     )
 
     mergedSchedules?.sort((scheduleA, scheduleB) => {
@@ -625,9 +640,12 @@ const retrieveAllMediaFilesFromDB = async () => {
   const db = useIndexedDB()
 
   // For active slides
-  const slides = [...appStore.activeSlides]
+  const slides = [...appStore.currentState.activeSlides]
   slides.forEach(async (slide) => {
-    if (slide.type === slideTypes.media) {
+    if (
+      slide.type === slideTypes.media &&
+      slide.background?.startsWith("blob:")
+    ) {
       const mediaObj = await db.media.where({ id: slide.id }).toArray()
       if (mediaObj[0]) {
         let b64 = null
@@ -663,33 +681,35 @@ const retrieveAllMediaFilesFromDB = async () => {
 
   // For saved slides
   const savedSlides = await db.library.where("type").equals("slide").toArray()
-  const slidesChanges = await savedSlides?.map((slide) => {
-    db.media.get(slide.id).then((resp) => {
-      const media = resp
+  savedSlides?.map((slide) => {
+    if (slide.content?.background?.startsWith("blob:")) {
+      db.media.get(slide.id).then((resp) => {
+        const media = resp
 
-      const arrayBuffer: ArrayBuffer = media?.data as ArrayBuffer
-      const blob = new Blob([arrayBuffer], {
-        type: media?.content?.type,
+        const arrayBuffer: ArrayBuffer = media?.data as ArrayBuffer
+        const blob = new Blob([arrayBuffer], {
+          type: media?.content?.type,
+        })
+        const fileUrl = URL.createObjectURL(blob)
+        // console.log(fileUrl)
+        // console.log({
+        //   key: slide.id,
+        //   changes: {
+        //     "content.data": { ...slide.content.data, url: fileUrl },
+        //   },
+        // })
+        const updatedLibraryItem = {
+          ...slide,
+          content: {
+            ...slide.content,
+            background: fileUrl,
+            data: { ...slide.content.data, url: fileUrl },
+          },
+        }
+        // console.log(updatedLibraryItem)
+        db.library.update(slide.id, updatedLibraryItem)
       })
-      const fileUrl = URL.createObjectURL(blob)
-      // console.log(fileUrl)
-      // console.log({
-      //   key: slide.id,
-      //   changes: {
-      //     "content.data": { ...slide.content.data, url: fileUrl },
-      //   },
-      // })
-      const updatedLibraryItem = {
-        ...slide,
-        content: {
-          ...slide.content,
-          background: fileUrl,
-          data: { ...slide.content.data, url: fileUrl },
-        },
-      }
-      // console.log(updatedLibraryItem)
-      db.library.update(slide.id, updatedLibraryItem)
-    })
+    }
   })
 
   setCachedVideosURL()
@@ -709,6 +729,7 @@ const setCachedVideosURL = async () => {
 onMounted(async () => {
   await downloadEssentialResources()
   overrideAppSettings()
+  appStore.refreshAppActionsStack()
   if (location.hostname !== "localhost") {
     useGtag()
   }

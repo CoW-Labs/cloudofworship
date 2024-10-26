@@ -57,13 +57,17 @@ import { useAppStore } from "~/store/app"
 import { appWideActions } from "~/utils/constants"
 
 const appStore = useAppStore()
-const { settings, bibleVersions } = storeToRefs(appStore)
-const bibleVersion = ref<string>(settings.value.defaultBibleVersion)
+const { currentState } = storeToRefs(appStore)
+const bibleVersion = ref<string>(
+  currentState.value.settings.defaultBibleVersion
+)
 const emit = defineEmits(["change"])
 const bibleVersionOptions = computed(() =>
   [
-    ...bibleVersions.value,
-    bibleVersions.value?.find((version) => !version?.isDownloaded)
+    ...currentState.value.settings.bibleVersions,
+    currentState.value.settings.bibleVersions?.find(
+      (version) => !version?.isDownloaded
+    )
       ? { id: "+ More Versions", name: "Add more versions", isDownloaded: true }
       : null,
   ]
