@@ -13,20 +13,44 @@
       ref="quickActions"
       tabindex="1"
     >
-      <div class="flex gap-2">
-        <UInput
-          icon="i-bx-search"
-          placeholder="Search scripture, hymns, actions"
-          v-model="searchInput"
-          color="black"
-          class="w-[100%]"
-        />
-        <UButton
-          v-if="searchInput.length >= 2"
-          icon="i-bx-x"
-          color="primary"
-          @click="searchInput = ''"
-        ></UButton>
+      <div
+        class="group search-focus transition-all rounded-md focus-within:p-2 focus-within:bg-primary-100 focus-within:dark:bg-primary-800"
+      >
+        <div class="flex gap-2">
+          <UInput
+            icon="i-bx-search"
+            placeholder="Search actions, scripture, hymns..."
+            v-model="searchInput"
+            color="black"
+            class="w-[100%]"
+            ref="searchInputEl"
+          />
+          <UButton
+            v-if="searchInput.length >= 2"
+            icon="i-bx-x"
+            color="primary"
+            @click="searchInput = ''"
+          ></UButton>
+        </div>
+        <div
+          class="hidden max-w-[100%] group-focus-within:flex items-center gap-2 whitespace-nowrap text-md pl-1 pt-3 come-up-1"
+        >
+          <div>Search anything</div>
+          <div class="flex overflow-x-auto scrollbar-none">
+            <SlideChip
+              v-for="slideType in [
+                slideTypes.bible,
+                slideTypes.hymn,
+                slideTypes.song,
+              ]"
+              :key="slideType"
+              :slide-type="slideType"
+              class="mr-1"
+              :dark-mode="useColorMode().value === 'dark'"
+            />
+            & more
+          </div>
+        </div>
       </div>
 
       <Transition name="fade-sm">
@@ -150,6 +174,7 @@ import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
 
 let searchInputBeforeTwoDigitNumbers = ""
+const searchInputEl = ref<HTMLInputElement>()
 const searchInput = ref<string>("")
 const focusedActionIndex = ref<number>(0)
 const actions = ref<any[]>([])
@@ -200,6 +225,12 @@ getAllHymns()
 watch(page, () => {
   if (page.value === "") {
     bibleSearchQuery.value = ""
+  }
+})
+
+watch(searchInput, () => {
+  if (searchInput.value.startsWith("/") && searchInput.value.length > 1) {
+    searchInput.value = searchInput.value.replaceAll("/", "")
   }
 })
 
@@ -268,6 +299,19 @@ emitter.on("new-countdown", () => {
 
 onMounted(() => {
   // console.log("mounted", quickActions.value)
+
+  emitter.on(appWideActions.quickActionsFocus, () => {
+    // Focus on Quick actions search bar input
+    if (page.value !== "") {
+      setTimeout(() => {
+        searchInputEl.value?.input?.focus()
+      }, 300)
+      // Go to Quick actions home
+      page.value = ""
+    } else {
+      searchInputEl.value?.input?.focus()
+    }
+  })
   quickActions.value?.addEventListener("keydown", (e) => {
     if (e.defaultPrevented) {
       e.preventDefault()
@@ -305,12 +349,17 @@ onMounted(() => {
 
 const bibleChapterAndVerse = computed(() => {
   const regex = /\b\d+\s*:\s*\d+\b|\b\d+\s\d+\b/g
-  const match = searchInput.value.match(regex)?.[0]?.replaceAll(" ", ":")
+  const match = searchInput.value
+    ?.replace("/", "")
+    .match(regex)?.[0]
+    ?.replaceAll(" ", ":")
   return match?.trim()
 })
 
 const searchedActions = computed(() => {
-  const twoDigitNumbers = searchInput.value?.match(/\b\d{2}\b/g)
+  const twoDigitNumbers = searchInput.value
+    ?.replace("/", "")
+    ?.match(/\b\d{2}\b/g)
 
   // Stop search if input includes two digit number
   if (!twoDigitNumbers) {

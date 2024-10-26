@@ -22,11 +22,15 @@ import { useAppStore } from "~/store/app"
 // import useScheduleWebsocket from "~/composables/useScheduleWebsocket";
 import { ref, watchEffect } from "vue"
 import { storeToRefs } from "pinia"
+import { useDebounce } from "@vueuse/core"
 
 const appStore = useAppStore()
-const { activeSchedule } = storeToRefs(appStore)
 
 const scheduleId = ref(undefined)
+
+const uploadOfflineSlides = useDebounce(() => {
+  useGlobalEmit(appWideActions.uploadOfflineSlides)
+}, 2000)
 
 onMounted(() => {
   const emailChange = useRoute().query.email_change
@@ -36,11 +40,65 @@ onMounted(() => {
     setTimeout(() => {
       useGlobalEmit(appWideActions.openSettings, "Profile Settings")
     }, 1000)
-  } else {
-    setTimeout(() => {
-      useGlobalEmit(appWideActions.openScheduleModal)
-    }, 2000)
   }
+  // else {
+  //   setTimeout(() => {
+  //     useGlobalEmit(appWideActions.openScheduleModal)
+  //   }, 2000)
+  // }
+
+  // APP-WIDE SHORTCUTS
+  useCreateShortcut("/", () => useGlobalEmit(appWideActions.quickActionsFocus))
+
+  // Prevent default action on specific keys
+  document.addEventListener("keydown", function (event) {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      (event.key === "y" || event.key === "Y" || event.key === "?")
+    ) {
+      event.preventDefault()
+    }
+  })
+
+  useCreateShortcut(
+    "z",
+    () => {
+      appStore.undo()
+      uploadOfflineSlides()
+    },
+    { ctrlOrMeta: true }
+  )
+
+  useCreateShortcut(
+    "y",
+    () => {
+      appStore.redo()
+      uploadOfflineSlides()
+    },
+    {
+      ctrlOrMeta: true,
+    }
+  )
+
+  useCreateShortcut(
+    "p",
+    () => {
+      useGlobalEmit("promote-active-slide-live")
+    },
+    {
+      ctrlOrMeta: true,
+    }
+  )
+
+  useCreateShortcut(
+    "h",
+    () => {
+      useGlobalEmit("open-shortcuts")
+    },
+    {
+      ctrlOrMeta: true,
+    }
+  )
 })
 
 // watch(

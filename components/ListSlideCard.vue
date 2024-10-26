@@ -5,8 +5,17 @@
     @click="
       useGlobalEmit(`new-${slide?.type}`, [
         slide?.type === slideTypes.media
-          ? { ...slide?.data, fromSaved: true, scheduleId: activeSchedule?._id }
-          : { ...slide, fromSaved: true, scheduleId: activeSchedule?._id },
+          ? {
+              ...slide?.data,
+              url: slide.background,
+              fromSaved: true,
+              scheduleId: currentState?.activeSchedule?._id,
+            }
+          : {
+              ...slide,
+              fromSaved: true,
+              scheduleId: currentState?.activeSchedule?._id,
+            },
       ])
     "
   >
@@ -16,7 +25,7 @@
       <LiveContentWithBackground
         :slide="slide"
         :slide-label="slide?.name"
-        :slide-styles="settings.slideStyles"
+        :slide-styles="currentState?.settings?.slideStyles"
       />
     </div>
     <div class="texts flex-col justify-between">
@@ -43,7 +52,7 @@ import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
 
 const appStore = useAppStore()
-const { settings, activeSchedule } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 
 const emit = defineEmits(["delete-slide"])
 

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="h-[62.5vh] overflow-y-auto mb-[2.5%]">
     <div
       v-for="bibleVersion in bibleVersionOptions"
       :key="bibleVersion"
@@ -41,14 +41,18 @@ const appStore = useAppStore()
 const db = useIndexedDB()
 
 const bibleDownloadProgress = ref<string>("0")
-const bibleVersion = ref(appStore.settings.defaultBibleVersion)
+const bibleVersion = ref(appStore.currentState.settings.defaultBibleVersion)
 const bibleVersionLoading = ref<boolean | string>(false)
-const { bibleVersions } = storeToRefs(appStore)
-const bibleVersionOptions = ref<Array<any>>(bibleVersions.value)
+const { currentState } = storeToRefs(appStore)
+const bibleVersionOptions = ref<Array<any>>(
+  currentState.value.settings.bibleVersions
+)
 const bibleVersionSelectOptions = computed(() =>
   [
-    ...bibleVersions.value,
-    bibleVersions.value?.find((version) => !version?.isDownloaded)
+    ...currentState.value.settings.bibleVersions,
+    currentState.value.settings.bibleVersions?.find(
+      (version) => !version?.isDownloaded
+    )
       ? {
           id: "+ More Versions",
           name: "Add more versions",
@@ -65,7 +69,7 @@ const isBibleVersionDownloaded = async (bibleVersion: string) => {
 }
 
 const populateBibleVersionOptions = async () => {
-  const tempBibleVersions = [...bibleVersions.value]
+  const tempBibleVersions = [...currentState.value.settings.bibleVersions]
   for (const bibleVersion of tempBibleVersions) {
     bibleVersion.isDownloaded = await isBibleVersionDownloaded(bibleVersion.id)
   }

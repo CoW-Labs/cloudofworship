@@ -69,7 +69,9 @@ const emit = defineEmits(["select"])
 //   "/video-bg-6.mp4",
 // ]
 const bgVideoToBeSelected = ref<string | null>(null)
-const backgroundVideos = ref<BackgroundVideo[]>(appStore.backgroundVideos)
+const backgroundVideos = ref<BackgroundVideo[]>(
+  appStore.currentState.backgroundVideos
+)
 
 const getAllLocallySavedVideos = async () => {
   const db = useIndexedDB()
@@ -105,8 +107,8 @@ const getAllLocallySavedVideos = async () => {
       return // Ignore non-video files
     }
   })
-  console.log("locallySavedVideos", locallySavedVideos)
-  console.log("backgroundVideos", backgroundVideos.value)
+  // console.log("locallySavedVideos", locallySavedVideos)
+  // console.log("backgroundVideos", backgroundVideos.value)
   // if (backgroundVideos.value.length > 0) {
   //   backgroundVideos.value = backgroundVideos.value.concat(locallySavedVideos)
   // } else {

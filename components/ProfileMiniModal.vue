@@ -41,6 +41,15 @@
           >App Settings
         </UButton>
         <UButton
+          size="xl"
+          variant="ghost"
+          color="gray"
+          class="px-5 py-3 text-md rounded-none justify-start items-start"
+          block
+          @click="useGlobalEmit('open-shortcuts')"
+          >Shortcut & Hotkeys
+        </UButton>
+        <UButton
           to="https://chat.whatsapp.com/DeQX11igCSU6YaOoTqY7GY"
           target="_blank"
           size="xl"

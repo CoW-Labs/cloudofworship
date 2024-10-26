@@ -17,7 +17,7 @@
         <LiveContentWithBackground
           :slide="slide"
           :slide-label="slide?.name"
-          :slide-styles="settings.slideStyles"
+          :slide-styles="currentState.settings.slideStyles"
         />
       </div>
       <div
@@ -106,7 +106,7 @@
       <LiveContentWithBackground
         :slide="slide"
         :slide-label="slide?.name"
-        :slide-styles="settings.slideStyles"
+        :slide-styles="currentState.settings.slideStyles"
       />
     </div>
     <div class="texts flex-col justify-between">
@@ -136,7 +136,7 @@ import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
 
 const appStore = useAppStore()
-const { settings } = storeToRefs(appStore)
+const { currentState } = storeToRefs(appStore)
 
 const props = defineProps<{
   slide: Slide

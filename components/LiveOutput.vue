@@ -51,7 +51,7 @@
               <LiveContentWithBackground
                 :slide="slide"
                 :slide-label="slide?.name"
-                :slide-styles="settings.slideStyles"
+                :slide-styles="currentState.settings.slideStyles"
               />
             </div>
             <div class="texts flex-col justify-between">
@@ -102,7 +102,7 @@
         :slide="liveSlide"
         :full-screen="false"
         :content-visible="true"
-        :slide-styles="settings.slideStyles"
+        :slide-styles="currentState.settings.slideStyles"
         class="lg-preview"
       />
     </div>
@@ -117,35 +117,94 @@ import type { Slide } from "~/types"
 
 const appStore = useAppStore()
 const toast = useToast()
-const { liveOutputSlidesId, liveSlideId, settings } = storeToRefs(appStore)
-const windowRefs = inject("windowRefs")
+const { currentState } = storeToRefs(appStore)
+const windowRefs = inject("windowRefs") as any[]
 
 watch(
   () => windowRefs,
   () => {
-    console.log("windowRefs", windowRefs.value)
+    // console.log("windowRefs", windowRefs.value)
   }
 )
 
 const liveSlide = computed(() => {
-  return appStore.activeSlides.find((slide) => slide.id === liveSlideId.value)
+  return currentState.value?.activeSlides.find(
+    (slide) => slide.id === currentState.value.liveSlideId
+  )
 })
 
 const liveOutputSlides = computed({
   get() {
-    const tempSlides = liveOutputSlidesId.value?.map((id) =>
-      appStore.activeSlides.find((slide) => slide.id === id)
+    const tempSlides = currentState.value?.liveOutputSlidesId?.map((id) =>
+      currentState.value?.activeSlides.find((slide) => slide.id === id)
     ) as Slide[]
 
     // Filter by current active schedule
     return tempSlides?.filter(
-      (slide) => slide.scheduleId === appStore.activeSchedule?._id
+      (slide) => slide.scheduleId === currentState.value?.activeSchedule?._id
     )
   },
   set(newVal) {
     appStore.replaceScheduleActiveSlides(newVal)
     toast.add({ icon: "i-bx-slideshow", title: "Slide order has been updated" })
   },
+})
+
+const nextSlide = computed(() => {
+  const liveSlideIndex = liveOutputSlides.value?.findIndex(
+    (slide: Slide) => slide.id === currentState.value.liveSlideId
+  )
+  // const tempSlides = liveOutputSlidesId.value?.map((id) =>
+  //   appStore.activeSlides.find((slide) => slide.id === id)
+  // ) as Slide[]
+  const gotoSlideIndex = (liveSlideIndex as number) + 1
+  if (gotoSlideIndex < liveOutputSlides.value?.length) {
+    return liveOutputSlides.value[gotoSlideIndex]
+  }
+})
+
+const previousSlide = computed(() => {
+  const liveSlideIndex = liveOutputSlides.value?.findIndex(
+    (slide: Slide) => slide.id === currentState.value?.liveSlideId
+  )
+  // const tempSlides = liveOutputSlidesId.value?.map((id) =>
+  //   appStore.activeSlides.find((slide) => slide.id === id)
+  // ) as Slide[]
+  const gotoSlideIndex = (liveSlideIndex as number) - 1 || 0
+  if (gotoSlideIndex < liveOutputSlides.value?.length) {
+    return liveOutputSlides.value[gotoSlideIndex]
+  }
+})
+
+onMounted(() => {
+  useCreateShortcut("ArrowDown", () => {
+    if (nextSlide.value) {
+      appStore.setLiveSlide(nextSlide.value.id)
+    }
+  })
+  useCreateShortcut("ArrowUp", () => {
+    if (previousSlide.value) {
+      appStore.setLiveSlide(previousSlide.value.id)
+    }
+  })
+  useCreateShortcut(
+    "0",
+    () => {
+      if (liveOutputSlides.value?.at(-1)?._id) {
+        appStore.setLiveSlide(liveOutputSlides.value?.at(-1)?._id!!)
+      }
+    },
+    { ctrlOrMeta: true, shift: false }
+  )
+  useCreateShortcut(
+    "1",
+    () => {
+      if (liveOutputSlides.value?.at(0)?._id) {
+        appStore.setLiveSlide(liveOutputSlides.value?.at(0)?._id!!)
+      }
+    },
+    { ctrlOrMeta: true, shift: false }
+  )
 })
 
 // const makeSlideActive = (slide: Slide, goLive: boolean = false) => {

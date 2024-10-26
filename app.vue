@@ -39,7 +39,7 @@ const appStore = useAppStore()
 nuxtApp.provide("emitter", emitter)
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("0.8.9")
+const appVersion = ref<string>("0.9.0")
 
 // const registerServiceWorker = async () => {
 //   if ("serviceWorker" in navigator) {

@@ -165,14 +165,14 @@ const editorTwo = ref(
       }),
     ],
     onCreate: ({ editor }) => {
-      // editor.commands.setFontFamily(appStore.settings.defaultFont)
+      // editor.commands.setFontFamily(appStore.currentState.settings.defaultFont)
     },
     onBlur: ({ editor }) => {
       emit("update", 1, editor.getHTML())
     },
     onFocus: ({ editor }) => {
       emit("change-focused-editor", editor)
-      // editor.commands.setFontFamily(appStore.settings.defaultFont)
+      // editor.commands.setFontFamily(appStore.currentState.settings.defaultFont)
     },
   })
 )
