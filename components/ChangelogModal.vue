@@ -58,10 +58,18 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added new durations for countdown slides - 1 min & 2 mins.
-- Fixed issue when deleting multiple slides with delete all functionality.
-- Fix issue where alert/banner restarts when slide changes.
-- Made minor fixes and improvements`
+const changelog = `- Introduced a live alert indicator on the control screen.
+- Added a shortcuts panel with new hotkeys for next, previous, search, and more actions.
+- Implemented undo/redo for slides with initial issues now resolved through refinements.
+- Resolved unnecessary redirects during church registration.
+- Fixed issues affecting the live page functionality.
+- Addressed a bug when saving slides with uploaded images.
+- Enhanced the search shortcut and resolved related issues.
+- Removed loggers and performed additional clean-up tasks.
+- Connected the app info endpoint and fixed breaking changes.
+- Expanded the app with new Bible versions.
+- Made improvements to force an update page when needed.
+- Refreshed and modified the Cloud of Worship page content.`
 
 const appStore = useAppStore()
 
