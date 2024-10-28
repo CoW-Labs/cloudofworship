@@ -320,9 +320,10 @@ emitter.on("close-offline-toast", () => {
 })
 
 emitter.on("selected-schedule", (schedule: Schedule) => {
+  appStore.setSlidesLoading(true)
   setTimeout(() => {
     retrieveAllMediaFilesFromDB()
-  }, 1000)
+  }, 2000)
 })
 
 emitter.on("go-live", () => {
@@ -648,6 +649,7 @@ const retrieveAllMediaFilesFromDB = async () => {
     ) {
       const mediaObj = await db.media.where({ id: slide.id }).toArray()
       if (mediaObj[0]) {
+        // console.log("media file", mediaObj[0])
         let b64 = null
         // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
         const arrayBuffer: ArrayBuffer = mediaObj[0]?.data
@@ -660,6 +662,7 @@ const retrieveAllMediaFilesFromDB = async () => {
           slide.background = fileUrl
         }
         appStore.setActiveSlides(slides)
+        appStore.setSlidesLoading(false)
       }
     } else {
       // console.log(slide.name, slide.backgroundVideoKey)
@@ -676,6 +679,7 @@ const retrieveAllMediaFilesFromDB = async () => {
         const fileUrl = URL.createObjectURL(blob)
         slide.background = fileUrl
       }
+      appStore.setSlidesLoading(false)
     }
   })
 
@@ -735,7 +739,7 @@ onMounted(async () => {
   }
 })
 
-retrieveAllMediaFilesFromDB()
+// retrieveAllMediaFilesFromDB()
 
 // WINDOW MANAGEMENT CODE STARTS HERE
 function openWindow(

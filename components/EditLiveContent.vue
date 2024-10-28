@@ -267,7 +267,8 @@
       class="h-[100%] relative text-white bg-primary-900 bg-no-repeat transition-all rounded-b-md overflow-hidden"
       :class="{
         'bg-center bg-cover':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
+          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop ||
+          slide?.slideStyle?.backgroundFillType == undefined,
         'bg-top bg-cover':
           slide?.slideStyle?.backgroundFillType === backgroundFillTypes.cropTop,
         'bg-bottom bg-cover':

@@ -179,7 +179,6 @@ watch(
     visible.value = props.visible
     if (visible.value) {
       uploadBatchSchedules()
-      retrieveSchedules()
     }
   }
 )
@@ -243,6 +242,7 @@ const uploadBatchSchedules = async () => {
   const schedules = appStore.currentState.schedules
   const tempSchedules = schedules?.filter((schedule) => !schedule?.lastUpdated)
   if (tempSchedules.length === 0) {
+    retrieveSchedules()
     return
   }
   appStore.setSlidesLoading(true)
