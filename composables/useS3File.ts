@@ -6,15 +6,15 @@ const useS3File = async (fileName: string, progressRef: Ref<string>) => {
 
   const client = new S3Client({
     region: runtimeConfig.public.AWS_BUCKET_REGION,
-    credentials: {
-      accessKeyId: runtimeConfig.public.AWS_ACCESS_KEY_ID,
-      secretAccessKey: runtimeConfig.public.AWS_SECRET_ACCESS_KEY
-    }
+    // credentials: {
+    //   accessKeyId: runtimeConfig.public.AWS_ACCESS_KEY_ID,
+    //   secretAccessKey: runtimeConfig.public.AWS_SECRET_ACCESS_KEY
+    // }
   })
 
   const command = new GetObjectCommand({
     Bucket: runtimeConfig.public.AWS_BUCKET_NAME,
-    Key: `bible-versions/${fileName}`,
+    Key: `open/bible-versions/${fileName}`,
   })
 
   progressRef.value = "0"

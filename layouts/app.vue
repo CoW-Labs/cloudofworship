@@ -496,7 +496,7 @@ const downloadEssentialResources = async () => {
     downloadStep.value = 3
 
     let kjvBible = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/kjv.json`,
+      `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/kjv.json`,
       downloadProgress
     )
     kjvBible = await kjvBible.json()
