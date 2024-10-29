@@ -120,7 +120,7 @@ const resendCode = async () => {
     })
   }
   toast.add({
-    title: error.value,
+    title: error.value?.data?.msg,
     color: "red",
     icon: "i-bx-error",
   })

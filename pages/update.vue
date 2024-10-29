@@ -63,6 +63,7 @@ const updateApp = () => {
 
   setTimeout(() => {
     loading.value = false
+    window.location = "/"
   }, 5000)
 }
 

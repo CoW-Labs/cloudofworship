@@ -84,10 +84,11 @@ const downloadBibleVersion = async (bibleVersion: string) => {
     updatedAt: new Date().toISOString(),
   })
   bibleVersionLoading.value = bibleVersion
-  const bibleResponse = await useS3File(
-    `${bibleVersion?.toLowerCase()}.json`,
+  let bibleResponse = await useDetailedFetch(
+    `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/${bibleVersion?.toLowerCase()}.json`,
     bibleDownloadProgress
   )
+  bibleResponse = await bibleResponse.json()
   await db.bibleAndHymns.add(tempBibleVersion(bibleVersion, bibleResponse))
   bibleVersionLoading.value = false
   populateBibleVersionOptions()

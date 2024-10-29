@@ -441,17 +441,20 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
 // Set slides to slides based on scheduler
 watch(
   () => currentState.value.activeSchedule,
-  () => {
-    slides.value = currentState.value.activeSlides?.filter(
-      (slide) => slide.scheduleId === appStore.currentState.activeSchedule?._id
-    )
+  (oldVal, newVal) => {
+    if (oldVal?._id !== newVal?._id) {
+      slides.value = currentState.value.activeSlides?.filter(
+        (slide) =>
+          slide.scheduleId === appStore.currentState.activeSchedule?._id
+      )
 
-    // Check if activeSchedule is remote object
-    if (!currentState.value.activeSchedule?.updatedAt) {
-      createScheduleOnline(currentState.value.activeSchedule as Schedule)
-    } else {
-      // retrieve all slides online
-      retrieveSlidesOnline(currentState.value.activeSchedule?._id)
+      // Check if activeSchedule is remote object
+      if (!currentState.value.activeSchedule?.updatedAt) {
+        createScheduleOnline(currentState.value.activeSchedule as Schedule)
+      } else {
+        // retrieve all slides online
+        retrieveSlidesOnline(currentState.value.activeSchedule?._id)
+      }
     }
   },
   { immediate: true }
