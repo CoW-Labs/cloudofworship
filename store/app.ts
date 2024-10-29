@@ -294,7 +294,7 @@ export const useAppStore = defineStore('app', {
     }
   },
   persist: {
-    storage: persistedState.localStorage
+    storage: piniaPluginPersistedstate.localStorage()
   },
   share: {
     enable: true,
