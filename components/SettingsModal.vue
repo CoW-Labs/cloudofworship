@@ -44,7 +44,7 @@
             {{ tab?.name }}
           </UButton>
         </div>
-        <div class="rhs w-[100%] rounded-lg p-6 pt-2 min-h-[600px]">
+        <div class="rhs w-[100%] rounded-lg p-6 pt-2 h-[600px]">
           <!-- SUB-SETTINGS HEADER -->
           <h3 class="font-semibold text-lg mb-4">
             {{ activeTab }}
@@ -65,6 +65,8 @@
             </div>
             <!-- PROFILE SETTINGS -->
             <ProfileSettings v-else-if="activeTab === 'Profile Settings'" />
+            <!-- DISPLAY SETTINGS -->
+            <DisplaySettings v-else-if="activeTab === 'Display Settings'" />
             <!-- SLIDE SETTINGS -->
             <SlideSettings
               v-else-if="activeTab === 'Slide Settings'"
@@ -104,6 +106,7 @@ const settingsModalOpen = ref(props.isOpen)
 const tabs = [
   { name: "Account Settings", active: false },
   { name: "Profile Settings", active: false },
+  { name: "Display Settings", active: false },
   { name: "Slide Settings", active: false },
   { name: "Bible Version Settings", active: false },
   { name: "Storage Settings", active: false },

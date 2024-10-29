@@ -79,6 +79,7 @@ export const useAppStore = defineStore('app', {
         bannerVisible: true as boolean,
         bibleVersions: bibleVersionObjects as Array<any>, // Check app.vue for bible versions array in a list
         activeSocket: null as WebSocket | null,
+        mainDisplayLabel: '',
         // activeLiveWindows: [] as any[]
       },
       // Undo/Redo stacks
@@ -226,6 +227,9 @@ export const useAppStore = defineStore('app', {
     },
     setActiveSocket(socket: WebSocket) {
       this.currentState.activeSocket = socket
+    },
+    setMainDisplayLabel(label: string) {
+      this.currentState.mainDisplayLabel = label
     },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)

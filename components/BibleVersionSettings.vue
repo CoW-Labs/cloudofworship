@@ -1,5 +1,5 @@
 <template>
-  <div class="h-[62.5vh] overflow-y-auto mb-[2.5%]">
+  <div class="h-[100%] overflow-y-auto mb-[2.5%]">
     <div
       v-for="bibleVersion in bibleVersionOptions"
       :key="bibleVersion"

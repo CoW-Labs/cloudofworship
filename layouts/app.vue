@@ -783,6 +783,15 @@ async function openWindows() {
   const screenDetails = await window.getScreenDetails()
   const noOfScreens = screenDetails.screens.length
 
+  if (!appStore.currentState.mainDisplayLabel) {
+    useToast().add({
+      title: "Set up your main display first",
+      icon: "i-bx-info-circle",
+    })
+    useGlobalEmit(appWideActions.openSettings, "Display Settings")
+    return
+  }
+
   if (noOfScreens === 1) {
     useToast().add({
       title:
@@ -803,11 +812,14 @@ async function openWindows() {
     // Two screens or more
     const screen1 = screenDetails.screens[0]
     const screen2 = screenDetails.screens[1]
+    const mainDisplayScreen = screenDetails.screens?.find(
+      (screen: any) => screen.label === appStore.currentState.mainDisplayLabel
+    )
     openWindow(
-      screen1.availLeft,
-      screen1.availTop,
-      screen2.availWidth,
-      screen2.availHeight,
+      mainDisplayScreen.availLeft,
+      mainDisplayScreen.availTop,
+      mainDisplayScreen.availWidth,
+      mainDisplayScreen.availHeight,
       `http://${window.location.host}/live`
     )
   }
