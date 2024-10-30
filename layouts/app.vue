@@ -477,6 +477,24 @@ const tempBibleVersion = (version: string, data: any) => ({
   updatedAt: new Date().toISOString(),
 })
 
+// Fix an anomaly in DB media data with [media] tables
+const fixAnomalyInDBMediaData = async () => {
+  const db = useIndexedDB()
+  const allMediaObjects = await db.media.toArray()
+  await Promise.all(
+    allMediaObjects.map(async (item) => {
+      const tempItem = {
+        ...item,
+        content: { type: item.content.type, size: item.content.size },
+      }
+      // delete tempItem.content
+      // console.log(item.id, tempItem)
+      return await db.media.update(item.id, { ...tempItem })
+    })
+  )
+  // console.log("done anomaly operation")
+}
+
 const downloadEssentialResources = async () => {
   const db = useIndexedDB()
 
@@ -541,9 +559,16 @@ const downloadEssentialResources = async () => {
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
   }
 
+  // Extra computations
+  // Fix an anomaly in DB media data with [media] tables
+  if (appStore.currentState.settings.appVersion !== props.appVersion) {
+    downloadResource.value = "updates in local database"
+    await fixAnomalyInDBMediaData()
+  }
+
   // All computations completed
   downloadStep.value = 5
-  downloadResource.value = "All resources downloaded"
+  downloadResource.value = "All resources downloaded."
 
   setTimeout(() => {
     loadingResources.value = false

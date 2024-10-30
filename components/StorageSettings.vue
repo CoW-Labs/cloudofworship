@@ -5,7 +5,7 @@
         <Icon name="i-lucide-hard-drive" class="w-8 h-8" />
         <h3 class="text-lg font-semibold">
           {{ formatMegabytes(totalDataSize) }}
-          <span class="text-sm font-normal">stored locally</span>
+          <span class="text-sm font-normal">stored on this computer</span>
         </h3>
       </div>
       <Icon
@@ -82,7 +82,7 @@
               <div
                 class="colored-circle rounded-full w-3 h-3 bg-blue-500"
               ></div>
-              Slides Media
+              Media Slides (Images, Videos, Audio)
             </div>
           </td>
           <td>{{ formatMegabytes(mediaTableSize) }}</td>

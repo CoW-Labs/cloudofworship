@@ -798,7 +798,7 @@ const createNewMediaSlide = async (
       // Store Blob in DB for easy retrieval on reload
       await useIndexedDB().media.add({
         id: tempSlide.id,
-        content: file.blob,
+        content: { size: file.blob.size, type: file.blob.type },
         data: data as ArrayBuffer,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -817,7 +817,7 @@ const createNewMediaSlide = async (
 }
 
 const createMultipleNewMediaSlides = async (files: any[]) => {
-  console.log("files", files)
+  // console.log("files", files)
   useGlobalEmit(appWideActions.appLoading, true)
   const multipleSlidesPromise: Promise<any>[] = []
   files?.forEach((file) => {
@@ -1204,12 +1204,11 @@ const saveSlide = async (item: Slide) => {
     } else {
       delete tempItem.data.blob
       delete tempItem.blob
-      console.log("tempItem", tempItem)
       await db.library.add(
         {
           id: tempItem.id,
           type: "slide",
-          content: tempItem,
+          content: { ...tempItem },
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
