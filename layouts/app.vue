@@ -275,7 +275,7 @@ const getChurch = async () => {
 }
 getChurch()
 
-// Get hymn count
+// Get hymn count and download app info
 let hymnCount: any
 const hymns = await db.bibleAndHymns.get("hymns")
 if (isAppOnline.value) {
@@ -284,6 +284,12 @@ if (isAppOnline.value) {
       Authorization: `Bearer ${token.value}`,
     },
   })
+  // Download app info
+  const { data } = await useAPIFetch("/app-config/info")
+  if (data.value) {
+    appInfo.value = data.value as any
+    appStore.setBibleVersions(data.value?.bibleVersions)
+  }
   hymnCount = await hymnCount.json()
 } else {
   // Handle offline hymn count
@@ -484,11 +490,6 @@ const downloadEssentialResources = async () => {
   // Download background videos
   downloadStep.value = 2
   await retrieveSchedules()
-
-  // Download app info
-  const { data } = await useAPIFetch("/app-config/info")
-  appInfo.value = data.value as any
-  appStore.setBibleVersions(data.value?.bibleVersions)
 
   // Download KJV Bible
   let tempBible = await db.bibleAndHymns.get("KJV")
