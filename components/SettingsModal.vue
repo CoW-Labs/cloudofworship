@@ -77,18 +77,7 @@
               v-else-if="activeTab === 'Bible Version Settings'"
             />
             <!-- STORAGE SETTINGS -->
-            <div
-              class="settings-ctn h-[100%]"
-              v-else-if="activeTab === 'Storage Settings'"
-            >
-              <EmptyState
-                icon="i-mdi-timer-sand-empty"
-                sub="Nothing to see for now"
-                action=""
-                action-text=""
-                class="pb-4"
-              />
-            </div>
+            <StorageSettings v-else-if="activeTab === 'Storage Settings'" />
           </Transition>
         </div>
       </div>
