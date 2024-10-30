@@ -785,7 +785,7 @@ async function openWindows() {
 
   if (!appStore.currentState.mainDisplayLabel) {
     useToast().add({
-      title: "Set up your main display first",
+      title: "Set up your live display first",
       icon: "i-bx-info-circle",
     })
     useGlobalEmit(appWideActions.openSettings, "Display Settings")
@@ -810,18 +810,25 @@ async function openWindows() {
     )
   } else {
     // Two screens or more
-    const screen1 = screenDetails.screens[0]
-    const screen2 = screenDetails.screens[1]
+    // const screen1 = screenDetails.screens[0]
+    // const screen2 = screenDetails.screens[1]
     const mainDisplayScreen = screenDetails.screens?.find(
       (screen: any) => screen.label === appStore.currentState.mainDisplayLabel
     )
-    openWindow(
-      mainDisplayScreen.availLeft,
-      mainDisplayScreen.availTop,
-      mainDisplayScreen.availWidth,
-      mainDisplayScreen.availHeight,
-      `http://${window.location.host}/live`
-    )
+    if (mainDisplayScreen) {
+      openWindow(
+        mainDisplayScreen.availLeft,
+        mainDisplayScreen.availTop,
+        mainDisplayScreen.availWidth,
+        mainDisplayScreen.availHeight,
+        `http://${window.location.host}/live`
+      )
+    } else {
+      useToast().add({
+        title: "Unable to find live display, update your display settings",
+        icon: "i-bx-info-circle",
+      })
+    }
   }
 
   const closeMonitor = setInterval(checkWindowClose, 250)
