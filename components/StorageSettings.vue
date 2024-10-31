@@ -89,6 +89,34 @@
         </tr>
       </tbody>
     </table>
+
+    <div class="danger-zone mt-4 bg-red-100 dark:bg-red-900 rounded-md p-4">
+      <h3 class="font-medium">Danger Zone</h3>
+      <p class="text-xs mb-4 mt-2">
+        This is a danger zone. If you are not sure what you are doing, do not
+        delete anything here. If you are sure, click the button below.
+      </p>
+      <UInput
+        v-if="deletePrompt"
+        v-model="deletePromptText"
+        placeholder="Type 'intentionally deleting' to confirm"
+        class="mb-4"
+        size="xs"
+      >
+      </UInput>
+      <UButton
+        color="danger"
+        block
+        icon="i-bx-trash"
+        variant="outline"
+        :disabled="
+          deletePrompt ? deletePromptText !== 'intentionally deleting' : false
+        "
+        @click="deletePrompt ? deleteAllData() : (deletePrompt = true)"
+      >
+        Clear all data on this device
+      </UButton>
+    </div>
   </div>
 </template>
 
@@ -101,6 +129,8 @@ const cachedTableSize = ref<number>(0)
 const libraryTableSize = ref<number>(0)
 const bibleAndHymnsTableSize = ref<number>(0)
 const mediaTableSize = ref<number>(0)
+const deletePrompt = ref<boolean>(false)
+const deletePromptText = ref<string>("")
 
 const totalDataSize = computed(() => {
   return (
@@ -153,6 +183,16 @@ const calculateLibraryTableSize = async () => {
 const calculateBibleAndHymnsTableSize = async () => {
   bibleAndHymnsTableSize.value =
     (await getStoreSize(db.bibleAndHymns)) / 1024 / 1024
+}
+
+const deleteAllData = async () => {
+  loading.value = true
+  console.log("deleting all data")
+
+  await db.delete()
+  deletePrompt.value = false
+  deletePromptText.value = ""
+  loading.value = false
 }
 
 // calculateMediaTableSize()
