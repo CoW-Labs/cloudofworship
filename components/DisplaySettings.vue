@@ -1,5 +1,7 @@
 <template>
-  <div class="settings-ctn h-[100%] flex flex-col gap-6">
+  <div
+    class="settings-ctn h-[100%] flex flex-col gap-6 overflow-y-auto mb-[2.5%] pb-[10%]"
+  >
     <div v-if="currentScreen" class="primary-display flex flex-col gap-2">
       <div class="sub-header">
         <h3 class="font-medium">Control Center</h3>

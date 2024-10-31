@@ -1,11 +1,10 @@
 <template>
-  <div class="settings-ctn h-[100%]">
+  <div class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] pb-[15%]">
+    <!-- LOOK AND FEEL OF SLIDES -->
     <div class="settings-group">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Look and Feel</h3>
       </div>
-
-      <!-- LOOK AND FEEL OF SLIDES -->
       <UForm>
         <UFormGroup label="Set default font">
           <USelectMenu
@@ -67,6 +66,42 @@
               })
             "
           />
+        </UFormGroup>
+      </UForm>
+    </div>
+
+    <!-- ANIMATION -->
+    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-md font-semibold">Animation & Transitions</h3>
+      </div>
+      <UForm>
+        <UFormGroup
+          label="Transition between slides and micro animations"
+          class=""
+        >
+          <UToggle
+            size="lg"
+            :model-value="appStore.currentState.settings.animations"
+            @change="appStore.setAnimations($event)"
+          />
+        </UFormGroup>
+        <UFormGroup
+          v-if="appStore.currentState.settings.animations"
+          label="Transition interval in seconds"
+          class="max-w-[200px] mt-4 come-up-1"
+        >
+          <div class="flex px-0 items-center gap-2 font-semibold">
+            <span class="text-sm">0s</span>
+            <URange
+              :model-value="appStore.currentState.settings.transitionInterval"
+              min="0"
+              max="5"
+              step="0.1"
+              @change="appStore.setTransitionInterval($event)"
+            />
+            <span class="text-sm"> 5s</span>
+          </div>
         </UFormGroup>
       </UForm>
     </div>
