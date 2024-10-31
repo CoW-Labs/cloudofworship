@@ -105,7 +105,7 @@
       <LiveContent
         :content-visible="foregroundContentVisible"
         :slide="slide"
-        class="relative come-up-1"
+        class="relative"
         :class="fullScreen ? '' : 'min-h-[220px] rounded-md'"
         :padding="fullScreen ? '6' : '0'"
         :style="
