@@ -231,6 +231,9 @@ export const useAppStore = defineStore('app', {
     setMainDisplayLabel(label: string) {
       this.currentState.mainDisplayLabel = label
     },
+    setLinesPerSlide(lines: number) {
+      this.currentState.settings = { ...this.currentState.settings, slideStyles: { ...this.currentState.settings.slideStyles, linesPerSlide: lines } }
+    },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)
     // },
