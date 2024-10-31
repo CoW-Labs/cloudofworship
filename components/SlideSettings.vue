@@ -6,7 +6,7 @@
           class="border-0 shadow-none w-[200px]"
           searchable
           searchable-placeholder="Search fonts"
-          select-class="w-[200px] bg-primary-100 dark:bg-primary-800 dark:text-white"
+          select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
           size="md"
           :options="appFonts"
           :model-value="appStore.currentState.settings.defaultFont"
@@ -46,7 +46,7 @@
             class="border-0 shadow-none max-w-[200px]"
             searchable
             searchable-placeholder="Search version"
-            select-class="w-[200px] bg-primary-100 dark:bg-primary-800 dark:text-white"
+            select-class="w-[200px]  bg-gray-100 dark:bg-gray-800 dark:text-white"
             size="md"
             :options="bibleVersionSelectOptions"
             :model-value="appStore.currentState.settings.defaultBibleVersion"
@@ -78,7 +78,7 @@
       <UFormGroup label="Set default slide alignment" class="mt-4">
         <USelectMenu
           class="border-0 shadow-none max-w-[200px] capitalize"
-          select-class="w-[200px] bg-primary-100 dark:bg-primary-800 dark:text-white capitalize"
+          select-class="w-[200px]  bg-gray-100 dark:bg-gray-800 dark:text-white capitalize"
           size="md"
           :options="['left', 'center', 'right']"
           :model-value="appStore.currentState.settings.slideStyles.alignment"

@@ -100,6 +100,7 @@
         v-if="deletePrompt"
         v-model="deletePromptText"
         placeholder="Type 'intentionally deleting' to confirm"
+        input-class=" bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         class="mb-4"
         size="xs"
       >
