@@ -66,6 +66,8 @@ export const useAppStore = defineStore('app', {
               backgroundVideoKey: '/video-bg-4.mp4'
             }
           },
+          animations: true,
+          transitionInterval: 0.7,
           slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center' } as SlideStyle,
           bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
         },
@@ -79,6 +81,7 @@ export const useAppStore = defineStore('app', {
         bannerVisible: true as boolean,
         bibleVersions: bibleVersionObjects as Array<any>, // Check app.vue for bible versions array in a list
         activeSocket: null as WebSocket | null,
+        mainDisplayLabel: '',
         // activeLiveWindows: [] as any[]
       },
       // Undo/Redo stacks
@@ -226,6 +229,18 @@ export const useAppStore = defineStore('app', {
     },
     setActiveSocket(socket: WebSocket) {
       this.currentState.activeSocket = socket
+    },
+    setMainDisplayLabel(label: string) {
+      this.currentState.mainDisplayLabel = label
+    },
+    setLinesPerSlide(lines: number) {
+      this.currentState.settings = { ...this.currentState.settings, slideStyles: { ...this.currentState.settings.slideStyles, linesPerSlide: lines } }
+    },
+    setAnimations(animations: boolean) {
+      this.currentState.settings = { ...this.currentState.settings, animations: animations }
+    },
+    setTransitionInterval(interval: number) {
+      this.currentState.settings = { ...this.currentState.settings, transitionInterval: interval }
     },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)

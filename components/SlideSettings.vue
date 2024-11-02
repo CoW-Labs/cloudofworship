@@ -1,101 +1,214 @@
 <template>
-  <div class="settings-ctn h-[100%]">
-    <UForm>
-      <UFormGroup label="Set default font">
-        <USelectMenu
-          class="border-0 shadow-none w-[200px]"
-          searchable
-          searchable-placeholder="Search fonts"
-          select-class="w-[200px] bg-primary-100 dark:bg-primary-800 dark:text-white"
-          size="md"
-          :options="appFonts"
-          :model-value="appStore.currentState.settings.defaultFont"
-          variant="none"
-          color="primary"
-          clear-search-on-close
-          :ui="selectUI"
-          :ui-menu="selectMenuUI"
-          @change="appStore.setDefaultFont($event)"
-        >
-          <template #label>
-            <IconWrapper name="i-bx-font-family" size="4"> </IconWrapper>
-            <span
-              v-if="font?.length"
-              class="truncate"
-              :class="
-                useURLFriendlyString(appStore.currentState.settings.defaultFont)
-              "
-              >{{ appStore.currentState.settings.defaultFont }}</span
-            >
-            <span v-else>Select font</span>
-          </template>
-          <template #option="{ option: font }">
-            <span
-              v-if="font?.length"
-              class="truncate"
-              :class="useURLFriendlyString(font)"
-              >{{ font }}</span
-            >
-            <span v-else>Select font</span>
-          </template>
-        </USelectMenu>
-      </UFormGroup>
-      <div class="flex items-end gap-4">
-        <UFormGroup label="Set default Bible Version" class="mt-4">
+  <div class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] pb-[15%]">
+    <!-- LOOK AND FEEL OF SLIDES -->
+    <div class="settings-group">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-md font-semibold">Look and Feel</h3>
+      </div>
+      <UForm>
+        <UFormGroup label="Set default font">
           <USelectMenu
-            class="border-0 shadow-none max-w-[200px]"
+            class="border-0 shadow-none w-[200px]"
             searchable
-            searchable-placeholder="Search version"
-            select-class="w-[200px] bg-primary-100 dark:bg-primary-800 dark:text-white"
+            searchable-placeholder="Search fonts"
+            select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
             size="md"
-            :options="bibleVersionSelectOptions"
-            :model-value="appStore.currentState.settings.defaultBibleVersion"
+            :options="appFonts"
+            :model-value="appStore.currentState.settings.defaultFont"
+            variant="none"
+            color="primary"
+            clear-search-on-close
+            :ui="selectUI"
+            :ui-menu="selectMenuUI"
+            @change="appStore.setDefaultFont($event)"
+          >
+            <template #label>
+              <IconWrapper name="i-bx-font-family" size="4"> </IconWrapper>
+              <span
+                v-if="font?.length"
+                class="truncate"
+                :class="
+                  useURLFriendlyString(
+                    appStore.currentState.settings.defaultFont
+                  )
+                "
+                >{{ appStore.currentState.settings.defaultFont }}</span
+              >
+              <span v-else>Select font</span>
+            </template>
+            <template #option="{ option: font }">
+              <span
+                v-if="font?.length"
+                class="truncate"
+                :class="useURLFriendlyString(font)"
+                >{{ font }}</span
+              >
+              <span v-else>Select font</span>
+            </template>
+          </USelectMenu>
+        </UFormGroup>
+        <UFormGroup label="Set default slide alignment" class="mt-4">
+          <USelectMenu
+            class="border-0 shadow-none max-w-[200px] capitalize"
+            select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white capitalize"
+            size="md"
+            :options="['left', 'center', 'right']"
+            :model-value="appStore.currentState.settings.slideStyles.alignment"
             variant="none"
             color="primary"
             clear-search-on-close
             :ui="selectUI"
             :ui-menu="selectMenuUI"
             @change="
-              $event === '+ More Versions'
-                ? useGlobalEmit(
-                    appWideActions.openSettings,
-                    'Bible Version Settings'
-                  )
-                : appStore.setDefaultBibleVersion($event)
+              appStore.setSlideStyles({
+                ...appStore.currentState.settings.slideStyles,
+                alignment: $event,
+              })
             "
+          />
+        </UFormGroup>
+      </UForm>
+    </div>
+
+    <!-- ANIMATION -->
+    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-md font-semibold">Animation & Transitions</h3>
+      </div>
+      <UForm>
+        <UFormGroup
+          label="Transition between slides and micro animations"
+          class=""
+        >
+          <UToggle
+            size="lg"
+            :model-value="appStore.currentState.settings.animations"
+            @change="appStore.setAnimations($event)"
+          />
+        </UFormGroup>
+        <UFormGroup
+          v-if="appStore.currentState.settings.animations"
+          label="Transition interval in seconds"
+          class="max-w-[200px] mt-4 come-up-1"
+        >
+          <div class="flex px-0 items-center gap-2 font-semibold">
+            <span class="text-sm">0s</span>
+            <URange
+              :model-value="appStore.currentState.settings.transitionInterval"
+              min="0"
+              max="5"
+              step="0.1"
+              @change="appStore.setTransitionInterval($event)"
+            />
+            <span class="text-sm"> 5s</span>
+          </div>
+        </UFormGroup>
+      </UForm>
+    </div>
+
+    <!-- BIBLE SLIDES -->
+    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-md font-semibold">Bible Slides</h3>
+      </div>
+      <UForm>
+        <div class="flex items-end gap-4">
+          <UFormGroup label="Set default Bible Version">
+            <USelectMenu
+              class="border-0 shadow-none max-w-[200px]"
+              searchable
+              searchable-placeholder="Search version"
+              select-class="w-[200px]  bg-gray-100 dark:bg-gray-800 dark:text-white"
+              size="md"
+              :options="bibleVersionSelectOptions"
+              :model-value="appStore.currentState.settings.defaultBibleVersion"
+              variant="none"
+              color="primary"
+              clear-search-on-close
+              :ui="selectUI"
+              :ui-menu="selectMenuUI"
+              @change="
+                $event === '+ More Versions'
+                  ? useGlobalEmit(
+                      appWideActions.openSettings,
+                      'Bible Version Settings'
+                    )
+                  : appStore.setDefaultBibleVersion($event)
+              "
+            >
+            </USelectMenu>
+          </UFormGroup>
+          <UButton
+            size="md"
+            icon="i-bx-plus"
+            variant="outline"
+            @click="$emit('select-active-tab', 'Bible Version Settings')"
           >
+            Add more
+          </UButton>
+        </div>
+      </UForm>
+    </div>
+
+    <!-- SONG SLIDES -->
+    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-md font-semibold">Song Slides</h3>
+      </div>
+      <UForm>
+        <UFormGroup label="Set default lines per slide">
+          <USelectMenu
+            class="absolute border-0 shadow-none top-[6px]"
+            select-class="border-3 shadow-none outline-none text-center w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
+            size="md"
+            :options="['1', '2', '3', '4', '5', '6']"
+            v-model.number="lines"
+            variant="none"
+            color="primary"
+            clear-search-on-close
+            :ui="{
+              base: 'bg-primary-500',
+              input: 'bg-primary-500',
+              color: {
+                primary: {
+                  outline: 'shadow-sm bg-primary-500 ',
+                },
+              },
+            }"
+            :ui-menu="{
+              width: 'w-[200px]',
+              input: 'text-xs',
+              empty: 'text-xs',
+              option: {
+                size: 'text-xs',
+              },
+            }"
+            @change="appStore.setLinesPerSlide($event)"
+          >
+            <template #label>
+              <IconWrapper name="i-tabler-list-numbers" size="4"> </IconWrapper>
+              <span v-if="lines" class="truncate"
+                >{{ lines }} {{ lines > 1 ? "lines" : "line" }}</span
+              >
+              <span v-else class="truncate whitespace-nowrap"
+                >Lines per slide</span
+              >
+            </template>
+            <template #option="{ option: lines }">
+              <span
+                v-if="lines"
+                class="truncate"
+                :class="useURLFriendlyString(lines)"
+                >{{ lines }} {{ lines > 1 ? "lines" : "line" }}</span
+              >
+              <span v-else class="truncate whitespace-nowrap"
+                >Lines per slide</span
+              >
+            </template>
           </USelectMenu>
         </UFormGroup>
-        <UButton
-          size="md"
-          icon="i-bx-plus"
-          variant="outline"
-          @click="$emit('select-active-tab', 'Bible Version Settings')"
-        >
-          Add more
-        </UButton>
-      </div>
-      <UFormGroup label="Set default slide alignment" class="mt-4">
-        <USelectMenu
-          class="border-0 shadow-none max-w-[200px] capitalize"
-          select-class="w-[200px] bg-primary-100 dark:bg-primary-800 dark:text-white capitalize"
-          size="md"
-          :options="['left', 'center', 'right']"
-          :model-value="appStore.currentState.settings.slideStyles.alignment"
-          variant="none"
-          color="primary"
-          clear-search-on-close
-          :ui="selectUI"
-          :ui-menu="selectMenuUI"
-          @change="
-            appStore.setSlideStyles({
-              ...appStore.currentState.settings.slideStyles,
-              alignment: $event,
-            })
-          "
-        />
-      </UFormGroup>
-    </UForm>
+      </UForm>
+    </div>
   </div>
 </template>
 
@@ -104,6 +217,9 @@ import { useAppStore } from "~/store/app"
 const appStore = useAppStore()
 
 const font = ref(appStore.currentState.settings.defaultFont)
+const lines = ref<number>(
+  appStore.currentState.settings.slideStyles.linesPerSlide || 4
+)
 const { currentState } = storeToRefs(appStore)
 const bibleVersionSelectOptions = computed(() =>
   [
