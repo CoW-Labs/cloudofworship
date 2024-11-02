@@ -3,6 +3,7 @@
     <UFormGroup label="Full Name">
       <UInput
         class="border-0 shadow-none max-w-[250px]"
+        input-class=" bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
         size="md"
         v-model="fullName"
       />
@@ -10,6 +11,7 @@
     <UFormGroup label="Email" class="mt-4">
       <UInput
         class="border-0 shadow-none max-w-[250px]"
+        input-class=" bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
         size="md"
         v-model="email"
       />

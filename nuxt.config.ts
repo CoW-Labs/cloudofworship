@@ -95,7 +95,15 @@ export default defineNuxtConfig({
 
   css: ["~/assets/css/main.css"],
 
-  modules: ["@nuxt/ui", "@vite-pwa/nuxt", "nuxt-tiptap-editor", "@pinia/nuxt", "pinia-plugin-persistedstate/nuxt", "nuxt-gtag"],
+  modules: [
+    "@nuxt/ui",
+    "@vite-pwa/nuxt",
+    "nuxt-tiptap-editor",
+    "@pinia/nuxt",
+    "pinia-plugin-persistedstate/nuxt",
+    "nuxt-gtag",
+    "@nuxthub/core"
+  ],
 
   ui: {
     global: true,

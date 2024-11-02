@@ -252,7 +252,18 @@ const passwordValid = computed(() => {
   return regex.test(password.value)
 })
 
+const getChurch = async () => {
+  if (user.value?.churchId) {
+    const { data } = await useAPIFetch(`/church/${user.value?.churchId}`)
+    authStore.setChurch(data.value)
+    navigateTo("/")
+  }
+}
+
 onMounted(() => {
+  if (route.query.registerChurch) {
+    getChurch()
+  }
   setTimeout(() => {
     useToast().add({
       title: "Still not convinced?",

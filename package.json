@@ -14,6 +14,7 @@
     "@aws-sdk/client-s3": "^3.540.0",
     "@hotjar/browser": "^1.0.9",
     "@nuxt/ui": "npm:@nuxt/ui-edge@latest",
+    "@nuxthub/core": "^0.8.4",
     "@pinia/nuxt": "^0.5.1",
     "@tiptap/extension-font-family": "^2.4.0",
     "@tiptap/extension-highlight": "^2.3.0",
@@ -58,11 +59,12 @@
     "@tauri-apps/cli": "^1.5.14",
     "@types/socket.io-client": "^3.0.0",
     "typescript": "^5.4.5",
-    "vue-tsc": "^2.0.16"
+    "vue-tsc": "^2.0.16",
+    "wrangler": "^3.84.1"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "4.9.5",
-    "@esbuild/linux-x64": "0.24.0"
+    "@esbuild/linux-x64": "0.24.0",
+    "@rollup/rollup-linux-x64-gnu": "4.9.5"
   },
   "overrides": {
     "sharp": "0.32.6",

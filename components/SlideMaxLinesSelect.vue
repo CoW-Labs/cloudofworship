@@ -59,7 +59,11 @@ const props = defineProps<{
 
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
-const lines = ref<number>(props.selectedLine || 4)
+const lines = ref<number>(
+  props.selectedLine ||
+    currentState.value.settings.slideStyles.linesPerSlide ||
+    4
+)
 
 watch(
   () => props.selectedLine,

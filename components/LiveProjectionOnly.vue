@@ -1,5 +1,13 @@
 <template>
-  <div class="live-output-ctn w-[100%] min-h-[220px] relative">
+  <div
+    class="live-output-ctn w-[100%] min-h-[220px] relative"
+    :class="{ 'no-animations': !currentState.settings.animations }"
+    :style="`transition-duration: ${
+      currentState.settings.animations
+        ? currentState.settings.transitionInterval
+        : 0
+    }s`"
+  >
     <div
       class="live-output w-[100%] min-h-[220px] rounded-md relative overflow-hidden border bg-no-repeat transition-all backdrop-blur-0 bg-black dark:border-none"
       v-if="contentVisible"
@@ -97,7 +105,7 @@
       <LiveContent
         :content-visible="foregroundContentVisible"
         :slide="slide"
-        class="relative come-up-1"
+        class="relative"
         :class="fullScreen ? '' : 'min-h-[220px] rounded-md'"
         :padding="fullScreen ? '6' : '0'"
         :style="

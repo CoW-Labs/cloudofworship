@@ -257,6 +257,16 @@ body {
   animation: come-up 0.6s ease-in-out forwards;
   -webkit-animation: come-up 0.6s ease-in-out forwards;
 }
+.no-animations {
+  .come-up-1 {
+    animation: none;
+    -webkit-animation: none;
+  }
+  .come-up-2 {
+    animation: none;
+    -webkit-animation: none;
+  }
+}
 
 @keyframes come-up {
   0% {

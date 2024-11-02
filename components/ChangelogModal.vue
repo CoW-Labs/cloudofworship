@@ -44,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+import { settings } from "firebase/analytics"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import type { Church, User } from "~/store/auth"
@@ -58,18 +59,18 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Introduced a live alert indicator on the control screen.
-- Added a shortcuts panel with new hotkeys for next, previous, search, and more actions.
-- Implemented undo/redo for slides with initial issues now resolved through refinements.
-- Resolved unnecessary redirects during church registration.
-- Fixed issues affecting the live page functionality.
-- Addressed a bug when saving slides with uploaded images.
-- Enhanced the search shortcut and resolved related issues.
-- Removed loggers and performed additional clean-up tasks.
-- Connected the app info endpoint and fixed breaking changes.
-- Expanded the app with new Bible versions.
-- Made improvements to force an update page when needed.
-- Refreshed and modified the Cloud of Worship page content.`
+const changelog = `- Switched to NuxtHub for better uptime in Nigeria region.
+- Enforced one church account per user.
+- Fixed flickering backdrop issue on slide change.
+- Added animation settings for slides.
+- Added app-wide setting for number of lines per slide.
+- Added storage settings, indicator including local data deletion.
+- Fixed an issue affecting offline access functionality.
+- Refined display and screen settings, including media slide background and content background fill type on Edit Content Pane.
+- Resolved an issue with a wrong error message on the /verify page.
+- Fixed a bug causing perpetual slide retrieval on schedule change.
+- Updated Bible versions download process and improved sensitive information handling.
+- Implemented auto-redirect to home page upon app update.`
 
 const appStore = useAppStore()
 

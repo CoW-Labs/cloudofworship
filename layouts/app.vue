@@ -275,7 +275,7 @@ const getChurch = async () => {
 }
 getChurch()
 
-// Get hymn count
+// Get hymn count and download app info
 let hymnCount: any
 const hymns = await db.bibleAndHymns.get("hymns")
 if (isAppOnline.value) {
@@ -284,6 +284,12 @@ if (isAppOnline.value) {
       Authorization: `Bearer ${token.value}`,
     },
   })
+  // Download app info
+  const { data } = await useAPIFetch("/app-config/info")
+  if (data.value) {
+    appInfo.value = data.value as any
+    appStore.setBibleVersions(data.value?.bibleVersions)
+  }
   hymnCount = await hymnCount.json()
 } else {
   // Handle offline hymn count
@@ -471,6 +477,24 @@ const tempBibleVersion = (version: string, data: any) => ({
   updatedAt: new Date().toISOString(),
 })
 
+// Fix an anomaly in DB media data with [media] tables
+const fixAnomalyInDBMediaData = async () => {
+  const db = useIndexedDB()
+  const allMediaObjects = await db.media.toArray()
+  await Promise.all(
+    allMediaObjects.map(async (item) => {
+      const tempItem = {
+        ...item,
+        content: { type: item.content.type, size: item.content.size },
+      }
+      // delete tempItem.content
+      // console.log(item.id, tempItem)
+      return await db.media.update(item.id, { ...tempItem })
+    })
+  )
+  // console.log("done anomaly operation")
+}
+
 const downloadEssentialResources = async () => {
   const db = useIndexedDB()
 
@@ -484,11 +508,6 @@ const downloadEssentialResources = async () => {
   // Download background videos
   downloadStep.value = 2
   await retrieveSchedules()
-
-  // Download app info
-  const { data } = await useAPIFetch("/app-config/info")
-  appInfo.value = data.value as any
-  appStore.setBibleVersions(data.value?.bibleVersions)
 
   // Download KJV Bible
   let tempBible = await db.bibleAndHymns.get("KJV")
@@ -540,9 +559,16 @@ const downloadEssentialResources = async () => {
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
   }
 
+  // Extra computations
+  // Fix an anomaly in DB media data with [media] tables
+  if (appStore.currentState.settings.appVersion !== props.appVersion) {
+    downloadResource.value = "updates in local database"
+    await fixAnomalyInDBMediaData()
+  }
+
   // All computations completed
   downloadStep.value = 5
-  downloadResource.value = "All resources downloaded"
+  downloadResource.value = "All resources downloaded."
 
   setTimeout(() => {
     loadingResources.value = false
@@ -783,6 +809,15 @@ async function openWindows() {
   const screenDetails = await window.getScreenDetails()
   const noOfScreens = screenDetails.screens.length
 
+  if (!appStore.currentState.mainDisplayLabel) {
+    useToast().add({
+      title: "Set up your live display first",
+      icon: "i-bx-info-circle",
+    })
+    useGlobalEmit(appWideActions.openSettings, "Display Settings")
+    return
+  }
+
   if (noOfScreens === 1) {
     useToast().add({
       title:
@@ -801,15 +836,25 @@ async function openWindows() {
     )
   } else {
     // Two screens or more
-    const screen1 = screenDetails.screens[0]
-    const screen2 = screenDetails.screens[1]
-    openWindow(
-      screen1.availLeft,
-      screen1.availTop,
-      screen2.availWidth,
-      screen2.availHeight,
-      `http://${window.location.host}/live`
+    // const screen1 = screenDetails.screens[0]
+    // const screen2 = screenDetails.screens[1]
+    const mainDisplayScreen = screenDetails.screens?.find(
+      (screen: any) => screen.label === appStore.currentState.mainDisplayLabel
     )
+    if (mainDisplayScreen) {
+      openWindow(
+        mainDisplayScreen.availLeft,
+        mainDisplayScreen.availTop,
+        mainDisplayScreen.availWidth,
+        mainDisplayScreen.availHeight,
+        `http://${window.location.host}/live`
+      )
+    } else {
+      useToast().add({
+        title: "Unable to find live display, update your display settings",
+        icon: "i-bx-info-circle",
+      })
+    }
   }
 
   const closeMonitor = setInterval(checkWindowClose, 250)
