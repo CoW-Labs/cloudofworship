@@ -25,8 +25,8 @@ import { storeToRefs } from "pinia"
 import { useDebounce } from "@vueuse/core"
 
 const appStore = useAppStore()
-
 const scheduleId = ref(undefined)
+const socket = ref(null)
 
 const uploadOfflineSlides = useDebounce(() => {
   useGlobalEmit(appWideActions.uploadOfflineSlides)
@@ -100,6 +100,46 @@ onMounted(() => {
     }
   )
 })
+
+if (appStore.currentState.activeSchedule) {
+  const nuxtApp = useNuxtApp()
+  socket.value = await useSocket(appStore.currentState.activeSchedule?._id)
+  nuxtApp.provide("socket", socket.value)
+
+  socket.value.onmessage = (event) => {
+    const data = JSON.parse(event.data)
+    console.log(data)
+
+    switch (data.action) {
+      case "live-slide":
+        break
+      case "new-slide":
+        break
+      case "update-slide":
+        break
+      default:
+        console.log("Unknown action:", data.action)
+    }
+  }
+
+  watch(
+    () => appStore.currentState.liveSlideId,
+    (liveSlideId) => {
+      const liveSlide = appStore.currentState.activeSlides.find(
+        (slide) => slide.id === liveSlideId
+      )
+      if (liveSlide) {
+        socket.value.send(
+          JSON.stringify({
+            action: "live-slide",
+            data: liveSlide,
+          })
+        )
+      }
+    },
+    { deep: true }
+  )
+}
 
 // watch(
 //   activeSchedule,

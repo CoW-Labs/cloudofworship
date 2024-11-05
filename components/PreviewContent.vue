@@ -109,6 +109,7 @@ const bulkSelectSlides = ref<boolean>(false)
 const bulkSelectedSlides = ref<string[]>([])
 const activeCountdownInterval = ref<any>(null)
 const countdownTimeLeft = ref<number>(0)
+const socket = useNuxtApp().$socket as WebSocket
 
 // Listen to see if active slide is in active schedule, and to scroll to newest slide if in active schedule
 watch(
@@ -493,25 +494,25 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
   }
 }
 
-const batchUpdateSlideOnline = async (slides: Slide[]) => {
-  appStore.setSlidesLoading(true)
-  const { data, error } = await useAPIFetch(
-    `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/batch`,
-    {
-      method: "PUT",
-      body: slides,
-      key: "batch-update-slides",
-      dedupe: "defer",
-    }
-  )
-  if (!error.value) {
-    appStore.setSlidesLoading(false)
-    appStore.setLastSynced(new Date().toISOString())
-    return data.value as Slide[]
-  } else {
-    throw new Error(error.value?.message)
-  }
-}
+// const batchUpdateSlideOnline = async (slides: Slide[]) => {
+//   appStore.setSlidesLoading(true)
+//   const { data, error } = await useAPIFetch(
+//     `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/batch`,
+//     {
+//       method: "PUT",
+//       body: slides,
+//       key: "batch-update-slides",
+//       dedupe: "defer",
+//     }
+//   )
+//   if (!error.value) {
+//     appStore.setSlidesLoading(false)
+//     appStore.setLastSynced(new Date().toISOString())
+//     return data.value as Slide[]
+//   } else {
+//     throw new Error(error.value?.message)
+//   }
+// }
 
 const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
   const tempSlide = { ...slide }
@@ -532,6 +533,16 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
       slide.backgroundType === backgroundTypes.video
     )
   ) {
+    // UPDATE OVER WEBSOCKET
+    socket.send(
+      JSON.stringify({
+        action: "update-slide",
+        data: slide,
+      })
+    )
+
+    // UPDATE OVER HTTP
+    // TODO: Take out http update in future when WS is stable and can store in DB
     appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
       `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
