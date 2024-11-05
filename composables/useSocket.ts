@@ -6,6 +6,6 @@ export const useSocket = async (scheduleId: string) => {
   // let port = 6787
   // const promise = await useFetch('http://localhost:6788')
   // host = JSON.parse(promise.data.value as string).ip
-  let socket = new WebSocket(`ws://${runtimeConfig.public.BASE_URL?.split('://')?.[1]}/schedules?schedule_id=${scheduleId}`)
+  let socket = new WebSocket(`wss://${runtimeConfig.public.BASE_URL?.split('://')?.[1]}/schedules?schedule_id=${scheduleId}`)
   return socket
 }
