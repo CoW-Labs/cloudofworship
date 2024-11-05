@@ -115,7 +115,7 @@ if (appStore.currentState.activeSchedule) {
         break
       case "new-slide":
         break
-      case "updated-slides":
+      case "update-slide":
         break
       default:
         console.log("Unknown action:", data.action)

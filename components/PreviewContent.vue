@@ -533,6 +533,16 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
       slide.backgroundType === backgroundTypes.video
     )
   ) {
+    // UPDATE OVER WEBSOCKET
+    socket.send(
+      JSON.stringify({
+        action: "update-slide",
+        data: slide,
+      })
+    )
+
+    // UPDATE OVER HTTP
+    // TODO: Take out http update in future when WS is stable and can store in DB
     appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
       `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
