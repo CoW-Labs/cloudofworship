@@ -281,10 +281,11 @@ onBeforeMount(async () => {
         break
       case "update-slide":
         const slideId = data?._id
+        const slideData = updateBlobBackgroundURl(data)
         slides.value.splice(
           slides.value.findIndex((slide) => slide?._id === slideId),
           1,
-          data
+          slideData
         )
         break
       case "updated-slides":

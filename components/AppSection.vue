@@ -41,35 +41,84 @@
               @confirm="$emit(secondaryButton.action, slide?.id)"
             >
             </ConfirmDialog>
-            <UButton
+            <UPopover
               v-if="secondaryButton.visible && !secondaryButton.confirmAction"
-              class="p-1 px-2 whitespace-nowrap"
-              :class="
-                isLiveWindowActive && secondaryButton.action === 'go-live'
-                  ? 'opacity-50 cursor-not-allowed'
-                  : ''
-              "
-              size="md"
-              :variant="secondaryButton?.variant || 'ghost'"
-              :color="secondaryButton.color"
-              :icon="secondaryButton.icon"
-              :target="secondaryButton.action === 'go-live' ? false : false"
-              :to="secondaryButton.action === 'go-live' ? '#' : '#'"
-              @click="
-                useGlobalEmit(
-                  isLiveWindowActive &&
-                    secondaryButton.action === appWideActions.goLive
-                    ? ''
-                    : secondaryButton.action
-                )
-              "
-              >{{
-                isLiveWindowActive &&
-                secondaryButton.action === appWideActions.goLive
-                  ? "You are live"
-                  : secondaryButton.label
-              }}</UButton
+              mode="click"
+              v-model:open="secondaryActionPopoverOpen"
+              :ui="{
+                ring: 'ring-1',
+                background: 'bg-white dark-bg-gray-900 border-0 mr-5',
+              }"
             >
+              <UButton
+                class="p-1 px-2 whitespace-nowrap"
+                size="md"
+                :variant="secondaryButton?.variant || 'ghost'"
+                :color="secondaryButton.color"
+                :icon="secondaryButton.icon"
+                :target="secondaryButton.action === 'go-live' ? false : false"
+                :to="secondaryButton.action === 'go-live' ? '#' : '#'"
+                @click="
+                  secondaryButton.action !== appWideActions.goLive
+                    ? useGlobalEmit(secondaryButton.action)
+                    : (secondaryActionPopoverOpen = true)
+                "
+                >{{
+                  isLiveWindowActive &&
+                  secondaryButton.action === appWideActions.goLive
+                    ? "You are live"
+                    : secondaryButton.label
+                }}</UButton
+              >
+              <template #panel>
+                <div class="actions max-w-[270px]">
+                  <UButton
+                    class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-primary-900"
+                    color="black"
+                    variant="ghost"
+                    :class="
+                      isLiveWindowActive && secondaryButton.action === 'go-live'
+                        ? 'opacity-50 cursor-not-allowed'
+                        : ''
+                    "
+                    :icon="secondaryButton.icon"
+                    size="sm"
+                    @click="
+                      useGlobalEmit(
+                        isLiveWindowActive ? '' : appWideActions.goLive
+                      )
+                    "
+                  >
+                    <div class="pl-2">
+                      <div class="text-sm">Open Live Window</div>
+                      <div class="text-xs opacity-80">
+                        Opens another browser window with live display
+                      </div>
+                    </div>
+                  </UButton>
+                  <div class="line border-b dark:border-gray-800"></div>
+                  <UButton
+                    class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-primary-900"
+                    color="black"
+                    variant="ghost"
+                    :icon="
+                      isClipboardCopying
+                        ? 'i-bx-check-circle'
+                        : 'i-bx-clipboard'
+                    "
+                    size="sm"
+                    @click="copyLivestreamURL"
+                  >
+                    <div class="pl-2">
+                      <div class="text-sm">Copy livestream URL</div>
+                      <div class="text-xs opacity-80">
+                        Copy link for OBS, VMix or similar software
+                      </div>
+                    </div>
+                  </UButton>
+                </div>
+              </template>
+            </UPopover>
           </div>
         </div>
       </h2>
@@ -93,6 +142,23 @@ const props = defineProps({
 })
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
+const secondaryActionPopoverOpen = ref(false)
+const isClipboardCopying = ref(false)
+
+const copyLivestreamURL = async () => {
+  isClipboardCopying.value = true
+  await navigator.clipboard.writeText(
+    `${window.location.origin}/livestream/${currentState.value.activeSchedule._id}`
+  )
+  useToast().add({
+    title: "Livestream URL copied to clipboard",
+    color: "success",
+    icon: "i-bx-check-circle",
+  })
+  setTimeout(() => {
+    isClipboardCopying.value = false
+  }, 3000)
+}
 </script>
 
 <style scoped></style>
