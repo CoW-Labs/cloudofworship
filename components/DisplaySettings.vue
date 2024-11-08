@@ -17,7 +17,7 @@
           <IconWrapper name="i-lucide-monitor" size="6" class="pt-1" />
           <div class="name-and-dimensions">
             <div class="name text-sm font-semibold">
-              {{ currentScreen?.label }}
+              {{ currentScreen?.label || "Unlabeled Screen" }}
               <span
                 v-if="currentScreen?.isPrimary"
                 class="internal bg-primary-300 dark:bg-primary-600 text-xs px-2 py-1 rounded-md ml-1"
@@ -63,15 +63,15 @@
         </div>
       </div>
       <div
-        v-for="screen in allScreens?.filter((screen: any) => screen?.label !== currentScreen?.label)"
-        :key="screen.label"
+        v-for="(screen, index) in allScreens?.filter((screen: any) => screen?.label !== currentScreen?.label)"
+        :key="screen.id"
         class="bg-gray-100 dark:bg-gray-800 p-4 px-6 rounded-md flex justify-between items-center"
       >
         <div class="info flex gap-4">
           <IconWrapper name="i-lucide-monitor-play" size="6" class="pt-1" />
           <div class="name-and-dimensions">
             <div class="name text-sm font-semibold">
-              {{ screen?.label }}
+              {{ screen?.label || `Unlabeled Screen ${index + 1}` }}
               <span
                 v-if="screen?.isPrimary"
                 class="internal bg-primary-200 dark:bg-primary-800 text-xs px-2 py-1 rounded-md ml-1"
@@ -93,7 +93,7 @@
           <UCheckbox
             :ui="{ base: 'h-5 w-5', rounded: 'rounded-full' }"
             label="Live display"
-            :value="screen.label"
+            :value="screen.id"
             :model-value="currentState.mainDisplayLabel === screen.label"
             @change="appStore.setMainDisplayLabel($event ? screen.label : '')"
           />
@@ -124,7 +124,11 @@ const externalScreens = computed(() => {
 const getDisplayDetails = async () => {
   isLoading.value = true
   screenDetails = await window.getScreenDetails()
-  currentScreen.value = screenDetails?.currentScreen
+  screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
+  screenDetails?.screens?.map((screen: any) => {
+    screen.id = useScreenId(screen)
+  })
+  currentScreen.value = screenDetails?.currentScreen as Screen
   allScreens.value = screenDetails?.screens
   isLoading.value = false
   useToast().add({
