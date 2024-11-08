@@ -27,12 +27,79 @@ import { useDebounce } from "@vueuse/core"
 const appStore = useAppStore()
 const scheduleId = ref(undefined)
 const socket = ref(null)
+const MAX_RETRIES = 10
+let retryCount = 0
 
 const uploadOfflineSlides = useDebounce(() => {
   useGlobalEmit(appWideActions.uploadOfflineSlides)
 }, 2000)
 
-onMounted(() => {
+const connectWebSocket = async () => {
+  const nuxtApp = useNuxtApp()
+  socket.value = await useSocket(appStore.currentState.activeSchedule?._id)
+  if (!nuxtApp.$socket) {
+    nuxtApp.provide("socket", socket.value)
+  }
+
+  socket.value.onopen = (event) => {
+    console.log("websocket connection opened")
+  }
+
+  socket.value.onmessage = (event) => {
+    const { data, action, message } = JSON.parse(event.data)
+    // console.log(data)
+
+    switch (data.action) {
+      case "live-slide":
+        break
+      case "new-slide":
+        break
+      case "update-slide":
+        break
+      default:
+      // DO SOMETHING
+      // console.log("Unknown action:", data.action)
+    }
+  }
+
+  socket.value.onclose = async () => {
+    console.log("websocket connection closed")
+    if (retryCount < MAX_RETRIES) {
+      retryCount++
+      const retryDelay = retryCount * 3000
+      console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
+      setTimeout(connectWebSocket, retryDelay)
+    } else {
+      console.error("Max reconnect attempts reached. Unable to reconnect.")
+    }
+  }
+
+  socket.value.onerror = (error) => {
+    console.error("WebSocket connection error:", error)
+    socket.value.close() // Close on error to trigger the onclose event
+  }
+}
+
+watch(
+  () => appStore.currentState.liveSlideId,
+  (liveSlideId) => {
+    const liveSlide = appStore.currentState.activeSlides.find(
+      (slide) => slide.id === liveSlideId
+    )
+    if (liveSlide) {
+      const socket = useNuxtApp().$socket
+      socket.send(
+        JSON.stringify({
+          action: "live-slide",
+          data: liveSlide,
+        })
+      )
+    }
+  },
+  { deep: true }
+)
+
+onMounted(async () => {
   const emailChange = useRoute().query.email_change
 
   // console.log("emailChange", emailChange)
@@ -99,54 +166,10 @@ onMounted(() => {
       ctrlOrMeta: true,
     }
   )
-})
 
-if (appStore.currentState.activeSchedule) {
-  const nuxtApp = useNuxtApp()
-  socket.value = await useSocket(appStore.currentState.activeSchedule?._id)
-  nuxtApp.provide("socket", socket.value)
-
-  socket.value.onmessage = (event) => {
-    const data = JSON.parse(event.data)
-    console.log(data)
-
-    switch (data.action) {
-      case "live-slide":
-        break
-      case "new-slide":
-        break
-      case "update-slide":
-        break
-      default:
-        console.log("Unknown action:", data.action)
-    }
+  // Connect to websocket
+  if (appStore.currentState.activeSchedule) {
+    connectWebSocket()
   }
-
-  watch(
-    () => appStore.currentState.liveSlideId,
-    (liveSlideId) => {
-      const liveSlide = appStore.currentState.activeSlides.find(
-        (slide) => slide.id === liveSlideId
-      )
-      if (liveSlide) {
-        socket.value.send(
-          JSON.stringify({
-            action: "live-slide",
-            data: liveSlide,
-          })
-        )
-      }
-    },
-    { deep: true }
-  )
-}
-
-// watch(
-//   activeSchedule,
-//   (newSchedule) => {
-//     scheduleId.value = newSchedule ? newSchedule._id : undefined;
-//     useScheduleWebsocket("http://localhost:4500", scheduleId);
-//   },
-//   {immediate: true}
-// );
+})
 </script>

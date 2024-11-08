@@ -27,7 +27,7 @@ function ensureUniqueIds(arr: Slide[]): Slide[] {
  * @param value
  */
 const onAppStateChange = useThrottleFn((pastStates: [], currentState: any, key: string, value: any) => {
-  console.log('added to Stack')
+  // console.log('added to Stack')
   const tempCurrentState = { ...currentState }
   if (key) {
     tempCurrentState[key] = value

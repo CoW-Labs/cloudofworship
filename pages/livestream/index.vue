@@ -116,21 +116,25 @@ onBeforeUnmount(() => {
   window.removeEventListener("MSFullscreenChange", checkFullScreen)
 })
 
-socket.value = await useSocket(currentState.value.activeSchedule?._id)
+// socket.value = await useSocket(currentState.value.activeSchedule?._id)
 
-socket.value.onmessage = (event) => {
-  const data = JSON.parse(event.data)
-  console.log(data)
+// socket.value.onmessage = (event) => {
+//   const data = JSON.parse(event.data)
+//   console.log(data)
 
-  switch (data.action) {
-    case "live-slide":
-      break
-    case "new-slide":
-      break
-    case "updated-slides":
-      break
-    default:
-      console.log("Unknown action:", data.action)
-  }
-}
+//   switch (data.action) {
+//     case "live-slide":
+//       break
+//     case "new-slide":
+//       break
+//     case "updated-slides":
+//       break
+//     default:
+//       console.log("Unknown action:", data.action)
+//   }
+// }
+
+// socket.value.onclose = async () => {
+//   socket.value = await useSocket(currentState.value.activeSchedule?._id)
+// }
 </script>
