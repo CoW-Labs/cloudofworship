@@ -89,7 +89,8 @@ export default defineNuxtConfig({
       ASSETS_BASE_URL:
         process.env.ASSETS_BASE_URL || "https://worshipcloud.favourfelix.com",
       AWS_BUCKET_NAME: process.env.CLOUD_AWS_BUCKET_NAME,
-      AWS_BUCKET_REGION: process.env.CLOUD_AWS_BUCKET_REGION
+      AWS_BUCKET_REGION: process.env.CLOUD_AWS_BUCKET_REGION,
+      NODE_ENV: process.env.NODE_ENV || 'production'
     },
   },
 

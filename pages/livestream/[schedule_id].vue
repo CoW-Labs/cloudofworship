@@ -114,6 +114,9 @@ const cachedVideosURLs = ref<BackgroundVideo[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const db = useIndexedDB()
 
+const MAX_RETRIES = 10
+let retryCount = 0
+
 useHead({
   title: "CoW Live",
   link: [
@@ -256,17 +259,14 @@ const updateBlobBackgroundURls = (slides: Slide[]) => {
   return slides?.map((slide) => updateBlobBackgroundURl(slide))
 }
 
-onBeforeMount(async () => {
-  await saveAllBackgroundVideos()
-  await setCachedVideosURL()
-
-  // WEBSOCKETS
+const connectWebSocket = async () => {
   socket.value = await useSocket(route.params.schedule_id as string)
 
   socket.value.onopen = (event) => {}
+
   socket.value.onmessage = (event) => {
     const { data, action, message } = JSON.parse(event.data)
-    console.log(action, data)
+    // console.log(action, data)
 
     switch (action) {
       case "connected":
@@ -291,13 +291,39 @@ onBeforeMount(async () => {
       case "updated-slides":
         break
       default:
-        console.log("Unknown action:", data.action)
+      // DO SOMETHING
+      // console.log("Unknown action:", data.action)
     }
   }
+
+  socket.value.onclose = async () => {
+    console.log("websocket connection closed")
+    if (retryCount < MAX_RETRIES) {
+      retryCount++
+      const retryDelay = retryCount * 31000
+      console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
+      setTimeout(connectWebSocket, retryDelay)
+    } else {
+      console.error("Max reconnect attempts reached. Unable to reconnect.")
+    }
+  }
+
+  socket.value.onerror = (error) => {
+    console.error("WebSocket connection error:", error)
+    socket.value.close() // Close on error to trigger the onclose event
+  }
+}
+
+onBeforeMount(async () => {
+  await saveAllBackgroundVideos()
+  await setCachedVideosURL()
 
   // All computations completed
   downloadStep.value = 5
   downloadResource.value = "All resources downloaded."
+
+  // Connect to websocket
+  await connectWebSocket()
 
   setTimeout(() => {
     loadingResources.value = false

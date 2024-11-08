@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { useAppStore } from './app'
+import posthog from 'posthog-js'
+
 
 export interface User {
   _id: string
@@ -48,6 +50,7 @@ export const useAuthStore = defineStore('auth', {
       setTimeout(() => {
         appStore.signOut()
       }, 1000)
+      posthog.reset()
     }
   },
   persist: {

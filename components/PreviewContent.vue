@@ -109,7 +109,6 @@ const bulkSelectSlides = ref<boolean>(false)
 const bulkSelectedSlides = ref<string[]>([])
 const activeCountdownInterval = ref<any>(null)
 const countdownTimeLeft = ref<number>(0)
-const socket = useNuxtApp().$socket as WebSocket
 
 // Listen to see if active slide is in active schedule, and to scroll to newest slide if in active schedule
 watch(
@@ -534,6 +533,7 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
     )
   ) {
     // UPDATE OVER WEBSOCKET
+    const socket = useNuxtApp().$socket as WebSocket
     socket.send(
       JSON.stringify({
         action: "update-slide",
