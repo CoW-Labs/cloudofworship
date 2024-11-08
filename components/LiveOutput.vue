@@ -35,7 +35,7 @@
         item-key="name"
       >
         <!-- SLIDE CARD (DUPLICATED FROM THE SLIDECARD.VUE, TO MAKE DRAGGABLE WORK AS IT COULD NOT WORK IN COMPONENT) -->
-        <template #item="{ element: slide }">
+        <template #item="{ element: slide, index }">
           <button
             class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-primary-950 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900 transition-all cursor-pointer relative"
             :id="slide?.id"
@@ -94,6 +94,13 @@
               >
               </ConfirmDialog>
             </div>
+            <!-- SLIDE INDEX -->
+            <div
+              v-show="ctrlOrMetaActive"
+              class="text-xs mono font-bold bg-gray-500 text-gray-100 inline-grid place-items-center p-1 px-1.5 min-w-[25px] rounded-md bottom-4 left-4 absolute"
+            >
+              {{ index === liveOutputSlides.length - 1 ? 0 : index + 1 }}
+            </div>
           </button>
         </template>
       </draggable>
@@ -117,6 +124,7 @@ import type { Slide } from "~/types"
 
 const appStore = useAppStore()
 const toast = useToast()
+const ctrlOrMetaActive = ref(false)
 const { currentState } = storeToRefs(appStore)
 const windowRefs = inject("windowRefs") as any[]
 
@@ -196,15 +204,30 @@ onMounted(() => {
     },
     { ctrlOrMeta: true, shift: false }
   )
-  useCreateShortcut(
-    "1",
-    () => {
-      if (liveOutputSlides.value?.at(0)?._id) {
-        appStore.setLiveSlide(liveOutputSlides.value?.at(0)?._id!!)
-      }
-    },
-    { ctrlOrMeta: true, shift: false }
-  )
+
+  // Create shortcuts for Slides 1-9
+  const oneDigitNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  oneDigitNumbers.forEach((digit) => {
+    useCreateShortcut(
+      digit.toString(),
+      () => {
+        if (liveOutputSlides.value?.at(digit - 1)?._id) {
+          appStore.setLiveSlide(liveOutputSlides.value?.at(digit - 1)?._id!!)
+        }
+      },
+      { ctrlOrMeta: true, shift: false }
+    )
+  })
+
+  // Add listener for ctrlOrMeta
+  window.addEventListener("keydown", (event) => {
+    if (event.ctrlKey || event.metaKey) {
+      ctrlOrMetaActive.value = true
+    }
+  })
+  window.addEventListener("keyup", (event) => {
+    ctrlOrMetaActive.value = false
+  })
 })
 
 // const makeSlideActive = (slide: Slide, goLive: boolean = false) => {

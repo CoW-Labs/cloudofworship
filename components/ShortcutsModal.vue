@@ -29,7 +29,7 @@
               v-for="shortcut in shortcuts"
               :key="shortcut?.cmd"
             >
-              <div class="col min-w-[100px] whitespace-nowrap">
+              <div class="col min-w-[110px] whitespace-nowrap">
                 <span
                   class="text-sm mono font-bold bg-gray-200 text-gray-500 inline-grid place-items-center p-1 px-2 min-w-[30px] rounded-md"
                 >
@@ -86,8 +86,8 @@ const shortcuts = ref([
     name: "Promote last slide to LIVE display",
   },
   {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + 1`,
-    name: "Promote first slide to LIVE display",
+    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Num`,
+    name: "Promote slide based on number to LIVE display",
   },
   {
     cmd: "↑",

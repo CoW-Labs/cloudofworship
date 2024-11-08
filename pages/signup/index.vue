@@ -257,6 +257,8 @@ const getChurch = async () => {
     const { data } = await useAPIFetch(`/church/${user.value?.churchId}`)
     authStore.setChurch(data.value)
     navigateTo("/")
+  } else if (!user.value) {
+    navigateTo("/login")
   }
 }
 
