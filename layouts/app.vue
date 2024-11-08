@@ -807,6 +807,10 @@ function closeAllWindows() {
 
 async function openWindows() {
   const screenDetails = await window.getScreenDetails()
+  screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
+  screenDetails?.screens?.forEach((screen: any) => {
+    screen.id = useScreenId(screen)
+  })
   const noOfScreens = screenDetails.screens.length
 
   if (!appStore.currentState.mainDisplayLabel) {
@@ -839,7 +843,7 @@ async function openWindows() {
     // const screen1 = screenDetails.screens[0]
     // const screen2 = screenDetails.screens[1]
     const mainDisplayScreen = screenDetails.screens?.find(
-      (screen: any) => screen.label === appStore.currentState.mainDisplayLabel
+      (screen: any) => screen.id === appStore.currentState.mainDisplayLabel
     )
     if (mainDisplayScreen) {
       openWindow(
