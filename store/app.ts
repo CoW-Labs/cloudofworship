@@ -3,6 +3,7 @@ import type { Alert, AppSettings, BackgroundVideo, Schedule, Slide, SlideStyle }
 import type { Emitter } from 'mitt'
 import { bibleVersionObjects } from '~/utils/constants';
 import { useThrottleFn } from '@vueuse/core';
+import posthog from 'posthog-js'
 
 // console.log(usePinia())
 function ensureUniqueIds(arr: Slide[]): Slide[] {
@@ -283,6 +284,7 @@ export const useAppStore = defineStore('app', {
       this.setFailedUploadRequests([])
       this.setSlidesLoading(false)
       this.setLastSynced(new Date().toISOString())
+      posthog.reset()
     },
     // Undo/Redo Actions
     setCurrentState(state: any) {
