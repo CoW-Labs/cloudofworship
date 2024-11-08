@@ -94,8 +94,8 @@
             :ui="{ base: 'h-5 w-5', rounded: 'rounded-full' }"
             label="Live display"
             :value="screen.id"
-            :model-value="currentState.mainDisplayLabel === screen.label"
-            @change="appStore.setMainDisplayLabel($event ? screen.label : '')"
+            :model-value="currentState.mainDisplayLabel === screen.id"
+            @change="appStore.setMainDisplayLabel($event ? screen.id : '')"
           />
         </div>
       </div>
