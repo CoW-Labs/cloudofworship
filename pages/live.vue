@@ -157,6 +157,25 @@ onMounted(() => {
   window.addEventListener("mozfullscreenchange", checkFullScreen)
   window.addEventListener("MSFullscreenChange", checkFullScreen)
 
+  // Prevent default action on specific keys
+  document.addEventListener("keydown", function (event) {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      (event.key === "f" || event.key === "F")
+    ) {
+      event.preventDefault()
+    }
+  })
+
+  // Shortcut to go full screen
+  useCreateShortcut("f", () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen()
+    } else {
+      document.documentElement.requestFullscreen()
+    }
+  })
+
   window.addEventListener("DOMContentLoaded", () => {
     console.log("DOMContentLoaded")
     // document.documentElement.requestFullscreen()
