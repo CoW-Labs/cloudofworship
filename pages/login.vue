@@ -81,6 +81,13 @@ import { useAuthStore } from "~/store/auth"
 definePageMeta({
   layout: "auth",
 })
+
+useHead({
+  title: "Sign in - Cloud of Worship",
+  description:
+    "Sign in to continue using Cloud of Worship - Your church's powerpoint",
+})
+
 const inaccessibleDate = new Date("2024-12-13T00:00:00.000Z")
 const authStore = useAuthStore()
 const runtimeConfig = useRuntimeConfig()

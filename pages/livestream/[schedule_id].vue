@@ -128,8 +128,6 @@ useHead({
 })
 
 const isAppOnline = computed(() => {
-  // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
-  // if() {}
   isOfflineToastOpen.value = !online.value
   return online.value
 })
@@ -298,7 +296,7 @@ const connectWebSocket = async () => {
 
   socket.value.onclose = async () => {
     console.log("websocket connection closed")
-    if (retryCount < MAX_RETRIES) {
+    if (retryCount < MAX_RETRIES && isAppOnline.value) {
       retryCount++
       const retryDelay = retryCount * 31000
       console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
