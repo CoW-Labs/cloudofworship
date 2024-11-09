@@ -82,14 +82,6 @@ const shortcuts = ref([
     name: "Go to previous verse (scriptures, songs, hymns)",
   },
   {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + 0`,
-    name: "Promote last slide to LIVE display",
-  },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Num`,
-    name: "Promote slide based on number to LIVE display",
-  },
-  {
     cmd: "↑",
     name: "Promote slide before current slide in schedule to LIVE display",
   },
@@ -98,8 +90,20 @@ const shortcuts = ref([
     name: "Promote slide before current slide in schedule to LIVE display",
   },
   {
+    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + 0`,
+    name: "Promote last slide to LIVE display",
+  },
+  {
+    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Num`,
+    name: "Promote slide based on number to LIVE display",
+  },
+  {
     cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + P`,
     name: "Promote active slide (in preview and edit content) to LIVE display",
+  },
+  {
+    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + F`,
+    name: "[Works only on live display] Use to take display fullscreen",
   },
   {
     cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Z`,

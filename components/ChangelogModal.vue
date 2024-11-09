@@ -59,18 +59,13 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Switched to NuxtHub for better uptime in Nigeria region.
-- Enforced one church account per user.
-- Fixed flickering backdrop issue on slide change.
-- Added animation settings for slides.
-- Added app-wide setting for number of lines per slide.
-- Added storage settings, indicator including local data deletion.
-- Fixed an issue affecting offline access functionality.
-- Refined display and screen settings, including media slide background and content background fill type on Edit Content Pane.
-- Resolved an issue with a wrong error message on the /verify page.
-- Fixed a bug causing perpetual slide retrieval on schedule change.
-- Updated Bible versions download process and improved sensitive information handling.
-- Implemented auto-redirect to home page upon app update.`
+const changelog = `- Added & Improved WebSocket functionality to reconnect on failure and upgraded to secure WebSocket (WSS).
+- Enhanced shortcuts to support full-screen mode.
+- Resolved display settings issues, including support for monitors without labels.
+- Integrated PostHog for improved user feedback and product experience.
+- Added keyboard shortcut to switch live display slides.
+- Introduced a new “Go Live” button with livestreaming options.
+- Updated livestream pages to support WebSocket integration.`
 
 const appStore = useAppStore()
 

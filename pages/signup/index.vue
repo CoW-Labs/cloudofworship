@@ -218,6 +218,12 @@ definePageMeta({
   layout: "auth",
 })
 
+useHead({
+  title: "Sign up - Cloud of Worship",
+  description:
+    "Sign up to start using Cloud of Worship - Your church's powerpoint",
+})
+
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 const googleSignIn = inject("handleGoogleSignIn")
