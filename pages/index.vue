@@ -22,7 +22,7 @@ import { useAppStore } from "~/store/app"
 // import useScheduleWebsocket from "~/composables/useScheduleWebsocket";
 import { ref, watchEffect } from "vue"
 import { storeToRefs } from "pinia"
-import { useDebounce } from "@vueuse/core"
+import { useDebounce, useOnline } from "@vueuse/core"
 
 const appStore = useAppStore()
 const scheduleId = ref(undefined)
@@ -64,7 +64,8 @@ const connectWebSocket = async () => {
 
   socket.value.onclose = async () => {
     console.log("websocket connection closed")
-    if (retryCount < MAX_RETRIES) {
+    const online = useOnline()
+    if (retryCount < MAX_RETRIES && online.value) {
       retryCount++
       const retryDelay = retryCount * 3000
       console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
