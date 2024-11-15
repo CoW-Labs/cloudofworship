@@ -114,7 +114,7 @@ const cachedVideosURLs = ref<BackgroundVideo[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const db = useIndexedDB()
 
-const MAX_RETRIES = 10
+const MAX_RETRIES = 30
 let retryCount = 0
 
 useHead({
@@ -306,7 +306,7 @@ const connectWebSocket = async () => {
     console.log("websocket connection closed")
     if (retryCount < MAX_RETRIES && isAppOnline.value) {
       retryCount++
-      const retryDelay = retryCount * 31000
+      const retryDelay = retryCount * 3000
       console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
       setTimeout(connectWebSocket, retryDelay)
     } else {
