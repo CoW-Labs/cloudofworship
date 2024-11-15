@@ -47,6 +47,7 @@
 </template>
 
 <script setup lang="ts">
+import { useOnline } from "@vueuse/core"
 import type { Media } from "~/types"
 
 defineProps<{
@@ -85,8 +86,13 @@ const getAllLocallySavedImages = async () => {
   // Create Object URLs from locally saved images
   const imageURLs: string[] = []
   images.forEach((image) => {
-    const blobURL = URL.createObjectURL(image.data as unknown as Blob)
+    const blobURL =
+      typeof image.data === "string"
+        ? image.data
+        : URL.createObjectURL(image.data as unknown as Blob)
+
     imageURLs.push(blobURL)
+
     if (image.id === bgImageToBeSelected.value) {
       bgImageToBeSelected.value = blobURL
     }
@@ -95,18 +101,29 @@ const getAllLocallySavedImages = async () => {
 }
 
 const saveAndSelectImage = async (file: any) => {
+  const online = useOnline()
   imageCompressionLoading.value = true
   const compressedFile = await useCompressedImage(file)
+  let uploadedFile = null
   // console.log("file", file)
   const db = useIndexedDB()
   const randomId = useID(6)
+
+  // Save to S3
+  if (online.value) {
+    uploadedFile = await useUploadImage(compressedFile)
+    console.log("uploadedFile", uploadedFile)
+  }
+
+  // Save to IndexedDB
   const tempMedia: Media = {
     id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
-    data: compressedFile,
+    data: uploadedFile ? uploadedFile?.file?.url : compressedFile,
     content: "image",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
+  console.log("tempMedia", tempMedia)
   db.cached.add(tempMedia)
   bgImageToBeSelected.value = tempMedia.id
   await getAllLocallySavedImages()
