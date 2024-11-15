@@ -274,8 +274,10 @@ const connectWebSocket = async () => {
       case "live-slide":
         const tempSlide = updateBlobBackgroundURl(data)
         liveSlide.value = tempSlide
+        // console.log("liveSlide", liveSlide.value)
         break
       case "new-slide":
+        slides.value.push(data)
         break
       case "update-slide":
         const slideId = data?._id
