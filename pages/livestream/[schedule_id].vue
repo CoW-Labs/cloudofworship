@@ -288,6 +288,12 @@ const connectWebSocket = async () => {
           slideData
         )
         break
+      case "add-alert":
+        appStore.setActiveAlert(data)
+        break
+      case "remove-alert":
+        appStore.setActiveAlert(null)
+        break
       case "updated-slides":
         break
       default:
