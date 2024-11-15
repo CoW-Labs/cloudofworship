@@ -286,6 +286,12 @@ emitter.on("remove-alert", () => {
     icon: "i-bx-trash",
     title: "Active alert has been removed",
   })
+  const socket = useNuxtApp().$socket as WebSocket
+  socket.send(
+    JSON.stringify({
+      action: "remove-alert",
+    })
+  )
 })
 
 emitter.on("add-song", () => {
