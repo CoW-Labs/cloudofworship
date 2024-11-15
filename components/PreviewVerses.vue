@@ -18,11 +18,8 @@
       :key="`verse-${index}`"
       :id="
         slide?.type === slideTypes.bible
-          ? `${(bibleChapter + '-' + verseTemp?.verse)
-              ?.toLowerCase()
-              .replaceAll(' ', '-')
-              .replaceAll(':', '-')}`
-          : `${verse?.toLowerCase().replaceAll(' ', '-').replace(/\d+/g, '')}`
+          ? convertStringToSlug(`${bibleChapter + '-' + verseTemp?.verse}`)
+          : convertStringToSlug(verse).replace(/\d+/g, '')
       "
       class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-200 dark:hover:bg-primary-600 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
       :class="{
@@ -106,10 +103,7 @@ watch(
       const activeVerse =
         props.slide.type === slideTypes.bible
           ? versesPreview.value?.querySelector(
-              `#${props.verse
-                ?.toLowerCase()
-                .replaceAll(" ", "-")
-                .replaceAll(":", "-")}`
+              `#${convertStringToSlug(props.verse)}`
             )
           : versesPreview.value?.querySelector(
               `#${props.verse?.replace(" ", "-")?.toLowerCase()}`
@@ -150,6 +144,16 @@ watch(
 //   }
 //   return []
 // })
+
+const convertStringToSlug = (str: string) => {
+  return str
+    .toLowerCase()
+    .replaceAll("1 ", "one-")
+    .replaceAll("2 ", "two-")
+    .replaceAll("3 ", "three-")
+    .replaceAll(" ", "-")
+    .replaceAll(":", "-")
+}
 
 const getNumberRange = (number: number, rangeBound = 20) => {
   const lowerRange = []
