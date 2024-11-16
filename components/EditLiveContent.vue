@@ -343,7 +343,9 @@ const animatedSlides = computed(() => {
 
 const nextVerse = computed(() => {
   if (props.slide?.type === slideTypes.bible) {
-    const tempVerse = Number(verse.value?.split(":")?.[1]) + 1
+    const tempVerse = verse.value?.split(":")?.[1]?.includes("-")
+      ? Number(verse.value?.split(":")?.[1]?.split("-")?.[1]) + 1
+      : Number(verse.value?.split(":")?.[1]) + 1
     return `${verse.value?.split(":")?.[0]}:${tempVerse}`
   }
   return `Verse ${Number(verse.value?.split(" ")?.[1]) + 1}`
@@ -351,7 +353,9 @@ const nextVerse = computed(() => {
 
 const previousVerse = computed(() => {
   if (props.slide?.type === slideTypes.bible) {
-    const tempVerse = Number(verse.value?.split(":")?.[1]) - 1
+    const tempVerse = verse.value?.split(":")?.[1]?.includes("-")
+      ? Number(verse.value?.split(":")?.[1]?.split("-")?.[0]) - 1
+      : Number(verse.value?.split(":")?.[1]) - 1
     return `${verse.value?.split(":")?.[0]}:${tempVerse < 1 ? 1 : tempVerse}`
   }
   return `Verse ${Number(verse.value?.split(" ")?.[1]) - 1}`

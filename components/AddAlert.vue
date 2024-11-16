@@ -129,6 +129,18 @@ const bgColor = ref<string>("#a855f7")
 const toast = useToast()
 const emit = defineEmits(["go-home"])
 
+watch(
+  currentState,
+  () => {
+    if (currentState.value?.activeAlert?.id === props.alert?.id) {
+      sendAlertToWebsocket(props.alert)
+    } else if (currentState.value.activeAlert === null) {
+      removeAlertFromWebsocket()
+    }
+  },
+  { deep: true }
+)
+
 const deleteAlert = (alert: Alert) => {
   const tempAlerts = [...currentState.value?.alerts]
   const newAlertIndex = tempAlerts.findIndex((a) => a.id === alert.id)
@@ -157,9 +169,29 @@ const addAlert = async () => {
     }
     appStore.setAlerts([...currentState.value?.alerts, alert])
     appStore.setActiveAlert(alert)
+
     toast.add({ icon: "i-bx-send", title: "Alert sent to live" })
     emit("go-home")
   }
+}
+
+const sendAlertToWebsocket = (alert: Alert) => {
+  const socket = useNuxtApp().$socket as WebSocket
+  socket.send(
+    JSON.stringify({
+      action: "add-alert",
+      data: alert,
+    })
+  )
+}
+
+const removeAlertFromWebsocket = () => {
+  const socket = useNuxtApp().$socket as WebSocket
+  socket.send(
+    JSON.stringify({
+      action: "remove-alert",
+    })
+  )
 }
 </script>
 

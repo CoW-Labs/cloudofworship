@@ -152,6 +152,9 @@ watch(
         (slide) => slide.id === activeSlide.value?.id
       )
     }
+    if (activeSlide.value) {
+      sendNewSlideToWebsocket(activeSlide.value)
+    }
   },
   { deep: true, immediate: true }
 )
@@ -305,6 +308,17 @@ emitter.on("promote-active-slide-live", () => {
     })
   }
 })
+
+const sendNewSlideToWebsocket = useDebounceFn((slide: Slide) => {
+  // console.log("activeSlide", slide)
+  const socket = useNuxtApp().$socket as WebSocket
+  socket.send(
+    JSON.stringify({
+      action: "new-slide",
+      data: slide,
+    })
+  )
+}, 500)
 
 const preSlideCreation = (): Slide => {
   const tempSlide: Slide = {

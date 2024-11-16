@@ -59,13 +59,11 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added & Improved WebSocket functionality to reconnect on failure and upgraded to secure WebSocket (WSS).
-- Enhanced shortcuts to support full-screen mode.
-- Resolved display settings issues, including support for monitors without labels.
-- Integrated PostHog for improved user feedback and product experience.
-- Added keyboard shortcut to switch live display slides.
-- Introduced a new “Go Live” button with livestreaming options.
-- Updated livestream pages to support WebSocket integration.`
+const changelog = `- Enabled multiple verses per Bible slide.
+- Increased timeout and retries for WebSocket connections.
+- Added support for uploading slide background images.
+- Implemented alerts and banners in livestream mode.
+- Fixed livestream to recognize new slides by default.`
 
 const appStore = useAppStore()
 

@@ -114,7 +114,7 @@ const cachedVideosURLs = ref<BackgroundVideo[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const db = useIndexedDB()
 
-const MAX_RETRIES = 10
+const MAX_RETRIES = 30
 let retryCount = 0
 
 useHead({
@@ -274,8 +274,10 @@ const connectWebSocket = async () => {
       case "live-slide":
         const tempSlide = updateBlobBackgroundURl(data)
         liveSlide.value = tempSlide
+        // console.log("liveSlide", liveSlide.value)
         break
       case "new-slide":
+        slides.value.push(data)
         break
       case "update-slide":
         const slideId = data?._id
@@ -285,6 +287,12 @@ const connectWebSocket = async () => {
           1,
           slideData
         )
+        break
+      case "add-alert":
+        appStore.setActiveAlert(data)
+        break
+      case "remove-alert":
+        appStore.setActiveAlert(null)
         break
       case "updated-slides":
         break
@@ -298,7 +306,7 @@ const connectWebSocket = async () => {
     console.log("websocket connection closed")
     if (retryCount < MAX_RETRIES && isAppOnline.value) {
       retryCount++
-      const retryDelay = retryCount * 31000
+      const retryDelay = retryCount * 3000
       console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
       setTimeout(connectWebSocket, retryDelay)
     } else {

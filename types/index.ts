@@ -111,7 +111,7 @@ export interface Media {
   id: string
   content?: any
   remoteUrl?: string
-  data?: ArrayBuffer
+  data?: ArrayBuffer | string
   createdAt?: string
   updatedAt?: string
 }
