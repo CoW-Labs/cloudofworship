@@ -13,6 +13,7 @@
         <UAvatarGroup class="mb-2" max="3">
           <UAvatar
             v-for="(user, index) in church?.users?.slice(0, 4)"
+            :src="user?.avatar"
             :text="user?.fullname?.split(' ')?.[0]?.[0]"
             size="lg"
             :ui="{ text: `text-[${user?.theme}] font-semibold` }"
@@ -182,7 +183,6 @@ const getChurch = async () => {
   if (churchId) {
     const promise = await useAPIFetch(`/church/${churchId}?teammates=true`)
     church.value = promise.data.value
-    authStore.setChurch(church.value)
   } else {
     navigateTo("/signup")
     useToast().add({
@@ -222,6 +222,7 @@ const signup = async () => {
       title: "You are all set! 🎉",
       color: "green",
     })
+    authStore.setChurch(church.value)
     navigateTo("/?newUser=1")
   }
   loading.value = false
@@ -257,6 +258,7 @@ const handleGoogleSignUp = async () => {
       title: "You are all set! 🎉",
       color: "green",
     })
+    authStore.setChurch(church.value)
     navigateTo("/?newUser=1")
   }
   loading.value = false
