@@ -106,12 +106,12 @@
         <GoogleIcon />
         Sign up with Google
       </UButton>
-      <p class="text-sm flex items-center justify-center gap-0">
+      <!-- <p class="text-sm flex items-center justify-center gap-0">
         I already have an account.
         <UButton size="sm" class="p-1" variant="link" to="/login"
           >Sign in</UButton
         >
-      </p>
+      </p> -->
     </form>
   </div>
 </template>
