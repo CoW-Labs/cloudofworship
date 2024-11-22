@@ -99,10 +99,12 @@
 <script setup lang="ts">
 import type { QuickAction, BibleVerse } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
+import { useAppStore } from "~/store/app"
 import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
+const appStore = useAppStore()
 
-const kjvBible = ref<BibleVerse[]>([])
+const defaultBible = ref<BibleVerse[]>([])
 const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const verses = ref<BibleVerse[]>()
@@ -126,37 +128,38 @@ const turnToBibleTypeAction = (bibleVerse: BibleVerse) => {
   }
 }
 
-const getBible = async () => {
-  const bible = await db.bibleAndHymns.get("KJV")
-  kjvBible.value = bible?.data as unknown as BibleVerse[]
-  getVerses()
-}
-
 watch(selectedFilter, () => {
   getVerses()
   loading.value = true
   onSearchInput(searchInput.value)
 })
 
+watch(
+  () => appStore.currentState.settings.defaultBibleVersion,
+  () => {
+    getDefaultBible()
+  }
+)
+
 const oldTestamentBible = computed(() => {
-  return kjvBible.value.filter((b) => Number(b.book) <= 39)
+  return defaultBible.value.filter((b) => Number(b.book) <= 39)
 })
 
 const newTestamentBible = computed(() => {
-  return kjvBible.value.filter((b) => Number(b.book) > 39)
+  return defaultBible.value.filter((b) => Number(b.book) > 39)
 })
 
-const formattedKjvBible = computed(() => {
+const formattedDefaultBible = computed(() => {
   if (selectedFilter.value === "old") {
     return oldTestamentBible.value
   } else if (selectedFilter.value === "new") {
     return newTestamentBible.value
   } else if (selectedFilter.value === "") {
-    return kjvBible.value
+    return defaultBible.value
   } else {
     const bibleBookIndex =
       bibleBooks.findIndex((b) => b === selectedFilter.value) + 1
-    const tempBible = kjvBible.value?.filter(
+    const tempBible = defaultBible.value?.filter(
       (b) => Number(b.book) === bibleBookIndex
     )
     return tempBible
@@ -191,17 +194,25 @@ onMounted(() => {
   })
 })
 
+const getDefaultBible = async () => {
+  const bible = await db.bibleAndHymns.get(
+    appStore.currentState.settings.defaultBibleVersion
+  )
+  defaultBible.value = bible?.data as unknown as BibleVerse[]
+  getVerses()
+}
+
 const getVerses = (query: string = "") => {
   if (query?.length >= 2) {
     loading.value = true
-    let results = fuzzysort.go(query, formattedKjvBible.value, {
+    let results = fuzzysort.go(query, formattedDefaultBible.value, {
       keys: ["scripture"],
     })
     results = results?.map((result) => result.obj) as BibleVerse[]
     verses.value = results.slice(0, 15)
   } else {
     const rand = Math.floor(Math.random() * 1115 + 15)
-    verses.value = formattedKjvBible.value.slice(0, 15)
+    verses.value = formattedDefaultBible.value.slice(0, 15)
   }
   loading.value = false
 }
@@ -209,17 +220,17 @@ const getVerses = (query: string = "") => {
 const getPlaceholderByFilter = () => {
   switch (selectedFilter.value) {
     case "new":
-      return "Search the New Testament (KJV)"
+      return `Search the New Testament (${appStore.currentState.settings.defaultBibleVersion})`
     case "old":
-      return "Search the Old Testament (KJV)"
+      return `Search the Old Testament (${appStore.currentState.settings.defaultBibleVersion})`
     case "":
-      return "Search the KJV Bible"
+      return `Search the ${appStore.currentState.settings.defaultBibleVersion} Bible`
     default:
-      return `Search ${selectedFilter.value} (KJV)`
+      return `Search ${selectedFilter.value} (${appStore.currentState.settings.defaultBibleVersion})`
   }
 }
 
-getBible()
+getDefaultBible()
 
 const onSearchInput = useDebounceFn(async () => {
   getVerses(searchInput.value)
