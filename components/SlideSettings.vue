@@ -70,6 +70,114 @@
       </UForm>
     </div>
 
+    <!-- SPACE MANAGEMENT OF SLIDES -->
+    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-md font-semibold">Space Management</h3>
+      </div>
+      <UForm>
+        <div class="header flex items-center justify-between">
+          <h4 class="text-sm font-semibold opacity-70 whitespace-nowrap mr-6">
+            Set default padding between slides
+          </h4>
+          <div
+            v-if="activePadding"
+            class="flex px-0 items-center gap-2 font-semibold come-up-1 w-[200px]"
+          >
+            <span class="text-sm">24</span>
+            <URange
+              :model-value="(appStore.currentState.settings.slideStyles?.windowPadding?.[activePadding] as string)"
+              min="24"
+              :max="
+                activePadding === 'right' || activePadding === 'left'
+                  ? 100
+                  : 120
+              "
+              step="1"
+              @change="appStore.setWindowPadding({ [activePadding]: $event })"
+            />
+            <span class="text-sm">
+              {{
+                activePadding === "right" || activePadding === "left"
+                  ? 100
+                  : 120
+              }}</span
+            >
+          </div>
+        </div>
+        <div
+          class="sample-monitor bg-gray-100 dark:bg-gray-800 dark:text-white rounded-lg my-4 relative grid place-items-center"
+          :style="`width: ${
+            (appStore.currentState.mainDisplayScreen?.availWidth || 1920) / 6
+          }px; height: ${
+            (appStore.currentState.mainDisplayScreen?.availHeight || 1080) / 6
+          }px`"
+        >
+          <div class="inner max-w-[60%] mx-auto text-center p-8">
+            <p class="text-sm opacity-50">
+              Click on any of the dashed corners to adjust the padding
+            </p>
+          </div>
+          <UButton
+            variant="ghost"
+            class="top-padding border-b border-dashed justify-center border-gray-500 dark:border-gray-500 absolute top-0 left-0 right-0 rounded-b-none"
+            :class="
+              activePadding === 'top'
+                ? 'bg-primary-200 dark:bg-primary-800'
+                : ''
+            "
+            :style="`height: ${currentState.settings.slideStyles?.windowPadding?.top}px`"
+            @click="activePadding = 'top'"
+          >
+            {{ currentState.settings.slideStyles?.windowPadding?.top }}</UButton
+          >
+          <UButton
+            variant="ghost"
+            class="bottom-padding border-t border-dashed justify-center border-gray-500 dark:border-gray-500 absolute bottom-0 left-0 right-0 rounded-t-none"
+            :class="
+              activePadding === 'bottom'
+                ? 'bg-primary-200 dark:bg-primary-800'
+                : ''
+            "
+            :style="`height: ${currentState.settings.slideStyles?.windowPadding?.bottom}px`"
+            @click="activePadding = 'bottom'"
+          >
+            {{
+              currentState.settings.slideStyles?.windowPadding?.bottom
+            }}</UButton
+          >
+          <UButton
+            variant="ghost"
+            class="right-padding opacity-50 p-0 pl-[3px] border-l border-dashed border-gray-500 dark:border-gray-500 absolute top-0 bottom-0 right-0 rounded-l-none"
+            :class="
+              activePadding === 'right'
+                ? 'bg-primary-200 dark:bg-primary-800'
+                : ''
+            "
+            :style="`width: ${currentState.settings.slideStyles?.windowPadding?.right}px`"
+            @click="activePadding = 'right'"
+          >
+            {{
+              currentState.settings.slideStyles?.windowPadding?.right
+            }}</UButton
+          >
+          <UButton
+            variant="ghost"
+            class="left-padding opacity-50 p-0 pl-[3px] border-r border-dashed border-gray-500 dark:border-gray-500 absolute top-0 bottom-0 left-0 rounded-r-none"
+            :class="
+              activePadding === 'left'
+                ? 'bg-primary-200 dark:bg-primary-800'
+                : ''
+            "
+            :style="`width: ${currentState.settings.slideStyles?.windowPadding?.left}px`"
+            @click="activePadding = 'left'"
+          >
+            {{ currentState.settings.slideStyles?.windowPadding?.left }}
+          </UButton>
+        </div>
+      </UForm>
+    </div>
+
     <!-- ANIMATION -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
@@ -220,6 +328,7 @@ const font = ref(appStore.currentState.settings.defaultFont)
 const lines = ref<number>(
   appStore.currentState.settings.slideStyles.linesPerSlide || 4
 )
+const activePadding = ref<string>("")
 const { currentState } = storeToRefs(appStore)
 const bibleVersionSelectOptions = computed(() =>
   [
@@ -237,6 +346,10 @@ const bibleVersionSelectOptions = computed(() =>
     ?.filter((version) => version?.isDownloaded)
     ?.map((version) => version?.id)
 )
+
+const getActivePaddingValue = (side: string) => {
+  return appStore.currentState.settings.slideStyles.windowPadding[side]
+}
 
 const selectUI = {
   base: "bg-primary-500",

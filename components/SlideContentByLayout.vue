@@ -2,7 +2,7 @@
   <div
     v-if="slide?.layout === slideLayoutTypes.heading_sub"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding || 0}vw`"
+    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw;`"
   >
     <div
       v-if="contentVisible"
@@ -19,7 +19,7 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.full_text"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding || 0}vw`"
+    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw;`"
   >
     <div
       v-if="contentVisible"
@@ -30,7 +30,7 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.two_column"
     class="slide-layout-ctn flex gap-4 h-[100%] justify-around items-center"
-    :style="`padding: ${padding || 0}vw`"
+    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw;`"
   >
     <div
       v-if="contentVisible"
@@ -46,7 +46,7 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.bible"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding || 0}vw; font-size: ${
+    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw; font-size: ${
       (slide?.slideStyle?.fontSize!!) *
       ((slide?.slideStyle?.fontSizePercent || 100) / 100)
     }vw`"
@@ -66,7 +66,7 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.countdown"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding || 0}vw; font-size: ${
+    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw; font-size: ${
       (slide?.slideStyle?.fontSize!!) *
       ((slide?.slideStyle?.fontSizePercent || 100) / 100)
     }vw`"
@@ -81,11 +81,11 @@
 </template>
 
 <script setup lang="ts">
-import type {Slide} from "~/types";
+import type { Slide } from "~/types"
 
 const props = defineProps<{
-  slide: Slide;
-  padding: string;
-  contentVisible: boolean;
-}>();
+  slide: Slide
+  padding: { top: number; right: number; bottom: number; left: number }
+  contentVisible: boolean
+}>()
 </script>

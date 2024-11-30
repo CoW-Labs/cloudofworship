@@ -26,7 +26,7 @@ import type { Slide, SlideStyle } from "~/types"
 
 const props = defineProps<{
   slide: Slide
-  padding: string
+  padding: { top: number; right: number; bottom: number; left: number }
   contentVisible: boolean
 }>()
 

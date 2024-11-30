@@ -142,6 +142,7 @@ export interface SlideStyle {
   isMediaPlaying?: boolean // also used to check if countdown is paused or is beginning
   mediaSeekPosition?: number // 0 or -1, -1 means not at the beginning
   isMediaMuted?: boolean
+  windowPadding?: { left?: number, right?: number, top?: number, bottom?: number }
 }
 
 export interface AppSettings {

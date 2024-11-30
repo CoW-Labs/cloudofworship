@@ -69,7 +69,7 @@ export const useAppStore = defineStore('app', {
           },
           animations: true,
           transitionInterval: 0.7,
-          slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center' } as SlideStyle,
+          slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center', windowPadding: { left: 24, right: 24, top: 24, bottom: 24 } } as SlideStyle,
           bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
         },
         backgroundVideos: [] as BackgroundVideo[],
@@ -83,6 +83,7 @@ export const useAppStore = defineStore('app', {
         bibleVersions: bibleVersionObjects as Array<any>, // Check app.vue for bible versions array in a list
         activeSocket: null as WebSocket | null,
         mainDisplayLabel: '',
+        mainDisplayScreen: null as Screen | null,
         // activeLiveWindows: [] as any[]
       },
       // Undo/Redo stacks
@@ -234,6 +235,9 @@ export const useAppStore = defineStore('app', {
     setMainDisplayLabel(label: string) {
       this.currentState.mainDisplayLabel = label
     },
+    setMainDisplayScreen(screen: Screen | null) {
+      this.currentState.mainDisplayScreen = screen
+    },
     setLinesPerSlide(lines: number) {
       this.currentState.settings = { ...this.currentState.settings, slideStyles: { ...this.currentState.settings.slideStyles, linesPerSlide: lines } }
     },
@@ -242,6 +246,9 @@ export const useAppStore = defineStore('app', {
     },
     setTransitionInterval(interval: number) {
       this.currentState.settings = { ...this.currentState.settings, transitionInterval: interval }
+    },
+    setWindowPadding(padding: { left?: number, right?: number, top?: number, bottom?: number }) {
+      this.currentState.settings = { ...this.currentState.settings, slideStyles: { ...this.currentState.settings.slideStyles, windowPadding: { ...this.currentState.settings.slideStyles.windowPadding, ...padding } } }
     },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)
@@ -274,7 +281,7 @@ export const useAppStore = defineStore('app', {
             backgroundVideoKey: '/video-bg-4.mp4'
           }
         },
-        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center' } as SlideStyle,
+        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center', windowPadding: { left: 24, right: 24, top: 24, bottom: 24 } } as SlideStyle,
         bibleVersions: bibleVersionObjects, // Check app.vue for bible versions array in a list
       })
       this.setBackgroundVideos([])

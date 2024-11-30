@@ -620,6 +620,7 @@ const overrideAppSettings = async () => {
         brightness: 50,
         linesPerSlide: 4,
         alignment: "center",
+        windowPadding: { left: 24, right: 24, top: 24, bottom: 24 },
       } as SlideStyle,
       bibleVersions: appInfo.value.bibleVersions as Array<any>, // Check app.vue for bible versions array in a list
     })
