@@ -95,7 +95,26 @@
             label="Live display"
             :value="screen.id"
             :model-value="currentState.mainDisplayLabel === screen.id"
-            @change="appStore.setMainDisplayLabel($event ? screen.id : '')"
+            @change="
+              ($event) => {
+                appStore.setMainDisplayLabel($event ? screen.id : '')
+                const tempScreen: Screen = ({
+                  id: screen.id,
+                  width: screen.width,
+                  height: screen.height,
+                  availWidth: screen.availWidth,
+                  availHeight: screen.availHeight,
+                  isExtended: screen.isExtended,
+                  isInternal: screen.isInternal,
+                  devicePixelRatio: screen.devicePixelRatio,
+                  label: screen.label,
+                  pixelDepth: screen.pixelDepth,
+                })
+                $event
+                  ? appStore.setMainDisplayScreen(tempScreen)
+                  : appStore.setMainDisplayScreen(null)
+              }
+            "
           />
         </div>
       </div>

@@ -102,12 +102,30 @@
       </div>
 
       <!-- MAIN FOREGROUND CONTENT -->
+      <!-- :padding="fullScreen ? '6' : '0'" -->
       <LiveContent
         :content-visible="foregroundContentVisible"
         :slide="slide"
         class="relative"
         :class="fullScreen ? '' : 'min-h-[220px] rounded-md'"
-        :padding="fullScreen ? '6' : '0'"
+        :padding="
+          fullScreen
+            ? {
+                top: computePadding(
+                  currentState.settings.slideStyles.windowPadding?.top
+                ),
+                right: computePadding(
+                  currentState.settings.slideStyles.windowPadding?.right
+                ),
+                bottom: computePadding(
+                  currentState.settings.slideStyles.windowPadding?.bottom
+                ),
+                left: computePadding(
+                  currentState.settings.slideStyles.windowPadding?.left
+                ),
+              }
+            : { top: 0, right: 0, bottom: 0, left: 0 }
+        "
         :style="
           slide?.type === slideTypes.media
             ? ''
@@ -283,6 +301,12 @@ onMounted(() => {
   //   video.value.currentTime = 0
   // })
 })
+
+// Function to create padding based on the ones set at display settings
+// Calculation is necessary because minimum padding is 6vw and the padding is in VW units
+const computePadding = (padding: number | undefined) => {
+  return ((padding || 24) * 6) / 24
+}
 
 const activateFullScreen = () => {
   // const toast = useToast()
