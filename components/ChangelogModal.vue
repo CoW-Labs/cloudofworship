@@ -59,9 +59,8 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Linked default Bible version to the whole Bible search.
-- Removed the login requirement from the church invite screen.
-- Fixed a minor issue in the invite user flow.`
+const changelog = `- Added a feature to increase space around slide edges.
+- Introduced elaborate and interactive window settings.`
 
 const appStore = useAppStore()
 
