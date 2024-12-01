@@ -65,6 +65,7 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
       case 'WEB':
       case 'NASB':
       case 'TPT':
+      case 'ESV':
         scripture = await fetchScripture(version, db, book, chapter, verses) as string;
         appStore.setDefaultBibleVersion(version);
         break;
