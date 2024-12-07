@@ -59,8 +59,9 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added a feature to increase space around slide edges.
-- Introduced elaborate and interactive window settings.`
+const changelog = `- Added slide settings to add or remove footnotes.
+	- Fixed the non-selectable default ESV version issue.
+  - Added new songs`
 
 const appStore = useAppStore()
 
