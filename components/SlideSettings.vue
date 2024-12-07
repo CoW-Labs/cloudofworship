@@ -258,6 +258,25 @@
       </UForm>
     </div>
 
+    <!-- FOOTNOTES & CREDITS -->
+    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-md font-semibold">Footnotes & Credits</h3>
+      </div>
+      <UForm>
+        <UFormGroup
+          label="Toggle footnotes and credits for Bible & Hymn Slides"
+          class=""
+        >
+          <UToggle
+            size="lg"
+            :model-value="appStore.currentState.settings.footnotes"
+            @change="appStore.setFootnotes($event)"
+          />
+        </UFormGroup>
+      </UForm>
+    </div>
+
     <!-- SONG SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
