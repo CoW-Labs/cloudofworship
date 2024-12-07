@@ -17,10 +17,16 @@ const useSlideContent = (slide: Slide, data: Scripture | Hymn | Song | Countdown
   switch (slide?.type) {
     case slideTypes.bible:
       data = data as Scripture
-      return [
+      if (appStore.currentState.settings.footnotes) {
+        return [
         `<p class="scripture-content">${data?.content}</>`,
         `<p class="scripture-label"><b>${data?.label}</b> • ${data?.version}</p>
-        <p class="copyright-content">${appStore.currentState.settings.bibleVersions?.find(version => version.id === data?.version)?.copyrightContent}</p>`,
+        <p class="copyright-content">${appStore.currentState.settings.bibleVersions?.find(version => version.id === data?.version)?.copyrightContent}</p>`
+        ]
+      }
+      return [
+          `<p class="scripture-content">${data?.content}</>`,
+          `<p class="scripture-label"><b>${data?.label}</b> • ${data?.version}</p>`,
       ]
     case slideTypes.hymn:
       data = data as Hymn
