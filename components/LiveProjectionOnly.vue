@@ -12,8 +12,9 @@
       class="live-output w-[100%] min-h-[220px] rounded-md relative overflow-hidden border bg-no-repeat transition-all backdrop-blur-0 bg-black dark:border-none"
       v-if="contentVisible"
       :class="{
-        'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
-        'h-[88vh] rounded-none border-none min-h-[100%]': fullScreenHeight,
+        'h-[100vh] rounded-none border-none min-h-[100%] bg-center': fullScreen,
+        'h-[88vh] rounded-none border-none min-h-[100%] bg-center':
+          fullScreenHeight,
         'bg-cover': slide?.type !== slideTypes.media,
         'bg-center bg-cover':
           slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,

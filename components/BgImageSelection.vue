@@ -1,16 +1,16 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
     <div
-      class="bg-image-selection gap-2 grid grid-cols-4 max-h-[190px] overflow-y-auto"
+      class="bg-image-selection gap-2 grid grid-cols-3 max-h-[190px] overflow-y-auto"
     >
       <UButton
         v-for="image in backgroundImages"
         :key="image"
         @click="$emit('select', image)"
-        class="w-[40px] h-[40px] p-0 text-black bg-cover transition-all overflow-hidden relative"
+        class="w-[70px] h-[70px] p-0 text-black bg-cover transition-all overflow-hidden relative"
       >
         <div
-          class="bg-image min-w-[40px] h-[40px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
+          class="bg-image min-w-[70px] h-[70px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
           :class="{ 'opacity-30': image === value }"
           :style="`background-image: url(${image})`"
         ></div>
@@ -28,7 +28,7 @@
     <FileDropzone
       size="sm"
       @change="saveAndSelectImage($event?.[0])"
-      class="max-w-[200px]"
+      class="max-w-[230px]"
     />
     <!-- <label class="relative">
       <input
@@ -59,6 +59,12 @@ const imageCompressionLoading = ref(false)
 
 const bgImageToBeSelected = ref<string | null>(null)
 const backgroundImages = ref<string[]>([
+  "https://images.unsplash.com/photo-1511268011861-691ed210aae8?q=80&w=1740",
+  "https://images.unsplash.com/photo-1545608444-f045a6db6133?w=1740",
+  "https://images.unsplash.com/photo-1519751138087-5bf79df62d5b?q=80&w=1740",
+  "https://images.unsplash.com/photo-1511783111049-b4c32d7fa8fa?q=80&w=1740",
+  "https://images.unsplash.com/photo-1482164565953-04b62dcac1cd?q=80&w=1740",
+  "https://images.unsplash.com/photo-1513680904158-42938c809a42?q=80&w=1740",
   "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740",
   "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?q=80&w=1740",
   "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?q=80&w=1740",
