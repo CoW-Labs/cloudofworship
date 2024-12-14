@@ -294,6 +294,12 @@ const connectWebSocket = async () => {
       case "remove-alert":
         appStore.setActiveAlert(null)
         break
+      case "add-overlay":
+        appStore.setActiveOverlay(data)
+        break
+      case "remove-overlay":
+        appStore.setActiveOverlay("")
+        break
       case "updated-slides":
         break
       default:

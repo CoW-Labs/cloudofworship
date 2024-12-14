@@ -72,10 +72,12 @@ export const useAppStore = defineStore('app', {
           transitionInterval: 0.7,
           slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center', windowPadding: { left: 24, right: 24, top: 24, bottom: 24 } } as SlideStyle,
           bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
+          alertLimit: 5,
         },
         backgroundVideos: [] as BackgroundVideo[],
         alerts: [] as Alert[],
         activeAlert: null as Alert | null,
+        activeOverlay: "",
         recentBibleSearches: [] as string[],
         failedUploadRequests: [] as { path: string, options: any }[],
         slidesLoading: false as boolean,
@@ -196,6 +198,9 @@ export const useAppStore = defineStore('app', {
     },
     setActiveAlert(alert: Alert | null) {
       this.currentState.activeAlert = alert
+    },
+    setActiveOverlay(overlay: string) {
+      this.currentState.activeOverlay = overlay
     },
     setBackgroundVideos(bgVideos: BackgroundVideo[]) {
       this.currentState.backgroundVideos = bgVideos

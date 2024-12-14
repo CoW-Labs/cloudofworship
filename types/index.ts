@@ -155,4 +155,6 @@ export interface AppSettings {
     text: { backgroundType: string, background: string, backgroundVideoKey: string },
   },
   slideStyles: SlideStyle
+  bibleVersions: Array<any>, // Check app.vue for bible versions array in a list
+  alertLimit: number
 }

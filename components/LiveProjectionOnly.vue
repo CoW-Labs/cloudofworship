@@ -179,8 +179,12 @@
               :slide-styles="slideStyles"
             />
           </UCard>
-        </UModal> </template
-      ><AlertView :size="fullScreen ? '' : 'sm'" />
+        </UModal>
+      </template>
+      <AlertView :size="fullScreen ? '' : 'sm'" />
+      <FallingSnowView
+        v-if="fullScreen && currentState.activeOverlay === 'falling-snow'"
+      />
     </div>
   </div>
 </template>

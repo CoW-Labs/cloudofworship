@@ -623,6 +623,7 @@ const overrideAppSettings = async () => {
         windowPadding: { left: 24, right: 24, top: 24, bottom: 24 },
       } as SlideStyle,
       bibleVersions: appInfo.value.bibleVersions as Array<any>, // Check app.vue for bible versions array in a list
+      alertLimit: 5,
     })
 
     // console.log("calling setBibleVersions")
