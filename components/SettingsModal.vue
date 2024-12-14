@@ -78,6 +78,9 @@
             />
             <!-- STORAGE SETTINGS -->
             <StorageSettings v-else-if="activeTab === 'Storage Settings'" />
+
+            <!-- OTHER SETTINGS -->
+            <OtherSettings v-else-if="activeTab === 'Other Settings'" />
           </Transition>
         </div>
       </div>
@@ -99,6 +102,7 @@ const tabs = [
   { name: "Slide Settings", active: false },
   { name: "Bible Version Settings", active: false },
   { name: "Storage Settings", active: false },
+  { name: "Other Settings", active: false },
 ]
 const activeTab = ref(props.page || "Slide Settings")
 

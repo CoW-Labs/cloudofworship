@@ -133,6 +133,11 @@
       @open="containerOverflow = ''"
       @close="containerOverflow = 'overflow-x-auto'"
     />
+    <!-- <UInput
+      type="color"
+      @input="editor.chain().focus().setColor($event.target.value).run()"
+      :value="editor.getAttributes('textStyle').color"
+    /> -->
     <UButton
       @click="editor.chain().focus().toggleBlockquote().run()"
       :class="{

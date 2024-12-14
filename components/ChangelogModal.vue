@@ -59,9 +59,9 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added slide settings to add or remove footnotes.
-	- Fixed the non-selectable default ESV version issue.
-  - Added new songs`
+const changelog = `- Increased the maximum number of alerts configurable in settings.
+- Added slide overlays with a maiden type featuring falling snow.
+- Introduced new backgrounds for Christmas and updated the background image component.`
 
 const appStore = useAppStore()
 
