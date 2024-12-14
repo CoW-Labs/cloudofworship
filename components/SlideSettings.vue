@@ -277,6 +277,42 @@
       </UForm>
     </div>
 
+    <!-- OVERLAYS AND THEMES -->
+    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-md font-semibold">Overlays & Themes</h3>
+      </div>
+      <UForm>
+        <div class="flex items-end gap-4">
+          <UFormGroup label="Set slide overlay">
+            <USelectMenu
+              class="border-0 shadow-none max-w-[200px]"
+              select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
+              size="md"
+              :options="[
+                { key: 'falling-snow', label: 'Falling Snow' },
+                { key: 'none', label: 'None selected' },
+              ]"
+              :model-value="appStore.currentState.activeOverlay"
+              variant="none"
+              color="primary"
+              :ui="selectUI"
+              :ui-menu="selectMenuUI"
+              @change="
+                (event: any) => {
+                  console.log(event)
+                  const overlay = event.key
+                  appStore.setActiveOverlay(overlay)
+                  sendOverlayToWebsocket(overlay)
+                }
+              "
+            >
+            </USelectMenu>
+          </UFormGroup>
+        </div>
+      </UForm>
+    </div>
+
     <!-- SONG SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
@@ -368,6 +404,28 @@ const bibleVersionSelectOptions = computed(() =>
 
 const getActivePaddingValue = (side: string) => {
   return appStore.currentState.settings.slideStyles.windowPadding[side]
+}
+
+const removeOverlayFromWebsocket = () => {
+  const socket = useNuxtApp().$socket as WebSocket
+  socket.send(
+    JSON.stringify({
+      action: "remove-overlay",
+    })
+  )
+}
+
+const sendOverlayToWebsocket = (overlay: string) => {
+  if (!overlay) {
+    return removeOverlayFromWebsocket()
+  }
+  const socket = useNuxtApp().$socket as WebSocket
+  socket.send(
+    JSON.stringify({
+      action: "add-overlay",
+      data: overlay,
+    })
+  )
 }
 
 const selectUI = {

@@ -8,40 +8,44 @@
         class="text-sm font-semibold flex items-center gap-2 text-primary-900 dark:text-primary-100 px-4 pb-3 border-b border-primary-200"
       >
         <!-- <IconWrapper name="i-bx-info-circle" size="4"></IconWrapper> -->
-        Alert Schedule (Maximum of 5)
+        Alert Schedule (Maximum of
+        {{ appStore.currentState.settings.alertLimit }})
       </div>
-      <div
-        class="alert-card-ctn flex items-center px-2"
-        v-for="alert in currentState.alerts"
-        :key="alert.id"
-      >
-        <UButton
-          class="alert-card flex items-start gap-1 justify-start mt-2 text-left hover:bg-primary-200 w-[calc(100%-0px)] relative"
-          :class="{
-            'bg-primary-200 dark:bg-primary-500':
-              currentState.activeAlert?.id === alert?.id,
-          }"
-          variant="ghost"
-          :icon="
-            currentState.activeAlert?.id === alert?.id
-              ? 'i-bx-check-circle'
-              : 'i-bx-circle'
-          "
-          color="black"
-          block
-          @click="appStore.setActiveAlert(alert)"
+      <div class="alerts max-h-[200px] overflow-y-auto">
+        <div
+          ref="alertsRef"
+          class="alert-card-ctn flex items-center px-2"
+          v-for="alert in currentState.alerts"
+          :key="alert.id"
         >
-          <div class="text text-xs">
-            {{ alert.title }}
-          </div>
           <UButton
-            class="absolute right-1 top-[2px] alert-delete bg-primary-200"
+            class="alert-card flex items-start gap-1 justify-start mt-2 text-left hover:bg-primary-200 w-[calc(100%-0px)] relative"
+            :class="{
+              'bg-primary-200 dark:bg-primary-500':
+                currentState.activeAlert?.id === alert?.id,
+            }"
             variant="ghost"
-            icon="i-bx-trash"
-            size="xs"
-            @click.stop.prevent="deleteAlert(alert)"
-          ></UButton>
-        </UButton>
+            :icon="
+              currentState.activeAlert?.id === alert?.id
+                ? 'i-bx-check-circle'
+                : 'i-bx-circle'
+            "
+            color="black"
+            block
+            @click="appStore.setActiveAlert(alert)"
+          >
+            <div class="text text-xs">
+              {{ alert.title }}
+            </div>
+            <UButton
+              class="absolute right-1 top-[2px] alert-delete bg-primary-200"
+              variant="ghost"
+              icon="i-bx-trash"
+              size="xs"
+              @click.stop.prevent="deleteAlert(alert)"
+            ></UButton>
+          </UButton>
+        </div>
       </div>
       <div class="button-ctn px-4">
         <UButton
@@ -123,6 +127,7 @@ const appStore = useAppStore()
 
 const { currentState } = storeToRefs(appStore)
 const loading = ref<boolean>(false)
+const alertsRef = ref<HTMLDivElement>()
 const content = ref<string>("")
 const position = ref<string>("Bottom")
 const bgColor = ref<string>("#a855f7")
@@ -153,7 +158,10 @@ const deleteAlert = (alert: Alert) => {
 }
 
 const addAlert = async () => {
-  if (currentState.value?.alerts?.length >= 5) {
+  if (
+    currentState.value?.alerts?.length >=
+    appStore.currentState.settings.alertLimit
+  ) {
     toast.add({
       icon: "i-bx-error-circle",
       title: "Maximum alerts exceeded. Delete alert to add more.",
@@ -172,6 +180,9 @@ const addAlert = async () => {
 
     toast.add({ icon: "i-bx-send", title: "Alert sent to live" })
     emit("go-home")
+    setTimeout(() => {
+      alertsRef.value?.scrollBy(0, 10000)
+    }, 300)
   }
 }
 
