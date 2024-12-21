@@ -69,6 +69,7 @@
 <script setup lang="ts">
 import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
+import { Color } from "@tiptap/extension-color"
 import TiptapHighlight from "@tiptap/extension-highlight"
 import TiptapTextAlign from "@tiptap/extension-text-align"
 import TiptapPlaceholder from "@tiptap/extension-placeholder"
@@ -129,6 +130,9 @@ const editorOne = ref(
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
+      Color.configure({
+        defaultColor: "#000",
+      }),
     ],
     onCreate: ({ editor }) => {
       editor.chain().focus().toggleHeading({ level: 1 }).run()
@@ -162,6 +166,9 @@ const editorTwo = ref(
       TipTapTextStyle,
       TipTapFontFamily.configure({
         types: ["textStyle"],
+      }),
+      Color.configure({
+        defaultColor: "#000",
       }),
     ],
     onCreate: ({ editor }) => {
@@ -197,6 +204,9 @@ const editorThree = ref(
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
+      Color.configure({
+        defaultColor: "#000",
+      }),
     ],
     onBlur: ({ editor }) => {
       emit("update", 2, editor.getHTML())
@@ -223,6 +233,9 @@ const uneditableEditorOne = ref(
       TipTapTextStyle,
       TipTapFontFamily.configure({
         types: ["textStyle"],
+      }),
+      Color.configure({
+        defaultColor: "#000",
       }),
     ],
     // onUpdate: ({ editor }) => {
@@ -254,6 +267,9 @@ const uneditableEditorTwo = ref(
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
+      Color.configure({
+        defaultColor: "#000",
+      }),
     ],
     // onUpdate: ({ editor }) => {
     //   emit("update", 2, editor.getHTML())
@@ -283,6 +299,9 @@ const uneditableEditorThree = ref(
       TipTapTextStyle,
       TipTapFontFamily.configure({
         types: ["textStyle"],
+      }),
+      Color.configure({
+        defaultColor: "#000",
       }),
     ],
     // onUpdate: ({ editor }) => {
