@@ -188,6 +188,8 @@
         />
       </UTooltip>
     </div>
+
+    <!-- SLIDE CONTENT LINE CONTROLS -->
     <SlideMaxLinesSelect
       v-if="slide?.type === slideTypes?.song"
       :selected-line="slide?.slideStyle?.linesPerSlide"
@@ -196,6 +198,34 @@
       @close="containerOverflow = 'overflow-x-auto'"
       @change="$emit('update-lines-per-slide', $event)"
     />
+
+    <!-- SLIDE CONTENT CASE CONTROLS -->
+    <UTooltip
+      text="Uppercase"
+      :popper="{ placement: 'top' }"
+      v-if="
+        !(slide?.type === slideTypes.text || slide?.type === slideTypes.media)
+      "
+    >
+      <UButton
+        @click="
+          $emit('update-style', {
+            ...slide.slideStyle,
+            lettercase:
+              slide?.slideStyle?.lettercase === 'uppercase' ? '' : 'uppercase',
+          })
+        "
+        class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300 h-[36px] mt-[3px] grid place-items-center"
+        :class="{
+          'bg-primary text-white dark:text-primary-700':
+            slide?.slideStyle?.lettercase === 'uppercase',
+        }"
+        variant="ghost"
+      >
+        <IconWrapper name="i-mdi-format-letter-case-upper" size="5" />
+      </UButton>
+    </UTooltip>
+
     <!-- COUNTDOWN SLIDE CONTROLS -->
     <div
       v-if="slide?.type === slideTypes.countdown"
@@ -225,6 +255,8 @@
         />
       </UTooltip>
     </div>
+
+    <!-- SLIDE CONTENT ALIGNMENT -->
     <div
       v-if="slide?.type !== slideTypes?.media"
       class="button-group rounded-md p-1 flex items-center gap-1"
@@ -272,6 +304,7 @@
         />
       </UTooltip>
     </div>
+
     <!-- SONG CONTROLS -->
     <div
       v-if="slide?.type === slideTypes.song"

@@ -67,6 +67,21 @@
             "
           />
         </UFormGroup>
+        <UFormGroup label="Use uppercase for slide content?" class="mt-4">
+          <UToggle
+            size="lg"
+            :model-value="
+              appStore.currentState.settings.slideStyles.lettercase ===
+              'uppercase'
+            "
+            @change="
+              appStore.setSlideStyles({
+                ...appStore.currentState.settings.slideStyles,
+                lettercase: $event ? 'uppercase' : '',
+              })
+            "
+          />
+        </UFormGroup>
       </UForm>
     </div>
 

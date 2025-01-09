@@ -70,7 +70,7 @@ export const useAppStore = defineStore('app', {
           animations: true,
           footnotes: true,
           transitionInterval: 0.7,
-          slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center', windowPadding: { left: 24, right: 24, top: 24, bottom: 24 } } as SlideStyle,
+          slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center', windowPadding: { left: 24, right: 24, top: 24, bottom: 24 }, lettercase: '' } as SlideStyle,
           bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
           alertLimit: 5,
         },
@@ -290,7 +290,7 @@ export const useAppStore = defineStore('app', {
             backgroundVideoKey: '/video-bg-4.mp4'
           }
         },
-        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center', windowPadding: { left: 24, right: 24, top: 24, bottom: 24 } } as SlideStyle,
+        slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center', windowPadding: { left: 24, right: 24, top: 24, bottom: 24 }, lettercase: '' } as SlideStyle,
         bibleVersions: bibleVersionObjects, // Check app.vue for bible versions array in a list
       })
       this.setBackgroundVideos([])

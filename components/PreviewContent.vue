@@ -342,6 +342,7 @@ const preSlideCreation = (): Slide => {
       font: appStore.currentState.settings.defaultFont,
       isMediaMuted: true,
       isMediaPlaying: false,
+      lettercase: appStore.currentState.settings.slideStyles.lettercase,
     },
   }
   return tempSlide

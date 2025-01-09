@@ -6,6 +6,7 @@
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
+      'uppercase-live-content': slide?.slideStyle?.lettercase === 'uppercase',
     }"
   >
     <TiptapEditorContent :editor="editorOne" />
@@ -18,6 +19,7 @@
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
+      'uppercase-live-content': slide?.slideStyle?.lettercase === 'uppercase',
     }"
   >
     <TiptapEditorContent :editor="editorTwo" />
@@ -41,6 +43,7 @@
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
+      'uppercase-live-content': slide?.slideStyle?.lettercase === 'uppercase',
     }"
   >
     <TiptapEditorContent
@@ -56,6 +59,7 @@
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
+      'uppercase-live-content': slide?.slideStyle?.lettercase === 'uppercase',
     }"
   >
     <TiptapEditorContent :editor="uneditableEditorTwo" class="jost" />

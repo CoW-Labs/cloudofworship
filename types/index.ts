@@ -144,6 +144,7 @@ export interface SlideStyle {
   mediaSeekPosition?: number // 0 or -1, -1 means not at the beginning
   isMediaMuted?: boolean
   windowPadding?: { left?: number, right?: number, top?: number, bottom?: number }
+  lettercase?: string
 }
 
 export interface AppSettings {
