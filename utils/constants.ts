@@ -50,6 +50,7 @@ export const appWideActions = {
   liveSettingsTransfer: 'live-settings-transfer',
   quickActionsFocus: 'quick-actions-focus',
   uploadOfflineSlides: 'upload-offline-slides',
+  batchUpdateSlides: 'batch-update-slides',
   openShortcutsModal: 'open-shortcuts'
 }
 

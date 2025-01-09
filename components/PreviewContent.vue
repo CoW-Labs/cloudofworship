@@ -278,6 +278,11 @@ emitter.on("upload-offline-slides", () => {
   uploadOfflineSlides()
 })
 
+emitter.on("batch-update-slides", (slides: Slide[]) => {
+  appStore.setActiveSlides(slides)
+  batchUpdateSlideOnline(slides)
+})
+
 emitter.on("select-slides", () => {
   if (bulkActionLabel.value === "Select Slides") {
     bulkSelectSlides.value = !bulkSelectSlides.value
@@ -323,6 +328,7 @@ const sendNewSlideToWebsocket = useDebounceFn((slide: Slide) => {
 const preSlideCreation = (): Slide => {
   const tempSlide: Slide = {
     id: useObjectID(),
+    index: appStore.currentState.activeSlides.length,
     name: "Untitled",
     type: slideTypes.text,
     layout: slideLayoutTypes.full_text,
@@ -403,7 +409,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
     `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
   )
   if (!error.value) {
-    const tempSlides = data.value as Slide[]
+    let tempSlides = data.value as Slide[]
     tempSlides.forEach((slide) => {
       if (
         slide.backgroundType === backgroundTypes.video &&
@@ -442,6 +448,9 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
         // console.log("not found")
       }
     })
+    // Sort slides by index
+    tempSlides = [...tempSlides].sort((a, b) => a.index - b.index)
+
     appStore.setActiveSlides(
       useMergeObjectArray(tempSlides, [...appStore.currentState.activeSlides])
     )
@@ -507,25 +516,25 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
   }
 }
 
-// const batchUpdateSlideOnline = async (slides: Slide[]) => {
-//   appStore.setSlidesLoading(true)
-//   const { data, error } = await useAPIFetch(
-//     `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/batch`,
-//     {
-//       method: "PUT",
-//       body: slides,
-//       key: "batch-update-slides",
-//       dedupe: "defer",
-//     }
-//   )
-//   if (!error.value) {
-//     appStore.setSlidesLoading(false)
-//     appStore.setLastSynced(new Date().toISOString())
-//     return data.value as Slide[]
-//   } else {
-//     throw new Error(error.value?.message)
-//   }
-// }
+const batchUpdateSlideOnline = async (slides: Slide[]) => {
+  appStore.setSlidesLoading(true)
+  const { data, error } = await useAPIFetch(
+    `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/batch`,
+    {
+      method: "PUT",
+      body: slides,
+      key: "batch-update-slides",
+      dedupe: "defer",
+    }
+  )
+  if (!error.value) {
+    appStore.setSlidesLoading(false)
+    appStore.setLastSynced(new Date().toISOString())
+    return data.value as Slide[]
+  } else {
+    throw new Error(error.value?.message)
+  }
+}
 
 const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
   const tempSlide = { ...slide }
