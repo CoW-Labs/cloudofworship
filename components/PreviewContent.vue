@@ -342,6 +342,7 @@ const preSlideCreation = (): Slide => {
       font: appStore.currentState.settings.defaultFont,
       isMediaMuted: true,
       isMediaPlaying: false,
+      // Added comment here to indicate new feat
       lettercase: appStore.currentState.settings.slideStyles.lettercase,
     },
   }
