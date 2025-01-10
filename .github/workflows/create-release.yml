@@ -95,8 +95,8 @@ jobs:
           # Commit and push the updated file
           git add app.vue
           git commit -m "Update appVersion to ${{ env.next_version }}"
-          git log
-          git push -f origin main
+          git branch
+          git push
 
       - name: Create Tag
         run: |
