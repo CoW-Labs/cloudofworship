@@ -11,7 +11,7 @@
           <div class="flex justify-between items-center">
             <div class="text-and-link">
               <h2 class="font-semibold text-md">
-                What's new in Version {{ appVersion }} 🎉
+                What's new in {{ appVersion }} 🎉
               </h2>
               <a
                 href="https://www.cloudofworship.com/changelog"

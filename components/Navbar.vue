@@ -16,7 +16,7 @@
           class="version-chip flex text-xs font-semibold bg-primary-200 p-2 py-1 rounded-full border border-transparent hover:bg-primary-300 hover:border-primary-900 transition-all text-primary-900"
           @click="useGlobalEmit(appWideActions.showChangelog)"
         >
-          Beta v{{ appVersion }}
+          {{ appVersion }}
         </UButton>
       </div>
       <div class="projects-ctn">
