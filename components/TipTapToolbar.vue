@@ -133,11 +133,18 @@
       @open="containerOverflow = ''"
       @close="containerOverflow = 'overflow-x-auto'"
     />
-    <!-- <UInput
-      type="color"
-      @input="editor.chain().focus().setColor($event.target.value).run()"
-      :value="editor.getAttributes('textStyle').color"
-    /> -->
+    <UTooltip text="Change text color" :popper="{ arrow: true }">
+      <input
+        type="color"
+        @input="editor.chain().focus().setColor($event.target.value).run()"
+        class="min-w-10 h-10 outline-none border-0 rounded-md p-1.5 bg-primary-100 dark:bg-primary-900 hover:bg-primary-200 dark:hover:bg-primary-950 cursor-pointer"
+        :class="{
+          'bg-primary text-white dark:text-primary-900':
+            editor.isActive('paragraph'),
+        }"
+        :value="editor.getAttributes('textStyle').color"
+      />
+    </UTooltip>
     <UButton
       @click="editor.chain().focus().toggleBlockquote().run()"
       :class="{

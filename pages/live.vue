@@ -30,7 +30,7 @@
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
     <TransitionGroup name="fade-list">
       <LiveProjectionOnly
-        v-for="liveSlide in currentState.activeSlides"
+        v-for="liveSlide in viewableSlides"
         :key="liveSlide.id"
         v-show="liveSlide?.id === currentState.liveSlideId"
         :content-visible="true"
@@ -59,13 +59,19 @@ const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
 const FPS = 10
 
-const liveSlide = computed(() => {
-  // console.log(activeSlides.value)
-  console.log(currentState.value.liveSlideId)
-  return currentState.value.activeSlides.find(
-    (slide) => slide.id === currentState.value.liveSlideId
-  )
+const viewableSlides = computed(() => {
+  return currentState.value.activeSlides?.filter((slide) => {
+    return slide.id === currentState.value.liveSlideId
+  })
 })
+
+// const liveSlide = computed(() => {
+//   // console.log(activeSlides.value)
+//   // console.log(currentState.value.liveSlideId)
+//   return currentState.value.activeSlides.find(
+//     (slide) => slide.id === currentState.value.liveSlideId
+//   )
+// })
 
 // LISTEN TO STATE CHANGES FOR SOCKET BROADCAST
 // const socket = await useSocket()

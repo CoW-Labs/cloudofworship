@@ -17,6 +17,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Get Last Tag
         id: last_tag
@@ -95,7 +96,8 @@ jobs:
           # Commit and push the updated file
           git add app.vue
           git commit -m "Update appVersion to ${{ env.next_version }}"
-          git push origin ${{ env.next_version }}
+          git branch
+          git push
 
       - name: Create Tag
         run: |

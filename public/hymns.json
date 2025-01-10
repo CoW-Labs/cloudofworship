@@ -19063,5 +19063,18 @@
         "author": "Yoruba Hymnal",
         "source": "Unknown",
         "meta": "yoruba"
+    },
+    {
+        "number": "2018",
+        "title": "Ding dong! merrily on high",
+        "chorus": "Gloria, hosannah in excelsis!\nGloria, hosannah in excelsis!",
+        "verses": [
+            "Ding dong, merrily on high!\nIn heav'n the bells are ringing;\nding dong, verily the sky\nis riv'n with angel singing.",
+            "E'en so here below, below,\nlet steeple bells be swungen,\nAnd io, io, io,\nby priest and people sungen.",
+            "Pray ye dutifully prime\nyour matin chime, ye ringers;\nmay ye beautifully rhyme\nyour evetime song, ye singers."
+        ],
+        "author": "George Ratcliffe Woodward",
+        "source": "Unknown",
+        "meta": "English Hymnal"
     }
 ]

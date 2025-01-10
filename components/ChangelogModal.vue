@@ -59,9 +59,7 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Increased the maximum number of alerts configurable in settings.
-- Added slide overlays with a maiden type featuring falling snow.
-- Introduced new backgrounds for Christmas and updated the background image component.`
+const changelog = `- See what's new in "View full changelog" link above`
 
 const appStore = useAppStore()
 

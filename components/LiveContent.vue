@@ -5,6 +5,7 @@
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
+      'uppercase-live-content': slide?.slideStyle?.lettercase === 'uppercase',
     }"
     :id="slide?.name"
   >

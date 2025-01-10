@@ -154,6 +154,13 @@ const liveOutputSlides = computed({
   },
   set(newVal) {
     appStore.replaceScheduleActiveSlides(newVal)
+    // console.log("slide order updated", newVal)
+    // Set Index for each slide
+    const tempSlides = [...newVal].map((slide, index) => {
+      slide.index = index
+      return slide
+    })
+    useGlobalEmit(appWideActions.batchUpdateSlides, tempSlides)
     toast.add({ icon: "i-bx-slideshow", title: "Slide order has been updated" })
   },
 })

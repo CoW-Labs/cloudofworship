@@ -450,6 +450,9 @@ body {
 .center-live-content {
   text-align: center;
 }
+.uppercase-live-content > .slide-layout-ctn > div:nth-child(1), .uppercase-live-content > div:nth-child(1) > .tiptap {
+  text-transform: uppercase;
+}
 .tiptap.live-content {
   padding: 0.75rem;
   border-radius: 0;
