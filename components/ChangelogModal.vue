@@ -59,8 +59,7 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const changelog = `- Added font color update to text slides.
-- Made minor fixes and improvements.`
+const changelog = `- See what's new in "View full changelog" link above`
 
 const appStore = useAppStore()
 
