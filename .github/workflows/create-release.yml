@@ -1,0 +1,114 @@
+name: Release Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Last Tag
+        id: last_tag
+        run: |
+          latest=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
+
+          echo "last_tag=$latest" >> $GITHUB_ENV
+
+      - name: Get Release Notes
+        id: release_notes
+        run: |
+          last_tag=${{ env.last_tag }}
+
+          if [ "$last_tag" = "v0.0.0" ]; then
+            commits=$(git log --pretty=format:"- %s")
+          else
+            commits=$(git log "$last_tag"..HEAD --pretty=format:"- %s")
+          fi
+
+          escaped_commits=$(printf "%s" "$commits" | jq -Rsa .)
+
+          echo "release_notes=$escaped_commits" >> $GITHUB_ENV
+
+      - name: Generate Next Version Tag
+        id: versioning
+        run: |
+          release_notes=${{ env.release_notes }}
+
+          hasMajor=0
+          hasMinor=0
+          hasPatch=0
+
+          while IFS= read -r line; do
+            echo "Processing line: $line"
+
+            if [[ $line == *BREAKING* ]]; then
+              hasMajor=1
+            elif [[ $line == "- feat:"* ]]; then
+              hasMinor=1
+            elif [[ $line == "- fix:"* ]]; then
+              hasPatch=1
+            fi
+          done <<< "$(echo -e "$release_notes")"
+
+          last_tag=${{ env.last_tag }}
+
+          base_tag=$(echo "$last_tag" | sed 's/-beta//')
+
+          major=$(echo $base_tag | awk -F. '{print $1}' | tr -d 'v')
+          minor=$(echo $base_tag | awk -F. '{print $2}')
+          patch=$(echo $base_tag | awk -F. '{print $3}')
+
+          if [[ $hasMajor -eq 1 ]]; then
+            next_major=$((major + 1))
+            next_version="v${next_major}.0.0-beta"
+          elif [[ $hasMinor -eq 1 ]]; then
+            next_minor=$((minor + 1))
+            next_version="v${major}.${next_minor}.0-beta"
+          else
+            next_patch=$((patch + 1))
+            next_version="v${major}.${minor}.${next_patch}-beta"
+          fi
+
+          echo "next_version=$next_version" >> $GITHUB_ENV
+      
+
+      - name: Update appVersion in app.vue
+        run: |
+          # Replace the version string in the specific line
+          sed -i '42s/const appVersion = ref<string>(".*")/const appVersion = ref<string>("${{ env.next_version }}")/' app.vue
+
+          # Configure Git to commit the changes
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          # Commit and push the updated file
+          git add app.vue
+          git commit -m "Update appVersion to ${{ env.next_version }}"
+          git push origin ${{ env.next_version }}
+
+      - name: Create Tag
+        run: |
+          git tag -a ${{ env.next_version }} -m "Release version ${{ env.next_version }}"
+          # git push origin ${{ env.next_version }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1.1.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.next_version }}
+          release_name: "Release ${{ env.next_version }}"
+          body: ${{ fromJSON(env.release_notes) }}
+          draft: false
+          prerelease: false
