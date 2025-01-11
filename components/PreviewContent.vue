@@ -1026,6 +1026,7 @@ const updateLiveOutput = (updatedSlide: Slide) => {
   // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
   if (updatedSlide.id === appStore.currentState.liveSlideId) {
     appStore.setLiveSlide(updatedSlide.id)
+    useDebounceFn(useBroadcastPost, 100)(JSON.stringify(updatedSlide))
   }
 }
 

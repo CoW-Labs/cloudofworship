@@ -42,7 +42,7 @@
             :class="{
               'bg-red-100 dark:bg-red-900': liveSlide?.id === slide?.id,
             }"
-            @click="appStore.setLiveSlide(slide?.id || '0')"
+            @click="setLiveSlide(slide?.id || '0')"
             @dblclick="useGlobalEmit(appWideActions.newActiveSlide, slide)"
           >
             <div
@@ -117,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDebounceFn } from "@vueuse/core"
 import draggable from "vuedraggable"
 import { useAppStore } from "~/store/app"
 import { appWideActions } from "~/utils/constants"
@@ -194,19 +195,19 @@ const previousSlide = computed(() => {
 onMounted(() => {
   useCreateShortcut("ArrowDown", () => {
     if (nextSlide.value) {
-      appStore.setLiveSlide(nextSlide.value.id)
+      setLiveSlide(nextSlide.value.id)
     }
   })
   useCreateShortcut("ArrowUp", () => {
     if (previousSlide.value) {
-      appStore.setLiveSlide(previousSlide.value.id)
+      setLiveSlide(previousSlide.value.id)
     }
   })
   useCreateShortcut(
     "0",
     () => {
       if (liveOutputSlides.value?.at(-1)?._id) {
-        appStore.setLiveSlide(liveOutputSlides.value?.at(-1)?._id!!)
+        setLiveSlide(liveOutputSlides.value?.at(-1)?._id!!)
       }
     },
     { ctrlOrMeta: true, shift: false }
@@ -219,7 +220,7 @@ onMounted(() => {
       digit.toString(),
       () => {
         if (liveOutputSlides.value?.at(digit - 1)?._id) {
-          appStore.setLiveSlide(liveOutputSlides.value?.at(digit - 1)?._id!!)
+          setLiveSlide(liveOutputSlides.value?.at(digit - 1)?._id!!)
         }
       },
       { ctrlOrMeta: true, shift: false }
@@ -240,9 +241,15 @@ onMounted(() => {
 // const makeSlideActive = (slide: Slide, goLive: boolean = false) => {
 //   if (goLive) {
 //     appStore.setActiveSlides(slides.value)
-//     appStore.setLiveSlide(activeSlide.value.id)
+//     setLiveSlide(activeSlide.value.id)
 //   }
 // }
+
+const setLiveSlide = (slideId: string) => {
+  const slide = appStore.currentState.activeSlides.find((s) => s.id === slideId)
+  useDebounceFn(useBroadcastPost, 100)(JSON.stringify(slide))
+  appStore.setLiveSlide(slideId)
+}
 </script>
 
 <style scoped>

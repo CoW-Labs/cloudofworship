@@ -52,15 +52,36 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
+import type { Slide } from "~/types"
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const isFullScreen = ref(false)
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
 const FPS = 10
+const mostUpdatedLiveSlide = ref<Slide | null>(null)
+
+const activeSlides = computed(() => {
+  const tempActiveSlides: Slide[] = [...currentState.value.activeSlides]
+  if (mostUpdatedLiveSlide.value) {
+    const mostUpdatedLiveSlideIndex = tempActiveSlides.findIndex(
+      (slide) => slide.id === mostUpdatedLiveSlide.value?.id
+    )
+    if (mostUpdatedLiveSlideIndex !== -1) {
+      tempActiveSlides.push(mostUpdatedLiveSlide.value!!)
+    } else {
+      tempActiveSlides.splice(
+        mostUpdatedLiveSlideIndex,
+        1,
+        mostUpdatedLiveSlide.value!!
+      )
+    }
+  }
+  return tempActiveSlides
+})
 
 const viewableSlides = computed(() => {
-  return currentState.value.activeSlides?.filter((slide) => {
+  return activeSlides.value?.filter((slide) => {
     return slide.id === currentState.value.liveSlideId
   })
 })
@@ -191,6 +212,10 @@ onMounted(() => {
 
   //  Capture screen on load
   // transmitScreenCapture()
+  useBroadcastMessage((data: string) => {
+    const updatedSlide = JSON.parse(data) as Slide
+    mostUpdatedLiveSlide.value = updatedSlide
+  })
 })
 
 onBeforeUnmount(() => {
