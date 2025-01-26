@@ -15,6 +15,11 @@
     >
       <div
         class="group search-focus transition-all rounded-md focus-within:p-2 focus-within:bg-primary-100 focus-within:dark:bg-primary-800"
+        :class="
+          searchInput.trim().length
+            ? 'bg-primary-100 dark:bg-primary-800 p-2'
+            : ''
+        "
       >
         <div class="flex gap-2">
           <UInput
@@ -33,7 +38,8 @@
           ></UButton>
         </div>
         <div
-          class="hidden max-w-[100%] group-focus-within:flex items-center gap-2 whitespace-nowrap text-md pl-1 pt-3 come-up-1"
+          class="max-w-[100%] group-focus-within:flex items-center gap-2 whitespace-nowrap text-md pl-1 pt-3 come-up-1"
+          :class="searchInput.trim().length ? 'flex' : 'hidden'"
         >
           <div>Search anything</div>
           <div class="flex overflow-x-auto scrollbar-none">
