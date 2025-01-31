@@ -334,8 +334,8 @@
 import type { Slide } from "~/types"
 import { appWideActions } from "~/utils/constants"
 
-const MAX_FONT_SIZE = 125
-const MIN_FONT_SIZE = 80
+const MAX_FONT_SIZE = 150
+const MIN_FONT_SIZE = 50
 const props = defineProps<{
   slide: Slide
 }>()
