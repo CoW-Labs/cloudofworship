@@ -69,6 +69,7 @@ export const useAppStore = defineStore('app', {
           },
           animations: true,
           footnotes: true,
+          motionlessSlides: false,
           transitionInterval: 0.7,
           slideStyles: { blur: 0.5, brightness: 50, linesPerSlide: 4, alignment: 'center', windowPadding: { left: 24, right: 24, top: 24, bottom: 24 }, lettercase: '' } as SlideStyle,
           bibleVersions: [] as Array<any>, // Check app.vue for bible versions array in a list
@@ -252,6 +253,9 @@ export const useAppStore = defineStore('app', {
     },
     setFootnotes(footnotes: boolean) {
       this.currentState.settings = { ...this.currentState.settings, footnotes: footnotes }
+    },
+    setMotionlessSlides(motionlessSlides: boolean) {
+      this.currentState.settings = { ...this.currentState.settings, motionlessSlides: motionlessSlides }
     },
     setTransitionInterval(interval: number) {
       this.currentState.settings = { ...this.currentState.settings, transitionInterval: interval }

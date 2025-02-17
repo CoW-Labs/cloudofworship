@@ -328,6 +328,22 @@
       </UForm>
     </div>
 
+    <!-- SLIDE EXPERIMENTS -->
+    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-md font-semibold">Slide Experiments</h3>
+      </div>
+      <UForm>
+        <UFormGroup label="Make slide transitions motionless" class="">
+          <UToggle
+            size="lg"
+            :model-value="appStore.currentState.settings.motionlessSlides"
+            @change="appStore.setMotionlessSlides($event)"
+          />
+        </UFormGroup>
+      </UForm>
+    </div>
+
     <!-- SONG SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
