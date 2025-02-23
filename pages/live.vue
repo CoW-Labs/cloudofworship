@@ -28,7 +28,23 @@
       </div>
     </div>
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
-    <TransitionGroup name="fade-list">
+    <!-- Using motionless slides to test bug with Bible Slides not moving to next slide in live view -->
+    <TransitionGroup v-if="currentState.settings.motionlessSlides">
+      <LiveProjectionOnly
+        v-show="mostUpdatedLiveSlide?.id === currentState.liveSlideId"
+        :content-visible="true"
+        :id="currentState.liveSlideId"
+        :full-screen="true"
+        :slide="mostUpdatedLiveSlide"
+        :slide-label="false"
+        :slide-styles="currentState.settings.slideStyles"
+        :audio-muted="
+          mostUpdatedLiveSlide?.id !== currentState.liveSlideId ||
+          mostUpdatedLiveSlide?.slideStyle?.isMediaMuted
+        "
+      />
+    </TransitionGroup>
+    <TransitionGroup v-else name="fade-list">
       <LiveProjectionOnly
         v-for="liveSlide in viewableSlides"
         :key="liveSlide.id"
@@ -96,15 +112,20 @@ const viewableSlides = computed(() => {
 
 // LISTEN TO STATE CHANGES FOR SOCKET BROADCAST
 // const socket = await useSocket()
-// watch(liveSlideId, (newVal, oldVal) => {
-//   console.log("liveSlideId", newVal)
-//   socket.send(
-//     JSON.stringify({
-//       type: appWideActions.liveSlideIdTransfer,
-//       data: newVal,
-//     })
-//   )
-// })
+watch(
+  currentState,
+  (newVal, oldVal) => {
+    if (newVal.liveSlideId !== oldVal.liveSlideId) {
+      const liveSlide = currentState.value.activeSlides.find(
+        (slide) => slide.id === currentState.value.liveSlideId
+      )
+      if (liveSlide) {
+        mostUpdatedLiveSlide.value = liveSlide
+      }
+    }
+  },
+  { deep: true }
+)
 
 // watch(
 //   activeSlides,
