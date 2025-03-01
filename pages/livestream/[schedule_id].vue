@@ -260,7 +260,10 @@ const updateBlobBackgroundURls = (slides: Slide[]) => {
 const connectWebSocket = async () => {
   socket.value = await useSocket(route.params.schedule_id as string)
 
-  socket.value.onopen = (event) => {}
+  socket.value.onopen = (event) => {
+    retryCount = 0
+    console.log("websocket connection opened - livestream")
+  }
 
   socket.value.onmessage = (event) => {
     const { data, action, message } = JSON.parse(event.data)
@@ -309,8 +312,8 @@ const connectWebSocket = async () => {
   }
 
   socket.value.onclose = async () => {
-    console.log("websocket connection closed")
-    if (retryCount < MAX_RETRIES && isAppOnline.value) {
+    console.log("websocket connection closed - livestream")
+    if (retryCount < MAX_RETRIES) {
       retryCount++
       const retryDelay = retryCount * 3000
       console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
