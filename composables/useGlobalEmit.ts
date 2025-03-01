@@ -8,6 +8,12 @@ const useGlobalEmit = (type: string, value?: string | boolean | Song | Hymn | Sl
   const emitter = (useNuxtApp().$emitter || appStore.currentState.emitter) as Emitter<any>
 
   try {
+    /** If action is a newBible action replace undefined with 1 to represent a chapter/verse
+     *  This is because we want a Bible slide to be opened even when the user specifies just a book or a book and chapter
+     */
+    if (type === appWideActions.newBible) {
+      value = value?.replaceAll('undefined', 1)
+    }
     emitter.emit(type, value)
   } catch (err) {
     console.log(err)

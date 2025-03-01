@@ -361,6 +361,18 @@ onMounted(() => {
 
 const bibleChapterAndVerse = computed(() => {
   const regex = /\b\d+\s*:\s*\d+\b|\b\d+\s\d+\b/g
+  const bibleBookFollowedByJustChapterMatch = searchInput.value
+    ?.replace("/", "")
+    .match(/\b\w+\s+\d+\b(?!\S)/g)
+
+  if (bibleBookFollowedByJustChapterMatch?.[0]) {
+    const standaloneChapter = Number(
+      bibleBookFollowedByJustChapterMatch?.[0]?.split(" ")?.[1] || 1
+    )
+    const verse = 1
+    return `${standaloneChapter}:${verse}`
+  }
+
   const match = searchInput.value
     ?.replace("/", "")
     .match(regex)?.[0]
