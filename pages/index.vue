@@ -185,6 +185,11 @@ onMounted(async () => {
 })
 
 emitter.on("refresh-slides", () => {
-  connectWebSocket()
+  if (
+    socket.value?.readyState === WebSocket.CLOSED ||
+    socket.value?.readyState === WebSocket.CLOSING
+  ) {
+    connectWebSocket()
+  }
 })
 </script>
