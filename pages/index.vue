@@ -26,6 +26,7 @@ import { useDebounce, useOnline } from "@vueuse/core"
 
 const appStore = useAppStore()
 const scheduleId = ref(undefined)
+const emitter = useNuxtApp().$emitter
 const socket = ref(null)
 const MAX_RETRIES = 10
 let retryCount = 0
@@ -181,5 +182,9 @@ onMounted(async () => {
   if (appStore.currentState.activeSchedule) {
     connectWebSocket()
   }
+})
+
+emitter.on("refresh-slides", () => {
+  connectWebSocket()
 })
 </script>
