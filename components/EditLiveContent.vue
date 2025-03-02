@@ -68,6 +68,7 @@
                 variant="none"
                 id="bible-verse-input"
                 v-model="verse"
+                autocomplete="off"
                 :inputClass="`bg-white border-0 shadow-none outline-none text-center dark:text-primary-900 transition-all ${
                   verse?.length > 20 ? 'px-1' : ''
                 }`"

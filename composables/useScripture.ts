@@ -35,7 +35,6 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
     async function fetchScripture(version: string, db: any, book: number, chapter: number, verses: number[]): Promise<string | undefined> {
       const bibleData = (await db.bibleAndHymns.get(version))?.data as unknown as BibleVerse[];
 
-      console.log(book, chapter, verses)
       
       // Since verses are sequential, we can optimize by finding start index
       const startIndex = bibleData?.findIndex((scripture: any) => 
