@@ -13,7 +13,7 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
   const shortLabelSplitted = label.split(':')
   const book = Number(shortLabelSplitted?.[0] || "1")
   const chapter = Number(shortLabelSplitted?.[1] || "1")
-  const verse = shortLabelSplitted?.[2]?.includes('-') ? shortLabelSplitted?.[2] : Number(shortLabelSplitted?.[2])
+  const verse = shortLabelSplitted?.[2]?.includes('-') ? shortLabelSplitted?.[2] : Number(shortLabelSplitted?.[2] || 1)
   const verses = []
 
   // If verse contains hyphen
@@ -34,10 +34,11 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
   try {
     async function fetchScripture(version: string, db: any, book: number, chapter: number, verses: number[]): Promise<string | undefined> {
       const bibleData = (await db.bibleAndHymns.get(version))?.data as unknown as BibleVerse[];
+
       
       // Since verses are sequential, we can optimize by finding start index
       const startIndex = bibleData?.findIndex((scripture: any) => 
-        Number(scripture.book) === book && 
+        Number(scripture.book) === (book) && 
         Number(scripture.chapter) === chapter && 
         Number(scripture.verse) === verses[0]
       );

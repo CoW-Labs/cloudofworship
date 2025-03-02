@@ -26,6 +26,7 @@ import { useDebounce, useOnline } from "@vueuse/core"
 
 const appStore = useAppStore()
 const scheduleId = ref(undefined)
+const emitter = useNuxtApp().$emitter
 const socket = ref(null)
 const MAX_RETRIES = 10
 let retryCount = 0
@@ -42,6 +43,7 @@ const connectWebSocket = async () => {
   }
 
   socket.value.onopen = (event) => {
+    retryCount = 0
     console.log("websocket connection opened")
   }
 
@@ -65,7 +67,8 @@ const connectWebSocket = async () => {
   socket.value.onclose = async () => {
     console.log("websocket connection closed")
     const online = useOnline()
-    if (retryCount < MAX_RETRIES && online.value) {
+    // if (retryCount < MAX_RETRIES && online.value) {
+    if (retryCount < MAX_RETRIES) {
       retryCount++
       const retryDelay = retryCount * 3000
       console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
@@ -81,6 +84,24 @@ const connectWebSocket = async () => {
   }
 }
 
+const sendLiveSlideToWebsocket = (slide) => {
+  if (
+    socket.value.readyState === WebSocket.CLOSED ||
+    socket.value.readyState === WebSocket.CLOSING
+  ) {
+    console.error("Error sending live slide to websocket", "WebSocket closed")
+    socket.value.close() // Close on error to trigger the onclose event
+    connectWebSocket()
+  } else {
+    socket.value.send(
+      JSON.stringify({
+        action: "live-slide",
+        data: slide,
+      })
+    )
+  }
+}
+
 watch(
   () => appStore.currentState.liveSlideId,
   (liveSlideId) => {
@@ -88,13 +109,7 @@ watch(
       (slide) => slide.id === liveSlideId
     )
     if (liveSlide) {
-      const socket = useNuxtApp().$socket
-      socket.send(
-        JSON.stringify({
-          action: "live-slide",
-          data: liveSlide,
-        })
-      )
+      sendLiveSlideToWebsocket(liveSlide)
     }
   },
   { deep: true }
@@ -109,11 +124,6 @@ onMounted(async () => {
       useGlobalEmit(appWideActions.openSettings, "Profile Settings")
     }, 1000)
   }
-  // else {
-  //   setTimeout(() => {
-  //     useGlobalEmit(appWideActions.openScheduleModal)
-  //   }, 2000)
-  // }
 
   // APP-WIDE SHORTCUTS
   useCreateShortcut("/", () => useGlobalEmit(appWideActions.quickActionsFocus))
@@ -170,6 +180,15 @@ onMounted(async () => {
 
   // Connect to websocket
   if (appStore.currentState.activeSchedule) {
+    connectWebSocket()
+  }
+})
+
+emitter.on("refresh-slides", () => {
+  if (
+    socket.value?.readyState === WebSocket.CLOSED ||
+    socket.value?.readyState === WebSocket.CLOSING
+  ) {
     connectWebSocket()
   }
 })

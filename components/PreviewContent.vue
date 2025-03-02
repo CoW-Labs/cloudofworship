@@ -1069,10 +1069,14 @@ const gotoScripture = async (title: string, version: string) => {
   const tempSlide = { ...activeSlide.value } as Slide
   const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
   const scriptureSplitted = useScriptureLabel(title || "1:1:1")?.split(":")
+
+  // added || 1 to make sure that if no verse is specified, it defaults to first chapter or first verse
   const scriptureLabel = `${title?.slice(0, title.lastIndexOf(" "))} ${
-    scriptureSplitted?.[1]
-  }:${scriptureSplitted?.[2]}`
-  const scriptureShortLabel = `${scriptureSplitted?.[0]}:${scriptureSplitted?.[1]}:${scriptureSplitted?.[2]}`
+    scriptureSplitted?.[1] || 1
+  }:${scriptureSplitted?.[2] || 1}`
+  const scriptureShortLabel = `${scriptureSplitted?.[0]}:${
+    scriptureSplitted?.[1] || 1
+  }:${scriptureSplitted?.[2] || 1}`
 
   const scripture = await useScripture(scriptureShortLabel, version)
   appStore.setRecentBibleSearches(scriptureShortLabel)
