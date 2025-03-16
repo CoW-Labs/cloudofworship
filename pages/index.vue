@@ -178,6 +178,16 @@ onMounted(async () => {
     }
   )
 
+  useCreateShortcut(
+    ",",
+    () => {
+      useGlobalEmit("open-settings")
+    },
+    {
+      ctrlOrMeta: true,
+    }
+  )
+
   // Connect to websocket
   if (appStore.currentState.activeSchedule) {
     connectWebSocket()

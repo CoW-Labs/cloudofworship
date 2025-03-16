@@ -113,6 +113,10 @@ const shortcuts = ref([
     cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Y`,
     name: "Redo previous action",
   },
+  {
+    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + ,`,
+    name: "Open App Settings",
+  },
 ])
 
 emitter.on("open-shortcuts", () => {
