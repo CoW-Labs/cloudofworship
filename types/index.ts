@@ -145,6 +145,7 @@ export interface SlideStyle {
   isMediaMuted?: boolean
   windowPadding?: { left?: number, right?: number, top?: number, bottom?: number }
   lettercase?: string
+  lineSpacing?: string
 }
 
 export interface AppSettings {

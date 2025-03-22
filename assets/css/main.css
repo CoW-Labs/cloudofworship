@@ -453,6 +453,15 @@ body {
 .uppercase-live-content > .slide-layout-ctn > div:nth-child(1), .uppercase-live-content > div:nth-child(1) > .tiptap {
   text-transform: uppercase;
 }
+.double-line-spacing > .slide-layout-ctn > div:nth-child(1), .double-line-spacing > div:nth-child(1) > .tiptap {
+  line-height: 200%;
+}
+.normal-line-spacing > .slide-layout-ctn > div:nth-child(1), .normal-line-spacing > div:nth-child(1) > .tiptap {
+  line-height: normal;
+}
+.single-line-spacing > .slide-layout-ctn > div:nth-child(1), .single-line-spacing > div:nth-child(1) > .tiptap {
+  line-height: 1;
+}
 .tiptap.live-content {
   padding: 0.75rem;
   border-radius: 0;
