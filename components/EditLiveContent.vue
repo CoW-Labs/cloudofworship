@@ -240,12 +240,6 @@
         @update-song-lyrics="onUpdateSongLyrics($event)"
         @update-font="onUpdateSlideStyle({ ...slide.slideStyle, font: $event })"
         @update-lines-per-slide="onUpdateSongLines($event)"
-        @update-line-spacing="
-          onUpdateLineSpacing({
-            ...slide.slideStyle,
-            lineSpacing: $event,
-          })
-        "
         @update-media-seek-position="
           onUpdateMediaSeekPosition({
             ...slide.slideStyle,
@@ -516,10 +510,6 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
       title: "Lines per slide updated",
     })
   }
-}
-
-const onUpdateLineSpacing = (slideStyle: SlideStyle) => {
-  onUpdateSlideStyle(slideStyle)
 }
 
 const predictVerseInput = (

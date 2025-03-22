@@ -226,7 +226,12 @@
           },
         }"
         :options="Object.values(lineSpacingTypes)"
-        @change="$emit('update-line-spacing', $event)"
+        @change="
+          $emit('update-style', {
+            ...slide.slideStyle,
+            lineSpacing: $event,
+          })
+        "
         @open="containerOverflow = ''"
         @close="containerOverflow = 'overflow-x-auto'"
       >
@@ -393,7 +398,19 @@ const slideFontSize = ref<number>(
 )
 const isLoading = ref<boolean>(false)
 const containerOverflow = ref<string>("overflow-x-auto")
-const emit = defineEmits(["update-song-lyrics"])
+const emit = defineEmits([
+  "update-song-lyrics",
+  "update-media-seek-position",
+  "update-style",
+  "update-media-playing",
+  "update-line-spacing",
+  "update-font",
+  "update-lines-per-slide",
+  "update-alignment",
+  "update-lettercase",
+  "update-bg-fill-type",
+  "update-media-muted",
+])
 
 watch(
   () => props.slide,

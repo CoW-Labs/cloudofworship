@@ -7,6 +7,12 @@
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
       'uppercase-live-content': slide?.slideStyle?.lettercase === 'uppercase',
+      'double-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.double,
+      'normal-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
+      'single-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
   >
     <TiptapEditorContent :editor="editorOne" />
@@ -37,6 +43,12 @@
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
+      'double-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.double,
+      'normal-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
+      'single-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
   >
     <TiptapEditorContent :editor="editorOne" />
@@ -50,6 +62,12 @@
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
       'uppercase-live-content': slide?.slideStyle?.lettercase === 'uppercase',
+      'double-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.double,
+      'normal-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
+      'single-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
   >
     <TiptapEditorContent
@@ -66,6 +84,12 @@
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
       'uppercase-live-content': slide?.slideStyle?.lettercase === 'uppercase',
+      'double-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.double,
+      'normal-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
+      'single-line-spacing':
+        slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
   >
     <TiptapEditorContent :editor="uneditableEditorTwo" class="jost" />
