@@ -344,6 +344,7 @@ const preSlideCreation = (): Slide => {
       isMediaPlaying: false,
       // Added comment here to indicate new feat
       lettercase: appStore.currentState.settings.slideStyles.lettercase,
+      lineSpacing: appStore.currentState.settings.slideStyles.lineSpacing,
     },
   }
   return tempSlide

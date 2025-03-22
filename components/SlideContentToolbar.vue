@@ -199,6 +199,51 @@
       @change="$emit('update-lines-per-slide', $event)"
     />
 
+    <!-- SLIDE CONTENT LINE HEIGHT CONTROLS -->
+    <UTooltip text="Set line spacing" :popper="{ placement: 'top' }">
+      <USelectMenu
+        v-model="lineSpacing"
+        size="lg"
+        :select-class="`border-3 shadow-none outline-none text-center w-[120px] bg-primary-100 dark:bg-primary-900 dark:text-white`"
+        variant="none"
+        color="primary"
+        clear-search-on-close
+        :ui="{
+          base: 'bg-primary-500',
+          input: 'bg-primary-500',
+          color: {
+            primary: {
+              outline: 'shadow-sm bg-primary-500 ',
+            },
+          },
+        }"
+        :ui-menu="{
+          width: 'w-[140px]',
+          input: 'text-xs',
+          empty: 'text-xs',
+          option: {
+            size: 'text-xs',
+          },
+        }"
+        :options="Object.values(lineSpacingTypes)"
+        @change="$emit('update-line-spacing', $event)"
+        @open="containerOverflow = ''"
+        @close="containerOverflow = 'overflow-x-auto'"
+      >
+        <template #option="{ option: lineSpacing }">
+          <span v-if="lineSpacing?.length" class="truncate capitalize">{{
+            lineSpacing
+          }}</span>
+        </template>
+        <template #label>
+          <IconWrapper name="i-tabler-line-height" size="4"> </IconWrapper>
+          <span v-if="lineSpacing?.length" class="truncate capitalize">{{
+            lineSpacing
+          }}</span>
+        </template>
+      </USelectMenu>
+    </UTooltip>
+
     <!-- SLIDE CONTENT CASE CONTROLS -->
     <UTooltip
       text="Uppercase"
@@ -339,8 +384,13 @@ const MIN_FONT_SIZE = 50
 const props = defineProps<{
   slide: Slide
 }>()
-const backgroundFillType = ref<string>("")
-const slideFontSize = ref<number>(0)
+const backgroundFillType = ref<string>(
+  props.slide.slideStyle?.backgroundFillType || ""
+)
+const lineSpacing = ref<string>(props.slide.slideStyle?.lineSpacing || "")
+const slideFontSize = ref<number>(
+  props.slide.slideStyle?.fontSizePercent || 100
+)
 const isLoading = ref<boolean>(false)
 const containerOverflow = ref<string>("overflow-x-auto")
 const emit = defineEmits(["update-song-lyrics"])

@@ -264,6 +264,12 @@ export const backgroundFillTypes = {
   // center: 'Center',
 }
 
+export const lineSpacingTypes = {
+  single: 'single',
+  normal: 'normal', // default
+  double: 'double',
+}
+
 export const bibleBooks = [
   "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
   "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
