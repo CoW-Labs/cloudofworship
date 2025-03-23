@@ -30,15 +30,23 @@ jobs:
         id: release_notes
         run: |
           last_tag=${{ env.last_tag }}
-
-          if [ "$last_tag" = "v0.0.0" ]; then
-            commits=$(git log --pretty=format:"- %s")
+      
+          if [[ "$last_tag" == "v0.0.0" ]]; then
+            commits=$(git log --no-merges --pretty=format:"- %s")
           else
-            commits=$(git log "$last_tag"..HEAD --pretty=format:"- %s")
+            commits=$(git log "$last_tag"..HEAD --no-merges --pretty=format:"- %s")
           fi
-
-          escaped_commits=$(printf "%s" "$commits" | jq -Rsa .)
-
+      
+          filtered_commits=""
+          while IFS= read -r line; do
+            if [[ "$line" == *"Update appVersion to"* ]]; then
+              break
+            fi
+            filtered_commits+="$line"$'\n'
+          done <<< "$commits"
+      
+          escaped_commits=$(printf "%s" "$filtered_commits" | jq -Rsa .)
+      
           echo "release_notes=$escaped_commits" >> $GITHUB_ENV
 
       - name: Generate Next Version Tag
@@ -53,7 +61,18 @@ jobs:
           while IFS= read -r line; do
             echo "Processing line: $line"
 
-            if [[ $line == *BREAKING* ]]; then
+            # Skip merge commits
+            if [[ $line == "- Merge branch"* ]]; then
+              continue
+            fi
+
+            # Skip version bump commits
+            if [[ $line == "- Update appVersion"* ]]; then
+              continue
+            fi
+
+            # Check for major, minor, and patch updates
+            if [[ $line == "- BREAKING"* ]]; then
               hasMajor=1
             elif [[ $line == "- feat:"* ]]; then
               hasMinor=1
@@ -76,9 +95,11 @@ jobs:
           elif [[ $hasMinor -eq 1 ]]; then
             next_minor=$((minor + 1))
             next_version="v${major}.${next_minor}.0-beta"
-          else
+          elif [[ $hasPatch -eq 1 ]]; then
             next_patch=$((patch + 1))
             next_version="v${major}.${minor}.${next_patch}-beta"
+          else
+            next_version="$last_tag"  # If no valid changes, keep the same version
           fi
 
           echo "next_version=$next_version" >> $GITHUB_ENV
