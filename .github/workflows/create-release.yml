@@ -30,15 +30,15 @@ jobs:
         id: release_notes
         run: |
           last_tag=${{ env.last_tag }}
-
-          if [ "$last_tag" = "v0.0.0" ]; then
-            commits=$(git log --pretty=format:"- %s")
+      
+          if [[ "$last_tag" == "v0.0.0" ]]; then
+            commits=$(git log --no-merges --pretty=format:"- %s")
           else
-            commits=$(git log "$last_tag"..HEAD --pretty=format:"- %s")
+            commits=$(git log "$last_tag"..HEAD --no-merges --pretty=format:"- %s")
           fi
-
+      
           escaped_commits=$(printf "%s" "$commits" | jq -Rsa .)
-
+      
           echo "release_notes=$escaped_commits" >> $GITHUB_ENV
 
       - name: Generate Next Version Tag
