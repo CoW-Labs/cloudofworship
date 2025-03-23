@@ -53,7 +53,18 @@ jobs:
           while IFS= read -r line; do
             echo "Processing line: $line"
 
-            if [[ $line == *BREAKING* ]]; then
+            # Skip merge commits
+            if [[ $line == "- Merge branch"* ]]; then
+              continue
+            fi
+
+            # Skip version bump commits
+            if [[ $line == "- Update appVersion"* ]]; then
+              continue
+            fi
+
+            # Check for major, minor, and patch updates
+            if [[ $line == "- BREAKING"* ]]; then
               hasMajor=1
             elif [[ $line == "- feat:"* ]]; then
               hasMinor=1
@@ -76,9 +87,11 @@ jobs:
           elif [[ $hasMinor -eq 1 ]]; then
             next_minor=$((minor + 1))
             next_version="v${major}.${next_minor}.0-beta"
-          else
+          elif [[ $hasPatch -eq 1 ]]; then
             next_patch=$((patch + 1))
             next_version="v${major}.${minor}.${next_patch}-beta"
+          else
+            next_version="$last_tag"  # If no valid changes, keep the same version
           fi
 
           echo "next_version=$next_version" >> $GITHUB_ENV
