@@ -94,6 +94,8 @@
           />
         </div>
       </Transition>
+
+      <AdvertModal :active-advert="currentState.activeAdvert" />
     </ClientOnly>
   </div>
   <div
@@ -167,6 +169,7 @@ import type {
   Schedule,
   Song,
   SlideStyle,
+  Advert,
 } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { appWideActions } from "~/utils/constants"
@@ -194,6 +197,8 @@ const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
 const appInfo = ref({})
 const route = useRoute()
+
+const { currentState } = storeToRefs(appStore)
 
 const isAppOnline = computed(() => {
   // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
@@ -495,6 +500,11 @@ const fixAnomalyInDBMediaData = async () => {
   // console.log("done anomaly operation")
 }
 
+const fetchActiveAdvert = async () => {
+  const { data, error } = await useAPIFetch(`/advert/active`)
+  appStore.setActiveAdvert(data.value as Advert)
+}
+
 const downloadEssentialResources = async () => {
   const db = useIndexedDB()
 
@@ -762,6 +772,7 @@ onMounted(async () => {
   await downloadEssentialResources()
   overrideAppSettings()
   appStore.refreshAppActionsStack()
+  fetchActiveAdvert()
   if (location.hostname !== "localhost") {
     useGtag()
   }
