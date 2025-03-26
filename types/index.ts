@@ -161,3 +161,12 @@ export interface AppSettings {
   bibleVersions: Array<any>, // Check app.vue for bible versions array in a list
   alertLimit: number
 }
+
+export interface Advert {
+  _id: string
+  title: string
+  url: string
+  image: string
+  createdAt: string
+  updatedAt: string
+}

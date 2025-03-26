@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { Alert, AppSettings, BackgroundVideo, Schedule, Slide, SlideStyle } from '~/types/index'
+import type { Alert, AppSettings, BackgroundVideo, Schedule, Slide, SlideStyle, Advert } from '~/types/index'
 import type { Emitter } from 'mitt'
 import { bibleVersionObjects } from '~/utils/constants';
 import { useThrottleFn } from '@vueuse/core';
@@ -40,6 +40,7 @@ export const useAppStore = defineStore('app', {
   state: () => {
     return {
       currentState: {
+        activeAdvert: null as Advert | null,
         schedules: [] as Array<Schedule>,
         activeSchedule: null as Schedule | null,
         activeSlides: [] as Array<Slide>, // Returns all slides on CoW
@@ -305,6 +306,9 @@ export const useAppStore = defineStore('app', {
       this.setSlidesLoading(false)
       this.setLastSynced(new Date().toISOString())
       posthog.reset()
+    },
+    setActiveAdvert(advert: Advert | null) {
+      this.currentState.activeAdvert = advert
     },
     // Undo/Redo Actions
     setCurrentState(state: any) {

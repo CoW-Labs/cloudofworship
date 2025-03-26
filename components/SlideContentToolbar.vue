@@ -200,7 +200,13 @@
     />
 
     <!-- SLIDE CONTENT LINE HEIGHT CONTROLS -->
-    <UTooltip text="Set line spacing" :popper="{ placement: 'top' }">
+    <UTooltip
+      v-if="
+        !(slide?.type === slideTypes.text || slide?.type === slideTypes.media)
+      "
+      text="Set line spacing"
+      :popper="{ placement: 'top' }"
+    >
       <USelectMenu
         v-model="lineSpacing"
         size="lg"
