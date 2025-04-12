@@ -30,10 +30,16 @@ const useSlideContent = (slide: Slide, data: Scripture | Hymn | Song | Countdown
       ]
     case slideTypes.hymn:
       data = data as Hymn
+      if (appStore.currentState.settings.footnotes) {
+        return [
+          `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`,
+          `<p class="song-label"><b>${data?.title}</b> • HYMN</p>
+          <p class="copyright-content">${data?.source?.replace('undefined -', '').trim()}</p>`,
+        ]
+      }
       return [
         `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`,
-        `<p class="song-label"><b>${data?.title}</b> • HYMN</p>
-        <p class="copyright-content">${data?.source?.replace('undefined -', '').trim()}</p>`,
+        `<p class="song-label"><b>${data?.title}</b> • HYMN</p>`,
       ]
     case slideTypes.song:
       data = data as Song
