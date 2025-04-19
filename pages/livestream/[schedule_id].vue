@@ -162,6 +162,8 @@ const saveAllBackgroundVideos = async () => {
   const savedBgVideo4 = await db.cached.get("/video-bg-4.mp4")
   const savedBgVideo5 = await db.cached.get("/video-bg-5.mp4")
   const savedBgVideo6 = await db.cached.get("/video-bg-6.mp4")
+  const savedBgVideo9 = await db.cached.get("/video-bg-9.mp4")
+  const savedBgVideo10 = await db.cached.get("/video-bg-10.mp4")
 
   const saveBackground = (blob: any, index: number) => {
     const tempMedia: Media = {
@@ -227,6 +229,24 @@ const saveAllBackgroundVideos = async () => {
     )
     const bgVideoBlob = await bgVideoPromise.blob()
     saveBackground(bgVideoBlob, 6)
+  }
+
+  if (!savedBgVideo9) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-9.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 9)
+  }
+
+  if (!savedBgVideo10) {
+    const bgVideoPromise = await useDetailedFetch(
+      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-10.mp4`,
+      downloadProgress
+    )
+    const bgVideoBlob = await bgVideoPromise.blob()
+    saveBackground(bgVideoBlob, 10)
   }
 }
 
