@@ -59,6 +59,11 @@ const imageCompressionLoading = ref(false)
 
 const bgImageToBeSelected = ref<string | null>(null)
 const backgroundImages = ref<string[]>([
+  // EASTER IMAGES
+  "https://images.unsplash.com/photo-1649894708597-93851f061545?q=80&w=1740",
+  "https://images.unsplash.com/photo-1616548321600-aaab929899b5?q=80&w=1740",
+  "https://images.unsplash.com/photo-1711560728293-14b647bd3a12?q=80&w=1740",
+  // ---
   "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740",
   "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?q=80&w=1740",
   "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?q=80&w=1740",
