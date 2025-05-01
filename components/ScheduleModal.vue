@@ -298,7 +298,7 @@ const deleteSchedule = (scheduleId: string) => {
   )
 
   if (scheduleId === appStore.currentState.activeSchedule?._id) {
-    appStore.setActiveSchedule(updatedScheduleList?.at(0))
+    appStore.setActiveSchedule(updatedScheduleList?.at(0)!!)
   }
   appStore.setSchedules(updatedScheduleList)
 

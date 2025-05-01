@@ -43,6 +43,6 @@ const props = defineProps<{
 const { currentState } = storeToRefs(appStore)
 const animationDuration = computed(() => {
   // 1 char = 0.25s - Standard Calc
-  return `${currentState.value?.activeAlert.title.length}s`
+  return `${currentState.value?.activeAlert?.title.length}s`
 })
 </script>

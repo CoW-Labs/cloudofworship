@@ -1,7 +1,7 @@
 <template>
   <div
     class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
-    :id="currentState.liveSlideId"
+    :id="currentState.liveSlideId?.toString()"
   >
     <div
       v-if="!isFullScreen"
@@ -165,7 +165,7 @@ useHead({
   ],
 })
 
-const displayMediaOptions: DisplayMediaStreamConstraints = {
+const displayMediaOptions = {
   video: {
     displaySurface: "tab",
   },
@@ -194,12 +194,6 @@ const checkFullScreen = () => {
 }
 
 onMounted(() => {
-  // const toast = useToast()
-  // toast.add({
-  //   icon: "i-bx-info-circle",
-  //   title: "Double tap display to go full screen",
-  // })
-
   window.addEventListener("fullscreenchange", checkFullScreen)
   window.addEventListener("webkitfullscreenchange", checkFullScreen)
   window.addEventListener("mozfullscreenchange", checkFullScreen)
@@ -244,62 +238,62 @@ onBeforeUnmount(() => {
   window.removeEventListener("webkitfullscreenchange", checkFullScreen)
   window.removeEventListener("mozfullscreenchange", checkFullScreen)
   window.removeEventListener("MSFullscreenChange", checkFullScreen)
-  stopScreenCapture()
+  // stopScreenCapture()
 })
 
-const startScreenCapture = async () => {
-  let captureStream = null
-  try {
-    captureStream = await navigator.mediaDevices.getDisplayMedia(
-      displayMediaOptions
-    )
-  } catch (err) {
-    console.log("Error getting screen capture stream", err)
-  }
-  return captureStream
-}
+// const startScreenCapture = async () => {
+//   let captureStream = null
+//   try {
+//     captureStream = await navigator.mediaDevices.getDisplayMedia(
+//       (displayMediaOptions as DisplayMediaStreamConstraints)
+//     )
+//   } catch (err) {
+//     console.log("Error getting screen capture stream", err)
+//   }
+//   return captureStream
+// }
 
-const transmitScreenCapture = async () => {
-  const socket = await useSocket()
-  const captureStream = await startScreenCapture()
-  if (captureStream !== null) {
-    mediaRecorder.value = new MediaRecorder(captureStream, {
-      mimeType: "video/webm",
-    })
-    mediaRecorder.value.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        socket.send(event.data)
-        // console.log("data available", event.data)
-      }
-    }
-    mediaRecorder.value.onstop = (event) => {
-      // console.log("stopped", event)
-    }
-    mediaRecorder.value.start()
+// const transmitScreenCapture = async () => {
+//   const socket = await useSocket()
+//   const captureStream = await startScreenCapture()
+//   if (captureStream !== null) {
+//     mediaRecorder.value = new MediaRecorder(captureStream, {
+//       mimeType: "video/webm",
+//     })
+//     mediaRecorder.value.ondataavailable = (event) => {
+//       if (event.data.size > 0) {
+//         socket.send(event.data)
+//         // console.log("data available", event.data)
+//       }
+//     }
+//     mediaRecorder.value.onstop = (event) => {
+//       // console.log("stopped", event)
+//     }
+//     mediaRecorder.value.start()
 
-    mediaRecorderInterval.value = setInterval(() => {
-      if (mediaRecorder.value?.state !== "inactive") {
-        mediaRecorder.value?.requestData()
-      }
-    }, 1000 / FPS)
-    // console.log("mediaRecorder", mediaRecorder.value)
-  } else {
-    console.log("No capture stream")
-  }
-}
+//     mediaRecorderInterval.value = setInterval(() => {
+//       if (mediaRecorder.value?.state !== "inactive") {
+//         mediaRecorder.value?.requestData()
+//       }
+//     }, 1000 / FPS)
+//     // console.log("mediaRecorder", mediaRecorder.value)
+//   } else {
+//     console.log("No capture stream")
+//   }
+// }
 
-const stopScreenCapture = async () => {
-  try {
-    if (mediaRecorder.value) {
-      mediaRecorder.value.stop()
-      mediaRecorder.value.ondataavailable = null
-      mediaRecorder.value = null
-    }
-    clearInterval(mediaRecorderInterval.value)
-  } catch (err) {
-    console.log("Error stopping screen capture", err)
-  }
-}
+// const stopScreenCapture = async () => {
+//   try {
+//     if (mediaRecorder.value) {
+//       mediaRecorder.value.stop()
+//       mediaRecorder.value.ondataavailable = null
+//       mediaRecorder.value = null
+//     }
+//     clearInterval(mediaRecorderInterval.value)
+//   } catch (err) {
+//     console.log("Error stopping screen capture", err)
+//   }
+// }
 </script>
 
 <style>

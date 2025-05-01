@@ -121,10 +121,12 @@ const getSongs = async (query: string = "") => {
     const promise = await useAPIFetch(
       `/church/${authStore.user?.churchId}/songs?search=${query}&limit=20`
     )
-    let songsData = promise.data.value.data?.data?.map((song) => ({
-      ...song,
-      title: song.title.replaceAll("â", "'"),
-    }))
+    let songsData = (promise.data.value as any)?.data?.data?.map(
+      (song: Song) => ({
+        ...song,
+        title: song.title.replaceAll("â", "'"),
+      })
+    )
     songs.value = songsData
     loading.value = false
   } catch (err) {

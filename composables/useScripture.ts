@@ -14,7 +14,7 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
   const book = Number(shortLabelSplitted?.[0] || "1")
   const chapter = Number(shortLabelSplitted?.[1] || "1")
   const verse = shortLabelSplitted?.[2]?.includes('-') ? shortLabelSplitted?.[2] : Number(shortLabelSplitted?.[2] || 1)
-  const verses = []
+  const verses: number[] = []
 
   // If verse contains hyphen
   if (verse.toString().includes('-')) {
@@ -26,7 +26,7 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
       verses.push(i)
     }
   } else {
-    verses.push(verse)
+    verses.push(Number(verse))
   }
 
   let scripture = ''

@@ -56,33 +56,36 @@
 </template>
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
-import type { Scripture, Slide } from "~/types"
+import type { Scripture, Slide, BibleVerse, Song } from "~/types"
 
 const props = defineProps<{
   slide: Slide
   verse: string
 }>()
 
-const allChapterVerses = ref<any[]>()
+const allChapterVerses = ref<BibleVerse[]>()
 const relatedData = ref<any>({})
 const bibleChapter = computed(() => props.verse?.split(":")?.[0])
 const versesPreview = ref<HTMLDivElement | null>(null)
 
 const getAllChapterVerses = async () => {
   const chapter = await useScriptureChapter(props.verse)
-  allChapterVerses.value = chapter?.content
+  console.log("chapter", chapter?.content)
+  allChapterVerses.value = chapter?.content as BibleVerse[]
 }
 
 // Return connected Hymn / Song object related
 const getSongOrHymnObj = async () => {
   switch (props.slide?.type) {
     case slideTypes.hymn:
-      const hymn = await useHymn(props.slide?.songId)
+      const hymn = await useHymn(props.slide?.songId!!)
       relatedData.value = hymn
       break
     case slideTypes.song:
       // console.log(props.slide)
-      const song = await useSong(props.slide?.data || props.slide?.songId)
+      const song = await useSong(
+        (props.slide?.data as Song) || props.slide?.songId!!
+      )
       relatedData.value = song
       break
   }

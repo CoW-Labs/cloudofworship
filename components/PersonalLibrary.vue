@@ -202,7 +202,9 @@ watch(page, (newVal, oldVal) => {
 })
 
 const savedSongs = computed(() => {
-  return libraryItems?.value?.filter((item) => item.type === libraryTypes.song)
+  return (
+    libraryItems?.value?.filter((item) => item.type === libraryTypes.song) || []
+  )
 })
 
 const savedSlides = computed(() => {
@@ -237,16 +239,27 @@ const editSong = (song: Song) => {
 }
 
 const searchLibraryItems = (query: string = "") => {
-  let results = fuzzysort.go(query, libraryItems.value, {
-    keys: [
-      "id",
-      "content.type",
-      "content.title",
-      "content.name",
-      "content.artist",
-    ],
-  })
-  results = results?.map((result) => result.obj)
+  console.log(query, libraryItems.value)
+
+  // Cast LibraryItem to Fuzzysort.Prepared to avoid errors
+  const tempLibraryItems = [...(libraryItems.value || [])]?.map(
+    (item) => item as unknown as Fuzzysort.Prepared
+  )
+
+  let results: Array<Fuzzysort.Result> | any = fuzzysort.go(
+    query,
+    tempLibraryItems,
+    {
+      keys: [
+        "id",
+        "content.type",
+        "content.title",
+        "content.name",
+        "content.artist",
+      ],
+    }
+  )
+  results = results?.map((result: Fuzzysort.Result | any) => result.obj)
   // console.log(results)
   searchedLibraryItems.value = results
   loading.value = false

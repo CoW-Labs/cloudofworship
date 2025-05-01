@@ -17,7 +17,7 @@ export interface Slide {
   title?: string // For hymn and song titles, also for scripture labels (e.g Ephesians 3:1)
   songId?: string // only for hymns/songs, could be [hymn.number] or [song.id]
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
-  data?: Song | Scripture | Hymn | Countdown // for song/bible/hymn/file, Object mapped to Slide only on client
+  data?: Song | Scripture | Hymn | Countdown | ExtendedFileT // for song/bible/hymn/file, Object mapped to Slide only on client
   slideStyle?: SlideStyle,
   createdAt?: string,
   updatedAt?: string
@@ -58,20 +58,21 @@ export interface QuickAction {
   icon: string
   name: string
   desc: string
-  type: string
   action: string
-  unreleased: boolean
+  type?: string
+  unreleased?: boolean
   bibleBookIndex?: string
   bibleChapterAndVerse?: string
   hymnIndex?: string
   searchableOnly?: boolean
+  meta?: string
 }
 
 export interface Scripture {
   label: string
   labelShortFormat: string
   version: string
-  content: string
+  content: string | BibleVerse[]
 }
 
 export interface BibleVerse {
@@ -112,7 +113,7 @@ export interface Media {
   id: string
   content?: any
   remoteUrl?: string
-  data?: ArrayBuffer | string
+  data?: ArrayBuffer | File | string
   createdAt?: string
   updatedAt?: string
 }
@@ -169,4 +170,9 @@ export interface Advert {
   image: string
   createdAt: string
   updatedAt: string
+}
+
+export interface ExtendedFileT extends File {
+  blob?: Blob
+  url: string
 }

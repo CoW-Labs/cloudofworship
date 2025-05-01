@@ -19,7 +19,7 @@
               </h4>
               <SlideChip
                 :slide-type="slide?.type"
-                :slide-sub-type="slide?.data?.type"
+                :slide-sub-type="(slide?.data as ExtendedFileT)?.type"
                 dark-mode
               />
             </div>
@@ -146,7 +146,7 @@
               v-show="
                 slide?.type !== slideTypes.media ||
                 (slide?.type === slideTypes.media &&
-                  slide?.data?.type?.includes('audio'))
+                  (slide?.data as ExtendedFileT)?.type?.includes('audio'))
               "
               class="button-group flex rounded-md mx-1 p-1"
               :class="{
@@ -184,7 +184,7 @@
                 </template>
               </UPopover>
               <UPopover
-                v-if="!slide?.data?.type?.includes('audio')"
+                v-if="!(slide?.data as ExtendedFileT)?.type?.includes('audio')"
                 v-model:open="bgVideoPopoverOpen"
               >
                 <UTooltip text="Add background video" :popper="{ arrow: true }">
@@ -307,7 +307,7 @@
 <script setup lang="ts">
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
-import type { Slide, SlideStyle, Song } from "~/types"
+import type { ExtendedFileT, Slide, SlideStyle, Song } from "~/types"
 
 const props = defineProps<{
   slide: Slide
@@ -331,7 +331,7 @@ const bgImagePopoverOpen = ref<boolean>(false)
 const bgVideoPopoverOpen = ref<boolean>(false)
 const bgColorPopoverOpen = ref<boolean>(false)
 const slideContents = ref<Array<string>>([])
-const verse = ref<string | undefined>(props.slide?.title)
+const verse = ref<string>(props.slide?.title || "")
 const searchedBibleBookOptions = ref<string[]>([])
 const containerOverflow = ref<string>("overflow-x-auto")
 
@@ -366,7 +366,7 @@ watch(
   () => props.slide,
   () => {
     // Update slide title when Slide is updated
-    verse.value = props.slide?.title
+    verse.value = props.slide?.title || ""
 
     // Remove toolbar when Slide is updated, if slide.type is not text
     if (props.slide?.type !== slideTypes.text) {
@@ -397,14 +397,14 @@ emitter.on("pause-inactive-slide-video", () => {
   }
 })
 
-const onSelectLayout = (data: string) => {
-  layoutPopoverOpen.value = false
-  const tempSlide: Slide = {
-    ...props.slide,
-    layout: data,
-  }
-  emit("slide-update", tempSlide)
-}
+// const onSelectLayout = (data: string) => {
+//   layoutPopoverOpen.value = false
+//   const tempSlide: Slide = {
+//     ...props.slide,
+//     layout: data,
+//   }
+//   emit("slide-update", tempSlide)
+// }
 
 const onSelectBackground = (
   backgroundType: string,
@@ -414,12 +414,12 @@ const onSelectBackground = (
   bgVideoPopoverOpen.value = false
   bgColorPopoverOpen.value = false
 
-  const tempSlide: Slide = {
+  const tempSlide = {
     ...props.slide,
     background: data.video || data,
     backgroundVideoKey: data.key || undefined,
     backgroundType,
-  }
+  } as Slide
   emit("slide-update", tempSlide)
 }
 
@@ -513,12 +513,14 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
 }
 
 const predictVerseInput = (
-  element: HTMLElement | undefined,
+  element: HTMLInputElement | undefined,
   specificBook?: string
 ) => {
   if (verse.value?.trim()) {
     console.log(specificBook)
-    const bibleVerseInput = document.getElementById("bible-verse-input")
+    const bibleVerseInput = document.getElementById(
+      "bible-verse-input"
+    ) as HTMLInputElement
     if (typeof specificBook === "string") {
       verse.value = `${specificBook} 1:1`
       setTimeout(() => {
@@ -534,8 +536,8 @@ const predictVerseInput = (
     } else if (verse.value?.includes(":")) {
       setTimeout(() => {
         element?.setSelectionRange(
-          verse.value?.indexOf(":") + 1,
-          verse.value?.indexOf(":") + 2
+          (verse.value?.indexOf(":") || 0) + 1,
+          (verse.value?.indexOf(":") || 0) + 2
         )
         element?.focus()
       }, 100)

@@ -61,11 +61,12 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { appFonts } from "~/utils/constants"
+import type { Editor } from "@tiptap/core"
 
 const props = defineProps<{
   size: string
   disabled: boolean
-  editor: Object
+  editor: Editor
 }>()
 
 const appStore = useAppStore()
@@ -91,5 +92,6 @@ const selectedFont = computed(() => {
       return `${tempFont}`
     }
   })
+  return null
 })
 </script>

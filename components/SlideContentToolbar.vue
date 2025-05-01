@@ -54,8 +54,8 @@
     <template
       v-if="
         slide?.type === slideTypes.media &&
-        (slide?.data?.type?.includes('video') ||
-          slide?.data?.type?.includes('audio'))
+        ((slide?.data as ExtendedFileT)?.type?.includes('video') ||
+          (slide?.data as ExtendedFileT)?.type?.includes('audio'))
       "
     >
       <UTooltip text="Mute/Unmute media" :popper="{ placement: 'top' }">
@@ -387,7 +387,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Slide } from "~/types"
+import type { ExtendedFileT, Slide } from "~/types"
 import { appWideActions } from "~/utils/constants"
 
 const MAX_FONT_SIZE = 150

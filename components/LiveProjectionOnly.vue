@@ -34,8 +34,8 @@
       <!-- AUDIO BACKGROUND -->
       <audio
         ref="video"
-        v-if="slide?.data?.type?.includes('audio')"
-        :src="slide?.data?.url"
+        v-if="(slide?.data as ExtendedFileT)?.type?.includes('audio')"
+        :src="(slide?.data as ExtendedFileT)?.url"
         autoplay
         :loop="
           slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
@@ -79,9 +79,6 @@
             'object-center bg-fixed bg-stretch object-fill':
               slide?.slideStyle?.backgroundFillType ===
               backgroundFillTypes.stretch,
-            'object-center bg-repeat':
-              slide?.slideStyle?.backgroundFillType ===
-              backgroundFillTypes.center,
           },
         ]"
         crossorigin="anonymous"
@@ -192,7 +189,7 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
-import type { Slide, SlideStyle } from "~/types"
+import type { ExtendedFileT, Slide, SlideStyle } from "~/types"
 const appMounted = ref<boolean>(false)
 const video = ref<HTMLVideoElement | null>(null)
 const foregroundContentVisible = ref<boolean>(true)
@@ -255,7 +252,7 @@ watch(
         }
 
         // console.log(newVal.slideStyle?.mediaSeekPosition)
-        if (newVal.slideStyle?.mediaSeekPosition === 0) {
+        if (newVal.slideStyle?.mediaSeekPosition === 0 && video.value) {
           video.value.currentTime = newVal.slideStyle?.mediaSeekPosition
         }
 

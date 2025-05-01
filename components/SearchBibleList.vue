@@ -131,7 +131,7 @@ const turnToBibleTypeAction = (bibleVerse: BibleVerse) => {
 watch(selectedFilter, () => {
   getVerses()
   loading.value = true
-  onSearchInput(searchInput.value)
+  onSearchInput()
 })
 
 watch(
@@ -205,13 +205,18 @@ const getDefaultBible = async () => {
 const getVerses = (query: string = "") => {
   if (query?.length >= 2) {
     loading.value = true
-    let results = fuzzysort.go(query, formattedDefaultBible.value, {
-      keys: ["scripture"],
-    })
-    results = results?.map((result) => result.obj) as BibleVerse[]
+    let results: any | Fuzzysort.Result[] = fuzzysort.go(
+      query,
+      formattedDefaultBible.value,
+      {
+        keys: ["scripture"],
+      }
+    )
+    results = results?.map(
+      (result: Fuzzysort.Result | any) => result.obj
+    ) as BibleVerse[]
     verses.value = results.slice(0, 15)
   } else {
-    const rand = Math.floor(Math.random() * 1115 + 15)
     verses.value = formattedDefaultBible.value.slice(0, 15)
   }
   loading.value = false

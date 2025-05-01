@@ -1,7 +1,7 @@
 <template>
   <div
     class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
-    :id="currentState.liveSlideId"
+    :id="currentState.liveSlideId?.toString()"
   >
     <div
       v-if="!isFullScreen"

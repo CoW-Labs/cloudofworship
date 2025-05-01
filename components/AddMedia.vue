@@ -128,6 +128,7 @@
 <script setup lang="ts">
 import { appWideActions } from "~/utils/constants"
 import type { Emitter } from "mitt"
+import type { ExtendedFileT } from "~/types"
 
 const imageCompressionLoading = ref(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -164,7 +165,7 @@ const addMediaEmitter = async () => {
         ...fileObj,
         blob: compressedFile,
         url: URL.createObjectURL(compressedFile),
-      }
+      } as ExtendedFileT
     })
   )
   // console.log("compressedFiles", compressedFiles)

@@ -88,7 +88,7 @@ const scriptureActions: QuickAction[] = bibleBooks?.map((book, index) => {
     action: "new-bible",
     meta: `${book} 0:0 1:1 2:2 3:3 4:4 5:5 6:6 7:7 8:8 9:9 10:10 -`,
     searchableOnly: true,
-    bibleBookIndex,
+    bibleBookIndex: `${bibleBookIndex}`,
     type: slideTypes.bible,
   }
 })
@@ -99,7 +99,7 @@ const bibleChapterAndVerse = computed(() => {
   return searchInput.value.match(regex)?.[0]?.replaceAll(" ", "")
 })
 
-const searchedActions = computed(() => {
+const searchedActions = computed<QuickAction[]>(() => {
   const twoDigitNumbers = searchInput.value?.match(/\b\d{2}\b/g)
 
   // Stop search if input includes two digit number
@@ -114,13 +114,17 @@ const searchedActions = computed(() => {
       ? searchInputBeforeTwoDigitNumbers
       : searchInputBeforeTwoDigitNumbers?.substring(0, colonIndex)
 
-  let results = fuzzysort.go(searchInputBeforeColon, actions.value, {
-    keys: ["name", "desc", "meta"],
-  })
-  results = results?.map((result) => result.obj)
+  let results: any | Fuzzysort.Result[] = fuzzysort.go(
+    searchInputBeforeColon,
+    actions.value,
+    {
+      keys: ["name", "desc", "meta"],
+    }
+  )
+  results = results?.map((result: Fuzzysort.Result | any) => result.obj)
 
   // Sort by showing [searchableOnly] actions last
-  results.sort((a, b) => {
+  results.sort((a: QuickAction, b: QuickAction) => {
     if (a.searchableOnly && !b.searchableOnly) {
       return 1
     } else if (!a.searchableOnly && b.searchableOnly) {
@@ -132,7 +136,7 @@ const searchedActions = computed(() => {
 
   // If true, then show Bible types first.
   if (bibleChapterAndVerse.value) {
-    results.sort((a, b) => {
+    results.sort((a: QuickAction, b: QuickAction) => {
       if (a.type === "bible" && b.type !== "bible") {
         return -1
       } else if (a.type !== "bible" && b.type === "bible") {

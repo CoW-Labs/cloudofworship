@@ -140,7 +140,7 @@ const copyToClipboard = () => {
   document.execCommand("copy")
   copied.value = true
   setTimeout(() => {
-    copied.value = null
+    copied.value = false
   }, 2000)
   document.body.removeChild(input)
 }

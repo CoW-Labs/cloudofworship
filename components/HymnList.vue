@@ -90,7 +90,7 @@ import { useDebounceFn } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
 
-const allHymns = ref<Hymn[]>()
+const allHymns = ref<Hymn[]>([])
 const searchInput = ref<string>("")
 const loading = ref<boolean>(true)
 const hymns = ref<Hymn[]>()
@@ -135,14 +135,18 @@ const getAllHymns = async () => {
 const getHymns = (query: string = "") => {
   if (query?.length >= 2) {
     loading.value = true
-    let results = fuzzysort.go(query, allHymns.value, {
-      keys: ["title", "meta"],
-    })
-    results = results?.map((result) => result.obj)
+    let results: any | Fuzzysort.Result[] = fuzzysort.go(
+      query,
+      allHymns.value,
+      {
+        keys: ["title", "meta"],
+      }
+    )
+    results = results?.map((result: Fuzzysort.Result | any) => result.obj)
     hymns.value = results.slice(0, 15)
   } else {
     const rand = Math.floor(Math.random() * 1115 + 15)
-    hymns.value = allHymns.value.slice(rand - 15, rand)
+    hymns.value = allHymns.value?.slice(rand - 15, rand)
   }
   loading.value = false
 }

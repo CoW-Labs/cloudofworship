@@ -123,11 +123,10 @@ const addSong = async () => {
   } finally {
     loading.value = false
     if (props.song) {
-      // updateSongInAPI()
+      emit("go-home")
     } else {
       uploadSongToAPI(song)
     }
-    emit("go-home")
   }
 }
 
@@ -149,9 +148,8 @@ const uploadSongToAPI = async (song: Song) => {
 
     // If error occurred
     if (error.value) {
-      toast.add({ icon: "i-bx-error", title: error.value })
+      toast.add({ icon: "i-bx-error", title: error.value.data?.message })
     } else {
-      // console.log("data", data.value)
       loading.value = false
       toast.add({ icon: "i-bx-save", title: "Song uploaded" })
       emit("go-home")

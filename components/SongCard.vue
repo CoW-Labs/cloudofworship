@@ -18,7 +18,7 @@
         useGlobalEmit(
           `new-${type || slideTypes.song}`,
           type === slideTypes.hymn
-            ? song?.number
+            ? (song as Hymn)?.number
             : { ...song, fromSaved: saved }
         )
       "
@@ -29,7 +29,7 @@
           {{ song?.title || "" }}
         </h4>
         <p class="font-light text-xs mt-1 break-all">
-          {{ song?.artist || song?.author || "" }}
+          {{ (song as Song)?.artist || song?.author || "" }}
         </p>
         <p
           v-if="song?.author === 'me'"
@@ -54,7 +54,7 @@
           button-size="xs"
           header="Delete song"
           label="Are you sure you want to delete this song from your library? This action is not reversible"
-          @confirm="$emit('delete-song', song?.id)"
+          @confirm="$emit('delete-song', (song as Song)?.id)"
         >
         </ConfirmDialog>
       </div>
@@ -66,7 +66,10 @@
         >
           <AppSection heading="Lyrics Preview">
             <p class="px-2">
-              {{ song?.lyrics?.trim() || song?.verses?.toString().trim() }}
+              {{
+                (song as Song)?.lyrics?.trim() ||
+                song?.verses?.toString().trim()
+              }}
             </p>
           </AppSection>
           <IconWrapper

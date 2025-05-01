@@ -123,7 +123,6 @@ const saveAndSelectImage = async (file: any) => {
   // Save to S3
   if (online.value) {
     uploadedFile = await useUploadImage(compressedFile)
-    console.log("uploadedFile", uploadedFile)
   }
 
   // Save to IndexedDB

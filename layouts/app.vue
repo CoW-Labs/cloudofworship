@@ -779,7 +779,6 @@ const retrieveAllMediaFilesFromDB = async () => {
 
 const setCachedVideosURL = async () => {
   const cachedVideos = await useBackgroundVideos()
-  console.log('cachedVideos', cachedVideos)
   const tempCachedVideos = cachedVideos?.map((cached: BackgroundVideo) => ({
     id: cached?.id,
     url: URL.createObjectURL(cached?.data),

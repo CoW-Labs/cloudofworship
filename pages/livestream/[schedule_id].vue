@@ -52,7 +52,7 @@
   </div>
   <div
     class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
-    :id="currentState.liveSlideId"
+    :id="currentState.liveSlideId?.toString()"
     v-else
   >
     <!-- <div
@@ -94,7 +94,7 @@
 </template>
 <script setup lang="ts">
 import type { Emitter } from "mitt"
-import type { BackgroundVideo, Slide } from "~/types"
+import type { BackgroundVideo, Media, Slide } from "~/types"
 import { useAppStore } from "@/store/app"
 import { useOnline } from "@vueuse/core"
 const appStore = useAppStore()
@@ -166,7 +166,7 @@ const saveAllBackgroundVideos = async () => {
   const savedBgVideo10 = await db.cached.get("/video-bg-10.mp4")
 
   const saveBackground = (blob: any, index: number) => {
-    const tempMedia: Media = {
+    const tempMedia = {
       id: `/video-bg-${index}.mp4`,
       data: blob,
       content: "video",
@@ -251,10 +251,10 @@ const saveAllBackgroundVideos = async () => {
 }
 
 const setCachedVideosURL = async () => {
-  const cachedVideos = await useBackgroundVideos()
-  const tempCachedVideos = cachedVideos?.map((cached: BackgroundVideo) => ({
+  const cachedVideos = (await useBackgroundVideos()) as Media[]
+  const tempCachedVideos = cachedVideos?.map((cached: Media) => ({
     id: cached?.id,
-    url: URL.createObjectURL(cached?.data),
+    url: URL.createObjectURL(cached?.data as File),
   }))
   cachedVideosURLs.value = tempCachedVideos as BackgroundVideo[]
   // console.log(tempCachedVideosURLs)
@@ -345,7 +345,7 @@ const connectWebSocket = async () => {
 
   socket.value.onerror = (error) => {
     console.error("WebSocket connection error:", error)
-    socket.value.close() // Close on error to trigger the onclose event
+    socket.value?.close() // Close on error to trigger the onclose event
   }
 }
 

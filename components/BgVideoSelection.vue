@@ -11,14 +11,14 @@
       >
         <video
           class="bg-image w-[100%] h-[100%] transition rounded-md opacity-100 hover:opacity-30 object-cover"
-          :class="{ 'opacity-30': video === value }"
+          :class="{ 'opacity-30': video?.url === value }"
           :src="video?.url"
           muted
           autoplay
           crossorigin="anonymous"
         ></video>
         <IconWrapper
-          v-if="video === value"
+          v-if="video?.url === value"
           name="i-bx-check"
           size="5"
           :rounded-bg="true"

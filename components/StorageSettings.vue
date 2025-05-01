@@ -163,7 +163,7 @@ const calculateMediaTableSize = async () => {
   let totalSize = 0
   // console.log("mediaTableSize", await db.media.count())
   await db.media.each((item: Media) => {
-    totalSize += item?.data?.byteLength || 0
+    totalSize += (item?.data as ArrayBuffer)?.byteLength || 0
   })
   mediaTableSize.value = totalSize / 1024 / 1024
 }

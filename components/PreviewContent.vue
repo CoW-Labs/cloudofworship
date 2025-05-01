@@ -91,7 +91,15 @@ import type { Emitter } from "mitt"
 import { merge } from "rxjs"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import type { Hymn, Scripture, Slide, Song, Countdown, Schedule } from "~/types"
+import type {
+  Hymn,
+  Scripture,
+  Slide,
+  Song,
+  Countdown,
+  Schedule,
+  ExtendedFileT,
+} from "~/types"
 import { appWideActions } from "~/utils/constants"
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -233,7 +241,7 @@ emitter.on("new-song-search", (query: string) => {
   // Do nothing
 })
 
-emitter.on("new-media", async (data: any) => {
+emitter.on("new-media", async (data: ExtendedFileT[]) => {
   if (data) {
     // console.log("media-data", data)
     if (data?.length > 0) {
@@ -722,7 +730,7 @@ const createNewBibleSlide = (
   tempSlide.name = useSlideName(tempSlide)
 
   // Calculate font-size of scripture content
-  let fontSize = useScreenFontSize(scripture?.content)
+  let fontSize = useScreenFontSize(scripture?.content as string)
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
     fontSize: Number(fontSize),
@@ -806,7 +814,7 @@ const createNewSongSlide = (song: Song) => {
 }
 
 const createNewMediaSlide = async (
-  file: any,
+  file: ExtendedFileT,
   options?: { oneOfManySlides: boolean }
 ) => {
   const tempSlide = { ...preSlideCreation() }
@@ -835,7 +843,7 @@ const createNewMediaSlide = async (
       // Store Blob in DB for easy retrieval on reload
       await useIndexedDB().media.add({
         id: tempSlide.id,
-        content: { size: file.blob.size, type: file.blob.type },
+        content: { size: file?.blob?.size, type: file?.blob?.type },
         data: data as ArrayBuffer,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -853,8 +861,7 @@ const createNewMediaSlide = async (
   return { ...tempSlide, blob }
 }
 
-const createMultipleNewMediaSlides = async (files: any[]) => {
-  // console.log("files", files)
+const createMultipleNewMediaSlides = async (files: ExtendedFileT[]) => {
   useGlobalEmit(appWideActions.appLoading, true)
   const multipleSlidesPromise: Promise<any>[] = []
   files?.forEach((file) => {
@@ -872,8 +879,8 @@ const createMultipleNewMediaSlides = async (files: any[]) => {
   // Upload image files as backgrounds
   newSlides = newSlides.filter((slide) => slide.backgroundType === "image")
 
-  const uploadedImages = files.map((file) =>
-    file.blob.type.includes("image") ? useUploadImage(file.blob) : null
+  const uploadedImages = files.map((file: ExtendedFileT) =>
+    file?.blob?.type.includes("image") ? useUploadImage(file?.blob) : null
   )
   const uploadedImagesResp = await Promise.all(uploadedImages)
   // console.log("files", files)
@@ -1085,7 +1092,7 @@ const gotoScripture = async (title: string, version: string) => {
     // Calculate font-size of scripture content
     tempSlide.title = scriptureLabel
     tempSlide.data = scripture
-    let fontSize = useScreenFontSize(scripture?.content)
+    let fontSize = useScreenFontSize(scripture?.content as string)
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
       fontSize: Number(fontSize),
@@ -1196,7 +1203,7 @@ const saveSlide = async (item: Slide) => {
 
   // If slide is a hymn slide, convert it to a song
   if (tempItem.type === slideTypes.hymn) {
-    const hymn = await useHymn(tempItem.songId as string)
+    const hymn = (await useHymn(tempItem.songId as string)) as Hymn
     const verses = [...hymn?.verses]
     if (hymn?.chorus !== "false") {
       verses.splice(1, 0, hymn?.chorus)
@@ -1244,8 +1251,8 @@ const saveSlide = async (item: Slide) => {
       )
       toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
     } else {
-      delete tempItem.data.blob
-      delete tempItem.blob
+      delete (tempItem?.data as ExtendedFileT)?.blob
+      // delete tempItem.blob - Removed because I couldn't find a place where it was assigned, TODO: Check if it is needed
       await db.library.add(
         {
           id: tempItem.id,
@@ -1270,7 +1277,7 @@ const saveSlide = async (item: Slide) => {
         })
         toast.add({ icon: "i-bx-save", title: "Updated song saved to Library" })
       } else {
-        delete tempItem.data.blob
+        delete (tempItem?.data as ExtendedFileT)?.blob
         db.library.update(tempItem.id, {
           id: tempItem.id,
           type: "slide",

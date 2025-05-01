@@ -1,3 +1,5 @@
+import { QuickAction } from "~/types"
+
 export const slideTypes = {
   song: 'song',
   hymn: 'hymn',
@@ -54,7 +56,7 @@ export const appWideActions = {
   openShortcutsModal: 'open-shortcuts'
 }
 
-export const quickActionsArr = [
+export const quickActionsArr: QuickAction[] = [
   {
     icon: "i-bx-bible",
     name: "Display Bible",
@@ -62,7 +64,7 @@ export const quickActionsArr = [
     action: appWideActions.newBible,
     // meta: bibleBooks.toString(),
     meta: "",
-    bibleBookIndex: 1,
+    bibleBookIndex: "1",
     type: slideTypes.bible,
   },
   {
@@ -207,7 +209,7 @@ export const quickActionsArr = [
     desc: "Extract from other apps like PowerPoint",
     action: "new-ppt",
     meta: "power point Google slides",
-    unreleased: true,
+    // unreleased: true,
     // type: slideTypes.text
   },
   // {

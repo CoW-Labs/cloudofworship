@@ -164,9 +164,10 @@ const editorOne = ref(
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
-      Color.configure({
-        defaultColor: "#000",
-      }),
+
+      // Color.configure({
+      //   defaultColor: "#000",
+      // }),
     ],
     onCreate: ({ editor }) => {
       editor.chain().focus().toggleHeading({ level: 1 }).run()
@@ -201,9 +202,10 @@ const editorTwo = ref(
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
-      Color.configure({
-        defaultColor: "#000",
-      }),
+
+      // Color.configure({
+      //   defaultColor: "#000",
+      // }),
     ],
     onCreate: ({ editor }) => {
       // editor.commands.setFontFamily(appStore.currentState.settings.defaultFont)
@@ -238,9 +240,10 @@ const editorThree = ref(
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
-      Color.configure({
-        defaultColor: "#000",
-      }),
+
+      // Color.configure({
+      //   defaultColor: "#000",
+      // }),
     ],
     onBlur: ({ editor }) => {
       emit("update", 2, editor.getHTML())
@@ -268,9 +271,10 @@ const uneditableEditorOne = ref(
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
-      Color.configure({
-        defaultColor: "#000",
-      }),
+
+      // Color.configure({
+      //   defaultColor: "#000",
+      // }),
     ],
     // onUpdate: ({ editor }) => {
     //   emit("update", 2, editor.getHTML())
@@ -301,9 +305,10 @@ const uneditableEditorTwo = ref(
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
-      Color.configure({
-        defaultColor: "#000",
-      }),
+
+      // Color.configure({
+      //   defaultColor: "#000",
+      // }),
     ],
     // onUpdate: ({ editor }) => {
     //   emit("update", 2, editor.getHTML())
@@ -334,9 +339,10 @@ const uneditableEditorThree = ref(
       TipTapFontFamily.configure({
         types: ["textStyle"],
       }),
-      Color.configure({
-        defaultColor: "#000",
-      }),
+
+      // Color.configure({
+      //   defaultColor: "#000",
+      // }),
     ],
     // onUpdate: ({ editor }) => {
     //   emit("update", 2, editor.getHTML())

@@ -101,7 +101,7 @@
           >
             <span class="text-sm">24</span>
             <URange
-              :model-value="(appStore.currentState.settings.slideStyles?.windowPadding?.[activePadding] as string)"
+              :model-value="(appStore.currentState.settings.slideStyles?.windowPadding?.[activePadding as 'top' | 'right' | 'bottom' | 'left'] as number)"
               min="24"
               :max="
                 activePadding === 'right' || activePadding === 'left'
@@ -434,7 +434,10 @@ const bibleVersionSelectOptions = computed(() =>
 )
 
 const getActivePaddingValue = (side: string) => {
-  return appStore.currentState.settings.slideStyles.windowPadding[side]
+  side = side as "top" | "right" | "bottom" | "left"
+  return appStore.currentState.settings.slideStyles.windowPadding?.[
+    side as "top" | "right" | "bottom" | "left"
+  ]
 }
 
 const removeOverlayFromWebsocket = () => {
