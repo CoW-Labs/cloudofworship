@@ -28,10 +28,10 @@
 const props = defineProps<{
   icon: string
   sub: string
-  desc: string
   actionText: string
   action: string
-  isWider: boolean
+  desc?: string
+  isWider?: boolean
 }>()
 
 const actionIcon = computed(() => {

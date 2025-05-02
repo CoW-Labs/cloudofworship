@@ -41,7 +41,7 @@
         :slide-styles="currentState.settings.slideStyles"
         :audio-muted="
           liveSlide?.id !== currentState.liveSlideId ||
-          liveSlide?.slideStyle?.isMediaMuted
+          liveSlide?.slideStyle?.isMediaMuted!!
         "
       />
     </TransitionGroup>

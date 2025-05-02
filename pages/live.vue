@@ -35,12 +35,12 @@
         :content-visible="true"
         :id="currentState.liveSlideId"
         :full-screen="true"
-        :slide="mostUpdatedLiveSlide"
+        :slide="mostUpdatedLiveSlide!!"
         :slide-label="false"
         :slide-styles="currentState.settings.slideStyles"
         :audio-muted="
           mostUpdatedLiveSlide?.id !== currentState.liveSlideId ||
-          mostUpdatedLiveSlide?.slideStyle?.isMediaMuted
+          mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!
         "
       />
     </TransitionGroup>
@@ -57,7 +57,7 @@
         :slide-styles="currentState.settings.slideStyles"
         :audio-muted="
           liveSlide?.id !== currentState.liveSlideId ||
-          liveSlide?.slideStyle?.isMediaMuted
+          liveSlide?.slideStyle?.isMediaMuted!!
         "
       />
     </TransitionGroup>

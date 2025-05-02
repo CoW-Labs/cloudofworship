@@ -1,4 +1,4 @@
-<template>
+ <template>
   <div>
     <UButton
       v-if="noTooltip"
@@ -59,17 +59,19 @@
 </template>
 
 <script setup lang="ts">
+import type { ButtonVariant } from '@nuxt/ui/dist/runtime/types';
+
 const isOpen = ref(false)
 const props = defineProps<{
-  buttonIcon: string
-  buttonLabel: string
-  buttonColor: string
-  buttonSize: string
-  buttonVariant: string
-  buttonStyles: string
   header: string
   label: string
-  noTooltip: boolean
+  buttonIcon: string
+  buttonStyles: string
+  buttonColor: string
+  buttonLabel?: string
+  buttonSize?: string
+  buttonVariant?: ButtonVariant
+  noTooltip?: boolean
 }>()
 const emit = defineEmits(["confirm"])
 

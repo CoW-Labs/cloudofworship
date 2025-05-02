@@ -202,13 +202,13 @@ const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["activate-fullscreen"])
 
 const props = defineProps<{
-  slideLabel: Boolean
   slide: Slide
   contentVisible: Boolean
   fullScreen: Boolean
-  fullScreenHeight: string
   slideStyles: SlideStyle
-  audioMuted: Boolean
+  audioMuted?: Boolean
+  slideLabel?: Boolean
+  fullScreenHeight?: string
 }>()
 
 // TODO: Listen to slide.id and pause video if it is no longer the current live slide, using the Global Emitter on EditLiveContent component and passing ot here

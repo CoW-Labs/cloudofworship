@@ -106,7 +106,7 @@
       </draggable>
       <LiveProjectionOnly
         slide-label
-        :slide="liveSlide"
+        :slide="liveSlide!!"
         :full-screen="false"
         :content-visible="true"
         :slide-styles="currentState.settings.slideStyles"
