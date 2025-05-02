@@ -99,6 +99,7 @@
               ($event) => {
                 appStore.setMainDisplayLabel($event ? screen.id : '')
                 const tempScreen: Screen = ({
+                  // prettier-ignore
                   id: screen.id,
                   width: screen.width,
                   height: screen.height,
@@ -141,19 +142,28 @@ const externalScreens = computed(() => {
 })
 
 const getDisplayDetails = async () => {
-  isLoading.value = true
-  screenDetails = await window.getScreenDetails()
-  screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
-  screenDetails?.screens?.map((screen: any) => {
-    screen.id = useScreenId(screen)
-  })
-  currentScreen.value = screenDetails?.currentScreen as Screen
-  allScreens.value = screenDetails?.screens
-  isLoading.value = false
-  useToast().add({
-    title: "Screens updated",
-    icon: "i-bx-check-circle",
-  })
+  if ("getScreenDetails" in window) {
+    isLoading.value = true
+    // prettier-ignore
+    screenDetails = await window.getScreenDetails()
+    screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
+    screenDetails?.screens?.map((screen: any) => {
+      screen.id = useScreenId(screen)
+    })
+    currentScreen.value = screenDetails?.currentScreen as Screen
+    allScreens.value = screenDetails?.screens
+    isLoading.value = false
+    useToast().add({
+      title: "Screens updated",
+      icon: "i-bx-check-circle",
+    })
+  } else {
+    useToast().add({
+      title: "Your browser does not support automatic displays detection",
+      icon: "i-bx-info-circle",
+      color: "amber",
+    })
+  }
 }
 
 const debouncedGetDisplayDetails = useDebounceFn(getDisplayDetails, 500)
@@ -175,6 +185,7 @@ const moveCurrentScreenToNativeDisplay = async () => {
     (screen: any) => screen?.isPrimary
   )
   document.documentElement.requestFullscreen({
+    // prettier-ignore
     screen: nativeDisplay,
   })
 }

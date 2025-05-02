@@ -254,7 +254,7 @@ const setCachedVideosURL = async () => {
   const cachedVideos = (await useBackgroundVideos()) as Media[]
   const tempCachedVideos = cachedVideos?.map((cached: Media) => ({
     id: cached?.id,
-    url: URL.createObjectURL(cached?.data as File),
+    url: URL.createObjectURL(cached?.data as Blob),
   }))
   cachedVideosURLs.value = tempCachedVideos as BackgroundVideo[]
   // console.log(tempCachedVideosURLs)

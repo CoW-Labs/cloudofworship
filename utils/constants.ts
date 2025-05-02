@@ -1,4 +1,4 @@
-import { QuickAction } from "~/types"
+import { BibleVersion, QuickAction } from "~/types"
 
 export const slideTypes = {
   song: 'song',
@@ -297,7 +297,7 @@ export const bibleVersions = [
   'NLT',
 ]
 
-export const bibleVersionObjects = [
+export const bibleVersionObjects: BibleVersion[] = [
   {
     id: "KJV",
     name: "King James Version",

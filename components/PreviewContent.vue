@@ -548,8 +548,10 @@ const batchUpdateSlideOnline = async (slides: Slide[]) => {
 }
 
 const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
-  const tempSlide = { ...slide }
+  const tempSlide: Slide | any = { ...slide }
   delete tempSlide._id
+
+  // Remove already added slide properties when updating slide online
   delete tempSlide.id
   delete tempSlide.churchId
   delete tempSlide.type
