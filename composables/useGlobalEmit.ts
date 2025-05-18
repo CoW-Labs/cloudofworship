@@ -1,6 +1,6 @@
 import type { Emitter } from 'mitt'
 import { useAppStore } from '~/store/app'
-import { Hymn, Slide, Song } from '~/types'
+import type { Hymn, Slide, Song } from '~/types'
 
 const useGlobalEmit = (type: string, value?: string | boolean | Song | Hymn | Slide | any) => {
   const appStore = useAppStore()

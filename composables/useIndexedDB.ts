@@ -1,14 +1,6 @@
 import Dexie from 'dexie'
-import useURLFriendlyString from './useURLFriendlyString'
 import type { Table } from 'dexie'
-import type { Slide, Song, Media, LibraryItem, Scripture, Hymn } from '~/types'
-
-const addIdToReturnedSongs = (songs: Array<Song>) => {
-  return songs?.map((song) => ({
-    ...song,
-    id: useURLFriendlyString(`${song.artist} ${song.title}`),
-  }))
-}
+import type { Song, Media, LibraryItem, Scripture, Hymn } from '~/types'
 
 
 class WorshipCloudDatabase extends Dexie {

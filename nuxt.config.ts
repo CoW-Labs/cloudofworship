@@ -106,6 +106,13 @@ export default defineNuxtConfig({
     "@nuxthub/core"
   ],
 
+  components: [
+    {
+      path: '~/components',
+      pathPrefix: false
+    }
+  ],
+
   ui: {
     global: true,
     icons: ["mdi", "bx", "bxs", "bi", "mingcute", "tabler", "ph"],

@@ -76,7 +76,7 @@
         class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
       >
         <ActionCard
-          v-for="(action, index) in actions?.filter((a) => !a?.searchableOnly)"
+          v-for="(action, index) in actions?.filter((a: QuickAction) => !a?.searchableOnly)"
           :key="action?.name"
           :action="action"
           :class="{

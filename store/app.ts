@@ -136,7 +136,7 @@ export const useAppStore = defineStore("app", {
   actions: {
     setSchedules(schedules: Schedule[]) {
       // onAppStateChange(this.pastStates, this.currentState)
-      this.currentState.schedules = schedules
+      this.currentState.schedules = schedules?.filter(schedule => schedule !== null)
       if (this.currentState.activeSchedule) {
         const tempSchedule = schedules.find(
           (sch) => sch?._id === this.currentState.activeSchedule?._id
@@ -315,7 +315,7 @@ export const useAppStore = defineStore("app", {
       this.currentState.bannerVisible = bannerVisible
     },
     setBibleVersions(bibleVersions: Array<BibleVersion>) {
-      console.log("bibleVersions", bibleVersions)
+      // console.log("bibleVersions", bibleVersions)
       // this.currentState.bibleVersions = []
       // this.currentState.bibleVersions = [...bibleVersions]
       this.currentState.settings = {
@@ -438,17 +438,17 @@ export const useAppStore = defineStore("app", {
     // Undo/Redo Actions
     setCurrentState(state: any) {
       this.currentState = { ...state }
-      console.log("updated current state", this.currentState)
+      // console.log("updated current state", this.currentState)
     },
     undo() {
-      console.log("undo action")
+      // console.log("undo action")
       if (this.pastStates.length) {
         this.futureStates.push(this.currentState)
         this.setCurrentState(this.pastStates.pop())
       }
     },
     redo() {
-      console.log("redo action")
+      // console.log("redo action")
       if (this.futureStates.length) {
         this.pastStates.push(this.currentState)
         this.setCurrentState(this.futureStates.pop())

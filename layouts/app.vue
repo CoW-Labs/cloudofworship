@@ -95,7 +95,7 @@
         </div>
       </Transition>
 
-      <AdvertModal :active-advert="currentState.activeAdvert" />
+      <!-- <AdvertModal :active-advert="currentState.activeAdvert" /> -->
     </ClientOnly>
   </div>
   <div
@@ -152,11 +152,6 @@
 </template>
 
 <script setup lang="ts">
-// import kjvBible from "../public/kjv.json"
-// import nkjvBible from "../public/nkjv.json"
-// import nivBible from "../public/niv.json"
-// import ampBible from "../public/amp.json"
-// import hymns from "../public/hymns.json"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
@@ -221,17 +216,19 @@ provide("windowRefs", windowRefs)
 
 const getUser = async () => {
   const { data, error } = await useAPIFetch(`/user/auth`)
-  const user = data.value as unknown as User
-  authStore.setUser(user)
+  if (data.value) {
+    const user = data.value as unknown as User
+    authStore.setUser(user)
+  }
 }
 getUser()
 
 const retrieveChurchSongs = async () => {
   try {
-    const countPromise = await useAPIFetch(
+    const {data} = await useAPIFetch(
       `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
     )
-    const onlineCount = countPromise.data.value as unknown as number
+    const onlineCount = data.value ? (data.value as unknown as number) : 0
     const offlineCount = await db.library.where("type").equals("song").count()
     if (onlineCount > offlineCount) {
       // Delete songs that are not in the online database
@@ -264,9 +261,11 @@ const getChurch = async () => {
     const { data, error } = await useAPIFetch(
       `/church/${churchId}?teammates=true`
     )
-    const church = data.value as unknown as Church
-    authStore.setChurch(church)
-    retrieveChurchSongs()
+    if (data.value) {
+      const church = data.value as unknown as Church
+      authStore.setChurch(church)
+      retrieveChurchSongs()
+    }
     if (error.value) {
       throw new Error(error.value?.message)
     }
@@ -678,10 +677,11 @@ const retrieveSchedules = async () => {
   if (isAppOnline.value) {
     downloadProgress.value = "0"
     downloadResource.value = "schedules and slides"
-    const schedulesPromise = await useAPIFetch(
+    const {data} = await useAPIFetch(
       `/church/${authStore.user?.churchId}/schedules`
     )
-    const schedules = schedulesPromise.data.value as unknown as Schedule[]
+
+    const schedules = data.value ? (data.value as unknown as Schedule[]) : []
     const mergedSchedules = useMergeObjectArray(
       [...schedules],
       appStore.currentState.schedules
@@ -692,6 +692,7 @@ const retrieveSchedules = async () => {
       const dateB = new Date(scheduleB?.updatedAt)
       return dateB?.getTime() - dateA?.getTime()
     })
+    console.log("currentState.schedules", schedules)
     appStore.setSchedules(mergedSchedules)
     downloadProgress.value = "100"
   }

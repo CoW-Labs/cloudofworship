@@ -1,5 +1,5 @@
 import { useAppStore } from '~/store/app'
-import { BibleVerse, Scripture } from '~/types'
+import type { BibleVerse, Scripture } from '~/types'
 
 const useScripture = async (label: string = '1:1:1', version: string = ''): Promise<Scripture | null> => {
   const db = useIndexedDB()

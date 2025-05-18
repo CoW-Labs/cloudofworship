@@ -1,4 +1,4 @@
-import { Slide } from "~/types";
+import type { Slide } from "~/types";
 
 const useShortSlideName = (slide: Slide, options?: { longer: boolean }) => {
   switch (slide.type) {

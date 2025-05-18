@@ -1,6 +1,4 @@
 import { useFetch } from "#app"
-import { UseFetchOptions } from "@vueuse/core"
-import { useAuthStore } from "~/store/auth"
 
 type useFetchType = typeof useFetch
 

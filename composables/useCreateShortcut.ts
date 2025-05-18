@@ -5,7 +5,7 @@ const useCreateShortcut = (commandKey: string, action: () => void, options?: { c
     const isCtrlOrMetaPressed = e.ctrlKey || e.metaKey;
     const isEditableElement = activeElement?.tagName === 'INPUT' ||
       activeElement?.tagName === 'TEXTAREA' ||
-      activeElement?.contentEditable === 'true';
+      activeElement?.getAttribute('contenteditable') === 'true';
 
     if (isEditableElement) return;
 
