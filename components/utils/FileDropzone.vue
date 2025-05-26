@@ -37,7 +37,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive } from "vue"
 
 const props = defineProps({
@@ -57,7 +57,7 @@ const props = defineProps({
 const toast = useToast()
 const fileInput = ref(null)
 const isDragOver = ref(false)
-const files = reactive([])
+const files = reactive<File[]>([])
 const emit = defineEmits(["change"])
 
 const onDragOver = () => {
@@ -68,20 +68,20 @@ const onDragLeave = () => {
   isDragOver.value = false
 }
 
-const onDrop = (event) => {
+const onDrop = (event: DragEvent) => {
   isDragOver.value = false
-  handleFiles(event.dataTransfer.files)
+  handleFiles(event.dataTransfer?.files || [])
 }
 
-const onFileSelect = (event) => {
-  handleFiles(event.target.files)
+const onFileSelect = (event: Event) => {
+  handleFiles((event?.target as HTMLInputElement).files || [])
 }
 
-const openFileDialog = () => {
-  fileInput.value.click()
-}
+// const openFileDialog = () => {
+//   fileInput.value.click()
+// }
 
-const handleFiles = (selectedFiles) => {
+const handleFiles = (selectedFiles: FileList | File[]) => {
   // console.log("selectedFiles", selectedFiles)
   if (props.size === "sm" && props.icon === "i-bx-image") {
     if (!selectedFiles?.[0]?.type.startsWith("image")) {
@@ -110,7 +110,7 @@ const handleFiles = (selectedFiles) => {
 }
 
 // Currently only for images
-const isFileSizeExceeded = (file) => {
+const isFileSizeExceeded = (file: File) => {
   if (
     file.size > props.maxFileSize * 1024 * 1024 &&
     file.type.startsWith("image")
@@ -125,8 +125,8 @@ const isFileSizeExceeded = (file) => {
   return true
 }
 
-const handlePaste = (event) => {
-  const items = event.clipboardData.items
+const handlePaste = (event: ClipboardEvent) => {
+  const items = event.clipboardData?.items || []
   const filesFromClipboard = []
 
   for (let i = 0; i < items.length; i++) {
@@ -147,11 +147,11 @@ const handlePaste = (event) => {
 }
 
 onMounted(() => {
-  window.addEventListener("paste", handlePaste)
+  window.addEventListener("paste", handlePaste as EventListener)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener("paste", handlePaste)
+  window.removeEventListener("paste", handlePaste as EventListener)
 })
 </script>
 

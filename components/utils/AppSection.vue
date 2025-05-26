@@ -38,7 +38,7 @@
               header="Delete selected slides"
               button-styles="p-1 px-2"
               label="Are you sure you want to delete all of the selected slides? This action is irreversible."
-              @confirm="$emit(secondaryButton.action, slide?.id)"
+              @confirm="$emit(secondaryButton.action)"
             >
             </ConfirmDialog>
             <UPopover
@@ -129,15 +129,25 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useAppStore } from "@/store/app"
 import { appWideActions } from "~/utils/constants"
-const props = defineProps({
+defineProps({
   heading: String,
   subHeading: String,
   slotCtnStyles: String,
   headingStyles: String,
-  secondaryButtons: Array,
+  secondaryButtons: Array as PropType<
+    Array<{
+      label: string
+      action: string
+      icon: string
+      color: string
+      variant?: string
+      confirmAction: boolean
+      visible: boolean
+    }>
+  >,
   isLiveWindowActive: Boolean,
 })
 const appStore = useAppStore()
@@ -148,11 +158,11 @@ const isClipboardCopying = ref(false)
 const copyLivestreamURL = async () => {
   isClipboardCopying.value = true
   await navigator.clipboard.writeText(
-    `${window.location.origin}/livestream/${currentState.value.activeSchedule._id}`
+    `${window.location.origin}/livestream/${currentState.value.activeSchedule?._id}`
   )
   useToast().add({
     title: "Livestream URL copied to clipboard",
-    color: "success",
+    color: "green",
     icon: "i-bx-check-circle",
   })
   setTimeout(() => {

@@ -9,8 +9,8 @@
     </div>
   </Transition>
 </template>
-<script setup>
-const props = defineProps({
+<script setup lang="ts">
+defineProps({
   visible: Boolean,
   hideText: Boolean,
 })

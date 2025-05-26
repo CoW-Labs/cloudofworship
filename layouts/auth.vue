@@ -18,7 +18,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth"
 useHead({
   title: "Cloud of Worship",

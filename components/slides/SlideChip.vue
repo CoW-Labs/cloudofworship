@@ -8,13 +8,13 @@
   </p>
 </template>
 
-<script setup>
+<script setup lang="ts">
 const props = defineProps({
   slideType: String,
   slideSubType: String,
   darkMode: Boolean,
 })
-const getIconBySlideType = (slideType) => {
+const getIconBySlideType = (slideType?: string) => {
   switch (slideType) {
     case slideTypes.song:
       return "i-bx-music"
@@ -35,7 +35,7 @@ const getIconBySlideType = (slideType) => {
   }
   return ""
 }
-const getBGBySlideType = (slideType) => {
+const getBGBySlideType = (slideType?: string) => {
   switch (slideType) {
     case slideTypes.song:
       if (props.darkMode) {

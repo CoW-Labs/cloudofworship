@@ -116,15 +116,17 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useAuthStore } from "~/store/auth"
+import type { SignupResponseT, ApiErrorT } from "~/types/api-responses"
+import type { Church } from "~/store/auth"
 definePageMeta({
   layout: "auth",
 })
 
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
-const googleSignIn = inject("handleGoogleSignIn")
+const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
 
 const thirtyDaysAhead = new Date()
 thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
@@ -143,11 +145,7 @@ const password = ref("")
 const passwordType = ref("password")
 const passwordInputHover = ref(false)
 const loading = ref(false)
-const church = ref(null)
-// const otherChurch = ref("")
-// const churchIdentity = ref("")
-// const churchAddress = ref("")
-// const churchPastor = ref("")
+const church = ref<Church>()
 
 const passwordValid = computed(() => {
   const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+]{8,}$/
@@ -182,7 +180,7 @@ const getChurch = async () => {
   const churchId = route.params.church_id
   if (churchId) {
     const promise = await useAPIFetch(`/church/${churchId}?teammates=true`)
-    church.value = promise.data.value
+    church.value = promise.data.value as Church
   } else {
     navigateTo("/signup")
     useToast().add({
@@ -195,17 +193,20 @@ const getChurch = async () => {
 getChurch()
 
 const signup = async () => {
-  const churchId = route.params.church_id
+  const churchId = route.params.church_id.toString()
   loading.value = true
-  const { data, error } = await useAPIFetch("/auth/signup/teammate", {
-    method: "POST",
-    body: {
-      fullname: fullName.value,
-      email: email.value,
-      password: password.value,
-      churchId,
-    },
-  })
+  const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
+    "/auth/signup/teammate",
+    {
+      method: "POST",
+      body: {
+        fullname: fullName.value,
+        email: email.value,
+        password: password.value,
+        churchId,
+      },
+    }
+  )
   if (error.value) {
     useToast().add({
       title: error.value?.data?.error?.includes("E11000")
@@ -216,32 +217,36 @@ const signup = async () => {
     })
   } else {
     token.value = data.value?.token
-    authStore.setUser(data?.value?.data.newUser)
-    authStore.setUser({ ...authStore.user, churchId })
+    authStore.setUser({ ...data?.value?.data.newUser!!, churchId })
     useToast().add({
       title: "You are all set! 🎉",
       color: "green",
     })
-    authStore.setChurch(church.value)
+    if (church.value) {
+      authStore.setChurch(church.value)
+    }
     navigateTo("/?newUser=1")
   }
   loading.value = false
 }
 
 const handleGoogleSignUp = async () => {
-  const churchId = route.params.church_id
+  const churchId = route.params.church_id.toString()
   loading.value = true
   const { user } = await googleSignIn()
   // console.log(user)
   // console.log(user?.accessToken)
 
-  const { data, error } = await useAPIFetch("/auth/signup/google", {
-    method: "POST",
-    headers: { "x-access-token": `Bearer ${user?.accessToken}` },
-    body: {
-      churchId,
-    },
-  })
+  const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
+    "/auth/signup/google",
+    {
+      method: "POST",
+      headers: { "x-access-token": `Bearer ${user?.accessToken}` },
+      body: {
+        churchId,
+      },
+    }
+  )
   if (error.value) {
     useToast().add({
       title: error.value?.data?.error?.includes("E11000")
@@ -252,14 +257,14 @@ const handleGoogleSignUp = async () => {
     })
   } else {
     token.value = data.value?.token
-    authStore.setUser(data?.value?.data.newUser)
-    authStore.setUser({ ...authStore.user, churchId })
+    authStore.setUser({ ...data?.value?.data.newUser!!, churchId })
     useToast().add({
       title: "You are all set! 🎉",
       color: "green",
     })
-    authStore.setChurch(church.value)
-    navigateTo("/?newUser=1")
+    if (church.value) {
+      authStore.setChurch(church.value)
+    }
   }
   loading.value = false
 }

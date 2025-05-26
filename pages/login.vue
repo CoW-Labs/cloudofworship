@@ -90,7 +90,8 @@ useHead({
   meta: [
     {
       name: "description",
-      content: "Sign in to continue using Cloud of Worship - Your church's powerpoint",
+      content:
+        "Sign in to continue using Cloud of Worship - Your church's powerpoint",
     },
   ],
 })
@@ -99,13 +100,16 @@ const inaccessibleDate = new Date("2024-12-13T00:00:00.000Z")
 const authStore = useAuthStore()
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
-const googleSignIn = inject("handleGoogleSignIn") as () => Promise<UserCredential>
+const googleSignIn = inject(
+  "handleGoogleSignIn"
+) as () => Promise<UserCredential>
 // console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()
 const email = ref("")
 const password = ref("")
 const passwordType = ref("password")
+const passwordInputHover = ref(false)
 const loading = ref(false)
 const googleLoading = ref(false)
 const thirtyDaysAhead = new Date()
@@ -178,10 +182,13 @@ const handleGoogleSignIn = async () => {
   const { user } = await googleSignIn()
   // console.log(user)
 
-  const { data, error } = await useAPIFetch<GoogleAuthResponseT>("/auth/login/google", {
-    method: "POST",
-    headers: { "x-access-token": `Bearer ${user?.accessToken}` },
-  })
+  const { data, error } = await useAPIFetch<GoogleAuthResponseT>(
+    "/auth/login/google",
+    {
+      method: "POST",
+      headers: { "x-access-token": `Bearer ${user?.accessToken}` },
+    }
+  )
 
   if (error.value) {
     toast.add({
@@ -191,7 +198,7 @@ const handleGoogleSignIn = async () => {
     })
   } else {
     token.value = data.value?.token
-      authStore.setUser(data.value?.data?.user!!)
+    authStore.setUser(data.value?.data?.user!!)
     toast.add({
       title: `Successful login as ${user?.email}`,
       color: "green",

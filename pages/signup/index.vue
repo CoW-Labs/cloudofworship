@@ -211,8 +211,10 @@
     </form>
   </div>
 </template>
-<script setup>
+<script setup lang="ts">
 import { useAuthStore } from "~/store/auth"
+import type { User, Church } from "~/store/auth"
+import type { ApiErrorT, SignupResponseT } from "~/types/api-responses"
 
 definePageMeta({
   layout: "auth",
@@ -220,13 +222,18 @@ definePageMeta({
 
 useHead({
   title: "Sign up - Cloud of Worship",
-  description:
-    "Sign up to start using Cloud of Worship - Your church's powerpoint",
+  meta: [
+    {
+      name: "description",
+      content:
+        "Sign up to start using Cloud of Worship - Your church's powerpoint",
+    },
+  ],
 })
 
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
-const googleSignIn = inject("handleGoogleSignIn")
+const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
 
 const thirtyDaysAhead = new Date()
 thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
@@ -261,7 +268,7 @@ const passwordValid = computed(() => {
 const getChurch = async () => {
   if (user.value?.churchId) {
     const { data } = await useAPIFetch(`/church/${user.value?.churchId}`)
-    authStore.setChurch(data.value)
+    authStore.setChurch(data.value as Church)
     navigateTo("/")
   } else if (!user.value) {
     navigateTo("/login")
@@ -306,14 +313,17 @@ const goToVerify = () => {
 const signup = async () => {
   if (step.value === 1) {
     loading.value = true
-    const { data, error } = await useAPIFetch("/auth/signup", {
-      method: "POST",
-      body: {
-        fullname: fullName.value,
-        email: email.value,
-        password: password.value,
-      },
-    })
+    const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
+      "/auth/signup",
+      {
+        method: "POST",
+        body: {
+          fullname: fullName.value,
+          email: email.value,
+          password: password.value,
+        },
+      }
+    )
     if (error.value) {
       useToast().add({
         title: error.value?.data?.error?.includes("E11000")
@@ -324,7 +334,7 @@ const signup = async () => {
       })
     } else {
       token.value = data.value?.token
-      authStore.setUser(data?.value?.data.newUser)
+      authStore.setUser(data?.value?.data.newUser!!)
       step.value = 2
     }
     loading.value = false
@@ -350,8 +360,9 @@ const signup = async () => {
         icon: "i-bx-error",
       })
     } else {
-      authStore.setChurch(data?.value)
-      authStore.setUser({ ...authStore.user, churchId: data?.value?._id })
+      const church = data?.value as Church
+      authStore.setChurch(church)
+      authStore.setUser({ ...authStore.user, churchId: church?._id } as User)
       goToVerify()
       useToast().add({
         title: "You are all set! 🎉",
@@ -369,10 +380,13 @@ const handleGoogleSignUp = async () => {
   // console.log(user)
   // console.log(user?.accessToken)
 
-  const { data, error } = await useAPIFetch("/auth/signup/google", {
-    method: "POST",
-    headers: { "x-access-token": `Bearer ${user?.accessToken}` },
-  })
+  const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
+    "/auth/signup/google",
+    {
+      method: "POST",
+      headers: { "x-access-token": `Bearer ${user?.accessToken}` },
+    }
+  )
   if (error.value) {
     useToast().add({
       title: error.value?.data?.error?.includes("E11000")
@@ -383,7 +397,7 @@ const handleGoogleSignUp = async () => {
     })
   } else {
     token.value = data.value?.token
-    authStore.setUser(data?.value?.data.newUser)
+    authStore.setUser(data?.value?.data.newUser!!)
     step.value = 2
   }
   googleLoading.value = false

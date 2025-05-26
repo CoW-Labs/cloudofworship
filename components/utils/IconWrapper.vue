@@ -18,8 +18,8 @@
   </div>
 </template>
 
-<script setup>
-const props = defineProps({
+<script setup lang="ts">
+defineProps({
   size: {
     type: String,
     default: "6",

@@ -90,7 +90,6 @@
         <!-- ACCOUNT PROFILE BUTTON -->
         <UPopover
           mode="click"
-          v-model:open="bgImagePopoverOpen"
           :ui="{
             ring: 'ring-0',
             background: 'bg-white dark-bg-gray-900 border-0',
@@ -152,12 +151,12 @@
   </Transition>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
 const route = useRoute()
-const darkMode = ref(false)
 const settingsModalOpen = ref(false)
 const settingsPage = ref("")
 const colorMode = useColorMode()
@@ -190,7 +189,9 @@ onMounted(() => {
   }
 })
 
-const emitter = useNuxtApp().$emitter || appStore.currentState.emitter
+const emitter = (useNuxtApp().$emitter || appStore.currentState.emitter) as
+  | Emitter<any>
+  | undefined
 
 emitter?.on("close-modal", () => {
   settingsModalOpen.value = false

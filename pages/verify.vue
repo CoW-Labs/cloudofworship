@@ -7,7 +7,7 @@
         <span class="font-semibold">Cloud of Worship</span>
       </p>
     </div>
-    <form class="flex flex-col gap-3 max-w-[325px] mx-auto" @submit="login()">
+    <form class="flex flex-col gap-3 max-w-[325px] mx-auto">
       <UFormGroup size="lg" class="relative">
         <UInput placeholder="Your email" v-model="email" disabled />
         <p
@@ -53,7 +53,7 @@
     </form>
   </div>
 </template>
-<script setup>
+<script setup lang="ts">
 import { useAuthStore } from "~/store/auth"
 
 definePageMeta({
@@ -61,13 +61,9 @@ definePageMeta({
 })
 
 const authStore = useAuthStore()
-const runtimeConfig = useRuntimeConfig()
-const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
-const googleSignIn = inject("handleGoogleSignIn")
-// console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
-
 const toast = useToast()
-const email = ref(authStore.user?.email)
+
+const email = ref(authStore.user?.email || "")
 const verificationCode = ref("")
 const loading = ref(false)
 const resendLoading = ref(false)

@@ -48,7 +48,7 @@
       <UButton
         v-for="headingSize in 3"
         :key="`heading-size-${headingSize}`"
-        @click="toggleHeading(headingSize).run()"
+        @click="toggleHeading(headingSize)"
         class="dark:text-primary-400 dark:hover:text-primary-500 gap-0 items-end"
         :class="{
           'bg-primary text-white dark:text-primary-900': editor.isActive(
@@ -136,7 +136,13 @@
     <UTooltip text="Change text color" :popper="{ arrow: true }">
       <input
         type="color"
-        @input="editor.chain().focus().setColor($event.target.value).run()"
+        @input="
+          editor
+            .chain()
+            .focus()
+            .setColor(($event?.target as HTMLInputElement).value)
+            .run()
+        "
         class="min-w-10 h-10 outline-none border-0 rounded-md p-1.5 bg-primary-100 dark:bg-primary-900 hover:bg-primary-200 dark:hover:bg-primary-950 cursor-pointer"
         :class="{
           'bg-primary text-white dark:text-primary-900':
@@ -166,14 +172,14 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 const props = defineProps({
   editor: Object,
 })
 const containerOverflow = ref("overflow-x-auto")
-const isEmpty = (obj) => Object.keys(obj).length === 0
+const isEmpty = (obj: Object) => Object.keys(obj).length === 0
 
-const toggleHeading = (level) => {
+const toggleHeading = (level: number) => {
   let otherAttributes = props.editor?.getAttributes("heading")
   if (isEmpty(otherAttributes)) {
     otherAttributes = props.editor?.getAttributes("paragraph")

@@ -6,7 +6,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 definePageMeta({
   layout: "app",
 })
@@ -19,25 +19,26 @@ useHead({
   ],
 })
 import { useAppStore } from "~/store/app"
-// import useScheduleWebsocket from "~/composables/useScheduleWebsocket";
-import { ref, watchEffect } from "vue"
-import { storeToRefs } from "pinia"
-import { useDebounce, useOnline } from "@vueuse/core"
+import { ref } from "vue"
+import { useDebounceFn, useOnline } from "@vueuse/core"
+import type { Emitter } from "mitt"
+import type { Slide } from "~/types"
 
 const appStore = useAppStore()
-const scheduleId = ref(undefined)
-const emitter = useNuxtApp().$emitter
-const socket = ref(null)
+const emitter = useNuxtApp().$emitter as Emitter<any>
+const socket = ref<WebSocket>()
 const MAX_RETRIES = 10
 let retryCount = 0
 
-const uploadOfflineSlides = useDebounce(() => {
+const uploadOfflineSlides = useDebounceFn(() => {
   useGlobalEmit(appWideActions.uploadOfflineSlides)
 }, 2000)
 
 const connectWebSocket = async () => {
   const nuxtApp = useNuxtApp()
-  socket.value = await useSocket(appStore.currentState.activeSchedule?._id)
+  socket.value = await useSocket(
+    appStore.currentState.activeSchedule?._id || ""
+  )
   if (!nuxtApp.$socket) {
     nuxtApp.provide("socket", socket.value)
   }
@@ -80,20 +81,20 @@ const connectWebSocket = async () => {
 
   socket.value.onerror = (error) => {
     console.error("WebSocket connection error:", error)
-    socket.value.close() // Close on error to trigger the onclose event
+    socket.value?.close() // Close on error to trigger the onclose event
   }
 }
 
-const sendLiveSlideToWebsocket = (slide) => {
+const sendLiveSlideToWebsocket = (slide: Slide) => {
   if (
-    socket.value.readyState === WebSocket.CLOSED ||
-    socket.value.readyState === WebSocket.CLOSING
+    socket.value?.readyState === WebSocket.CLOSED ||
+    socket.value?.readyState === WebSocket.CLOSING
   ) {
     console.error("Error sending live slide to websocket", "WebSocket closed")
     socket.value.close() // Close on error to trigger the onclose event
     connectWebSocket()
   } else {
-    socket.value.send(
+    socket.value?.send(
       JSON.stringify({
         action: "live-slide",
         data: slide,

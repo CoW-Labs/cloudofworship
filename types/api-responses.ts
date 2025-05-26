@@ -7,10 +7,24 @@ export interface LoginResponseT {
   }
 }
 
+export interface SignupResponseT {
+  token: string
+  data: {
+    newUser: User
+  }
+}
+
 export interface GoogleAuthResponseT {
   token: string
   data?: {
     user: User
+  }
+}
+
+export interface ApiErrorT {
+  data?: {
+    message: string
+    error: string
   }
 }
 
