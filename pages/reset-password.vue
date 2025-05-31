@@ -67,23 +67,16 @@
     </form>
   </div>
 </template>
-<script setup>
-import { useAuthStore } from "~/store/auth"
-
+<script setup lang="ts">
 definePageMeta({
   layout: "auth",
 })
 
-const authStore = useAuthStore()
-const runtimeConfig = useRuntimeConfig()
-const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
-// console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
-
 const toast = useToast()
 const email = ref("")
 const password = ref("")
-const token = ref("")
 const passwordType = ref("password")
+const passwordInputHover = ref(false)
 const loading = ref(false)
 const thirtyDaysAhead = new Date()
 thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
@@ -91,7 +84,7 @@ thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
 const login = async () => {
   loading.value = true
   const route = useRoute()
-  const { data, error } = await useAPIFetch("/auth/reset-password", {
+  const { error } = await useAPIFetch("/auth/reset-password", {
     method: "POST",
     body: {
       email: email.value,

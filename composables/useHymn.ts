@@ -7,7 +7,7 @@ const useHymn = async (number: string): Promise<Hymn | null> => {
   const toast = useToast()
 
   try {
-    const hymn = hymns.find(hymn => hymn.number === number) as Hymn
+    const hymn = hymns.find((hymn: Hymn) => hymn.number === number) as Hymn
     return hymn
   } catch (err) {
     toast.add({ title: 'Hymn not found', icon: 'i-bx-error', color: 'red' })

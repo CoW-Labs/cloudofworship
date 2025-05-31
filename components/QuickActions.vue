@@ -76,7 +76,7 @@
         class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
       >
         <ActionCard
-          v-for="(action, index) in actions?.filter((a) => !a?.searchableOnly)"
+          v-for="(action, index) in actions?.filter((a: QuickAction) => !a?.searchableOnly)"
           :key="action?.name"
           :action="action"
           :class="{
@@ -180,10 +180,10 @@ import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
 
 let searchInputBeforeTwoDigitNumbers = ""
-const searchInputEl = ref<HTMLInputElement>()
+const searchInputEl = ref<{ input: HTMLInputElement }>()
 const searchInput = ref<string>("")
 const focusedActionIndex = ref<number>(0)
-const actions = ref<any[]>([])
+const actions = ref<QuickAction[]>([])
 const quickActions = ref<HTMLDivElement | null>(null)
 const appStore = useAppStore()
 const page = ref<string>("") // song, search, bible, hymn...
@@ -198,8 +198,9 @@ const getAllHymns = async () => {
   hymns.value = allHymns?.data as unknown as Hymn[]
 
   actions.value = quickActionsArr.concat(
-    bibleBooks?.map((book, index) => {
+    bibleBooks?.map((book: string, index: number) => {
       const bibleBookIndex = index + 1 // Does not start from 0, starts from 1
+
       return {
         icon: "i-bx-bible",
         name: `${book}`,
@@ -207,7 +208,7 @@ const getAllHymns = async () => {
         action: "new-bible",
         meta: `${book} 0:0 1:1 2:2 3:3 4:4 5:5 6:6 7:7 8:8 9:9 10:10 -`,
         searchableOnly: true,
-        bibleBookIndex,
+        bibleBookIndex: `${bibleBookIndex}`,
         type: slideTypes.bible,
       }
     }),
@@ -397,13 +398,13 @@ const searchedActions = computed(() => {
       ? searchInputBeforeTwoDigitNumbers
       : searchInputBeforeTwoDigitNumbers?.substring(0, colonIndex)
 
-  let results = fuzzysort.go(searchInputBeforeColon, actions.value, {
+  let results: any = fuzzysort.go(searchInputBeforeColon, actions.value, {
     keys: ["name", "desc", "meta"],
   })
-  results = results?.map((result) => result.obj)
+  results = results?.map((result: Fuzzysort.Result | any) => result.obj)
 
   // Sort by showing [searchableOnly] actions last
-  results.sort((a, b) => {
+  results.sort((a: QuickAction, b: QuickAction) => {
     if (a.searchableOnly && !b.searchableOnly) {
       return 1
     } else if (!a.searchableOnly && b.searchableOnly) {
@@ -415,7 +416,7 @@ const searchedActions = computed(() => {
 
   // If true, then show Bible types first.
   if (bibleChapterAndVerse.value) {
-    results.sort((a, b) => {
+    results.sort((a: QuickAction, b: QuickAction) => {
       if (a.type === "bible" && b.type !== "bible") {
         return -1
       } else if (a.type !== "bible" && b.type === "bible") {

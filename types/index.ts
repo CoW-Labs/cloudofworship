@@ -1,3 +1,4 @@
+import type { Emitter, EventType } from "mitt"
 import { User } from "~/store/auth"
 
 export interface Slide {
@@ -17,9 +18,9 @@ export interface Slide {
   title?: string // For hymn and song titles, also for scripture labels (e.g Ephesians 3:1)
   songId?: string // only for hymns/songs, could be [hymn.number] or [song.id]
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
-  data?: Song | Scripture | Hymn | Countdown // for song/bible/hymn/file, Object mapped to Slide only on client
-  slideStyle?: SlideStyle,
-  createdAt?: string,
+  data?: Song | Scripture | Hymn | Countdown | ExtendedFileT // for song/bible/hymn/file, Object mapped to Slide only on client
+  slideStyle?: SlideStyle
+  createdAt?: string
   updatedAt?: string
 }
 
@@ -30,8 +31,8 @@ export interface Schedule {
   authorId: string
   editorIds: Array<User> // sorted in the order of most recent person to edit a Slide, with most recent person being the 0th index
   churchId: string
-  lastUpdated?: string,
-  createdAt?: string,
+  lastUpdated?: string
+  createdAt?: string
   updatedAt?: string
 }
 
@@ -58,20 +59,21 @@ export interface QuickAction {
   icon: string
   name: string
   desc: string
-  type: string
   action: string
-  unreleased: boolean
+  type?: string
+  unreleased?: boolean
   bibleBookIndex?: string
   bibleChapterAndVerse?: string
   hymnIndex?: string
   searchableOnly?: boolean
+  meta?: string
 }
 
 export interface Scripture {
   label: string
   labelShortFormat: string
   version: string
-  content: string
+  content: string | BibleVerse[]
 }
 
 export interface BibleVerse {
@@ -79,6 +81,13 @@ export interface BibleVerse {
   chapter: string
   verse: string
   scripture: string
+}
+
+export interface BibleVersion {
+  id: string
+  name: string
+  isDownloaded: boolean
+  copyrightContent: string
 }
 
 export interface Hymn {
@@ -112,7 +121,7 @@ export interface Media {
   id: string
   content?: any
   remoteUrl?: string
-  data?: ArrayBuffer | string
+  data?: ArrayBuffer | File | string
   createdAt?: string
   updatedAt?: string
 }
@@ -143,23 +152,14 @@ export interface SlideStyle {
   isMediaPlaying?: boolean // also used to check if countdown is paused or is beginning
   mediaSeekPosition?: number // 0 or -1, -1 means not at the beginning
   isMediaMuted?: boolean
-  windowPadding?: { left?: number, right?: number, top?: number, bottom?: number }
+  windowPadding?: {
+    left?: number
+    right?: number
+    top?: number
+    bottom?: number
+  }
   lettercase?: string
   lineSpacing?: string
-}
-
-export interface AppSettings {
-  appVersion: string,
-  defaultBibleVersion: string,
-  defaultFont: string,
-  defaultBackground: {
-    hymn: { backgroundType: string, background: string, backgroundVideoKey: string },
-    bible: { backgroundType: string, background: string, backgroundVideoKey: string },
-    text: { backgroundType: string, background: string, backgroundVideoKey: string },
-  },
-  slideStyles: SlideStyle
-  bibleVersions: Array<any>, // Check app.vue for bible versions array in a list
-  alertLimit: number
 }
 
 export interface Advert {
@@ -169,4 +169,70 @@ export interface Advert {
   image: string
   createdAt: string
   updatedAt: string
+}
+
+export interface ExtendedFileT extends File {
+  blob?: Blob
+  url: string
+}
+
+export interface AppSettings {
+  appVersion: string
+  defaultBibleVersion: string
+  defaultFont: string
+  defaultBackground: {
+    default?: {
+      backgroundType: string
+      background: string
+      backgroundVideoKey: string
+    },
+    hymn: {
+      backgroundType: string
+      background: string
+      backgroundVideoKey: string
+    }
+    bible: {
+      backgroundType: string
+      background: string
+      backgroundVideoKey: string
+    }
+    text: {
+      backgroundType: string
+      background: string
+      backgroundVideoKey: string
+    }
+  }
+  slideStyles: SlideStyle
+  bibleVersions: Array<any> // Check app.vue for bible versions array in a list
+  animations?: boolean
+  footnotes?: boolean
+  songAndHymnLabels?: boolean
+
+  motionlessSlides?: boolean
+  transitionInterval?: number
+  alertLimit?: number
+}
+
+export interface AppState {
+  activeAdvert: Advert | null
+  schedules: Array<Schedule>
+  activeSchedule: Schedule | null
+  activeSlides: Array<Slide> // Returns all slides on CoW
+  liveOutputSlidesId: Array<string> | null
+  liveSlideId: string | null
+  emitter: Emitter<Record<EventType, any>> | null
+  settings: AppSettings
+  backgroundVideos: Array<BackgroundVideo>
+  alerts: Array<Alert>
+  activeAlert: Alert | null
+  activeOverlay: string
+  recentBibleSearches: Array<string>
+  failedUploadRequests: Array<{ path: string; options: any }>
+  slidesLoading: boolean
+  lastSynced: string
+  bannerVisible: boolean
+  bibleVersions: Array<any> // Check app.vue for bible versions array in a list
+  activeSocket: WebSocket | null
+  mainDisplayLabel: string
+  mainDisplayScreen: Screen | null
 }

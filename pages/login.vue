@@ -75,8 +75,11 @@
     </form>
   </div>
 </template>
-<script setup>
+
+<script setup lang="ts">
+import type { UserCredential } from "firebase/auth"
 import { useAuthStore } from "~/store/auth"
+import type { GoogleAuthResponseT, LoginResponseT } from "~/types/api-responses"
 
 definePageMeta({
   layout: "auth",
@@ -84,21 +87,29 @@ definePageMeta({
 
 useHead({
   title: "Sign in - Cloud of Worship",
-  description:
-    "Sign in to continue using Cloud of Worship - Your church's powerpoint",
+  meta: [
+    {
+      name: "description",
+      content:
+        "Sign in to continue using Cloud of Worship - Your church's powerpoint",
+    },
+  ],
 })
 
 const inaccessibleDate = new Date("2024-12-13T00:00:00.000Z")
 const authStore = useAuthStore()
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
-const googleSignIn = inject("handleGoogleSignIn")
+const googleSignIn = inject("handleGoogleSignIn") as () => Promise<
+  UserCredential | any
+>
 // console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()
 const email = ref("")
 const password = ref("")
 const passwordType = ref("password")
+const passwordInputHover = ref(false)
 const loading = ref(false)
 const googleLoading = ref(false)
 const thirtyDaysAhead = new Date()
@@ -111,7 +122,7 @@ const token = useCookie("token", {
 
 const login = async () => {
   loading.value = true
-  const { data, error } = await useAPIFetch("/auth/login", {
+  const { data, error } = await useAPIFetch<LoginResponseT>("/auth/login", {
     method: "POST",
     body: {
       email: email.value,
@@ -139,8 +150,8 @@ const login = async () => {
       })
       navigateTo("/verify")
     } else {
-      token.value = data.value.token
-      authStore.setUser(data.value?.data?.user)
+      token.value = data.value?.token
+      authStore.setUser(data.value?.data?.user!!)
       toast.add({
         title: `Successful login as ${email.value}`,
         color: "green",
@@ -171,10 +182,13 @@ const handleGoogleSignIn = async () => {
   const { user } = await googleSignIn()
   // console.log(user)
 
-  const { data, error } = await useAPIFetch("/auth/login/google", {
-    method: "POST",
-    headers: { "x-access-token": `Bearer ${user?.accessToken}` },
-  })
+  const { data, error } = await useAPIFetch<GoogleAuthResponseT>(
+    "/auth/login/google",
+    {
+      method: "POST",
+      headers: { "x-access-token": `Bearer ${user?.accessToken}` },
+    }
+  )
 
   if (error.value) {
     toast.add({
@@ -183,8 +197,8 @@ const handleGoogleSignIn = async () => {
       icon: "i-bx-error",
     })
   } else {
-    token.value = data.value.token
-    authStore.setUser(data.value?.data?.user)
+    token.value = data.value?.token
+    authStore.setUser(data.value?.data?.user!!)
     toast.add({
       title: `Successful login as ${user?.email}`,
       color: "green",

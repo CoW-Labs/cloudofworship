@@ -14,7 +14,7 @@ const useScriptureChapter = async (label: string = '1:1', version: string = ''):
   const shortLabelSplitted = label.split(':')
   const book = Number(shortLabelSplitted?.[0] || "1")
   const chapter = Number(shortLabelSplitted?.[1] || "1")
-  let verses = []
+  let verses: BibleVerse[] = []
 
   try {
     async function fetchVerses(version: string, db: any, book: number, chapter: number): Promise<any[]> {

@@ -1,6 +1,18 @@
 import { useAuthStore } from "~/store/auth";
 
-const useUploadImage = async (image: Blob) => {
+type UploadImageResponseT = {
+  message: string,
+  file: {
+    id: string;
+    name: string;
+    size: number;
+    type: string;
+    url: string;
+    createdAt: string;
+  }
+}
+
+const useUploadImage = async (image: Blob) : Promise<UploadImageResponseT> => {
   // console.log("uploading image", image?.name)
   const authStore = useAuthStore()
   const churchId = authStore.user?.churchId
@@ -10,12 +22,12 @@ const useUploadImage = async (image: Blob) => {
   const { data, error } = await useAPIFetch(`/church/${churchId}/files`, {
     method: "POST",
     body: formdata,
-    key: `upload-image-${image?.name}`,
+    key: `upload-image-${image?.size}`,
   })
   if (error.value) {
     throw new Error(error.value.message)
   }
-  return data.value
+  return (data.value as unknown as UploadImageResponseT)
 }
 
 export default useUploadImage;

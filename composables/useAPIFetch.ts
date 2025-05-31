@@ -1,5 +1,5 @@
 import { useFetch } from "#app";
-import { UseFetchOptions, useOnline, useDebounceFn } from "@vueuse/core";
+import { useOnline } from "@vueuse/core";
 import { useAuthStore } from "~/store/auth";
 import { useAppStore } from "~/store/app";
 

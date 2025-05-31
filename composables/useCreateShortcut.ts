@@ -1,24 +1,29 @@
-const useCreateShortcut = (commandKey: string, action: () => void, options?: { ctrlOrMeta: boolean, shift: boolean }) => {
+const useCreateShortcut = (
+  commandKey: string,
+  action: () => void,
+  options?: { ctrlOrMeta?: boolean; shift?: boolean }
+) => {
   window.addEventListener("keydown", (e) => {
-    const activeElement = document.activeElement;
-    const isCommandKeyPressed = e.key === commandKey;
-    const isCtrlOrMetaPressed = e.ctrlKey || e.metaKey;
-    const isEditableElement = activeElement?.tagName === 'INPUT' ||
-      activeElement?.tagName === 'TEXTAREA' ||
-      activeElement?.contentEditable === 'true';
+    const activeElement = document.activeElement
+    const isCommandKeyPressed = e.key === commandKey
+    const isCtrlOrMetaPressed = e.ctrlKey || e.metaKey
+    const isEditableElement =
+      activeElement?.tagName === "INPUT" ||
+      activeElement?.tagName === "TEXTAREA" ||
+      activeElement?.getAttribute("contenteditable") === "true"
 
-    if (isEditableElement) return;
+    if (isEditableElement) return
 
     if (options?.ctrlOrMeta) {
       if (isCommandKeyPressed && isCtrlOrMetaPressed) {
-        action();
-        e.preventDefault();
+        action()
+        e.preventDefault()
       }
     } else if (isCommandKeyPressed) {
-      action();
-      e.stopImmediatePropagation();
+      action()
+      e.stopImmediatePropagation()
     }
-  });
+  })
 }
 
 export default useCreateShortcut

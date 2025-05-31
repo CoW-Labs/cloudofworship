@@ -38,7 +38,7 @@
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^4.1.2",
     "pinia-shared-state": "^0.5.1",
-    "posthog-js": "^1.181.0",
+    "posthog-js": "^1.239.0",
     "rxjs": "^7.8.1",
     "timeago.js": "^4.0.2",
     "vite-plugin-pwa": "^0.20.0",

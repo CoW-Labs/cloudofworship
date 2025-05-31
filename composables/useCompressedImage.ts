@@ -9,7 +9,7 @@ const useCompressedImage = async (image: Blob) => {
     useWebWorker: true,
   }
   try {
-    const compressedFile = await imageCompression(image, options);
+    const compressedFile = await imageCompression((image as File), options);
     // console.log('compressedFile instanceof Blob', compressedFile instanceof Blob); // true
     // console.log(`compressedFile size ${compressedFile.size / 1024 / 1024} MB`);
     // console.log('compressedFile type', URL.createObjectURL(compressedFile));

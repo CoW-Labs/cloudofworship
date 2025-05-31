@@ -95,7 +95,7 @@
         </div>
       </Transition>
 
-      <AdvertModal :active-advert="currentState.activeAdvert" />
+      <!-- <AdvertModal :active-advert="currentState.activeAdvert" /> -->
     </ClientOnly>
   </div>
   <div
@@ -152,11 +152,6 @@
 </template>
 
 <script setup lang="ts">
-// import kjvBible from "../public/kjv.json"
-// import nkjvBible from "../public/nkjv.json"
-// import nivBible from "../public/niv.json"
-// import ampBible from "../public/amp.json"
-// import hymns from "../public/hymns.json"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
@@ -170,6 +165,10 @@ import type {
   Song,
   SlideStyle,
   Advert,
+  ExtendedFileT,
+  Slide,
+  Hymn,
+  AppSettings,
 } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { appWideActions } from "~/utils/constants"
@@ -189,14 +188,13 @@ const downloadStep = ref<number>(0)
 const downloadResource = ref<string>("")
 const downloadProgress = ref<string>("0")
 const fullScreenLoading = ref<boolean>(false)
-const cachedVideosURLs = ref<string[]>()
+const cachedVideosURLs = ref<BackgroundVideo[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const config = useRuntimeConfig()
 const token = useCookie("token")
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
-const appInfo = ref({})
-const route = useRoute()
+const appInfo = ref<AppSettings>()
 
 const { currentState } = storeToRefs(appStore)
 
@@ -218,17 +216,19 @@ provide("windowRefs", windowRefs)
 
 const getUser = async () => {
   const { data, error } = await useAPIFetch(`/user/auth`)
-  const user = data.value as unknown as User
-  authStore.setUser(user)
+  if (data.value) {
+    const user = data.value as unknown as User
+    authStore.setUser(user)
+  }
 }
 getUser()
 
 const retrieveChurchSongs = async () => {
   try {
-    const countPromise = await useAPIFetch(
+    const {data} = await useAPIFetch(
       `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
     )
-    const onlineCount = countPromise.data.value as unknown as number
+    const onlineCount = data.value ? (data.value as unknown as number) : 0
     const offlineCount = await db.library.where("type").equals("song").count()
     if (onlineCount > offlineCount) {
       // Delete songs that are not in the online database
@@ -261,9 +261,11 @@ const getChurch = async () => {
     const { data, error } = await useAPIFetch(
       `/church/${churchId}?teammates=true`
     )
-    const church = data.value as unknown as Church
-    authStore.setChurch(church)
-    retrieveChurchSongs()
+    if (data.value) {
+      const church = data.value as unknown as Church
+      authStore.setChurch(church)
+      retrieveChurchSongs()
+    }
     if (error.value) {
       throw new Error(error.value?.message)
     }
@@ -293,13 +295,12 @@ if (isAppOnline.value) {
   const { data } = await useAPIFetch("/app-config/info")
   if (data.value) {
     appInfo.value = data.value as any
-    appStore.setBibleVersions(data.value?.bibleVersions)
+    appStore.setBibleVersions((data.value as any)?.bibleVersions)
   }
   hymnCount = await hymnCount.json()
 } else {
   // Handle offline hymn count
-  hymnCount = hymns?.data?.length
-  console.log("hymnCount", hymnCount)
+  hymnCount = (hymns?.data as Hymn[])?.length
 }
 
 // LISTEN TO EVENTS
@@ -558,7 +559,7 @@ const downloadEssentialResources = async () => {
   }
 
   const populateBibleVersionOptions = async () => {
-    const tempBibleVersions = appInfo.value.bibleVersions?.length
+    const tempBibleVersions = appInfo.value?.bibleVersions?.length
       ? appInfo.value.bibleVersions
       : [...appStore.currentState.settings.bibleVersions]
     for (const bibleVersion of tempBibleVersions) {
@@ -618,7 +619,6 @@ const overrideAppSettings = async () => {
     const db = useIndexedDB()
     // db.newSchemaUpdate()
 
-    // console.log("calling again")
     setTimeout(() => {
       useGlobalEmit(appWideActions.showChangelog)
     }, 2000)
@@ -627,21 +627,21 @@ const overrideAppSettings = async () => {
     // Remove setting property here if it is defined by the user.
     appStore.setAppSettings({
       ...currentAppSettings,
-      appVersion: props.appVersion,
+      appVersion: props.appVersion!!,
       defaultBackground: {
         hymn: {
           backgroundType: "video",
-          background: cachedVideosURLs.value?.[0],
+          background: cachedVideosURLs.value?.[0].url!!,
           backgroundVideoKey: "/video-bg-1.mp4",
         },
         bible: {
           backgroundType: "video",
-          background: cachedVideosURLs.value?.[2],
+          background: cachedVideosURLs.value?.[0].url!!,
           backgroundVideoKey: "/video-bg-3.mp4",
         },
         text: {
           backgroundType: "video",
-          background: cachedVideosURLs.value?.[3],
+          background: cachedVideosURLs.value?.[0].url!!,
           backgroundVideoKey: "/video-bg-4.mp4",
         },
       },
@@ -652,12 +652,11 @@ const overrideAppSettings = async () => {
         alignment: "center",
         windowPadding: { left: 24, right: 24, top: 24, bottom: 24 },
       } as SlideStyle,
-      bibleVersions: appInfo.value.bibleVersions as Array<any>, // Check app.vue for bible versions array in a list
+      bibleVersions: appInfo.value?.bibleVersions!!, // Check app.vue for bible versions array in a list
       alertLimit: 5,
     })
 
-    // console.log("calling setBibleVersions")
-    appStore.setBibleVersions(appInfo.value.bibleVersions)
+    appStore.setBibleVersions(appInfo.value?.bibleVersions!!)
   }
 }
 
@@ -676,10 +675,11 @@ const retrieveSchedules = async () => {
   if (isAppOnline.value) {
     downloadProgress.value = "0"
     downloadResource.value = "schedules and slides"
-    const schedulesPromise = await useAPIFetch(
+    const {data} = await useAPIFetch(
       `/church/${authStore.user?.churchId}/schedules`
     )
-    const schedules = schedulesPromise.data.value as unknown as Schedule[]
+
+    const schedules = data.value ? (data.value as unknown as Schedule[]) : []
     const mergedSchedules = useMergeObjectArray(
       [...schedules],
       appStore.currentState.schedules
@@ -700,23 +700,24 @@ const retrieveAllMediaFilesFromDB = async () => {
 
   // For active slides
   const slides = [...appStore.currentState.activeSlides]
-  slides.forEach(async (slide) => {
+  slides.forEach(async (slide: Slide) => {
     if (
       slide.type === slideTypes.media &&
       slide.background?.startsWith("blob:")
     ) {
       const mediaObj = await db.media.where({ id: slide.id }).toArray()
       if (mediaObj[0]) {
-        // console.log("media file", mediaObj[0])
-        let b64 = null
         // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
-        const arrayBuffer: ArrayBuffer = mediaObj[0]?.data
+        const arrayBuffer = mediaObj[0]?.data!!
         const blob = new Blob([arrayBuffer], {
           type: mediaObj[0]?.content?.type,
         })
         const fileUrl = URL.createObjectURL(blob)
-        slide.data.url = fileUrl
-        if (!slide.data?.type?.includes("audio")) {
+        if (slide.data) {
+          slide.data = slide.data as ExtendedFileT
+          slide.data.url = fileUrl
+        }
+        if (!(slide.data as ExtendedFileT)?.type?.includes("audio")) {
           slide.background = fileUrl
         }
         appStore.setActiveSlides(slides)
@@ -730,7 +731,7 @@ const retrieveAllMediaFilesFromDB = async () => {
           slide?.backgroundVideoKey
         )
         // console.log(cachedBackgroundVideo)
-        const arrayBuffer: ArrayBuffer = cachedBackgroundVideo?.data!!
+        const arrayBuffer = cachedBackgroundVideo?.data!!
         const blob = new Blob([arrayBuffer], {
           type: cachedBackgroundVideo?.content?.type,
         })
@@ -744,7 +745,7 @@ const retrieveAllMediaFilesFromDB = async () => {
   // For saved slides
   const savedSlides = await db.library.where("type").equals("slide").toArray()
   savedSlides?.map((slide) => {
-    if (slide.content?.background?.startsWith("blob:")) {
+    if ((slide.content as Slide)?.background?.startsWith("blob:")) {
       db.media.get(slide.id).then((resp) => {
         const media = resp
 
@@ -753,20 +754,13 @@ const retrieveAllMediaFilesFromDB = async () => {
           type: media?.content?.type,
         })
         const fileUrl = URL.createObjectURL(blob)
-        // console.log(fileUrl)
-        // console.log({
-        //   key: slide.id,
-        //   changes: {
-        //     "content.data": { ...slide.content.data, url: fileUrl },
-        //   },
-        // })
-        const updatedLibraryItem = {
+        const updatedLibraryItem: LibraryItem = {
           ...slide,
           content: {
             ...slide.content,
             background: fileUrl,
-            data: { ...slide.content.data, url: fileUrl },
-          },
+            data: { ...(slide.content as Slide).data, url: fileUrl },
+          } as Slide,
         }
         // console.log(updatedLibraryItem)
         db.library.update(slide.id, updatedLibraryItem)
@@ -779,13 +773,13 @@ const retrieveAllMediaFilesFromDB = async () => {
 
 const setCachedVideosURL = async () => {
   const cachedVideos = await useBackgroundVideos()
-  console.log('cachedVideos', cachedVideos)
-  const tempCachedVideos = cachedVideos?.map((cached: BackgroundVideo) => ({
-    id: cached?.id,
-    url: URL.createObjectURL(cached?.data),
-  }))
-  cachedVideosURLs.value = tempCachedVideos as BackgroundVideo[]
-  // console.log(tempCachedVideosURLs)
+  const tempCachedVideos: BackgroundVideo[] = cachedVideos?.map(
+    (cached: Media) => ({
+      id: cached?.id,
+      url: URL.createObjectURL(cached?.data as Blob),
+    })
+  )
+  cachedVideosURLs.value = tempCachedVideos
   appStore.setBackgroundVideos(tempCachedVideos)
 }
 
@@ -840,78 +834,87 @@ function closeAllWindows() {
 }
 
 async function openWindows() {
-  const screenDetails = await window.getScreenDetails()
-  screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
-  screenDetails?.screens?.forEach((screen: any) => {
-    screen.id = useScreenId(screen)
-  })
-  const noOfScreens = screenDetails.screens.length
-
-  if (!appStore.currentState.mainDisplayLabel) {
-    useToast().add({
-      title: "Set up your live display first",
-      icon: "i-bx-info-circle",
+  if ("getScreenDetails" in window) {
+    // prettier-ignore
+    const screenDetails = await window.getScreenDetails()
+    screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
+    screenDetails?.screens?.forEach((screen: any) => {
+      screen.id = useScreenId(screen)
     })
-    useGlobalEmit(appWideActions.openSettings, "Display Settings")
-    return
-  }
+    const noOfScreens = screenDetails.screens.length
 
-  if (noOfScreens === 1) {
-    useToast().add({
-      title:
-        "Only one screen detected. Connect a second screen to project on another display",
-      icon: "i-bx-info-circle",
-    })
+    if (!appStore.currentState.mainDisplayLabel) {
+      useToast().add({
+        title: "Set up your live display first",
+        icon: "i-bx-info-circle",
+      })
+      useGlobalEmit(appWideActions.openSettings, "Display Settings")
+      return
+    }
 
-    // Two screens or more
-    const screen1 = screenDetails.screens[0]
-    openWindow(
-      screen1.availLeft,
-      screen1.availTop,
-      screen1.availWidth,
-      screen1.availHeight,
-      `http://${window.location.host}/live`
-    )
-  } else {
-    // Two screens or more
-    // const screen1 = screenDetails.screens[0]
-    // const screen2 = screenDetails.screens[1]
-    const mainDisplayScreen = screenDetails.screens?.find(
-      (screen: any) => screen.id === appStore.currentState.mainDisplayLabel
-    )
-    if (mainDisplayScreen) {
+    if (noOfScreens === 1) {
+      useToast().add({
+        title:
+          "Only one screen detected. Connect a second screen to project on another display",
+        icon: "i-bx-info-circle",
+      })
+
+      // Two screens or more
+      const screen1 = screenDetails.screens[0]
       openWindow(
-        mainDisplayScreen.availLeft,
-        mainDisplayScreen.availTop,
-        mainDisplayScreen.availWidth,
-        mainDisplayScreen.availHeight,
+        screen1.availLeft,
+        screen1.availTop,
+        screen1.availWidth,
+        screen1.availHeight,
         `http://${window.location.host}/live`
       )
     } else {
-      useToast().add({
-        title: "Unable to find live display, update your display settings",
-        icon: "i-bx-info-circle",
-      })
+      // Two screens or more
+      // const screen1 = screenDetails.screens[0]
+      // const screen2 = screenDetails.screens[1]
+      const mainDisplayScreen = screenDetails.screens?.find(
+        (screen: any) => screen.id === appStore.currentState.mainDisplayLabel
+      )
+      if (mainDisplayScreen) {
+        openWindow(
+          mainDisplayScreen.availLeft,
+          mainDisplayScreen.availTop,
+          mainDisplayScreen.availWidth,
+          mainDisplayScreen.availHeight,
+          `http://${window.location.host}/live`
+        )
+      } else {
+        useToast().add({
+          title: "Unable to find live display, update your display settings",
+          icon: "i-bx-info-circle",
+        })
+      }
     }
-  }
 
-  const closeMonitor = setInterval(checkWindowClose, 250)
+    const closeMonitor = setInterval(checkWindowClose, 250)
 
-  function checkWindowClose() {
-    if (windowRefs.value.some((windowRef: any) => windowRef.closed)) {
+    function checkWindowClose() {
+      if (windowRefs.value.some((windowRef: any) => windowRef.closed)) {
+        closeAllWindows()
+        clearInterval(closeMonitor)
+      }
+    }
+
+    // Also close our popup windows if the main app window is closed
+    window.addEventListener("beforeunload", () => {
       closeAllWindows()
-      clearInterval(closeMonitor)
-    }
+    })
+
+    screenDetails.addEventListener("screenschange", () => {
+      // TODO: Action when screen count changes
+    })
+  } else {
+    useToast().add({
+      title: "Your browser does not support automatic displays detection",
+      icon: "i-bx-info-circle",
+      color: "amber",
+    })
   }
-
-  // Also close our popup windows if the main app window is closed
-  window.addEventListener("beforeunload", () => {
-    closeAllWindows()
-  })
-
-  screenDetails.addEventListener("screenschange", () => {
-    // TODO: Action when screen count changes
-  })
 }
 // WINDOW MANAGEMENT CODE ENDS HERE
 </script>
