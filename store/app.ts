@@ -92,6 +92,7 @@ export const useAppStore = defineStore("app", {
           },
           animations: true,
           footnotes: true,
+          songAndHymnLabels: true,
           motionlessSlides: false,
           transitionInterval: 0.7,
           slideStyles: {
@@ -136,7 +137,9 @@ export const useAppStore = defineStore("app", {
   actions: {
     setSchedules(schedules: Schedule[]) {
       // onAppStateChange(this.pastStates, this.currentState)
-      this.currentState.schedules = schedules?.filter(schedule => schedule !== null)
+      this.currentState.schedules = schedules?.filter(
+        (schedule) => schedule !== null
+      )
       if (this.currentState.activeSchedule) {
         const tempSchedule = schedules.find(
           (sch) => sch?._id === this.currentState.activeSchedule?._id
@@ -382,6 +385,33 @@ export const useAppStore = defineStore("app", {
         },
       }
     },
+    setActiveAdvert(advert: Advert | null) {
+      this.currentState.activeAdvert = advert
+    },
+    setDefaultSlideBackground(
+      type: string,
+      background: string,
+      backgroundVideoKey?: string
+    ) {
+      console.log(
+        "setDefaultSlideBackground",
+        type,
+        background,
+        backgroundVideoKey
+      )
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        defaultBackground: {
+          ...this.currentState.settings.defaultBackground,
+          default: {
+            backgroundType: type,
+            background,
+            backgroundVideoKey: backgroundVideoKey || "",
+          },
+        },
+      }
+      console.log("setDefaultSlideBackground", this.currentState.settings)
+    },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)
     // },
@@ -431,9 +461,6 @@ export const useAppStore = defineStore("app", {
       this.setSlidesLoading(false)
       this.setLastSynced(new Date().toISOString())
       posthog.reset()
-    },
-    setActiveAdvert(advert: Advert | null) {
-      this.currentState.activeAdvert = advert
     },
     // Undo/Redo Actions
     setCurrentState(state: any) {

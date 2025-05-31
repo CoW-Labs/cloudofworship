@@ -67,6 +67,49 @@
             "
           />
         </UFormGroup>
+        <UFormGroup label="Set default slide background" class="mt-4">
+          <UTabs
+            :items="slideBackgroundTabs"
+            @change="activeSlideBackgroundTab = $event"
+          >
+            <template #default="{ item }">
+              <div class="flex gap-2 capitalize">
+                <IconWrapper :name="item.icon" size="4" />
+                {{ item.label }}
+              </div>
+            </template>
+          </UTabs>
+          <Transition class="fade">
+            <div class="tab-content">
+              <BgVideoSelection
+                v-if="activeSlideBackgroundTab === 0"
+                settings-page
+                @select="
+                  appStore.setDefaultSlideBackground(
+                    'video',
+                    $event.video,
+                    $event.key
+                  )
+                "
+              />
+              <BgImageSelection
+                v-else-if="activeSlideBackgroundTab === 1"
+                settings-page
+                @select="
+                  appStore.setDefaultSlideBackground('image', $event.image)
+                "
+              />
+              <BgColorSelection
+                v-else-if="activeSlideBackgroundTab === 2"
+                :count="12"
+                @select="
+                  appStore.setDefaultSlideBackground('color', $event.color)
+                "
+              />
+            </div>
+          </Transition>
+        </UFormGroup>
+        <!-- flex items-center justify-between -->
         <UFormGroup label="Use uppercase for slide content?" class="mt-4">
           <UToggle
             size="lg"
@@ -279,9 +322,16 @@
         <h3 class="text-md font-semibold">Footnotes & Credits</h3>
       </div>
       <UForm>
+        <!-- <UFormGroup label="Toggle song/hymn title and artistes">
+          <UToggle
+            size="lg"
+            :model-value="appStore.currentState.settings.songAndHymnLabels"
+            @change="appStore.setSongAndHymnLabels($event)"
+          />
+        </UFormGroup> -->
         <UFormGroup
           label="Toggle footnotes and credits for Bible & Hymn Slides"
-          class=""
+          class="mt-4"
         >
           <UToggle
             size="lg"
@@ -410,6 +460,12 @@
 import { useAppStore } from "~/store/app"
 const appStore = useAppStore()
 
+const slideBackgroundTabs = [
+  { label: "video", icon: "i-bx-video" },
+  { label: "image", icon: "i-bx-image" },
+  { label: "color", icon: "i-bx-paint" },
+]
+const activeSlideBackgroundTab = ref<number>(0)
 const font = ref(appStore.currentState.settings.defaultFont)
 const lines = ref<number>(
   appStore.currentState.settings.slideStyles.linesPerSlide || 4

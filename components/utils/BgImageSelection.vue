@@ -1,12 +1,13 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
     <div
-      class="bg-image-selection gap-2 grid grid-cols-3 max-h-[190px] overflow-y-auto"
+      :class="{ 'gap-4 grid-cols-7 max-h-full': settingsPage }"
+      class="bg-image-selection grid gap-2 grid-cols-3 max-h-[190px] overflow-y-auto overflow-x-hidden"
     >
       <UButton
         v-for="image in backgroundImages"
         :key="image"
-        @click="$emit('select', image)"
+        @click="$emit('select', { image })"
         class="w-[70px] h-[70px] p-0 text-black bg-cover transition-all overflow-hidden relative"
       >
         <div
@@ -29,6 +30,7 @@
       size="sm"
       @change="saveAndSelectImage($event?.[0])"
       class="max-w-[230px]"
+      :class="{ 'max-w-full': settingsPage }"
     />
     <!-- <label class="relative">
       <input
@@ -52,6 +54,7 @@ import type { Media } from "~/types"
 
 defineProps<{
   value?: string
+  settingsPage?: boolean
 }>()
 
 const emit = defineEmits(["select"])

@@ -1,7 +1,8 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
     <div
-      class="bg-image-selection gap-2 grid grid-cols-3 max-h-[200px] overflow-y-auto"
+      :class="{'gap-4 grid-cols-5': settingsPage }"
+      class="bg-image-selection grid gap-2 grid-cols-3 max-h-[200px] overflow-y-auto overflow-x-hidden"
     >
       <UButton
         v-for="video in backgroundVideos"
@@ -56,6 +57,7 @@ const appStore = useAppStore()
 
 defineProps<{
   value?: string
+  settingsPage?: boolean
 }>()
 
 const emit = defineEmits(["select"])
