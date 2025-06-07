@@ -1,7 +1,7 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
     <div
-      :class="{'gap-4 grid-cols-5': settingsPage }"
+      :class="{ 'gap-4 grid-cols-5': settingsPage }"
       class="bg-image-selection grid gap-2 grid-cols-3 max-h-[200px] overflow-y-auto overflow-x-hidden"
     >
       <UButton
@@ -29,11 +29,12 @@
     </div>
     <div class="button-ctn pt-2">
       <FileDropzone
+        v-if="!settingsPage"
         size="sm"
         icon="i-bx-film"
         @change="saveAndSelectVideo($event?.[0])"
       />
-      <!-- <label class="relative">
+      <label class="relative" v-else>
         <input
           type="file"
           name=""
@@ -42,10 +43,15 @@
           accept="video/*"
           @change="saveAndSelectVideo($event.target?.files?.[0])"
         />
-        <UButton class="z-1" block variant="outline" icon="i-bx-plus" size="xs"
+        <UButton
+          class="z-1 mt-2"
+          block
+          variant="outline"
+          icon="i-bx-plus"
+          size="sm"
           >Add from device</UButton
         >
-      </label> -->
+      </label>
     </div>
   </div>
 </template>

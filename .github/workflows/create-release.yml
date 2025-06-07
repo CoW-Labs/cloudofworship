@@ -102,8 +102,36 @@ jobs:
             next_version="$last_tag"  # If no valid changes, keep the same version
           fi
 
+          echo "Initial next_version: $next_version"
+
+          # Check if the proposed version already exists as a tag
+          if git tag -l | grep -q "^${next_version}$"; then
+            echo "Tag $next_version already exists, bumping to next patch version"
+            
+            # Extract version components from the proposed version
+            base_next=$(echo "$next_version" | sed 's/-beta//')
+            next_major=$(echo $base_next | awk -F. '{print $1}' | tr -d 'v')
+            next_minor=$(echo $base_next | awk -F. '{print $2}')
+            next_patch=$(echo $base_next | awk -F. '{print $3}')
+            
+            # Keep bumping patch version until we find an unused tag
+            while git tag -l | grep -q "^v${next_major}.${next_minor}.${next_patch}-beta$"; do
+              next_patch=$((next_patch + 1))
+              echo "Checking v${next_major}.${next_minor}.${next_patch}-beta"
+            done
+            
+            next_version="v${next_major}.${next_minor}.${next_patch}-beta"
+            echo "Bumped to available version: $next_version"
+          fi
+
+          # Double-check that our final version doesn't exist
+          if git tag -l | grep -q "^${next_version}$"; then
+            echo "ERROR: Final version $next_version still conflicts with existing tag"
+            exit 1
+          fi
+
+          echo "Final next_version: $next_version"
           echo "next_version=$next_version" >> $GITHUB_ENV
-      
 
       - name: Update appVersion in app.vue
         run: |

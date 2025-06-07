@@ -362,6 +362,7 @@ const preSlideCreation = (): Slide => {
       // Added comment here to indicate new feat
       lettercase: appStore.currentState.settings.slideStyles.lettercase,
       lineSpacing: appStore.currentState.settings.slideStyles.lineSpacing,
+      textOutlined: appStore.currentState.settings.slideStyles.textOutlined,
     },
   }
   return tempSlide
@@ -631,6 +632,7 @@ const createNewSlide = (duplicateSlide?: Slide) => {
     tempSlide = { ...duplicateSlide }
     delete tempSlide._id
   } else {
+    tempSlide.slideStyle = { ...tempSlide.slideStyle, alignment: "left" }
     tempSlide.background =
       appStore.currentState.settings.defaultBackground.default?.background ||
       appStore.currentState.settings.defaultBackground.default?.background

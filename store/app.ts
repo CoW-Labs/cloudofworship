@@ -92,7 +92,7 @@ export const useAppStore = defineStore("app", {
           },
           animations: true,
           footnotes: true,
-          songAndHymnLabels: true,
+          songAndHymnLabelsVisibility: true,
           motionlessSlides: false,
           transitionInterval: 0.7,
           slideStyles: {
@@ -258,6 +258,14 @@ export const useAppStore = defineStore("app", {
         ...this.currentState.settings,
         slideStyles: styles,
       }
+
+      // Update slide styles in all active slides
+      this.currentState.activeSlides.forEach((slide) => {
+        slide.slideStyle = {
+          ...slide.slideStyle,
+          textOutlined: styles.textOutlined, // only this property inherited for now
+        }
+      })
     },
     setDefaultBibleVersion(version: string) {
       this.currentState.settings = {
@@ -356,6 +364,12 @@ export const useAppStore = defineStore("app", {
         footnotes: footnotes,
       }
     },
+    setSongAndHymnLabelsVisibility(songAndHymnLabelsVisibility: boolean) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        songAndHymnLabelsVisibility: songAndHymnLabelsVisibility,
+      }
+    },
     setMotionlessSlides(motionlessSlides: boolean) {
       this.currentState.settings = {
         ...this.currentState.settings,
@@ -452,6 +466,7 @@ export const useAppStore = defineStore("app", {
           lettercase: "",
         } as SlideStyle,
         bibleVersions: bibleVersionObjects, // Check app.vue for bible versions array in a list
+        songAndHymnLabelsVisibility: true,
       })
       this.setBackgroundVideos([])
       this.setAlerts([])

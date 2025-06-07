@@ -6,7 +6,10 @@
         <h3 class="text-md font-semibold">Look and Feel</h3>
       </div>
       <UForm>
-        <UFormGroup label="Set default font">
+        <UFormGroup
+          label="Set default font"
+          class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
+        >
           <USelectMenu
             class="border-0 shadow-none w-[200px]"
             searchable
@@ -47,7 +50,10 @@
             </template>
           </USelectMenu>
         </UFormGroup>
-        <UFormGroup label="Set default slide alignment" class="mt-4">
+        <UFormGroup
+          label="Set default slide alignment"
+          class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
+        >
           <USelectMenu
             class="border-0 shadow-none max-w-[200px] capitalize"
             select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white capitalize"
@@ -67,50 +73,10 @@
             "
           />
         </UFormGroup>
-        <UFormGroup label="Set default slide background" class="mt-4">
-          <UTabs
-            :items="slideBackgroundTabs"
-            @change="activeSlideBackgroundTab = $event"
-          >
-            <template #default="{ item }">
-              <div class="flex gap-2 capitalize">
-                <IconWrapper :name="item.icon" size="4" />
-                {{ item.label }}
-              </div>
-            </template>
-          </UTabs>
-          <Transition class="fade">
-            <div class="tab-content">
-              <BgVideoSelection
-                v-if="activeSlideBackgroundTab === 0"
-                settings-page
-                @select="
-                  appStore.setDefaultSlideBackground(
-                    'video',
-                    $event.video,
-                    $event.key
-                  )
-                "
-              />
-              <BgImageSelection
-                v-else-if="activeSlideBackgroundTab === 1"
-                settings-page
-                @select="
-                  appStore.setDefaultSlideBackground('image', $event.image)
-                "
-              />
-              <BgColorSelection
-                v-else-if="activeSlideBackgroundTab === 2"
-                :count="12"
-                @select="
-                  appStore.setDefaultSlideBackground('color', $event.color)
-                "
-              />
-            </div>
-          </Transition>
-        </UFormGroup>
-        <!-- flex items-center justify-between -->
-        <UFormGroup label="Use uppercase for slide content?" class="mt-4">
+        <UFormGroup
+          label="Uppercase Text"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
           <UToggle
             size="lg"
             :model-value="
@@ -125,6 +91,84 @@
             "
           />
         </UFormGroup>
+        <UFormGroup
+          label="Outlined Text"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
+          <UToggle
+            size="lg"
+            :model-value="
+              appStore.currentState.settings.slideStyles.textOutlined
+            "
+            @change="
+              appStore.setSlideStyles({
+                ...appStore.currentState.settings,
+                textOutlined: $event,
+              })
+            "
+          />
+        </UFormGroup>
+        <UFormGroup label="Set default slide background" class="px-2 py-3">
+          <UTabs
+            :items="slideBackgroundTabs"
+            v-model:model-value="activeSlideBackgroundTab"
+          >
+            <template #default="{ item }">
+              <div class="flex gap-2 capitalize">
+                <IconWrapper :name="item.icon" size="4" />
+                {{ item.label }}
+              </div>
+            </template>
+          </UTabs>
+          <Transition class="fade">
+            <div class="tab-content">
+              <BgVideoSelection
+                v-if="activeSlideBackgroundTab === 0"
+                settings-page
+                :value="
+                  appStore.currentState.settings.defaultBackground.default
+                    ?.background
+                "
+                @select="
+                  appStore.setDefaultSlideBackground(
+                    backgroundTypes.video,
+                    $event.video,
+                    $event.key
+                  )
+                "
+              />
+              <BgImageSelection
+                v-else-if="activeSlideBackgroundTab === 1"
+                settings-page
+                :value="
+                  appStore.currentState.settings.defaultBackground.default
+                    ?.background
+                "
+                @select="
+                  appStore.setDefaultSlideBackground(
+                    backgroundTypes.image,
+                    $event.image
+                  )
+                "
+              />
+              <BgColorSelection
+                v-else-if="activeSlideBackgroundTab === 2"
+                :count="12"
+                :value="
+                  appStore.currentState.settings.defaultBackground.default
+                    ?.background
+                "
+                @select="
+                  appStore.setDefaultSlideBackground(
+                    backgroundTypes.solid,
+                    $event.color
+                  )
+                "
+              />
+            </div>
+          </Transition>
+        </UFormGroup>
+        <!-- flex items-center justify-between -->
       </UForm>
     </div>
 
@@ -244,7 +288,7 @@
       <UForm>
         <UFormGroup
           label="Transition between slides and micro animations"
-          class=""
+          class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
         >
           <UToggle
             size="lg"
@@ -255,9 +299,11 @@
         <UFormGroup
           v-if="appStore.currentState.settings.animations"
           label="Transition interval in seconds"
-          class="max-w-[200px] mt-4 come-up-1"
+          class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
         >
-          <div class="flex px-0 items-center gap-2 font-semibold">
+          <div
+            class="flex px-0 items-center gap-2 font-semibold w-full min-w-[200px]"
+          >
             <span class="text-sm">0s</span>
             <URange
               :model-value="appStore.currentState.settings.transitionInterval"
@@ -278,8 +324,11 @@
         <h3 class="text-md font-semibold">Bible Slides</h3>
       </div>
       <UForm>
-        <div class="flex items-end gap-4">
-          <UFormGroup label="Set default Bible Version">
+        <div class="flex items-center gap-2">
+          <UFormGroup
+            label="Set default Bible Version"
+            class="flex items-center w-full justify-between py-1 px-2 hover:bg-primary/10"
+          >
             <USelectMenu
               class="border-0 shadow-none max-w-[200px]"
               searchable
@@ -308,6 +357,7 @@
             size="md"
             icon="i-bx-plus"
             variant="outline"
+            class="mt-1"
             @click="$emit('select-active-tab', 'Bible Version Settings')"
           >
             Add more
@@ -322,16 +372,21 @@
         <h3 class="text-md font-semibold">Footnotes & Credits</h3>
       </div>
       <UForm>
-        <!-- <UFormGroup label="Toggle song/hymn title and artistes">
+        <UFormGroup
+          label="Toggle song/hymn title and artistes"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
           <UToggle
             size="lg"
-            :model-value="appStore.currentState.settings.songAndHymnLabels"
-            @change="appStore.setSongAndHymnLabels($event)"
+            :model-value="
+              appStore.currentState.settings.songAndHymnLabelsVisibility
+            "
+            @change="appStore.setSongAndHymnLabelsVisibility($event)"
           />
-        </UFormGroup> -->
+        </UFormGroup>
         <UFormGroup
           label="Toggle footnotes and credits for Bible & Hymn Slides"
-          class="mt-4"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
         >
           <UToggle
             size="lg"
@@ -349,7 +404,10 @@
       </div>
       <UForm>
         <div class="flex items-end gap-4">
-          <UFormGroup label="Set slide overlay">
+          <UFormGroup
+            label="Set slide overlay"
+            class="flex w-full items-center justify-between py-2 px-2 hover:bg-primary/10"
+          >
             <USelectMenu
               class="border-0 shadow-none max-w-[200px]"
               select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
@@ -384,7 +442,10 @@
         <h3 class="text-md font-semibold">Slide Experiments</h3>
       </div>
       <UForm>
-        <UFormGroup label="Make slide transitions motionless" class="">
+        <UFormGroup
+          label="Make slide transitions motionless"
+          class="flex w-full items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
           <UToggle
             size="lg"
             :model-value="appStore.currentState.settings.motionlessSlides"
@@ -488,6 +549,21 @@ const bibleVersionSelectOptions = computed(() =>
     ?.filter((version) => version?.isDownloaded)
     ?.map((version) => version?.id)
 )
+
+// Set default activeSlideBackgroundTab
+switch (
+  appStore.currentState.settings.defaultBackground.default?.backgroundType
+) {
+  case backgroundTypes.video:
+    activeSlideBackgroundTab.value = 0
+    break
+  case backgroundTypes.image:
+    activeSlideBackgroundTab.value = 1
+    break
+  case backgroundTypes.solid:
+    activeSlideBackgroundTab.value = 2
+    break
+}
 
 const getActivePaddingValue = (side: string) => {
   side = side as "top" | "right" | "bottom" | "left"
