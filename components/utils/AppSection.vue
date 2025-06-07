@@ -56,7 +56,6 @@
                 :variant="secondaryButton?.variant || 'ghost'"
                 :color="secondaryButton.color"
                 :icon="secondaryButton.icon"
-                :target="secondaryButton.action === 'go-live' ? false : false"
                 :to="secondaryButton.action === 'go-live' ? '#' : '#'"
                 @click="
                   secondaryButton.action !== appWideActions.goLive

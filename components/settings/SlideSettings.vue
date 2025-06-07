@@ -5,7 +5,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Look and Feel</h3>
       </div>
-      <UForm>
+      <UForm :state="{}">
         <UFormGroup
           label="Set default font"
           class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
@@ -177,7 +177,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Space Management</h3>
       </div>
-      <UForm>
+      <UForm :state="{}">
         <div class="header flex items-center justify-between">
           <h4 class="text-sm font-semibold opacity-70 whitespace-nowrap mr-6">
             Set default padding between slides
@@ -285,7 +285,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Animation & Transitions</h3>
       </div>
-      <UForm>
+      <UForm :state="{}">
         <UFormGroup
           label="Transition between slides and micro animations"
           class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
@@ -323,7 +323,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Bible Slides</h3>
       </div>
-      <UForm>
+      <UForm :state="{}">
         <div class="flex items-center gap-2">
           <UFormGroup
             label="Set default Bible Version"
@@ -371,7 +371,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Footnotes & Credits</h3>
       </div>
-      <UForm>
+      <UForm :state="{}">
         <UFormGroup
           label="Toggle song/hymn title and artistes"
           class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
@@ -402,7 +402,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Overlays & Themes</h3>
       </div>
-      <UForm>
+      <UForm :state="{}">
         <div class="flex items-end gap-4">
           <UFormGroup
             label="Set slide overlay"
@@ -441,7 +441,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Slide Experiments</h3>
       </div>
-      <UForm>
+      <UForm :state="{}">
         <UFormGroup
           label="Make slide transitions motionless"
           class="flex w-full items-center justify-between py-2 px-2 hover:bg-primary/10"
@@ -460,7 +460,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Song Slides</h3>
       </div>
-      <UForm>
+      <UForm :state="{}">
         <UFormGroup label="Set default lines per slide">
           <USelectMenu
             class="absolute border-0 shadow-none top-[6px]"

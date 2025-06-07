@@ -45,14 +45,11 @@
 
 <script setup lang="ts">
 import type { Emitter } from "mitt"
-import type { Church, User } from "~/store/auth"
 const visible = ref<boolean>(false)
 
 defineProps<{
   appVersion: string
-  value: string
-  user: User
-  church: Church
+  value?: string
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
