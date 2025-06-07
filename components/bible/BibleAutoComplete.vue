@@ -60,14 +60,18 @@ const activeBook = ref<string>()
 watch(
   () => props.verse,
   () => {
-    let results: any | Fuzzysort.Result[] = fuzzysort.go(props.verse, bibleBooks)
-    results = results?.map((result: Fuzzysort.Result | any) => result.obj).slice(0, 6)
-    results.sort()
+    let results: any | Fuzzysort.Result[] = fuzzysort.go(
+      props.verse,
+      bibleBooks
+    )
+    results = results
+      ?.map((result: Fuzzysort.Result | any) => result.target)
+      .slice(0, 6)
     // sort by showing string without numbers first
     results.sort((a: string, b: string) => {
-      if (a.includes(" ") && !b.includes(" ")) {
+      if (a?.includes(" ") && !b?.includes(" ")) {
         return 1
-      } else if (!a.includes(" ") && b.includes(" ")) {
+      } else if (!a?.includes(" ") && b?.includes(" ")) {
         return -1
       } else {
         return 0
