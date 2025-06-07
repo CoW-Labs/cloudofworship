@@ -1,14 +1,18 @@
 <template>
   <div
-    class="bg-image-selection p-2 gap-2 grid grid-cols-4"
-    :class="{ 'grid-cols-6': count === 6 }"
+    class="bg-image-selection p-2 gap-2 grid"
+    :class="{
+      'grid-cols-6': count === 6,
+      'grid-cols-12': count === 12,
+      'grid-cols-4': !count,
+    }"
   >
     <UButton
       v-for="color in count === 6
         ? backgroundColors?.slice(0, 6)
         : backgroundColors"
       :key="color"
-      @click="$emit('select', color)"
+      @click="$emit('select', { color })"
       class="w-[40px] h-[40px] p-0 text-black bg-cover transition-all overflow-hidden relative rounded-md"
       :class="{ 'w-[34px] h-[34px]': count === 6 }"
     >

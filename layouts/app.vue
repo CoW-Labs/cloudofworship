@@ -301,7 +301,6 @@ if (isAppOnline.value) {
 } else {
   // Handle offline hymn count
   hymnCount = (hymns?.data as Hymn[])?.length
-  console.log("hymnCount", hymnCount)
 }
 
 // LISTEN TO EVENTS
@@ -620,7 +619,6 @@ const overrideAppSettings = async () => {
     const db = useIndexedDB()
     // db.newSchemaUpdate()
 
-    // console.log("calling again")
     setTimeout(() => {
       useGlobalEmit(appWideActions.showChangelog)
     }, 2000)
@@ -692,7 +690,6 @@ const retrieveSchedules = async () => {
       const dateB = new Date(scheduleB?.updatedAt)
       return dateB?.getTime() - dateA?.getTime()
     })
-    console.log("currentState.schedules", schedules)
     appStore.setSchedules(mergedSchedules)
     downloadProgress.value = "100"
   }
@@ -708,7 +705,6 @@ const retrieveAllMediaFilesFromDB = async () => {
       slide.type === slideTypes.media &&
       slide.background?.startsWith("blob:")
     ) {
-      console.log("media", slide)
       const mediaObj = await db.media.where({ id: slide.id }).toArray()
       if (mediaObj[0]) {
         // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
@@ -748,7 +744,6 @@ const retrieveAllMediaFilesFromDB = async () => {
 
   // For saved slides
   const savedSlides = await db.library.where("type").equals("slide").toArray()
-  console.log(savedSlides)
   savedSlides?.map((slide) => {
     if ((slide.content as Slide)?.background?.startsWith("blob:")) {
       db.media.get(slide.id).then((resp) => {

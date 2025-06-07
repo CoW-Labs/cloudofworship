@@ -100,9 +100,9 @@ const inaccessibleDate = new Date("2024-12-13T00:00:00.000Z")
 const authStore = useAuthStore()
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
-const googleSignIn = inject(
-  "handleGoogleSignIn"
-) as () => Promise<UserCredential>
+const googleSignIn = inject("handleGoogleSignIn") as () => Promise<
+  UserCredential | any
+>
 // console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()

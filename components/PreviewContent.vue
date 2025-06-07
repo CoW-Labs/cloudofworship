@@ -343,6 +343,15 @@ const preSlideCreation = (): Slide => {
     contents: [],
     userId: authStore.user?._id as string,
     churchId: authStore?.user?.churchId as string,
+    ...(appStore.currentState.settings.defaultBackground?.default && {
+      backgroundType:
+        appStore.currentState.settings.defaultBackground.text.backgroundType,
+      background:
+        appStore.currentState.settings.defaultBackground.text.background,
+      backgroundVideoKey:
+        appStore.currentState.settings.defaultBackground.text
+          .backgroundVideoKey,
+    }),
     scheduleId: appStore.currentState.activeSchedule?._id as string,
     slideStyle: {
       alignment: appStore.currentState.settings.slideStyles.alignment,
@@ -353,6 +362,7 @@ const preSlideCreation = (): Slide => {
       // Added comment here to indicate new feat
       lettercase: appStore.currentState.settings.slideStyles.lettercase,
       lineSpacing: appStore.currentState.settings.slideStyles.lineSpacing,
+      textOutlined: appStore.currentState.settings.slideStyles.textOutlined,
     },
   }
   return tempSlide
@@ -622,11 +632,17 @@ const createNewSlide = (duplicateSlide?: Slide) => {
     tempSlide = { ...duplicateSlide }
     delete tempSlide._id
   } else {
+    tempSlide.slideStyle = { ...tempSlide.slideStyle, alignment: "left" }
     tempSlide.background =
-      appStore.currentState.settings.defaultBackground.text.background
+      appStore.currentState.settings.defaultBackground.default?.background ||
+      appStore.currentState.settings.defaultBackground.default?.background
     tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.text.backgroundVideoKey
+      appStore.currentState.settings.defaultBackground.default
+        ?.backgroundVideoKey ||
+      appStore.currentState.settings.defaultBackground.text?.background
     tempSlide.backgroundType =
+      appStore.currentState.settings.defaultBackground.default
+        ?.backgroundType ||
       appStore.currentState.settings.defaultBackground.text.backgroundType
   }
   tempSlide.id = useObjectID()
@@ -723,10 +739,14 @@ const createNewBibleSlide = (
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.bible
   tempSlide.background =
+    appStore.currentState.settings.defaultBackground.default?.background ||
     appStore.currentState.settings.defaultBackground.bible.background
   tempSlide.backgroundVideoKey =
+    appStore.currentState.settings.defaultBackground.default
+      ?.backgroundVideoKey ||
     appStore.currentState.settings.defaultBackground.bible.backgroundVideoKey
   tempSlide.backgroundType =
+    appStore.currentState.settings.defaultBackground.default?.backgroundType ||
     appStore.currentState.settings.defaultBackground.bible.backgroundType
   tempSlide.title = scripture?.label
   tempSlide.name = useSlideName(tempSlide)
@@ -754,10 +774,14 @@ const createNewHymnSlide = (hymn: Hymn) => {
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.hymn
   tempSlide.background =
+    appStore.currentState.settings.defaultBackground.default?.background ||
     appStore.currentState.settings.defaultBackground.hymn.background
   tempSlide.backgroundVideoKey =
+    appStore.currentState.settings.defaultBackground.default
+      ?.backgroundVideoKey ||
     appStore.currentState.settings.defaultBackground.hymn.backgroundVideoKey
   tempSlide.backgroundType =
+    appStore.currentState.settings.defaultBackground.default?.backgroundType ||
     appStore.currentState.settings.defaultBackground.hymn.backgroundType
   tempSlide.songId = hymn.number
   tempSlide.hasChorus = hymn.chorus === "false" ? false : !!hymn.chorus
@@ -787,10 +811,14 @@ const createNewSongSlide = (song: Song) => {
   tempSlide.layout = slideLayoutTypes.bible
   tempSlide.type = slideTypes.song
   tempSlide.background =
+    appStore.currentState.settings.defaultBackground.default?.background ||
     appStore.currentState.settings.defaultBackground.hymn.background
   tempSlide.backgroundVideoKey =
+    appStore.currentState.settings.defaultBackground.default
+      ?.backgroundVideoKey ||
     appStore.currentState.settings.defaultBackground.hymn.backgroundVideoKey
   tempSlide.backgroundType =
+    appStore.currentState.settings.defaultBackground.default?.backgroundType ||
     appStore.currentState.settings.defaultBackground.hymn.backgroundType
   tempSlide.songId = song._id || song.id
   tempSlide.title = "Verse 1"

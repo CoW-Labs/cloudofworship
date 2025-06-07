@@ -65,7 +65,7 @@
           :count="6"
           class="bg-gray-100 rounded-md"
           :value="bgColor"
-          @select="bgColor = $event"
+          @select="bgColor = $event.color"
         />
       </UFormGroup>
 
@@ -117,7 +117,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import type { SelectVariant } from "@nuxt/ui/dist/runtime/types";
+import type { SelectVariant } from "@nuxt/ui/dist/runtime/types"
 import { useAppStore } from "~/store/app"
 import type { Alert } from "~/types"
 const props = defineProps<{

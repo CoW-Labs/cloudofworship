@@ -179,7 +179,9 @@
                 <template #panel>
                   <BgImageSelection
                     :value="slide?.background"
-                    @select="onSelectBackground(backgroundTypes.image, $event)"
+                    @select="
+                      onSelectBackground(backgroundTypes.image, $event.image)
+                    "
                   />
                 </template>
               </UPopover>
@@ -214,7 +216,9 @@
                 <template #panel>
                   <BgColorSelection
                     :value="slide?.background"
-                    @select="onSelectBackground(backgroundTypes.solid, $event)"
+                    @select="
+                      onSelectBackground(backgroundTypes.solid, $event.color)
+                    "
                   />
                 </template>
               </UPopover>

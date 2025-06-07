@@ -6,10 +6,10 @@ const useBackgroundVideos = async (id?: string): Promise<Media[]> => {
   //   const video = await db.cached.get(id)
   //   return video?.data
   // } else {
-    let allVideos = await db.cached.toArray()
-    allVideos = allVideos?.filter(video => video.content?.includes('video') && !video?.id?.includes('custom'))
-    console.log(allVideos)
-    return allVideos
+  let allVideos = await db.cached.toArray()
+  allVideos = allVideos?.filter(video => video.content?.includes('video') && !video?.id?.includes('custom'))
+  // console.log(allVideos)
+  return allVideos
   // }
 }
 
