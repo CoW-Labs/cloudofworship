@@ -185,7 +185,7 @@ export interface AppSettings {
       backgroundType: string
       background: string
       backgroundVideoKey: string
-    },
+    }
     hymn: {
       backgroundType: string
       background: string
@@ -206,7 +206,7 @@ export interface AppSettings {
   bibleVersions: Array<any> // Check app.vue for bible versions array in a list
   animations?: boolean
   footnotes?: boolean
-  songAndHymnLabels?: boolean
+  songAndHymnLabelsVisibility: boolean
 
   motionlessSlides?: boolean
   transitionInterval?: number

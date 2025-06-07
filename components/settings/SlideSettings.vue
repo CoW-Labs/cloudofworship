@@ -340,13 +340,15 @@
         <h3 class="text-md font-semibold">Footnotes & Credits</h3>
       </div>
       <UForm>
-        <!-- <UFormGroup label="Toggle song/hymn title and artistes">
+        <UFormGroup label="Toggle song/hymn title and artistes">
           <UToggle
             size="lg"
-            :model-value="appStore.currentState.settings.songAndHymnLabels"
-            @change="appStore.setSongAndHymnLabels($event)"
+            :model-value="
+              appStore.currentState.settings.songAndHymnLabelsVisibility
+            "
+            @change="appStore.setSongAndHymnLabelsVisibility($event)"
           />
-        </UFormGroup> -->
+        </UFormGroup>
         <UFormGroup
           label="Toggle footnotes and credits for Bible & Hymn Slides"
           class="mt-4"
