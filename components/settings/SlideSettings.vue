@@ -74,8 +74,8 @@
           />
         </UFormGroup>
         <UFormGroup
-          label="Use uppercase for slide content?"
-          class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
+          label="Uppercase Text"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
         >
           <UToggle
             size="lg"
@@ -87,6 +87,23 @@
               appStore.setSlideStyles({
                 ...appStore.currentState.settings.slideStyles,
                 lettercase: $event ? 'uppercase' : '',
+              })
+            "
+          />
+        </UFormGroup>
+        <UFormGroup
+          label="Outlined Text"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
+          <UToggle
+            size="lg"
+            :model-value="
+              appStore.currentState.settings.slideStyles.textOutlined
+            "
+            @change="
+              appStore.setSlideStyles({
+                ...appStore.currentState.settings,
+                textOutlined: $event,
               })
             "
           />

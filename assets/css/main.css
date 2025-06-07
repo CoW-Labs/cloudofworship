@@ -450,6 +450,13 @@ body {
 .center-live-content {
   text-align: center;
 }
+.outlined-live-content {
+  text-shadow:
+  -4px -4px 0 #000,
+  2px -2px 0 #000,
+  -2px 2px 0 #000,
+  -4px 2px 0 #000;
+}
 .uppercase-live-content > .slide-layout-ctn > div:nth-child(1), .uppercase-live-content > div:nth-child(1) > .tiptap {
   text-transform: uppercase;
 }
@@ -461,6 +468,13 @@ body {
 }
 .single-line-spacing > .slide-layout-ctn > div:nth-child(1), .single-line-spacing > div:nth-child(1) > .tiptap {
   line-height: 1;
+}
+ .outlined-live-content > div > .tiptap {
+  text-shadow:
+  -1px -1px 0 #000,
+  1px -1px 0 #000,
+  -1px 1px 0 #000,
+  -1px 1px 0 #000;
 }
 .tiptap.live-content {
   padding: 0.75rem;

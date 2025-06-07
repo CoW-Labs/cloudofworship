@@ -2,6 +2,7 @@
   <div
     class="live-content tiptap border-none w-[100%] h-[100%] pointer-events-none text-left"
     :class="{
+      'outlined-live-content': slide?.slideStyle?.textOutlined,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',

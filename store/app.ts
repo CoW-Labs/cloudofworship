@@ -258,6 +258,14 @@ export const useAppStore = defineStore("app", {
         ...this.currentState.settings,
         slideStyles: styles,
       }
+
+      // Update slide styles in all active slides
+      this.currentState.activeSlides.forEach((slide) => {
+        slide.slideStyle = {
+          ...slide.slideStyle,
+          textOutlined: styles.textOutlined, // only this property inherited for now
+        }
+      })
     },
     setDefaultBibleVersion(version: string) {
       this.currentState.settings = {
