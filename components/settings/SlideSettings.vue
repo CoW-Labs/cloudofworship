@@ -161,7 +161,7 @@
         <h3 class="text-md font-semibold">Space Management</h3>
       </div>
       <UForm>
-        <div class="header flex items-center justify-between px-2">
+        <div class="header flex items-center justify-between">
           <h4 class="text-sm font-semibold opacity-70 whitespace-nowrap mr-6">
             Set default padding between slides
           </h4>
@@ -285,7 +285,7 @@
           class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
         >
           <div
-            class="flex px-0 items-center gap-2 font-semibold w-full max-w-[200px]"
+            class="flex px-0 items-center gap-2 font-semibold w-full min-w-[200px]"
           >
             <span class="text-sm">0s</span>
             <URange

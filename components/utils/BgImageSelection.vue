@@ -27,24 +27,32 @@
   </div>
   <div class="button-ctn p-2 pt-0">
     <FileDropzone
+      v-if="!settingsPage"
       size="sm"
       @change="saveAndSelectImage($event?.[0])"
       class="max-w-[230px]"
       :class="{ 'max-w-full': settingsPage }"
     />
-    <!-- <label class="relative">
+    <label v-else class="relative">
       <input
         type="file"
         name=""
         id=""
         class="absolute inset-0 opacity-0 cursor-pointer"
         accept="image/*"
-        @change="saveAndSelectImage($event.target?.files?.[0])"
+        @change="
+          saveAndSelectImage(($event.target as HTMLInputElement)?.files?.[0])
+        "
       />
-      <UButton class="z-1" block variant="outline" icon="i-bx-plus" size="xs"
+      <UButton
+        class="z-1 mt-2"
+        block
+        variant="outline"
+        icon="i-bx-plus"
+        size="sm"
         >Add from device</UButton
       >
-    </label> -->
+    </label>
   </div>
 </template>
 
