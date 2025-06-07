@@ -70,7 +70,7 @@
         <UFormGroup label="Set default slide background" class="mt-4">
           <UTabs
             :items="slideBackgroundTabs"
-            @change="activeSlideBackgroundTab = $event"
+            v-model:model-value="activeSlideBackgroundTab"
           >
             <template #default="{ item }">
               <div class="flex gap-2 capitalize">
@@ -84,9 +84,13 @@
               <BgVideoSelection
                 v-if="activeSlideBackgroundTab === 0"
                 settings-page
+                :value="
+                  appStore.currentState.settings.defaultBackground.default
+                    ?.background
+                "
                 @select="
                   appStore.setDefaultSlideBackground(
-                    'video',
+                    backgroundTypes.video,
                     $event.video,
                     $event.key
                   )
@@ -95,15 +99,29 @@
               <BgImageSelection
                 v-else-if="activeSlideBackgroundTab === 1"
                 settings-page
+                :value="
+                  appStore.currentState.settings.defaultBackground.default
+                    ?.background
+                "
                 @select="
-                  appStore.setDefaultSlideBackground('image', $event.image)
+                  appStore.setDefaultSlideBackground(
+                    backgroundTypes.image,
+                    $event.image
+                  )
                 "
               />
               <BgColorSelection
                 v-else-if="activeSlideBackgroundTab === 2"
                 :count="12"
+                :value="
+                  appStore.currentState.settings.defaultBackground.default
+                    ?.background
+                "
                 @select="
-                  appStore.setDefaultSlideBackground('color', $event.color)
+                  appStore.setDefaultSlideBackground(
+                    backgroundTypes.solid,
+                    $event.color
+                  )
                 "
               />
             </div>
@@ -488,6 +506,21 @@ const bibleVersionSelectOptions = computed(() =>
     ?.filter((version) => version?.isDownloaded)
     ?.map((version) => version?.id)
 )
+
+// Set default activeSlideBackgroundTab
+switch (
+  appStore.currentState.settings.defaultBackground.default?.backgroundType
+) {
+  case backgroundTypes.video:
+    activeSlideBackgroundTab.value = 0
+    break
+  case backgroundTypes.image:
+    activeSlideBackgroundTab.value = 1
+    break
+  case backgroundTypes.solid:
+    activeSlideBackgroundTab.value = 2
+    break
+}
 
 const getActivePaddingValue = (side: string) => {
   side = side as "top" | "right" | "bottom" | "left"

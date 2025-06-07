@@ -1,7 +1,11 @@
 <template>
   <div
-    class="bg-image-selection p-2 gap-2 grid grid-cols-4"
-    :class="{ 'grid-cols-6': count === 6, 'grid-cols-12': count === 12 }"
+    class="bg-image-selection p-2 gap-2 grid"
+    :class="{
+      'grid-cols-6': count === 6,
+      'grid-cols-12': count === 12,
+      'grid-cols-4': !count,
+    }"
   >
     <UButton
       v-for="color in count === 6
