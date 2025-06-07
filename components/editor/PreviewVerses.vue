@@ -70,7 +70,7 @@ const versesPreview = ref<HTMLDivElement | null>(null)
 
 const getAllChapterVerses = async () => {
   const chapter = await useScriptureChapter(props.verse)
-  console.log("chapter", chapter?.content)
+  // console.log("chapter", chapter?.content)
   allChapterVerses.value = chapter?.content as BibleVerse[]
 }
 

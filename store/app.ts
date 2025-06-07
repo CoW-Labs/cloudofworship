@@ -260,12 +260,12 @@ export const useAppStore = defineStore("app", {
       }
 
       // Update slide styles in all active slides
-      this.currentState.activeSlides.forEach((slide) => {
-        slide.slideStyle = {
-          ...slide.slideStyle,
-          textOutlined: styles.textOutlined, // only this property inherited for now
-        }
-      })
+      // this.currentState.activeSlides.forEach((slide) => {
+      //   slide.slideStyle = {
+      //     ...slide.slideStyle,
+      //     textOutlined: styles.textOutlined, // only this property inherited for now
+      //   }
+      // })
     },
     setDefaultBibleVersion(version: string) {
       this.currentState.settings = {

@@ -4,7 +4,7 @@
  * @returns
  */
 function useScriptureLabel(label: string, options?: { toLongForm: boolean }) {
-  console.log("label", label)
+  // console.log("label", label)
   if (options?.toLongForm) {
     const book = Number(label?.split(":")?.[0])
 
