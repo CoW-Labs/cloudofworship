@@ -172,6 +172,8 @@
       </UForm>
     </div>
 
+    <UDivider class="mt-4" />
+
     <!-- SPACE MANAGEMENT OF SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
@@ -280,6 +282,8 @@
       </UForm>
     </div>
 
+    <UDivider class="mt-4" />
+
     <!-- ANIMATION -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
@@ -317,6 +321,8 @@
         </UFormGroup>
       </UForm>
     </div>
+
+    <UDivider class="mt-4" />
 
     <!-- BIBLE SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
@@ -366,6 +372,8 @@
       </UForm>
     </div>
 
+    <UDivider class="mt-4" />
+
     <!-- FOOTNOTES & CREDITS -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
@@ -396,6 +404,8 @@
         </UFormGroup>
       </UForm>
     </div>
+
+    <UDivider class="mt-4" />
 
     <!-- OVERLAYS AND THEMES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
@@ -436,6 +446,8 @@
       </UForm>
     </div>
 
+    <UDivider class="mt-4" />
+
     <!-- SLIDE EXPERIMENTS -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
@@ -454,6 +466,8 @@
         </UFormGroup>
       </UForm>
     </div>
+
+    <UDivider class="mt-4" />
 
     <!-- SONG SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
