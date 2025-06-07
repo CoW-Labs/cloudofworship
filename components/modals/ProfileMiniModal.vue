@@ -82,7 +82,6 @@ import type { Church, User } from "~/store/auth"
 import { useAuthStore } from "~/store/auth"
 
 defineProps<{
-  value: string
   user: User
   church: Church
 }>()

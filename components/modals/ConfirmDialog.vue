@@ -1,4 +1,4 @@
- <template>
+<template>
   <div>
     <UButton
       v-if="noTooltip"
@@ -30,36 +30,34 @@
       }"
     >
       <div class="p-6">
-        <Placeholder>
-          <div class="flex flex-col justify-center h-full">
-            <h4 class="text-md font-medium">{{ header }}</h4>
-            <p class="mt-2 text-xs">{{ label }}</p>
-            <div class="flex items-center justify-end gap-2 mt-6">
-              <UButton variant="outline" color="gray" @click="handleCancel"
-                >Cancel</UButton
-              >
-              <UButton
-                :color="
-                  header?.split(' ')[0] === 'Delete' ||
-                  header?.split(' ')[0] === 'Sign'
-                    ? 'red'
-                    : 'primary'
-                "
-                @click="handleYesAction"
-                >{{
-                  header !== "Sign out" ? header?.split(" ")[0] : header
-                }}</UButton
-              >
-            </div>
+        <div class="flex flex-col justify-center h-full">
+          <h4 class="text-md font-medium">{{ header }}</h4>
+          <p class="mt-2 text-xs">{{ label }}</p>
+          <div class="flex items-center justify-end gap-2 mt-6">
+            <UButton variant="outline" color="gray" @click="handleCancel"
+              >Cancel</UButton
+            >
+            <UButton
+              :color="
+                header?.split(' ')[0] === 'Delete' ||
+                header?.split(' ')[0] === 'Sign'
+                  ? 'red'
+                  : 'primary'
+              "
+              @click="handleYesAction"
+              >{{
+                header !== "Sign out" ? header?.split(" ")[0] : header
+              }}</UButton
+            >
           </div>
-        </Placeholder>
+        </div>
       </div>
     </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { ButtonVariant } from '@nuxt/ui/dist/runtime/types';
+import type { ButtonVariant } from "@nuxt/ui/dist/runtime/types"
 
 const isOpen = ref(false)
 const props = defineProps<{

@@ -56,9 +56,6 @@ const visible = ref<boolean>(false)
 
 defineProps<{
   visible: Boolean
-  value: string
-  user: User
-  church: Church
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>

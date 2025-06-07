@@ -469,7 +469,7 @@ body {
 .single-line-spacing > .slide-layout-ctn > div:nth-child(1), .single-line-spacing > div:nth-child(1) > .tiptap {
   line-height: 1;
 }
- .outlined-live-content > div > .tiptap {
+.outlined-live-content > div > .tiptap {
   text-shadow:
   -1px -1px 0 #000,
   1px -1px 0 #000,
@@ -692,6 +692,13 @@ body {
 .lg-preview .tiptap.live-content blockquote {
   border-left-width: 1px;
 }
+.lg-preview .outlined-live-content > .slide-layout-ctn > div {
+  text-shadow:
+  -1px -1px 0 #000,
+  1px -1px 0 #000,
+  -1px 1px 0 #000,
+  -1px 1px 0 #000;
+}
 
 /* LIVE CONTENT MD PREVIEW */
 .md-preview .slide-layout-ctn {
@@ -747,6 +754,13 @@ body {
 .md-preview .tiptap.live-content blockquote {
   border-left-width: 1px;
 }
+.md-preview .outlined-live-content > .slide-layout-ctn > div {
+  text-shadow:
+  -1px -1px 0 #000,
+  1px -1px 0 #000,
+  -1px 1px 0 #000,
+  -1px 1px 0 #000;
+}
 
 /* LIVE CONTENT SM PREVIEW */
 .sm-preview .slide-layout-ctn {
@@ -801,6 +815,13 @@ body {
 }
 .sm-preview .tiptap.live-content blockquote {
   border-left-width: 1px;
+}
+.sm-preview .outlined-live-content > .slide-layout-ctn > div {
+  text-shadow:
+  -1px -1px 0 #000,
+  1px -1px 0 #000,
+  -1px 1px 0 #000,
+  -1px 1px 0 #000;
 }
 
 @media screen and (min-width: 1500px) {

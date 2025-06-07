@@ -366,7 +366,10 @@ const bibleChapterAndVerse = computed(() => {
     ?.replace("/", "")
     .match(/\b\w+\s+\d+\b(?!\S)/g)
 
-  if (bibleBookFollowedByJustChapterMatch?.[0]) {
+  if (
+    bibleBookFollowedByJustChapterMatch?.[0] &&
+    !searchInput.value?.match(regex)
+  ) {
     const standaloneChapter = Number(
       bibleBookFollowedByJustChapterMatch?.[0]?.split(" ")?.[1] || 1
     )

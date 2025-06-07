@@ -225,7 +225,7 @@ getUser()
 
 const retrieveChurchSongs = async () => {
   try {
-    const {data} = await useAPIFetch(
+    const { data } = await useAPIFetch(
       `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
     )
     const onlineCount = data.value ? (data.value as unknown as number) : 0
@@ -675,7 +675,7 @@ const retrieveSchedules = async () => {
   if (isAppOnline.value) {
     downloadProgress.value = "0"
     downloadResource.value = "schedules and slides"
-    const {data} = await useAPIFetch(
+    const { data } = await useAPIFetch(
       `/church/${authStore.user?.churchId}/schedules`
     )
 
