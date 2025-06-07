@@ -6,7 +6,10 @@
         <h3 class="text-md font-semibold">Look and Feel</h3>
       </div>
       <UForm>
-        <UFormGroup label="Set default font">
+        <UFormGroup
+          label="Set default font"
+          class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
+        >
           <USelectMenu
             class="border-0 shadow-none w-[200px]"
             searchable
@@ -47,7 +50,10 @@
             </template>
           </USelectMenu>
         </UFormGroup>
-        <UFormGroup label="Set default slide alignment" class="mt-4">
+        <UFormGroup
+          label="Set default slide alignment"
+          class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
+        >
           <USelectMenu
             class="border-0 shadow-none max-w-[200px] capitalize"
             select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white capitalize"
@@ -67,7 +73,25 @@
             "
           />
         </UFormGroup>
-        <UFormGroup label="Set default slide background" class="mt-4">
+        <UFormGroup
+          label="Use uppercase for slide content?"
+          class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
+        >
+          <UToggle
+            size="lg"
+            :model-value="
+              appStore.currentState.settings.slideStyles.lettercase ===
+              'uppercase'
+            "
+            @change="
+              appStore.setSlideStyles({
+                ...appStore.currentState.settings.slideStyles,
+                lettercase: $event ? 'uppercase' : '',
+              })
+            "
+          />
+        </UFormGroup>
+        <UFormGroup label="Set default slide background" class="px-2 py-3">
           <UTabs
             :items="slideBackgroundTabs"
             v-model:model-value="activeSlideBackgroundTab"
@@ -128,21 +152,6 @@
           </Transition>
         </UFormGroup>
         <!-- flex items-center justify-between -->
-        <UFormGroup label="Use uppercase for slide content?" class="mt-4">
-          <UToggle
-            size="lg"
-            :model-value="
-              appStore.currentState.settings.slideStyles.lettercase ===
-              'uppercase'
-            "
-            @change="
-              appStore.setSlideStyles({
-                ...appStore.currentState.settings.slideStyles,
-                lettercase: $event ? 'uppercase' : '',
-              })
-            "
-          />
-        </UFormGroup>
       </UForm>
     </div>
 
@@ -152,7 +161,7 @@
         <h3 class="text-md font-semibold">Space Management</h3>
       </div>
       <UForm>
-        <div class="header flex items-center justify-between">
+        <div class="header flex items-center justify-between px-2">
           <h4 class="text-sm font-semibold opacity-70 whitespace-nowrap mr-6">
             Set default padding between slides
           </h4>
@@ -262,7 +271,7 @@
       <UForm>
         <UFormGroup
           label="Transition between slides and micro animations"
-          class=""
+          class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
         >
           <UToggle
             size="lg"
@@ -273,9 +282,11 @@
         <UFormGroup
           v-if="appStore.currentState.settings.animations"
           label="Transition interval in seconds"
-          class="max-w-[200px] mt-4 come-up-1"
+          class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
         >
-          <div class="flex px-0 items-center gap-2 font-semibold">
+          <div
+            class="flex px-0 items-center gap-2 font-semibold w-full max-w-[200px]"
+          >
             <span class="text-sm">0s</span>
             <URange
               :model-value="appStore.currentState.settings.transitionInterval"
@@ -296,8 +307,11 @@
         <h3 class="text-md font-semibold">Bible Slides</h3>
       </div>
       <UForm>
-        <div class="flex items-end gap-4">
-          <UFormGroup label="Set default Bible Version">
+        <div class="flex items-center gap-2">
+          <UFormGroup
+            label="Set default Bible Version"
+            class="flex items-center w-full justify-between py-1 px-2 hover:bg-primary/10"
+          >
             <USelectMenu
               class="border-0 shadow-none max-w-[200px]"
               searchable
@@ -326,6 +340,7 @@
             size="md"
             icon="i-bx-plus"
             variant="outline"
+            class="mt-1"
             @click="$emit('select-active-tab', 'Bible Version Settings')"
           >
             Add more
@@ -340,7 +355,10 @@
         <h3 class="text-md font-semibold">Footnotes & Credits</h3>
       </div>
       <UForm>
-        <UFormGroup label="Toggle song/hymn title and artistes">
+        <UFormGroup
+          label="Toggle song/hymn title and artistes"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
           <UToggle
             size="lg"
             :model-value="
@@ -351,7 +369,7 @@
         </UFormGroup>
         <UFormGroup
           label="Toggle footnotes and credits for Bible & Hymn Slides"
-          class="mt-4"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
         >
           <UToggle
             size="lg"
@@ -369,7 +387,10 @@
       </div>
       <UForm>
         <div class="flex items-end gap-4">
-          <UFormGroup label="Set slide overlay">
+          <UFormGroup
+            label="Set slide overlay"
+            class="flex w-full items-center justify-between py-2 px-2 hover:bg-primary/10"
+          >
             <USelectMenu
               class="border-0 shadow-none max-w-[200px]"
               select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
@@ -404,7 +425,10 @@
         <h3 class="text-md font-semibold">Slide Experiments</h3>
       </div>
       <UForm>
-        <UFormGroup label="Make slide transitions motionless" class="">
+        <UFormGroup
+          label="Make slide transitions motionless"
+          class="flex w-full items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
           <UToggle
             size="lg"
             :model-value="appStore.currentState.settings.motionlessSlides"

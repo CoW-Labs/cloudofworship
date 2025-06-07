@@ -5,7 +5,10 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Alert Settings</h3>
       </div>
-      <UFormGroup label="Set default alert limit">
+      <UFormGroup
+        label="Set default alert limit"
+        class="flex items-center justify-between px-2 py-1 hover:bg-primary/10"
+      >
         <div
           class="flex px-0 items-center gap-2 font-semibold max-w-[200px] mt-2"
         >
