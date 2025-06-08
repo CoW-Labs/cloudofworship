@@ -90,11 +90,13 @@ export default defineNuxtConfig({
         process.env.ASSETS_BASE_URL || "https://worshipcloud.favourfelix.com",
       AWS_BUCKET_NAME: process.env.CLOUD_AWS_BUCKET_NAME,
       AWS_BUCKET_REGION: process.env.CLOUD_AWS_BUCKET_REGION,
-      NODE_ENV: process.env.NODE_ENV || 'production'
+      NODE_ENV: process.env.NODE_ENV || "production",
     },
   },
 
   css: ["~/assets/css/main.css"],
+
+  spaLoadingTemplate: "public/loading.html",
 
   modules: [
     "@nuxt/ui",
@@ -103,14 +105,14 @@ export default defineNuxtConfig({
     "@pinia/nuxt",
     "pinia-plugin-persistedstate/nuxt",
     "nuxt-gtag",
-    "@nuxthub/core"
+    "@nuxthub/core",
   ],
 
   components: [
     {
-      path: '~/components',
-      pathPrefix: false
-    }
+      path: "~/components",
+      pathPrefix: false,
+    },
   ],
 
   ui: {
@@ -138,7 +140,7 @@ export default defineNuxtConfig({
   },
 
   gtag: {
-    id: 'G-Z23FTMP6WE'
+    id: "G-Z23FTMP6WE",
   },
 
   pwa: {
@@ -196,4 +198,4 @@ export default defineNuxtConfig({
       installPrompt: true,
     },
   },
-});
+})

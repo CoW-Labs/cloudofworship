@@ -405,7 +405,7 @@ export const useAppStore = defineStore("app", {
     setDefaultSlideBackground(
       type: string,
       background: string,
-      backgroundVideoKey?: string
+      backgroundVideoKey?: string | null
     ) {
       console.log(
         "setDefaultSlideBackground",
@@ -420,11 +420,11 @@ export const useAppStore = defineStore("app", {
           default: {
             backgroundType: type,
             background,
-            backgroundVideoKey: backgroundVideoKey || "",
+            backgroundVideoKey: backgroundVideoKey || null,
           },
         },
       }
-      console.log("setDefaultSlideBackground", this.currentState.settings)
+      // console.log("setDefaultSlideBackground", this.currentState.settings)
     },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)

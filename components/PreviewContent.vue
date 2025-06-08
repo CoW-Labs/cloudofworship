@@ -345,12 +345,13 @@ const preSlideCreation = (): Slide => {
     churchId: authStore?.user?.churchId as string,
     ...(appStore.currentState.settings.defaultBackground?.default && {
       backgroundType:
-        appStore.currentState.settings.defaultBackground.text.backgroundType,
+        appStore.currentState.settings.defaultBackground.default
+          ?.backgroundType,
       background:
-        appStore.currentState.settings.defaultBackground.text.background,
+        appStore.currentState.settings.defaultBackground.default?.background,
       backgroundVideoKey:
-        appStore.currentState.settings.defaultBackground.text
-          .backgroundVideoKey,
+        appStore.currentState.settings.defaultBackground.default
+          ?.backgroundVideoKey,
     }),
     scheduleId: appStore.currentState.activeSchedule?._id as string,
     slideStyle: {
@@ -567,7 +568,7 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
   delete tempSlide.type
 
   if (tempSlide.backgroundType !== backgroundTypes.video) {
-    tempSlide.backgroundVideoKey = ""
+    tempSlide.backgroundVideoKey = null
   }
 
   // If slide is a media (video) slide, do not update it
@@ -636,10 +637,6 @@ const createNewSlide = (duplicateSlide?: Slide) => {
     tempSlide.background =
       appStore.currentState.settings.defaultBackground.default?.background ||
       appStore.currentState.settings.defaultBackground.default?.background
-    tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.default
-        ?.backgroundVideoKey ||
-      appStore.currentState.settings.defaultBackground.text?.background
     tempSlide.backgroundType =
       appStore.currentState.settings.defaultBackground.default
         ?.backgroundType ||
@@ -861,6 +858,10 @@ const createNewMediaSlide = async (
   }
   tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
   tempSlide.background = file.type === "audio" ? randomImage : file.url
+  tempSlide.backgroundVideoKey = file.type?.includes("video")
+    ? appStore.currentState.settings.defaultBackground.default
+        ?.backgroundVideoKey
+    : null
   tempSlide.data = file
   tempSlide.name = useSlideName(tempSlide)
 
@@ -918,7 +919,7 @@ const createMultipleNewMediaSlides = async (files: ExtendedFileT[]) => {
   newSlides.forEach((slide, index) => {
     const imageObject = uploadedImagesResp[index]
     // console.log("imageObject", imageObject)
-    slide.background = imageObject?.file?.url
+    slide.background = imageObject?.file?.url || slide.background
   })
 
   // update [slides] with new slides
