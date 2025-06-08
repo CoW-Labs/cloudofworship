@@ -147,7 +147,8 @@
                 @select="
                   appStore.setDefaultSlideBackground(
                     backgroundTypes.image,
-                    $event.image
+                    $event.image,
+                    null
                   )
                 "
               />
@@ -161,7 +162,8 @@
                 @select="
                   appStore.setDefaultSlideBackground(
                     backgroundTypes.solid,
-                    $event.color
+                    $event.color,
+                    null
                   )
                 "
               />
