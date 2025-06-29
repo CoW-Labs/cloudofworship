@@ -403,7 +403,7 @@ const uploadOfflineSlides = async () => {
     const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
     // console.log("merged slides", mergedSlides)
     appStore.appendActiveSlides(mergedSlides)
-    return uploadedSlides
+    // return uploadedSlides
   }
 }
 
@@ -641,6 +641,7 @@ const createNewSlide = (duplicateSlide?: Slide) => {
       appStore.currentState.settings.defaultBackground.default
         ?.backgroundType ||
       appStore.currentState.settings.defaultBackground.text.backgroundType
+    usePosthogCapture("NEW_TEXT_SLIDE_CREATED")
   }
   tempSlide.id = useObjectID()
 
