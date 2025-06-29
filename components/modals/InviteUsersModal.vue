@@ -172,6 +172,7 @@ const sendEmailInvite = async () => {
       } recipients! 🎉`,
       color: "green",
     })
+    usePosthogCapture("INVITED_USERS_EMAIL_SENT")
     emit("close")
   }
   loading.value = false

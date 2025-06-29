@@ -313,14 +313,17 @@ emitter.on("app-loading", (loading) => {
 
 emitter.on("pwa-install", () => {
   useNuxtApp().$pwa?.install()
+  usePosthogCapture("APP_INSTALLED")
 })
 
 emitter.on("cancel-pwa-install", () => {
   useNuxtApp().$pwa?.cancelInstall()
+  usePosthogCapture("APP_INSTALL_CANCELLED")
 })
 
 emitter.on("pwa-refresh", () => {
   useNuxtApp().$pwa?.updateServiceWorker()
+  usePosthogCapture("APP_UPDATED")
 })
 
 emitter.on("cancel-pwa-refresh", () => {
@@ -340,6 +343,7 @@ emitter.on("selected-schedule", (schedule: Schedule) => {
 
 emitter.on("go-live", () => {
   openWindows()
+  usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
 
 const saveAllBackgroundVideos = async () => {

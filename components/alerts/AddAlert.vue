@@ -180,6 +180,7 @@ const addAlert = async () => {
     appStore.setActiveAlert(alert)
 
     toast.add({ icon: "i-bx-send", title: "Alert sent to live" })
+    usePosthogCapture("NEW_ALERT_SENT")
     emit("go-home")
     setTimeout(() => {
       alertsRef.value?.scrollBy(0, 10000)

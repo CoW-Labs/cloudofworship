@@ -88,7 +88,6 @@
 import { useDebounceFn } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
-import { merge } from "rxjs"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
@@ -641,7 +640,6 @@ const createNewSlide = (duplicateSlide?: Slide) => {
       appStore.currentState.settings.defaultBackground.default
         ?.backgroundType ||
       appStore.currentState.settings.defaultBackground.text.backgroundType
-    usePosthogCapture("NEW_TEXT_SLIDE_CREATED")
   }
   tempSlide.id = useObjectID()
 
@@ -651,6 +649,7 @@ const createNewSlide = (duplicateSlide?: Slide) => {
     title: `${tempSlide?.name} created`,
     icon: "i-bx-slideshow",
   })
+  usePosthogCapture("NEW_TEXT_SLIDE_CREATED")
   uploadOfflineSlides()
 }
 
@@ -679,6 +678,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   if (addToast) {
     toast.add({ title: `${tempSlide?.name} deleted`, icon: "i-tabler-trash" })
   }
+  usePosthogCapture("DELETE_SLIDE")
 }
 
 const deleteMultipleSlides = (slideIds: Array<string>) => {
@@ -764,6 +764,7 @@ const createNewBibleSlide = (
     newlyCreated: true,
   })
   toast.add({ title: "Bible slide created", icon: "i-bx-bible" })
+  usePosthogCapture("NEW_BIBLE_SLIDE_CREATED")
   uploadOfflineSlides()
 }
 
@@ -800,6 +801,7 @@ const createNewHymnSlide = (hymn: Hymn) => {
   slides.value?.push(tempSlide)
   makeSlideActive(tempSlide, { goLive: false, newlyCreated: true })
   toast.add({ title: "Hymn slide created", icon: "i-bx-church" })
+  usePosthogCapture("NEW_HYMN_SLIDE_CREATED")
   uploadOfflineSlides()
 }
 
@@ -838,6 +840,7 @@ const createNewSongSlide = (song: Song) => {
   makeSlideActive(tempSlide, { goLive: false, newlyCreated: true })
   // console.log("called")
   toast.add({ title: "Song slide created", icon: "i-bx-music" })
+  usePosthogCapture("NEW_SONG_SLIDE_CREATED")
   uploadOfflineSlides()
 }
 
@@ -890,6 +893,9 @@ const createNewMediaSlide = async (
     toast.add({ title: "Media slide created", icon: "i-bx-image" })
     // uploadOfflineSlides()
   }
+  usePosthogCapture("NEW_MEDIA_SLIDE_CREATED", {
+    file_type: tempSlide?.data?.type,
+  })
   return { ...tempSlide, blob }
 }
 
@@ -987,6 +993,7 @@ const createNewCountdownSlide = (countdown: Countdown) => {
     makeSlideActive(tempSlide, { goLive: false, newlyCreated: true })
   }
   toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
+  usePosthogCapture("NEW_COUNTDOWN_SLIDE_CREATED")
   uploadOfflineSlides()
 }
 
@@ -1139,6 +1146,7 @@ const gotoScripture = async (title: string, version: string) => {
 
     // Every 10 seconds
     // const debouncedSlideUpdate = useDebounceFn(updateSlideOnline, 10000)
+    usePosthogCapture("GOTO_SCRIPTURE_TOOLBAR_USED")
     updateSlideOnline(activeSlide.value)
   }
 }
@@ -1170,6 +1178,7 @@ const gotoHymnVerse = async (title: string) => {
       updateSlideOnline(activeSlide.value)
       updateLiveOutput(activeSlide.value)
     }
+    usePosthogCapture("GOTO_HYMN_TOOLBAR_USED")
   }
 }
 
@@ -1204,6 +1213,7 @@ const gotoSongVerse = async (title: string) => {
       updateSlideOnline(activeSlide.value)
       updateLiveOutput(activeSlide.value)
     }
+    usePosthogCapture("GOTO_SONG_TOOLBAR_USED")
   }
 }
 
@@ -1226,6 +1236,7 @@ const gotoChorus = async () => {
     slides.value.splice(slideIndex, 1, tempSlide)
     updateLiveOutput(activeSlide.value)
   }
+  usePosthogCapture("GOTO_CHORUS_TOOLBAR_USED")
 }
 
 const saveSlide = async (item: Slide) => {
@@ -1328,6 +1339,7 @@ const saveSlide = async (item: Slide) => {
       console.log(err)
     }
   }
+  usePosthogCapture("LIBRARY_SAVE_SLIDE")
 }
 
 const addAllSlidesToSelectedSlides = () => {
@@ -1338,6 +1350,7 @@ const addAllSlidesToSelectedSlides = () => {
 
 const removeAllSelectedSlides = () => {
   bulkSelectedSlides.value = []
+  usePosthogCapture("REMOVE_ALL_SELECTED_SLIDES_BTN_CLICKED")
 }
 
 const addToSelectedSlides = (slideId: string, isSelected: boolean) => {

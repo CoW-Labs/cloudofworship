@@ -201,6 +201,7 @@ emitter?.on("close-modal", () => {
 emitter?.on("open-settings", (data) => {
   settingsModalOpen.value = true
   settingsPage.value = data
+  usePosthogCapture("OPEN_SETTINGS_MODAL")
 })
 
 emitter?.on("open-shortcuts", (data) => {
@@ -213,10 +214,14 @@ emitter?.on("open-schedule-modal", (data) => {
 
 emitter?.on("open-invite-modal", () => {
   inviteModalVisible.value = true
+  usePosthogCapture("OPEN_INVITE_MODAL")
 })
 
 emitter?.on("toggle-dark-mode", () => {
   isDark.value = !isDark.value
+  usePosthogCapture("TOGGLE_DARK_MODE", {
+    mode: isDark.value ? "dark" : "light",
+  })
 })
 </script>
 
