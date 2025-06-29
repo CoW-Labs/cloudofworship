@@ -13,7 +13,7 @@
       >
         <IconWrapper name="i-bx-x" class="p-2 text-white" />
       </button>
-      <a :href="activeAdvert?.url" target="_blank">
+      <a :href="activeAdvert?.url" target="_blank" @click="onAdvertClicked">
         <img class="rounded-3xl" :src="activeAdvert?.image"
       /></a>
     </UModal>
@@ -35,10 +35,15 @@ watch(
     if (newVal) {
       setTimeout(() => {
         visible.value = true
+        usePosthogCapture("ADVERT_MODAL_OPENED")
       }, 10000)
     }
   }
 )
 
 const emit = defineEmits(["close"])
+
+const onAdvertClicked = () => {
+  usePosthogCapture("ADVERT_CLICKED")
+}
 </script>

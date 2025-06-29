@@ -193,6 +193,7 @@ onMounted(() => {
         return
     }
   })
+  usePosthogCapture("SEARCH_BIBLE_PAGE_OPENED")
 })
 
 const getDefaultBible = async () => {

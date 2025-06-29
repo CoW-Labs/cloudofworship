@@ -333,6 +333,7 @@ export const useAppStore = defineStore("app", {
         ...this.currentState.settings,
         bibleVersions: bibleVersions,
       }
+      usePosthogCapture("BIBLE_VERSIONS_SETTINGS_CHANGED")
     },
     setActiveSocket(socket: WebSocket) {
       this.currentState.activeSocket = socket
@@ -351,36 +352,42 @@ export const useAppStore = defineStore("app", {
           linesPerSlide: lines,
         },
       }
+      usePosthogCapture("LINES_PER_SLIDE_SETTINGS_CHANGED")
     },
     setAnimations(animations: boolean) {
       this.currentState.settings = {
         ...this.currentState.settings,
         animations: animations,
       }
+      usePosthogCapture("ANIMATIONS_SETTINGS_CHANGED")
     },
     setFootnotes(footnotes: boolean) {
       this.currentState.settings = {
         ...this.currentState.settings,
         footnotes: footnotes,
       }
+      usePosthogCapture("FOOTNOTES_SETTINGS_CHANGED")
     },
     setSongAndHymnLabelsVisibility(songAndHymnLabelsVisibility: boolean) {
       this.currentState.settings = {
         ...this.currentState.settings,
         songAndHymnLabelsVisibility: songAndHymnLabelsVisibility,
       }
+      usePosthogCapture("SONG_AND_HYMN_LABELS_SETTINGS_CHANGED")
     },
     setMotionlessSlides(motionlessSlides: boolean) {
       this.currentState.settings = {
         ...this.currentState.settings,
         motionlessSlides: motionlessSlides,
       }
+      usePosthogCapture("MOTIONLESS_SLIDES_SETTINGS_CHANGED")
     },
     setTransitionInterval(interval: number) {
       this.currentState.settings = {
         ...this.currentState.settings,
         transitionInterval: interval,
       }
+      usePosthogCapture("TRANSITION_INTERVAL_SETTINGS_CHANGED")
     },
     setWindowPadding(padding: {
       left?: number
@@ -398,6 +405,7 @@ export const useAppStore = defineStore("app", {
           },
         },
       }
+      usePosthogCapture("WINDOW_PADDING_SETTINGS_CHANGED")
     },
     setActiveAdvert(advert: Advert | null) {
       this.currentState.activeAdvert = advert
@@ -424,6 +432,7 @@ export const useAppStore = defineStore("app", {
           },
         },
       }
+      usePosthogCapture("DEFAULT_BACKGROUND_SETTINGS_CHANGED")
       // console.log("setDefaultSlideBackground", this.currentState.settings)
     },
     // setActiveLiveWindows(windows: any[]) {
