@@ -69,6 +69,7 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 import type { Slide } from "~/types"
+import { useAuthStore } from "~/store/auth"
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const isFullScreen = ref(false)
@@ -228,6 +229,12 @@ onMounted(() => {
   //  Capture screen on load
   // transmitScreenCapture()
   useBroadcastMessage((data: string) => {
+    if (
+      useAuthStore().user?.email === "hello@favourfelix.com" ||
+      useAuthStore().user?.email === "fgc.salvationmedia@gmail.com"
+    ) {
+      console.log("broadcasting data received:", data)
+    }
     const updatedSlide = JSON.parse(data) as Slide
     mostUpdatedLiveSlide.value = updatedSlide
   })
