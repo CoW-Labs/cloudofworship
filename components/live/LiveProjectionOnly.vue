@@ -1,5 +1,6 @@
 <template>
   <div
+    :key="renderKey"
     class="live-output-ctn w-[100%] min-h-[220px] relative"
     :class="{ 'no-animations': !currentState.settings.animations }"
     :style="`transition-duration: ${
@@ -197,6 +198,7 @@ const isLargePreviewOpen = ref<boolean>(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
 const route = useRoute()
+const renderKey = ref(0)
 // const previousSlideVideo = ref<HTMLVideoElement | null>(null)
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["activate-fullscreen"])
@@ -233,6 +235,7 @@ watch(
   () => props.slide,
   (newVal, oldVal) => {
     try {
+      renderKey.value += 1
       if (process.client && props.fullScreen && route.name === "live") {
         document.documentElement.requestFullscreen()
       }
@@ -280,7 +283,8 @@ watch(
     } catch (err) {
       // console.log(err)
     }
-  }
+  },
+  { deep: true }
 )
 
 onBeforeMount(() => {
