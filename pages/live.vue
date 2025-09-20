@@ -228,7 +228,7 @@ onMounted(() => {
 
   //  Capture screen on load
   // transmitScreenCapture()
-  useBroadcastMessage((data: string) => {
+  useBroadcastMessage(async (data: string) => {
     if (
       useAuthStore().user?.email === "hello@favourfelix.com" ||
       useAuthStore().user?.email === "fgc.salvationmedia@gmail.com"
@@ -237,6 +237,7 @@ onMounted(() => {
     }
     const updatedSlide = JSON.parse(data) as Slide
     mostUpdatedLiveSlide.value = updatedSlide
+    await nextTick()
   })
 })
 

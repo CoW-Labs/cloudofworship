@@ -389,6 +389,10 @@ const mergeSlides = (
   return tempOfflineSlides
 }
 
+const isArrayOfStrings = (arr: any[]) => {
+  return arr.every((item) => typeof item === "string")
+}
+
 const uploadOfflineSlides = async () => {
   // console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
@@ -397,9 +401,29 @@ const uploadOfflineSlides = async () => {
     ?.filter((slide) => slide.scheduleId)
   if (offlineSlides.length > 0) {
     const uploadedSlides = await batchCreateSlideOnline(offlineSlides)
-    // console.log("uploadedSlides", uploadedSlides)
 
-    const mergedSlides = mergeSlides([...offlineSlides], [...uploadedSlides])
+    if (isArrayOfStrings(uploadedSlides)) {
+      let slidesWithDuplicateErrors = [...uploadedSlides] as string[]
+      const tempSlides = [...offlineSlides]
+      const updatedTempSlides = []
+      tempSlides.forEach((slide, index) => {
+        if (slidesWithDuplicateErrors.includes(slide.id)) {
+          tempSlides[index]._id = slide.id
+          updatedTempSlides.push(tempSlides[index])
+        }
+      })
+
+      console.log("updatedTempSlides", updatedTempSlides)
+      const mergedSlides = mergeSlides([...offlineSlides], [
+        ...uploadedSlides,
+      ] as Slide[])
+      // console.log("merged slides", mergedSlides)
+      appStore.appendActiveSlides(mergedSlides)
+    }
+
+    const mergedSlides = mergeSlides([...offlineSlides], [
+      ...uploadedSlides,
+    ] as Slide[])
     // console.log("merged slides", mergedSlides)
     appStore.appendActiveSlides(mergedSlides)
     // return uploadedSlides
@@ -504,7 +528,9 @@ watch(
   { immediate: true }
 )
 
-const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
+const batchCreateSlideOnline = async (
+  slides: Slide[]
+): Promise<Slide[] | string[]> => {
   // Find song slides and update
   const tempSlides = [...slides]
   tempSlides.forEach((slide) => {
@@ -519,6 +545,7 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
   })
 
   appStore.setSlidesLoading(true)
+
   const { data, error } = await useAPIFetch(
     `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/batch`,
     {
@@ -533,6 +560,9 @@ const batchCreateSlideOnline = async (slides: Slide[]): Promise<Slide[]> => {
     appStore.setLastSynced(new Date().toISOString())
     return data.value as Slide[]
   } else {
+    if (error.value?.data?.data) {
+      return error.value?.data?.data
+    }
     throw new Error(error.value?.message)
   }
 }
