@@ -1,6 +1,5 @@
 <template>
   <div
-    :key="renderKey"
     class="live-output-ctn w-[100%] min-h-[220px] relative"
     :class="{ 'no-animations': !currentState.settings.animations }"
     :style="`transition-duration: ${
@@ -103,6 +102,7 @@
       <!-- MAIN FOREGROUND CONTENT -->
       <!-- :padding="fullScreen ? '6' : '0'" -->
       <LiveContent
+        :key="renderKey"
         :content-visible="foregroundContentVisible"
         :slide="slide"
         class="relative"
@@ -188,6 +188,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDebounceFn } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import type { ExtendedFileT, Slide, SlideStyle } from "~/types"
@@ -202,6 +203,7 @@ const renderKey = ref(0)
 // const previousSlideVideo = ref<HTMLVideoElement | null>(null)
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["activate-fullscreen"])
+const mostRecentSlideUpdate = ref<Slide | null>(null)
 
 const props = defineProps<{
   slide: Slide
@@ -235,11 +237,11 @@ watch(
   () => props.slide,
   (newVal, oldVal) => {
     try {
-      renderKey.value += 1
       if (process.client && props.fullScreen && route.name === "live") {
         document.documentElement.requestFullscreen()
       }
       if (appMounted && props.slide.id === currentState.value?.liveSlideId) {
+        incrementRenderKey(props.slide)
         // console.log(video.value)
         // if (newVal.type === slideTypes.media) {
         //   previousSlideVideo.value = video.value
@@ -307,6 +309,15 @@ onMounted(() => {
   //   video.value.currentTime = 0
   // })
 })
+
+const incrementRenderKey = (slide: Slide) => {
+  if (JSON.stringify(slide) === JSON.stringify(mostRecentSlideUpdate.value)) {
+    return
+  } else {
+    renderKey.value += 1
+  }
+  mostRecentSlideUpdate.value = slide
+}
 
 // Function to create padding based on the ones set at display settings
 // Calculation is necessary because minimum padding is 6vw and the padding is in VW units
