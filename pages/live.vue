@@ -237,7 +237,6 @@ onMounted(() => {
     }
     const updatedSlide = JSON.parse(data) as Slide
     mostUpdatedLiveSlide.value = updatedSlide
-    await nextTick()
   })
 })
 
