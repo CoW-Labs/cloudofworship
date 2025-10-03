@@ -95,7 +95,7 @@
         </div>
       </Transition>
 
-      <!-- <AdvertModal :active-advert="currentState.activeAdvert" /> -->
+      <AdvertModal :active-advert="currentState.activeAdvert" />
     </ClientOnly>
   </div>
   <div
