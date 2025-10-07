@@ -175,6 +175,7 @@ import { appWideActions } from "~/utils/constants"
 
 useHead({
   title: "Cloud of Worship",
+  link: [{ rel: "stylesheet", href: "/css/main.css" }],
 })
 const props = defineProps({
   appVersion: String,
