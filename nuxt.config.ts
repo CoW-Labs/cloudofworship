@@ -56,6 +56,12 @@ export default defineNuxtConfig({
           href: "/css/fonts.css",
           as: "style",
           onload: "this.onload=null;this.rel='stylesheet'"
+        },
+        {
+          rel: "prefetch",
+          href: "/css/main.css",
+          as: "style",
+          onload: "this.onload=null;this.rel='stylesheet'"
         }
       ],
     },
