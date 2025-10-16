@@ -279,6 +279,11 @@ onMounted(() => {
   if (route.query.registerChurch) {
     getChurch()
   }
+  // If coming from lyrics.cloudofworship.com
+  if (route.query.from_lyrics) {
+    usePosthogCapture("OPENED_SIGNUP_FROM_LYRICS")
+  }
+
   setTimeout(() => {
     useToast().add({
       title: "Still not convinced?",
