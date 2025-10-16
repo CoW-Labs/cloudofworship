@@ -1,7 +1,6 @@
 <template>
   <div
     v-if="slide?.layout === slideLayoutTypes.heading_sub"
-    class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
@@ -15,13 +14,13 @@
       'single-line-spacing':
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
+    class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
   >
     <TiptapEditorContent :editor="editorOne" />
     <TiptapEditorContent :editor="editorTwo" />
   </div>
   <div
     v-else-if="slide?.layout === slideLayoutTypes.full_text"
-    class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
@@ -35,6 +34,7 @@
       'single-line-spacing':
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
+    class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
   >
     <TiptapEditorContent :editor="editorTwo" />
   </div>
@@ -126,7 +126,12 @@ const appStore = useAppStore()
 watch(
   () => props.slide,
   (newVal, oldVal) => {
-    if (newVal?.name !== oldVal?.name && newVal.type === slideTypes.text) {
+    console.log("slide content changed")
+    if (newVal?.id !== oldVal?.id && newVal.type === slideTypes.text) {
+      // editorTwo.value?.commands.clearContent()
+      // editorOne.value?.commands.setContent("")
+      // editorTwo.value?.commands.setContent("")
+
       editorOne.value?.commands.setContent(newVal?.contents[0])
       editorTwo.value?.commands.setContent(newVal?.contents[1])
       editorThree.value?.commands.setContent(newVal?.contents[2])

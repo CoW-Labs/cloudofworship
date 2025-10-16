@@ -1,6 +1,5 @@
 <template>
   <div
-    class="live-content tiptap border-none w-[100%] h-[100%] pointer-events-none text-left"
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
@@ -14,6 +13,7 @@
       'single-line-spacing':
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
+    class="live-content tiptap border-none w-[100%] h-[100%] pointer-events-none"
     :id="slide?.name"
   >
     <!-- <div
