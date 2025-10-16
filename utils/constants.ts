@@ -1,7 +1,5 @@
 import { BibleVersion, QuickAction } from "~/types"
 
-// console.log('testing n8n')
-
 export const slideTypes = {
   song: 'song',
   hymn: 'hymn',
