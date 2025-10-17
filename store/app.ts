@@ -93,7 +93,7 @@ export const useAppStore = defineStore("app", {
           animations: true,
           footnotes: true,
           songAndHymnLabelsVisibility: true,
-          motionlessSlides: false,
+          motionlessSlides: true,
           transitionInterval: 0.7,
           slideStyles: {
             blur: 0.5,
