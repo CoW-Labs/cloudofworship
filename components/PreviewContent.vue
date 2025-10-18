@@ -102,11 +102,11 @@ import type {
 import { appWideActions } from "~/utils/constants"
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const { slides, updateLiveOutput } = useSlides()
 const churchId = authStore.user?.churchId
 const toast = useToast()
 
 const windowHeight = ref<number>(0)
-const slides = ref<Array<Slide>>(appStore.currentState.activeSlides || [])
 const activeSlide = ref<Slide>()
 const { currentState } = storeToRefs(appStore)
 const slidesGrid = ref<HTMLDivElement | null>(null)
@@ -116,6 +116,9 @@ const bulkSelectSlides = ref<boolean>(false)
 const bulkSelectedSlides = ref<string[]>([])
 const activeCountdownInterval = ref<any>(null)
 const countdownTimeLeft = ref<number>(0)
+const countdownStartTime = ref<number>(0)
+const countdownDuration = ref<number>(0)
+const countdownRAF = ref<number>(0)
 
 // Listen to see if active slide is in active schedule, and to scroll to newest slide if in active schedule
 watch(
@@ -394,7 +397,6 @@ const isArrayOfStrings = (arr: any[]) => {
 }
 
 const uploadOfflineSlides = async () => {
-  // console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
   const offlineSlides = appStore.currentState.activeSlides
     .filter((slide) => slide._id === undefined)
@@ -413,7 +415,6 @@ const uploadOfflineSlides = async () => {
         }
       })
 
-      console.log("updatedTempSlides", updatedTempSlides)
       const mergedSlides = mergeSlides([...offlineSlides], [
         ...uploadedSlides,
       ] as Slide[])
@@ -686,10 +687,12 @@ const createNewSlide = (duplicateSlide?: Slide) => {
 const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   const tempSlide = slides.value.find((s) => s.id === slideId) as Slide
 
-  // Clear interval if slide is a countdown slide before deleting
+  // Clear countdown animation if slide is a countdown slide before deleting
   if (tempSlide?.type === slideTypes.countdown) {
-    // console.log("clearing interval", activeCountdownInterval.value)
-    clearInterval(activeCountdownInterval.value)
+    if (countdownRAF.value) {
+      cancelAnimationFrame(countdownRAF.value)
+    }
+    activeCountdownInterval.value = null
     countdownTimeLeft.value = 0
   }
 
@@ -1052,58 +1055,65 @@ const updateCountdownSlide = (
 const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
   const countdown = slide?.data as Countdown
   if (countdown?.time) {
-    const countdownTimeout = useTimeStringToMilli(
+    const duration = useTimeStringToMilli(
       restartCountdown
         ? (slide.data as Countdown)?.time
         : (slide.data as Countdown)?.timeLeft
     )
+
     if (activeCountdownInterval.value === null || restartCountdown) {
-      // console.log("play or restart")
+      // Stop any existing animation
+      if (countdownRAF.value) {
+        cancelAnimationFrame(countdownRAF.value)
+      }
+
+      // Reset or initialize countdown state
       if (restartCountdown) {
-        clearInterval(activeCountdownInterval.value)
-        countdownTimeLeft.value = countdownTimeout
+        countdownTimeLeft.value = duration
+        countdownDuration.value = duration
       } else {
         countdownTimeLeft.value =
-          countdownTimeLeft.value === 0
-            ? countdownTimeout
-            : countdownTimeLeft.value
+          countdownTimeLeft.value === 0 ? duration : countdownTimeLeft.value
+        countdownDuration.value = duration
       }
-      const countdownInterval = setInterval(() => {
-        // console.log("1 second gone", countdownTimeLeft.value)
-        if (countdownTimeLeft.value - 1000 < 1000) {
-          countdownTimeLeft.value = 0
-          clearInterval(activeCountdownInterval.value)
-        } else {
-          countdownTimeLeft.value = countdownTimeLeft.value - 1000
+
+      // Record start time
+      countdownStartTime.value = performance.now()
+      const startTimeLeft = countdownTimeLeft.value
+
+      // Animation function
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - countdownStartTime.value
+        const remaining = Math.max(0, startTimeLeft - elapsed)
+
+        // Update only when we cross a second boundary to maintain the same visual update rate
+        if (
+          Math.floor(remaining / 1000) !==
+          Math.floor(countdownTimeLeft.value / 1000)
+        ) {
+          countdownTimeLeft.value = remaining
+          updateCountdownSlide(slide, remaining)
         }
 
-        updateCountdownSlide(slide, countdownTimeLeft.value)
-        activeCountdownInterval.value = countdownInterval
-      }, 1000)
-      activeCountdownInterval.value = countdownInterval
+        if (remaining > 0) {
+          countdownRAF.value = requestAnimationFrame(animate)
+          activeCountdownInterval.value = true
+        } else {
+          countdownTimeLeft.value = 0
+          updateCountdownSlide(slide, 0, false)
+          activeCountdownInterval.value = null
+        }
+      }
 
-      setTimeout(() => {
-        clearInterval(countdownInterval)
-        activeCountdownInterval.value = null
-        updateCountdownSlide(slide, countdownTimeLeft.value, false)
-      }, countdownTimeout)
+      // Start the animation
+      countdownRAF.value = requestAnimationFrame(animate)
+      activeCountdownInterval.value = true
     } else {
-      // console.log("reached pause section", activeCountdownInterval.value)
-      // console.log("reached pause section", countdownTimeLeft.value)
-      clearInterval(activeCountdownInterval.value)
+      // Pause the countdown
+      cancelAnimationFrame(countdownRAF.value)
       activeCountdownInterval.value = null
       updateCountdownSlide(slide, countdownTimeLeft.value, false)
     }
-  }
-}
-
-const updateLiveOutput = (updatedSlide: Slide) => {
-  appStore.replaceScheduleActiveSlides(slides.value || [])
-
-  // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
-  if (updatedSlide.id === appStore.currentState.liveSlideId) {
-    appStore.setLiveSlide(updatedSlide.id)
-    useDebounceFn(useBroadcastPost, 100)(JSON.stringify(updatedSlide))
   }
 }
 

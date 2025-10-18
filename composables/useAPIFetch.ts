@@ -2,12 +2,13 @@ import { useFetch } from "#app";
 import { useOnline } from "@vueuse/core";
 import { useAuthStore } from "~/store/auth";
 import { useAppStore } from "~/store/app";
+import { useOnlineStatus } from "./useOnlineStatus";
+import { useRequestCounter } from "./useRequestCounter";
 
 type useFetchType = typeof useFetch;
-const lastSlidesRequest = null
 
 // wrap useFetch with configuration needed to talk to our API
-export const useAPIFetch: useFetchType = (path, options = {}) => {
+export const useAPIFetch: useFetchType = async (path, options = {}) => {
   const online = useOnline();
   const toast = useToast();
   const config = useRuntimeConfig();
@@ -36,14 +37,27 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
     Authorization: `Bearer ${token.value}`,
   };
 
-  options.onRequest = ({ request }) => {
-    // console.log(request)
-    // console.log(options.body)
+  const executeWithDelay = async () => {
+    const delay = getDelayPromise();
+    if (delay) {
+      toast.add({
+        title: "Rate limiting",
+        description: "Taking a short break to avoid overloading the server",
+        color: "blue",
+        icon: "i-tabler-clock",
+        timeout: 5000
+      });
+      await delay;
+    }
+  };
+
+  options.onRequest = async ({ request }) => {
+    await executeWithDelay();
   };
 
   options.onResponseError = ({ response }) => {
     appStore.setSlidesLoading(false);
-    if (response.status === 401 && !path.includes("/auth")) {
+    if (response.status === 401 && !(path as string).includes("/auth")) {
       authStore.signOut();
       toast.add({
         title: "Your session has expired",
@@ -61,14 +75,37 @@ export const useAPIFetch: useFetchType = (path, options = {}) => {
     // console.log(response.status)
   };
 
+  const { onBackOnline } = useOnlineStatus();
+
+  const { getDelayPromise } = useRequestCounter();
+
   if (!online.value) {
-    // Track failed POST/PUT requests
-    if (options.method === "POST" || options.method === "PUT") {
-      appStore.setFailedUploadRequests({ path: path as string, options });
-      addErrorInDevEnvironment(`, ${path}: Failed, cause: offline`);
+    // Track failed POST/PUT/DELETE requests (Only track PUT requests that are not related to slides i.e slide updates)
+    if (options.method === "POST" || (options.method === "PUT" && !(path as string).includes("/slides")) || options.method === 'DELETE') {
+      const failedRequest = { path: path as string, options, timestamp: Date.now() };
+      appStore.setFailedUploadRequests(failedRequest);
+
+      // Set up retry when back online
+      onBackOnline(async () => {
+        try {
+          const { data, error } = await useFetch(path, options);
+          if (error.value) {
+            console.error(`Failed to retry request to ${path}:`, error.value);
+          } else {
+            // Remove from failed requests if successful
+            appStore.removeFailedUploadRequest(failedRequest);
+            console.log(`Successfully retried request to ${path}`);
+          }
+        } catch (err) {
+          console.error(`Error retrying request to ${path}:`, err);
+        }
+      });
+
+      addErrorInDevEnvironment(`${path}: Failed, cause: offline`);
     }
     appStore.setSlidesLoading(false);
-    throw new Error("No internet connection");
+    console.error("No internet connection");
+    return useFetch(path, options);
   }
 
   return useFetch(path, options);

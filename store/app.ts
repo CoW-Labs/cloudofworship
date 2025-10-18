@@ -213,7 +213,6 @@ export const useAppStore = defineStore("app", {
       this.futureStates = []
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
-      // console.log('replacing schedule active slides', this.currentState.activeSlides?.length)
       // onAppStateChange(this.pastStates, this.currentState)
       let tempSlides = [...this.currentState.activeSlides]
       tempSlides = tempSlides.filter(
@@ -310,10 +309,26 @@ export const useAppStore = defineStore("app", {
       }
     },
     setFailedUploadRequests(
-      failedRequest: { path: string; options: any } | null
+      failedRequest: { path: string; options: any; timestamp: number } | null
     ) {
+      const tempArr = this.currentState.failedUploadRequests ? [...this.currentState.failedUploadRequests] : []
       if (failedRequest) {
-        this.currentState.failedUploadRequests.push(failedRequest)
+        tempArr.push(failedRequest)
+        this.currentState.failedUploadRequests = tempArr
+      }
+    },
+    removeFailedUploadRequest(
+      failedRequest: { path: string; options: any; timestamp: number }
+    ) {
+      const index = this.currentState.failedUploadRequests.findIndex(
+        (req) =>
+          req.path === failedRequest.path &&
+          req.timestamp === failedRequest.timestamp
+      );
+      if (index !== -1) {
+        const tempArr = [...this.currentState.failedUploadRequests];
+        tempArr.splice(index, 1);
+        this.currentState.failedUploadRequests = tempArr;
       }
     },
     setSlidesLoading(loading: boolean) {

@@ -228,7 +228,7 @@ export interface AppState {
   activeAlert: Alert | null
   activeOverlay: string
   recentBibleSearches: Array<string>
-  failedUploadRequests: Array<{ path: string; options: any }>
+  failedUploadRequests: Array<{ path: string; options: any; timestamp: number }>
   slidesLoading: boolean
   lastSynced: string
   bannerVisible: boolean
