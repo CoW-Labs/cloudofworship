@@ -213,7 +213,6 @@ export const useAppStore = defineStore("app", {
       this.futureStates = []
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
-      // console.log('replacing schedule active slides', this.currentState.activeSlides?.length)
       // onAppStateChange(this.pastStates, this.currentState)
       let tempSlides = [...this.currentState.activeSlides]
       tempSlides = tempSlides.filter(

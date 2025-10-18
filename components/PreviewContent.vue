@@ -102,11 +102,11 @@ import type {
 import { appWideActions } from "~/utils/constants"
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const { slides, updateLiveOutput } = useSlides()
 const churchId = authStore.user?.churchId
 const toast = useToast()
 
 const windowHeight = ref<number>(0)
-const slides = ref<Array<Slide>>(appStore.currentState.activeSlides || [])
 const activeSlide = ref<Slide>()
 const { currentState } = storeToRefs(appStore)
 const slidesGrid = ref<HTMLDivElement | null>(null)
@@ -397,7 +397,6 @@ const isArrayOfStrings = (arr: any[]) => {
 }
 
 const uploadOfflineSlides = async () => {
-  // console.log("uploading offline slides")
   // Retrieve all offline slides (with a scheduleId)
   const offlineSlides = appStore.currentState.activeSlides
     .filter((slide) => slide._id === undefined)
@@ -416,7 +415,6 @@ const uploadOfflineSlides = async () => {
         }
       })
 
-      console.log("updatedTempSlides", updatedTempSlides)
       const mergedSlides = mergeSlides([...offlineSlides], [
         ...uploadedSlides,
       ] as Slide[])
@@ -1086,7 +1084,6 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
       // Animation function
       const animate = (currentTime: number) => {
         const elapsed = currentTime - countdownStartTime.value
-        console.log("elapsed", elapsed)
         const remaining = Math.max(0, startTimeLeft - elapsed)
 
         // Update only when we cross a second boundary to maintain the same visual update rate
@@ -1117,16 +1114,6 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
       activeCountdownInterval.value = null
       updateCountdownSlide(slide, countdownTimeLeft.value, false)
     }
-  }
-}
-
-const updateLiveOutput = (updatedSlide: Slide) => {
-  appStore.replaceScheduleActiveSlides(slides.value || [])
-
-  // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
-  if (updatedSlide.id === appStore.currentState.liveSlideId) {
-    appStore.setLiveSlide(updatedSlide.id)
-    useDebounceFn(useBroadcastPost, 100)(JSON.stringify(updatedSlide))
   }
 }
 
