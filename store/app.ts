@@ -92,7 +92,7 @@ export const useAppStore = defineStore("app", {
           },
           animations: true,
           footnotes: true,
-          songAndHymnLabelsVisibility: true,
+          songAndHymnLabelsVisibility: false,
           motionlessSlides: true,
           transitionInterval: 0.7,
           slideStyles: {
@@ -490,7 +490,7 @@ export const useAppStore = defineStore("app", {
           lettercase: "",
         } as SlideStyle,
         bibleVersions: bibleVersionObjects, // Check app.vue for bible versions array in a list
-        songAndHymnLabelsVisibility: true,
+        songAndHymnLabelsVisibility: false,
       })
       this.setBackgroundVideos([])
       this.setAlerts([])
