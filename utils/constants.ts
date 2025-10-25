@@ -297,6 +297,7 @@ export const bibleVersions = [
   'NLT',
 ]
 
+// This is a fallback list of bible versions with copyright info, actual data is gotten from API
 export const bibleVersionObjects: BibleVersion[] = [
   {
     id: "KJV",
@@ -354,8 +355,6 @@ export const bibleVersionObjects: BibleVersion[] = [
     copyrightContent:
       "Scripture quotations marked (NLT) are taken from the Holy Bible, New Living Translation, copyright ©1996, 2004, 2015 by Tyndale House Foundation.",
   },
-  // { id: 'TPT', name: 'The Passion Translation', isDownloaded: false, copyrightContent: '' },
-  // { id: 'GNT', name: 'Good News Translation', isDownloaded: false, copyrightContent: '' },
   {
     id: "CEV",
     name: "Contemporary English Version",
@@ -384,6 +383,13 @@ export const bibleVersionObjects: BibleVersion[] = [
     copyrightContent:
       "Scripture quotations marked TPT are from The Passion Translation®. Copyright © 2017, 2018, 2020 by Passion & Fire Ministries, Inc.",
   },
+  {
+    id: "YBCV",
+    name: "Yoruba YBCV (Bibeli Mimọ)",
+    isDownloaded: false,
+    copyrightContent:
+      "Scripture quotations taken from the Yoruba Bible Crowther Version © The Bible Society of Nigeria, 2012",
+  }
 ]
 
 export const appFonts = [

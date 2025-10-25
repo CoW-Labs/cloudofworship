@@ -215,14 +215,13 @@ const inaccessibleDateRemaining = computed(() => {
 
 provide("windowRefs", windowRefs)
 
-const getUser = async () => {
+const fetchUser = async () => {
   const { data, error } = await useAPIFetch(`/user/auth`)
   if (data.value) {
     const user = data.value as unknown as User
     authStore.setUser(user)
   }
 }
-getUser()
 
 const retrieveChurchSongs = async () => {
   try {
@@ -255,7 +254,7 @@ const retrieveChurchSongs = async () => {
 }
 
 // Get Church Info and see if registered
-const getChurch = async () => {
+const fetchChurch = async () => {
   // console.log(authStore.user)
   const churchId = authStore.user?.churchId
   if (churchId) {
@@ -281,27 +280,44 @@ const getChurch = async () => {
     })
   }
 }
-getChurch()
 
-// Get hymn count and download app info
-let hymnCount: any
-const hymns = await db.bibleAndHymns.get("hymns")
-if (isAppOnline.value) {
-  hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
-    headers: {
-      Authorization: `Bearer ${token.value}`,
-    },
-  })
+const fetchAppInfo = async () => {
   // Download app info
   const { data } = await useAPIFetch("/app-config/info")
   if (data.value) {
     appInfo.value = data.value as any
     appStore.setBibleVersions((data.value as any)?.bibleVersions)
   }
+}
+
+const fetchHymns = async () => {
+  let hymnCount: any
+  const hymns = await db.bibleAndHymns.get("hymns")
+
+  // Download all hymns
+  hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
+    headers: {
+      Authorization: `Bearer ${token.value}`,
+    },
+  })
   hymnCount = await hymnCount.json()
-} else {
-  // Handle offline hymn count
-  hymnCount = (hymns?.data as Hymn[])?.length
+
+  if (hymns?.data?.length !== hymnCount) {
+    db.bibleAndHymns.delete("hymns")
+    downloadResource.value = "hymns"
+    downloadStep.value = 4
+    let hymns = await useDetailedFetch(
+      `${config.public.BASE_URL}/hymn`,
+      downloadProgress,
+      {
+        headers: {
+          Authorization: `Bearer ${token.value}`,
+        },
+      }
+    )
+    hymns = await hymns.json()
+    db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
+  }
 }
 
 // LISTEN TO EVENTS
@@ -577,24 +593,6 @@ const downloadEssentialResources = async () => {
 
   populateBibleVersionOptions()
 
-  // Download all hymns
-  if (hymns?.data?.length !== hymnCount) {
-    db.bibleAndHymns.delete("hymns")
-    downloadResource.value = "hymns"
-    downloadStep.value = 4
-    let hymns = await useDetailedFetch(
-      `${config.public.BASE_URL}/hymn`,
-      downloadProgress,
-      {
-        headers: {
-          Authorization: `Bearer ${token.value}`,
-        },
-      }
-    )
-    hymns = await hymns.json()
-    db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
-  }
-
   // Extra computations
   // Fix an anomaly in DB media data with [media] tables
   if (appStore.currentState.settings.appVersion !== props.appVersion) {
@@ -612,6 +610,8 @@ const downloadEssentialResources = async () => {
       appWideActions.selectedSchedule,
       appStore.currentState.activeSchedule?._id
     )
+    overrideAppSettings()
+    appStore.refreshAppActionsStack()
   }, 100)
 }
 
@@ -663,17 +663,6 @@ const overrideAppSettings = async () => {
 
     appStore.setBibleVersions(appInfo.value?.bibleVersions!!)
   }
-}
-
-function base64ToBlobURL(base64String: string, mimeType: string) {
-  const byteCharacters = atob(decodeURIComponent(base64String))
-  const byteNumbers = new Array(byteCharacters.length)
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i)
-  }
-  const byteArray = new Uint8Array(byteNumbers)
-  const blob = new Blob([byteArray], { type: mimeType })
-  return URL.createObjectURL(blob)
 }
 
 const retrieveSchedules = async () => {
@@ -787,18 +776,6 @@ const setCachedVideosURL = async () => {
   cachedVideosURLs.value = tempCachedVideos
   appStore.setBackgroundVideos(tempCachedVideos)
 }
-
-onMounted(async () => {
-  await downloadEssentialResources()
-  overrideAppSettings()
-  appStore.refreshAppActionsStack()
-  fetchActiveAdvert()
-  if (location.hostname !== "localhost") {
-    useGtag()
-  }
-})
-
-// retrieveAllMediaFilesFromDB()
 
 // WINDOW MANAGEMENT CODE STARTS HERE
 function openWindow(
@@ -922,6 +899,21 @@ async function openWindows() {
   }
 }
 // WINDOW MANAGEMENT CODE ENDS HERE
+
+onMounted(() => {
+  downloadEssentialResources()
+  fetchActiveAdvert()
+  if (location.hostname !== "localhost") {
+    useGtag()
+  }
+})
+
+if (isAppOnline.value) {
+  fetchUser()
+  fetchChurch()
+  fetchAppInfo()
+  fetchHymns()
+}
 </script>
 
 <style scoped></style>

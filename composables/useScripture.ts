@@ -35,11 +35,11 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
     async function fetchScripture(version: string, db: any, book: number, chapter: number, verses: number[]): Promise<string | undefined> {
       const bibleData = (await db.bibleAndHymns.get(version))?.data as unknown as BibleVerse[];
 
-      
+
       // Since verses are sequential, we can optimize by finding start index
-      const startIndex = bibleData?.findIndex((scripture: any) => 
-        Number(scripture.book) === (book) && 
-        Number(scripture.chapter) === chapter && 
+      const startIndex = bibleData?.findIndex((scripture: any) =>
+        Number(scripture.book) === (book) &&
+        Number(scripture.chapter) === chapter &&
         Number(scripture.verse) === verses[0]
       );
 
@@ -51,30 +51,11 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
         .map(scripture => scripture.scripture)
         .join(' ');
     }
-    // console.log('verse', verse)
-    // console.log('verses', verses)
 
-    switch (version) {
-      case 'NKJV':
-      case 'NIV':
-      case 'AMP':
-      case 'NLT':
-      case 'CEV':
-      case 'YLT':
-      case 'ASV':
-      case 'MSG':
-      case 'WEB':
-      case 'NASB':
-      case 'TPT':
-      case 'ESV':
-        scripture = await fetchScripture(version, db, book, chapter, verses) as string;
-        appStore.setDefaultBibleVersion(version);
-        break;
-      default:
-        scripture = await fetchScripture('KJV', db, book, chapter, verses) as string;
-        appStore.setDefaultBibleVersion('KJV');
-        break;
-    }
+    // Fetch scripture and set most recent version as default
+    scripture = await fetchScripture(version, db, book, chapter, verses) as string;
+    appStore.setDefaultBibleVersion(version);
+
     if (!scripture) {
       throw new Error('Scripture not found')
     }
