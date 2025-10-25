@@ -22,27 +22,9 @@ const useScriptureChapter = async (label: string = '1:1', version: string = ''):
       return bibleData?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter);
     }
 
-    switch (version) {
-      case 'NKJV':
-      case 'NIV':
-      case 'AMP':
-      case 'NLT':
-      case 'CEV':
-      case 'YLT':
-      case 'ASV':
-      case 'MSG':
-      case 'WEB':
-      case 'NASB':
-      case 'TPT':
-      case 'ESV':
-        verses = await fetchVerses(version, db, book, chapter) as any[];
-        appStore.setDefaultBibleVersion(version);
-        break;
-      default:
-        verses = await fetchVerses('KJV', db, book, chapter) as any[];
-        appStore.setDefaultBibleVersion('KJV');
-        break;
-    }
+    // Fetch scripture and set most recent version as default
+    verses = await fetchVerses(version, db, book, chapter) as any[];
+    appStore.setDefaultBibleVersion(version);
 
     return {
       label: `${bibleBooks?.[Number(book) - 1]} ${chapter}`,
