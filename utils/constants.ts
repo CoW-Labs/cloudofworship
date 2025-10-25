@@ -297,6 +297,7 @@ export const bibleVersions = [
   'NLT',
 ]
 
+// This is a fallback list of bible versions with copyright info, actual data is gotten from API
 export const bibleVersionObjects: BibleVersion[] = [
   {
     id: "KJV",
