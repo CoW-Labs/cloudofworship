@@ -196,6 +196,7 @@ const token = useCookie("token")
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
 const appInfo = ref<AppSettings>()
+const { fetchSavedSlides } = useSlides()
 
 const { currentState } = storeToRefs(appStore)
 
@@ -223,7 +224,7 @@ const fetchUser = async () => {
   }
 }
 
-const retrieveChurchSongs = async () => {
+const fetchChurchSongs = async () => {
   try {
     const { data } = await useAPIFetch(
       `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
@@ -263,7 +264,7 @@ const fetchChurch = async () => {
     if (data.value) {
       const church = data.value as unknown as Church
       authStore.setChurch(church)
-      retrieveChurchSongs()
+      fetchChurchSongs()
     }
     if (error.value) {
       throw new Error(error.value?.message)
@@ -316,6 +317,25 @@ const fetchHymns = async () => {
     )
     hymns = await hymns.json()
     db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
+  }
+}
+
+const fetchSavedSlidesAndCache = async () => {
+  const savedSlides = await fetchSavedSlides()
+  if (savedSlides) {
+    const libraryData: LibraryItem[] = savedSlides?.map((slide: Slide) => ({
+      id: slide.id,
+      type: "slide",
+      content: JSON.parse(JSON.stringify(slide)),
+      createdAt: slide.createdAt,
+      updatedAt: slide.updatedAt,
+    }))
+
+    try {
+      db.library.bulkAdd(libraryData)
+    } catch (err) {
+      console.log(err)
+    }
   }
 }
 
@@ -845,6 +865,7 @@ if (isAppOnline.value) {
   fetchChurch()
   fetchAppInfo()
   fetchHymns()
+  fetchSavedSlidesAndCache()
 }
 </script>
 

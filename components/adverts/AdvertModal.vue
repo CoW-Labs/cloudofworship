@@ -28,16 +28,18 @@ const props = defineProps<{
 }>()
 
 const visible = ref(false)
+const stateChange = ref(0)
 
 watch(
   () => props.activeAdvert,
   (newVal, oldVal) => {
-    if (newVal) {
+    if (newVal && stateChange.value === 0) {
       setTimeout(() => {
         visible.value = true
         usePosthogCapture("ADVERT_MODAL_OPENED")
       }, 10000)
     }
+    stateChange.value += 1
   }
 )
 

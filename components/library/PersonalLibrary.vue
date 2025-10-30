@@ -161,6 +161,7 @@ import { useObservable } from "@vueuse/rxjs"
 import fuzzysort from "fuzzysort"
 import { liveQuery } from "dexie"
 const toast = useToast()
+const { unsaveSlideOnline } = useSlides()
 
 const props = defineProps<{
   page: string
@@ -233,6 +234,7 @@ const deleteSong = async (songId: string) => {
 const deleteSlide = async (slideId: string) => {
   await useIndexedDB().library.delete(slideId)
   toast.add({ icon: "i-tabler-trash", title: "Slide has been deleted" })
+  unsaveSlideOnline(slideId)
 }
 
 const editSong = (song: Song) => {

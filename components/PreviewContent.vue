@@ -102,7 +102,7 @@ import type {
 import { appWideActions } from "~/utils/constants"
 const appStore = useAppStore()
 const authStore = useAuthStore()
-const { slides, updateLiveOutput } = useSlides()
+const { slides, updateLiveOutput, saveSlideOnline } = useSlides()
 const churchId = authStore.user?.churchId
 const toast = useToast()
 
@@ -1346,6 +1346,7 @@ const saveSlide = async (item: Slide) => {
         },
         tempItem.id
       )
+      saveSlideOnline(tempItem)
       toast.add({ icon: "i-bx-save", title: "Slide saved to Library" })
     }
   } catch (err: any) {
