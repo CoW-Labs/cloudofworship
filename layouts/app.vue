@@ -255,7 +255,6 @@ const retrieveChurchSongs = async () => {
 
 // Get Church Info and see if registered
 const fetchChurch = async () => {
-  // console.log(authStore.user)
   const churchId = authStore.user?.churchId
   if (churchId) {
     const { data, error } = await useAPIFetch(
@@ -324,7 +323,6 @@ const fetchHymns = async () => {
 const emitter = useNuxtApp().$emitter as Emitter<any>
 
 emitter.on("app-loading", (loading) => {
-  // console.log("triggered", loading)
   fullScreenLoading.value = loading
 })
 
@@ -456,65 +454,6 @@ const saveAllBackgroundVideos = async () => {
     const bgVideoBlob = await bgVideoPromise.blob()
     saveBackground(bgVideoBlob, 10)
   }
-
-  // let bgVideoPromise2 = await useDetailedFetch(
-  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-2.mp4`,
-  //   downloadProgress
-  // )
-  // bgVideoPromise2 = await bgVideoPromise2.blob()
-
-  // let bgVideoPromise3 = await useDetailedFetch(
-  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-3.mp4`,
-  //   downloadProgress
-  // )
-  // bgVideoPromise3 = await bgVideoPromise3.blob()
-
-  // let bgVideoPromise4 = await useDetailedFetch(
-  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-4.mp4`,
-  //   downloadProgress
-  // )
-  // bgVideoPromise4 = await bgVideoPromise4.blob()
-
-  // let bgVideoPromise5 = await useDetailedFetch(
-  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-5.mp4`,
-  //   downloadProgress
-  // )
-  // bgVideoPromise5 = await bgVideoPromise5.blob
-
-  // let bgVideoPromise6 = await useDetailedFetch(
-  //   `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-6.mp4`,
-  //   downloadProgress
-  // )
-  // bgVideoPromise6 = await bgVideoPromise6.blob()
-
-  // const bgVideoResponse = await Promise.all([
-  //   bgVideoPromise1,
-  //   bgVideoPromise2,
-  //   bgVideoPromise3,
-  //   bgVideoPromise4,
-  //   bgVideoPromise5,
-  //   bgVideoPromise6,
-  //   // bgVideoPromise[6].blob(),
-  // ])
-
-  // bgVideoResponse.forEach((blob, index) => {
-  //   const tempMedia: Media = {
-  //     id: `/video-bg-${index + 1}.mp4`,
-  //     data: blob,
-  //     content: "video",
-  //     createdAt: new Date().toISOString(),
-  //     updatedAt: new Date().toISOString(),
-  //   }
-  //   db.cached.add(tempMedia)
-  // })
-
-  // console.log("values", bgVideoResponse.values())
-  // const blobData = await bgVideoPromise.blob()
-  // // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
-  // const arrayBuffer: ArrayBuffer = mediaObj[0]?.data
-  // const blob = new Blob([blobData], {
-  //   type: 'video/mp4',
-  // })
 }
 
 const tempBibleVersion = (version: string, data: any) => ({
@@ -619,11 +558,7 @@ const overrideAppSettings = async () => {
   const currentAppSettings = appStore.currentState.settings
   // Override App Settings if current app version mismatches appVersion in state
   // TODO: When appSettings is editable by user, it must take preference over system settings and override
-  // console.log(currentAppSettings.appVersion, props.appVersion)
   if (currentAppSettings.appVersion !== props.appVersion) {
-    const db = useIndexedDB()
-    // db.newSchemaUpdate()
-
     setTimeout(() => {
       useGlobalEmit(appWideActions.showChangelog)
     }, 2000)
@@ -633,35 +568,32 @@ const overrideAppSettings = async () => {
     appStore.setAppSettings({
       ...currentAppSettings,
       appVersion: props.appVersion!!,
-      defaultBackground: {
-        hymn: {
-          backgroundType: "video",
-          background: cachedVideosURLs.value?.[0].url!!,
-          backgroundVideoKey: "/video-bg-1.mp4",
-        },
-        bible: {
-          backgroundType: "video",
-          background: cachedVideosURLs.value?.[0].url!!,
-          backgroundVideoKey: "/video-bg-3.mp4",
-        },
-        text: {
-          backgroundType: "video",
-          background: cachedVideosURLs.value?.[0].url!!,
-          backgroundVideoKey: "/video-bg-4.mp4",
-        },
-      },
-      slideStyles: {
-        blur: 0.5,
-        brightness: 50,
-        linesPerSlide: 4,
-        alignment: "center",
-        windowPadding: { left: 24, right: 24, top: 24, bottom: 24 },
-      } as SlideStyle,
-      bibleVersions: appInfo.value?.bibleVersions!!, // Check app.vue for bible versions array in a list
-      alertLimit: 5,
+      // TODO: Remove commented settings and TODO above if all checks out - after upload
+      // defaultBackground: {
+      //   hymn: {
+      //     backgroundType: "video",
+      //     background: cachedVideosURLs.value?.[0].url!!,
+      //     backgroundVideoKey: "/video-bg-1.mp4",
+      //   },
+      //   bible: {
+      //     backgroundType: "video",
+      //     background: cachedVideosURLs.value?.[0].url!!,
+      //     backgroundVideoKey: "/video-bg-3.mp4",
+      //   },
+      //   text: {
+      //     backgroundType: "video",
+      //     background: cachedVideosURLs.value?.[0].url!!,
+      //     backgroundVideoKey: "/video-bg-4.mp4",
+      //   },
+      // },
+      // slideStyles: {
+      //   blur: 0.5,
+      //   brightness: 50,
+      //   linesPerSlide: 4,
+      //   alignment: "center",
+      //   windowPadding: { left: 24, right: 24, top: 24, bottom: 24 },
+      // } as SlideStyle,
     })
-
-    appStore.setBibleVersions(appInfo.value?.bibleVersions!!)
   }
 }
 

@@ -115,6 +115,12 @@ export default defineNuxtConfig({
     icons: ["mdi", "bx", "bxs", "bi", "mingcute", "tabler", "ph"],
   },
 
+  icon: {
+    serverBundle: {
+      collections: ['bi', 'bx', 'bxs', 'mdi', 'mingcute', 'ph', 'tabler']
+    }
+  },
+
   colorMode: {
     preference: "system",
     fallback: "light",
