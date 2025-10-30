@@ -9,7 +9,7 @@ jobs:
   release:
     permissions:
       contents: write
-      
+
     runs-on: ubuntu-latest
 
     steps:
@@ -30,13 +30,13 @@ jobs:
         id: release_notes
         run: |
           last_tag=${{ env.last_tag }}
-      
+
           if [[ "$last_tag" == "v0.0.0" ]]; then
             commits=$(git log --no-merges --pretty=format:"- %s")
           else
             commits=$(git log "$last_tag"..HEAD --no-merges --pretty=format:"- %s")
           fi
-      
+
           filtered_commits=""
           while IFS= read -r line; do
             if [[ "$line" == *"Update appVersion to"* ]]; then
@@ -44,9 +44,9 @@ jobs:
             fi
             filtered_commits+="$line"$'\n'
           done <<< "$commits"
-      
+
           escaped_commits=$(printf "%s" "$filtered_commits" | jq -Rsa .)
-      
+
           echo "release_notes=$escaped_commits" >> $GITHUB_ENV
 
       - name: Generate Next Version Tag
@@ -136,7 +136,7 @@ jobs:
       - name: Update appVersion in app.vue
         run: |
           # Replace the version string in the specific line
-          sed -i '42s/const appVersion = ref<string>(".*")/const appVersion = ref<string>("${{ env.next_version }}")/' app.vue
+          sed -i '40s/const appVersion = ref<string>(".*")/const appVersion = ref<string>("${{ env.next_version }}")/' app.vue
 
           # Configure Git to commit the changes
           git config user.name "github-actions"
