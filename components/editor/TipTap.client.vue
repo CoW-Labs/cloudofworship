@@ -126,7 +126,6 @@ const appStore = useAppStore()
 watch(
   () => props.slide,
   (newVal, oldVal) => {
-    console.log("slide content changed")
     if (newVal?.id !== oldVal?.id && newVal.type === slideTypes.text) {
       // editorTwo.value?.commands.clearContent()
       // editorOne.value?.commands.setContent("")

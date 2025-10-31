@@ -65,7 +65,7 @@
           class="song-excerpt text-xs w-100 rounded-xl bg-white dark:bg-gray-800 bg-primary-100rounded-lg w-[300px] max-h-[200px] overflow-hidden shadow-lg truncate whitespace-pre-line text-ellipsis z-50 relative"
         >
           <AppSection heading="Lyrics Preview">
-            <p class="px-2">
+            <p class="px-2 h-[140px] overflow-scroll">
               {{
                 (song as Song)?.lyrics?.trim() ||
                 song?.verses?.toString().trim()

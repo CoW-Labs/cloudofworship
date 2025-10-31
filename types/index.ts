@@ -20,6 +20,7 @@ export interface Slide {
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
   data?: Song | Scripture | Hymn | Countdown | ExtendedFileT // for song/bible/hymn/file, Object mapped to Slide only on client
   slideStyle?: SlideStyle
+  saved?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -209,7 +210,7 @@ export interface AppSettings {
   footnotes?: boolean
   songAndHymnLabelsVisibility: boolean
 
-  motionlessSlides?: boolean
+  motionlessSlides?: boolean // deprecated
   transitionInterval?: number
   alertLimit?: number
 }

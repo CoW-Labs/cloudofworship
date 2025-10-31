@@ -645,24 +645,24 @@ body {
   min-height: calc(220px - 24px);
 }
 .lg-preview .tiptap.live-content {
-  font-size: 0.8vw;
-  line-height: 1.1vw;
+  font-size: 0.512vw;
+  line-height: 0.704vw;
 }
 .lg-preview .tiptap.live-content .scripture-content,
 .lg-preview .tiptap.live-content .countdown-content,
 .lg-preview .tiptap.live-content .song-content {
-  font-size: 0.8vw !important;
-  line-height: 1.1vw !important;
+  font-size: 0.512vw !important;
+  line-height: 0.704vw !important;
 }
 
 .lg-preview .tiptap.live-content .scripture-label,
 .lg-preview .tiptap.live-content .countdown-label,
 .lg-preview .tiptap.live-content .song-label {
-  font-size: 0.5vw;
+  font-size: 0.32vw;
 }
 
 .lg-preview .tiptap.live-content .copyright-content {
-  font-size: 0.3vw;
+  font-size: 0.192vw;
   line-height: 1.2;
 }
 
@@ -676,23 +676,23 @@ body {
 .lg-preview .tiptap.live-content h4,
 .lg-preview .tiptap.live-content h5,
 .lg-preview .tiptap.live-content h6 {
-  margin: 0.5vw 0;
+  margin: 0.32vw 0;
 }
 
 .lg-preview .tiptap.live-content h1 {
-  font-size: 1.5vw;
+  font-size: 0.96vw;
 }
 
 .lg-preview .tiptap.live-content h2 {
-  font-size: 1.3vw;
+  font-size: 0.832vw;
 }
 
 .lg-preview .tiptap.live-content h3 {
-  font-size: 1.15vw;
+  font-size: 0.736vw;
 }
 
 .lg-preview .tiptap.live-content h4 {
-  font-size: 1vw;
+  font-size: 0.64vw;
 }
 .lg-preview .tiptap.live-content blockquote {
   border-left-width: 1px;
@@ -707,26 +707,26 @@ body {
   min-height: 95px;
 }
 .md-preview .tiptap.live-content {
-  font-size: 0.4vw;
-  line-height: 0.6vw;
+  font-size: 0.2vw;
+  line-height: 0.3vw;
 }
 
 .md-preview .tiptap.live-content .scripture-label,
 .md-preview .tiptap.live-content .countdown-label,
 .md-preview .tiptap.live-content .song-label {
-  font-size: 0.15vw;
+  font-size: 0.075vw;
 }
 
 .md-preview .tiptap.live-content .copyright-content {
-  font-size: 0.05vw;
-  line-height: 1.2;
+  font-size: 0.025vw;
+  line-height: 0.7;
 }
 
 .md-preview .tiptap.live-content .scripture-content,
 .md-preview .tiptap.live-content .countdown-content,
 .md-preview .tiptap.live-content .song-content {
-  font-size: 0.4vw !important;
-  line-height: 0.6vw !important;
+  font-size: 0.2vw !important;
+  line-height: 0.3vw !important;
 }
 
 .md-preview .tiptap.live-content h1,
@@ -735,23 +735,23 @@ body {
 .md-preview .tiptap.live-content h4,
 .md-preview .tiptap.live-content h5,
 .md-preview .tiptap.live-content h6 {
-  margin: 0.3vw 0;
+  margin: 0.15vw 0;
 }
 
 .md-preview .tiptap.live-content h1 {
-  font-size: 0.7vw;
+  font-size: 0.35vw;
 }
 
 .md-preview .tiptap.live-content h2 {
-  font-size: 0.6vw;
+  font-size: 0.3vw;
 }
 
 .md-preview .tiptap.live-content h3 {
-  font-size: 0.5vw;
+  font-size: 0.25vw;
 }
 
 .md-preview .tiptap.live-content h4 {
-  font-size: 0.4vw;
+  font-size: 0.2vw;
 }
 .md-preview .tiptap.live-content blockquote {
   border-left-width: 1px;
@@ -766,25 +766,25 @@ body {
   height: 45px;
 }
 .sm-preview .tiptap.live-content {
-  font-size: 0.2vw;
-  line-height: 0.3vw;
+  font-size: 0.1vw;
+  line-height: 0.15vw;
 }
 
 .sm-preview .tiptap.live-content .scripture-content,
 .sm-preview .tiptap.live-content .countdown-content,
 .sm-preview .tiptap.live-content .song-content {
-  font-size: 0.2vw !important;
-  line-height: 0.3vw !important;
+  font-size: 0.1vw !important;
+  line-height: 0.15vw !important;
 }
 
 .sm-preview .tiptap.live-content .scripture-label,
 .sm-preview .tiptap.live-content .countdown-label,
 .sm-preview .tiptap.live-content .song-label {
-  font-size: 0.2vw;
+  font-size: 0.1vw;
 }
 
 .sm-preview .tiptap.live-content .copyright-content {
-  font-size: 0.1vw;
+  font-size: 0.05vw;
   line-height: 1.2;
 }
 
@@ -794,23 +794,23 @@ body {
 .sm-preview .tiptap.live-content h4,
 .sm-preview .tiptap.live-content h5,
 .sm-preview .tiptap.live-content h6 {
-  margin: 0.2vw 0;
+  margin: 0.1vw 0;
 }
 
 .sm-preview .tiptap.live-content h1 {
-  font-size: 0.4vw;
+  font-size: 0.2vw;
 }
 
 .sm-preview .tiptap.live-content h2 {
-  font-size: 0.35vw;
+  font-size: 0.175vw;
 }
 
 .sm-preview .tiptap.live-content h3 {
-  font-size: 0.3vw;
+  font-size: 0.15vw;
 }
 
 .sm-preview .tiptap.live-content h4 {
-  font-size: 0.25vw;
+  font-size: 0.125vw;
 }
 .sm-preview .tiptap.live-content blockquote {
   border-left-width: 1px;

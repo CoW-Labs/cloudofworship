@@ -93,7 +93,7 @@ export const useAppStore = defineStore("app", {
           animations: true,
           footnotes: true,
           songAndHymnLabelsVisibility: false,
-          motionlessSlides: true,
+          // motionlessSlides: true,
           transitionInterval: 0.7,
           slideStyles: {
             blur: 0.5,
@@ -390,13 +390,13 @@ export const useAppStore = defineStore("app", {
       }
       usePosthogCapture("SONG_AND_HYMN_LABELS_SETTINGS_CHANGED")
     },
-    setMotionlessSlides(motionlessSlides: boolean) {
-      this.currentState.settings = {
-        ...this.currentState.settings,
-        motionlessSlides: motionlessSlides,
-      }
-      usePosthogCapture("MOTIONLESS_SLIDES_SETTINGS_CHANGED")
-    },
+    // setMotionlessSlides(motionlessSlides: boolean) {
+    //   this.currentState.settings = {
+    //     ...this.currentState.settings,
+    //     motionlessSlides: motionlessSlides,
+    //   }
+    //   usePosthogCapture("MOTIONLESS_SLIDES_SETTINGS_CHANGED")
+    // },
     setTransitionInterval(interval: number) {
       this.currentState.settings = {
         ...this.currentState.settings,

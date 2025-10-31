@@ -4,14 +4,12 @@
     :style="useSlideBackground(slide)"
   >
     <!-- VIDEO BACKGROUND -->
-    <video
-      ref="video"
-      v-if="slide?.backgroundType === backgroundTypes.video"
-      :src="slide?.background"
-      :loop="slide?.slideStyle?.repeatMedia"
-      class="h-[100%] w-[100%] object-cover absolute inset-0"
-      crossorigin="anonymous"
-    ></video>
+    <BackgroundVideo
+      v-show="slide?.backgroundType === backgroundTypes.video"
+      :source="slide?.background"
+      :repeat="slide?.slideStyle?.repeatMedia"
+      :visible="slide?.backgroundType === backgroundTypes.video"
+    />
 
     <!-- MAIN FOREGROUND CONTENT -->
     <LiveContent
@@ -30,7 +28,6 @@
 <script setup lang="ts">
 import type { Slide, SlideStyle } from "~/types"
 const appMounted = ref<boolean>(false)
-const video = ref<HTMLVideoElement | null>(null)
 const foregroundContentVisible = ref<boolean>(true)
 
 const props = defineProps<{

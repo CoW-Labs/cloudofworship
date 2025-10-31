@@ -40,13 +40,6 @@ export const useAPIFetch: useFetchType = async (path, options = {}) => {
   const executeWithDelay = async () => {
     const delay = getDelayPromise();
     if (delay) {
-      toast.add({
-        title: "Rate limiting",
-        description: "Taking a short break to avoid overloading the server",
-        color: "blue",
-        icon: "i-tabler-clock",
-        timeout: 5000
-      });
       await delay;
     }
   };

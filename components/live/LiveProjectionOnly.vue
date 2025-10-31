@@ -9,104 +9,116 @@
     }s`"
   >
     <div
-      class="live-output w-[100%] min-h-[220px] rounded-md relative overflow-hidden border bg-no-repeat transition-all backdrop-blur-0 bg-black dark:border-none"
+      class="live-output w-[100%] min-h-[220px] rounded-md relative overflow-hidden border bg-black dark:border-none"
       v-if="contentVisible"
-      :class="{
-        'h-[100vh] rounded-none border-none min-h-[100%] bg-center': fullScreen,
-        'h-[88vh] rounded-none border-none min-h-[100%] bg-center':
-          fullScreenHeight,
-        'bg-cover': slide?.type !== slideTypes.media,
-        'bg-center bg-cover':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
-        'bg-top bg-cover':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.cropTop,
-        'bg-bottom bg-cover':
-          slide?.slideStyle?.backgroundFillType ===
-          backgroundFillTypes.cropBottom,
-        'bg-center bg-contain':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
-        'bg-center bg-stretch':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.stretch,
-      }"
       @dblclick="activateFullScreen()"
-      :style="useSlideBackground(slide)"
     >
-      <!-- AUDIO BACKGROUND -->
-      <audio
-        ref="video"
-        v-if="(slide?.data as ExtendedFileT)?.type?.includes('audio')"
-        :src="(slide?.data as ExtendedFileT)?.url"
-        autoplay
-        :loop="
-          slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
-        "
-        :muted="
-          audioMuted
-            ? true
-            : fullScreen
-            ? slide?.slideStyle?.isMediaMuted
-            : true
-        "
-        playsinline="true"
-        crossorigin="anonymous"
-      ></audio>
-      <!-- VIDEO BACKGROUND -->
-      <video
-        ref="video"
-        v-if="slide?.backgroundType === backgroundTypes.video"
-        :src="slide?.background"
-        autoplay
-        :loop="
-          slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
-        "
-        :muted="
-          audioMuted
-            ? true
-            : fullScreen
-            ? slide?.slideStyle?.isMediaMuted
-            : true
-        "
-        playsinline="true"
-        :class="[
-          'h-[100%] w-[100%] absolute inset-0',
-          slide?.type === slideTypes.media ? 'object-contain' : 'object-cover',
-          {
-            'object-center object-cover':
-              slide?.slideStyle?.backgroundFillType ===
-              backgroundFillTypes.crop,
-            'object-center object-contain':
-              slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
-            'object-center bg-fixed bg-stretch object-fill':
-              slide?.slideStyle?.backgroundFillType ===
-              backgroundFillTypes.stretch,
-          },
-        ]"
-        crossorigin="anonymous"
-      ></video>
+      <!-- BACKGROUND CONTENT -->
       <div
-        v-if="!fullScreen || slideLabel"
-        class="overlay-gradient absolute z-10 inset-0"
-      ></div>
-      <div
-        v-if="!fullScreen || slideLabel"
-        class="heading p-3 absolute z-10 inset-0"
+        class="absolute inset-0 bg-no-repeat transition-all"
+        :class="{
+          'h-[100vh] rounded-none border-none min-h-[100%] bg-center':
+            fullScreen,
+          'h-[88vh] rounded-none border-none min-h-[100%] bg-center':
+            fullScreenHeight,
+          'bg-cover': slide?.type !== slideTypes.media,
+          'bg-center bg-cover':
+            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
+          'bg-top bg-cover':
+            slide?.slideStyle?.backgroundFillType ===
+            backgroundFillTypes.cropTop,
+          'bg-bottom bg-cover':
+            slide?.slideStyle?.backgroundFillType ===
+            backgroundFillTypes.cropBottom,
+          'bg-center bg-contain':
+            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
+          'bg-center bg-stretch':
+            slide?.slideStyle?.backgroundFillType ===
+            backgroundFillTypes.stretch,
+        }"
+        :style="backgroundStyles"
       >
-        <h5
-          class="font-semibold text-white overflow-hidden truncate w-48 2xl:w-64"
+        <!-- AUDIO BACKGROUND -->
+        <audio
+          v-show="(slide?.data as ExtendedFileT)?.type?.includes('audio')"
+          :src="(slide?.data as ExtendedFileT)?.url"
+          autoplay
+          :loop="
+            slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
+          "
+          :muted="
+            audioMuted
+              ? true
+              : fullScreen
+              ? slide?.slideStyle?.isMediaMuted
+              : true
+          "
+          playsinline="true"
+          crossorigin="anonymous"
+        ></audio>
+
+        <!-- VIDEO BACKGROUND -->
+        <video
+          ref="video"
+          v-show="slide?.backgroundType === backgroundTypes.video"
+          :src="slide?.background"
+          autoplay
+          :loop="
+            slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
+          "
+          :muted="
+            audioMuted
+              ? true
+              : fullScreen
+              ? slide?.slideStyle?.isMediaMuted
+              : true
+          "
+          playsinline="true"
+          :class="[
+            'h-[100%] w-[100%] absolute inset-0',
+            slide?.type === slideTypes.media
+              ? 'object-contain'
+              : 'object-cover',
+            {
+              'object-center object-cover':
+                slide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.crop,
+              'object-center object-contain':
+                slide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.fit,
+              'object-center bg-fixed bg-stretch object-fill':
+                slide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.stretch,
+            },
+          ]"
+          crossorigin="anonymous"
+        ></video>
+
+        <div
+          v-if="!fullScreen || slideLabel"
+          class="overlay-gradient absolute z-10 inset-0"
+        ></div>
+
+        <div
+          v-if="!fullScreen || slideLabel"
+          class="heading p-3 absolute z-10 inset-0"
         >
-          {{ slide?.name || "No Live Slide" }}
-        </h5>
-        <LiveSlideIndicator :visible="!!slide?.name" class="mr-4 mt-4" />
+          <h5
+            class="font-semibold text-white overflow-hidden truncate w-48 2xl:w-64"
+          >
+            {{ slide?.name || "No Live Slide" }}
+          </h5>
+          <LiveSlideIndicator :visible="!!slide?.name" class="mr-4 mt-4" />
+        </div>
       </div>
 
       <!-- MAIN FOREGROUND CONTENT -->
-      <!-- :padding="fullScreen ? '6' : '0'" -->
       <LiveContent
-        :key="renderKey"
+        :key="slide?._id"
         :content-visible="foregroundContentVisible"
         :slide="slide"
         class="relative"
-        :class="fullScreen ? '' : 'min-h-[220px] rounded-md'"
+        :class="fullScreen ? 'h-screen' : 'min-h-[220px] rounded-md'"
         :padding="
           fullScreen
             ? {
@@ -124,11 +136,6 @@
                 ),
               }
             : { top: 0, right: 0, bottom: 0, left: 0 }
-        "
-        :style="
-          slide?.type === slideTypes.media
-            ? ''
-            : `backdrop-filter: blur(${slideStyles.blur}px) brightness(${slideStyles.brightness}%);`
         "
       />
 
@@ -200,7 +207,6 @@ const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
 const route = useRoute()
 const renderKey = ref(0)
-// const previousSlideVideo = ref<HTMLVideoElement | null>(null)
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["activate-fullscreen"])
 const mostRecentSlideUpdate = ref<Slide | null>(null)
@@ -215,24 +221,6 @@ const props = defineProps<{
   fullScreenHeight?: string
 }>()
 
-// TODO: Listen to slide.id and pause video if it is no longer the current live slide, using the Global Emitter on EditLiveContent component and passing ot here
-// Listen to liveSlideId and pause video if it is no longer the current live slide
-watch(
-  () => currentState.value?.liveSlideId,
-  (newVal, oldVal) => {
-    // console.log("liveSlideId", newVal)
-  }
-)
-
-watch(
-  () => props.audioMuted,
-  (newVal, oldVal) => {
-    if (props.audioMuted) {
-      // video.value?.pause()
-    }
-  }
-)
-
 watch(
   () => props.slide,
   (newVal, oldVal) => {
@@ -242,12 +230,7 @@ watch(
       }
       if (appMounted && props.slide.id === currentState.value?.liveSlideId) {
         incrementRenderKey(props.slide)
-        // console.log(video.value)
-        // if (newVal.type === slideTypes.media) {
-        //   previousSlideVideo.value = video.value
-        //   console.log(video.value)
-        //   // video.value?.pause()
-        // }
+
         video.value?.play()
         if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
           foregroundContentVisible.value = false
@@ -273,14 +256,6 @@ watch(
           // console.log("triggered pause")
           video.value?.pause()
         }
-
-        // TODO: Listen to see if video is playing or paused
-        // video.value?.addEventListener("play", (ev) => {
-        //   useGlobalEmit()
-        // })
-        // video.value?.addEventListener("pause", (ev) => {
-        //   console.log(ev)
-        // })
       }
     } catch (err) {
       // console.log(err)
@@ -289,25 +264,18 @@ watch(
   { deep: true }
 )
 
-onBeforeMount(() => {
-  // if (props.fullScreen) {
-  //   document.addEventListener("mouseover", () => {
-  //     document.documentElement.requestFullscreen()
-  //   })
-  // }
-})
-
 onMounted(() => {
   appMounted.value = true
-  // try {
   video.value?.play()
+})
 
-  // emitter.on("media-seek", (seekPosition: string) => {
-  //   // video.value?.fastSeek(Number(seekPosition))
-  //   // console.log(seekPosition, video.value?.currentTime)
-  //   // Number(seekPosition)
-  //   video.value.currentTime = 0
-  // })
+const backgroundStyles = computed(() => {
+  if (props.slide.type === slideTypes.media) {
+    return useSlideBackground(props.slide)
+  }
+  return `${useSlideBackground(props.slide)}; filter: blur(${
+    props.slideStyles.blur
+  }px) brightness(${props.slideStyles.brightness}%);`
 })
 
 const incrementRenderKey = (slide: Slide) => {

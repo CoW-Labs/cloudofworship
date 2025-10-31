@@ -451,7 +451,7 @@
     <UDivider class="mt-4" />
 
     <!-- SLIDE EXPERIMENTS -->
-    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
+    <!-- <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-md font-semibold">Slide Experiments</h3>
       </div>
@@ -467,7 +467,7 @@
           />
         </UFormGroup>
       </UForm>
-    </div>
+    </div> -->
 
     <UDivider class="mt-4" />
 
