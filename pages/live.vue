@@ -29,38 +29,21 @@
     </div>
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
     <!-- Using motionless slides to test bug with Bible Slides not moving to next slide in live view -->
-    <TransitionGroup v-if="currentState.settings.motionlessSlides">
-      <LiveProjectionOnly
-        v-show="mostUpdatedLiveSlide?.id === currentState.liveSlideId"
-        :content-visible="true"
-        :id="currentState.liveSlideId"
-        :full-screen="true"
-        :slide="mostUpdatedLiveSlide!!"
-        :slide-label="false"
-        :slide-styles="currentState.settings.slideStyles"
-        :audio-muted="
+    <!-- <Transition class="fade"> -->
+    <LiveProjectionOnly
+      v-show="mostUpdatedLiveSlide?.id === currentState.liveSlideId"
+      :content-visible="true"
+      :id="currentState.liveSlideId"
+      :full-screen="true"
+      :slide="mostUpdatedLiveSlide!!"
+      :slide-label="false"
+      :slide-styles="currentState.settings.slideStyles"
+      :audio-muted="
           mostUpdatedLiveSlide?.id !== currentState.liveSlideId ||
           mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!
         "
-      />
-    </TransitionGroup>
-    <TransitionGroup v-else name="fade-list">
-      <LiveProjectionOnly
-        v-for="liveSlide in viewableSlides"
-        :key="liveSlide.id"
-        v-show="liveSlide?.id === currentState.liveSlideId"
-        :content-visible="true"
-        :id="currentState.liveSlideId"
-        :full-screen="true"
-        :slide="liveSlide"
-        :slide-label="false"
-        :slide-styles="currentState.settings.slideStyles"
-        :audio-muted="
-          liveSlide?.id !== currentState.liveSlideId ||
-          liveSlide?.slideStyle?.isMediaMuted!!
-        "
-      />
-    </TransitionGroup>
+    />
+    <!-- </Transition> -->
 
     <AlertView />
   </div>
@@ -78,84 +61,6 @@ const mediaRecorderInterval = ref()
 const FPS = 10
 const mostUpdatedLiveSlide = ref<Slide | null>(null)
 
-const activeSlides = computed(() => {
-  const tempActiveSlides: Slide[] = [...currentState.value.activeSlides]
-  if (mostUpdatedLiveSlide.value) {
-    const mostUpdatedLiveSlideIndex = tempActiveSlides.findIndex(
-      (slide) => slide.id === mostUpdatedLiveSlide.value?.id
-    )
-    if (mostUpdatedLiveSlideIndex !== -1) {
-      tempActiveSlides.push(mostUpdatedLiveSlide.value!!)
-    } else {
-      tempActiveSlides.splice(
-        mostUpdatedLiveSlideIndex,
-        1,
-        mostUpdatedLiveSlide.value!!
-      )
-    }
-  }
-  return tempActiveSlides
-})
-
-const viewableSlides = computed(() => {
-  return activeSlides.value?.filter((slide) => {
-    return slide.id === currentState.value.liveSlideId
-  })
-})
-
-// const liveSlide = computed(() => {
-//   // console.log(activeSlides.value)
-//   // console.log(currentState.value.liveSlideId)
-//   return currentState.value.activeSlides.find(
-//     (slide) => slide.id === currentState.value.liveSlideId
-//   )
-// })
-
-// LISTEN TO STATE CHANGES FOR SOCKET BROADCAST
-// const socket = await useSocket()
-watch(
-  currentState,
-  (newVal, oldVal) => {
-    if (newVal.liveSlideId !== oldVal.liveSlideId) {
-      const liveSlide = currentState.value.activeSlides.find(
-        (slide) => slide.id === currentState.value.liveSlideId
-      )
-      if (liveSlide) {
-        mostUpdatedLiveSlide.value = liveSlide
-      }
-    }
-  },
-  { deep: true }
-)
-
-// watch(
-//   activeSlides,
-//   (newVal, oldVal) => {
-//     console.log("activeSlides", newVal)
-//     socket.send(
-//       JSON.stringify({
-//         type: appWideActions.liveActiveSlidesTransfer,
-//         data: newVal,
-//       })
-//     )
-//   },
-//   { deep: true }
-// )
-
-// watch(
-//   settings,
-//   (newVal, oldVal) => {
-//     console.log("settings", newVal)
-//     socket.send(
-//       JSON.stringify({
-//         type: appWideActions.liveSettingsTransfer,
-//         data: newVal,
-//       })
-//     )
-//   },
-//   { deep: true }
-// )
-
 useHead({
   title: "CoW Live",
   link: [
@@ -164,26 +69,6 @@ useHead({
       href: "/live-manifest.json",
     },
   ],
-})
-
-const displayMediaOptions = {
-  video: {
-    displaySurface: "tab",
-  },
-  audio: {
-    suppressLocalAudioPlayback: true,
-  },
-  preferCurrentTab: true,
-  selfBrowserSurface: "include",
-  systemAudio: "include",
-  surfaceSwitching: "exclude",
-  monitorTypeSurfaces: "exclude",
-}
-
-// LISTEN TO EVENTS
-const emitter = useNuxtApp().$emitter as Emitter<any>
-emitter.on("goto-verse", (data: any) => {
-  // console.log("goto-verse", 1)
 })
 
 const checkFullScreen = () => {
@@ -219,24 +104,19 @@ onMounted(() => {
     }
   })
 
-  window.addEventListener("DOMContentLoaded", () => {
-    console.log("DOMContentLoaded")
-    // document.documentElement.requestFullscreen()
-  })
-
   checkFullScreen()
 
-  //  Capture screen on load
-  // transmitScreenCapture()
   useBroadcastMessage(async (data: string) => {
+    const updatedSlide = JSON.parse(data) as Slide
+    mostUpdatedLiveSlide.value = updatedSlide
+
+    // Added specific emails for Testing purposes only
     if (
       useAuthStore().user?.email === "hello@favourfelix.com" ||
       useAuthStore().user?.email === "fgc.salvationmedia@gmail.com"
     ) {
-      console.log("broadcasting data received:", data)
+      console.log("broadcasting data received:", updatedSlide.id)
     }
-    const updatedSlide = JSON.parse(data) as Slide
-    mostUpdatedLiveSlide.value = updatedSlide
   })
 })
 
@@ -245,62 +125,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("webkitfullscreenchange", checkFullScreen)
   window.removeEventListener("mozfullscreenchange", checkFullScreen)
   window.removeEventListener("MSFullscreenChange", checkFullScreen)
-  // stopScreenCapture()
 })
-
-// const startScreenCapture = async () => {
-//   let captureStream = null
-//   try {
-//     captureStream = await navigator.mediaDevices.getDisplayMedia(
-//       (displayMediaOptions as DisplayMediaStreamConstraints)
-//     )
-//   } catch (err) {
-//     console.log("Error getting screen capture stream", err)
-//   }
-//   return captureStream
-// }
-
-// const transmitScreenCapture = async () => {
-//   const socket = await useSocket()
-//   const captureStream = await startScreenCapture()
-//   if (captureStream !== null) {
-//     mediaRecorder.value = new MediaRecorder(captureStream, {
-//       mimeType: "video/webm",
-//     })
-//     mediaRecorder.value.ondataavailable = (event) => {
-//       if (event.data.size > 0) {
-//         socket.send(event.data)
-//         // console.log("data available", event.data)
-//       }
-//     }
-//     mediaRecorder.value.onstop = (event) => {
-//       // console.log("stopped", event)
-//     }
-//     mediaRecorder.value.start()
-
-//     mediaRecorderInterval.value = setInterval(() => {
-//       if (mediaRecorder.value?.state !== "inactive") {
-//         mediaRecorder.value?.requestData()
-//       }
-//     }, 1000 / FPS)
-//     // console.log("mediaRecorder", mediaRecorder.value)
-//   } else {
-//     console.log("No capture stream")
-//   }
-// }
-
-// const stopScreenCapture = async () => {
-//   try {
-//     if (mediaRecorder.value) {
-//       mediaRecorder.value.stop()
-//       mediaRecorder.value.ondataavailable = null
-//       mediaRecorder.value = null
-//     }
-//     clearInterval(mediaRecorderInterval.value)
-//   } catch (err) {
-//     console.log("Error stopping screen capture", err)
-//   }
-// }
 </script>
 
 <style>

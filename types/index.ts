@@ -210,7 +210,7 @@ export interface AppSettings {
   footnotes?: boolean
   songAndHymnLabelsVisibility: boolean
 
-  motionlessSlides?: boolean
+  motionlessSlides?: boolean // deprecated
   transitionInterval?: number
   alertLimit?: number
 }

@@ -176,14 +176,12 @@ const makeSlideActive = (
     newlyCreated: boolean
   }
 ) => {
-  // console.log("make slide active")
-  // console.log(goLive, slide)
   activeSlide.value = slide
   if (options?.newlyCreated) {
     appStore.appendActiveSlide(slide)
   }
   if (options?.goLive) {
-    appStore.setLiveSlide(activeSlide.value.id)
+    updateLiveOutput(activeSlide.value, { forceGoLive: true })
   }
 }
 
@@ -620,7 +618,7 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
 
     // UPDATE OVER HTTP
     // TODO: Take out http update in future when WS is stable and can store in DB
-    appStore.setSlidesLoading(true)
+    // appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
       `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
       {
@@ -629,7 +627,7 @@ const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
       }
     )
     if (!error.value) {
-      appStore.setSlidesLoading(false)
+      // appStore.setSlidesLoading(false)
       appStore.setLastSynced(new Date().toISOString())
       return data.value
     } else {

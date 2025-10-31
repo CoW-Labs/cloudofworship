@@ -247,7 +247,8 @@ onMounted(() => {
 
 const setLiveSlide = (slideId: string) => {
   const slide = appStore.currentState.activeSlides.find((s) => s.id === slideId)
-  useDebounceFn(useBroadcastPost, 100)(JSON.stringify(slide))
+  // useDebounceFn(useBroadcastPost, 0)(JSON.stringify(slide))
+  useBroadcastPost(JSON.stringify(slide))
   appStore.setLiveSlide(slideId)
 }
 </script>

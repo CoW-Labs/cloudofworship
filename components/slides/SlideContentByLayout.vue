@@ -6,16 +6,24 @@
   >
     <div
       v-if="contentVisible"
-      class="content come-up-1"
-      :class="[useURLFriendlyString(slide?.slideStyle?.font || 'Inter')]"
+      class="content"
+      :class="[
+        useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
+        currentState.settings.animations ? 'come-up-1' : '',
+      ]"
       v-html="slide?.contents?.[0]"
     ></div>
     <div
       v-if="contentVisible"
-      class="content come-up-2"
+      class="content"
+      :class="[
+        useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
+        currentState.settings.animations ? 'come-up-2' : '',
+      ]"
       v-html="slide?.contents?.[1]"
     ></div>
   </div>
+
   <div
     v-else-if="slide?.layout === slideLayoutTypes.full_text"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
@@ -23,10 +31,12 @@
   >
     <div
       v-if="contentVisible"
-      class="content come-up-1"
+      class="content"
+      :class="[currentState.settings.animations ? 'come-up-1' : '']"
       v-html="slide?.contents?.[1]"
     ></div>
   </div>
+
   <div
     v-else-if="slide?.layout === slideLayoutTypes.two_column"
     class="slide-layout-ctn flex gap-4 h-[100%] justify-around items-center"
@@ -34,15 +44,18 @@
   >
     <div
       v-if="contentVisible"
-      class="content come-up-1"
+      class="content"
+      :class="[currentState.settings.animations ? 'come-up-1' : '']"
       v-html="slide?.contents?.[0]"
     ></div>
     <div
       v-if="contentVisible"
-      class="content come-up-2"
+      class="content"
+      :class="[currentState.settings.animations ? 'come-up-2' : '']"
       v-html="slide?.contents?.[1]"
     ></div>
   </div>
+
   <div
     v-else-if="slide?.layout === slideLayoutTypes.bible"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
@@ -53,16 +66,21 @@
   >
     <div
       v-if="contentVisible"
-      class="content come-up-1"
-      :class="[useURLFriendlyString(slide?.slideStyle?.font || 'Inter')]"
+      class="content"
+      :class="[
+        useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
+        currentState.settings.animations ? 'come-up-1' : '',
+      ]"
       v-html="slide?.contents?.[0]"
     ></div>
     <div
       v-if="contentVisible"
-      class="content come-up-2"
+      class="content"
+      :class="[currentState.settings.animations ? 'come-up-2' : '']"
       v-html="slide?.contents?.[1]"
     ></div>
   </div>
+
   <div
     v-else-if="slide?.layout === slideLayoutTypes.countdown"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
@@ -81,6 +99,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAppStore } from "~/store/app"
 import type { Slide } from "~/types"
 
 const props = defineProps<{
@@ -88,4 +107,6 @@ const props = defineProps<{
   padding: { top: number; right: number; bottom: number; left: number }
   contentVisible: boolean
 }>()
+
+const { currentState } = storeToRefs(useAppStore())
 </script>
