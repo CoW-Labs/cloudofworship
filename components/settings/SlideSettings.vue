@@ -3,7 +3,10 @@
     <!-- LOOK AND FEEL OF SLIDES -->
     <div class="settings-group">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Look and Feel</h3>
+        <h3 class="text-md font-semibold">
+          Look and Feel
+          <div class="text-primary">Settings ONLY apply to new slides</div>
+        </h3>
       </div>
       <UForm :state="{}">
         <UFormGroup
@@ -329,7 +332,10 @@
     <!-- BIBLE SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Bible Slides</h3>
+        <h3 class="text-md font-semibold">
+          Bible Slides
+          <div class="text-primary">Settings ONLY apply to new slides</div>
+        </h3>
       </div>
       <UForm :state="{}">
         <div class="flex items-center gap-2">
@@ -379,7 +385,10 @@
     <!-- FOOTNOTES & CREDITS -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Footnotes & Credits</h3>
+        <h3 class="text-md font-semibold">
+          Footnotes & Credits
+          <div class="text-primary">Settings ONLY apply to new slides</div>
+        </h3>
       </div>
       <UForm :state="{}">
         <UFormGroup
@@ -474,7 +483,10 @@
     <!-- SONG SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Song Slides</h3>
+        <h3 class="text-md font-semibold">
+          Song Slides
+          <div class="text-primary">Settings ONLY apply to new slides</div>
+        </h3>
       </div>
       <UForm :state="{}">
         <UFormGroup label="Set default lines per slide">
