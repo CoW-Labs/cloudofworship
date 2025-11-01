@@ -75,19 +75,19 @@ export const useAppStore = defineStore("app", {
           defaultFont: "Inter",
           defaultBackground: {
             hymn: {
-              backgroundType: "video",
-              background: "/video-bg-1.mp4",
-              backgroundVideoKey: "/video-bg-1.mp4",
+              backgroundType: "image",
+              background: "https://images.unsplash.com/photo-1506056820413-f8fa4de15de6?q=80&w=1740",
+              backgroundVideoKey: null
             },
             bible: {
-              backgroundType: "video",
-              background: "/video-bg-3.mp4",
-              backgroundVideoKey: "/video-bg-3.mp4",
+              backgroundType: "image",
+              background: "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?q=80&w=1740",
+              backgroundVideoKey: null
             },
             text: {
-              backgroundType: "video",
-              background: "/video-bg-4.mp4",
-              backgroundVideoKey: "/video-bg-4.mp4",
+              backgroundType: "image",
+              background: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1740",
+              backgroundVideoKey: null
             },
           },
           animations: true,
@@ -289,9 +289,11 @@ export const useAppStore = defineStore("app", {
     },
     setBackgroundVideos(bgVideos: BackgroundVideo[]) {
       this.currentState.backgroundVideos = bgVideos
+    },
+    setDefaultSlideBackgrounds() {
+
       this.currentState.settings.defaultBackground.hymn.background =
-        bgVideos?.[0]?.url
-      this.currentState.settings.defaultBackground.bible.background =
+        this.currentState.settings.defaultBackground.bible.background =
         bgVideos?.[2]?.url
       this.currentState.settings.defaultBackground.text.background =
         bgVideos?.[3]?.url
@@ -466,19 +468,19 @@ export const useAppStore = defineStore("app", {
         defaultFont: "Inter",
         defaultBackground: {
           hymn: {
-            backgroundType: "video",
-            background: "/video-bg-1.mp4",
-            backgroundVideoKey: "/video-bg-1.mp4",
+            backgroundType: "image",
+            background: "https://images.unsplash.com/photo-1506056820413-f8fa4de15de6?q=80&w=1740",
+            backgroundVideoKey: null
           },
           bible: {
-            backgroundType: "video",
-            background: "/video-bg-3.mp4",
-            backgroundVideoKey: "/video-bg-3.mp4",
+            backgroundType: "image",
+            background: "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?q=80&w=1740",
+            backgroundVideoKey: null
           },
           text: {
-            backgroundType: "video",
-            background: "/video-bg-4.mp4",
-            backgroundVideoKey: "/video-bg-4.mp4",
+            backgroundType: "image",
+            background: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1740",
+            backgroundVideoKey: null
           },
         },
         slideStyles: {
@@ -493,6 +495,7 @@ export const useAppStore = defineStore("app", {
         songAndHymnLabelsVisibility: false,
       })
       this.setBackgroundVideos([])
+      this.setDefaultSlideBackgrounds()
       this.setAlerts([])
       this.setActiveAlert(null)
       this.setRecentBibleSearches("")

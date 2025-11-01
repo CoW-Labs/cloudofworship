@@ -70,11 +70,8 @@ const imageCompressionLoading = ref(false)
 
 const bgImageToBeSelected = ref<string | null>(null)
 const backgroundImages = ref<string[]>([
-  // EASTER IMAGES
-  "https://images.unsplash.com/photo-1649894708597-93851f061545?q=80&w=1740",
-  "https://images.unsplash.com/photo-1616548321600-aaab929899b5?q=80&w=1740",
-  "https://images.unsplash.com/photo-1711560728293-14b647bd3a12?q=80&w=1740",
-  // ---
+  "https://images.unsplash.com/photo-1553901753-215db344677a?q=80&w=1740",
+  "https://images.unsplash.com/photo-1506056820413-f8fa4de15de6?q=80&w=1740",
   "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740",
   "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?q=80&w=1740",
   "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?q=80&w=1740",
@@ -97,6 +94,11 @@ const backgroundImages = ref<string[]>([
   "https://images.unsplash.com/photo-1511783111049-b4c32d7fa8fa?q=80&w=1740",
   "https://images.unsplash.com/photo-1482164565953-04b62dcac1cd?q=80&w=1740",
   "https://images.unsplash.com/photo-1513680904158-42938c809a42?q=80&w=1740",
+  // EASTER IMAGES
+  "https://images.unsplash.com/photo-1649894708597-93851f061545?q=80&w=1740",
+  "https://images.unsplash.com/photo-1616548321600-aaab929899b5?q=80&w=1740",
+  "https://images.unsplash.com/photo-1711560728293-14b647bd3a12?q=80&w=1740",
+  // ---
 ])
 
 const getAllLocallySavedImages = async () => {

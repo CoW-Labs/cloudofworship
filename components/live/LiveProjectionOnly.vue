@@ -93,23 +93,23 @@
           ]"
           crossorigin="anonymous"
         ></video>
+      </div>
 
-        <div
-          v-if="!fullScreen || slideLabel"
-          class="overlay-gradient absolute z-10 inset-0"
-        ></div>
+      <div
+        v-if="!fullScreen || slideLabel"
+        class="overlay-gradient absolute z-10 inset-0"
+      ></div>
 
-        <div
-          v-if="!fullScreen || slideLabel"
-          class="heading p-3 absolute z-10 inset-0"
+      <div
+        v-if="!fullScreen || slideLabel"
+        class="heading p-3 absolute z-10 inset-0"
+      >
+        <h5
+          class="font-semibold text-white overflow-hidden truncate w-48 2xl:w-64"
         >
-          <h5
-            class="font-semibold text-white overflow-hidden truncate w-48 2xl:w-64"
-          >
-            {{ slide?.name || "No Live Slide" }}
-          </h5>
-          <LiveSlideIndicator :visible="!!slide?.name" class="mr-4 mt-4" />
-        </div>
+          {{ slide?.name || "No Live Slide" }}
+        </h5>
+        <LiveSlideIndicator :visible="!!slide?.name" class="mr-4 mt-4" />
       </div>
 
       <!-- MAIN FOREGROUND CONTENT -->
@@ -270,7 +270,7 @@ onMounted(() => {
 })
 
 const backgroundStyles = computed(() => {
-  if (props.slide.type === slideTypes.media) {
+  if (props.slide?.type === slideTypes.media) {
     return useSlideBackground(props.slide)
   }
   return `${useSlideBackground(props.slide)}; filter: blur(${
