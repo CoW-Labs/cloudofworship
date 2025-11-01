@@ -61,7 +61,7 @@
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
     :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw; font-size: ${
       (slide?.slideStyle?.fontSize!!) *
-      ((slide?.slideStyle?.fontSizePercent || 100) / 100)
+      ((slide?.slideStyle?.fontSizePercent || currentState.settings.slideStyles.fontSizePercent || 100) / 100)
     }vw`"
   >
     <div
@@ -86,7 +86,7 @@
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
     :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw; font-size: ${
       (slide?.slideStyle?.fontSize!!) *
-      ((slide?.slideStyle?.fontSizePercent || 100) / 100)
+      ((slide?.slideStyle?.fontSizePercent || currentState.settings.slideStyles.fontSizePercent || 100) / 100)
     }vw`"
   >
     <div class="content jost" v-html="slide?.contents?.[1]"></div>

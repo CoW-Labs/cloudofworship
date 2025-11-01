@@ -53,6 +53,33 @@
             </template>
           </USelectMenu>
         </UFormGroup>
+
+        <UFormGroup
+          label="Set default font size"
+          class="flex items-center justify-between py-3 px-2 hover:bg-primary/10"
+        >
+          <div
+            class="flex px-0 items-center gap-2 font-semibold w-full min-w-[200px]"
+          >
+            <span class="text-sm">{{ MIN_FONT_SIZE }}%</span>
+            <URange
+              :model-value="
+                appStore.currentState.settings.slideStyles.fontSizePercent
+              "
+              :min="MIN_FONT_SIZE"
+              :max="MAX_FONT_SIZE"
+              :step="5"
+              @change="
+                appStore.setSlideStyles({
+                  ...appStore.currentState.settings.slideStyles,
+                  fontSizePercent: Number($event),
+                })
+              "
+            />
+            <span class="text-sm">{{ MAX_FONT_SIZE }}%</span>
+          </div>
+        </UFormGroup>
+
         <UFormGroup
           label="Set default slide alignment"
           class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
@@ -549,6 +576,8 @@
 import { useAppStore } from "~/store/app"
 const appStore = useAppStore()
 
+const MAX_FONT_SIZE = 150
+const MIN_FONT_SIZE = 50
 const slideBackgroundTabs = [
   { label: "video", icon: "i-bx-video" },
   { label: "image", icon: "i-bx-image" },
