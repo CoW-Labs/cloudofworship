@@ -102,7 +102,7 @@
             "
             @change="
               appStore.setSlideStyles({
-                ...appStore.currentState.settings,
+                ...appStore.currentState.settings.slideStyles,
                 textOutlined: $event,
               })
             "
