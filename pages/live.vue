@@ -8,7 +8,11 @@
       class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center bg-opacity-70"
     >
       <div class="banner-text text-lg flex items-center gap-6">
-        <span
+        <span v-if="!mostUpdatedLiveSlide"
+          ><span class="font-bold">Select a slide</span> from the Slide Schedule
+          Pane to show here</span
+        >
+        <span v-else
           ><span class="font-bold">Double click</span> the display below to
           toggle full screen and remove this banner</span
         >

@@ -1,7 +1,7 @@
 const addResourcesToCache = async (resources) => {
-  const cache = await caches.open("v1");
-  await cache.addAll(resources);
-};
+  const cache = await caches.open("v1")
+  await cache.addAll(resources)
+}
 
 // const putInCache = async (request, response) => {
 //   const cache = await caches.open("v1")
@@ -52,13 +52,13 @@ const addResourcesToCache = async (resources) => {
 const enableNavigationPreload = async () => {
   if (self.registration.navigationPreload) {
     // Enable navigation preloads!
-    await self.registration.navigationPreload.enable();
+    await self.registration.navigationPreload.enable()
   }
-};
+}
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(enableNavigationPreload());
-});
+  event.waitUntil(enableNavigationPreload())
+})
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -76,6 +76,8 @@ self.addEventListener("install", (event) => {
       "/niv.json",
       "/amp.json",
       "/hymns.json",
+      "https://images.unsplash.com/photo-1553901753-215db344677a?q=80&w=1740",
+      "https://images.unsplash.com/photo-1506056820413-f8fa4de15de6?q=80&w=1740",
       "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740",
       "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?q=80&w=1740",
       "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?q=80&w=1740",
@@ -92,6 +94,15 @@ self.addEventListener("install", (event) => {
       "https://images.unsplash.com/photo-1523821741446-edb2b68bb7a0?q=80&w=1740",
       "https://images.unsplash.com/photo-1597773150796-e5c14ebecbf5?q=80&w=1740",
       "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1740",
-    ]),
-  );
-});
+      "https://images.unsplash.com/photo-1511268011861-691ed210aae8?q=80&w=1740",
+      "https://images.unsplash.com/photo-1545608444-f045a6db6133?w=1740",
+      "https://images.unsplash.com/photo-1519751138087-5bf79df62d5b?q=80&w=1740",
+      "https://images.unsplash.com/photo-1511783111049-b4c32d7fa8fa?q=80&w=1740",
+      "https://images.unsplash.com/photo-1482164565953-04b62dcac1cd?q=80&w=1740",
+      "https://images.unsplash.com/photo-1513680904158-42938c809a42?q=80&w=1740",
+      "https://images.unsplash.com/photo-1649894708597-93851f061545?q=80&w=1740",
+      "https://images.unsplash.com/photo-1616548321600-aaab929899b5?q=80&w=1740",
+      "https://images.unsplash.com/photo-1711560728293-14b647bd3a12?q=80&w=1740",
+    ])
+  )
+})

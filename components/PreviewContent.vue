@@ -356,7 +356,8 @@ const preSlideCreation = (): Slide => {
     scheduleId: appStore.currentState.activeSchedule?._id as string,
     slideStyle: {
       alignment: appStore.currentState.settings.slideStyles.alignment,
-      fontSizePercent: 100,
+      fontSizePercent:
+        appStore.currentState.settings.slideStyles.fontSizePercent,
       font: appStore.currentState.settings.defaultFont,
       isMediaMuted: true,
       isMediaPlaying: false,

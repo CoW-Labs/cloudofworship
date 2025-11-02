@@ -387,6 +387,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAppStore } from "~/store/app"
 import type { ExtendedFileT, Slide } from "~/types"
 import { appWideActions } from "~/utils/constants"
 
@@ -395,12 +396,17 @@ const MIN_FONT_SIZE = 50
 const props = defineProps<{
   slide: Slide
 }>()
+
+const { currentState } = storeToRefs(useAppStore())
+
 const backgroundFillType = ref<string>(
   props.slide.slideStyle?.backgroundFillType || ""
 )
 const lineSpacing = ref<string>(props.slide.slideStyle?.lineSpacing || "")
 const slideFontSize = ref<number>(
-  props.slide.slideStyle?.fontSizePercent || 100
+  props.slide.slideStyle?.fontSizePercent ||
+    currentState.value.settings.slideStyles.fontSizePercent ||
+    100
 )
 const isLoading = ref<boolean>(false)
 const containerOverflow = ref<string>("overflow-x-auto")

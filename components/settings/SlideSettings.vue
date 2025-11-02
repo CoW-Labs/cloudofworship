@@ -3,7 +3,10 @@
     <!-- LOOK AND FEEL OF SLIDES -->
     <div class="settings-group">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Look and Feel</h3>
+        <h3 class="text-md font-semibold">
+          Look and Feel
+          <div class="text-primary">Settings ONLY apply to new slides</div>
+        </h3>
       </div>
       <UForm :state="{}">
         <UFormGroup
@@ -50,6 +53,33 @@
             </template>
           </USelectMenu>
         </UFormGroup>
+
+        <UFormGroup
+          label="Set default font size"
+          class="flex items-center justify-between py-3 px-2 hover:bg-primary/10"
+        >
+          <div
+            class="flex px-0 items-center gap-2 font-semibold w-full min-w-[200px]"
+          >
+            <span class="text-sm">{{ MIN_FONT_SIZE }}%</span>
+            <URange
+              :model-value="
+                appStore.currentState.settings.slideStyles.fontSizePercent
+              "
+              :min="MIN_FONT_SIZE"
+              :max="MAX_FONT_SIZE"
+              :step="5"
+              @change="
+                appStore.setSlideStyles({
+                  ...appStore.currentState.settings.slideStyles,
+                  fontSizePercent: Number($event),
+                })
+              "
+            />
+            <span class="text-sm">{{ MAX_FONT_SIZE }}%</span>
+          </div>
+        </UFormGroup>
+
         <UFormGroup
           label="Set default slide alignment"
           class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
@@ -102,7 +132,7 @@
             "
             @change="
               appStore.setSlideStyles({
-                ...appStore.currentState.settings,
+                ...appStore.currentState.settings.slideStyles,
                 textOutlined: $event,
               })
             "
@@ -329,7 +359,10 @@
     <!-- BIBLE SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Bible Slides</h3>
+        <h3 class="text-md font-semibold">
+          Bible Slides
+          <div class="text-primary">Settings ONLY apply to new slides</div>
+        </h3>
       </div>
       <UForm :state="{}">
         <div class="flex items-center gap-2">
@@ -379,7 +412,10 @@
     <!-- FOOTNOTES & CREDITS -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Footnotes & Credits</h3>
+        <h3 class="text-md font-semibold">
+          Footnotes & Credits
+          <div class="text-primary">Settings ONLY apply to new slides</div>
+        </h3>
       </div>
       <UForm :state="{}">
         <UFormGroup
@@ -474,7 +510,10 @@
     <!-- SONG SLIDES -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Song Slides</h3>
+        <h3 class="text-md font-semibold">
+          Song Slides
+          <div class="text-primary">Settings ONLY apply to new slides</div>
+        </h3>
       </div>
       <UForm :state="{}">
         <UFormGroup label="Set default lines per slide">
@@ -537,6 +576,8 @@
 import { useAppStore } from "~/store/app"
 const appStore = useAppStore()
 
+const MAX_FONT_SIZE = 150
+const MIN_FONT_SIZE = 50
 const slideBackgroundTabs = [
   { label: "video", icon: "i-bx-video" },
   { label: "image", icon: "i-bx-image" },
