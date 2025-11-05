@@ -17,10 +17,8 @@
       <div
         class="absolute inset-0 bg-no-repeat transition-all"
         :class="{
-          'h-[100vh] rounded-none border-none min-h-[100%] bg-center':
-            fullScreen,
-          'h-[88vh] rounded-none border-none min-h-[100%] bg-center':
-            fullScreenHeight,
+          'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
+          'h-[88vh] rounded-none border-none min-h-[100%]': fullScreenHeight,
           'bg-cover': slide?.type !== slideTypes.media,
           'bg-center bg-cover':
             slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
