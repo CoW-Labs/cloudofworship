@@ -43,12 +43,20 @@
             />
           </UButton>
         </div>
+        <UButton
+          size="sm"
+          class="p-1 w-full justify-center mt-2"
+          variant="link"
+          to="/forgot-password"
+        >
+          I can't remember my password
+        </UButton>
       </UFormGroup>
 
       <UButton
         block
         size="lg"
-        class="mt-12"
+        class="mt-6"
         :disabled="!(useValidEmail(email) && password.length >= 8)"
         :loading="loading"
         @click="login"
