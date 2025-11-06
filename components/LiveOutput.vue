@@ -162,7 +162,7 @@ const liveOutputSlides = computed({
       return slide
     })
     useGlobalEmit(appWideActions.batchUpdateSlides, tempSlides)
-    toast.add({ icon: "i-bx-slideshow", title: "Slide order has been updated" })
+    // toast.add({ icon: "i-bx-slideshow", title: "Slide order has been updated" })
   },
 })
 

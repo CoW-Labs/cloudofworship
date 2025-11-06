@@ -85,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn } from "@vueuse/core"
+import { useDebounceFn, useThrottleFn } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
@@ -119,55 +119,6 @@ const countdownTimeLeft = ref<number>(0)
 const countdownStartTime = ref<number>(0)
 const countdownDuration = ref<number>(0)
 const countdownRAF = ref<number>(0)
-
-// Listen to see if active slide is in active schedule, and to scroll to newest slide if in active schedule
-watch(
-  slides,
-  (newVal, oldVal) => {
-    const isActiveSlideInActiveSchedule = currentState.value.activeSlides
-      ?.filter(
-        (slide) =>
-          slide.scheduleId === appStore.currentState.activeSchedule?._id
-      )
-      ?.find((slide) => slide.id === activeSlide.value?.id)
-    if (!isActiveSlideInActiveSchedule) {
-      activeSlide.value = undefined
-    }
-
-    setTimeout(() => {
-      // Scroll down to newest slide on slide create
-      const slideId = activeSlide.value?.id
-      const newestSlide = slidesGrid.value?.querySelector(
-        `#${slideId?.replace(/\d+/g, "")}`
-      )
-      newestSlide?.scrollIntoView()
-    }, 100)
-  },
-  { deep: true, immediate: true }
-)
-
-// Update Slides order when they are updated in live content
-watch(
-  () => currentState.value.activeSlides,
-  () => {
-    // console.log("slide has been updated", appStore.activeScheduleSlides)
-    const tempSlides = currentState.value.activeSlides?.filter(
-      (slide) => slide.scheduleId === appStore.currentState.activeSchedule?._id
-    )
-    if (tempSlides.length > 0) {
-      slides.value = tempSlides
-    }
-    if (tempSlides?.find((slide) => slide.id === activeSlide.value?.id)) {
-      activeSlide.value = tempSlides?.find(
-        (slide) => slide.id === activeSlide.value?.id
-      )
-    }
-    if (activeSlide.value) {
-      sendNewSlideToWebsocket(activeSlide.value)
-    }
-  },
-  { deep: true, immediate: true }
-)
 
 const makeSlideActive = (
   slide: Slide,
@@ -506,6 +457,50 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
   }
 }
 
+// Listen to see if active slide is in active schedule, and to scroll to newest slide if in active schedule
+watch(
+  () => ({
+    length: slides.value?.length,
+    activeId: activeSlide.value?.id,
+  }),
+  () => {
+    nextTick(() => {
+      const slideId = activeSlide.value?.id
+      const newestSlide = slidesGrid.value?.querySelector(
+        `#${slideId?.replace(/\d+/g, "")}`
+      )
+      newestSlide?.scrollIntoView({ behavior: "auto" })
+    })
+  }
+)
+
+// Update Slides order when they are updated in Slide schedule
+watch(
+  () => currentState.value.activeSlides,
+  (newSlides) => {
+    const scheduleId = appStore.currentState.activeSchedule?._id
+    const tempSlides = newSlides?.filter(
+      (slide) => slide.scheduleId === scheduleId
+    )
+
+    if (tempSlides.length > 0) {
+      slides.value = tempSlides
+
+      // Only update activeSlide if it exists in the filtered slides
+      if (activeSlide.value?.id) {
+        const updatedActiveSlide = tempSlides.find(
+          (slide) => slide.id === activeSlide.value?.id
+        )
+        if (updatedActiveSlide) {
+          activeSlide.value = updatedActiveSlide
+          sendNewSlideToWebsocket(updatedActiveSlide)
+        }
+      }
+    }
+  },
+  { deep: true, immediate: true }
+)
+
 // Set slides to slides based on scheduler
 watch(
   () => currentState.value.activeSchedule,
@@ -568,7 +563,7 @@ const batchCreateSlideOnline = async (
 }
 
 const batchUpdateSlideOnline = async (slides: Slide[]) => {
-  appStore.setSlidesLoading(true)
+  // appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(
     `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/batch`,
     {
@@ -579,7 +574,7 @@ const batchUpdateSlideOnline = async (slides: Slide[]) => {
     }
   )
   if (!error.value) {
-    appStore.setSlidesLoading(false)
+    // appStore.setSlidesLoading(false)
     appStore.setLastSynced(new Date().toISOString())
     return data.value as Slide[]
   } else {
@@ -587,55 +582,59 @@ const batchUpdateSlideOnline = async (slides: Slide[]) => {
   }
 }
 
-const updateSlideOnline = useDebounceFn(async (slide: Slide) => {
-  const tempSlide: Slide | any = { ...slide }
-  delete tempSlide._id
+const updateSlideOnline = useThrottleFn(
+  async (slide: Slide) => {
+    const tempSlide: Slide | any = { ...slide }
+    delete tempSlide._id
 
-  // Remove already added slide properties when updating slide online
-  delete tempSlide.id
-  delete tempSlide.churchId
-  delete tempSlide.type
+    // Remove already added slide properties when updating slide online
+    delete tempSlide.id
+    delete tempSlide.churchId
+    delete tempSlide.type
 
-  if (tempSlide.backgroundType !== backgroundTypes.video) {
-    tempSlide.backgroundVideoKey = null
-  }
-
-  // If slide is a media (video) slide, do not update it
-  if (
-    slide?._id &&
-    !(
-      slide.type === slideTypes.media &&
-      slide.backgroundType === backgroundTypes.video
-    )
-  ) {
-    // UPDATE OVER WEBSOCKET
-    const socket = useNuxtApp().$socket as WebSocket
-    socket.send(
-      JSON.stringify({
-        action: "update-slide",
-        data: slide,
-      })
-    )
-
-    // UPDATE OVER HTTP
-    // TODO: Take out http update in future when WS is stable and can store in DB
-    // appStore.setSlidesLoading(true)
-    const { data, error } = await useAPIFetch(
-      `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
-      {
-        method: "PUT",
-        body: tempSlide,
-      }
-    )
-    if (!error.value) {
-      // appStore.setSlidesLoading(false)
-      appStore.setLastSynced(new Date().toISOString())
-      return data.value
-    } else {
-      throw new Error(error.value?.message)
+    if (tempSlide.backgroundType !== backgroundTypes.video) {
+      tempSlide.backgroundVideoKey = null
     }
-  }
-}, 100)
+
+    // If slide is a media (video) slide, do not update it
+    if (
+      slide?._id &&
+      !(
+        slide.type === slideTypes.media &&
+        slide.backgroundType === backgroundTypes.video
+      )
+    ) {
+      // UPDATE OVER WEBSOCKET
+      const socket = useNuxtApp().$socket as WebSocket
+      socket.send(
+        JSON.stringify({
+          action: "update-slide",
+          data: slide,
+        })
+      )
+
+      // UPDATE OVER HTTP
+      // TODO: Take out http update in future when WS is stable and can store in DB
+      // appStore.setSlidesLoading(true)
+      const { data, error } = await useAPIFetch(
+        `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
+        {
+          method: "PUT",
+          body: tempSlide,
+        }
+      )
+      if (!error.value) {
+        // appStore.setSlidesLoading(false)
+        appStore.setLastSynced(new Date().toISOString())
+        return data.value
+      } else {
+        throw new Error(error.value?.message)
+      }
+    }
+  },
+  2000,
+  true
+)
 
 const deleteSlideOnline = async (slide: Slide) => {
   if (slide?._id) {
