@@ -5,7 +5,7 @@
     class="bg-transparent"
     :popper="{ placement: 'right' }"
     :ui="{
-      base: 'bg-green-500 z-1000',
+      base: 'bg-green-500 z-50',
       ring: 'ring-0',
       background:
         'border-0 px-6 py-4 bg-transparent dark:bg-transparent shadow-none',
@@ -60,7 +60,7 @@
       </div>
     </button>
     <template #panel>
-      <div class="bg-transparent z-1000 relative px-0">
+      <div class="bg-transparent z-50 relative px-0">
         <div
           class="song-excerpt text-xs w-100 rounded-xl bg-white dark:bg-gray-800 bg-primary-100rounded-lg w-[300px] max-h-[200px] overflow-hidden shadow-lg truncate whitespace-pre-line text-ellipsis z-50 relative"
         >

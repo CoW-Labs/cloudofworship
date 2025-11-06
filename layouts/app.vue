@@ -36,7 +36,7 @@
       <Transition name="fade-sm">
         <div
           v-if="$pwa?.offlineReady || $pwa?.needRefresh"
-          class="ctn fixed z-100 right-4 bottom-4"
+          class="ctn fixed z-50 right-4 bottom-4"
           role="alert"
           aria-labelledby="toast-message"
         >
@@ -61,7 +61,7 @@
           v-if="
             $pwa?.showInstallPrompt && !$pwa?.offlineReady && !$pwa?.needRefresh
           "
-          class="ctn fixed z-100 right-4 bottom-4"
+          class="ctn fixed z-50 right-4 bottom-4"
           role="alert"
           aria-labelledby="install-pwa"
         >
@@ -80,7 +80,7 @@
       <Transition name="fade-sm">
         <div
           v-show="isOfflineToastOpen"
-          class="ctn fixed z-100 right-4 bottom-4"
+          class="ctn fixed z-50 right-4 bottom-4"
           role="alert"
           aria-labelledby="toast-message"
         >

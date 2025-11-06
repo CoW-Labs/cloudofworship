@@ -872,6 +872,10 @@ const createNewSongSlide = (song: Song) => {
   makeSlideActive(tempSlide, { goLive: false, newlyCreated: true })
   // console.log("called")
   toast.add({ title: "Song slide created", icon: "i-bx-music" })
+
+  // Save song to Library if it is added to schedule.
+  saveSlide(tempSlide)
+
   usePosthogCapture("NEW_SONG_SLIDE_CREATED")
   uploadOfflineSlides()
 }
