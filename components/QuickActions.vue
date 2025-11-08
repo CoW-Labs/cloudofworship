@@ -71,12 +71,15 @@
       </Transition>
 
       <!-- BASIC ACTIONS -->
-      <div
+      <RecycleScroller
         v-if="searchInput.length < 2"
-        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+        class="actions-ctn mt-2 max-h-[calc(100vh-190px)]"
+        :items="actions?.filter((a: QuickAction) => !a?.searchableOnly)"
+        :item-size="80"
+        key-field="name"
+        v-slot="{ item: action, index }"
       >
         <ActionCard
-          v-for="(action, index) in actions?.filter((a: QuickAction) => !a?.searchableOnly)"
           :key="action?.name"
           :action="action"
           :class="{
@@ -85,20 +88,23 @@
           }"
           @click="focusedActionIndex = index"
         />
-      </div>
+      </RecycleScroller>
 
       <!-- SEARCHING ACTIONS -->
-      <div
+      <RecycleScroller
         v-else
-        class="actions-ctn mt-2 overflow-y-auto"
+        class="actions-ctn mt-2"
         :class="
           searchInput.length >= 4
             ? 'max-h-[calc(100vh-350px)]'
             : 'max-h-[calc(100vh-190px)]'
         "
+        :items="searchedActions"
+        :item-size="80"
+        key-field="name"
+        v-slot="{ item: action, index }"
       >
         <ActionCard
-          v-for="(action, index) in searchedActions"
           :key="action?.name"
           :action="{ ...action, bibleChapterAndVerse }"
           :class="{
@@ -106,7 +112,7 @@
               index === focusedActionIndex,
           }"
         />
-      </div>
+      </RecycleScroller>
     </div>
 
     <!-- SONG SECTION -->

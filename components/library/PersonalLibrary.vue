@@ -49,7 +49,7 @@
         <!-- SAVED SONGS -->
         <div
           v-if="activeLibraryTab === 0"
-          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
+          class="actions-ctn mt-2 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
         >
           <AddSong
             v-if="page === 'add-song'"
@@ -63,15 +63,23 @@
               sub="No songs saved yet."
               desc="Click the save icon on the Slide card to start saving"
             />
-            <SongCard
-              v-for="(song, index) in savedSongs?.slice(0, libraryEndIndex)"
-              saved
-              :key="song.content.id"
-              :song="(song.content as Song)"
-              type="song"
-              @edit-song="editSong($event)"
-              @delete-song="deleteSong($event)"
-            />
+            <RecycleScroller
+              v-else
+              class="h-[calc(100vh-380px)]"
+              :items="savedSongs?.slice(0, libraryEndIndex)"
+              :item-size="80"
+              key-field="id"
+              v-slot="{ item: song }"
+            >
+              <SongCard
+                saved
+                :key="song.content.id"
+                :song="(song.content as Song)"
+                type="song"
+                @edit-song="editSong($event)"
+                @delete-song="deleteSong($event)"
+              />
+            </RecycleScroller>
 
             <UButton
               @click="libraryEndIndex = libraryEndIndex + 15"
@@ -88,7 +96,7 @@
         <!-- SAVED SLIDES -->
         <div
           v-if="activeLibraryTab === 1"
-          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
+          class="actions-ctn mt-2 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
         >
           <EmptyState
             v-if="savedSlides?.length === 0"
@@ -96,12 +104,20 @@
             sub="No slides saved yet."
             desc="Click the save icon on the Slide card to start saving"
           />
-          <ListSlideCard
-            v-for="(slide, index) in savedSlides"
-            :key="slide.content.id"
-            :slide="(slide.content as Slide)"
-            @delete-slide="deleteSlide($event)"
-          />
+          <RecycleScroller
+            v-else
+            class="h-[calc(100vh-300px)]"
+            :items="savedSlides"
+            :item-size="100"
+            key-field="id"
+            v-slot="{ item: slide }"
+          >
+            <ListSlideCard
+              :key="slide.content.id"
+              :slide="(slide.content as Slide)"
+              @delete-slide="deleteSlide($event)"
+            />
+          </RecycleScroller>
         </div>
       </template>
       <!-- SEARCHING LIBRARY ITEMS -->
@@ -109,7 +125,7 @@
         <!-- SAVED SONGS -->
         <div
           v-if="activeLibraryTab === 0"
-          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
+          class="actions-ctn mt-2 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
         >
           <AddSong
             v-if="page === 'add-song'"
@@ -122,33 +138,49 @@
               icon="i-tabler-database-search"
               sub="We couldn't find a saved song matching your query"
             />
-            <SongCard
-              v-for="(song, index) in savedSongsSearchResults"
-              saved
-              type="song"
-              :key="song.content.id"
-              :song="song.content"
-              @edit-song="editSong($event)"
-              @delete-song="deleteSong($event)"
-            />
+            <RecycleScroller
+              v-else
+              class="h-[calc(100vh-300px)]"
+              :items="savedSongsSearchResults"
+              :item-size="80"
+              key-field="id"
+              v-slot="{ item: song }"
+            >
+              <SongCard
+                saved
+                type="song"
+                :key="song.content.id"
+                :song="song.content"
+                @edit-song="editSong($event)"
+                @delete-song="deleteSong($event)"
+              />
+            </RecycleScroller>
           </template>
         </div>
         <!-- SAVED SLIDES -->
         <div
           v-if="activeLibraryTab === 1"
-          class="actions-ctn mt-2 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
+          class="actions-ctn mt-2 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
         >
           <EmptyState
             v-if="savedSlidesSearchResults?.length === 0"
             icon="i-tabler-database-search"
             sub="We couldn't find a saved slide matching your query"
           />
-          <ListSlideCard
-            v-for="(slide, index) in savedSlidesSearchResults"
-            :key="slide.content.id"
-            :slide="slide.content"
-            @delete-slide="deleteSlide($event)"
-          />
+          <RecycleScroller
+            v-else
+            class="h-[calc(100vh-300px)]"
+            :items="savedSlidesSearchResults"
+            :item-size="100"
+            key-field="id"
+            v-slot="{ item: slide }"
+          >
+            <ListSlideCard
+              :key="slide.content.id"
+              :slide="slide.content"
+              @delete-slide="deleteSlide($event)"
+            />
+          </RecycleScroller>
         </div>
       </template>
     </template>
@@ -173,24 +205,18 @@ const libraryTabs = [
 ]
 const activeLibraryTab = ref<number>(0)
 const searchInput = ref<string>("")
-const loading = ref<boolean>(false)
+const loading = ref<boolean>(true)
 const page = ref<string>(props.page || "")
 const songToEdit = ref<Song>()
 const libraryEndIndex = ref<number>(15)
 const libraryItems = useObservable<LibraryItem[]>(
   liveQuery(async () => {
+    loading.value = true
     const data = await useIndexedDB()
       .library.orderBy("createdAt")
       .reverse()
       .toArray()
-    // const tempData = JSON.parse(JSON.stringify([...data]))
-    // console.log(tempData)
-    // tempData.sort((a, b) => {
-    //   const dateA = new Date(a.createdAt)
-    //   const dateB = new Date(b.createdAt)
-
-    //   return dateA.getTime() > dateB.getTime()
-    // })
+    loading.value = false
     return data
   }) as any
 )
@@ -227,16 +253,16 @@ const savedSlidesSearchResults = computed(() => {
 })
 
 const deleteSong = async (songId: string) => {
-  await useIndexedDB().library.delete(songId).catch(err => 
-    console.error('Failed to delete song:', err)
-  )
+  await useIndexedDB()
+    .library.delete(songId)
+    .catch((err) => console.error("Failed to delete song:", err))
   toast.add({ icon: "i-tabler-trash", title: "Song has been deleted" })
 }
 
 const deleteSlide = async (slideId: string) => {
-  await useIndexedDB().library.delete(slideId).catch(err => 
-    console.error('Failed to delete slide:', err)
-  )
+  await useIndexedDB()
+    .library.delete(slideId)
+    .catch((err) => console.error("Failed to delete slide:", err))
   toast.add({ icon: "i-tabler-trash", title: "Slide has been deleted" })
   unsaveSlideOnline(slideId)
 }

@@ -79,9 +79,14 @@
     </div>
     <template v-else>
       <!-- SEARCHING BIBLE VERSES -->
-      <div class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-260px)]">
+      <RecycleScroller
+        class="actions-ctn mt-2 max-h-[calc(100vh-260px)]"
+        :items="verses || []"
+        :item-size="100"
+        :key-field="(verse: any) => `${verse.book}-${verse.chapter}-${verse.verse}`"
+        v-slot="{ item: verse, index }"
+      >
         <ActionCard
-          v-for="(verse, index) in verses"
           :key="`verse ${index}`"
           :action="turnToBibleTypeAction(verse)"
           type="bible"
@@ -92,7 +97,7 @@
           }"
           @click="focusedActionIndex = index"
         />
-      </div>
+      </RecycleScroller>
     </template>
   </div>
 </template>

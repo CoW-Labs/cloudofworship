@@ -36,12 +36,15 @@
     </div>
     <template v-else>
       <!-- BASIC SONGS -->
-      <div
+      <RecycleScroller
         v-if="searchInput.length < 2"
-        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+        class="actions-ctn mt-2 max-h-[calc(100vh-190px)]"
+        :items="hymns"
+        :item-size="80"
+        key-field="number"
+        v-slot="{ item: hymn, index }"
       >
         <SongCard
-          v-for="(hymn, index) in hymns"
           :key="hymn?.number"
           :song="hymn"
           type="hymn"
@@ -51,20 +54,23 @@
           }"
           @click="focusedActionIndex = index"
         />
-      </div>
+      </RecycleScroller>
 
       <!-- SEARCHING SONGS -->
-      <div
+      <RecycleScroller
         v-else
-        class="actions-ctn mt-2 overflow-y-auto"
+        class="actions-ctn mt-2"
         :class="
           searchInput.length >= 4
             ? 'max-h-[calc(100vh-350px)]'
             : 'max-h-[calc(100vh-190px)]'
         "
+        :items="hymns"
+        :item-size="80"
+        key-field="number"
+        v-slot="{ item: hymn, index }"
       >
         <SongCard
-          v-for="(hymn, index) in hymns"
           :key="hymn?.number"
           :song="hymn"
           type="hymn"
@@ -74,7 +80,7 @@
           }"
           @click="focusedActionIndex = index"
         />
-      </div>
+      </RecycleScroller>
 
       <EmptyState
         v-if="!loading && hymns?.length === 0"

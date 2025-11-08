@@ -1,7 +1,7 @@
 <template>
   <UButton
     variant="ghost"
-    class="schedule-card flex items-center justify-between border-b border-gray-100 dark:border-gray-800 py-4 last:border-0 text-black dark:text-white"
+    class="schedule-card flex items-center justify-between border-b border-gray-100 w-full dark:border-gray-800 py-4 last:border-0 text-black dark:text-white"
     @click="$emit('select', schedule)"
   >
     <div class="title-and-date">
