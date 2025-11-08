@@ -12,12 +12,15 @@
     </div>
 
     <!-- SEARCHING BIBLE VERSES -->
-    <div
+    <RecycleScroller
       v-if="searchInput.length >= 2"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+      class="actions-ctn mt-2 max-h-[calc(100vh-190px)]"
+      :items="searchedActions"
+      :item-size="80"
+      key-field="name"
+      v-slot="{ item: action, index }"
     >
       <ActionCard
-        v-for="(action, index) in searchedActions"
         :key="action?.name"
         :action="{ ...action, bibleChapterAndVerse }"
         :class="{
@@ -25,22 +28,25 @@
             index === focusedActionIndex,
         }"
       />
-    </div>
+    </RecycleScroller>
 
     <!-- RECENTLY OPENED SCRIPTURES -->
-    <div
+    <RecycleScroller
       v-if="
         currentState.recentBibleSearches.length > 0 && searchInput.length < 2
       "
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+      class="actions-ctn mt-2 max-h-[calc(100vh-190px)]"
+      :items="[...currentState.recentBibleSearches].reverse()"
+      :item-size="80"
+      key-field="id"
+      v-slot="{ item: bibleQuery }"
     >
       <BibleQueryCard
-        v-for="bibleQuery in [...currentState.recentBibleSearches].reverse()"
         :key="bibleQuery"
         :bible-query="bibleQuery"
         type="song"
       />
-    </div>
+    </RecycleScroller>
 
     <EmptyState
       v-if="

@@ -105,22 +105,32 @@ const getAllLocallySavedImages = async () => {
   const db = useIndexedDB()
   const images = await db.cached.where({ content: "image" }).toArray()
 
-  // console.log(images.reverse())
-
-  // Create Object URLs from locally saved images
+  // Create Object URLs from locally saved images - process in batches
   const imageURLs: string[] = []
-  images.forEach((image) => {
-    const blobURL =
-      typeof image.data === "string"
-        ? image.data
-        : URL.createObjectURL(image.data as unknown as Blob)
+  
+  // Process images in smaller chunks to avoid blocking
+  const chunkSize = 20
+  for (let i = 0; i < images.length; i += chunkSize) {
+    const chunk = images.slice(i, i + chunkSize)
+    chunk.forEach((image) => {
+      const blobURL =
+        typeof image.data === "string"
+          ? image.data
+          : URL.createObjectURL(image.data as unknown as Blob)
 
-    imageURLs.push(blobURL)
+      imageURLs.push(blobURL)
 
-    if (image.id === bgImageToBeSelected.value) {
-      bgImageToBeSelected.value = blobURL
+      if (image.id === bgImageToBeSelected.value) {
+        bgImageToBeSelected.value = blobURL
+      }
+    })
+    
+    // Allow UI to breathe between chunks
+    if (i + chunkSize < images.length) {
+      await new Promise(resolve => setTimeout(resolve, 0))
     }
-  })
+  }
+  
   backgroundImages.value = backgroundImages.value.concat(imageURLs)
 }
 
@@ -147,7 +157,9 @@ const saveAndSelectImage = async (file: any) => {
     updatedAt: new Date().toISOString(),
   }
   // console.log("tempMedia", tempMedia)
-  db.cached.add(tempMedia)
+  await db.cached.add(tempMedia).catch(err => 
+    console.error('Failed to save custom image:', err)
+  )
   bgImageToBeSelected.value = tempMedia.id
   await getAllLocallySavedImages()
   imageCompressionLoading.value = false

@@ -29,9 +29,14 @@ class WorshipCloudDatabase extends Dexie {
   // REMOVED A CODE BLOCK FROM HERE IN SEPTEMBER 2024, GOD IS GOOD, REMEMBER :)
 }
 
+// Singleton instance to avoid creating multiple connections
+let dbInstance: WorshipCloudDatabase | null = null
+
 const useIndexedDB = () => {
-  const db = new WorshipCloudDatabase()
-  return db
+  if (!dbInstance) {
+    dbInstance = new WorshipCloudDatabase()
+  }
+  return dbInstance
 }
 
 export default useIndexedDB

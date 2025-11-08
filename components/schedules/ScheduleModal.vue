@@ -102,7 +102,7 @@
           <div class="schedules-ctn mt-6">
             <p class="text-sm text-gray-400">Recent schedules</p>
 
-            <div class="schedules flex-col flex mt-4 h-[40vh] overflow-auto">
+            <div class="schedules flex-col flex mt-4 h-[40vh]">
               <EmptyState
                 v-if="currentState.schedules.length === 0"
                 icon="i-bx-calendar"
@@ -110,20 +110,27 @@
                 desc="Click the button above to create a new schedule and start using Cloud of Worship."
                 is-wider
               />
-              <ScheduleCard
+              <RecycleScroller
                 v-else
-                v-for="schedule in searchedSchedules
+                class="h-[40vh]"
+                :items="searchedSchedules
                   ?.filter((schedule: Schedule) => schedule?.name?.trim().length > 0)
                   ?.slice(0, scheduleListLimit)"
-                :key="schedule?._id"
-                :schedule="schedule"
-                @select="(schedule: Schedule) => {
-                  appStore.setActiveSchedule(schedule)
-                  useGlobalEmit(appWideActions.selectedSchedule, schedule)
-                  $emit('close')
-                }"
-                @delete="deleteSchedule($event)"
-              />
+                :item-size="80"
+                key-field="_id"
+                v-slot="{ item: schedule }"
+              >
+                <ScheduleCard
+                  :key="schedule?._id"
+                  :schedule="schedule"
+                  @select="(schedule: Schedule) => {
+                    appStore.setActiveSchedule(schedule)
+                    useGlobalEmit(appWideActions.selectedSchedule, schedule)
+                    $emit('close')
+                  }"
+                  @delete="deleteSchedule($event)"
+                />
+              </RecycleScroller>
               <UButton
                 v-if="searchedSchedules?.length > scheduleListLimit"
                 variant="ghost"
@@ -253,10 +260,10 @@ const uploadBatchSchedules = async () => {
 
 const retrieveSchedules = async () => {
   appStore.setSlidesLoading(true)
-  const {data} = await useAPIFetch(
+  const { data } = await useAPIFetch(
     `/church/${authStore.user?.churchId}/schedules`
   )
-  const schedules = data.value ? data.value as unknown as Schedule[] : []
+  const schedules = data.value ? (data.value as unknown as Schedule[]) : []
   const mergedSchedules = useMergeObjectArray(
     [...schedules],
     appStore.currentState.schedules

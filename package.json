@@ -7,8 +7,7 @@
     "dev": "nuxt dev --port 3000",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
-    "tauri": "tauri"
+    "postinstall": "nuxt prepare"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",
@@ -58,7 +57,6 @@
     "@iconify-json/mingcute": "^1.1.17",
     "@iconify-json/ph": "^1.1.12",
     "@iconify-json/tabler": "^1.1.110",
-    "@tauri-apps/cli": "^1.5.14",
     "@types/socket.io-client": "^3.0.0",
     "typescript": "^5.4.5",
     "vue-tsc": "^2.0.16",
