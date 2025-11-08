@@ -95,40 +95,44 @@ const getAllLocallySavedVideos = async () => {
     ".flv",
   ]
 
-  // Create Object URLs from locally saved images
+  // Create Object URLs from locally saved videos - process in batches
   const locallySavedVideos: BackgroundVideo[] = []
-  videos.forEach((video) => {
-    const blobURL = URL.createObjectURL(video.data as unknown as Blob)
-    if (
-      video.id?.includes(videoTypes[0]) ||
-      video.id?.includes(videoTypes[1]) ||
-      video.id?.includes(videoTypes[2]) ||
-      video.id?.includes(videoTypes[3]) ||
-      video.id?.includes(videoTypes[4]) ||
-      video.id?.includes(videoTypes[5])
-    ) {
-      locallySavedVideos.push({ id: video.id, url: blobURL })
-      if (video.id === bgVideoToBeSelected.value) {
-        bgVideoToBeSelected.value = blobURL
+  
+  // Process videos in smaller chunks to avoid blocking
+  const chunkSize = 15
+  for (let i = 0; i < videos.length; i += chunkSize) {
+    const chunk = videos.slice(i, i + chunkSize)
+    chunk.forEach((video) => {
+      const blobURL = URL.createObjectURL(video.data as unknown as Blob)
+      if (
+        video.id?.includes(videoTypes[0]) ||
+        video.id?.includes(videoTypes[1]) ||
+        video.id?.includes(videoTypes[2]) ||
+        video.id?.includes(videoTypes[3]) ||
+        video.id?.includes(videoTypes[4]) ||
+        video.id?.includes(videoTypes[5])
+      ) {
+        locallySavedVideos.push({ id: video.id, url: blobURL })
+        if (video.id === bgVideoToBeSelected.value) {
+          bgVideoToBeSelected.value = blobURL
+        }
+      } else {
+        return // Ignore non-video files
       }
-    } else {
-      return // Ignore non-video files
+    })
+    
+    // Allow UI to breathe between chunks
+    if (i + chunkSize < videos.length) {
+      await new Promise(resolve => setTimeout(resolve, 0))
     }
-  })
-  // console.log("locallySavedVideos", locallySavedVideos)
-  // console.log("backgroundVideos", backgroundVideos.value)
-  // if (backgroundVideos.value.length > 0) {
-  //   backgroundVideos.value = backgroundVideos.value.concat(locallySavedVideos)
-  // } else {
-  //   backgroundVideos.value = locallySavedVideos
-  // }
+  }
+  
   locallySavedVideos.forEach((video) => {
     if (backgroundVideos.value.find((bgVideo) => bgVideo.id === video.id)) {
       return
     }
     backgroundVideos.value.push(video)
   })
-  // console.log(backgroundVideos.value)
 }
 
 const saveAndSelectVideo = async (file: any) => {
@@ -141,7 +145,9 @@ const saveAndSelectVideo = async (file: any) => {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
-  db.cached.add(tempMedia)
+  await db.cached.add(tempMedia).catch(err => 
+    console.error('Failed to save custom video:', err)
+  )
   bgVideoToBeSelected.value = tempMedia.id
   await getAllLocallySavedVideos()
   // console.log(bgVideoToBeSelected.value, tempMedia.id)

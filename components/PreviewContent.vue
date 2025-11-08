@@ -383,7 +383,7 @@ const uploadOfflineSlides = async () => {
 
 const createScheduleOnline = async (schedule: Schedule) => {
   // console.log("createScheduleOnline", schedule)
-  appStore.setSlidesLoading(true)
+  // appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(`/church/${churchId}/schedules`, {
     method: "POST",
     body: schedule,
@@ -391,7 +391,7 @@ const createScheduleOnline = async (schedule: Schedule) => {
   if (!error.value) {
     const tempSchedule = data.value as Schedule
     appStore.setActiveSchedule(tempSchedule)
-    appStore.setSlidesLoading(false)
+    // appStore.setSlidesLoading(false)
     appStore.setLastSynced(new Date().toISOString())
     return tempSchedule
   } else {
@@ -400,7 +400,7 @@ const createScheduleOnline = async (schedule: Schedule) => {
 }
 
 const retrieveSlidesOnline = async (scheduleId: string) => {
-  appStore.setSlidesLoading(true)
+  // appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(
     `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
   )
@@ -450,7 +450,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
     appStore.setActiveSlides(
       useMergeObjectArray(tempSlides, [...appStore.currentState.activeSlides])
     )
-    appStore.setSlidesLoading(false)
+    // appStore.setSlidesLoading(false)
     appStore.setLastSynced(new Date().toISOString())
   } else {
     throw new Error(error.value?.message)
@@ -539,7 +539,7 @@ const batchCreateSlideOnline = async (
     }
   })
 
-  appStore.setSlidesLoading(true)
+  // appStore.setSlidesLoading(true)
 
   const { data, error } = await useAPIFetch(
     `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/batch`,
@@ -551,7 +551,7 @@ const batchCreateSlideOnline = async (
     }
   )
   if (!error.value) {
-    appStore.setSlidesLoading(false)
+    // appStore.setSlidesLoading(false)
     appStore.setLastSynced(new Date().toISOString())
     return data.value as Slide[]
   } else {
@@ -638,7 +638,7 @@ const updateSlideOnline = useThrottleFn(
 
 const deleteSlideOnline = async (slide: Slide) => {
   if (slide?._id) {
-    appStore.setSlidesLoading(true)
+    // appStore.setSlidesLoading(true)
     const { data, error } = await useAPIFetch(
       `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
       {
@@ -646,7 +646,7 @@ const deleteSlideOnline = async (slide: Slide) => {
       }
     )
     if (!error.value) {
-      appStore.setSlidesLoading(false)
+      // appStore.setSlidesLoading(false)
       appStore.setLastSynced(new Date().toISOString())
       return data.value
     } else {
@@ -703,7 +703,9 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   const db = useIndexedDB()
   const itemSaved = await db.library.get(slideId)
   if (!itemSaved) {
-    await db.media.delete(slideId)
+    await db.media
+      .delete(slideId)
+      .catch((err) => console.error("Failed to delete media:", err))
   }
 
   if (addToast) {
@@ -911,13 +913,15 @@ const createNewMediaSlide = async (
     fileReader.addEventListener("loadend", async (event) => {
       data = fileReader.result
       // Store Blob in DB for easy retrieval on reload
-      await useIndexedDB().media.add({
-        id: tempSlide.id,
-        content: { size: file?.blob?.size, type: file?.blob?.type },
-        data: data as ArrayBuffer,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
+      await useIndexedDB()
+        .media.add({
+          id: tempSlide.id,
+          content: { size: file?.blob?.size, type: file?.blob?.type },
+          data: data as ArrayBuffer,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .catch((err) => console.error("Failed to add media slide:", err))
       delete file.blob
     })
   }
@@ -1312,65 +1316,75 @@ const saveSlide = async (item: Slide) => {
   try {
     if (tempItem.type === slideTypes.song) {
       tempSong.verses = [...tempSong?.verses!!] as []
-      await db.library.add(
-        {
-          id: tempSong.id,
-          type: "song",
-          content: tempSong,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        tempSong.id
-      )
+      await db.library
+        .add(
+          {
+            id: tempSong.id,
+            type: "song",
+            content: tempSong,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          tempSong.id
+        )
+        .catch((err) => console.error("Failed to add song to library:", err))
       toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
     } else if (tempItem.type === slideTypes.hymn) {
-      await db.library.add(
-        {
-          id: tempSong.id,
-          type: "song",
-          content: tempSong,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        tempSong.id
-      )
+      await db.library
+        .add(
+          {
+            id: tempSong.id,
+            type: "song",
+            content: tempSong,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          tempSong.id
+        )
+        .catch((err) => console.error("Failed to add hymn to library:", err))
       toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
     } else {
       delete (tempItem?.data as ExtendedFileT)?.blob
       // delete tempItem.blob - Removed because I couldn't find a place where it was assigned, TODO: Check if it is needed
-      await db.library.add(
-        {
-          id: tempItem.id,
-          type: "slide",
-          content: { ...tempItem },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        tempItem.id
-      )
+      await db.library
+        .add(
+          {
+            id: tempItem.id,
+            type: "slide",
+            content: { ...tempItem },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          tempItem.id
+        )
+        .catch((err) => console.error("Failed to add slide to library:", err))
       saveSlideOnline(tempItem)
       toast.add({ icon: "i-bx-save", title: "Slide saved to Library" })
     }
   } catch (err: any) {
     if (err.name === "ConstraintError") {
       if (tempItem.type === slideTypes.song) {
-        db.library.update(tempSong.id, {
-          id: tempSong.id,
-          type: "song",
-          content: tempSong,
-          createdAt: tempItem?.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
+        await db.library
+          .update(tempSong.id, {
+            id: tempSong.id,
+            type: "song",
+            content: tempSong,
+            createdAt: tempItem?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })
+          .catch((err) => console.error("Failed to update song:", err))
         toast.add({ icon: "i-bx-save", title: "Updated song saved to Library" })
       } else {
         delete (tempItem?.data as ExtendedFileT)?.blob
-        db.library.update(tempItem.id, {
-          id: tempItem.id,
-          type: "slide",
-          content: tempItem,
-          createdAt: tempItem?.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
+        await db.library
+          .update(tempItem.id, {
+            id: tempItem.id,
+            type: "slide",
+            content: tempItem,
+            createdAt: tempItem?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })
+          .catch((err) => console.error("Failed to update slide:", err))
         toast.add({
           icon: "i-bx-save",
           title: "Updated slide saved to Library",

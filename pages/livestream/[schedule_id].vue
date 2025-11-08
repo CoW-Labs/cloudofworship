@@ -156,14 +156,15 @@ onBeforeUnmount(() => {
 })
 
 const saveAllBackgroundVideos = async () => {
-  const savedBgVideo1 = await db.cached.get("/video-bg-1.mp4")
-  const savedBgVideo2 = await db.cached.get("/video-bg-2.mp4")
-  const savedBgVideo3 = await db.cached.get("/video-bg-3.mp4")
-  const savedBgVideo4 = await db.cached.get("/video-bg-4.mp4")
-  const savedBgVideo5 = await db.cached.get("/video-bg-5.mp4")
-  const savedBgVideo6 = await db.cached.get("/video-bg-6.mp4")
-  const savedBgVideo9 = await db.cached.get("/video-bg-9.mp4")
-  const savedBgVideo10 = await db.cached.get("/video-bg-10.mp4")
+  // Use Promise.all to fetch all videos in parallel - non-blocking
+  const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
+  const savedVideos = await Promise.all(
+    videoIds.map(id => db.cached.get(`/video-bg-${id}.mp4`))
+  )
+  
+  const savedBgVideoMap = new Map(
+    videoIds.map((id, index) => [id, savedVideos[index]])
+  )
 
   const saveBackground = (blob: any, index: number) => {
     const tempMedia = {
@@ -173,80 +174,39 @@ const saveAllBackgroundVideos = async () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    db.cached.add(tempMedia)
+    db.cached.add(tempMedia).catch(err => console.error(`Failed to save video-bg-${index}:`, err))
   }
 
   downloadResource.value = "background videos"
-  if (!savedBgVideo1) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://presentation-software.s3.eu-west-3.amazonaws.com/open/bg-videos/video-bg-1.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 1)
+  
+  // Download videos that aren't cached yet - using a map for URLs
+  const videoUrlMap: Record<number, string> = {
+    1: 'https://presentation-software.s3.eu-west-3.amazonaws.com/open/bg-videos/video-bg-1.mp4',
+    2: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-2.mp4',
+    3: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-3.mp4',
+    4: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-4.mp4',
+    5: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-5.mp4',
+    6: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-6.mp4',
+    9: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-9.mp4',
+    10: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-10.mp4'
   }
-
-  if (!savedBgVideo2) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-2.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 2)
-  }
-
-  if (!savedBgVideo3) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-3.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 3)
-  }
-
-  if (!savedBgVideo4) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-4.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 4)
-  }
-
-  if (!savedBgVideo5) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-5.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 5)
-  }
-
-  if (!savedBgVideo6) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-6.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 6)
-  }
-
-  if (!savedBgVideo9) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-9.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 9)
-  }
-
-  if (!savedBgVideo10) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-10.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 10)
+  
+  const videoDownloadPromises = videoIds
+    .filter(id => !savedBgVideoMap.get(id))
+    .map(async (id) => {
+      const bgVideoPromise = await useDetailedFetch(
+        videoUrlMap[id],
+        downloadProgress
+      )
+      const bgVideoBlob = await bgVideoPromise.blob()
+      saveBackground(bgVideoBlob, id)
+    })
+  
+  // Process in batches to avoid blocking
+  const batchSize = 2
+  for (let i = 0; i < videoDownloadPromises.length; i += batchSize) {
+    const batch = videoDownloadPromises.slice(i, i + batchSize)
+    await Promise.all(batch)
   }
 }
 

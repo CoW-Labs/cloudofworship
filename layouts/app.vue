@@ -233,7 +233,7 @@ const fetchChurchSongs = async () => {
     const offlineCount = await db.library.where("type").equals("song").count()
     if (onlineCount > offlineCount) {
       // Delete songs that are not in the online database
-      db.library.where("type").equals("song").delete()
+      await db.library.where("type").equals("song").delete()
 
       // Add online songs
       const promise = await useAPIFetch(
@@ -247,7 +247,16 @@ const fetchChurchSongs = async () => {
         createdAt: song.createdAt,
         updatedAt: song.updatedAt,
       }))
-      await db.library.bulkAdd(libraryData)
+
+      // Use bulkPut instead of bulkAdd to avoid blocking on duplicates
+      // Process in chunks to avoid blocking
+      const chunkSize = 50
+      for (let i = 0; i < libraryData.length; i += chunkSize) {
+        const chunk = libraryData.slice(i, i + chunkSize)
+        await db.library.bulkAdd(chunk).catch((err) => {
+          console.error("Failed to add song chunk:", err)
+        })
+      }
     }
   } catch (err: any) {
     console.log(err)
@@ -303,7 +312,9 @@ const fetchHymns = async () => {
   hymnCount = await hymnCount.json()
 
   if (hymns?.data?.length !== hymnCount) {
-    db.bibleAndHymns.delete("hymns")
+    await db.bibleAndHymns
+      .delete("hymns")
+      .catch((err) => console.error("Failed to delete hymns:", err))
     downloadResource.value = "hymns"
     downloadStep.value = 4
     let hymns = await useDetailedFetch(
@@ -316,7 +327,9 @@ const fetchHymns = async () => {
       }
     )
     hymns = await hymns.json()
-    db.bibleAndHymns.add(tempBibleVersion("hymns", hymns))
+    await db.bibleAndHymns
+      .add(tempBibleVersion("hymns", hymns))
+      .catch((err) => console.error("Failed to add hymns:", err))
   }
 }
 
@@ -332,7 +345,14 @@ const fetchSavedSlidesAndCache = async () => {
     }))
 
     try {
-      db.library.bulkAdd(libraryData)
+      // Process in chunks to avoid blocking
+      const chunkSize = 50
+      for (let i = 0; i < libraryData.length; i += chunkSize) {
+        const chunk = libraryData.slice(i, i + chunkSize)
+        await db.library.bulkAdd(chunk).catch((err) => {
+          console.error("Failed to add slide chunk:", err)
+        })
+      }
     } catch (err) {
       console.log(err)
     }
@@ -382,14 +402,15 @@ emitter.on("go-live", () => {
 })
 
 const saveAllBackgroundVideos = async () => {
-  const savedBgVideo1 = await db.cached.get("/video-bg-1.mp4")
-  const savedBgVideo2 = await db.cached.get("/video-bg-2.mp4")
-  const savedBgVideo3 = await db.cached.get("/video-bg-3.mp4")
-  const savedBgVideo4 = await db.cached.get("/video-bg-4.mp4")
-  const savedBgVideo5 = await db.cached.get("/video-bg-5.mp4")
-  const savedBgVideo6 = await db.cached.get("/video-bg-6.mp4")
-  const savedBgVideo9 = await db.cached.get("/video-bg-9.mp4")
-  const savedBgVideo10 = await db.cached.get("/video-bg-10.mp4")
+  // Use Promise.all to fetch all videos in parallel - non-blocking
+  const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
+  const savedVideos = await Promise.all(
+    videoIds.map((id) => db.cached.get(`/video-bg-${id}.mp4`))
+  )
+
+  const savedBgVideoMap = new Map(
+    videoIds.map((id, index) => [id, savedVideos[index]])
+  )
 
   const saveBackground = (blob: any, index: number) => {
     const tempMedia: Media = {
@@ -399,80 +420,30 @@ const saveAllBackgroundVideos = async () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    db.cached.add(tempMedia)
+    db.cached
+      .add(tempMedia)
+      .catch((err) => console.error(`Failed to save video-bg-${index}:`, err))
   }
 
   downloadResource.value = "background videos"
-  if (!savedBgVideo1) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-1.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 1)
-  }
 
-  if (!savedBgVideo2) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-2.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 2)
-  }
+  // Download videos that aren't cached yet
+  const videoDownloadPromises = videoIds
+    .filter((id) => !savedBgVideoMap.get(id))
+    .map(async (id) => {
+      const bgVideoPromise = await useDetailedFetch(
+        `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`,
+        downloadProgress
+      )
+      const bgVideoBlob = await bgVideoPromise.blob()
+      saveBackground(bgVideoBlob, id)
+    })
 
-  if (!savedBgVideo3) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-3.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 3)
-  }
-
-  if (!savedBgVideo4) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-4.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 4)
-  }
-
-  if (!savedBgVideo5) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-5.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 5)
-  }
-
-  if (!savedBgVideo6) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-6.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 6)
-  }
-
-  if (!savedBgVideo9) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-9.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 9)
-  }
-
-  if (!savedBgVideo10) {
-    const bgVideoPromise = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-10.mp4`,
-      downloadProgress
-    )
-    const bgVideoBlob = await bgVideoPromise.blob()
-    saveBackground(bgVideoBlob, 10)
+  // Process in batches to avoid blocking
+  const batchSize = 2
+  for (let i = 0; i < videoDownloadPromises.length; i += batchSize) {
+    const batch = videoDownloadPromises.slice(i, i + batchSize)
+    await Promise.all(batch)
   }
 }
 
@@ -482,24 +453,6 @@ const tempBibleVersion = (version: string, data: any) => ({
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 })
-
-// Fix an anomaly in DB media data with [media] tables
-const fixAnomalyInDBMediaData = async () => {
-  const db = useIndexedDB()
-  const allMediaObjects = await db.media.toArray()
-  await Promise.all(
-    allMediaObjects.map(async (item) => {
-      const tempItem = {
-        ...item,
-        content: { type: item.content.type, size: item.content.size },
-      }
-      // delete tempItem.content
-      // console.log(item.id, tempItem)
-      return await db.media.update(item.id, { ...tempItem })
-    })
-  )
-  // console.log("done anomaly operation")
-}
 
 const fetchActiveAdvert = async () => {
   const { data, error } = await useAPIFetch(`/advert/active`)
@@ -551,13 +504,6 @@ const downloadEssentialResources = async () => {
   }
 
   populateBibleVersionOptions()
-
-  // Extra computations
-  // Fix an anomaly in DB media data with [media] tables
-  if (appStore.currentState.settings.appVersion !== props.appVersion) {
-    downloadResource.value = "updates in local database"
-    await fixAnomalyInDBMediaData()
-  }
 
   // All computations completed
   downloadStep.value = 5
@@ -644,75 +590,99 @@ const retrieveSchedules = async () => {
 const retrieveAllMediaFilesFromDB = async () => {
   const db = useIndexedDB()
 
-  // For active slides
+  // For active slides - use Promise.all instead of forEach
   const slides = [...appStore.currentState.activeSlides]
-  slides.forEach(async (slide: Slide) => {
-    if (
-      slide.type === slideTypes.media &&
-      slide.background?.startsWith("blob:")
-    ) {
-      const mediaObj = await db.media.where({ id: slide.id }).toArray()
-      if (mediaObj[0]) {
-        // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
-        const arrayBuffer = mediaObj[0]?.data!!
-        const blob = new Blob([arrayBuffer], {
-          type: mediaObj[0]?.content?.type,
+
+  // Process slides in parallel but in small batches to avoid blocking
+  const processSlidesInBatches = async (
+    slidesToProcess: Slide[],
+    batchSize = 5
+  ) => {
+    for (let i = 0; i < slidesToProcess.length; i += batchSize) {
+      const batch = slidesToProcess.slice(i, i + batchSize)
+      await Promise.all(
+        batch.map(async (slide: Slide) => {
+          if (
+            slide.type === slideTypes.media &&
+            slide.background?.startsWith("blob:")
+          ) {
+            const mediaObj = await db.media.where({ id: slide.id }).toArray()
+            if (mediaObj[0]) {
+              // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
+              const arrayBuffer = mediaObj[0]?.data!!
+              const blob = new Blob([arrayBuffer], {
+                type: mediaObj[0]?.content?.type,
+              })
+              const fileUrl = URL.createObjectURL(blob)
+              if (slide.data) {
+                slide.data = slide.data as ExtendedFileT
+                slide.data.url = fileUrl
+              }
+              if (!(slide.data as ExtendedFileT)?.type?.includes("audio")) {
+                slide.background = fileUrl
+              }
+            }
+          } else if (slide?.backgroundVideoKey) {
+            const cachedBackgroundVideo = await db.cached.get(
+              slide?.backgroundVideoKey
+            )
+            if (cachedBackgroundVideo) {
+              const arrayBuffer = cachedBackgroundVideo?.data!!
+              const blob = new Blob([arrayBuffer], {
+                type: cachedBackgroundVideo?.content?.type,
+              })
+              const fileUrl = URL.createObjectURL(blob)
+              slide.background = fileUrl
+            }
+          }
         })
-        const fileUrl = URL.createObjectURL(blob)
-        if (slide.data) {
-          slide.data = slide.data as ExtendedFileT
-          slide.data.url = fileUrl
-        }
-        if (!(slide.data as ExtendedFileT)?.type?.includes("audio")) {
-          slide.background = fileUrl
-        }
-        appStore.setActiveSlides(slides)
-        appStore.setSlidesLoading(false)
-      }
-    } else {
-      // console.log(slide.name, slide.backgroundVideoKey)
-      // console.log(slide.name, slide.background)
-      if (slide?.backgroundVideoKey) {
-        const cachedBackgroundVideo = await db.cached.get(
-          slide?.backgroundVideoKey
-        )
-        // console.log(cachedBackgroundVideo)
-        const arrayBuffer = cachedBackgroundVideo?.data!!
-        const blob = new Blob([arrayBuffer], {
-          type: cachedBackgroundVideo?.content?.type,
-        })
-        const fileUrl = URL.createObjectURL(blob)
-        slide.background = fileUrl
-      }
-      appStore.setSlidesLoading(false)
+      )
     }
-  })
+  }
 
-  // For saved slides
-  const savedSlides = await db.library.where("type").equals("slide").toArray()
-  savedSlides?.map((slide) => {
-    if ((slide.content as Slide)?.background?.startsWith("blob:")) {
-      db.media.get(slide.id).then((resp) => {
-        const media = resp
+  await processSlidesInBatches(slides)
+  appStore.setActiveSlides(slides)
+  appStore.setSlidesLoading(false)
 
-        const arrayBuffer: ArrayBuffer = media?.data as ArrayBuffer
-        const blob = new Blob([arrayBuffer], {
-          type: media?.content?.type,
-        })
-        const fileUrl = URL.createObjectURL(blob)
-        const updatedLibraryItem: LibraryItem = {
-          ...slide,
-          content: {
-            ...slide.content,
-            background: fileUrl,
-            data: { ...(slide.content as Slide).data, url: fileUrl },
-          } as Slide,
+  // For saved slides - process asynchronously without blocking
+  db.library
+    .where("type")
+    .equals("slide")
+    .toArray()
+    .then((savedSlides) => {
+      // Process saved slides in background
+      savedSlides?.forEach((slide) => {
+        if ((slide.content as Slide)?.background?.startsWith("blob:")) {
+          db.media
+            .get(slide.id)
+            .then((resp) => {
+              if (!resp) return
+              const media = resp
+
+              const arrayBuffer: ArrayBuffer = media?.data as ArrayBuffer
+              const blob = new Blob([arrayBuffer], {
+                type: media?.content?.type,
+              })
+              const fileUrl = URL.createObjectURL(blob)
+              const updatedLibraryItem: LibraryItem = {
+                ...slide,
+                content: {
+                  ...slide.content,
+                  background: fileUrl,
+                  data: { ...(slide.content as Slide).data, url: fileUrl },
+                } as Slide,
+              }
+              db.library
+                .update(slide.id, updatedLibraryItem)
+                .catch((err) =>
+                  console.error("Failed to update library item:", err)
+                )
+            })
+            .catch((err) => console.error("Failed to get media:", err))
         }
-        // console.log(updatedLibraryItem)
-        db.library.update(slide.id, updatedLibraryItem)
       })
-    }
-  })
+    })
+    .catch((err) => console.error("Failed to get saved slides:", err))
 
   setCachedVideosURL()
 }

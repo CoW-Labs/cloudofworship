@@ -227,12 +227,16 @@ const savedSlidesSearchResults = computed(() => {
 })
 
 const deleteSong = async (songId: string) => {
-  await useIndexedDB().library.delete(songId)
+  await useIndexedDB().library.delete(songId).catch(err => 
+    console.error('Failed to delete song:', err)
+  )
   toast.add({ icon: "i-tabler-trash", title: "Song has been deleted" })
 }
 
 const deleteSlide = async (slideId: string) => {
-  await useIndexedDB().library.delete(slideId)
+  await useIndexedDB().library.delete(slideId).catch(err => 
+    console.error('Failed to delete slide:', err)
+  )
   toast.add({ icon: "i-tabler-trash", title: "Slide has been deleted" })
   unsaveSlideOnline(slideId)
 }
