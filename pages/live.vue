@@ -57,6 +57,12 @@ import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 import type { Slide } from "~/types"
 import { useAuthStore } from "~/store/auth"
+
+// Use dedicated live layout
+definePageMeta({
+  layout: "live",
+})
+
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const isFullScreen = ref(false)
@@ -71,6 +77,14 @@ useHead({
     {
       rel: "manifest",
       href: "/live-manifest.json",
+    },
+    {
+      rel: "stylesheet",
+      href: "/css/fonts.css",
+    },
+    {
+      rel: "stylesheet",
+      href: "/css/main.css",
     },
   ],
 })

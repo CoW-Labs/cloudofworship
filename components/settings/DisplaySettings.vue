@@ -8,6 +8,9 @@
         <p class="text-xs opacity-50 mb-2 mt-1">
           This is where behind the scene control is done. We advise you get a
           second screen for the live content.
+          <span v-if="isTauri" class="text-primary-500 font-medium">
+            (Desktop Mode)
+          </span>
         </p>
       </div>
       <div
@@ -31,7 +34,7 @@
           </div>
         </div>
         <UButton
-          v-if="!currentScreen?.isPrimary"
+          v-if="!currentScreen?.isPrimary && !isTauri"
           variant="ghost"
           leading-icon="i-bx-info-circle"
           @click="moveCurrentScreenToNativeDisplay"
@@ -128,6 +131,7 @@ import { useAppStore } from "@/store/app"
 import { useDebounceFn } from "@vueuse/core"
 
 const appStore = useAppStore()
+const { isTauri } = useTauri()
 const currentScreen = ref<any>({})
 const allScreens = ref<any>([])
 const { currentState } = storeToRefs(appStore)
@@ -142,26 +146,116 @@ const externalScreens = computed(() => {
 })
 
 const getDisplayDetails = async () => {
-  if ("getScreenDetails" in window) {
-    isLoading.value = true
+  isLoading.value = true
+
+  if (isTauri.value) {
+    // Use Tauri API for desktop
+    await getTauriDisplays()
+  } else if ("getScreenDetails" in window) {
+    // Use browser API for web
+    await getBrowserDisplays()
+  } else {
+    useToast().add({
+      title: "Your browser does not support automatic displays detection",
+      icon: "i-bx-info-circle",
+      color: "amber",
+    })
+  }
+
+  isLoading.value = false
+}
+
+const getTauriDisplays = async () => {
+  try {
+    const { availableMonitors, currentMonitor } = await import(
+      "@tauri-apps/api/window"
+    )
+    const monitors = await availableMonitors()
+    const current = await currentMonitor()
+
+    if (!monitors || monitors.length === 0) {
+      useToast().add({
+        title: "No monitors detected",
+        icon: "i-bx-info-circle",
+        color: "amber",
+      })
+      return
+    }
+
+    // Map Tauri monitors to screen format
+    allScreens.value = monitors.map((monitor: any, index: number) => {
+      const monitorId = useScreenId(monitor)
+      const isCurrent =
+        current &&
+        monitor.position.x === current.position.x &&
+        monitor.position.y === current.position.y &&
+        monitor.size.width === current.size.width &&
+        monitor.size.height === current.size.height
+
+      return {
+        id: monitorId,
+        label: monitor.name || `Display ${index + 1}`,
+        width: monitor.size.width,
+        height: monitor.size.height,
+        availWidth: monitor.size.width,
+        availHeight: monitor.size.height,
+        availLeft: monitor.position.x,
+        availTop: monitor.position.y,
+        isPrimary: monitor.position.x === 0 && monitor.position.y === 0,
+        isInternal: false, // Tauri doesn't expose this
+        isExtended: true,
+        devicePixelRatio: monitor.scaleFactor || 1,
+        pixelDepth: 24,
+      }
+    })
+
+    // Set current screen
+    if (current) {
+      const currentId = useScreenId(current)
+      currentScreen.value =
+        allScreens.value.find((s: any) => s.id === currentId) ||
+        allScreens.value[0]
+    } else {
+      currentScreen.value = allScreens.value[0]
+    }
+
+    useToast().add({
+      title: "Screens updated",
+      icon: "i-bx-check-circle",
+    })
+  } catch (error) {
+    console.error("Failed to get Tauri displays:", error)
+    useToast().add({
+      title: "Failed to detect displays",
+      description: "Please try again",
+      icon: "i-bx-error-circle",
+      color: "red",
+    })
+  }
+}
+
+const getBrowserDisplays = async () => {
+  try {
     // prettier-ignore
-    screenDetails = await window.getScreenDetails()
+    screenDetails = await (window as any).getScreenDetails()
     screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
     screenDetails?.screens?.map((screen: any) => {
       screen.id = useScreenId(screen)
     })
     currentScreen.value = screenDetails?.currentScreen as Screen
     allScreens.value = screenDetails?.screens
-    isLoading.value = false
+
     useToast().add({
       title: "Screens updated",
       icon: "i-bx-check-circle",
     })
-  } else {
+  } catch (error) {
+    console.error("Failed to get browser displays:", error)
     useToast().add({
-      title: "Your browser does not support automatic displays detection",
-      icon: "i-bx-info-circle",
-      color: "amber",
+      title: "Failed to detect displays",
+      description: "Please try again",
+      icon: "i-bx-error-circle",
+      color: "red",
     })
   }
 }
@@ -181,12 +275,28 @@ onBeforeUnmount(() => {
 })
 
 const moveCurrentScreenToNativeDisplay = async () => {
+  if (isTauri.value) {
+    // In Tauri, we can't move windows between screens this way
+    // Instead, show a message
+    useToast().add({
+      title: "Window movement not supported",
+      description: "Please manually move the window to your primary display",
+      icon: "i-bx-info-circle",
+    })
+    return
+  }
+
+  // Browser mode
   const nativeDisplay = allScreens.value.find(
     (screen: any) => screen?.isPrimary
   )
-  document.documentElement.requestFullscreen({
-    // prettier-ignore
-    screen: nativeDisplay,
-  })
+  try {
+    await document.documentElement.requestFullscreen({
+      // @ts-ignore - screen option is experimental
+      screen: nativeDisplay,
+    })
+  } catch (error) {
+    console.error("Failed to move to native display:", error)
+  }
 }
 </script>

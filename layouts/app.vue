@@ -396,8 +396,19 @@ emitter.on("selected-schedule", (schedule: Schedule) => {
   }, 2000)
 })
 
-emitter.on("go-live", () => {
-  openWindows()
+emitter.on("go-live", async () => {
+  const { isTauri } = useTauri()
+  console.log("isTauri:", isTauri.value)
+  await openTauriLiveWindow()
+
+  // if (isTauri.value) {
+  //   // Use Tauri's window management for desktop
+  //   await openTauriLiveWindow()
+  // } else {
+  //   // Use web API for browser
+  //   openWindows()
+  // }
+
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
 
@@ -700,6 +711,108 @@ const setCachedVideosURL = async () => {
 }
 
 // WINDOW MANAGEMENT CODE STARTS HERE
+
+// Tauri window management for desktop app
+async function openTauriLiveWindow() {
+  try {
+    const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
+
+    // Check if live window already exists
+    const { getAllWebviewWindows } = await import(
+      "@tauri-apps/api/webviewWindow"
+    )
+    const existingWindows = await getAllWebviewWindows()
+    const existingLiveWindow = existingWindows.find(
+      (w: any) => w.label === "live-output"
+    )
+
+    if (existingLiveWindow) {
+      await existingLiveWindow.setFocus()
+      await existingLiveWindow.setFullscreen(true)
+      return
+    }
+
+    // Get available monitors
+    const { availableMonitors } = await import("@tauri-apps/api/window")
+    const monitors = await availableMonitors()
+    console.log("Available monitors:", monitors)
+
+    if (!appStore.currentState.mainDisplayLabel) {
+      useToast().add({
+        title: "Set up your live display first",
+        icon: "i-bx-info-circle",
+      })
+      useGlobalEmit(appWideActions.openSettings, "Display Settings")
+      return
+    }
+
+    if (monitors.length === 1) {
+      useToast().add({
+        title:
+          "Only one screen detected. Connect a second screen to project on another display",
+        icon: "i-bx-info-circle",
+      })
+    }
+
+    // Find the target monitor based on saved settings
+    let targetMonitor = monitors.find((monitor: any) => {
+      const monitorId = useScreenId(monitor)
+      return monitorId === appStore.currentState.mainDisplayLabel
+    })
+
+    // Fallback to secondary monitor or current monitor
+    if (!targetMonitor) {
+      targetMonitor = monitors.length > 1 ? monitors[1] : monitors[0]
+    }
+
+    // Create new window on the target monitor
+    const liveWindow = new WebviewWindow("live-output", {
+      url: "/live",
+      title: "Cloud of Worship - Live Output",
+      fullscreen: true,
+      alwaysOnTop: false,
+      decorations: false,
+      resizable: true,
+      x: targetMonitor.position.x,
+      y: targetMonitor.position.y,
+      width: targetMonitor.size.width,
+      height: targetMonitor.size.height,
+    })
+
+    // Wait for window to be ready
+    await liveWindow.once("tauri://created", () => {
+      console.log("Live window created successfully")
+    })
+
+    await liveWindow.once("tauri://error", (error: any) => {
+      console.error("Error creating live window:", error)
+      useToast().add({
+        title: "Failed to open live window",
+        icon: "i-bx-error-circle",
+        color: "red",
+      })
+    })
+
+    // Listen for window close
+    await liveWindow.once("tauri://close-requested", async () => {
+      console.log("Live window closed")
+    })
+
+    // Set fullscreen after a brief delay to ensure proper rendering
+    setTimeout(async () => {
+      await liveWindow.setFullscreen(true)
+    }, 500)
+  } catch (error) {
+    console.error("Error opening Tauri window:", error)
+    useToast().add({
+      title: "Failed to open live window",
+      description: "Please try again or check your display settings",
+      icon: "i-bx-error-circle",
+      color: "red",
+    })
+  }
+}
+
 function openWindow(
   left: number,
   top: number,
@@ -740,7 +853,7 @@ function closeAllWindows() {
 async function openWindows() {
   if ("getScreenDetails" in window) {
     // prettier-ignore
-    const screenDetails = await window.getScreenDetails()
+    const screenDetails = await (window as any).getScreenDetails()
     screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
     screenDetails?.screens?.forEach((screen: any) => {
       screen.id = useScreenId(screen)
