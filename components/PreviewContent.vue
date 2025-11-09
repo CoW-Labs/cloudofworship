@@ -24,7 +24,7 @@
     @delete-selected-slides="deleteMultipleSlides(bulkSelectedSlides)"
   >
     <div
-      class="slides-ctn mb-4 rounded-md transition h-[50%]"
+      class="slides-ctn overflow-y-scroll mb-4 rounded-md transition h-[50%]"
       :class="[
         slides?.length === 0 ? 'bg-primary-100 dark:bg-primary-900' : '',
       ]"
@@ -32,7 +32,7 @@
       <div
         v-if="slides?.length > 0"
         ref="slidesGrid"
-        class="grid slides-grid gap-3 overflow-y-scroll h-full"
+        class="grid slides-grid gap-3"
       >
         <SlideCard
           v-for="(slide, index) in slides"
