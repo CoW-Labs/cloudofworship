@@ -26,7 +26,7 @@ import type { Slide } from "~/types"
 
 const appStore = useAppStore()
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const socket = ref<WebSocket>()
+const socket = ref<WebSocket | null>(null)
 const MAX_RETRIES = 10
 let retryCount = 0
 
@@ -35,53 +35,11 @@ const uploadOfflineSlides = useDebounceFn(() => {
 }, 2000)
 
 const connectWebSocket = async () => {
-  const nuxtApp = useNuxtApp()
-  socket.value = await useSocket(
-    appStore.currentState.activeSchedule?._id || ""
-  )
-  if (!nuxtApp.$socket) {
-    nuxtApp.provide("socket", socket.value)
-  }
-
-  socket.value.onopen = (event) => {
-    retryCount = 0
-    console.log("websocket connection opened")
-  }
-
-  socket.value.onmessage = (event) => {
-    const { data, action, message } = JSON.parse(event.data)
-    // console.log(data)
-
-    switch (data.action) {
-      case "live-slide":
-        break
-      case "new-slide":
-        break
-      case "update-slide":
-        break
-      default:
-      // DO SOMETHING
-      // console.log("Unknown action:", data.action)
-    }
-  }
-
-  socket.value.onclose = async () => {
-    console.log("websocket connection closed")
-    const online = useOnline()
-    // if (retryCount < MAX_RETRIES && online.value) {
-    if (retryCount < MAX_RETRIES) {
-      retryCount++
-      const retryDelay = retryCount * 3000
-      console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
-      setTimeout(connectWebSocket, retryDelay)
-    } else {
-      console.error("Max reconnect attempts reached. Unable to reconnect.")
-    }
-  }
-
-  socket.value.onerror = (error) => {
-    console.error("WebSocket connection error:", error)
-    socket.value?.close() // Close on error to trigger the onclose event
+  const socketInstance = useSocket({
+    scheduleId: appStore.currentState.activeSchedule?._id!!,
+  }).connect()
+  if (socketInstance) {
+    socket.value = socketInstance
   }
 }
 
