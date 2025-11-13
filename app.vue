@@ -42,7 +42,7 @@ if (nuxtApp.$emitter) {
 }
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("v0.28.1-beta")
+const appVersion = ref<string>("v0.28.2-beta")
 </script>
 
 <style>
