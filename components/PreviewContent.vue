@@ -273,16 +273,16 @@ emitter.on("promote-active-slide-live", () => {
   }
 })
 
-const sendNewSlideToWebsocket = useDebounceFn((slide: Slide) => {
-  // console.log("activeSlide", slide)
-  const socket = useNuxtApp().$socket as WebSocket
-  socket.send(
-    JSON.stringify({
-      action: "new-slide",
-      data: slide,
-    })
-  )
-}, 500)
+// const sendNewSlideToWebsocket = useDebounceFn((slide: Slide) => {
+//   // console.log("activeSlide", slide)
+//   const socket = useNuxtApp().$socket as WebSocket
+//   socket.send(
+//     JSON.stringify({
+//       action: "new-slide",
+//       data: slide,
+//     })
+//   )
+// }, 500)
 
 const preSlideCreation = (): Slide => {
   const tempSlide: Slide = {
@@ -493,7 +493,7 @@ watch(
         )
         if (updatedActiveSlide) {
           activeSlide.value = updatedActiveSlide
-          sendNewSlideToWebsocket(updatedActiveSlide)
+          // sendNewSlideToWebsocket(updatedActiveSlide)
         }
       }
     }

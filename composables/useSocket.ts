@@ -32,6 +32,7 @@ export const useSocket = (options: WebSocketOptions) => {
 
   const runtimeConfig = useRuntimeConfig()
   const online = useOnline()
+  const nuxtApp = useNuxtApp()
 
   let socket: WebSocket | null = null
   let retryCount = 0
@@ -78,7 +79,7 @@ export const useSocket = (options: WebSocketOptions) => {
     heartbeatTimer = setInterval(() => {
       if (socket?.readyState === WebSocket.OPEN) {
         try {
-          socket.send(JSON.stringify({ action: 'ping' }))
+          socket.send(JSON.stringify({ action: 'ping', data: 'reconnect' }))
         } catch (error) {
           console.error('Failed to send heartbeat:', error)
           reconnect()
@@ -115,6 +116,13 @@ export const useSocket = (options: WebSocketOptions) => {
 
       console.log(`Connecting to WebSocket... (Attempt ${retryCount + 1}/${maxRetries})`)
       socket = new WebSocket(getWebSocketUrl())
+
+      if (nuxtApp.$socket) {
+        nuxtApp.$socket = socket
+      } else {
+        nuxtApp.provide('socket', socket)
+      }
+
 
       // Connection timeout
       connectionTimer = setTimeout(() => {
@@ -174,6 +182,7 @@ export const useSocket = (options: WebSocketOptions) => {
       console.error('Failed to create WebSocket:', error)
       reconnect()
     }
+    return socket
   }
 
   const reconnect = () => {
