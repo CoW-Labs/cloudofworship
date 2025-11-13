@@ -79,14 +79,9 @@
     </div>
     <template v-else>
       <!-- SEARCHING BIBLE VERSES -->
-      <RecycleScroller
-        class="actions-ctn mt-2 max-h-[calc(100vh-260px)]"
-        :items="verses || []"
-        :item-size="100"
-        :key-field="(verse: any) => `${verse.book}-${verse.chapter}-${verse.verse}`"
-        v-slot="{ item: verse, index }"
-      >
+      <div class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-260px)]">
         <ActionCard
+          v-for="(verse, index) in verses"
           :key="`verse ${index}`"
           :action="turnToBibleTypeAction(verse)"
           type="bible"
@@ -97,7 +92,7 @@
           }"
           @click="focusedActionIndex = index"
         />
-      </RecycleScroller>
+      </div>
     </template>
   </div>
 </template>
@@ -212,16 +207,92 @@ const getDefaultBible = async () => {
 const getVerses = (query: string = "") => {
   if (query?.length >= 2) {
     loading.value = true
-    let results: any | Fuzzysort.Result[] = fuzzysort.go(
-      query,
-      formattedDefaultBible.value,
-      {
-        keys: ["scripture"],
-      }
-    )
-    results = results?.map(
-      (result: Fuzzysort.Result | any) => result.obj
-    ) as BibleVerse[]
+
+    // Prepare search targets with book names for better context
+    const searchTargets = formattedDefaultBible.value.map((verse) => ({
+      ...verse,
+      bookName: bibleBooks?.[Number(verse.book) - 1] || "",
+      fullReference: `${bibleBooks?.[Number(verse.book) - 1]} ${
+        verse.chapter
+      }:${verse.verse}`,
+    }))
+
+    // Split query into words for multi-word matching
+    const queryWords = query.toLowerCase().trim().split(/\s+/).filter(w => w.length > 0)
+    
+    // If single word or phrase, use fuzzy search
+    let results: any[] = []
+    
+    if (queryWords.length === 1) {
+      // Single word fuzzy search
+      const fuzzyResults = fuzzysort.go(query, searchTargets, {
+        keys: ["scripture", "bookName", "fullReference"],
+        limit: 50,
+        threshold: -10000,
+        scoreFn: (a) => {
+          const scriptureScore = a[0] ? a[0].score : -Infinity
+          const bookNameScore = a[1] ? a[1].score * 0.5 : -Infinity
+          const referenceScore = a[2] ? a[2].score * 0.7 : -Infinity
+          return Math.max(scriptureScore, bookNameScore, referenceScore)
+        },
+      })
+      results = fuzzyResults?.map((result: any) => result.obj) || []
+    } else {
+      // Multi-word search: find verses containing all words in any order
+      results = searchTargets.filter((verse) => {
+        const scriptureLower = verse.scripture.toLowerCase()
+        const bookNameLower = verse.bookName.toLowerCase()
+        const fullReferenceLower = verse.fullReference.toLowerCase()
+        const combinedText = `${scriptureLower} ${bookNameLower} ${fullReferenceLower}`
+        
+        // Check if all query words are present in any field
+        return queryWords.every(word => combinedText.includes(word))
+      })
+      
+      // Score and sort results based on word proximity and frequency
+      results = results.map((verse) => {
+        const scriptureLower = verse.scripture.toLowerCase()
+        const bookNameLower = verse.bookName.toLowerCase()
+        
+        let score = 0
+        
+        // Higher score for exact phrase match
+        if (scriptureLower.includes(query.toLowerCase())) {
+          score += 1000
+        }
+        
+        // Score based on word positions (closer words = higher score)
+        const positions: number[] = []
+        queryWords.forEach(word => {
+          const pos = scriptureLower.indexOf(word)
+          if (pos !== -1) {
+            positions.push(pos)
+            score += 100 // Base score for word in scripture
+          } else if (bookNameLower.includes(word)) {
+            score += 50 // Word in book name
+          }
+        })
+        
+        // Bonus for words appearing close together
+        if (positions.length > 1) {
+          positions.sort((a, b) => a - b)
+          const maxDistance = positions[positions.length - 1] - positions[0]
+          // Shorter distance = higher score
+          score += Math.max(0, 100 - maxDistance)
+        }
+        
+        // Bonus for matching word count
+        const wordCount = scriptureLower.split(/\s+/).length
+        const matchRatio = queryWords.length / wordCount
+        score += matchRatio * 50
+        
+        return { ...verse, searchScore: score }
+      })
+      
+      // Sort by score descending
+      results.sort((a: any, b: any) => b.searchScore - a.searchScore)
+    }
+
     verses.value = results.slice(0, 15)
   } else {
     verses.value = formattedDefaultBible.value.slice(0, 15)
