@@ -34,7 +34,12 @@ import { useAppStore } from "./store/app"
 const nuxtApp = useNuxtApp()
 const emitter = mitt()
 const appStore = useAppStore()
-nuxtApp.provide("emitter", emitter)
+
+if (nuxtApp.$emitter) {
+  // nuxtApp.$emitter = emitter
+} else {
+  nuxtApp.provide("emitter", emitter)
+}
 appStore.setEmitter(emitter)
 
 const appVersion = ref<string>("v0.28.2-beta")
