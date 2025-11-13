@@ -118,7 +118,7 @@ export const useSocket = (options: WebSocketOptions) => {
       socket = new WebSocket(getWebSocketUrl())
 
       if (nuxtApp.$socket) {
-        nuxtApp.$socket = socket
+        // nuxtApp.$socket = socket
       } else {
         nuxtApp.provide('socket', socket)
       }

@@ -36,7 +36,7 @@ const emitter = mitt()
 const appStore = useAppStore()
 
 if (nuxtApp.$emitter) {
-  nuxtApp.$emitter = emitter
+  // nuxtApp.$emitter = emitter
 } else {
   nuxtApp.provide("emitter", emitter)
 }
