@@ -55,6 +55,35 @@
     :id="currentState.liveSlideId?.toString()"
     v-else
   >
+    <!-- Connection Status Indicator -->
+    <div
+      v-if="connectionStatus !== 'connected'"
+      class="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
+      :class="{
+        'bg-primary-200 text-primary-800':
+          connectionStatus === 'connecting' ||
+          connectionStatus === 'disconnected',
+        'bg-red-500 text-white': connectionStatus === 'failed',
+      }"
+    >
+      <div
+        v-if="
+          connectionStatus === 'connecting' ||
+          connectionStatus === 'disconnected'
+        "
+        class="w-2 h-2 bg-primary-800 rounded-full animate-pulse"
+      ></div>
+      <span class="text-sm font-medium">
+        {{
+          connectionStatus === "connecting"
+            ? "Connecting..."
+            : connectionStatus === "disconnected"
+            ? "Reconnecting..."
+            : "Connection Failed"
+        }}
+      </span>
+    </div>
+
     <!-- <div
       v-if="!isFullScreen"
       class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center bg-opacity-70"
@@ -70,25 +99,18 @@
         >
       </div>
     </div> -->
-    <!-- :content-visible="liveSlide?.id === liveSlideId" -->
-    <TransitionGroup name="fade-list">
-      <LiveProjectionOnly
-        v-for="slide in slides"
-        :key="slide.id"
-        v-show="slide?.id === liveSlide?.id"
-        :content-visible="true"
-        :id="slide.id"
-        :full-screen="true"
-        :slide="slide"
-        :slide-label="false"
-        :slide-styles="currentState.settings.slideStyles"
-        :audio-muted="
-          slide?.id !== currentState.liveSlideId ||
-          slide?.slideStyle?.isMediaMuted!!
-        "
-      />
-    </TransitionGroup>
 
+    <LiveProjectionOnly
+      :content-visible="true"
+      :id="liveSlide?.id"
+      :full-screen="true"
+      :slide="liveSlide!!"
+      :slide-label="false"
+      :slide-styles="currentState.settings.slideStyles"
+      :audio-muted="
+          liveSlide?.slideStyle?.isMediaMuted!!
+        "
+    />
     <AlertView />
   </div>
 </template>
@@ -99,23 +121,20 @@ import { useAppStore } from "@/store/app"
 import { useOnline } from "@vueuse/core"
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
-const slides = ref<Slide[]>(appStore.currentState.activeSlides || [])
 const liveSlide = ref<Slide | null>(null)
 const isFullScreen = ref(false)
 const downloadProgress = ref<string>("0")
 const downloadResource = ref<string>("")
 const route = useRoute()
-const socket = ref<WebSocket | null>(null)
 const loadingResources = ref<boolean>(true)
 const online = useOnline()
 const downloadStep = ref<number>(0)
-const fullScreenLoading = ref<boolean>(false)
 const cachedVideosURLs = ref<BackgroundVideo[]>()
-const isOfflineToastOpen = ref<boolean>(false)
 const db = useIndexedDB()
-
-const MAX_RETRIES = 30
-let retryCount = 0
+const connectionStatus = ref<
+  "connecting" | "connected" | "disconnected" | "failed"
+>("connecting")
+const showConnectionError = ref(false)
 
 useHead({
   title: "CoW Live",
@@ -125,11 +144,6 @@ useHead({
       href: "/live-manifest.json",
     },
   ],
-})
-
-const isAppOnline = computed(() => {
-  isOfflineToastOpen.value = !online.value
-  return online.value
 })
 
 const checkFullScreen = () => {
@@ -148,20 +162,13 @@ onMounted(() => {
   checkFullScreen()
 })
 
-onBeforeUnmount(() => {
-  window.removeEventListener("fullscreenchange", checkFullScreen)
-  window.removeEventListener("webkitfullscreenchange", checkFullScreen)
-  window.removeEventListener("mozfullscreenchange", checkFullScreen)
-  window.removeEventListener("MSFullscreenChange", checkFullScreen)
-})
-
 const saveAllBackgroundVideos = async () => {
   // Use Promise.all to fetch all videos in parallel - non-blocking
   const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
   const savedVideos = await Promise.all(
-    videoIds.map(id => db.cached.get(`/video-bg-${id}.mp4`))
+    videoIds.map((id) => db.cached.get(`/video-bg-${id}.mp4`))
   )
-  
+
   const savedBgVideoMap = new Map(
     videoIds.map((id, index) => [id, savedVideos[index]])
   )
@@ -174,25 +181,27 @@ const saveAllBackgroundVideos = async () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    db.cached.add(tempMedia).catch(err => console.error(`Failed to save video-bg-${index}:`, err))
+    db.cached
+      .add(tempMedia)
+      .catch((err) => console.error(`Failed to save video-bg-${index}:`, err))
   }
 
   downloadResource.value = "background videos"
-  
+
   // Download videos that aren't cached yet - using a map for URLs
   const videoUrlMap: Record<number, string> = {
-    1: 'https://presentation-software.s3.eu-west-3.amazonaws.com/open/bg-videos/video-bg-1.mp4',
-    2: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-2.mp4',
-    3: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-3.mp4',
-    4: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-4.mp4',
-    5: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-5.mp4',
-    6: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-6.mp4',
-    9: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-9.mp4',
-    10: 'https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-10.mp4'
+    1: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-1.mp4",
+    2: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-2.mp4",
+    3: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-3.mp4",
+    4: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-4.mp4",
+    5: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-5.mp4",
+    6: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-6.mp4",
+    9: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-9.mp4",
+    10: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-10.mp4",
   }
-  
+
   const videoDownloadPromises = videoIds
-    .filter(id => !savedBgVideoMap.get(id))
+    .filter((id) => !savedBgVideoMap.get(id))
     .map(async (id) => {
       const bgVideoPromise = await useDetailedFetch(
         videoUrlMap[id],
@@ -201,7 +210,7 @@ const saveAllBackgroundVideos = async () => {
       const bgVideoBlob = await bgVideoPromise.blob()
       saveBackground(bgVideoBlob, id)
     })
-  
+
   // Process in batches to avoid blocking
   const batchSize = 2
   for (let i = 0; i < videoDownloadPromises.length; i += batchSize) {
@@ -237,77 +246,72 @@ const updateBlobBackgroundURls = (slides: Slide[]) => {
   return slides?.map((slide) => updateBlobBackgroundURl(slide))
 }
 
-const connectWebSocket = async () => {
-  socket.value = await useSocket(route.params.schedule_id as string)
+const handleWebSocketMessage = (parsedData: any) => {
+  const { data, action, message } = parsedData
 
-  socket.value.onopen = (event) => {
-    retryCount = 0
-    console.log("websocket connection opened - livestream")
-  }
-
-  socket.value.onmessage = (event) => {
-    const { data, action, message } = JSON.parse(event.data)
-    // console.log(action, data)
-
-    switch (action) {
-      case "connected":
-        slides.value = data
-        updateBlobBackgroundURls(data)
-        break
-      case "live-slide":
-        const tempSlide = updateBlobBackgroundURl(data)
-        liveSlide.value = tempSlide
-        // console.log("liveSlide", liveSlide.value)
-        break
-      case "new-slide":
-        slides.value.push(data)
-        break
-      case "update-slide":
-        const slideId = data?._id
+  switch (action) {
+    case "connected":
+      updateBlobBackgroundURls(data)
+      break
+    case "live-slide":
+      const tempSlide = updateBlobBackgroundURl(data)
+      liveSlide.value = tempSlide
+      break
+    case "new-slide":
+      // Do nothing for now as live-slide covers it
+      break
+    case "update-slide":
+      if (liveSlide.value?.id === data.id) {
         const slideData = updateBlobBackgroundURl(data)
-        slides.value.splice(
-          slides.value.findIndex((slide) => slide?._id === slideId),
-          1,
-          slideData
-        )
-        break
-      case "add-alert":
-        appStore.setActiveAlert(data)
-        break
-      case "remove-alert":
-        appStore.setActiveAlert(null)
-        break
-      case "add-overlay":
-        appStore.setActiveOverlay(data)
-        break
-      case "remove-overlay":
-        appStore.setActiveOverlay("")
-        break
-      case "updated-slides":
-        break
-      default:
-      // DO SOMETHING
-      // console.log("Unknown action:", data.action)
-    }
-  }
-
-  socket.value.onclose = async () => {
-    console.log("websocket connection closed - livestream")
-    if (retryCount < MAX_RETRIES) {
-      retryCount++
-      const retryDelay = retryCount * 3000
-      console.log(`Reconnecting in ${retryDelay / 1000} seconds...`)
-      setTimeout(connectWebSocket, retryDelay)
-    } else {
-      console.error("Max reconnect attempts reached. Unable to reconnect.")
-    }
-  }
-
-  socket.value.onerror = (error) => {
-    console.error("WebSocket connection error:", error)
-    socket.value?.close() // Close on error to trigger the onclose event
+        liveSlide.value = slideData
+      }
+      break
+    case "add-alert":
+      appStore.setActiveAlert(data)
+      break
+    case "remove-alert":
+      appStore.setActiveAlert(null)
+      break
+    case "add-overlay":
+      appStore.setActiveOverlay(data)
+      break
+    case "remove-overlay":
+      appStore.setActiveOverlay("")
+      break
+    case "updated-slides":
+      break
+    default:
+    // Unknown action
   }
 }
+
+const socketManager = useSocket({
+  scheduleId: route.params.schedule_id as string,
+  maxRetries: 30,
+  baseRetryDelay: 3000,
+  maxRetryDelay: 30000,
+  connectionTimeout: 10000,
+  heartbeatInterval: 30000,
+  onMessage: handleWebSocketMessage,
+  onConnected: () => {
+    console.log("✅ WebSocket connected successfully")
+    connectionStatus.value = "connected"
+    showConnectionError.value = false
+  },
+  onDisconnected: () => {
+    console.log("⚠️ WebSocket disconnected")
+    connectionStatus.value = "disconnected"
+  },
+  onError: (error) => {
+    console.error("❌ WebSocket error:", error)
+    connectionStatus.value = "disconnected"
+  },
+  onMaxRetriesReached: () => {
+    console.error("❌ Max retries reached. Could not establish connection.")
+    connectionStatus.value = "failed"
+    showConnectionError.value = true
+  },
+})
 
 onBeforeMount(async () => {
   await saveAllBackgroundVideos()
@@ -318,10 +322,21 @@ onBeforeMount(async () => {
   downloadResource.value = "All resources downloaded."
 
   // Connect to websocket
-  await connectWebSocket()
+  socketManager.connect()
 
   setTimeout(() => {
     loadingResources.value = false
   }, 100)
+})
+
+onBeforeUnmount(() => {
+  // Clean up WebSocket connection
+  socketManager.disconnect()
+
+  // Clean up fullscreen event listeners
+  window.removeEventListener("fullscreenchange", checkFullScreen)
+  window.removeEventListener("webkitfullscreenchange", checkFullScreen)
+  window.removeEventListener("mozfullscreenchange", checkFullScreen)
+  window.removeEventListener("MSFullscreenChange", checkFullScreen)
 })
 </script>
