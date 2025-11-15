@@ -4,6 +4,7 @@ import { useAuthStore } from "~/store/auth"
 export default defineNuxtPlugin((nuxtApp) => {
   const auth = useAuthStore()
   // console.log(auth.user)
+
   // posthog.init('phc_sZj5IKRKRCd6Mv8GrthWQOlWu4ihmCFry3oQAIKrW9T',
   //   {
   //     api_host: 'https://us.i.posthog.com',
@@ -20,7 +21,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
   if (
     !window.location.host.includes("127.0.0.1") &&
-    !window.location.host.includes("localhost")
+    !window.location.host.includes("localhost:30") // 3000, 3001 etc
   ) {
     posthog.init("phc_sZj5IKRKRCd6Mv8GrthWQOlWu4ihmCFry3oQAIKrW9T", {
       api_host: "https://us.i.posthog.com",
