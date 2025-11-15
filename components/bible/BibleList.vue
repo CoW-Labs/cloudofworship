@@ -1,5 +1,5 @@
 <template>
-  <div class="bible-main min-h-[80vh] h-[100%]" ref="quickActions">
+  <div class="bible-main min-h-[80vh] h-[100%]" ref="quickActions" tabindex="1">
     <div class="flex gap-2">
       <UInput
         icon="i-bx-search"
@@ -12,41 +12,36 @@
     </div>
 
     <!-- SEARCHING BIBLE VERSES -->
-    <RecycleScroller
+    <div
       v-if="searchInput.length >= 2"
-      class="actions-ctn mt-2 max-h-[calc(100vh-190px)]"
-      :items="searchedActions"
-      :item-size="80"
-      key-field="name"
-      v-slot="{ item: action, index }"
+      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
     >
       <ActionCard
+        v-for="(action, index) in searchedActions"
         :key="action?.name"
         :action="{ ...action, bibleChapterAndVerse }"
         :class="{
           'bg-primary-50 dark:bg-primary-800 rounded-md':
             index === focusedActionIndex,
         }"
+        @click="focusedActionIndex = index"
       />
-    </RecycleScroller>
+    </div>
 
     <!-- RECENTLY OPENED SCRIPTURES -->
-    <RecycleScroller
+    <div
       v-if="
         currentState.recentBibleSearches.length > 0 && searchInput.length < 2
       "
-      class="actions-ctn mt-2 max-h-[calc(100vh-190px)]"
-      :items="[...currentState.recentBibleSearches].reverse()"
-      :item-size="80"
-      key-field="id"
-      v-slot="{ item: bibleQuery }"
+      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
     >
       <BibleQueryCard
+        v-for="bibleQuery in [...currentState.recentBibleSearches].reverse()"
         :key="bibleQuery"
         :bible-query="bibleQuery"
         type="song"
       />
-    </RecycleScroller>
+    </div>
 
     <EmptyState
       v-if="
@@ -84,6 +79,12 @@ watch(
   }
 )
 
+watch(searchInput, () => {
+  if (searchInput.value.startsWith("/") && searchInput.value.length > 1) {
+    searchInput.value = searchInput.value.replaceAll("/", "")
+  }
+})
+
 // Initialize actions
 const scriptureActions: QuickAction[] = bibleBooks?.map((book, index) => {
   const bibleBookIndex = index + 1 // Does not start from 0, starts from 1
@@ -101,8 +102,27 @@ const scriptureActions: QuickAction[] = bibleBooks?.map((book, index) => {
 actions.value = scriptureActions
 
 const bibleChapterAndVerse = computed(() => {
-  const regex = /\b\d+\s*:\s*\d+\b/g
-  return searchInput.value.match(regex)?.[0]?.replaceAll(" ", "")
+  const regex = /\b\d+\s*:\s*\d+\b|\b\d+\s\d+\b/g
+  const bibleBookFollowedByJustChapterMatch = searchInput.value
+    ?.replace("/", "")
+    .match(/\b\w+\s+\d+\b(?!\S)/g)
+
+  if (
+    bibleBookFollowedByJustChapterMatch?.[0] &&
+    !searchInput.value?.match(regex)
+  ) {
+    const standaloneChapter = Number(
+      bibleBookFollowedByJustChapterMatch?.[0]?.split(" ")?.[1] || 1
+    )
+    const verse = 1
+    return `${standaloneChapter}:${verse}`
+  }
+
+  const match = searchInput.value
+    ?.replace("/", "")
+    .match(regex)?.[0]
+    ?.replaceAll(" ", ":")
+  return match?.trim()
 })
 
 const searchedActions = computed<QuickAction[]>(() => {
@@ -158,4 +178,38 @@ const searchedActions = computed<QuickAction[]>(() => {
 const onSearchInput = useDebounceFn(async () => {
   // getSongs(searchInput.value)
 }, 1000)
+
+onMounted(() => {
+  quickActions.value?.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented) {
+      e.preventDefault()
+      return
+    }
+    switch (e.key) {
+      case "ArrowDown":
+        focusedActionIndex.value < searchedActions.value.length - 1
+          ? (focusedActionIndex.value += 1)
+          : null
+        break
+      case "ArrowUp":
+        focusedActionIndex.value > 0 ? (focusedActionIndex.value -= 1) : null
+        break
+      case "Enter":
+        const action = searchedActions.value?.[
+          focusedActionIndex.value
+        ] as unknown as QuickAction
+        useGlobalEmit(
+          action?.action,
+          action?.type === slideTypes.bible
+            ? `${action?.bibleBookIndex}:${bibleChapterAndVerse.value}`
+            : action?.type === slideTypes.hymn
+            ? action?.hymnIndex
+            : ""
+        )
+        break
+      default:
+        return
+    }
+  })
+})
 </script>
