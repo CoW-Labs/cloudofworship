@@ -11,7 +11,7 @@ export const useTauriWindows = () => {
    * Get all available monitors/displays
    */
   const getMonitors = async () => {
-    if (!isTauri.value) {
+    if (!isTauri) {
       console.warn('Monitor detection only available in Tauri')
       return []
     }
@@ -29,7 +29,7 @@ export const useTauriWindows = () => {
    * Check if live window is already open
    */
   const isLiveWindowOpen = async () => {
-    if (!isTauri.value) return false
+    if (!isTauri) return false
 
     try {
       const { getAllWebviewWindows } = await import('@tauri-apps/api/webviewWindow')
@@ -45,7 +45,7 @@ export const useTauriWindows = () => {
    * Get the live window instance if it exists
    */
   const getLiveWindow = async () => {
-    if (!isTauri.value) return null
+    if (!isTauri) return null
 
     try {
       const { getAllWebviewWindows } = await import('@tauri-apps/api/webviewWindow')
@@ -61,7 +61,7 @@ export const useTauriWindows = () => {
    * Close the live window
    */
   const closeLiveWindow = async () => {
-    if (!isTauri.value) return
+    if (!isTauri) return
 
     try {
       const liveWindow = await getLiveWindow()
@@ -77,7 +77,7 @@ export const useTauriWindows = () => {
    * Focus the live window
    */
   const focusLiveWindow = async () => {
-    if (!isTauri.value) return
+    if (!isTauri) return
 
     try {
       const liveWindow = await getLiveWindow()
@@ -94,7 +94,7 @@ export const useTauriWindows = () => {
    * Create a new live output window on the specified monitor
    */
   const createLiveWindow = async (monitorIndex?: number) => {
-    if (!isTauri.value) {
+    if (!isTauri) {
       throw new Error('Live windows can only be created in Tauri')
     }
 

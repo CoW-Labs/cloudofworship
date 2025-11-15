@@ -1,21 +1,18 @@
 /**
  * Composable to detect and interact with Tauri desktop environment
  * Use this to conditionally run desktop-specific features
+ * Should be run onMounted to avoid undefined window issues
  */
 export const useTauri = () => {
-  const isTauri = ref(false)
-
-  onMounted(() => {
-    // Check if running in Tauri environment
+  const getTauriAvailability = () => {
     if (typeof window !== 'undefined') {
-      // @ts-ignore
-      isTauri.value = '__TAURI__' in window || '__TAURI_INTERNALS__' in window
+      return '__TAURI__' in window || '__TAURI_INTERNALS__' in window
     }
-  })
+    return false
+  }
 
   return {
-    isTauri: readonly(isTauri),
-    isWeb: computed(() => !isTauri.value)
+    isTauri: getTauriAvailability(),
   }
 }
 
@@ -26,7 +23,7 @@ export const useTauri = () => {
 export const getTauriAPI = async () => {
   const { isTauri } = useTauri()
 
-  if (!isTauri.value) {
+  if (!isTauri) {
     console.warn('Tauri API is not available in web environment')
     return null
   }

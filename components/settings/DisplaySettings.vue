@@ -148,7 +148,7 @@ const externalScreens = computed(() => {
 const getDisplayDetails = async () => {
   isLoading.value = true
 
-  if (isTauri.value) {
+  if (isTauri) {
     // Use Tauri API for desktop
     await getTauriDisplays()
   } else if ("getScreenDetails" in window) {
@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
 })
 
 const moveCurrentScreenToNativeDisplay = async () => {
-  if (isTauri.value) {
+  if (isTauri) {
     // In Tauri, we can't move windows between screens this way
     // Instead, show a message
     useToast().add({

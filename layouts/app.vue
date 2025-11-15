@@ -398,16 +398,12 @@ emitter.on("selected-schedule", (schedule: Schedule) => {
 
 emitter.on("go-live", async () => {
   const { isTauri } = useTauri()
-  console.log("isTauri:", isTauri.value)
-  await openTauriLiveWindow()
 
-  // if (isTauri.value) {
-  //   // Use Tauri's window management for desktop
-  //   await openTauriLiveWindow()
-  // } else {
-  //   // Use web API for browser
-  //   openWindows()
-  // }
+  if (isTauri) {
+    await openTauriLiveWindow()
+  } else {
+    openWindows()
+  }
 
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
@@ -717,6 +713,11 @@ async function openTauriLiveWindow() {
   try {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
 
+    // Get available monitors
+    const { availableMonitors } = await import("@tauri-apps/api/window")
+    const monitors = await availableMonitors()
+    console.log("Available monitors:", monitors)
+
     // Check if live window already exists
     const { getAllWebviewWindows } = await import(
       "@tauri-apps/api/webviewWindow"
@@ -731,11 +732,6 @@ async function openTauriLiveWindow() {
       await existingLiveWindow.setFullscreen(true)
       return
     }
-
-    // Get available monitors
-    const { availableMonitors } = await import("@tauri-apps/api/window")
-    const monitors = await availableMonitors()
-    console.log("Available monitors:", monitors)
 
     if (!appStore.currentState.mainDisplayLabel) {
       useToast().add({
@@ -769,10 +765,10 @@ async function openTauriLiveWindow() {
     const liveWindow = new WebviewWindow("live-output", {
       url: "/live",
       title: "Cloud of Worship - Live Output",
-      fullscreen: true,
-      alwaysOnTop: false,
+      alwaysOnTop: true,
       decorations: false,
       resizable: true,
+      closable: true,
       x: targetMonitor.position.x,
       y: targetMonitor.position.y,
       width: targetMonitor.size.width,
@@ -780,28 +776,17 @@ async function openTauriLiveWindow() {
     })
 
     // Wait for window to be ready
-    await liveWindow.once("tauri://created", () => {
-      console.log("Live window created successfully")
-    })
-
-    await liveWindow.once("tauri://error", (error: any) => {
-      console.error("Error creating live window:", error)
-      useToast().add({
-        title: "Failed to open live window",
-        icon: "i-bx-error-circle",
-        color: "red",
-      })
-    })
+    await liveWindow.once("tauri://created", () => {})
 
     // Listen for window close
     await liveWindow.once("tauri://close-requested", async () => {
       console.log("Live window closed")
     })
 
-    // Set fullscreen after a brief delay to ensure proper rendering
-    setTimeout(async () => {
-      await liveWindow.setFullscreen(true)
-    }, 500)
+    // Add windowRef to track if live window is active
+    const tempWindowRefs = windowRefs.value
+    tempWindowRefs.push(liveWindow)
+    windowRefs.value = tempWindowRefs
   } catch (error) {
     console.error("Error opening Tauri window:", error)
     useToast().add({
@@ -843,10 +828,25 @@ function openWindow(
   }
 }
 
-function closeAllWindows() {
-  windowRefs.value.forEach((windowRef: any) => {
-    windowRef.close()
-  })
+async function closeAllWindows() {
+  const { isTauri } = useTauri()
+
+  if (isTauri) {
+    const { getAllWebviewWindows } = await import(
+      "@tauri-apps/api/webviewWindow"
+    )
+    const existingWindows = await getAllWebviewWindows()
+    const existingLiveWindow = existingWindows.find(
+      (w: any) => w.label === appStore.currentState.mainDisplayLabel
+    )
+    if (existingLiveWindow) {
+      await existingLiveWindow.close()
+    }
+  } else {
+    windowRefs.value.forEach((windowRef: any) => {
+      windowRef.close()
+    })
+  }
   windowRefs.value = []
 }
 

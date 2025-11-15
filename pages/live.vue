@@ -4,7 +4,7 @@
     :id="currentState.liveSlideId?.toString()"
   >
     <div
-      v-if="!isFullScreen"
+      v-if="!isFullScreen && !isTauri"
       class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center bg-opacity-70"
     >
       <div class="banner-text text-lg flex items-center gap-6">
@@ -65,6 +65,7 @@ definePageMeta({
 
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
+const { isTauri } = useTauri()
 const isFullScreen = ref(false)
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()

@@ -11,7 +11,7 @@ export const useIsFullscreen = () => {
   const { isTauri } = useTauri()
 
   const checkFullscreen = async () => {
-    if (!isTauri.value) {
+    if (!isTauri) {
       // Web API fallback
       isFullscreen.value = !!document.fullscreenElement
       return
@@ -27,7 +27,7 @@ export const useIsFullscreen = () => {
   }
 
   const toggleFullscreen = async () => {
-    if (!isTauri.value) {
+    if (!isTauri) {
       // Web API fallback
       if (!document.fullscreenElement) {
         await document.documentElement.requestFullscreen()
@@ -52,13 +52,13 @@ export const useIsFullscreen = () => {
     checkFullscreen()
 
     // Listen for fullscreen changes in web mode
-    if (!isTauri.value) {
+    if (!isTauri) {
       document.addEventListener('fullscreenchange', checkFullscreen)
     }
   })
 
   onUnmounted(() => {
-    if (!isTauri.value) {
+    if (!isTauri) {
       document.removeEventListener('fullscreenchange', checkFullscreen)
     }
   })
@@ -78,7 +78,7 @@ export const useSystemTheme = () => {
   const theme = ref<'light' | 'dark'>('light')
 
   const checkTheme = async () => {
-    if (!isTauri.value) {
+    if (!isTauri) {
       // Web API fallback
       theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
       return
@@ -136,7 +136,7 @@ export const usePreventClose = (shouldPrevent: Ref<boolean>) => {
   const { isTauri } = useTauri()
 
   onMounted(async () => {
-    if (!isTauri.value) return
+    if (!isTauri) return
 
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window')
