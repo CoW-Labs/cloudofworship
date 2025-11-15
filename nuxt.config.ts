@@ -97,8 +97,6 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       BASE_URL: process.env.BASE_URL || "http://localhost:4500/api/v1",
-      AWS_BUCKET_NAME: process.env.CLOUD_AWS_BUCKET_NAME,
-      AWS_BUCKET_REGION: process.env.CLOUD_AWS_BUCKET_REGION,
       NODE_ENV: process.env.NODE_ENV || "production",
     },
   },

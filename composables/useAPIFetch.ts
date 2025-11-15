@@ -30,11 +30,12 @@ export const useAPIFetch: useFetchType = async (path, options = {}) => {
   };
 
   const authStore = useAuthStore();
-  const token = useCookie("token");
+  const { getToken } = useAuthToken();
+  const tokenValue = getToken();
   options.baseURL = config.public.BASE_URL as string;
   options.headers = {
     ...options.headers,
-    Authorization: `Bearer ${token.value}`,
+    Authorization: `Bearer ${tokenValue}`,
   };
 
   const executeWithDelay = async () => {

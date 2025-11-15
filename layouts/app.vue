@@ -192,7 +192,7 @@ const fullScreenLoading = ref<boolean>(false)
 const cachedVideosURLs = ref<BackgroundVideo[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const config = useRuntimeConfig()
-const token = useCookie("token")
+const { getToken } = useAuthToken()
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
 const appInfo = ref<AppSettings>()
@@ -302,11 +302,12 @@ const fetchAppInfo = async () => {
 const fetchHymns = async () => {
   let hymnCount: any
   const hymns = await db.bibleAndHymns.get("hymns")
+  const tokenValue = getToken()
 
   // Download all hymns
   hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
     headers: {
-      Authorization: `Bearer ${token.value}`,
+      Authorization: `Bearer ${tokenValue}`,
     },
   })
   hymnCount = await hymnCount.json()
@@ -322,7 +323,7 @@ const fetchHymns = async () => {
       downloadProgress,
       {
         headers: {
-          Authorization: `Bearer ${token.value}`,
+          Authorization: `Bearer ${tokenValue}`,
         },
       }
     )

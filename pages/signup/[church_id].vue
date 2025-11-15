@@ -128,13 +128,7 @@ const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
 
-const thirtyDaysAhead = new Date()
-thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
-const token = useCookie("token", {
-  secure: !isDevEnvironment,
-  sameSite: true,
-  expires: thirtyDaysAhead,
-})
+const { token } = useAuthToken()
 const authStore = useAuthStore()
 const route = useRoute()
 

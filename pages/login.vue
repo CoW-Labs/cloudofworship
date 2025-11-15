@@ -120,13 +120,7 @@ const passwordType = ref("password")
 const passwordInputHover = ref(false)
 const loading = ref(false)
 const googleLoading = ref(false)
-const thirtyDaysAhead = new Date()
-thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
-const token = useCookie("token", {
-  secure: !isDevEnvironment,
-  sameSite: true,
-  expires: thirtyDaysAhead,
-})
+const { token } = useAuthToken()
 
 const login = async () => {
   loading.value = true
