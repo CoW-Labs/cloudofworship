@@ -3,18 +3,22 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "nuxt build",
+    "build": "nuxt generate",
     "dev": "nuxt dev --port 3000",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",
+    "@fabianlars/tauri-plugin-oauth": "^2.0.0",
     "@hotjar/browser": "^1.0.9",
     "@nuxt/ui": "npm:@nuxt/ui-edge@latest",
-    "@nuxthub/core": "^0.8.4",
     "@pinia/nuxt": "^0.5.1",
+    "@tauri-apps/api": "^2.9.0",
     "@tiptap/extension-color": "^2.10.4",
     "@tiptap/extension-font-family": "^2.4.0",
     "@tiptap/extension-highlight": "^2.3.0",
@@ -57,6 +61,7 @@
     "@iconify-json/mingcute": "^1.1.17",
     "@iconify-json/ph": "^1.1.12",
     "@iconify-json/tabler": "^1.1.110",
+    "@tauri-apps/cli": "^2.9.3",
     "@types/socket.io-client": "^3.0.0",
     "typescript": "^5.4.5",
     "vue-tsc": "^2.0.16",

@@ -156,6 +156,9 @@ const isClipboardCopying = ref(false)
 
 const copyLivestreamURL = async () => {
   isClipboardCopying.value = true
+  const origin = window.location.origin?.includes("localhost:30")
+    ? window.location.origin
+    : "https://app.cloudofworship.com"
   await navigator.clipboard.writeText(
     `${window.location.origin}/livestream/${currentState.value.activeSchedule?._id}`
   )

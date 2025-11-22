@@ -77,17 +77,29 @@ export default defineNuxtConfig({
     },
   },
 
+  vite: {
+    // Tauri expects a fixed port for the dev server
+    server: {
+      strictPort: true,
+      port: 3000,
+      hmr: {
+        protocol: 'ws',
+        host: 'localhost',
+        port: 3000,
+      },
+    },
+    // Prevent vite from obscuring rust errors
+    clearScreen: false,
+    // Enable environment variables
+    envPrefix: ['VITE_', 'TAURI_'],
+  },
+
   runtimeConfig: {
     public: {
       BASE_URL: process.env.BASE_URL || "http://localhost:4500/api/v1",
-      // BASE_URL:
-      //   process.env.BASE_URL ||
-      //   "https://worshipcloud-api-6xak8.ondigitalocean.app/api/v1",
-      ASSETS_BASE_URL:
-        process.env.ASSETS_BASE_URL || "https://worshipcloud.favourfelix.com",
-      AWS_BUCKET_NAME: process.env.CLOUD_AWS_BUCKET_NAME,
-      AWS_BUCKET_REGION: process.env.CLOUD_AWS_BUCKET_REGION,
       NODE_ENV: process.env.NODE_ENV || "production",
+      GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID || "",
+      GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET || "",
     },
   },
 
@@ -100,7 +112,7 @@ export default defineNuxtConfig({
     "@pinia/nuxt",
     "pinia-plugin-persistedstate/nuxt",
     "nuxt-gtag",
-    "@nuxthub/core",
+    // "@nuxthub/core",
   ],
 
   components: [

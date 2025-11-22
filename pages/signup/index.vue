@@ -79,6 +79,7 @@
         Create your account
       </UButton>
       <UButton
+        v-if="!isTauri"
         block
         size="lg"
         class="mt-0"
@@ -234,14 +235,10 @@ useHead({
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
+const { isTauri } = useTauri()
+const { checkRedirectResult } = useTauriGoogleAuth()
 
-const thirtyDaysAhead = new Date()
-thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
-const token = useCookie("token", {
-  secure: !isDevEnvironment,
-  sameSite: true,
-  expires: thirtyDaysAhead,
-})
+const { token } = useAuthToken()
 const authStore = useAuthStore()
 const route = useRoute()
 
@@ -381,32 +378,91 @@ const signup = async () => {
 
 const handleGoogleSignUp = async () => {
   googleLoading.value = true
-  const { user } = await googleSignIn()
-  // console.log(user)
-  // console.log(user?.accessToken)
 
-  const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
-    "/auth/signup/google",
-    {
-      method: "POST",
-      headers: { "x-access-token": `Bearer ${user?.accessToken}` },
+  try {
+    const { user } = await googleSignIn()
+
+    // Don't process if redirect was initiated
+    if (!user) {
+      return
     }
-  )
-  if (error.value) {
-    useToast().add({
-      title: error.value?.data?.error?.includes("E11000")
-        ? "Email linked to an account. Sign in instead."
-        : error.value?.data?.message,
-      color: "red",
-      icon: "i-bx-error",
-    })
-  } else {
-    token.value = data.value?.token
-    authStore.setUser(data?.value?.data.newUser!!)
-    step.value = 2
+
+    // Get the ID token from Firebase user
+    const idToken = await user.getIdToken()
+
+    const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
+      "/auth/signup/google",
+      {
+        method: "POST",
+        headers: { "x-access-token": `Bearer ${idToken}` },
+      }
+    )
+    if (error.value) {
+      useToast().add({
+        title: error.value?.data?.error?.includes("E11000")
+          ? "Email linked to an account. Sign in instead."
+          : error.value?.data?.message,
+        color: "red",
+        icon: "i-bx-error",
+      })
+    } else {
+      token.value = data.value?.token
+      authStore.setUser(data?.value?.data.newUser!!)
+      step.value = 2
+    }
+  } catch (error: any) {
+    // Only show error if it's not a redirect initiation
+    if (error?.message !== "Redirect initiated") {
+      useToast().add({
+        title: "Google sign up failed",
+        description: error?.message || "An error occurred",
+        color: "red",
+        icon: "i-bx-error",
+      })
+    }
+  } finally {
+    googleLoading.value = false
   }
-  googleLoading.value = false
 }
+
+// Check for redirect result on mount (for Tauri)
+onMounted(async () => {
+  if (isTauri) {
+    googleLoading.value = true
+    const result = await checkRedirectResult()
+
+    if (result?.user) {
+      // Process the Google auth result
+      const { user } = result
+
+      // Get the ID token from Firebase user
+      const idToken = await user.getIdToken()
+
+      const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
+        "/auth/signup/google",
+        {
+          method: "POST",
+          headers: { "x-access-token": `Bearer ${idToken}` },
+        }
+      )
+
+      if (error.value) {
+        useToast().add({
+          title: error.value?.data?.error?.includes("E11000")
+            ? "Email linked to an account. Sign in instead."
+            : error.value?.data?.message,
+          color: "red",
+          icon: "i-bx-error",
+        })
+      } else {
+        token.value = data.value?.token
+        authStore.setUser(data?.value?.data.newUser!!)
+        step.value = 2
+      }
+    }
+    googleLoading.value = false
+  }
+})
 </script>
 
 <style scoped></style>

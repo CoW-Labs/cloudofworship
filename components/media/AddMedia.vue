@@ -2,28 +2,6 @@
   <div
     class="media-main min-h-[75vh] lg:min-h-[75vh] xl:min-h-[80vh] 2xl:min-h-[85vh] flex flex-col justify-between"
   >
-    <!-- <label class="flex flex-col center text-center">
-      <IconWrapper
-        name="i-bx-image"
-        size="12"
-        class="py-4"
-        rounded-bg
-      ></IconWrapper>
-      <h4 class="text-md mt-4 font-medium">Add image, video or audio slides</h4>
-      <div
-        class="text-center max-w-[150px] mx-auto px-4 py-1 mt-4 bg-primary-500 rounded-md flex items-center text-white cursor-pointer gap-1"
-      >
-        <IconWrapper name="i-bx-plus" size="5" />
-        Add file
-      </div>
-      <input
-        type="file"
-        class="invisible"
-        accept="video/*,image/*,audio/*"
-        multiple
-        @change="files = $event.target?.files"
-      />
-    </label> -->
     <div class="collector-ctn flex flex-col gap-3">
       <div
         class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
@@ -44,6 +22,21 @@
         </div>
       </div>
       <FileDropzone @change="files = $event" />
+      <label v-if="isTauri" class="flex flex-col center text-center">
+        <div
+          class="text-center w-full mx-auto px-2 py-2 mt-1 bg-primary-500 rounded-md flex items-center text-primary-500 cursor-pointer gap-1 border border-primary-500 bg-transparent"
+        >
+          <IconWrapper name="i-bx-folder-open" size="5" />
+          Choose files
+        </div>
+        <input
+          type="file"
+          class="invisible"
+          accept="video/*,image/*,audio/*"
+          multiple
+          @change="files = $event.target?.files"
+        />
+      </label>
     </div>
     <div
       v-if="fileObjs?.length > 0"
@@ -131,6 +124,7 @@ import type { Emitter } from "mitt"
 import type { ExtendedFileT } from "~/types"
 
 const imageCompressionLoading = ref(false)
+const { isTauri } = useTauri()
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const files = ref()
 const emit = defineEmits(["close"])

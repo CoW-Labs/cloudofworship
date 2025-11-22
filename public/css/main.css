@@ -3,6 +3,9 @@
 body {
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+/* body.tauri {
+  zoom: 0.9;
+} */
 .hotkey {
   font-size: 0.6rem;
   color: #000000;

@@ -19,14 +19,16 @@
 </template>
 
 <script setup lang="ts">
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import type { UserCredential } from "firebase/auth"
+
 useHead({
   title: "Cloud of Worship",
 })
 
-const handleGoogleSignIn = async () => {
-  const provider = new GoogleAuthProvider()
-  return await signInWithPopup(useFirebaseAuth(), provider)
+const { handleGoogleSignIn: tauriGoogleSignIn } = useTauriGoogleAuth()
+
+const handleGoogleSignIn = async (): Promise<UserCredential> => {
+  return await tauriGoogleSignIn()
 }
 
 provide("handleGoogleSignIn", handleGoogleSignIn)
