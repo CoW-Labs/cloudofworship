@@ -129,13 +129,6 @@ const ctrlOrMetaActive = ref(false)
 const { currentState } = storeToRefs(appStore)
 const windowRefs = inject("windowRefs") as any[]
 
-watch(
-  () => windowRefs,
-  () => {
-    // console.log("windowRefs", windowRefs.value)
-  }
-)
-
 const liveSlide = computed(() => {
   return currentState.value?.activeSlides.find(
     (slide) => slide.id === currentState.value.liveSlideId

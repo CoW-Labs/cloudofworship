@@ -192,7 +192,7 @@ const fullScreenLoading = ref<boolean>(false)
 const cachedVideosURLs = ref<BackgroundVideo[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const config = useRuntimeConfig()
-const token = useCookie("token")
+const { getToken } = useAuthToken()
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
 const appInfo = ref<AppSettings>()
@@ -302,11 +302,12 @@ const fetchAppInfo = async () => {
 const fetchHymns = async () => {
   let hymnCount: any
   const hymns = await db.bibleAndHymns.get("hymns")
+  const tokenValue = getToken()
 
   // Download all hymns
   hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
     headers: {
-      Authorization: `Bearer ${token.value}`,
+      Authorization: `Bearer ${tokenValue}`,
     },
   })
   hymnCount = await hymnCount.json()
@@ -322,7 +323,7 @@ const fetchHymns = async () => {
       downloadProgress,
       {
         headers: {
-          Authorization: `Bearer ${token.value}`,
+          Authorization: `Bearer ${tokenValue}`,
         },
       }
     )
@@ -396,8 +397,15 @@ emitter.on("selected-schedule", (schedule: Schedule) => {
   }, 2000)
 })
 
-emitter.on("go-live", () => {
-  openWindows()
+emitter.on("go-live", async () => {
+  const { isTauri } = useTauri()
+
+  if (isTauri) {
+    await openTauriLiveWindow()
+  } else {
+    openWindows()
+  }
+
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
 
@@ -700,6 +708,97 @@ const setCachedVideosURL = async () => {
 }
 
 // WINDOW MANAGEMENT CODE STARTS HERE
+
+// Tauri window management for desktop app
+async function openTauriLiveWindow() {
+  try {
+    const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
+
+    // Get available monitors
+    const { availableMonitors } = await import("@tauri-apps/api/window")
+    const monitors = await availableMonitors()
+    console.log("Available monitors:", monitors)
+
+    // Check if live window already exists
+    const { getAllWebviewWindows } = await import(
+      "@tauri-apps/api/webviewWindow"
+    )
+    const existingWindows = await getAllWebviewWindows()
+    const existingLiveWindow = existingWindows.find(
+      (w: any) => w.label === "live-output"
+    )
+
+    if (existingLiveWindow) {
+      await existingLiveWindow.setFocus()
+      await existingLiveWindow.setFullscreen(true)
+      return
+    }
+
+    if (!appStore.currentState.mainDisplayLabel) {
+      useToast().add({
+        title: "Set up your live display first",
+        icon: "i-bx-info-circle",
+      })
+      useGlobalEmit(appWideActions.openSettings, "Display Settings")
+      return
+    }
+
+    if (monitors.length === 1) {
+      useToast().add({
+        title:
+          "Only one screen detected. Connect a second screen to project on another display",
+        icon: "i-bx-info-circle",
+      })
+    }
+
+    // Find the target monitor based on saved settings
+    let targetMonitor = monitors.find((monitor: any) => {
+      const monitorId = useScreenId(monitor)
+      return monitorId === appStore.currentState.mainDisplayLabel
+    })
+
+    // Fallback to secondary monitor or current monitor
+    if (!targetMonitor) {
+      targetMonitor = monitors.length > 1 ? monitors[1] : monitors[0]
+    }
+
+    // Create new window on the target monitor
+    const liveWindow = new WebviewWindow("live-output", {
+      url: "/live",
+      title: "Cloud of Worship - Live Output",
+      alwaysOnTop: true,
+      decorations: false,
+      resizable: true,
+      closable: true,
+      x: targetMonitor.position.x,
+      y: targetMonitor.position.y,
+      width: targetMonitor.size.width,
+      height: targetMonitor.size.height,
+    })
+
+    // Wait for window to be ready
+    await liveWindow.once("tauri://created", () => {})
+
+    // Listen for window close
+    await liveWindow.once("tauri://close-requested", async () => {
+      console.log("Live window closed")
+    })
+
+    // Add windowRef to track if live window is active
+    const tempWindowRefs = windowRefs.value
+    tempWindowRefs.push(liveWindow)
+    windowRefs.value = tempWindowRefs
+  } catch (error) {
+    console.error("Error opening Tauri window:", error)
+    useToast().add({
+      title: "Failed to open live window",
+      description: "Please try again or check your display settings",
+      icon: "i-bx-error-circle",
+      color: "red",
+    })
+  }
+}
+
 function openWindow(
   left: number,
   top: number,
@@ -730,17 +829,32 @@ function openWindow(
   }
 }
 
-function closeAllWindows() {
-  windowRefs.value.forEach((windowRef: any) => {
-    windowRef.close()
-  })
+async function closeAllWindows() {
+  const { isTauri } = useTauri()
+
+  if (isTauri) {
+    const { getAllWebviewWindows } = await import(
+      "@tauri-apps/api/webviewWindow"
+    )
+    const existingWindows = await getAllWebviewWindows()
+    const existingLiveWindow = existingWindows.find(
+      (w: any) => w.label === appStore.currentState.mainDisplayLabel
+    )
+    if (existingLiveWindow) {
+      await existingLiveWindow.close()
+    }
+  } else {
+    windowRefs.value.forEach((windowRef: any) => {
+      windowRef.close()
+    })
+  }
   windowRefs.value = []
 }
 
 async function openWindows() {
   if ("getScreenDetails" in window) {
     // prettier-ignore
-    const screenDetails = await window.getScreenDetails()
+    const screenDetails = await (window as any).getScreenDetails()
     screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
     screenDetails?.screens?.forEach((screen: any) => {
       screen.id = useScreenId(screen)

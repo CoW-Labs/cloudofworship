@@ -64,6 +64,7 @@
         Log In
       </UButton>
       <UButton
+        v-if="!isTauri"
         block
         size="lg"
         class="mt-0"
@@ -111,6 +112,8 @@ const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<
   UserCredential | any
 >
+const { isTauri } = useTauri()
+const { checkRedirectResult } = useTauriGoogleAuth()
 // console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()
@@ -120,13 +123,7 @@ const passwordType = ref("password")
 const passwordInputHover = ref(false)
 const loading = ref(false)
 const googleLoading = ref(false)
-const thirtyDaysAhead = new Date()
-thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
-const token = useCookie("token", {
-  secure: !isDevEnvironment,
-  sameSite: true,
-  expires: thirtyDaysAhead,
-})
+const { token } = useAuthToken()
 
 const login = async () => {
   loading.value = true
@@ -187,35 +184,98 @@ const goToVerify = () => {
 
 const handleGoogleSignIn = async () => {
   googleLoading.value = true
-  const { user } = await googleSignIn()
-  // console.log(user)
 
-  const { data, error } = await useAPIFetch<GoogleAuthResponseT>(
-    "/auth/login/google",
-    {
-      method: "POST",
-      headers: { "x-access-token": `Bearer ${user?.accessToken}` },
+  try {
+    const { user } = await googleSignIn()
+
+    // Don't process if redirect was initiated (Tauri only)
+    if (!user) {
+      return
     }
-  )
 
-  if (error.value) {
-    toast.add({
-      title: error.value?.data?.message,
-      color: "red",
-      icon: "i-bx-error",
-    })
-  } else {
-    token.value = data.value?.token
-    authStore.setUser(data.value?.data?.user!!)
-    toast.add({
-      title: `Successful login as ${user?.email}`,
-      color: "green",
-      icon: "i-bx-check-circle",
-    })
-    navigateTo("/")
+    // Get the ID token from Firebase user
+    const idToken = await user.getIdToken()
+
+    const { data, error } = await useAPIFetch<GoogleAuthResponseT>(
+      "/auth/login/google",
+      {
+        method: "POST",
+        headers: { "x-access-token": `Bearer ${idToken}` },
+      }
+    )
+
+    if (error.value) {
+      toast.add({
+        title: error.value?.data?.message,
+        color: "red",
+        icon: "i-bx-error",
+      })
+    } else {
+      token.value = data.value?.token
+      authStore.setUser(data.value?.data?.user!!)
+      toast.add({
+        title: `Successful login as ${user?.email}`,
+        color: "green",
+        icon: "i-bx-check-circle",
+      })
+      navigateTo("/")
+    }
+  } catch (error: any) {
+    // Only show error if it's not a redirect initiation
+    if (error?.message !== "Redirect initiated") {
+      toast.add({
+        title: "Google sign in failed",
+        description: error?.message || "An error occurred",
+        color: "red",
+        icon: "i-bx-error",
+      })
+    }
+  } finally {
+    googleLoading.value = false
   }
-  googleLoading.value = false
 }
+
+// Check for redirect result on mount (for Tauri OAuth redirect)
+onMounted(async () => {
+  if (isTauri) {
+    googleLoading.value = true
+    const result = await checkRedirectResult()
+
+    if (result?.user) {
+      // Process the Google auth result
+      const { user } = result
+
+      // Get the ID token from Firebase user
+      const idToken = await user.getIdToken()
+
+      const { data, error } = await useAPIFetch<GoogleAuthResponseT>(
+        "/auth/login/google",
+        {
+          method: "POST",
+          headers: { "x-access-token": `Bearer ${idToken}` },
+        }
+      )
+
+      if (error.value) {
+        toast.add({
+          title: error.value?.data?.message,
+          color: "red",
+          icon: "i-bx-error",
+        })
+      } else {
+        token.value = data.value?.token
+        authStore.setUser(data.value?.data?.user!!)
+        toast.add({
+          title: `Successful login as ${user?.email}`,
+          color: "green",
+          icon: "i-bx-check-circle",
+        })
+        navigateTo("/")
+      }
+    }
+    googleLoading.value = false
+  }
+})
 </script>
 
 <style scoped></style>

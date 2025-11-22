@@ -30,7 +30,8 @@ export const useAuthStore = defineStore('auth', {
   state: () => {
     return {
       user: null as User | null,
-      church: null as Church | null
+      church: null as Church | null,
+      token: null as string | null // Store token for Tauri
     }
   },
   actions: {
@@ -40,10 +41,21 @@ export const useAuthStore = defineStore('auth', {
     setChurch(church: Church) {
       this.church = church
     },
+    setToken(token: string | null) {
+      this.token = token
+    },
     signOut() {
       const appStore = useAppStore()
-      const cookie = useCookie('token')
-      cookie.value = undefined
+      const { isTauri } = useTauri()
+
+      // Clear token based on environment
+      if (isTauri) {
+        this.token = null
+      } else {
+        const cookie = useCookie('token')
+        cookie.value = undefined
+      }
+
       this.user = null
       this.church = null
       navigateTo('/login')

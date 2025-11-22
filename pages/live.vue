@@ -4,7 +4,7 @@
     :id="currentState.liveSlideId?.toString()"
   >
     <div
-      v-if="!isFullScreen"
+      v-if="!isFullScreen && !isTauri"
       class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center bg-opacity-70"
     >
       <div class="banner-text text-lg flex items-center gap-6">
@@ -57,8 +57,15 @@ import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 import type { Slide } from "~/types"
 import { useAuthStore } from "~/store/auth"
+
+// Use dedicated live layout
+definePageMeta({
+  layout: "live",
+})
+
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
+const { isTauri } = useTauri()
 const isFullScreen = ref(false)
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
@@ -71,6 +78,14 @@ useHead({
     {
       rel: "manifest",
       href: "/live-manifest.json",
+    },
+    {
+      rel: "stylesheet",
+      href: "/css/fonts.css",
+    },
+    {
+      rel: "stylesheet",
+      href: "/css/main.css",
     },
   ],
 })
