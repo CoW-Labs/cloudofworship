@@ -135,18 +135,26 @@ jobs:
 
       - name: Update appVersion in app.vue
         run: |
-          # Replace the version string in the specific line
-          sed -i '40s/const appVersion = ref<string>(".*")/const appVersion = ref<string>("${{ env.next_version }}")/' app.vue
+          # Replace the version string in the specific line (more flexible pattern)
+          sed -i 's/const appVersion = ref<string>("[^"]*")/const appVersion = ref<string>("${{ env.next_version }}")/' app.vue
 
-          # Configure Git to commit the changes
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
+          # Check if there are actually changes to commit
+          if git diff --quiet app.vue; then
+            echo "No changes detected in app.vue - version might already be ${{ env.next_version }}"
+            echo "Skipping commit step"
+          else
+            echo "Changes detected in app.vue, committing..."
+            
+            # Configure Git to commit the changes
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
 
-          # Commit and push the updated file
-          git add app.vue
-          git commit -m "Update appVersion to ${{ env.next_version }}"
-          git branch
-          git push
+            # Commit and push the updated file
+            git add app.vue
+            git commit -m "Update appVersion to ${{ env.next_version }}"
+            git branch
+            git push
+          fi
 
       - name: Create Tag
         run: |
