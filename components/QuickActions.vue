@@ -29,6 +29,7 @@
             color="black"
             class="w-[100%]"
             ref="searchInputEl"
+            @keydown="handleInputKeydown"
           />
           <UButton
             v-if="searchInput.length >= 2"
@@ -74,11 +75,13 @@
       <div
         v-if="searchInput.length < 2"
         class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+        ref="actionsContainer"
       >
         <ActionCard
           v-for="(action, index) in actions?.filter((a: QuickAction) => !a?.searchableOnly)"
           :key="action?.name"
           :action="action"
+          :data-action-index="index"
           :class="{
             'bg-primary-50 dark:bg-primary-800 rounded-md':
               index === focusedActionIndex,
@@ -96,11 +99,13 @@
             ? 'max-h-[calc(100vh-350px)]'
             : 'max-h-[calc(100vh-190px)]'
         "
+        ref="actionsContainer"
       >
         <ActionCard
           v-for="(action, index) in searchedActions"
           :key="action?.name"
           :action="{ ...action, bibleChapterAndVerse }"
+          :data-action-index="index"
           :class="{
             'bg-primary-50 dark:bg-primary-800 rounded-md':
               index === focusedActionIndex,
@@ -185,6 +190,7 @@ const searchInput = ref<string>("")
 const focusedActionIndex = ref<number>(0)
 const actions = ref<QuickAction[]>([])
 const quickActions = ref<HTMLDivElement | null>(null)
+const actionsContainer = ref<HTMLDivElement | null>(null)
 const appStore = useAppStore()
 const page = ref<string>("") // song, search, bible, hymn...
 const songSearchQuery = ref<string>("")
@@ -310,6 +316,49 @@ emitter.on("new-countdown", () => {
   page.value = "countdown"
 })
 
+const handleInputKeydown = (e: KeyboardEvent) => {
+  // Get the current actions list based on search state
+  const currentActions =
+    searchInput.value.length >= 2
+      ? searchedActions.value
+      : actions.value?.filter((a: QuickAction) => !a?.searchableOnly)
+
+  const maxIndex = currentActions.length - 1
+
+  switch (e.key) {
+    case "ArrowDown":
+      e.preventDefault()
+      if (focusedActionIndex.value < maxIndex) {
+        focusedActionIndex.value += 1
+      }
+      break
+    case "ArrowUp":
+      e.preventDefault()
+      if (focusedActionIndex.value > 0) {
+        focusedActionIndex.value -= 1
+      }
+      break
+    case "Enter":
+      e.preventDefault()
+      const action = currentActions?.[
+        focusedActionIndex.value
+      ] as unknown as QuickAction
+      if (action) {
+        useGlobalEmit(
+          action?.action,
+          action?.type === slideTypes.bible
+            ? `${action?.bibleBookIndex}:${bibleChapterAndVerse.value}`
+            : action?.type === slideTypes.hymn
+            ? action?.hymnIndex
+            : ""
+        )
+      }
+      break
+    default:
+      return
+  }
+}
+
 onMounted(() => {
   // console.log("mounted", quickActions.value)
 
@@ -323,39 +372,6 @@ onMounted(() => {
       page.value = ""
     } else {
       searchInputEl.value?.input?.focus()
-    }
-  })
-  quickActions.value?.addEventListener("keydown", (e) => {
-    if (e.defaultPrevented) {
-      e.preventDefault()
-      return
-    }
-    switch (e.key) {
-      case "ArrowDown":
-        // console.log("down")
-        focusedActionIndex.value < searchedActions.value.length - 1
-          ? (focusedActionIndex.value += 1)
-          : null
-        break
-      case "ArrowUp":
-        // console.log("up")
-        focusedActionIndex.value > 0 ? (focusedActionIndex.value -= 1) : null
-        break
-      case "Enter":
-        const action = searchedActions.value?.[
-          focusedActionIndex.value
-        ] as unknown as QuickAction
-        useGlobalEmit(
-          action?.action,
-          action?.type === slideTypes.bible
-            ? `${action?.bibleBookIndex}:${bibleChapterAndVerse.value}`
-            : action?.type === slideTypes.hymn
-            ? action?.hymnIndex
-            : ""
-        )
-        break
-      default:
-        return
     }
   })
 })
@@ -438,6 +454,23 @@ watch(page, () => {
   if (page.value === "") {
     libraryPage.value = ""
   }
+})
+
+// Watch for focused action changes and scroll into view
+watch(focusedActionIndex, () => {
+  nextTick(() => {
+    if (actionsContainer.value) {
+      const focusedElement = actionsContainer.value.querySelector(
+        `[data-action-index="${focusedActionIndex.value}"]`
+      )
+      if (focusedElement) {
+        focusedElement.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        })
+      }
+    }
+  })
 })
 </script>
 
