@@ -38,6 +38,7 @@
       >
         <!-- AUDIO BACKGROUND -->
         <audio
+          ref="audio"
           v-show="(slide?.data as ExtendedFileT)?.type?.includes('audio')"
           :src="(slide?.data as ExtendedFileT)?.url"
           autoplay
@@ -199,6 +200,7 @@ import { useAppStore } from "~/store/app"
 import type { ExtendedFileT, Slide, SlideStyle } from "~/types"
 const appMounted = ref<boolean>(false)
 const video = ref<HTMLVideoElement | null>(null)
+const audio = ref<HTMLAudioElement | null>(null)
 const foregroundContentVisible = ref<boolean>(true)
 const isLargePreviewOpen = ref<boolean>(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -238,14 +240,18 @@ watch(
         }
 
         // console.log(newVal.slideStyle?.mediaSeekPosition)
-        if (newVal.slideStyle?.mediaSeekPosition === 0 && video.value) {
+        if (newVal.slideStyle?.mediaSeekPosition === 0 && (video.value)) {
           video.value.currentTime = newVal.slideStyle?.mediaSeekPosition
+        }
+        if (newVal.slideStyle?.mediaSeekPosition === 0 && (audio.value)) {
+          audio.value!.currentTime = newVal.slideStyle?.mediaSeekPosition
         }
 
         // Play/pause video
         // console.log(newVal.name, newVal.slideStyle)
         if (newVal.slideStyle?.isMediaPlaying) {
           video.value?.play()
+          audio.value?.play()
         } else if (
           !newVal.slideStyle?.isMediaPlaying &&
           newVal.slideStyle?.isMediaPlaying !== undefined &&
@@ -253,6 +259,7 @@ watch(
         ) {
           // console.log("triggered pause")
           video.value?.pause()
+          audio.value?.pause()
         }
       }
     } catch (err) {
