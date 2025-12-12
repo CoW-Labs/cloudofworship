@@ -1,5 +1,5 @@
 <template>
-  <div class="page-root">
+  <div class="page-root eoy">
     <div ref="bg" class="animated-bg" aria-hidden="true"></div>
       <div class="overlay" aria-hidden="true"></div>
 
@@ -27,7 +27,7 @@
           </div>
         </div>
 
-        <div ref="actionButtons" class="flex flex-row align-items-center gap-2 mb-6 w-[90%] lg:w-[85%] mx-auto mt-[8%] lg:mt-[12.5%] px-4 lg:px-0">
+        <div ref="actionButtons" class="flex flex-row align-items-center gap-2 mb-6 w-[90%] lg:w-[85%] mx-auto mt-[8%] lg:mt-[10%] px-4 lg:px-0">
           <button 
             v-if="step !== '0'" 
             class="btn rounded" 
@@ -50,9 +50,8 @@
 
       <footer>
         <YearScroll :showOnlyFirstRow="true" />
-      </footer>
+      </footer>   
     </main>
-
   </div>
 </template>
 
@@ -110,8 +109,8 @@ const data = ref([
   },
   {
     "id": "1",
-    "maintext": "Hello, {{church_name}}, you made the bold choice to try out CoW in May 2025.",
-    "subtext": "Thank you for stepping into something new with us. <br> Let’s take a look at how your year went!",
+    "maintext": "Hello, {{church_name}}, you made the bold choice to try out Cloud of Worship in May 2025.",
+    "subtext": "Thank you for stepping into something new with us. Let’s take a look at how your year went!",
     "actions": [
       {
         "text": "See your year in review",
@@ -126,7 +125,7 @@ const data = ref([
     "subtext": "Your most active days? Sunday (of course!) and Wednesday.",
     "actions": [
       {
-        "text": "Next",
+        "text": "See how you did with songs",
         "link": "",
         "type": "next"
       }
@@ -135,10 +134,10 @@ const data = ref([
   {
     "id": "3",
     "maintext": "Your church contributed 173+ songs, placing you in the top 0.05% of all CoW churches.",
-    "subtext": "That’s incredible! Check out the global leaderboard at lyrics.cloudofworship.com.",
+    "subtext": "That’s incredible! Check out the global leaderboard at <a target=\"_blank\" class=\"underline font-medium\" href=\"https://lyrics.cloudofworship.com\">lyrics.cloudofworship.com</a>.",
     "actions": [
       {
-        "text": "Next",
+        "text": "See how you did with Scriptures",
         "link": "",
         "type": "next"
       }
@@ -150,7 +149,7 @@ const data = ref([
     "subtext": "With 1,257+ Bible passages opened, you’ve engaged more Scripture than 80% of churches on CoW.",
     "actions": [
       {
-        "text": "See your Scripture engagement",
+        "text": "See how you did on the Cloud",
         "link": "",
         "type": "next"
       }
@@ -162,7 +161,7 @@ const data = ref([
     "subtext": "Guess what? We love a church that covets all of the free cloud storage we share. That's why we are Cloud of Worship.",
     "actions": [
       {
-        "text": "See your media uploads",
+        "text": "See how much much you explored",
         "link": "",
         "type": "next"
       }
@@ -182,28 +181,28 @@ const data = ref([
   },
   {
     "id": "7",
-    "maintext": "That’s a wrap for this year!",
-    "subtext": "We’ve got loads of exciting features coming in 2026, and we hope you’re just as excited as we are.",
+    "maintext": "See our documentary on the State of Church media today",
+    "subtext": "<iframe width=\"100%\" height=\"250\" src=\"https://www.youtube.com/embed/BfDWaR3paro?si=DHwRVMa8Flk0s5gP\" title=\"YouTube video player\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen></iframe>",
     "actions": [
       {
-        "text": "Share CoW with someone",
-        "link": "#share-cow",
+        "text": "Next",
+        "link": "",
         "type": "next"
       }
     ]
   },
   {
     "id": "8",
-    "maintext": "See our documentary on the State of Church media today",
-    "subtext": "",
+    "maintext": "That’s a wrap for this year!",
+    "subtext": "We’ve got loads of exciting features coming in 2026, and we hope you’re just as excited as we are.",
     "actions": [
       {
-        "text": "Watch documentary",
-        "link": "#documentary",
-        "type": "link"
+        "text": "Share CoW with someone",
+        "link": "",
+        "type": "share"
       }
     ]
-  }
+  },
 ])
 
 // Computed property to reform data with API values
@@ -211,6 +210,7 @@ const reformedData = computed(() => {
   if (!apiData.value || !authStore.church) return data.value
 
   const church = authStore.church
+  const user = authStore.user
   const api = apiData.value
 
   // Helper function to format bytes to MB
@@ -222,7 +222,7 @@ const reformedData = computed(() => {
 
     // Replace church name with colored version
     const churchName = `<span class="text-primary-300">${church?.type || church?.name || 'Church'}</span>`
-    const churchCreationDate = church?.createdAt ? new Date(church.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '2025'
+    const churchCreationDate = (church?.createdAt || user?.createdAt) ? new Date(church?.createdAt || user?.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '2025'
     maintext = maintext.replace(/May 2025/g, churchCreationDate)
     subtext = subtext.replace(/May 2025/g, churchCreationDate)
     maintext = maintext.replace(/{{church_name}}/g, churchName)
@@ -254,7 +254,7 @@ const reformedData = computed(() => {
         if (api.countdownSlides > 0) {
           maintext = `You've created <span class="text-primary-300">${api.countdownSlides}</span> countdown slides this year.`
           subtext = "That's awesome! Keep engaging your congregation with these dynamic elements."
-          return { ...item, maintext, subtext, actions: [{ text: "Next", link: "", type: "next" }] }
+          return { ...item, maintext, subtext, actions: [{ text: "Countdown to 2026?", link: "", type: "next" }] }
         }
         break
     }
@@ -421,8 +421,51 @@ const handleAction = (action: { text: string, link: string, type: string }, curr
   if (action.type === 'next') {
     nextStep(currentStep)
   } else if (action.type === 'link' && action.link) {
-    // Open link in new tab
     window.open(action.link, '_blank')
+  } else if (action.type === 'share') {
+    nativeShareOrCopy()
+  }
+}
+
+function numberWithCommas(x: number | null | undefined) {
+  if (!x && x !== 0) return '0'
+  return String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+function composeShareMessage() {
+  const scriptures = apiData.value?.scriptureUsage ?? 0
+  const live = apiData.value?.liveSessions ?? 0
+  const churchId = authStore.church?.id || ''
+  const link = `https://app.cloudofworship.com/signup${churchId ? `?from=${churchId}` : ''}`
+  return `${authStore.church?.name}, ${authStore.church?.type} opened ${numberWithCommas(scriptures)} Scriptures and went live ${numberWithCommas(live)} times this year with Cloud of Worship. Try it: ${link}`
+}
+
+async function nativeShareOrCopy() {
+  const message = composeShareMessage()
+  // Try native share first
+  if (typeof navigator !== 'undefined' && (navigator as any).share) {
+    try {
+      await (navigator as any).share({
+        title: 'Cloud of Worship — Year in Review',
+        text: message
+      })
+      return
+    } catch (err) {
+      // fall back to clipboard
+      // user may have cancelled share
+    }
+  }
+
+  // Clipboard fallback
+  try {
+    await navigator.clipboard.writeText(message)
+    // minimal feedback: alert (keeps changes tiny and cross-platform)
+    // eslint-disable-next-line no-alert
+    alert('Share message copied to clipboard — paste it in your app to share')
+  } catch (err) {
+    console.error('Clipboard write failed', err)
+    // eslint-disable-next-line no-alert
+    alert('Unable to share or copy message on this device')
   }
 }
 
@@ -590,5 +633,21 @@ onBeforeUnmount(() => {
 
 .year-scroll-container {
   will-change: transform, opacity, filter;
+}
+
+/* Share sheet styles */
+/* sharing handled via native API or clipboard fallback */
+</style>
+
+<style>
+.eoy iframe {
+  width: 600px;
+  height: 330px;
+  border-radius: 32px;
+
+  @media (max-width: 768px) {
+    width: 300px;
+    height: 200px
+  }
 }
 </style>
