@@ -157,7 +157,7 @@ export default defineNuxtConfig({
   },
 
   pwa: {
-    registerType: "prompt",
+    registerType: "autoUpdate",
     injectRegister: false,
 
     pwaAssets: {
