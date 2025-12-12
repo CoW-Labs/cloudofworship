@@ -34,7 +34,7 @@ import { useAppStore } from "./store/app"
 const nuxtApp = useNuxtApp()
 const emitter = mitt()
 const appStore = useAppStore()
-const { isTauri } = useTauri()
+const { isTauri, initializeTauri } = useTauri()
 
 if (nuxtApp.$emitter) {
   // nuxtApp.$emitter = emitters
@@ -46,10 +46,8 @@ appStore.setEmitter(emitter)
 const appVersion = ref<string>("v0.29.1-beta")
 
 onMounted(() => {
-  if (isTauri) {
-    document.body.classList.add("tauri")
-  }
-})
+  initializeTauri()
+  })
 </script>
 
 <style>
