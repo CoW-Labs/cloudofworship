@@ -121,6 +121,7 @@ const getSongs = async (query: string = "") => {
     const promise = await useAPIFetch(
       `/church/${authStore.user?.churchId}/songs?search=${query}&limit=20`
     )
+
     let songsData = (promise.data.value as any)?.data?.data?.map(
       (song: Song) => ({
         ...song,

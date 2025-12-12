@@ -36,3 +36,16 @@ export const getTauriAPI = async () => {
     return null
   }
 }
+
+export const initializeTauri = () => {
+  const { isTauri } = useTauri()
+
+  if (isTauri) {
+    document.body.classList.add("tauri")
+
+    // Initialize zoom functionality for desktop app
+    const { initializeZoom, registerZoomShortcuts } = useZoom()
+    initializeZoom()
+    registerZoomShortcuts()
+  }
+}

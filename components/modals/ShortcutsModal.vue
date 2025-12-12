@@ -114,6 +114,14 @@ const shortcuts = ref([
     cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + ,`,
     name: "Open App Settings",
   },
+  {
+    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + +`,
+    name: "Zoom in / Increase display size",
+  },
+  {
+    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + -`,
+    name: "Zoom out / Decrease display size",
+  },
 ])
 
 emitter.on("open-shortcuts", () => {

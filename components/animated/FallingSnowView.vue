@@ -2,9 +2,10 @@
   <div class="main">
     <div class="initial-snow">
       <!-- <div class="snow">&#10052;</div> -->
-      <div class="snow">&#x25CF;</div>
+      <!-- <div class="snow">&#127876;</div> -->
+      <div class="snow">❄</div>
       <!-- Code for heavy full stop -->
-      <div v-for="i in 10" :key="i" class="snow">&#x25CF;</div>
+      <div v-for="i in 10" :key="i" class="snow">❄</div>
     </div>
   </div>
 </template>

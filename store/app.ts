@@ -111,7 +111,7 @@ export const useAppStore = defineStore("app", {
         backgroundVideos: [],
         alerts: [],
         activeAlert: null,
-        activeOverlay: "",
+        activeOverlay: "falling-snow",
         recentBibleSearches: [],
         failedUploadRequests: [],
         slidesLoading: false,
