@@ -51,7 +51,8 @@
     "vue-virtual-scroller": "^2.0.0-beta.8",
     "vuedraggable": "^4.1.0",
     "workbox-build": "^7.1.0",
-    "workbox-window": "^7.1.0"
+    "workbox-window": "^7.1.0",
+    "gsap": "^3.12.2"
   },
   "devDependencies": {
     "@iconify-json/bi": "^1.1.23",
