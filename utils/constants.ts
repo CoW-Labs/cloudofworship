@@ -227,7 +227,7 @@ export const quickActionsArr: QuickAction[] = [
     desc: "Extract from other apps like PowerPoint",
     action: "new-ppt",
     meta: "power point Google slides",
-    unreleased: true, wha
+    unreleased: true,
     // type: slideTypes.text
   },
   // {
