@@ -95,6 +95,10 @@
         </div>
       </Transition>
 
+      <Transition name="fade-sm">
+        <UpdateNotification />
+      </Transition>
+
       <AdvertModal :active-advert="currentState.activeAdvert" />
     </ClientOnly>
   </div>

@@ -19,6 +19,9 @@
     "@nuxt/ui": "npm:@nuxt/ui-edge@latest",
     "@pinia/nuxt": "^0.5.1",
     "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-shell": "^2.3.3",
+    "@tauri-apps/plugin-updater": "^2.9.0",
     "@tiptap/extension-color": "^2.10.4",
     "@tiptap/extension-font-family": "^2.4.0",
     "@tiptap/extension-highlight": "^2.3.0",
@@ -34,6 +37,7 @@
     "dexie": "^4.0.4",
     "firebase": "^10.14.0",
     "fuzzysort": "^2.0.4",
+    "gsap": "^3.12.2",
     "mitt": "^3.0.1",
     "nuxt": "^3.11.2",
     "nuxt-gtag": "^3.0.1",
@@ -51,8 +55,7 @@
     "vue-virtual-scroller": "^2.0.0-beta.8",
     "vuedraggable": "^4.1.0",
     "workbox-build": "^7.1.0",
-    "workbox-window": "^7.1.0",
-    "gsap": "^3.12.2"
+    "workbox-window": "^7.1.0"
   },
   "devDependencies": {
     "@iconify-json/bi": "^1.1.23",

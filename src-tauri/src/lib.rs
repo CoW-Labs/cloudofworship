@@ -12,6 +12,9 @@ async fn start_oauth_server(window: Window) -> Result<u16, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .plugin(tauri_plugin_shell::init())
+    .plugin(tauri_plugin_updater::Builder::new().build())
+    .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_oauth::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
