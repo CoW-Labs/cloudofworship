@@ -47,7 +47,7 @@ const appVersion = ref<string>("v0.29.1-beta")
 
 onMounted(() => {
   initializeTauri()
-  })
+})
 </script>
 
 <style>

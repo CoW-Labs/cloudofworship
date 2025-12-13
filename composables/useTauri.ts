@@ -11,8 +11,22 @@ export const useTauri = () => {
     return false
   }
 
+  const initializeTauri = () => {
+    const { isTauri } = useTauri()
+
+    if (isTauri) {
+      document.body.classList.add("tauri")
+
+      // Initialize zoom functionality for desktop app
+      const { initializeZoom, registerZoomShortcuts } = useZoom()
+      initializeZoom()
+      registerZoomShortcuts()
+    }
+  }
+
   return {
     isTauri: getTauriAvailability(),
+    initializeTauri
   }
 }
 
@@ -34,18 +48,5 @@ export const getTauriAPI = async () => {
   } catch (error) {
     console.error('Failed to load Tauri API:', error)
     return null
-  }
-}
-
-export const initializeTauri = () => {
-  const { isTauri } = useTauri()
-
-  if (isTauri) {
-    document.body.classList.add("tauri")
-
-    // Initialize zoom functionality for desktop app
-    const { initializeZoom, registerZoomShortcuts } = useZoom()
-    initializeZoom()
-    registerZoomShortcuts()
   }
 }
