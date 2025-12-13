@@ -1,5 +1,5 @@
 import type { Emitter, EventType } from "mitt"
-import { User } from "~/store/auth"
+import type { User } from "~/store/auth"
 
 export interface Slide {
   _id?: string
@@ -118,11 +118,17 @@ export interface Song {
   updatedAt?: string
 }
 
+export interface ExternalVideo {
+  url: string
+  type: string // "youtube" | "vimeo" | "other"
+  name?: string
+}
+
 export interface Media {
   id: string
   content?: any
   remoteUrl?: string
-  data?: ArrayBuffer | File | string
+  data?: ArrayBuffer | File | string | ExternalVideo
   createdAt?: string
   updatedAt?: string
 }

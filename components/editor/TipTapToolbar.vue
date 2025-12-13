@@ -134,22 +134,23 @@
       @close="containerOverflow = 'overflow-x-auto'"
     />
     <UTooltip text="Change text color" :popper="{ arrow: true }">
-      <input
-        type="color"
-        @input="
-          editor
-            .chain()
-            .focus()
-            .setColor(($event?.target as HTMLInputElement).value)
-            .run()
-        "
-        class="min-w-10 h-10 outline-none border-0 rounded-md p-1.5 bg-primary-100 dark:bg-primary-900 hover:bg-primary-200 dark:hover:bg-primary-950 cursor-pointer"
-        :class="{
-          'bg-primary text-white dark:text-primary-900':
-            editor.isActive('paragraph'),
-        }"
-        :value="editor.getAttributes('textStyle').color"
-      />
+      <label class="cursor-pointer">
+        <input
+          type="color"
+          @input="onColorChange"
+          class="sr-only"
+          :value="currentColor"
+        />
+        <div
+          class="min-w-10 h-10 flex items-center justify-center rounded-md p-1.5 text-primary-500 dark:text-primary-400 bg-primary-100 dark:bg-primary-900 hover:bg-primary-200 dark:hover:bg-primary-950 cursor-pointer transition-colors"
+        >
+          <span class="i-bx-palette text-lg"></span>
+          <div
+            class="absolute w-[80%] rounded-xl h-1 bottom-[3px]"
+            :style="`background: ${currentColor}`"
+          ></div>
+        </div>
+      </label>
     </UTooltip>
     <UButton
       @click="editor.chain().focus().toggleBlockquote().run()"
@@ -179,36 +180,31 @@ const props = defineProps({
 const containerOverflow = ref("overflow-x-auto")
 const isEmpty = (obj: Object) => Object.keys(obj).length === 0
 
-const toggleHeading = (level: number) => {
-  let otherAttributes = props.editor?.getAttributes("heading")
-  if (isEmpty(otherAttributes)) {
-    otherAttributes = props.editor?.getAttributes("paragraph")
-  }
+// Computed property for current text color
+const currentColor = computed(() => {
+  return props.editor?.getAttributes("textStyle").color || "#ffffff"
+})
 
-  props.editor
-    ?.chain()
-    .focus()
-    .toggleHeading({
-      ...otherAttributes,
-      level,
-    })
-    .run()
+// Handle color change with proper focus management
+const onColorChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const color = target.value
+
+  // Set color and maintain focus
+  props.editor?.chain().focus().setColor(color).run()
+}
+
+const toggleHeading = (level: number) => {
+  if (!props.editor) return
+
+  // Use toggleHeading which is the correct TipTap command
+  props.editor.chain().focus().toggleHeading({ level }).run()
 }
 
 const setParagraph = () => {
-  let otherAttributes = props.editor?.getAttributes("paragraph")
-  if (isEmpty(otherAttributes)) {
-    otherAttributes = props.editor?.getAttributes("heading")
-  }
-  console.log(otherAttributes)
+  if (!props.editor) return
 
-  props.editor
-    ?.chain()
-    .focus()
-    .setParagraph({ ...otherAttributes })
-    .run()
-
-  props.editor?.commands.updateAttributes("paragraph", otherAttributes)
+  props.editor.chain().focus().setParagraph().run()
 }
 </script>
 

@@ -115,6 +115,7 @@
             <ListSlideCard
               :key="slide.content.id"
               :slide="(slide.content as Slide)"
+              :truncate="true"
               @delete-slide="deleteSlide($event)"
             />
           </RecycleScroller>
@@ -178,6 +179,7 @@
             <ListSlideCard
               :key="slide.content.id"
               :slide="slide.content"
+              :truncate="true"
               @delete-slide="deleteSlide($event)"
             />
           </RecycleScroller>

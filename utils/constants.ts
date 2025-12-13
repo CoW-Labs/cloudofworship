@@ -23,6 +23,8 @@ export const appWideActions = {
   newSong: 'new-song',
   newSlide: 'new-slide',
   newMedia: 'new-media',
+  newYouTubeVideo: 'new-youtube-video',
+  newVimeoVideo: 'new-vimeo-video',
   newLibrary: 'new-library',
   newAlert: 'new-alert',
   addSong: 'add-song',
@@ -99,6 +101,22 @@ export const quickActionsArr: QuickAction[] = [
     meta: "",
     type: slideTypes.media,
     // type: slideTypes.text
+  },
+  {
+    icon: "i-bxl-youtube",
+    name: "Add YouTube Video",
+    desc: "Embed YouTube videos in your schedule",
+    action: appWideActions.newYouTubeVideo,
+    meta: "youtube external video embed",
+    type: slideTypes.media,
+  },
+  {
+    icon: "i-bxl-vimeo",
+    name: "Add Vimeo Video",
+    desc: "Embed Vimeo videos in your schedule",
+    action: appWideActions.newVimeoVideo,
+    meta: "vimeo external video embed",
+    type: slideTypes.media,
   },
   {
     icon: "i-bx-library",
@@ -209,7 +227,7 @@ export const quickActionsArr: QuickAction[] = [
     desc: "Extract from other apps like PowerPoint",
     action: "new-ppt",
     meta: "power point Google slides",
-    // unreleased: true,
+    unreleased: true, wha
     // type: slideTypes.text
   },
   // {

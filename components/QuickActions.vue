@@ -139,8 +139,9 @@
 
     <!-- MEDIA(IMAGE/VIDEO) SECTION-->
     <AddMedia
-      v-else-if="page === 'media'"
+      v-else-if="page === 'media' || page === 'youtube' || page === 'vimeo'"
       class="come-up-1"
+      :initial-tab="page === 'youtube' || page === 'vimeo' ? 1 : 0"
       @close="page = ''"
     />
 
@@ -279,6 +280,14 @@ emitter.on("new-media", (data) => {
   if (!fromSaved) {
     page.value = "media"
   }
+})
+
+emitter.on("new-youtube-video", () => {
+  page.value = "youtube"
+})
+
+emitter.on("new-vimeo-video", () => {
+  page.value = "vimeo"
 })
 
 emitter.on("new-search-bible", () => {

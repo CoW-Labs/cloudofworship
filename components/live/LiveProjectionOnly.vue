@@ -38,6 +38,7 @@
       >
         <!-- AUDIO BACKGROUND -->
         <audio
+          v-if="fullScreen"
           ref="audio"
           v-show="(slide?.data as ExtendedFileT)?.type?.includes('audio')"
           :src="(slide?.data as ExtendedFileT)?.url"
@@ -56,10 +57,53 @@
           crossorigin="anonymous"
         ></audio>
 
+        <!-- EXTERNAL VIDEO (YOUTUBE/VIMEO) - Only in fullScreen -->
+        <iframe
+          v-if="
+            fullScreen &&
+            slide?.type === slideTypes.media &&
+            ((slide?.data as any)?.type === 'youtube' ||
+              (slide?.data as any)?.type === 'vimeo')
+          "
+          ref="iframe"
+          :src="getEmbedUrl(slide?.data as any)"
+          class="h-[100%] w-[100%] absolute inset-0"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        ></iframe>
+
+        <!-- EXTERNAL VIDEO THUMBNAIL - Only when NOT fullScreen -->
+        <div
+          v-if="
+            !fullScreen &&
+            slide?.type === slideTypes.media &&
+            ((slide?.data as any)?.type === 'youtube' ||
+              (slide?.data as any)?.type === 'vimeo')
+          "
+          class="h-[100%] w-[100%] absolute inset-0 flex items-center justify-center bg-primary-950"
+        >
+          <div class="flex flex-col items-center gap-2">
+            <IconWrapper
+              :name="(slide?.data as any)?.type === 'youtube' ? 'i-bxl-youtube' : 'i-bxl-vimeo'"
+              size="12"
+              :class="(slide?.data as any)?.type === 'youtube' ? 'text-red-500' : 'text-blue-500'"
+            />
+            <p class="text-white text-xs text-center px-4">
+              {{ (slide?.data as any)?.name }}
+            </p>
+          </div>
+        </div>
+
         <!-- VIDEO BACKGROUND -->
         <video
+          v-if="fullScreen"
           ref="video"
-          v-show="slide?.backgroundType === backgroundTypes.video"
+          v-show="
+            slide?.backgroundType === backgroundTypes.video &&
+            (slide?.data as any)?.type !== 'youtube' &&
+            (slide?.data as any)?.type !== 'vimeo'
+          "
           :src="slide?.background"
           autoplay
           :loop="
@@ -72,6 +116,37 @@
               ? slide?.slideStyle?.isMediaMuted
               : true
           "
+          playsinline="true"
+          :class="[
+            'h-[100%] w-[100%] absolute inset-0',
+            slide?.type === slideTypes.media
+              ? 'object-contain'
+              : 'object-cover',
+            {
+              'object-center object-cover':
+                slide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.crop,
+              'object-center object-contain':
+                slide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.fit,
+              'object-center bg-fixed bg-stretch object-fill':
+                slide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.stretch,
+            },
+          ]"
+          crossorigin="anonymous"
+        ></video>
+
+        <!-- VIDEO THUMBNAIL - Only when NOT fullScreen -->
+        <video
+          v-if="
+            !fullScreen &&
+            slide?.backgroundType === backgroundTypes.video &&
+            (slide?.data as any)?.type !== 'youtube' &&
+            (slide?.data as any)?.type !== 'vimeo'
+          "
+          :src="slide?.background"
+          muted
           playsinline="true"
           :class="[
             'h-[100%] w-[100%] absolute inset-0',
@@ -197,10 +272,11 @@
 import { useDebounceFn } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
-import type { ExtendedFileT, Slide, SlideStyle } from "~/types"
+import type { ExtendedFileT, Slide, SlideStyle, ExternalVideo } from "~/types"
 const appMounted = ref<boolean>(false)
 const video = ref<HTMLVideoElement | null>(null)
 const audio = ref<HTMLAudioElement | null>(null)
+const iframe = ref<HTMLIFrameElement | null>(null)
 const foregroundContentVisible = ref<boolean>(true)
 const isLargePreviewOpen = ref<boolean>(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -221,6 +297,35 @@ const props = defineProps<{
   fullScreenHeight?: string
 }>()
 
+const getEmbedUrl = (data: ExternalVideo): string => {
+  const isMuted =
+    props.audioMuted ||
+    (!props.fullScreen ? true : props.slide?.slideStyle?.isMediaMuted)
+  const shouldLoop =
+    props.slide?.type !== slideTypes.media ||
+    props.slide?.slideStyle?.repeatMedia
+
+  if (data.type === "youtube") {
+    let videoId = ""
+    if (data.url.includes("youtu.be")) {
+      videoId = data.url.split("youtu.be/")[1]?.split("?")[0] || ""
+    } else {
+      videoId = data.url.split("v=")[1]?.split("&")[0] || ""
+    }
+    // Enable JS API for control and add necessary parameters
+    const muteParam = isMuted ? "&mute=1" : "&mute=0"
+    const loopParam = shouldLoop ? `&loop=1&playlist=${videoId}` : ""
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0&enablejsapi=1&origin=${window.location.origin}${muteParam}${loopParam}`
+  } else if (data.type === "vimeo") {
+    const videoId = data.url.split("vimeo.com/")[1]?.split("?")[0] || ""
+    // Enable JS API for control
+    const muteParam = isMuted ? "&muted=1" : "&muted=0"
+    const loopParam = shouldLoop ? "&loop=1" : ""
+    return `https://player.vimeo.com/video/${videoId}?autoplay=1&api=1${muteParam}${loopParam}`
+  }
+  return ""
+}
+
 watch(
   () => props.slide,
   (newVal, oldVal) => {
@@ -231,7 +336,11 @@ watch(
       if (appMounted && props.slide.id === currentState.value?.liveSlideId) {
         incrementRenderKey(props.slide)
 
-        video.value?.play()
+        // Only play video/audio when in fullScreen mode
+        if (props.fullScreen) {
+          video.value?.play()
+        }
+
         if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
           foregroundContentVisible.value = false
           setTimeout(() => {
@@ -239,27 +348,136 @@ watch(
           }, 100)
         }
 
-        // console.log(newVal.slideStyle?.mediaSeekPosition)
-        if (newVal.slideStyle?.mediaSeekPosition === 0 && (video.value)) {
-          video.value.currentTime = newVal.slideStyle?.mediaSeekPosition
-        }
-        if (newVal.slideStyle?.mediaSeekPosition === 0 && (audio.value)) {
-          audio.value!.currentTime = newVal.slideStyle?.mediaSeekPosition
+        // Handle seeking - only in fullScreen mode
+        if (
+          props.fullScreen &&
+          newVal.slideStyle?.mediaSeekPosition !== undefined &&
+          newVal.slideStyle?.mediaSeekPosition >= 0
+        ) {
+          const isExternalVideo =
+            (newVal.data as any)?.type === "youtube" ||
+            (newVal.data as any)?.type === "vimeo"
+
+          if (isExternalVideo && iframe.value) {
+            // For YouTube/Vimeo, send postMessage to control playback
+            const videoData = newVal.data as ExternalVideo
+            if (videoData.type === "youtube") {
+              iframe.value.contentWindow?.postMessage(
+                JSON.stringify({
+                  event: "command",
+                  func: "seekTo",
+                  args: [newVal.slideStyle.mediaSeekPosition, true],
+                }),
+                "*"
+              )
+            } else if (videoData.type === "vimeo") {
+              iframe.value.contentWindow?.postMessage(
+                JSON.stringify({
+                  method: "setCurrentTime",
+                  value: newVal.slideStyle.mediaSeekPosition,
+                }),
+                "*"
+              )
+            }
+          } else {
+            // For regular video/audio files
+            if (video.value) {
+              video.value.currentTime = newVal.slideStyle.mediaSeekPosition
+            }
+            if (audio.value) {
+              audio.value.currentTime = newVal.slideStyle.mediaSeekPosition
+            }
+          }
         }
 
-        // Play/pause video
-        // console.log(newVal.name, newVal.slideStyle)
-        if (newVal.slideStyle?.isMediaPlaying) {
-          video.value?.play()
-          audio.value?.play()
-        } else if (
-          !newVal.slideStyle?.isMediaPlaying &&
-          newVal.slideStyle?.isMediaPlaying !== undefined &&
-          newVal.type === slideTypes.media
-        ) {
-          // console.log("triggered pause")
-          video.value?.pause()
-          audio.value?.pause()
+        // Play/pause video - only in fullScreen mode
+        if (props.fullScreen) {
+          if (newVal.slideStyle?.isMediaPlaying) {
+            const isExternalVideo =
+              (newVal.data as any)?.type === "youtube" ||
+              (newVal.data as any)?.type === "vimeo"
+
+            if (isExternalVideo && iframe.value) {
+              const videoData = newVal.data as ExternalVideo
+              if (videoData.type === "youtube") {
+                iframe.value.contentWindow?.postMessage(
+                  JSON.stringify({
+                    event: "command",
+                    func: "playVideo",
+                    args: [],
+                  }),
+                  "*"
+                )
+              } else if (videoData.type === "vimeo") {
+                iframe.value.contentWindow?.postMessage(
+                  JSON.stringify({ method: "play" }),
+                  "*"
+                )
+              }
+            } else {
+              video.value?.play()
+              audio.value?.play()
+            }
+          } else if (
+            !newVal.slideStyle?.isMediaPlaying &&
+            newVal.slideStyle?.isMediaPlaying !== undefined &&
+            newVal.type === slideTypes.media
+          ) {
+            const isExternalVideo =
+              (newVal.data as any)?.type === "youtube" ||
+              (newVal.data as any)?.type === "vimeo"
+
+            if (isExternalVideo && iframe.value) {
+              const videoData = newVal.data as ExternalVideo
+              if (videoData.type === "youtube") {
+                iframe.value.contentWindow?.postMessage(
+                  JSON.stringify({
+                    event: "command",
+                    func: "pauseVideo",
+                    args: [],
+                  }),
+                  "*"
+                )
+              } else if (videoData.type === "vimeo") {
+                iframe.value.contentWindow?.postMessage(
+                  JSON.stringify({ method: "pause" }),
+                  "*"
+                )
+              }
+            } else {
+              video.value?.pause()
+              audio.value?.pause()
+            }
+          }
+
+          // Handle mute/unmute for external videos
+          const isExternalVideo =
+            (newVal.data as any)?.type === "youtube" ||
+            (newVal.data as any)?.type === "vimeo"
+          if (
+            isExternalVideo &&
+            iframe.value &&
+            newVal.slideStyle?.isMediaMuted !== undefined
+          ) {
+            const videoData = newVal.data as ExternalVideo
+            if (videoData.type === "youtube") {
+              const muteFunc = newVal.slideStyle?.isMediaMuted
+                ? "mute"
+                : "unMute"
+              iframe.value.contentWindow?.postMessage(
+                JSON.stringify({ event: "command", func: muteFunc, args: [] }),
+                "*"
+              )
+            } else if (videoData.type === "vimeo") {
+              iframe.value.contentWindow?.postMessage(
+                JSON.stringify({
+                  method: "setVolume",
+                  value: newVal.slideStyle?.isMediaMuted ? 0 : 1,
+                }),
+                "*"
+              )
+            }
+          }
         }
       }
     } catch (err) {
@@ -271,7 +489,10 @@ watch(
 
 onMounted(() => {
   appMounted.value = true
-  video.value?.play()
+  // Only play video when in fullScreen mode
+  if (props.fullScreen) {
+    video.value?.play()
+  }
 })
 
 const backgroundStyles = computed(() => {

@@ -5,6 +5,7 @@
 import { GoogleAuthProvider, signInWithPopup, signInWithCredential, type UserCredential } from "firebase/auth"
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { open } from '@tauri-apps/plugin-shell'
 
 export default function useTauriGoogleAuth() {
   const { isTauri } = useTauri()
@@ -34,12 +35,11 @@ export default function useTauriGoogleAuth() {
           // Set up listener for OAuth callback
           unlistenFn = await listen('oauth_url', async (event: any) => {
             try {
-              console.log('OAuth URL received:', event.payload)
-              
+
               const url = new URL(event.payload as string)
               const code = url.searchParams.get('code')
               const state = url.searchParams.get('state')
-              
+
               if (code) {
                 // Exchange the authorization code for tokens using Firebase
                 // We'll need to use Firebase's REST API for this
@@ -65,7 +65,7 @@ export default function useTauriGoogleAuth() {
           const clientId = await getGoogleClientId()
           const redirectUri = `http://localhost:${oauthPort}`
           const state = Math.random().toString(36).substring(2)
-          
+
           const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
             `client_id=${clientId}` +
             `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -73,8 +73,8 @@ export default function useTauriGoogleAuth() {
             `&scope=${encodeURIComponent('openid email profile')}` +
             `&state=${state}`
 
-          // Open in system browser
-          window.open(authUrl, '_blank')
+          // Open in system browser using Tauri's shell plugin (avoids terminal window on Windows)
+          await open(authUrl)
 
           // Set timeout (5 minutes)
           setTimeout(() => {
@@ -121,7 +121,7 @@ export default function useTauriGoogleAuth() {
     // Or exchange it client-side using Google's token endpoint
     const clientId = await getGoogleClientId()
     const clientSecret = (config.public.GOOGLE_OAUTH_CLIENT_SECRET as string) || ''
-    
+
     try {
       // Exchange code for tokens
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {

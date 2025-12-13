@@ -3,6 +3,7 @@
  * Use this to conditionally run desktop-specific features
  * Should be run onMounted to avoid undefined window issues
  */
+
 export const useTauri = () => {
   const getTauriAvailability = () => {
     if (typeof window !== 'undefined') {
@@ -17,10 +18,12 @@ export const useTauri = () => {
     if (isTauri) {
       document.body.classList.add("tauri")
 
-      // Initialize zoom functionality for desktop app
       const { initializeZoom, registerZoomShortcuts } = useZoom()
+      // const { checkForUpdatesOnStartup } = useAutoUpdate()
+
       initializeZoom()
       registerZoomShortcuts()
+      // checkForUpdatesOnStartup()
     }
   }
 
