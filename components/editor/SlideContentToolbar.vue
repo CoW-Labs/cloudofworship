@@ -4,7 +4,7 @@
     :class="containerOverflow"
   >
     <UTooltip
-      v-if="slide?.type === slideTypes.media"
+      v-if="isMediaFileButNotExternalMedia"
       text="Background fill type"
       :popper="{ placement: 'top' }"
     >
@@ -55,7 +55,9 @@
       v-if="
         slide?.type === slideTypes.media &&
         ((slide?.data as ExtendedFileT)?.type?.includes('video') ||
-          (slide?.data as ExtendedFileT)?.type?.includes('audio'))
+          (slide?.data as ExtendedFileT)?.type?.includes('audio') ||
+          (slide?.data as any)?.type === 'youtube' ||
+          (slide?.data as any)?.type === 'vimeo')
       "
     >
       <UTooltip text="Mute/Unmute media" :popper="{ placement: 'top' }">
@@ -122,6 +124,7 @@
         <UButton
           @click="
             () => {
+              seekTime = 0
               useGlobalEmit(appWideActions.mediaSeek, '0')
               $emit('update-media-seek-position')
             }
@@ -134,6 +137,37 @@
           >Restart</UButton
         >
       </UTooltip>
+      <div
+        class="flex items-center gap-1 bg-primary-100 dark:bg-primary-900 rounded-md px-2"
+      >
+        <UTooltip text="Seek to specific time" :popper="{ placement: 'top' }">
+          <UInput
+            v-model="seekTime"
+            type="number"
+            placeholder="Seconds"
+            class="w-[80px]"
+            :ui="{
+              base: 'bg-transparent',
+              rounded: 'rounded-md',
+              size: { sm: 'text-xs' },
+            }"
+            size="sm"
+            min="0"
+            @keyup.enter="handleSeek"
+          />
+        </UTooltip>
+        <UTooltip text="Go to time" :popper="{ placement: 'top' }">
+          <UButton
+            @click="handleSeek"
+            :class="[
+              'dark:text-primary-500 dark:hover:text-primary-500 p-2 hover:bg-primary-300 hover:text-primary-500',
+            ]"
+            icon="i-tabler-player-skip-forward"
+            variant="ghost"
+            size="xs"
+          />
+        </UTooltip>
+      </div>
     </template>
     <FontSelect
       v-if="slide?.type !== slideTypes?.media"
@@ -410,6 +444,8 @@ const slideFontSize = ref<number>(
 )
 const isLoading = ref<boolean>(false)
 const containerOverflow = ref<string>("overflow-x-auto")
+const seekTime = ref<number>(0)
+
 const emit = defineEmits([
   "update-song-lyrics",
   "update-media-seek-position",
@@ -422,7 +458,17 @@ const emit = defineEmits([
   "update-lettercase",
   "update-bg-fill-type",
   "update-media-muted",
+  "update-media-seek",
 ])
+
+const isMediaFileButNotExternalMedia = computed(() => {
+  const mediaType = (props.slide?.data as ExternalVideo)?.type
+  return (
+    props.slide?.type === "media" &&
+    mediaType !== "youtube" &&
+    mediaType !== "vimeo"
+  )
+})
 
 watch(
   () => props.slide,
@@ -440,6 +486,13 @@ const refreshSongLyrics = async (songId: string) => {
   emit("update-song-lyrics", song)
   isLoading.value = false
   // console.log(song)
+}
+
+const handleSeek = () => {
+  if (seekTime.value >= 0) {
+    useGlobalEmit(appWideActions.mediaSeek, seekTime.value.toString())
+    emit("update-media-seek", seekTime.value)
+  }
 }
 </script>
 

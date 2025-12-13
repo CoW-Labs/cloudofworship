@@ -7,7 +7,7 @@
         <span class="font-semibold">Cloud of Worship</span>
       </p>
     </div>
-    <form class="flex flex-col gap-3 max-w-[325px] mx-auto" @submit="login()">
+    <form class="flex flex-col gap-3 max-w-[325px] mx-auto" @submit="login">
       <UFormGroup size="lg">
         <UInput placeholder="Your email" v-model="email" />
       </UFormGroup>
@@ -57,9 +57,9 @@
         block
         size="lg"
         class="mt-6"
+        type="submit"
         :disabled="!(useValidEmail(email) && password.length >= 8)"
         :loading="loading"
-        @click="login"
       >
         Log In
       </UButton>
@@ -69,6 +69,7 @@
         size="lg"
         class="mt-0"
         color="white"
+        type="button"
         :loading="googleLoading"
         @click="handleGoogleSignIn"
       >
@@ -77,7 +78,7 @@
       </UButton>
       <p class="text-sm flex items-center justify-center gap-0">
         I don't have an account.
-        <UButton size="sm" class="p-1" variant="link" to="/signup"
+        <UButton size="sm" class="p-1" variant="link" to="/signup" type="button"
           >Create an account</UButton
         >
       </p>
@@ -125,7 +126,8 @@ const loading = ref(false)
 const googleLoading = ref(false)
 const { token } = useAuthToken()
 
-const login = async () => {
+const login = async (event) => {
+  event.preventDefault()
   loading.value = true
   const { data, error } = await useAPIFetch<LoginResponseT>("/auth/login", {
     method: "POST",

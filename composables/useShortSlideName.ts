@@ -1,4 +1,4 @@
-import type { Slide } from "~/types";
+import type { ExternalVideo, Slide } from "~/types";
 
 const useShortSlideName = (slide: Slide, options?: { longer: boolean }) => {
   switch (slide.type) {
@@ -26,6 +26,8 @@ const useShortSlideName = (slide: Slide, options?: { longer: boolean }) => {
     case slideTypes.media:
       if (slide?.name?.length <= 12) {
         return slide.name
+      } else if ((slide.data as ExternalVideo)?.type === 'vimeo' || (slide.data as ExternalVideo)?.type === 'youtube') {
+        return `${slide?.name?.slice(0, options?.longer ? 20 : 10)}...`
       } else {
         return `${slide?.name?.slice(0, 6).trim()}..${slide.name?.substring(slide.name.lastIndexOf('.'))}`
       }

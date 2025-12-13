@@ -250,6 +250,7 @@
             mediaSeekPosition: 0,
           })
         "
+        @update-media-seek="onUpdateMediaSeek($event)"
         @update-bg-fill-type="
           onUpdateSlideStyle({
             ...slide.slideStyle,
@@ -452,7 +453,22 @@ const onUpdateSlideStyle = (
   emit(isSlideActive ? "slide-update" : "inactive-slide-update", tempSlide)
 }
 
+// For just restarting, to go back to position 0
 const onUpdateMediaSeekPosition = (slideStyle: SlideStyle) => {
+  onUpdateSlideStyle(slideStyle)
+
+  setTimeout(() => {
+    onUpdateSlideStyle({ ...slideStyle, mediaSeekPosition: -1 })
+  }, 5000)
+}
+
+// For Multiple seek Positions - Technical debt here
+// TODO: This function and [onUpdateMediaSeekPosition] need to be merged some way.
+const onUpdateMediaSeek = (seekTime: number) => {
+  const slideStyle = {
+    ...props.slide?.slideStyle,
+    mediaSeekPosition: seekTime,
+  }
   onUpdateSlideStyle(slideStyle)
 
   setTimeout(() => {

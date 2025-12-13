@@ -882,7 +882,7 @@ const createNewSongSlide = (song: Song) => {
 }
 
 const createNewMediaSlide = async (
-  file: ExtendedFileT,
+  file: ExtendedFileT & { isExternal?: boolean },
   options?: { oneOfManySlides: boolean }
 ) => {
   const tempSlide = { ...preSlideCreation() }
@@ -897,33 +897,60 @@ const createNewMediaSlide = async (
     ...tempSlide.slideStyle,
     backgroundFillType: backgroundFillTypes.crop,
   }
-  tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
-  tempSlide.background = file.type === "audio" ? randomImage : file.url
-  tempSlide.backgroundVideoKey = file.type?.includes("video")
-    ? appStore.currentState.settings.defaultBackground.default
-        ?.backgroundVideoKey
-    : null
-  tempSlide.data = file
-  tempSlide.name = useSlideName(tempSlide)
 
-  // Read Blob as array buffer
-  const fileReader = new FileReader()
-  if (file.blob) {
-    fileReader.readAsArrayBuffer(file.blob)
-    fileReader.addEventListener("loadend", async (event) => {
-      data = fileReader.result
-      // Store Blob in DB for easy retrieval on reload
-      await useIndexedDB()
-        .media.add({
-          id: tempSlide.id,
-          content: { size: file?.blob?.size, type: file?.blob?.type },
-          data: data as ArrayBuffer,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-        .catch((err) => console.error("Failed to add media slide:", err))
-      delete file.blob
-    })
+  // Handle external videos (YouTube/Vimeo)
+  if (file.isExternal) {
+    const externalVideo: any = {
+      url: file.url,
+      type: file.type, // 'youtube' or 'vimeo'
+      name: file.name,
+    }
+    tempSlide.backgroundType = "video"
+    tempSlide.background = randomImage // Placeholder image
+    tempSlide.backgroundVideoKey = null
+    tempSlide.data = externalVideo
+    tempSlide.name = file.name || `${file.type} Video`
+
+    // Store external video data in IndexedDB
+    await useIndexedDB()
+      .media.add({
+        id: tempSlide.id,
+        content: { type: file.type },
+        data: externalVideo,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .catch((err) => console.error("Failed to add external video slide:", err))
+  } else {
+    // Handle regular files
+    tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
+    tempSlide.background = file.type === "audio" ? randomImage : file.url
+    tempSlide.backgroundVideoKey = file.type?.includes("video")
+      ? appStore.currentState.settings.defaultBackground.default
+          ?.backgroundVideoKey
+      : null
+    tempSlide.data = file
+    tempSlide.name = useSlideName(tempSlide)
+
+    // Read Blob as array buffer
+    const fileReader = new FileReader()
+    if (file.blob) {
+      fileReader.readAsArrayBuffer(file.blob)
+      fileReader.addEventListener("loadend", async (event) => {
+        data = fileReader.result
+        // Store Blob in DB for easy retrieval on reload
+        await useIndexedDB()
+          .media.add({
+            id: tempSlide.id,
+            content: { size: file?.blob?.size, type: file?.blob?.type },
+            data: data as ArrayBuffer,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })
+          .catch((err) => console.error("Failed to add media slide:", err))
+        delete file.blob
+      })
+    }
   }
 
   slides.value?.push(tempSlide)
@@ -933,7 +960,7 @@ const createNewMediaSlide = async (
     // uploadOfflineSlides()
   }
   usePosthogCapture("NEW_MEDIA_SLIDE_CREATED", {
-    file_type: tempSlide?.data?.type,
+    file_type: tempSlide?.data?.type || file.type,
   })
   return { ...tempSlide, blob }
 }
