@@ -685,7 +685,8 @@ onBeforeUnmount(() => {
   border-radius: 40px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-  font-size: 0.875rem;
+  font-size: 1rem;
+  font-weight: 600;
   white-space: nowrap;
   height: 60px;
 }
@@ -693,7 +694,7 @@ onBeforeUnmount(() => {
 @media (min-width: 768px) {
   .btn {
     padding: 0.6rem 1.5rem;
-    font-size: 1rem;
+    font-size: 1.125rem;
   }
 }
 
