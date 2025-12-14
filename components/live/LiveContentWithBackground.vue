@@ -17,10 +17,8 @@
         <img
           :src="(slide?.data as any)?.thumbnail"
           :alt="(slide?.data as any)?.name"
-          class="w-full h-full object-cover opacity-60"
+          class="w-full h-full object-cover opacity-100"
         />
-        <!-- Dark overlay -->
-        <div class="absolute inset-0 bg-black bg-opacity-40"></div>
       </div>
     </div>
 
