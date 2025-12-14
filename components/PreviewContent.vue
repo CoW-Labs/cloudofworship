@@ -903,6 +903,7 @@ const createNewMediaSlide = async (
     const externalVideo: any = {
       url: file.url,
       type: file.type, // 'youtube' or 'vimeo'
+      thumbnail: file.thumbnail,
       name: file.name,
     }
     tempSlide.backgroundType = "video"

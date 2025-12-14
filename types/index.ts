@@ -122,6 +122,7 @@ export interface ExternalVideo {
   url: string
   type: string // "youtube" | "vimeo" | "other"
   name?: string
+  thumbnail?: string
 }
 
 export interface Media {
