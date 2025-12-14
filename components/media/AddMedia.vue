@@ -118,28 +118,63 @@
             @click="removeFile(index)"
           >
             <!-- External Videos (YouTube/Vimeo) -->
-
-            <div class="flex flex-col gap-2" v-if="fileObj.isExternal">
+            <div
+              v-if="fileObj.isExternal"
+              class="w-full flex items-center gap-3 p-3 rounded-md bg-primary-50 dark:bg-primary-900"
+            >
+              <!-- Thumbnail -->
               <div
-                v-for="(video, index) in externalVideos"
-                :key="index"
-                class="flex items-center gap-2 p-3 rounded-md bg-primary-50 dark:bg-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800 transition-all h-full w-[100%]"
+                class="relative w-32 h-20 flex-shrink-0 rounded-md overflow-hidden bg-primary-100 dark:bg-primary-800"
               >
-                <IconWrapper
-                  :name="
-                    video.type === 'youtube' ? 'i-bxl-youtube' : 'i-bxl-vimeo'
-                  "
-                  size="6"
-                  :class="
-                    video.type === 'youtube' ? 'text-red-500' : 'text-blue-500'
-                  "
+                <img
+                  v-if="fileObj.thumbnail"
+                  :src="fileObj.thumbnail"
+                  :alt="fileObj.name"
+                  class="w-full h-full object-cover"
+                  @error="(e) => (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'%3E%3Crect fill=\'%23333\' width=\'100\' height=\'100\'/%3E%3C/svg%3E'"
                 />
-                <div class="flex-1">
-                  <p class="text-sm font-medium">{{ video.name }}</p>
-                  <p class="text-xs text-gray-500 truncate w-[250px]">
-                    {{ video.url }}
-                  </p>
+                <div
+                  v-else
+                  class="w-full h-full flex items-center justify-center"
+                >
+                  <IconWrapper
+                    :name="
+                      fileObj.type === 'youtube'
+                        ? 'i-bxl-youtube'
+                        : 'i-bxl-vimeo'
+                    "
+                    size="8"
+                    :class="
+                      fileObj.type === 'youtube'
+                        ? 'text-red-500'
+                        : 'text-blue-500'
+                    "
+                  />
                 </div>
+                <!-- Play overlay -->
+                <div
+                  class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30"
+                >
+                  <IconWrapper
+                    :name="
+                      fileObj.type === 'youtube'
+                        ? 'i-bxl-youtube'
+                        : 'i-bxl-vimeo'
+                    "
+                    size="8"
+                    class="text-white opacity-90"
+                  />
+                </div>
+              </div>
+
+              <!-- Video Info -->
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium line-clamp-2">
+                  {{ fileObj.name }}
+                </p>
+                <p class="text-xs text-gray-500 truncate mt-1">
+                  {{ fileObj.url }}
+                </p>
               </div>
             </div>
 
@@ -233,21 +268,78 @@ const detectVideoType = (url: string): string => {
   return "other"
 }
 
-const extractVideoName = (url: string): string => {
-  const type = detectVideoType(url)
+const extractVideoId = (url: string, type: string): string => {
   if (type === "youtube") {
-    const videoId = url.includes("youtu.be")
-      ? url.split("youtu.be/")[1]?.split("?")[0]
-      : url.split("v=")[1]?.split("&")[0]
-    return `YouTube Video ${videoId ? `(${videoId})` : ""}`
+    if (url.includes("youtu.be")) {
+      return url.split("youtu.be/")[1]?.split("?")[0] || ""
+    } else {
+      return url.split("v=")[1]?.split("&")[0] || ""
+    }
   } else if (type === "vimeo") {
-    const videoId = url.split("vimeo.com/")[1]?.split("?")[0]
-    return `Vimeo Video ${videoId ? `(${videoId})` : ""}`
+    return url.split("vimeo.com/")[1]?.split("?")[0]?.split("/")[0] || ""
   }
-  return "External Video"
+  return ""
 }
 
-const addExternalVideo = () => {
+const getVideoThumbnail = (videoId: string, type: string): string => {
+  if (type === "youtube") {
+    // YouTube thumbnail URLs - maxresdefault for highest quality, fallback to hqdefault
+    return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+  } else if (type === "vimeo") {
+    // For Vimeo, we'll need to fetch from API - return placeholder for now
+    return `https://vumbnail.com/${videoId}.jpg`
+  }
+  return ""
+}
+
+const fetchVideoMetadata = async (
+  url: string,
+  type: string,
+  videoId: string
+): Promise<{ title: string; thumbnail: string }> => {
+  try {
+    if (type === "youtube") {
+      // For YouTube, use oEmbed API (no API key needed)
+      const response = await fetch(
+        `https://www.youtube.com/oembed?url=${encodeURIComponent(
+          url
+        )}&format=json`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        return {
+          title: data.title || `YouTube Video (${videoId})`,
+          thumbnail: getVideoThumbnail(videoId, type),
+        }
+      }
+    } else if (type === "vimeo") {
+      // For Vimeo, use oEmbed API
+      const response = await fetch(
+        `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        return {
+          title: data.title || `Vimeo Video (${videoId})`,
+          thumbnail: data.thumbnail_url || getVideoThumbnail(videoId, type),
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching video metadata:", error)
+  }
+
+  // Fallback
+  return {
+    title:
+      type === "youtube"
+        ? `YouTube Video (${videoId})`
+        : `Vimeo Video (${videoId})`,
+    thumbnail: getVideoThumbnail(videoId, type),
+  }
+}
+
+const addExternalVideo = async () => {
   if (!externalVideoUrl.value) return
 
   const type = detectVideoType(externalVideoUrl.value)
@@ -261,10 +353,29 @@ const addExternalVideo = () => {
     return
   }
 
+  const videoId = extractVideoId(externalVideoUrl.value, type)
+  if (!videoId) {
+    toast.add({
+      title: "Invalid URL",
+      description: "Could not extract video ID from URL",
+      icon: "i-bx-error",
+      color: "red",
+    })
+    return
+  }
+
+  // Fetch metadata
+  const metadata = await fetchVideoMetadata(
+    externalVideoUrl.value,
+    type,
+    videoId
+  )
+
   const video: ExternalVideo = {
     url: externalVideoUrl.value,
     type: type,
-    name: extractVideoName(externalVideoUrl.value),
+    name: metadata.title,
+    thumbnail: metadata.thumbnail,
   }
 
   externalVideos.value.push(video)
@@ -297,6 +408,7 @@ const fileObjs = computed(() => {
       name: video.name,
       type: video.type,
       url: video.url,
+      thumbnail: video.thumbnail,
       isExternal: true,
     })
   })
@@ -319,6 +431,7 @@ const addMediaEmitter = async () => {
           name: fileObj.name,
           type: fileObj.type,
           url: fileObj.url,
+          thumbnail: fileObj.thumbnail,
           isExternal: true,
         } as ExtendedFileT & { isExternal: boolean }
       }

@@ -10,17 +10,17 @@
         ((slide?.data as any)?.type === 'youtube' ||
           (slide?.data as any)?.type === 'vimeo')
       "
-      class="absolute inset-0 flex items-center justify-center bg-primary-950"
+      class="absolute inset-0 bg-primary-950"
     >
-      <div class="flex flex-col items-center gap-2 pt-4">
-        <IconWrapper
-          :name="(slide?.data as any)?.type === 'youtube' ? 'i-bxl-youtube' : 'i-bxl-vimeo'"
-          size="8"
-          :class="(slide?.data as any)?.type === 'youtube' ? 'text-red-500' : 'text-blue-500'"
+      <!-- Thumbnail Background -->
+      <div v-if="(slide?.data as any)?.thumbnail" class="absolute inset-0">
+        <img
+          :src="(slide?.data as any)?.thumbnail"
+          :alt="(slide?.data as any)?.name"
+          class="w-full h-full object-cover opacity-60"
         />
-        <p class="text-white text-xs text-center px-4">
-          {{ (slide?.data as any)?.name }}
-        </p>
+        <!-- Dark overlay -->
+        <div class="absolute inset-0 bg-black bg-opacity-40"></div>
       </div>
     </div>
 
