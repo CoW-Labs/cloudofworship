@@ -117,7 +117,19 @@ const apiData = ref<null | {
     shared: number
     contributionPercentile: number
   }
-  scriptureUsage: number
+  scriptureUsage: {
+    count: number
+    percentile: number
+  }
+  usageByWeekday: {
+    1: number // Monday
+    2: number // Tuesday
+    3: number // Wednesday
+    4: number // Thursday
+    5: number // Friday
+    6: number // Saturday
+    7: number // Sunday
+  }
   files: {
     fileCount: number
     bytesUsed: number
@@ -196,7 +208,7 @@ const data = ref([
     id: "5",
     maintext: "You’ve uploaded 30+ media files totaling 430 MB on CoW.",
     subtext:
-      "Guess what? We love a church that covets all of the free cloud storage we share. That's why we are Cloud of Worship.",
+      "We love it when churches take full advantage of the free cloud storage we share — that’s why Cloud of Worship exists.",
     actions: [
       {
         text: "See how much much you explored",
@@ -257,12 +269,34 @@ const reformedData = computed(() => {
   // Helper function to format bytes to MB
   const bytesToMB = (bytes: number) => (bytes / (1024 * 1024)).toFixed(0)
 
+  // Helper function to get top 2 most active days
+  const getMostActiveDays = () => {
+    if (!api.usageByWeekday) return ["Sunday", "Wednesday"]
+
+    const dayNames = [
+      "",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ]
+    const sortedDays = Object.entries(api.usageByWeekday)
+      .sort(([, a], [, b]) => (b as number) - (a as number))
+      .slice(0, 2)
+      .map(([day]) => dayNames[parseInt(day)])
+
+    return sortedDays.length === 2 ? sortedDays : ["Sunday", "Wednesday"]
+  }
+
   return data.value.map((item) => {
     let maintext = item.maintext
     let subtext = item.subtext
 
     // Replace church name with colored version
-    const churchName = `<span class="text-primary-300">${
+    const churchName = `<span class="text-primary-300 font-semibold">${
       church?.type || church?.name || "Church"
     }</span>`
     const churchCreationDate =
@@ -283,18 +317,28 @@ const reformedData = computed(() => {
         // Live sessions count
         maintext = maintext.replace(
           /6,540/g,
-          `<span class="text-primary-300">${api.liveSessions || 0}</span>`
+          `<span class="text-primary-300 font-semibold">${
+            api.liveSessions || 0
+          }</span>`
+        )
+        // Most active days
+        const [day1, day2] = getMostActiveDays()
+        subtext = subtext.replace(
+          /Sunday \(of course!\) and Wednesday/g,
+          `<span class="text-primary-300 font-semibold">${day1}</span> (of course!) and <span class="text-primary-300 font-semibold">${day2}</span>`
         )
         break
       case "3":
         // Songs contribution
         maintext = maintext.replace(
           /173\+/g,
-          `<span class="text-primary-300">${api.songs?.shared || 0}+</span>`
+          `<span class="text-primary-300 font-semibold">${
+            api.songs?.shared || 0
+          }+</span>`
         )
         maintext = maintext.replace(
           /0\.05%/g,
-          `<span class="text-primary-300">${
+          `<span class="text-primary-300 font-semibold">${
             api.songs?.contributionPercentile?.toFixed(2) || 0
           }%</span>`
         )
@@ -303,22 +347,28 @@ const reformedData = computed(() => {
         // Scripture usage
         subtext = subtext.replace(
           /1,257\+/g,
-          `<span class="text-primary-300">${api.scriptureUsage || 0}+</span>`
+          `<span class="text-primary-300 font-semibold">${
+            api.scriptureUsage?.count || 0
+          }+</span>`
         )
         subtext = subtext.replace(
           /80%/g,
-          `<span class="text-primary-300">80%</span>`
+          `<span class="text-primary-300 font-semibold">${
+            (100 - api.scriptureUsage?.percentile).toFixed(2) || 0
+          }%</span>`
         )
         break
       case "5":
         // Media files
         maintext = maintext.replace(
           /30\+/g,
-          `<span class="text-primary-300">${api.files?.fileCount || 0}+</span>`
+          `<span class="text-primary-300 font-semibold">${
+            api.files?.fileCount || 0
+          }+</span>`
         )
         maintext = maintext.replace(
           /430 MB/g,
-          `<span class="text-primary-300">${bytesToMB(
+          `<span class="text-primary-300 font-semibold">${bytesToMB(
             api.files?.bytesUsed || 0
           )} MB</span>`
         )
@@ -326,7 +376,7 @@ const reformedData = computed(() => {
       case "6":
         // Countdown feature - conditionally show if they have used it
         if (api.countdownSlides > 0) {
-          maintext = `You've created <span class="text-primary-300">${api.countdownSlides}</span> countdown slides this year.`
+          maintext = `You've created <span class="text-primary-300 font-semibold">${api.countdownSlides}</span> countdown slides this year.`
           subtext =
             "That's awesome! Keep engaging your congregation with these dynamic elements."
           return {
@@ -520,11 +570,13 @@ function numberWithCommas(x: number | null | undefined) {
 }
 
 function composeShareMessage() {
-  const scriptures = apiData.value?.scriptureUsage ?? 0
+  const scriptures = apiData.value?.scriptureUsage?.count ?? 0
   const live = apiData.value?.liveSessions ?? 0
-  const churchId = authStore.church?.id || ""
+  const churchId = authStore.church?._id || ""
   const link = `https://app.cloudofworship.com/signup${
-    churchId ? `?from=${churchId}` : ""
+    churchId
+      ? `?&utm_medium=share&utm_campaign=year_in_review&utm_source=${churchId}`
+      : ""
   }`
   return `${authStore.church?.name}, ${
     authStore.church?.type
