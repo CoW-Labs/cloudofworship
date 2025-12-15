@@ -99,7 +99,11 @@ jobs:
             next_patch=$((patch + 1))
             next_version="v${major}.${minor}.${next_patch}-beta"
           else
-            next_version="$last_tag"  # If no valid changes, keep the same version
+            # No semver-affecting commits detected -> skip release steps
+            echo "No semver changes detected; skipping release steps"
+            echo "SKIP_RELEASE=1" >> $GITHUB_ENV
+            echo "next_version=$last_tag" >> $GITHUB_ENV
+            exit 0
           fi
 
           echo "Initial next_version: $next_version"
@@ -134,6 +138,7 @@ jobs:
           echo "next_version=$next_version" >> $GITHUB_ENV
 
       - name: Update appVersion in app.vue
+        if: env.SKIP_RELEASE != '1'
         run: |
           # Replace the version string in the specific line (more flexible pattern)
           sed -i 's/const appVersion = ref<string>("[^"]*")/const appVersion = ref<string>("${{ env.next_version }}")/' app.vue
@@ -157,11 +162,13 @@ jobs:
           fi
 
       - name: Create Tag
+        if: env.SKIP_RELEASE != '1'
         run: |
           git tag -a ${{ env.next_version }} -m "Release version ${{ env.next_version }}"
           # git push origin ${{ env.next_version }}
 
       - name: Create GitHub Release
+        if: env.SKIP_RELEASE != '1'
         uses: actions/create-release@v1.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -169,5 +176,4 @@ jobs:
           tag_name: ${{ env.next_version }}
           release_name: "Release ${{ env.next_version }}"
           body: ${{ fromJSON(env.release_notes) }}
-          draft: false
-          prerelease: false
+          draft:
