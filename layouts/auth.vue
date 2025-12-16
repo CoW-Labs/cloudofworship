@@ -6,19 +6,19 @@
       >
         <div>
           <div class="flex items-center gap-3 mb-16">
-            <CoWLogo class="w-80" />
+            <CoWLogo class="w-80 blur-in-0 opacity-0" />
           </div>
 
-          <div class="space-y-4">
+          <div class="space-y-4 blur-in-1 opacity-0">
             <h1 class="text-6xl font-light leading-tight">
-              <div class="font-semibold">Join 1,000+ churches</div>
+              <div class="font-semibold">Join 1,200+ churches</div>
               delivering great on-screen experiences to their congregations.
             </h1>
           </div>
         </div>
 
-        <div class="text-xs opacity-80">
-          <p>
+        <div class="text-xs opacity-0 blur-in-2">
+          <p class="opacity-80">
             &copy; {{ new Date().getFullYear() }} Cloud of Worship (CoW Labs).
             All rights reserved.
           </p>
@@ -27,9 +27,10 @@
     </div>
 
     <!-- Right Side - Auth Form -->
-    <div
+    <!-- <div
       class="w-full lg:w-2/5 bg-[radial-gradient(circle,#cd99ff,white,white)] dark:bg-[radial-gradient(circle,#31005f,rgb(17,24,39),rgb(17,24,39))] grid place-items-center lg:p-8"
-    >
+    > -->
+    <div class="w-full lg:w-2/5 grid place-items-center lg:p-8">
       <div
         class="auth-box bg-[#1a1f2e] dark:bg-gray-900 rounded-2xl p-[3rem] py-[5%] max-w-[450px] w-[100%] relative"
       >
@@ -74,5 +75,30 @@ h1 {
 }
 .outlined-text-dark {
   -webkit-text-stroke: 1px #a855f7;
+}
+
+@keyframes blurIn {
+  0% {
+    filter: blur(10px);
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    filter: blur(0px);
+    transform: translate(0px);
+    opacity: 1;
+  }
+}
+
+.blur-in-0 {
+  animation: blurIn 0.5s ease-out 0s forwards;
+}
+
+.blur-in-1 {
+  animation: blurIn 0.5s ease-out 0.2s forwards;
+}
+
+.blur-in-2 {
+  animation: blurIn 0.5s ease-out 0.4s forwards;
 }
 </style>
