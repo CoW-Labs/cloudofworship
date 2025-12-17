@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cloud of Worship",
-  "version": "1.0.0",
+  "version": "0.35.5",
   "identifier": "com.cloudofworship.app",
   "build": {
     "frontendDist": "../dist",
@@ -52,7 +52,7 @@
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYxRDg0OTNGREE5OTExNTAKUldSUUVabmFQMG5ZWWF1ZDlRUVFxSi9OZ1BtZWthdXE3c2lESXVweXBUbjdkcWRwQ3JJNHR0RVUK",
       "endpoints": [
-        "https://github.com/felixfavour/minimalist-church-presentation-software/releases/latest/download/latest.json"
+        "https://felixfavour.github.io/minimalist-church-presentation-software/latest.json"
       ],
       "dialog": true,
       "windows": {
