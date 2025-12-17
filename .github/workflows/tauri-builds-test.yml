@@ -229,3 +229,58 @@ jobs:
           prerelease: false
           # This tells tauri-action to update an existing release
           includeUpdaterJson: true
+
+  create-latest-json:
+    needs: [release, build]
+    if: needs.release.outputs.skip_release != '1'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Create latest.json
+        run: |
+          # Remove 'v' prefix for version string
+          version=$(echo "${{ needs.release.outputs.next_version }}" | sed 's/^v//')
+
+          # Create latest.json with release information
+          cat > latest.json << EOF
+          {
+            "version": "${version}",
+            "tag": "${{ needs.release.outputs.next_version }}",
+            "releaseDate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "releaseNotes": ${{ needs.release.outputs.release_notes }},
+            "platforms": {
+              "darwin": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.release.outputs.next_version }}/",
+                "signature": ""
+              },
+              "windows": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.release.outputs.next_version }}/",
+                "signature": ""
+              }
+            }
+          }
+          EOF
+
+          cat latest.json
+
+      - name: Commit and Push latest.json
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add latest.json
+
+          if git diff --staged --quiet; then
+            echo "No changes to latest.json"
+          else
+            git commit -m "Update latest.json for release ${{ needs.release.outputs.next_version }}"
+            git push
+          fi
