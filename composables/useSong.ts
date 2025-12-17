@@ -31,8 +31,6 @@ const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<S
   appStore.setSlideStyles({ ...appStore.currentState.settings.slideStyles, linesPerSlide: linesPerDisplay })
 
   try {
-    // console.log('song', song)
-    // console.log('song', song)
     if (typeof song === 'string' && song?.includes('-')) {
       // If [song] param comes as an ID, retrieve song obj from local backend first, if it's not ObjectID string
       const db = useIndexedDB()
@@ -58,19 +56,24 @@ const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<S
     const lyricLines = song.lyrics?.replaceAll('\n \n', '\n\n')?.split('\n')
 
     for (let i = 0; i < lyricLines.length; i++) {
+      console.log('lineCount', lineCount)
       let line = lyricLines[i]
-      // if (line.toLocaleLowerCase().includes('[verse') || line.toLocaleLowerCase().includes('[intro]') || line.toLocaleLowerCase().includes('[chorus]')) {
-      //   continue
-      // }
 
+      // Clean up line
       line = line.replaceAll("â", "'").replaceAll('solo: ', '')?.replaceAll(' ??? ', '')?.replaceAll(' ?? ', '')?.replaceAll('[force-verse-break]', '')
+
+      // if line is empty, pick new line and start new verse
+      if (line.trim() === '') {
+        verses.push(tempVerse?.replace('\n\n', ''))
+        lineCount = 0
+        tempVerse = ''
+        continue
+      }
+
       tempVerse += `${line}\n`
       lineCount += 1
 
-
       if (tempVerse.includes('\n\n')) {
-        // console.log(lyricLines[i])
-        // console.log(lyricLines[i + 1])
         verses.push(tempVerse?.replace('\n\n', ''))
         lineCount = 0
         tempVerse = ''
