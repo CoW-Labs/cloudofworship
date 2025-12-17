@@ -9,6 +9,10 @@ jobs:
   release:
     permissions:
       contents: write
+    outputs:
+      next_version: ${{ steps.versioning.outputs.next_version }}
+      release_notes: ${{ steps.release_notes.outputs.release_notes }}
+      skip_release: ${{ steps.versioning.outputs.skip_release }}
 
     runs-on: ubuntu-latest
 
@@ -23,7 +27,6 @@ jobs:
         id: last_tag
         run: |
           latest=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
-
           echo "last_tag=$latest" >> $GITHUB_ENV
 
       - name: Get Release Notes
@@ -48,6 +51,7 @@ jobs:
           escaped_commits=$(printf "%s" "$filtered_commits" | jq -Rsa .)
 
           echo "release_notes=$escaped_commits" >> $GITHUB_ENV
+          echo "release_notes=$escaped_commits" >> $GITHUB_OUTPUT
 
       - name: Generate Next Version Tag
         id: versioning
@@ -102,7 +106,9 @@ jobs:
             # No semver-affecting commits detected -> skip release steps
             echo "No semver changes detected; skipping release steps"
             echo "SKIP_RELEASE=1" >> $GITHUB_ENV
+            echo "skip_release=1" >> $GITHUB_OUTPUT
             echo "next_version=$last_tag" >> $GITHUB_ENV
+            echo "next_version=$last_tag" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -136,28 +142,35 @@ jobs:
 
           echo "Final next_version: $next_version"
           echo "next_version=$next_version" >> $GITHUB_ENV
+          echo "next_version=$next_version" >> $GITHUB_OUTPUT
+          echo "skip_release=0" >> $GITHUB_OUTPUT
 
-      - name: Update appVersion in app.vue
+      - name: Update appVersion in app.vue and tauri.conf.json
         if: env.SKIP_RELEASE != '1'
         run: |
-          # Replace the version string in the specific line (more flexible pattern)
+          # Remove 'v' prefix and '-beta' suffix for tauri.conf.json
+          tauri_version=$(echo "${{ env.next_version }}" | sed 's/^v//' | sed 's/-beta//')
+
+          # Replace the version string in app.vue
           sed -i 's/const appVersion = ref<string>("[^"]*")/const appVersion = ref<string>("${{ env.next_version }}")/' app.vue
 
+          # Replace the version in tauri.conf.json
+          sed -i 's/"version": "[^"]*"/"version": "'"$tauri_version"'"/' src-tauri/tauri.conf.json
+
           # Check if there are actually changes to commit
-          if git diff --quiet app.vue; then
-            echo "No changes detected in app.vue - version might already be ${{ env.next_version }}"
+          if git diff --quiet app.vue src-tauri/tauri.conf.json; then
+            echo "No changes detected - versions might already be ${{ env.next_version }}"
             echo "Skipping commit step"
           else
-            echo "Changes detected in app.vue, committing..."
+            echo "Changes detected, committing..."
             
             # Configure Git to commit the changes
             git config user.name "github-actions"
             git config user.email "actions@github.com"
 
-            # Commit and push the updated file
-            git add app.vue
+            # Commit and push the updated files
+            git add app.vue src-tauri/tauri.conf.json
             git commit -m "Update appVersion to ${{ env.next_version }}"
-            git branch
             git push
           fi
 
@@ -165,15 +178,109 @@ jobs:
         if: env.SKIP_RELEASE != '1'
         run: |
           git tag -a ${{ env.next_version }} -m "Release version ${{ env.next_version }}"
-          # git push origin ${{ env.next_version }}
+          git push origin ${{ env.next_version }}
 
-      - name: Create GitHub Release
-        if: env.SKIP_RELEASE != '1'
-        uses: actions/create-release@v1.1.0
+  build:
+    needs: release
+    if: needs.release.outputs.skip_release != '1'
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          # Checkout the branch, not the tag - let tauri-action handle the tag
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.next_version }}
-          release_name: "Release ${{ env.next_version }}"
-          body: ${{ fromJSON(env.release_notes) }}
-          draft:
+          tagName: ${{ needs.release.outputs.next_version }}
+          releaseName: "Release ${{ needs.release.outputs.next_version }}"
+          releaseBody: ${{ fromJSON(needs.release.outputs.release_notes) }}
+          releaseDraft: false
+          prerelease: false
+          # This tells tauri-action to update an existing release
+          includeUpdaterJson: true
+
+  create-latest-json:
+    needs: [release, build]
+    if: needs.release.outputs.skip_release != '1'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Create latest.json
+        run: |
+          # Remove 'v' prefix for version string
+          version=$(echo "${{ needs.release.outputs.next_version }}" | sed 's/^v//')
+
+          # Create latest.json with release information
+          cat > latest.json << EOF
+          {
+            "version": "${version}",
+            "tag": "${{ needs.release.outputs.next_version }}",
+            "releaseDate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "releaseNotes": ${{ needs.release.outputs.release_notes }},
+            "platforms": {
+              "darwin": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.release.outputs.next_version }}/",
+                "signature": ""
+              },
+              "windows": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.release.outputs.next_version }}/",
+                "signature": ""
+              }
+            }
+          }
+          EOF
+
+          cat latest.json
+
+      - name: Commit and Push latest.json
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add latest.json
+
+          if git diff --staged --quiet; then
+            echo "No changes to latest.json"
+          else
+            git commit -m "Update latest.json for release ${{ needs.release.outputs.next_version }}"
+            git push
+          fi
