@@ -3,7 +3,7 @@ name: Release Pipeline
 on:
   pull_request:
     branches:
-      - main
+      - staging
 
 jobs:
   release:

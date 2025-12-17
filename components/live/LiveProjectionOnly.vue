@@ -90,22 +90,6 @@
               :alt="(slide?.data as any)?.name"
               class="w-full h-full object-cover opacity-70"
             />
-            <!-- Dark overlay -->
-            <div class="absolute inset-0 bg-black bg-opacity-50"></div>
-          </div>
-
-          <!-- Play Icon and Title -->
-          <div class="absolute inset-0 flex items-center justify-center">
-            <div class="flex flex-col items-center gap-2">
-              <IconWrapper
-                :name="(slide?.data as any)?.type === 'youtube' ? 'i-bxl-youtube' : 'i-bxl-vimeo'"
-                size="12"
-                class="text-white opacity-90"
-              />
-              <p class="text-white text-xs text-center px-4 font-medium">
-                {{ (slide?.data as any)?.name }}
-              </p>
-            </div>
           </div>
         </div>
 
