@@ -96,7 +96,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      BASE_URL: process.env.BASE_URL || "http://localhost:4500/api/v1",
+      BASE_URL: process.env.BASE_URL || "https://api.cloudofworship.com/api/v1",
       NODE_ENV: process.env.NODE_ENV || "production",
       GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID || "",
       GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET || "",

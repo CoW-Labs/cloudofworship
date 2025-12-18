@@ -7,7 +7,10 @@
         <span class="font-semibold">Cloud of Worship</span>
       </p>
     </div>
-    <form class="flex flex-col gap-3 max-w-[325px] mx-auto" @submit="login()">
+    <form
+      class="flex flex-col gap-3 max-w-[325px] mx-auto"
+      @submit.prevent="login"
+    >
       <UFormGroup size="lg">
         <UInput placeholder="Your email" v-model="email" />
       </UFormGroup>
@@ -28,6 +31,7 @@
             class="absolute right-0 top-0 bottom-0 dark:hover:bg-primary-300"
             color="gray"
             variant="ghost"
+            type="button"
             size="sm"
             @click="
               passwordType === 'password'
@@ -51,10 +55,10 @@
       <UButton
         block
         size="lg"
+        type="submit"
         class="mt-12"
         :disabled="!(useValidEmail(email) && password.length >= 8)"
         :loading="loading"
-        @click="login"
       >
         Reset Password
       </UButton>
