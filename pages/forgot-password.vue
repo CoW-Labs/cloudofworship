@@ -9,7 +9,7 @@
     </div>
     <form
       class="flex flex-col gap-3 max-w-[325px] mx-auto"
-      @submit="requestReset()"
+      @submit="requestReset"
     >
       <UFormGroup size="lg">
         <UInput placeholder="Your email" v-model="email" />
@@ -19,6 +19,7 @@
         block
         size="lg"
         class="mt-6"
+        type="submit"
         :disabled="!useValidEmail(email)"
         :loading="loading"
         @click="requestReset"
