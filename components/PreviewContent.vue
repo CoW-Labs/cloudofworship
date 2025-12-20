@@ -55,6 +55,7 @@
           @duplicate="createNewSlide(slide)"
           @delete="deleteSlide"
           @save-slide="saveSlide(slide)"
+          @save-as-template="openSaveTemplateModal(slide)"
           @bulk-selected="addToSelectedSlides(slide?.id, $event)"
         />
       </div>
@@ -80,6 +81,11 @@
           newlyCreated: false,
         })
       "
+    />
+
+    <SaveAsTemplateModal
+      v-model="showSaveTemplateModal"
+      :slide="slideToSaveAsTemplate"
     />
   </AppSection>
 </template>
@@ -1425,6 +1431,15 @@ const saveSlide = async (item: Slide) => {
     }
   }
   usePosthogCapture("LIBRARY_SAVE_SLIDE")
+}
+
+// Save as Template Modal
+const showSaveTemplateModal = ref(false)
+const slideToSaveAsTemplate = ref<Slide | null>(null)
+
+const openSaveTemplateModal = (slide: Slide) => {
+  slideToSaveAsTemplate.value = slide
+  showSaveTemplateModal.value = true
 }
 
 const addAllSlidesToSelectedSlides = () => {

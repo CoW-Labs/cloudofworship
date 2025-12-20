@@ -2,6 +2,10 @@
 export default defineNuxtConfig({
   devtools: { enabled: false },
 
+  imports: {
+    autoImport: true,
+  },
+
   app: {
     head: {
       charset: "utf-8",
@@ -124,13 +128,124 @@ export default defineNuxtConfig({
 
   ui: {
     global: true,
-    icons: ["mdi", "bx", "bxs", "bi", "mingcute", "tabler", "ph"],
+    icons: ["mdi", "bx", "bxs", "bi", "mingcute", "tabler", "ph", "lucide"],
   },
 
   icon: {
-    serverBundle: {
-      collections: ['bi', 'bx', 'bxs', 'mdi', 'mingcute', 'ph', 'tabler']
-    }
+    clientBundle: {
+      scan: true,
+      // All icons used throughout the application
+      icons: [
+        // Boxicons (bx)
+        'bx:bible',
+        'bx:bell',
+        'bx:bold',
+        'bx:book-open',
+        'bx:bookmarks',
+        'bx:calendar-plus',
+        'bx:check',
+        'bx:check-circle',
+        'bx:chevron-left',
+        'bx:chevron-right',
+        'bx:church',
+        'bx:circle',
+        'bx:clipboard',
+        'bx:code',
+        'bx:code-curly',
+        'bx:cog',
+        'bx:copy',
+        'bx:dots-vertical-rounded',
+        'bx:edit',
+        'bx:error',
+        'bx:error-circle',
+        'bx:expand-alt',
+        'bx:film',
+        'bx:folder-open',
+        'bx:font-family',
+        'bx:grid-alt',
+        'bx:heart',
+        'bx:history',
+        'bx:image',
+        'bx:image-add',
+        'bx:info-circle',
+        'bx:italic',
+        'bx:library',
+        'bx:link',
+        'bx:list-ol',
+        'bx:list-ul',
+        'bx:loader-alt',
+        'bx:moon',
+        'bx:movie',
+        'bx:music',
+        'bx:palette',
+        'bx:paragraph',
+        'bx:play',
+        'bx:play-circle',
+        'bx:plus',
+        'bx:save',
+        'bx:search',
+        'bx:send',
+        'bx:shield',
+        'bx:slider',
+        'bx:slideshow',
+        'bx:strikethrough',
+        'bx:text',
+        'bx:time',
+        'bx:trash',
+        'bx:user-plus',
+        'bx:x',
+        // Boxicons Solid (bxs)
+        'bxs:heart',
+        'bxs:keyboard',
+        'bxs:quote-right',
+        // Boxicons Logos (bxl)
+        'bxl:youtube',
+        'bxl:vimeo',
+        // Lucide
+        'lucide:chevron-down',
+        'lucide:music-2',
+        // Material Design Icons (mdi)
+        'mdi:account',
+        'mdi:alert-circle-outline',
+        'mdi:arrow-expand-vertical',
+        'mdi:chevron-left',
+        'mdi:close',
+        'mdi:format-annotation-minus',
+        'mdi:format-annotation-plus',
+        'mdi:format-letter-case-upper',
+        'mdi:square-rounded',
+        // Bootstrap Icons (bi)
+        'bi:gear',
+        'bi:text-center',
+        'bi:text-left',
+        'bi:text-right',
+        // Tabler Icons
+        'tabler:cloud-off',
+        'tabler:cloud-search',
+        'tabler:device-desktop-plus',
+        'tabler:download',
+        'tabler:eye',
+        'tabler:eye-off',
+        'tabler:layout-grid',
+        'tabler:line-height',
+        'tabler:list-numbers',
+        'tabler:pause',
+        'tabler:play',
+        'tabler:player-skip-forward',
+        'tabler:refresh',
+        'tabler:repeat',
+        'tabler:search',
+        'tabler:skip-back',
+        'tabler:trash',
+        'tabler:volume',
+        'tabler:volume-off',
+        // Phosphor
+        'ph:file-ppt',
+        // Mingcute
+        'mingcute:layout-3-line',
+      ]
+    },
+    serverBundle: false
   },
 
   colorMode: {

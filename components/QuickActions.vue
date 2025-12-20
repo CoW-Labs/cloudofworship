@@ -160,6 +160,13 @@
       @close="page = ''"
     />
 
+    <!-- TEMPLATES SECTION-->
+    <TemplatesList
+      v-else-if="page === 'templates'"
+      class="come-up-1"
+      @close="page = ''"
+    />
+
     <!-- LIBRARY SECTION-->
     <AddAlert
       v-else-if="page === 'alert'"
@@ -296,6 +303,10 @@ emitter.on("new-search-bible", () => {
 
 emitter.on("new-library", () => {
   page.value = "library"
+})
+
+emitter.on("new-templates", () => {
+  page.value = "templates"
 })
 
 emitter.on("new-alert", () => {

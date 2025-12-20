@@ -73,6 +73,25 @@
       >
       </ConfirmDialog>
 
+      <UTooltip
+        v-if="
+          (slide?.type === slideTypes.text ||
+          slide?.type === slideTypes.media ||
+          slide?.type === slideTypes.bible) &&
+          authStore.user?.role === 'superadmin'
+        "
+        text="Save as Template"
+      >
+        <UButton
+          icon="i-bx-bookmarks"
+          size="xs"
+          variant="ghost"
+          class="px-1.5 text-white hover:bg-primary-500"
+          @click.stop.prevent="$emit('save-as-template', slide)"
+        >
+        </UButton>
+      </UTooltip>
+
       <ConfirmDialog
         button-icon="i-tabler-trash"
         header="Delete slide"
@@ -134,8 +153,10 @@
 import { appWideActions } from "~/utils/constants"
 import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 
 const props = defineProps<{
