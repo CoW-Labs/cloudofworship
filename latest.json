@@ -1,15 +1,15 @@
 {
-  "version": "0.35.4-beta",
-  "tag": "v0.35.4-beta",
-  "releaseDate": "2025-12-17T16:11:52Z",
-  "releaseNotes": "- fix: tauri workflow update\n",
+  "version": "0.35.6-beta",
+  "tag": "v0.35.6-beta",
+  "releaseDate": "2025-12-18T22:02:38Z",
+  "releaseNotes": "- chore: updated workflow\n- fix: updated BASE_URL for automatic tauri builds\n- chore: form improvements in auth flow\n- chore: updated workflow\n- chore: tauri-builds\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.35.4-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.35.6-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.35.4-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.35.6-beta/",
       "signature": ""
     }
   }
