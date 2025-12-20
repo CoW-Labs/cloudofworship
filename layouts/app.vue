@@ -740,7 +740,6 @@ async function openTauriLiveWindow() {
 
     if (existingLiveWindow) {
       await existingLiveWindow.setFocus()
-      await existingLiveWindow.setFullscreen(true)
       return
     }
 
@@ -772,14 +771,18 @@ async function openTauriLiveWindow() {
       targetMonitor = monitors.length > 1 ? monitors[1] : monitors[0]
     }
 
+    // Get fullscreen setting from store
+    const isFullscreen = appStore.currentState.settings.liveWindowFullscreen ?? true
+
     // Create new window on the target monitor
     const liveWindow = new WebviewWindow("live-output", {
       url: "/live",
       title: "Cloud of Worship - Live Output",
-      alwaysOnTop: true,
-      decorations: false,
+      alwaysOnTop: false,
+      decorations: !isFullscreen, // Show decorations only when not fullscreen
       resizable: true,
       closable: true,
+      fullscreen: isFullscreen,
       x: targetMonitor.position.x,
       y: targetMonitor.position.y,
       width: targetMonitor.size.width,
