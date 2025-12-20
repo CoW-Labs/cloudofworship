@@ -2,6 +2,10 @@
 export default defineNuxtConfig({
   devtools: { enabled: false },
 
+  imports: {
+    autoImport: true,
+  },
+
   app: {
     head: {
       charset: "utf-8",

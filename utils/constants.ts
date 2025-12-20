@@ -115,7 +115,7 @@ export const quickActionsArr: QuickAction[] = [
   {
     icon: "i-bx-slideshow",
     name: "Slide Templates",
-    desc: "Use pre-made slide templates",
+    desc: "Use pre-made, fancy slide templates",
     action: appWideActions.newTemplates,
     meta: "template preset saved design layout",
     // type: slideTypes.text
