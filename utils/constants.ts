@@ -26,6 +26,7 @@ export const appWideActions = {
   newYouTubeVideo: 'new-youtube-video',
   newVimeoVideo: 'new-vimeo-video',
   newLibrary: 'new-library',
+  newTemplates: 'new-templates',
   newAlert: 'new-alert',
   addSong: 'add-song',
   removeAlert: 'remove-alert',
@@ -103,28 +104,20 @@ export const quickActionsArr: QuickAction[] = [
     // type: slideTypes.text
   },
   {
-    icon: "i-bxl-youtube",
-    name: "Add YouTube Video",
-    desc: "Embed YouTube videos in your schedule",
-    action: appWideActions.newYouTubeVideo,
-    meta: "youtube external video embed",
-    type: slideTypes.media,
-  },
-  {
-    icon: "i-bxl-vimeo",
-    name: "Add Vimeo Video",
-    desc: "Embed Vimeo videos in your schedule",
-    action: appWideActions.newVimeoVideo,
-    meta: "vimeo external video embed",
-    type: slideTypes.media,
-  },
-  {
     icon: "i-bx-library",
     name: "My Library",
     desc: "Save your favorite songs, slides",
     action: appWideActions.newLibrary,
     meta: "save files images pictures videos songs documents",
     type: slideTypes.media,
+    // type: slideTypes.text
+  },
+  {
+    icon: "i-bx-slideshow",
+    name: "Slide Templates",
+    desc: "Use pre-made slide templates",
+    action: appWideActions.newTemplates,
+    meta: "template preset saved design layout",
     // type: slideTypes.text
   },
   {
@@ -172,6 +165,22 @@ export const quickActionsArr: QuickAction[] = [
     meta: "",
     unreleased: false,
     type: slideTypes.bible,
+  },
+  {
+    icon: "i-bxl-youtube",
+    name: "Add YouTube Video",
+    desc: "Embed YouTube videos in your schedule",
+    action: appWideActions.newYouTubeVideo,
+    meta: "youtube external video embed",
+    type: slideTypes.media,
+  },
+  {
+    icon: "i-bxl-vimeo",
+    name: "Add Vimeo Video",
+    desc: "Embed Vimeo videos in your schedule",
+    action: appWideActions.newVimeoVideo,
+    meta: "vimeo external video embed",
+    type: slideTypes.media,
   },
   {
     icon: "i-bx-cog",
