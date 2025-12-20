@@ -97,8 +97,9 @@
                   </UButton>
                   <div class="line border-b dark:border-gray-800"></div>
                   <UButton
-                    class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-primary-900"
+                    class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-primary-900 disabled:opacity-30"
                     color="black"
+                    :disabled="!canUseLivestreamLink"
                     variant="ghost"
                     :icon="
                       isClipboardCopying
@@ -131,6 +132,8 @@
 <script setup lang="ts">
 import { useAppStore } from "@/store/app"
 import { appWideActions } from "~/utils/constants"
+const { isEnabled: canUseLivestreamLink } = useFeatureFlags("livestream-link")
+
 defineProps({
   heading: String,
   subHeading: String,
