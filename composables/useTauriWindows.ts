@@ -1,3 +1,5 @@
+import { useAppStore } from '~/store/app'
+
 /**
  * Composable for managing multiple windows in Tauri
  * Handles creating and managing live output windows on multiple monitors
@@ -5,6 +7,7 @@
 
 export const useTauriWindows = () => {
   const { isTauri } = useTauri()
+  const appStore = useAppStore()
   const liveWindowLabel = 'live-output'
 
   /**
@@ -83,7 +86,6 @@ export const useTauriWindows = () => {
       const liveWindow = await getLiveWindow()
       if (liveWindow) {
         await liveWindow.setFocus()
-        await liveWindow.setFullscreen(true)
       }
     } catch (error) {
       console.error('Failed to focus live window:', error)
@@ -109,13 +111,16 @@ export const useTauriWindows = () => {
       // Select target monitor
       const targetMonitor = monitors[monitorIndex || 0] || monitors[0]
 
+      // Get fullscreen setting from store
+      const isFullscreen = appStore.currentState.settings.liveWindowFullscreen ?? true
+
       // Create the window
       const liveWindow = new WebviewWindow(liveWindowLabel, {
         url: '/live',
         title: 'Cloud of Worship - Live Output',
-        fullscreen: true,
+        fullscreen: isFullscreen,
         alwaysOnTop: false,
-        decorations: false,
+        decorations: !isFullscreen, // Show decorations only when not fullscreen
         resizable: true,
         skipTaskbar: false,
         x: targetMonitor.position.x,
@@ -127,10 +132,12 @@ export const useTauriWindows = () => {
       return new Promise((resolve, reject) => {
         liveWindow.once('tauri://created', () => {
           console.log('Live window created successfully')
-          // Ensure fullscreen after window is fully created
-          setTimeout(() => {
-            liveWindow.setFullscreen(true).catch(console.error)
-          }, 500)
+          // Only enforce fullscreen if the setting is enabled
+          if (isFullscreen) {
+            setTimeout(() => {
+              liveWindow.setFullscreen(true).catch(console.error)
+            }, 500)
+          }
           resolve(liveWindow)
         })
 

@@ -93,6 +93,7 @@ export const useAppStore = defineStore("app", {
           animations: true,
           footnotes: true,
           songAndHymnLabelsVisibility: false,
+          liveWindowFullscreen: true, // Default to fullscreen mode
           // motionlessSlides: true,
           transitionInterval: 0.7,
           slideStyles: {
@@ -361,6 +362,13 @@ export const useAppStore = defineStore("app", {
     },
     setMainDisplayScreen(screen: Screen | null) {
       this.currentState.mainDisplayScreen = screen
+    },
+    setLiveWindowFullscreen(fullscreen: boolean) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        liveWindowFullscreen: fullscreen,
+      }
+      usePosthogCapture("LIVE_WINDOW_FULLSCREEN_SETTINGS_CHANGED")
     },
     setLinesPerSlide(lines: number) {
       this.currentState.settings = {

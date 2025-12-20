@@ -228,6 +228,7 @@ export interface AppSettings {
   animations?: boolean
   footnotes?: boolean
   songAndHymnLabelsVisibility: boolean
+  liveWindowFullscreen?: boolean // Whether live window opens in fullscreen mode
 
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number
