@@ -129,16 +129,18 @@ onMounted(() => {
   const initializeLiveSlide = () => {
     const activeSlides = currentState.value.activeSlides || []
     const currentLiveSlideId = currentState.value.liveSlideId
-    
+
     // Check if there's an active slide selected
     if (currentLiveSlideId) {
-      const activeSlide = activeSlides.find(slide => slide.id === currentLiveSlideId)
+      const activeSlide = activeSlides.find(
+        (slide) => slide.id === currentLiveSlideId
+      )
       if (activeSlide) {
         mostUpdatedLiveSlide.value = activeSlide
         return
       }
     }
-    
+
     // If no active slide, show the first slide
     if (activeSlides.length > 0) {
       mostUpdatedLiveSlide.value = activeSlides[0]
