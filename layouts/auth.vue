@@ -32,7 +32,7 @@
     > -->
     <div class="w-full lg:w-2/5 grid place-items-center lg:p-8">
       <div
-        class="auth-box bg-[#1a1f2e] dark:bg-gray-900 rounded-2xl p-[3rem] py-[5%] max-w-[450px] w-[100%] relative"
+        class="auth-box bg-white dark:bg-gray-900 rounded-2xl p-[3rem] py-[5%] max-w-[450px] w-[100%] relative"
       >
         <slot />
       </div>

@@ -727,7 +727,7 @@ async function openTauriLiveWindow() {
     // Get available monitors
     const { availableMonitors } = await import("@tauri-apps/api/window")
     const monitors = await availableMonitors()
-    console.log("Available monitors:", monitors)
+    // console.log("Available monitors:", monitors)
 
     // Check if live window already exists
     const { getAllWebviewWindows } = await import(
@@ -772,7 +772,8 @@ async function openTauriLiveWindow() {
     }
 
     // Get fullscreen setting from store
-    const isFullscreen = appStore.currentState.settings.liveWindowFullscreen ?? true
+    const isFullscreen =
+      appStore.currentState.settings.liveWindowFullscreen ?? true
 
     // Create new window on the target monitor
     const liveWindow = new WebviewWindow("live-output", {
