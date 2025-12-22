@@ -639,6 +639,51 @@ onMounted(() => {
 onBeforeUnmount(() => {
   killAnimations(tl, configTransitionTl, ...contentAnimations)
 })
+
+// SEO Meta Tags
+useHead({
+  title: "Year in Review 2025 - Cloud of Worship",
+  meta: [
+    {
+      name: "description",
+      content:
+        "See your church's year in review with Cloud of Worship. Discover your live sessions, song contributions, scripture usage, and more from 2025.",
+    },
+    {
+      name: "keywords",
+      content:
+        "cloud of worship, year in review, church statistics, worship analytics, church report, end of year, 2025 review",
+    },
+    // Open Graph
+    {
+      property: "og:title",
+      content: "Year in Review 2025 - Cloud of Worship",
+    },
+    {
+      property: "og:description",
+      content:
+        "See your church's year in review with Cloud of Worship. Discover your live sessions, song contributions, scripture usage, and more.",
+    },
+    {
+      property: "og:type",
+      content: "website",
+    },
+    // Twitter Card
+    {
+      name: "twitter:card",
+      content: "summary_large_image",
+    },
+    {
+      name: "twitter:title",
+      content: "Year in Review 2025 - Cloud of Worship",
+    },
+    {
+      name: "twitter:description",
+      content:
+        "See your church's year in review with Cloud of Worship. Discover your live sessions, song contributions, and scripture usage.",
+    },
+  ],
+})
 </script>
 
 <style scoped>

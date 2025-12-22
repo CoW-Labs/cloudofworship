@@ -76,6 +76,36 @@ definePageMeta({
   layout: "auth",
 })
 
+useHead({
+  title: "Reset Password - Cloud of Worship",
+  meta: [
+    {
+      name: "description",
+      content:
+        "Create a new password for your Cloud of Worship account. Enter your email and new password to regain access to your church presentation tools.",
+    },
+    {
+      name: "keywords",
+      content:
+        "reset password, change password, password recovery, Cloud of Worship password, account recovery, church software password",
+    },
+    { property: "og:title", content: "Reset Password - Cloud of Worship" },
+    {
+      property: "og:description",
+      content:
+        "Create a new password for your Cloud of Worship account. Regain access to your church presentation tools.",
+    },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: "Reset Password - Cloud of Worship" },
+    {
+      name: "twitter:description",
+      content:
+        "Create a new password for your Cloud of Worship account and regain access.",
+    },
+  ],
+})
+
 const toast = useToast()
 const email = ref("")
 const password = ref("")

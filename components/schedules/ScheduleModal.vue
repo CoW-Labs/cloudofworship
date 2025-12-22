@@ -206,10 +206,8 @@ const searchedSchedules = computed(() => {
 })
 
 const createScheduleOnline = async (schedule: Schedule) => {
-  return useAPIFetch(`/church/${authStore.user?.churchId}/schedules`, {
-    method: "POST",
-    body: schedule,
-  })
+  const { createSchedule } = useSchedules()
+  return createSchedule(schedule)
 }
 
 const createNewSchedule = () => {
@@ -237,57 +235,18 @@ const createNewSchedule = () => {
 }
 
 const uploadBatchSchedules = async () => {
-  const schedules = appStore.currentState.schedules
-  const tempSchedules = schedules?.filter((schedule) => !schedule?.lastUpdated)
-  if (tempSchedules.length === 0) {
-    retrieveSchedules()
-    return
-  }
-  appStore.setSlidesLoading(true)
-  await Promise.all(
-    tempSchedules.map((schedule) => createScheduleOnline(schedule))
-  )
-  appStore.setSlidesLoading(false)
-  retrieveSchedules()
+  const { batchUploadSchedules } = useSchedules()
+  await batchUploadSchedules()
 }
 
 const retrieveSchedules = async () => {
-  appStore.setSlidesLoading(true)
-  const { data } = await useAPIFetch(
-    `/church/${authStore.user?.churchId}/schedules`
-  )
-  const schedules = data.value ? (data.value as unknown as Schedule[]) : []
-  const mergedSchedules = useMergeObjectArray(
-    [...schedules],
-    appStore.currentState.schedules
-  )
-
-  mergedSchedules?.sort((scheduleA, scheduleB) => {
-    const dateA = new Date(scheduleA?.updatedAt)
-    const dateB = new Date(scheduleB?.updatedAt)
-    return dateB?.getTime() - dateA?.getTime()
-  })
-
-  mergedSchedules?.sort((scheduleA, scheduleB) => {
-    const containsScheduleA = Number(!!scheduleA?.lastUpdated)
-    const containsScheduleB = Number(!!scheduleB?.lastUpdated)
-    return containsScheduleA - containsScheduleB
-  })
-
-  appStore.setSchedules(mergedSchedules)
-  appStore.setSlidesLoading(false)
+  const { fetchSchedules } = useSchedules()
+  await fetchSchedules()
 }
 
 const deleteScheduleOnline = async (scheduleId: string) => {
-  const { data, error } = await useAPIFetch(
-    `/church/${authStore.user?.churchId}/schedules/${scheduleId}`,
-    {
-      method: "DELETE",
-    }
-  )
-  if (error.value) {
-    throw new Error(error.value?.message)
-  }
+  const { deleteSchedule: deleteScheduleComposable } = useSchedules()
+  await deleteScheduleComposable(scheduleId)
 }
 
 const deleteSchedule = (scheduleId: string) => {

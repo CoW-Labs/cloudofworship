@@ -60,6 +60,36 @@ definePageMeta({
   layout: "auth",
 })
 
+useHead({
+  title: "Verify Email - Cloud of Worship",
+  meta: [
+    {
+      name: "description",
+      content:
+        "Verify your email address to activate your Cloud of Worship account and access all church presentation features including worship slides, lyrics, and media management.",
+    },
+    {
+      name: "keywords",
+      content:
+        "email verification, verify account, Cloud of Worship verification, account activation, confirm email, church software verification",
+    },
+    { property: "og:title", content: "Verify Email - Cloud of Worship" },
+    {
+      property: "og:description",
+      content:
+        "Verify your email address to activate your Cloud of Worship account and access all church presentation features.",
+    },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: "Verify Email - Cloud of Worship" },
+    {
+      name: "twitter:description",
+      content:
+        "Verify your email address to activate your Cloud of Worship account.",
+    },
+  ],
+})
+
 const authStore = useAuthStore()
 const toast = useToast()
 

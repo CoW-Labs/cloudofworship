@@ -371,12 +371,6 @@ const signup = async () => {
       } else {
         goToVerify()
       }
-
-      useToast().add({
-        title: "You are all set! 🎉",
-        color: "green",
-      })
-      // navigateTo("/?newUser=1")
     }
     loading.value = false
   }
