@@ -198,9 +198,6 @@ export default defineNuxtConfig({
         'bxs:heart',
         'bxs:keyboard',
         'bxs:quote-right',
-        // Boxicons Logos (bxl)
-        'bxl:youtube',
-        'bxl:vimeo',
         // Lucide
         'lucide:chevron-down',
         'lucide:music-2',
@@ -239,6 +236,8 @@ export default defineNuxtConfig({
         'tabler:trash',
         'tabler:volume',
         'tabler:volume-off',
+        'mdi:youtube',
+        'mdi:vimeo',
         // Phosphor
         'ph:file-ppt',
         // Mingcute
