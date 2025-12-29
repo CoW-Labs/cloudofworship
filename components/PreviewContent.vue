@@ -575,13 +575,13 @@ const updateSlideOnline = useThrottleFn(
       )
     ) {
       // UPDATE OVER WEBSOCKET
-      const socket = useNuxtApp().$socket as WebSocket
-      socket.send(
-        JSON.stringify({
-          action: "update-slide",
-          data: slide,
-        })
-      )
+      // const socket = useNuxtApp().$socket as WebSocket
+      // socket.send(
+      //   JSON.stringify({
+      //     action: "update-slide",
+      //     data: slide,
+      //   })
+      // )
 
       // UPDATE OVER HTTP
       // TODO: Take out http update in future when WS is stable and can store in DB

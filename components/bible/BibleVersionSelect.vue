@@ -58,8 +58,15 @@ import { appWideActions } from "~/utils/constants"
 
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
+const props = defineProps({
+  bibleVersionInherited: {
+    type: String,
+    default: "",
+  },
+})
+
 const bibleVersion = ref<string>(
-  currentState.value.settings.defaultBibleVersion
+  props.bibleVersionInherited || currentState.value.settings.defaultBibleVersion
 )
 const emit = defineEmits(["change", "open", "close"])
 const bibleVersionOptions = computed(() =>
@@ -73,6 +80,13 @@ const bibleVersionOptions = computed(() =>
   ]
     ?.filter((version) => version?.isDownloaded)
     ?.map((version) => version?.id)
+)
+
+watch(
+  () => props.bibleVersionInherited,
+  () => {
+    bibleVersion.value = props.bibleVersionInherited
+  }
 )
 
 watch(bibleVersion, (newValue, oldValue) => {

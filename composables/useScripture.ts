@@ -54,7 +54,7 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
 
     // Fetch scripture and set most recent version as default
     scripture = await fetchScripture(version, db, book, chapter, verses) as string;
-    appStore.setDefaultBibleVersion(version);
+    // appStore.setDefaultBibleVersion(version);
 
     if (!scripture) {
       throw new Error('Scripture not found')
