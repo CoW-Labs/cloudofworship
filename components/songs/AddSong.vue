@@ -26,7 +26,7 @@
       </div>
       <UFormGroup label="Lyrics" size="lg">
         <UTextarea
-        autoresize
+          autoresize
           placeholder="Hallelujah Eh! It's the sound of Victory"
           variant="none"
           :rows="12"
@@ -58,9 +58,12 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/store/auth"
 import type { Song } from "~/types"
+
 const props = defineProps<{
   song?: Song
 }>()
+
+const { saveSong } = useLibrary()
 const loading = ref<boolean>(false)
 const artist = ref<string>(props.song?.artist || "")
 const title = ref<string>(props.song?.title || "")
@@ -71,7 +74,6 @@ const emit = defineEmits(["go-home"])
 const authStore = useAuthStore()
 
 const addSong = async () => {
-  const db = useIndexedDB()
   const songId =
     props?.song?.id || useURLFriendlyString(`${title.value} ${artist.value}`)
   const song: Song = {
@@ -80,59 +82,32 @@ const addSong = async () => {
     artist: artist.value,
     lyrics: lyrics.value,
     createdBy: "me",
+    createdAt: props.song?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   }
+
   try {
     loading.value = true
-    await db.library.add(
-      {
-        id: songId,
-        type: "song",
-        content: song,
-        createdAt: props.song?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      songId
-    )
-    toast.add({ icon: "i-bx-save", title: "Song saved to Library" })
-  } catch (err: any) {
-    if (err.name === "ConstraintError") {
-      if (props.song) {
-        await db.library.update(songId, {
-          id: songId,
-          type: "song",
-          content: song,
-          createdAt: props.song?.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-        toast.add({
-          icon: "i-bx-save",
-          title: "Song updated in library",
-        })
-      } else {
-        toast.add({
-          icon: "i-bx-error",
-          title: "Can't add a song twice",
-          color: "red",
-        })
-      }
-    } else if (err.name === "DataCloneError") {
-      // toast.add({ icon: 'i-bx-save', title: 'Item added to Library' })
+
+    // Save song to library using composable
+    await saveSong(song)
+
+    // Upload to API if it's a new song
+    if (!props.song) {
+      await uploadSongToAPI(song)
     } else {
-      // console.log(err)
+      // For editing, just emit go-home
+      emit("go-home")
     }
+  } catch (err: any) {
+    console.error("Error adding song:", err)
   } finally {
     loading.value = false
-    if (props.song) {
-      emit("go-home")
-    } else {
-      uploadSongToAPI(song)
-    }
   }
 }
 
 const uploadSongToAPI = async (song: Song) => {
   try {
-    // loading.value = true
     const { data, error } = await useAPIFetch(
       `/church/${authStore.user?.churchId}/songs`,
       {
@@ -148,52 +123,23 @@ const uploadSongToAPI = async (song: Song) => {
 
     // If error occurred
     if (error.value) {
-      toast.add({ icon: "i-bx-error", title: error.value.data?.message })
+      toast.add({
+        icon: "i-bx-error",
+        title: error.value.data?.message || "Failed to upload song",
+        color: "red",
+      })
     } else {
-      loading.value = false
-      toast.add({ icon: "i-bx-save", title: "Song uploaded" })
       emit("go-home")
     }
   } catch (err: any) {
+    console.error("Error uploading song to API:", err)
+    toast.add({
+      icon: "i-bx-error",
+      title: "Failed to upload song",
+      color: "red",
+    })
   } finally {
     loading.value = false
   }
 }
-
-// const updateSongInAPI = async () => {
-//   const songId = useURLFriendlyString(`${title.value} ${artist.value}`)
-//   const song: Song = {
-//     ...props.song,
-//     id: songId,
-//     title: title.value,
-//     artist: artist.value,
-//     lyrics: lyrics.value,
-//     isPublic: isSongPublic.value,
-//     createdBy: authStore.user?._id,
-//     churchId: authStore.user?.churchId,
-//   }
-//   try {
-//     // loading.value = true
-//     const { data, error } = await useAPIFetch(
-//       `/church/${authStore.user?.churchId}/songs/${props.song?._id}`,
-//       {
-//         method: "PUT",
-//         body: song,
-//       }
-//     )
-
-//     // If error occurred
-//     if (error.value) {
-//       toast.add({ icon: "i-bx-error", title: error.value })
-//     } else {
-//       // console.log("data", data.value)
-//       loading.value = false
-//       toast.add({ icon: "i-bx-save", title: "Song updated" })
-//       emit("go-home")
-//     }
-//   } catch (err: any) {
-//   } finally {
-//     loading.value = false
-//   }
-// }
 </script>

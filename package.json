@@ -17,7 +17,7 @@
     "@fabianlars/tauri-plugin-oauth": "^2.0.0",
     "@hotjar/browser": "^1.0.9",
     "@nuxt/ui": "npm:@nuxt/ui-edge@latest",
-    "@pinia/nuxt": "^0.5.1",
+    "@pinia/nuxt": "^0.11.0",
     "@tauri-apps/api": "^2.9.0",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.3",
@@ -28,8 +28,8 @@
     "@tiptap/extension-placeholder": "^2.2.4",
     "@tiptap/extension-text-align": "^2.2.4",
     "@tiptap/extension-text-style": "^2.10.4",
-    "@vite-pwa/assets-generator": "^0.2.4",
-    "@vite-pwa/nuxt": "^0.7.0",
+    "@vite-pwa/assets-generator": "^1.0.0",
+    "@vite-pwa/nuxt": "^1.1.0",
     "@vueuse/core": "^10.10.0",
     "@vueuse/rxjs": "^10.9.0",
     "browser-image-compression": "^2.0.2",
@@ -42,13 +42,13 @@
     "nuxt": "^3.11.2",
     "nuxt-gtag": "^3.0.1",
     "nuxt-tiptap-editor": "^1.1.0",
-    "pinia": "^2.1.7",
-    "pinia-plugin-persistedstate": "^4.1.2",
-    "pinia-shared-state": "^0.5.1",
+    "pinia": "^3.0.4",
+    "pinia-plugin-persistedstate": "^4.7.1",
+    "pinia-shared-state": "^1.0.1",
     "posthog-js": "^1.239.0",
     "rxjs": "^7.8.1",
     "timeago.js": "^4.0.2",
-    "vite-plugin-pwa": "^0.20.0",
+    "vite-plugin-pwa": "^1.2.0",
     "vue": "^3.4.27",
     "vue-router": "^4.3.2",
     "vue-virtual-scroll-list": "^2.3.5",
@@ -78,6 +78,7 @@
   },
   "overrides": {
     "sharp": "0.32.6",
-    "sharp-ico": "0.1.5"
+    "sharp-ico": "0.1.5",
+    "chokidar": "3.6.0"
   }
 }

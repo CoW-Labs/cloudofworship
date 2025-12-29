@@ -59,7 +59,9 @@
                   variant="ghost"
                   class="p-1"
                   icon="i-bx-chevron-left"
-                  @click="$emit('goto-verse', previousVerse)"
+                  @click="
+                    $emit('goto-verse', previousVerse, selectedBibleVersion)
+                  "
                 />
               </UTooltip>
               <UInput
@@ -80,21 +82,23 @@
                 @focus="$event.target.select()"
                 @keydown.tab.prevent="predictVerseInput($event.target)"
                 @keydown.arrow-right.prevent="predictVerseInput($event.target)"
-                @keydown.enter="$emit('goto-verse', verse)"
+                @keydown.enter="
+                  $emit('goto-verse', verse, selectedBibleVersion)
+                "
               />
               <UTooltip text="Next verse" :popper="{ arrow: true }">
                 <UButton
                   variant="ghost"
                   class="p-1"
                   icon="i-bx-chevron-right"
-                  @click="$emit('goto-verse', nextVerse)"
+                  @click="$emit('goto-verse', nextVerse, selectedBibleVersion)"
                 />
               </UTooltip>
               <UButton
                 v-if="slide?.type === slideTypes?.hymn && slide?.hasChorus"
                 class="rounded-md"
                 size="xs"
-                @click="$emit('goto-chorus', verse)"
+                @click="$emit('goto-chorus', verse, selectedBibleVersion)"
               >
                 Chorus
               </UButton>
@@ -115,14 +119,15 @@
               class="preview-verses"
               :slide="slide"
               :verse="verse"
-              @goto-verse="$emit('goto-verse', $event)"
+              @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
             />
             <BibleVersionSelect
               v-if="slide?.type === slideTypes?.bible"
               class="bg-primary-200 dark:bg-primary-900 rounded-r-md mr-1 flex items-center gap-1 h-[36px] relative min-w-[80px]"
+              :bibleVersionInherited="selectedBibleVersion"
               @open="containerOverflow = ''"
               @close="containerOverflow = 'overflow-x-auto'"
-              @change="$emit('update-bible-version', $event)"
+              @change="onUpdateBibleVersion($event)"
             />
             <!-- <UPopover
               v-if="slide?.layout !== slideLayoutTypes.bible"
@@ -312,6 +317,7 @@
 <script setup lang="ts">
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
+import { useAppStore } from "~/store/app"
 import type { ExtendedFileT, Slide, SlideStyle, Song } from "~/types"
 
 const props = defineProps<{
@@ -329,6 +335,8 @@ const emit = defineEmits([
   "take-live",
 ])
 
+const appStore = useAppStore()
+
 const focusedEditor = ref<Editor | undefined>()
 const layoutPopoverOpen = ref<boolean>(false)
 const bgEditBgPopoverOpen = ref<boolean>(false)
@@ -339,9 +347,13 @@ const slideContents = ref<Array<string>>([])
 const verse = ref<string>(props.slide?.title || "")
 const searchedBibleBookOptions = ref<string[]>([])
 const containerOverflow = ref<string>("overflow-x-auto")
+const selectedBibleVersion = ref<string>(
+  appStore.currentState.settings.defaultBibleVersion
+)
 
 const animatedSlides = computed(() => {
   if (props.slide) {
+    selectedBibleVersion.value = props.slide.slideStyle?.bibleVersion
     return [props.slide]
   }
   return null
@@ -384,12 +396,12 @@ watch(
 onMounted(() => {
   useCreateShortcut("ArrowRight", () => {
     if (nextVerse.value) {
-      emit("goto-verse", nextVerse.value)
+      emit("goto-verse", nextVerse.value, selectedBibleVersion.value)
     }
   })
   useCreateShortcut("ArrowLeft", () => {
     if (previousVerse.value) {
-      emit("goto-verse", previousVerse.value)
+      emit("goto-verse", previousVerse.value, selectedBibleVersion.value)
     }
   })
 })
@@ -398,7 +410,7 @@ onMounted(() => {
 const emitter = useNuxtApp().$emitter as Emitter<any>
 emitter.on("pause-inactive-slide-video", () => {
   if (props.slide?.type === slideTypes.media) {
-    console.log("pausing video")
+    // console.log("pausing video")
   }
 })
 
@@ -530,6 +542,11 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
       title: "Lines per slide updated",
     })
   }
+}
+
+const onUpdateBibleVersion = (version: string) => {
+  onUpdateSlideStyle({ ...props.slide.slideStyle, bibleVersion: version })
+  emit("update-bible-version", version)
 }
 
 const predictVerseInput = (

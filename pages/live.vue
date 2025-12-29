@@ -73,7 +73,36 @@ const FPS = 10
 const mostUpdatedLiveSlide = ref<Slide | null>(null)
 
 useHead({
-  title: "CoW Live",
+  title: "Live Projection - Cloud of Worship",
+  meta: [
+    {
+      name: "description",
+      content:
+        "Display worship slides, lyrics, Bible verses, and media in full screen during your church service with Cloud of Worship's live projection feature.",
+    },
+    {
+      name: "keywords",
+      content:
+        "live projection, worship display, church presentation, full screen slides, live worship, church service display, presentation software",
+    },
+    { property: "og:title", content: "Live Projection - Cloud of Worship" },
+    {
+      property: "og:description",
+      content:
+        "Display worship slides, lyrics, Bible verses, and media in full screen during your church service with Cloud of Worship's live projection feature.",
+    },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+    {
+      name: "twitter:title",
+      content: "Live Projection - Cloud of Worship",
+    },
+    {
+      name: "twitter:description",
+      content:
+        "Display worship slides, lyrics, Bible verses, and media in full screen during your church service.",
+    },
+  ],
   link: [
     {
       rel: "manifest",

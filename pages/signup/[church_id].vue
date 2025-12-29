@@ -203,10 +203,6 @@ onMounted(async () => {
           ...data?.value?.data.newUser!!,
           churchId: churchIdParam,
         })
-        useToast().add({
-          title: "You are all set! 🎉",
-          color: "green",
-        })
         if (church.value) {
           authStore.setChurch(church.value)
         }
@@ -266,10 +262,6 @@ const signup = async () => {
   } else {
     token.value = data.value?.token
     authStore.setUser({ ...data?.value?.data.newUser!!, churchId })
-    useToast().add({
-      title: "You are all set! 🎉",
-      color: "green",
-    })
     if (church.value) {
       authStore.setChurch(church.value)
     }
@@ -314,10 +306,6 @@ const handleGoogleSignUp = async () => {
     } else {
       token.value = data.value?.token
       authStore.setUser({ ...data?.value?.data.newUser!!, churchId })
-      useToast().add({
-        title: "You are all set! 🎉",
-        color: "green",
-      })
       if (church.value) {
         authStore.setChurch(church.value)
       }

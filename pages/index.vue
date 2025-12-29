@@ -35,12 +35,12 @@ const uploadOfflineSlides = useDebounceFn(() => {
 }, 2000)
 
 const connectWebSocket = async () => {
-  const socketInstance = useSocket({
-    scheduleId: appStore.currentState.activeSchedule?._id!!,
-  }).connect()
-  if (socketInstance) {
-    socket.value = socketInstance
-  }
+  // const socketInstance = useSocket({
+  //   scheduleId: appStore.currentState.activeSchedule?._id!!,
+  // }).connect()
+  // if (socketInstance) {
+  //   socket.value = socketInstance
+  // }
 }
 
 const sendLiveSlideToWebsocket = (slide: Slide) => {
@@ -81,6 +81,21 @@ onMounted(async () => {
   if (emailChange) {
     setTimeout(() => {
       useGlobalEmit(appWideActions.openSettings, "Profile Settings")
+    }, 1000)
+  }
+
+  // Check for pending plan_id from signup flow
+  const pendingPlanId = localStorage.getItem("pending_plan_id")
+  if (pendingPlanId) {
+    localStorage.removeItem("pending_plan_id")
+
+    usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
+      planId: pendingPlanId,
+    })
+
+    // Show upgrade modal after a brief delay
+    setTimeout(() => {
+      useGlobalEmit("show-upgrade-modal", { planId: pendingPlanId })
     }, 1000)
   }
 

@@ -41,6 +41,51 @@ definePageMeta({
   layout: "auth",
 })
 
+// SEO Meta Tags
+useHead({
+  title: "Forgot Password - Cloud of Worship",
+  meta: [
+    {
+      name: "description",
+      content:
+        "Reset your Cloud of Worship password. Enter your email to receive a password reset link and regain access to your church presentation software account.",
+    },
+    {
+      name: "keywords",
+      content:
+        "forgot password, reset password, cloud of worship, church software, password recovery, account access",
+    },
+    // Open Graph
+    {
+      property: "og:title",
+      content: "Forgot Password - Cloud of Worship",
+    },
+    {
+      property: "og:description",
+      content:
+        "Reset your Cloud of Worship password. Enter your email to receive a password reset link.",
+    },
+    {
+      property: "og:type",
+      content: "website",
+    },
+    // Twitter Card
+    {
+      name: "twitter:card",
+      content: "summary",
+    },
+    {
+      name: "twitter:title",
+      content: "Forgot Password - Cloud of Worship",
+    },
+    {
+      name: "twitter:description",
+      content:
+        "Reset your Cloud of Worship password and regain access to your account.",
+    },
+  ],
+})
+
 const toast = useToast()
 const email = ref("")
 const loading = ref(false)

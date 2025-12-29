@@ -80,12 +80,22 @@ const props = defineProps<{
 
 const searchInput = ref<string>(props.query || "")
 const toast = useToast()
-const loading = ref<boolean>(true)
+const { searchSongs, loading: songsLoading } = useSongs()
+const loading = songsLoading
 const songs = ref<Song[]>([])
 const searchedSongs = ref<Song[]>([])
 const focusedActionIndex = ref(0)
 const quickActions = ref<HTMLDivElement | null>(null)
 const authStore = useAuthStore()
+
+const getSongs = async (query: string = "") => {
+  try {
+    const results = await searchSongs(query, 20)
+    songs.value = results
+  } catch (err) {
+    toast.add({ title: "You are offline.", color: "red", icon: "i-bx-error" })
+  }
+}
 
 onMounted(() => {
   quickActions.value?.addEventListener("keydown", (e) => {
@@ -114,27 +124,6 @@ onMounted(() => {
     }
   })
 })
-
-const getSongs = async (query: string = "") => {
-  try {
-    loading.value = true
-    const promise = await useAPIFetch(
-      `/church/${authStore.user?.churchId}/songs?search=${query}&limit=20`
-    )
-
-    let songsData = (promise.data.value as any)?.data?.data?.map(
-      (song: Song) => ({
-        ...song,
-        title: song.title.replaceAll("â", "'"),
-      })
-    )
-    songs.value = songsData
-    loading.value = false
-  } catch (err) {
-    loading.value = false
-    toast.add({ title: "You are offline.", color: "red", icon: "i-bx-error" })
-  }
-}
 
 getSongs(props.query || "")
 

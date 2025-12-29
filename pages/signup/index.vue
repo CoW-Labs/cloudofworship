@@ -365,12 +365,11 @@ const signup = async () => {
       const church = data?.value as Church
       authStore.setChurch(church)
       authStore.setUser({ ...authStore.user, churchId: church?._id } as User)
-      goToVerify()
-      useToast().add({
-        title: "You are all set! 🎉",
-        color: "green",
-      })
-      // navigateTo("/?newUser=1")
+      if (authStore.user?.emailVerified) {
+        navigateTo("/")
+      } else {
+        goToVerify()
+      }
     }
     loading.value = false
   }

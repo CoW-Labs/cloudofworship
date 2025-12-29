@@ -189,17 +189,23 @@
   </div>
 </template>
 <script setup lang="ts">
-import type { LibraryItem, Slide, Song } from "~/types"
+import type { Slide, Song } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
-import { useObservable } from "@vueuse/rxjs"
-import fuzzysort from "fuzzysort"
-import { liveQuery } from "dexie"
-const toast = useToast()
-const { unsaveSlideOnline } = useSlides()
 
 const props = defineProps<{
   page: string
 }>()
+
+// Use the library composable
+const {
+  loading,
+  savedSongs,
+  savedSlides,
+  deleteSong,
+  deleteSlide,
+  searchLibraryItems,
+  refreshLibrary,
+} = useLibrary()
 
 const libraryTabs = [
   { label: "song", icon: "i-bx-music" },
@@ -207,101 +213,59 @@ const libraryTabs = [
 ]
 const activeLibraryTab = ref<number>(0)
 const searchInput = ref<string>("")
-const loading = ref<boolean>(true)
 const page = ref<string>(props.page || "")
 const songToEdit = ref<Song>()
 const libraryEndIndex = ref<number>(15)
-const libraryItems = useObservable<LibraryItem[]>(
-  liveQuery(async () => {
-    loading.value = true
-    const data = await useIndexedDB()
-      .library.orderBy("createdAt")
-      .reverse()
-      .toArray()
-    loading.value = false
-    return data
-  }) as any
-)
 const searchedLibraryItems = ref<any[]>([])
-const focusedActionIndex = ref(0)
 const quickActions = ref<HTMLDivElement | null>(null)
 
-watch(page, (newVal, oldVal) => {
-  if (oldVal === "add-song" && songToEdit.value) {
-    songToEdit.value = undefined
-  }
-})
-
-const savedSongs = computed(() => {
-  return (
-    libraryItems?.value?.filter((item) => item.type === libraryTypes.song) || []
-  )
-})
-
-const savedSlides = computed(() => {
-  return libraryItems?.value?.filter((item) => item.type === libraryTypes.slide)
-})
-
+// Computed: Filter songs from search results
 const savedSongsSearchResults = computed(() => {
   return searchedLibraryItems?.value?.filter(
     (item) => item.type === libraryTypes.song
   )
 })
 
+// Computed: Filter slides from search results
 const savedSlidesSearchResults = computed(() => {
   return searchedLibraryItems?.value?.filter(
     (item) => item.type === libraryTypes.slide
   )
 })
 
-const deleteSong = async (songId: string) => {
-  await useIndexedDB()
-    .library.delete(songId)
-    .catch((err) => console.error("Failed to delete song:", err))
-  toast.add({ icon: "i-tabler-trash", title: "Song has been deleted" })
-}
+// Watch page changes to reset song editing state
+watch(page, (newVal, oldVal) => {
+  if (oldVal === "add-song" && songToEdit.value) {
+    songToEdit.value = undefined
+  }
+})
 
-const deleteSlide = async (slideId: string) => {
-  await useIndexedDB()
-    .library.delete(slideId)
-    .catch((err) => console.error("Failed to delete slide:", err))
-  toast.add({ icon: "i-tabler-trash", title: "Slide has been deleted" })
-  unsaveSlideOnline(slideId)
-}
-
+// Edit song handler
 const editSong = (song: Song) => {
   page.value = "add-song"
   songToEdit.value = song
 }
 
-const searchLibraryItems = (query: string = "") => {
-  console.log(query, libraryItems.value)
+// Perform search with debounce
+const performSearch = (query: string = "") => {
+  if (!query || query.length < 2) {
+    searchedLibraryItems.value = []
+    loading.value = false
+    return
+  }
 
-  // Cast LibraryItem to Fuzzysort.Prepared to avoid errors
-  const tempLibraryItems = [...(libraryItems.value || [])]?.map(
-    (item) => item as unknown as Fuzzysort.Prepared
-  )
-
-  let results: Array<Fuzzysort.Result> | any = fuzzysort.go(
-    query,
-    tempLibraryItems,
-    {
-      keys: [
-        "id",
-        "content.type",
-        "content.title",
-        "content.name",
-        "content.artist",
-      ],
-    }
-  )
-  results = results?.map((result: Fuzzysort.Result | any) => result.obj)
-  // console.log(results)
+  const results = searchLibraryItems(query)
   searchedLibraryItems.value = results
   loading.value = false
 }
 
-const onSearchInput = useDebounceFn(async () => {
-  searchLibraryItems(searchInput.value)
+const onSearchInput = useDebounceFn(() => {
+  loading.value = true
+  performSearch(searchInput.value)
 }, 500)
+
+// Refresh library when component is mounted
+onMounted(async () => {
+  await refreshLibrary()
+})
 </script>

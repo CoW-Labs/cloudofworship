@@ -17,8 +17,6 @@
       <div class="text">
         Your email is not verified, please verify
         <a class="border-b font-bold border-black" href="/verify">here</a>.
-        Unverified accounts will be deactivated after
-        {{ inaccessibleDateRemaining }} days.
       </div>
       <UButton
         variant="ghost"
@@ -200,7 +198,7 @@ const { getToken } = useAuthToken()
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
 const appInfo = ref<AppSettings>()
-const { fetchSavedSlides } = useSlides()
+const { refreshLibrary } = useLibrary()
 
 const { currentState } = storeToRefs(appStore)
 
@@ -341,32 +339,6 @@ const fetchHymns = async () => {
     await db.bibleAndHymns
       .add(tempBibleVersion("hymns", hymns))
       .catch((err) => console.error("Failed to add hymns:", err))
-  }
-}
-
-const fetchSavedSlidesAndCache = async () => {
-  const savedSlides = await fetchSavedSlides()
-  if (savedSlides) {
-    const libraryData: LibraryItem[] = savedSlides?.map((slide: Slide) => ({
-      id: slide.id,
-      type: "slide",
-      content: JSON.parse(JSON.stringify(slide)),
-      createdAt: slide.createdAt,
-      updatedAt: slide.updatedAt,
-    }))
-
-    try {
-      // Process in chunks to avoid blocking
-      const chunkSize = 50
-      for (let i = 0; i < libraryData.length; i += chunkSize) {
-        const chunk = libraryData.slice(i, i + chunkSize)
-        await db.library.bulkAdd(chunk).catch((err) => {
-          console.error("Failed to add slide chunk:", err)
-        })
-      }
-    } catch (err) {
-      console.log(err)
-    }
   }
 }
 
@@ -963,7 +935,7 @@ if (isAppOnline.value) {
   fetchChurch()
   fetchAppInfo()
   fetchHymns()
-  fetchSavedSlidesAndCache()
+  refreshLibrary()
 }
 </script>
 

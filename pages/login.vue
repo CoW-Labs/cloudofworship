@@ -101,7 +101,26 @@ useHead({
     {
       name: "description",
       content:
-        "Sign in to continue using Cloud of Worship - Your church's powerpoint",
+        "Sign in to Cloud of Worship to access powerful church presentation tools for worship slides, lyrics, Bible verses, and media. Free account available.",
+    },
+    {
+      name: "keywords",
+      content:
+        "church login, worship software, church presentation login, Cloud of Worship sign in, worship slides login, church media software",
+    },
+    { property: "og:title", content: "Login - Cloud of Worship" },
+    {
+      property: "og:description",
+      content:
+        "Sign in to Cloud of Worship to access powerful church presentation tools for worship slides, lyrics, Bible verses, and media.",
+    },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: "Login - Cloud of Worship" },
+    {
+      name: "twitter:description",
+      content:
+        "Sign in to Cloud of Worship to access powerful church presentation tools for worship slides and media.",
     },
   ],
 })

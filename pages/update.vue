@@ -31,6 +31,39 @@ definePageMeta({
   layout: "auth",
 })
 
+useHead({
+  title: "Update Available - Cloud of Worship",
+  meta: [
+    {
+      name: "description",
+      content:
+        "A new version of Cloud of Worship is available. Update now to get the latest features, improvements, and bug fixes for your church presentation software.",
+    },
+    {
+      name: "keywords",
+      content:
+        "Cloud of Worship update, software update, app update, church software update, PWA update, presentation software update",
+    },
+    { property: "og:title", content: "Update Available - Cloud of Worship" },
+    {
+      property: "og:description",
+      content:
+        "A new version of Cloud of Worship is available. Update now to get the latest features and improvements.",
+    },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+    {
+      name: "twitter:title",
+      content: "Update Available - Cloud of Worship",
+    },
+    {
+      name: "twitter:description",
+      content:
+        "Update Cloud of Worship to get the latest features and improvements for your church.",
+    },
+  ],
+})
+
 const loading = ref(false)
 
 onMounted(() => {
