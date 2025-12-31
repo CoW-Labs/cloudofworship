@@ -56,8 +56,8 @@
                 :variant="secondaryButton?.variant || 'ghost'"
                 :color="secondaryButton.color"
                 :icon="secondaryButton.icon"
-                :to="secondaryButton.action === 'go-live' ? '#' : '#'"
-                @click="
+                :to="secondaryButton.action === appWideActions.goLive ? undefined : '#'"
+                @click.stop="
                   secondaryButton.action !== appWideActions.goLive
                     ? useGlobalEmit(secondaryButton.action)
                     : (secondaryActionPopoverOpen = true)
