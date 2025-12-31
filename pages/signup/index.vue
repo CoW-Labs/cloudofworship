@@ -273,6 +273,17 @@ const getChurch = async () => {
 }
 
 onMounted(() => {
+  usePosthogCapture("SIGNUP_PAGE_VIEWED", {
+    step: route.query.registerChurch ? 2 : 1,
+    hasReferral: !!route.query.from_lyrics,
+    hasPlanId: !!route.query.plan_id,
+  })
+
+  // Fetch subscription plans and detect currency early
+  const { fetchPlans, detectCurrency } = useSubscriptionPlans()
+  detectCurrency() // Start currency detection in background
+  fetchPlans()
+
   if (route.query.registerChurch) {
     getChurch()
   }
@@ -315,6 +326,12 @@ const goToVerify = () => {
 const signup = async () => {
   if (step.value === 1) {
     loading.value = true
+
+    usePosthogCapture("SIGNUP_STEP1_ATTEMPTED", {
+      email: email.value,
+      hasFullName: !!fullName.value,
+    })
+
     const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
       "/auth/signup",
       {
@@ -327,6 +344,13 @@ const signup = async () => {
       }
     )
     if (error.value) {
+      usePosthogCapture("SIGNUP_STEP1_FAILED", {
+        email: email.value,
+        error: error.value?.data?.error?.includes("E11000")
+          ? "Email already exists"
+          : error.value?.data?.message,
+      })
+
       useToast().add({
         title: error.value?.data?.error?.includes("E11000")
           ? "Email linked to an account"
@@ -337,11 +361,30 @@ const signup = async () => {
     } else {
       token.value = data.value?.token
       authStore.setUser(data?.value?.data.newUser!!)
+
+      usePosthogCapture("SIGNUP_STEP1_COMPLETED", {
+        userId: data?.value?.data.newUser?._id,
+        email: email.value,
+        fullName: fullName.value,
+      })
+
       step.value = 2
     }
     loading.value = false
   } else {
     loading.value = true
+
+    usePosthogCapture("SIGNUP_STEP2_ATTEMPTED", {
+      userId: authStore.user?._id,
+      churchName:
+        church.value === "Other Church (not included)"
+          ? otherChurch.value
+          : church.value,
+      hasChurchIdentity: !!churchIdentity.value,
+      hasChurchPastor: !!churchPastor.value,
+      hasChurchAddress: !!churchAddress.value,
+    })
+
     const { data, error } = await useAPIFetch("/church", {
       method: "POST",
       body: {
@@ -356,6 +399,11 @@ const signup = async () => {
       },
     })
     if (error.value) {
+      usePosthogCapture("SIGNUP_STEP2_FAILED", {
+        userId: authStore.user?._id,
+        error: error.value?.data?.message,
+      })
+
       useToast().add({
         title: error.value?.data?.message,
         color: "red",
@@ -365,9 +413,56 @@ const signup = async () => {
       const church = data?.value as Church
       authStore.setChurch(church)
       authStore.setUser({ ...authStore.user, churchId: church?._id } as User)
+
+      usePosthogCapture("SIGNUP_STEP2_COMPLETED", {
+        userId: authStore.user?._id,
+        churchId: church._id,
+        churchName: church.name,
+        emailVerified: authStore.user?.emailVerified,
+      })
+
+      // Check for plan_id query parameter
+      const planId = route.query.plan_id as string
+
       if (authStore.user?.emailVerified) {
-        navigateTo("/")
+        usePosthogCapture("SIGNUP_COMPLETE", {
+          userId: authStore.user._id,
+          churchId: church._id,
+          emailVerified: true,
+          hasPlanId: !!planId,
+        })
+
+        // If there's a plan ID, show upgrade modal before navigating
+        if (planId) {
+          usePosthogCapture("SIGNUP_COMPLETE_WITH_PLAN_ID", {
+            planId,
+            userId: authStore.user._id,
+            churchId: church._id,
+          })
+
+          // Navigate to index first
+          await navigateTo("/")
+
+          // Show upgrade modal after a brief delay to ensure page is loaded
+          setTimeout(() => {
+            useGlobalEmit("show-upgrade-modal", { planId })
+          }, 500)
+        } else {
+          navigateTo("/")
+        }
       } else {
+        usePosthogCapture("SIGNUP_COMPLETE_UNVERIFIED", {
+          userId: authStore.user._id,
+          churchId: church._id,
+          emailVerified: false,
+          hasPlanId: !!planId,
+        })
+
+        // If email not verified, still go to verify page
+        // But store plan_id in localStorage to show modal after verification
+        if (planId) {
+          localStorage.setItem("pending_plan_id", planId)
+        }
         goToVerify()
       }
     }
@@ -377,6 +472,10 @@ const signup = async () => {
 
 const handleGoogleSignUp = async () => {
   googleLoading.value = true
+
+  usePosthogCapture("SIGNUP_STEP1_ATTEMPTED", {
+    method: "google",
+  })
 
   try {
     const { user } = await googleSignIn()
@@ -397,6 +496,14 @@ const handleGoogleSignUp = async () => {
       }
     )
     if (error.value) {
+      usePosthogCapture("SIGNUP_STEP1_FAILED", {
+        method: "google",
+        email: user?.email,
+        error: error.value?.data?.error?.includes("E11000")
+          ? "Email already exists"
+          : error.value?.data?.message,
+      })
+
       useToast().add({
         title: error.value?.data?.error?.includes("E11000")
           ? "Email linked to an account. Sign in instead."
@@ -407,11 +514,24 @@ const handleGoogleSignUp = async () => {
     } else {
       token.value = data.value?.token
       authStore.setUser(data?.value?.data.newUser!!)
+
+      usePosthogCapture("SIGNUP_STEP1_COMPLETED", {
+        method: "google",
+        userId: data?.value?.data.newUser?._id,
+        email: user?.email,
+        fullName: user?.displayName,
+      })
+
       step.value = 2
     }
   } catch (error: any) {
     // Only show error if it's not a redirect initiation
     if (error?.message !== "Redirect initiated") {
+      usePosthogCapture("SIGNUP_STEP1_FAILED", {
+        method: "google",
+        error: error?.message,
+      })
+
       useToast().add({
         title: "Google sign up failed",
         description: error?.message || "An error occurred",
@@ -431,6 +551,10 @@ onMounted(async () => {
     const result = await checkRedirectResult()
 
     if (result?.user) {
+      usePosthogCapture("SIGNUP_STEP1_ATTEMPTED", {
+        method: "google_tauri",
+      })
+
       // Process the Google auth result
       const { user } = result
 
@@ -446,6 +570,14 @@ onMounted(async () => {
       )
 
       if (error.value) {
+        usePosthogCapture("SIGNUP_STEP1_FAILED", {
+          method: "google_tauri",
+          email: user?.email,
+          error: error.value?.data?.error?.includes("E11000")
+            ? "Email already exists"
+            : error.value?.data?.message,
+        })
+
         useToast().add({
           title: error.value?.data?.error?.includes("E11000")
             ? "Email linked to an account. Sign in instead."
@@ -456,6 +588,14 @@ onMounted(async () => {
       } else {
         token.value = data.value?.token
         authStore.setUser(data?.value?.data.newUser!!)
+
+        usePosthogCapture("SIGNUP_STEP1_COMPLETED", {
+          method: "google_tauri",
+          userId: data?.value?.data.newUser?._id,
+          email: user?.email,
+          fullName: user?.displayName,
+        })
+
         step.value = 2
       }
     }

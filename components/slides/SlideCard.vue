@@ -45,7 +45,7 @@
           size="xs"
           variant="ghost"
           class="px-1.5 text-white hover:bg-primary-500"
-          @click.stop.prevent="$emit('duplicate')"
+          @click.stop.prevent="$emit('duplicate', slide)"
         >
         </UButton>
       </UTooltip>
@@ -69,15 +69,15 @@
             ? 'You are about to save this hymn as a song for easy update, song slide benefits and future access. Continue?'
             : 'You are about to save this slide to your library for quick and easy access in the future. Continue?'
         "
-        @confirm="$emit('save-slide', slide?.id)"
+        @confirm="handleSaveConfirm"
       >
       </ConfirmDialog>
 
       <UTooltip
         v-if="
           (slide?.type === slideTypes.text ||
-          slide?.type === slideTypes.media ||
-          slide?.type === slideTypes.bible) &&
+            slide?.type === slideTypes.media ||
+            slide?.type === slideTypes.bible) &&
           authStore.user?.role === 'superadmin'
         "
         text="Save as Template"
@@ -87,7 +87,7 @@
           size="xs"
           variant="ghost"
           class="px-1.5 text-white hover:bg-primary-500"
-          @click.stop.prevent="$emit('save-as-template', slide)"
+          @click.stop.prevent="handleSaveAsTemplateClick"
         >
         </UButton>
       </UTooltip>
@@ -159,6 +159,9 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 
+// Subscription check
+const { hasAccessToFeature } = useSubscription()
+
 const props = defineProps<{
   slide: Slide
   live: boolean
@@ -167,6 +170,39 @@ const props = defineProps<{
   selectable: boolean
   checkboxSelected: boolean
 }>()
+
+const emit = defineEmits([
+  "save-slide",
+  "save-as-template",
+  "duplicate",
+  "click",
+])
+
+const handleSaveConfirm = () => {
+  emit("save-slide", props.slide?.id)
+  // if (!hasAccessToFeature("My Library")) {
+  //   useGlobalEmit("show-upgrade-modal")
+  //   usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+  //     feature: "My Library",
+  //     location: "slide_card_save",
+  //   })
+  // } else {
+  //   emit("save-slide", props.slide?.id)
+  // }
+}
+
+const handleSaveAsTemplateClick = () => {
+  emit("save-as-template", props.slide)
+  // if (!hasAccessToFeature("Slide Templates")) {
+  //   useGlobalEmit("show-upgrade-modal")
+  //   usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+  //     feature: "Slide Templates",
+  //     location: "slide_card_template",
+  //   })
+  // } else {
+  //   emit("save-as-template", props.slide)
+  // }
+}
 </script>
 
 <style scoped>

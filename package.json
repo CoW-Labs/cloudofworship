@@ -34,6 +34,7 @@
     "@vueuse/rxjs": "^10.9.0",
     "browser-image-compression": "^2.0.2",
     "bson-objectid": "^2.0.4",
+    "canvas-confetti": "^1.9.4",
     "dexie": "^4.0.4",
     "firebase": "^10.14.0",
     "fuzzysort": "^2.0.4",

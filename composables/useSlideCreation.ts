@@ -60,32 +60,34 @@ export default function useSlideCreation() {
   }
 
   /**
-   * Create a new text slide or duplicate an existing slide
+   * Create a new text slide
    */
-  const createTextSlide = (duplicateSlide?: Slide): Slide => {
+  const createTextSlide = (): Slide => {
     let tempSlide = { ...preSlideCreation() }
 
-    if (duplicateSlide) {
-      tempSlide = { ...duplicateSlide }
-      delete tempSlide._id
-    } else {
-      tempSlide.slideStyle = { ...tempSlide.slideStyle, alignment: "left" }
-      tempSlide.background =
-        appStore.currentState.settings.defaultBackground.default?.background ||
-        appStore.currentState.settings.defaultBackground.text?.background
-      tempSlide.backgroundType =
-        appStore.currentState.settings.defaultBackground.default
-          ?.backgroundType ||
-        appStore.currentState.settings.defaultBackground.text?.backgroundType
-    }
+    tempSlide.slideStyle = { ...tempSlide.slideStyle, alignment: "left" }
+    tempSlide.background =
+      appStore.currentState.settings.defaultBackground.default?.background ||
+      appStore.currentState.settings.defaultBackground.text?.background
+    tempSlide.backgroundType =
+      appStore.currentState.settings.defaultBackground.default
+        ?.backgroundType ||
+      appStore.currentState.settings.defaultBackground.text?.backgroundType
 
     tempSlide.id = useObjectID()
-
-    toast.add({
-      title: `${tempSlide?.name} created`,
-      icon: "i-bx-slideshow",
-    })
     usePosthogCapture("NEW_TEXT_SLIDE_CREATED")
+
+    return tempSlide
+  }
+
+  const duplicateSlide = (slideToDuplicate?: Slide): Slide | null => {
+    if (!slideToDuplicate) return null;
+
+    const tempSlide = { ...slideToDuplicate }
+    delete tempSlide._id
+    tempSlide.id = useObjectID()
+
+    usePosthogCapture("SLIDE_DUPLICATED")
 
     return tempSlide
   }
@@ -231,7 +233,7 @@ export default function useSlideCreation() {
       const externalVideo: any = {
         url: file.url,
         type: file.type, // 'youtube' or 'vimeo'
-        thumbnail: (file as any).thumbnail,
+        thumbnail: file.thumbnail,
         name: file.name,
       }
       tempSlide.backgroundType = "video"
@@ -287,7 +289,7 @@ export default function useSlideCreation() {
     }
 
     usePosthogCapture("NEW_MEDIA_SLIDE_CREATED", {
-      file_type: (tempSlide?.data as any)?.type || (file as any).type,
+      file_type: tempSlide?.data?.type || file.type,
     })
 
     return { ...tempSlide, blob } as Slide
@@ -414,5 +416,6 @@ export default function useSlideCreation() {
     createMultipleMediaSlides,
     createCountdownSlide,
     saveSlideToLib,
+    duplicateSlide
   }
 }

@@ -35,12 +35,12 @@ const uploadOfflineSlides = useDebounceFn(() => {
 }, 2000)
 
 const connectWebSocket = async () => {
-  // const socketInstance = useSocket({
-  //   scheduleId: appStore.currentState.activeSchedule?._id!!,
-  // }).connect()
-  // if (socketInstance) {
-  //   socket.value = socketInstance
-  // }
+  const socketInstance = useSocket({
+    scheduleId: appStore.currentState.activeSchedule?._id!!,
+  }).connect()
+  if (socketInstance) {
+    socket.value = socketInstance
+  }
 }
 
 const sendLiveSlideToWebsocket = (slide: Slide) => {
@@ -49,8 +49,8 @@ const sendLiveSlideToWebsocket = (slide: Slide) => {
     socket.value?.readyState === WebSocket.CLOSING
   ) {
     console.error("Error sending live slide to websocket", "WebSocket closed")
-    socket.value.close() // Close on error to trigger the onclose event
-    connectWebSocket()
+    // socket.value.close() // Close on error to trigger the onclose event
+    // connectWebSocket()
   } else {
     socket.value?.send(
       JSON.stringify({
@@ -164,7 +164,7 @@ onMounted(async () => {
 
   // Connect to websocket
   if (appStore.currentState.activeSchedule) {
-    connectWebSocket()
+    // connectWebSocket()
   }
 })
 
@@ -173,7 +173,7 @@ emitter.on("refresh-slides", () => {
     socket.value?.readyState === WebSocket.CLOSED ||
     socket.value?.readyState === WebSocket.CLOSING
   ) {
-    connectWebSocket()
+    // connectWebSocket()
   }
 })
 </script>
