@@ -145,7 +145,7 @@ jobs:
           echo "next_version=$next_version" >> $GITHUB_OUTPUT
           echo "skip_release=0" >> $GITHUB_OUTPUT
 
-      - name: Update appVersion in app.vue and tauri.conf.json
+      - name: Update appVersion, in app.vue and tauri.conf.json
         if: env.SKIP_RELEASE != '1'
         run: |
           # Remove 'v' prefix and '-beta' suffix for tauri.conf.json
@@ -203,7 +203,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

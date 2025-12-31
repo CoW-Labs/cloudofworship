@@ -280,9 +280,11 @@ onMounted(() => {
   })
 
   // Fetch subscription plans and detect currency early
-  const { fetchPlans, detectCurrency } = useSubscriptionPlans()
-  detectCurrency() // Start currency detection in background
-  fetchPlans()
+
+  // TODO: Payments & Subscriptions
+  // const { fetchPlans, detectCurrency } = useSubscriptionPlans()
+  // detectCurrency() // Start currency detection in background
+  // fetchPlans()
 
   if (route.query.registerChurch) {
     getChurch()

@@ -160,7 +160,7 @@ const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 
 // Subscription check
-const { hasAccessToFeature } = useSubscription()
+// const { hasAccessToFeature } = useSubscription()
 
 const props = defineProps<{
   slide: Slide

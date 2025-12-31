@@ -1,4 +1,4 @@
-import { BibleVersion, QuickAction } from "~/types"
+import type { BibleVersion, QuickAction } from "~/types"
 
 export const slideTypes = {
   song: 'song',
