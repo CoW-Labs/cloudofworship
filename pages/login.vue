@@ -148,6 +148,12 @@ const { token } = useAuthToken()
 const login = async (event) => {
   event.preventDefault()
   loading.value = true
+
+  usePosthogCapture("LOGIN_ATTEMPTED", {
+    method: "email_password",
+    email: email.value,
+  })
+
   const { data, error } = await useAPIFetch<LoginResponseT>("/auth/login", {
     method: "POST",
     body: {
@@ -158,6 +164,12 @@ const login = async (event) => {
 
   // If error occurred
   if (error.value) {
+    usePosthogCapture("LOGIN_FAILED", {
+      method: "email_password",
+      email: email.value,
+      error: error.value?.data?.message,
+    })
+
     toast.add({
       title: error.value?.data?.message,
       color: "red",
@@ -169,6 +181,12 @@ const login = async (event) => {
       new Date().getTime() > new Date(inaccessibleDate).getTime()
     ) {
       // If account is no longer accessible and user is not verified
+      usePosthogCapture("LOGIN_FAILED", {
+        method: "email_password",
+        email: email.value,
+        error: "Email not verified",
+      })
+
       toast.add({
         title: "Account is no longer accessible. Verify your email to proceed",
         color: "red",
@@ -178,6 +196,14 @@ const login = async (event) => {
     } else {
       token.value = data.value?.token
       authStore.setUser(data.value?.data?.user!!)
+
+      usePosthogCapture("LOGIN_SUCCESSFUL", {
+        method: "email_password",
+        userId: data.value?.data?.user?._id,
+        email: email.value,
+        emailVerified: data.value?.data?.user?.emailVerified,
+      })
+
       toast.add({
         title: `Successful login as ${email.value}`,
         color: "green",
@@ -206,6 +232,10 @@ const goToVerify = () => {
 const handleGoogleSignIn = async () => {
   googleLoading.value = true
 
+  usePosthogCapture("LOGIN_ATTEMPTED", {
+    method: "google",
+  })
+
   try {
     const { user } = await googleSignIn()
 
@@ -226,6 +256,12 @@ const handleGoogleSignIn = async () => {
     )
 
     if (error.value) {
+      usePosthogCapture("LOGIN_FAILED", {
+        method: "google",
+        email: user?.email,
+        error: error.value?.data?.message,
+      })
+
       toast.add({
         title: error.value?.data?.message,
         color: "red",
@@ -234,6 +270,14 @@ const handleGoogleSignIn = async () => {
     } else {
       token.value = data.value?.token
       authStore.setUser(data.value?.data?.user!!)
+
+      usePosthogCapture("LOGIN_SUCCESSFUL", {
+        method: "google",
+        userId: data.value?.data?.user?._id,
+        email: user?.email,
+        emailVerified: data.value?.data?.user?.emailVerified,
+      })
+
       toast.add({
         title: `Successful login as ${user?.email}`,
         color: "green",
@@ -244,6 +288,11 @@ const handleGoogleSignIn = async () => {
   } catch (error: any) {
     // Only show error if it's not a redirect initiation
     if (error?.message !== "Redirect initiated") {
+      usePosthogCapture("LOGIN_FAILED", {
+        method: "google",
+        error: error?.message,
+      })
+
       toast.add({
         title: "Google sign in failed",
         description: error?.message || "An error occurred",
@@ -258,11 +307,17 @@ const handleGoogleSignIn = async () => {
 
 // Check for redirect result on mount (for Tauri OAuth redirect)
 onMounted(async () => {
+  usePosthogCapture("LOGIN_PAGE_VIEWED")
+
   if (isTauri) {
     googleLoading.value = true
     const result = await checkRedirectResult()
 
     if (result?.user) {
+      usePosthogCapture("LOGIN_ATTEMPTED", {
+        method: "google_tauri",
+      })
+
       // Process the Google auth result
       const { user } = result
 
@@ -278,6 +333,12 @@ onMounted(async () => {
       )
 
       if (error.value) {
+        usePosthogCapture("LOGIN_FAILED", {
+          method: "google_tauri",
+          email: user?.email,
+          error: error.value?.data?.message,
+        })
+
         toast.add({
           title: error.value?.data?.message,
           color: "red",
@@ -286,6 +347,14 @@ onMounted(async () => {
       } else {
         token.value = data.value?.token
         authStore.setUser(data.value?.data?.user!!)
+
+        usePosthogCapture("LOGIN_SUCCESSFUL", {
+          method: "google_tauri",
+          userId: data.value?.data?.user?._id,
+          email: user?.email,
+          emailVerified: data.value?.data?.user?.emailVerified,
+        })
+
         toast.add({
           title: `Successful login as ${user?.email}`,
           color: "green",

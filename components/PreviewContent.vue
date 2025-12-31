@@ -54,7 +54,7 @@
           "
           @duplicate="
             (slide) => {
-              const newSlide = createTextSlide(slide)
+              const newSlide = duplicateSlide(slide)
               slides.push(newSlide)
               makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
               uploadOfflineSlides()
@@ -139,6 +139,7 @@ const {
   createMultipleMediaSlides,
   createCountdownSlide,
   saveSlideToLib,
+  duplicateSlide,
 } = useSlideCreation()
 const { gotoVerse, gotoChorus: gotoChorusNav } = useSlideNavigation()
 
@@ -197,7 +198,12 @@ emitter.on("new-slide", () => {
 })
 
 emitter.on("new-text", (slide: Slide[]) => {
-  const newSlide = createTextSlide(slide?.[0] || slide)
+  let newSlide
+  if (slide) {
+    newSlide = duplicateSlide(slide?.[0] || slide)
+  } else {
+    newSlide = createTextSlide()
+  }
   slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   uploadOfflineSlides()

@@ -80,6 +80,7 @@ export interface QuickAction {
   hymnIndex?: string
   searchableOnly?: boolean
   meta?: string
+  tier?: 'free' | 'teams' // Subscription tier required for this action
 }
 
 export interface Scripture {
@@ -181,6 +182,7 @@ export interface SlideStyle {
   lettercase?: string
   lineSpacing?: string
   textOutlined?: boolean
+  bibleVersion?: string
 }
 
 export interface Advert {

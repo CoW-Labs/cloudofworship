@@ -98,13 +98,38 @@ const verificationCode = ref("")
 const loading = ref(false)
 const resendLoading = ref(false)
 const codeResentTimes = ref(0)
+const router = useRouter()
+
+// Store reference to upgrade modal
+const showUpgradeModalWithPlan = ref(false)
+const pendingPlanId = ref<string | null>(null)
 
 onMounted(() => {
+  usePosthogCapture("EMAIL_VERIFICATION_PAGE_VIEWED", {
+    email: email.value,
+  })
+
+  // Fetch subscription plans and detect currency early
+  const { fetchPlans, detectCurrency } = useSubscriptionPlans()
+  detectCurrency() // Start currency detection in background
+  fetchPlans()
+
+  // Check if there's a pending plan_id from signup
+  const storedPlanId = localStorage.getItem("pending_plan_id")
+  if (storedPlanId) {
+    pendingPlanId.value = storedPlanId
+  }
+
   resendCode()
 })
 
 const verifyEmail = async () => {
   loading.value = true
+
+  usePosthogCapture("EMAIL_VERIFICATION_ATTEMPTED", {
+    email: email.value,
+  })
+
   const { data, error } = await useAPIFetch("/auth/verify-email", {
     method: "POST",
     body: {
@@ -114,24 +139,63 @@ const verifyEmail = async () => {
 
   // If error occurred
   if (error.value) {
+    usePosthogCapture("EMAIL_VERIFICATION_FAILED", {
+      email: email.value,
+      error: error.value?.data?.message,
+    })
+
     toast.add({
       title: error.value?.data?.message,
       color: "red",
       icon: "i-bx-error",
     })
+    loading.value = false
   } else {
+    usePosthogCapture("EMAIL_VERIFICATION_SUCCESSFUL", {
+      email: email.value,
+      hasPendingPlanId: !!pendingPlanId.value,
+    })
+
     toast.add({
       title: "Email successfully verified",
       color: "green",
       icon: "i-bx-check-circle",
     })
-    useRouter().push("/")
+
+    // Check if there's a pending plan_id to show upgrade modal
+    if (pendingPlanId.value) {
+      // Clear the stored plan_id
+      localStorage.removeItem("pending_plan_id")
+
+      usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
+        planId: pendingPlanId.value,
+        email: email.value,
+      })
+
+      // Navigate to index page first
+      await router.push("/")
+
+      // Wait for navigation to complete and show modal
+      setTimeout(() => {
+        useGlobalEmit("show-upgrade-modal", { planId: pendingPlanId.value })
+      }, 500)
+    } else {
+      // Normal flow - just navigate to index
+      router.push("/")
+    }
+
+    loading.value = false
   }
-  loading.value = false
 }
 
 const resendCode = async () => {
   resendLoading.value = true
+
+  usePosthogCapture("EMAIL_VERIFICATION_CODE_RESEND_REQUESTED", {
+    email: email.value,
+    attemptNumber: codeResentTimes.value + 1,
+  })
+
   const { data, error } = await useAPIFetch("/auth/send-verify-email", {
     method: "POST",
     body: {
@@ -139,17 +203,31 @@ const resendCode = async () => {
     },
   })
   if (data.value) {
+    usePosthogCapture("EMAIL_VERIFICATION_CODE_SENT", {
+      email: email.value,
+      attemptNumber: codeResentTimes.value + 1,
+    })
+
     toast.add({
       title: `Code sent to ${email.value}`,
       color: "green",
       icon: "i-bx-check-circle",
     })
   }
-  toast.add({
-    title: error.value?.data?.msg,
-    color: "red",
-    icon: "i-bx-error",
-  })
+
+  if (error.value) {
+    usePosthogCapture("EMAIL_VERIFICATION_CODE_SEND_FAILED", {
+      email: email.value,
+      error: error.value?.data?.msg,
+    })
+
+    toast.add({
+      title: error.value?.data?.msg,
+      color: "red",
+      icon: "i-bx-error",
+    })
+  }
+
   resendLoading.value = false
   codeResentTimes.value += 1
 }
