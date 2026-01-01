@@ -1,15 +1,15 @@
 {
-  "version": "0.36.7-beta",
-  "tag": "v0.36.7-beta",
-  "releaseDate": "2025-12-31T18:59:15Z",
-  "releaseNotes": "- fix: GH workflow\n- ci: updated node version in GH workflow\n",
+  "version": "0.36.8-beta",
+  "tag": "v0.36.8-beta",
+  "releaseDate": "2025-12-31T21:10:55Z",
+  "releaseNotes": "- fix: go live button triggering other actions\n- Update latest.json for release v0.36.7-beta\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.36.7-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.36.8-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.36.7-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.36.8-beta/",
       "signature": ""
     }
   }
