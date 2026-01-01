@@ -162,6 +162,7 @@ export default function useSlideCreation() {
       font: appStore.currentState.settings.defaultFont,
     }
     tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
+    tempSlide.name = useSlideName(tempSlide)
 
     toast.add({ title: "Hymn slide created", icon: "i-bx-church" })
     usePosthogCapture("NEW_HYMN_SLIDE_CREATED")
@@ -308,24 +309,32 @@ export default function useSlideCreation() {
       )
     })
 
+    // Wait for all slides to be created
+    const newSlides = await Promise.all(multipleSlidesPromise)
     useGlobalEmit(appWideActions.appLoading, false)
-    toast.add({ title: "Media slides created", icon: "i-bx-image" })
 
-    // Network call to create multiple slides
-    let newSlides = await Promise.all(multipleSlidesPromise)
+    if (files.some((file) => !file?.blob?.type?.includes("image"))) {
+      return newSlides
+    }
 
-    // Upload image files as backgrounds
-    newSlides = newSlides.filter((slide) => slide.backgroundType === "image")
+    // Upload only image files as backgrounds
+    try {
+      const uploadedImages = files.map((file: ExtendedFileT) =>
+        file?.blob?.type?.includes("image") ? useUploadImage(file?.blob) : null
+      )
+      const uploadedImagesResp = await Promise.all(uploadedImages)
 
-    const uploadedImages = files.map((file: ExtendedFileT) =>
-      file?.blob?.type.includes("image") ? useUploadImage(file?.blob) : null
-    )
-    const uploadedImagesResp = await Promise.all(uploadedImages)
-
-    newSlides.forEach((slide, index) => {
-      const imageObject = uploadedImagesResp[index]
-      slide.background = imageObject?.file?.url || slide.background
-    })
+      // Update background URLs for image slides only
+      newSlides.forEach((slide, index) => {
+        const imageObject = uploadedImagesResp[index]
+        if (imageObject?.file?.url && slide.backgroundType === "image") {
+          slide.background = imageObject.file.url
+        }
+      })
+    } catch (err) {
+      console.log(err)
+      toast.add({ title: 'Error uploading images', icon: 'i-bx-error', color: 'red' })
+    }
 
     return newSlides
   }
