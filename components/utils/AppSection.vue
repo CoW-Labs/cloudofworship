@@ -56,7 +56,11 @@
                 :variant="secondaryButton?.variant || 'ghost'"
                 :color="secondaryButton.color"
                 :icon="secondaryButton.icon"
-                :to="secondaryButton.action === appWideActions.goLive ? undefined : '#'"
+                :to="
+                  secondaryButton.action === appWideActions.goLive
+                    ? undefined
+                    : '#'
+                "
                 @click.stop="
                   secondaryButton.action !== appWideActions.goLive
                     ? useGlobalEmit(secondaryButton.action)
