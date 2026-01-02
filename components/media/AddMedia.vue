@@ -2,14 +2,7 @@
   <div
     class="media-main min-h-[75vh] lg:min-h-[75vh] xl:min-h-[80vh] 2xl:min-h-[82.5vh]"
   >
-    <UTabs :items="mediaTabs" @change="activeTab = $event">
-      <template #default="{ item }">
-        <div class="flex gap-2 capitalize">
-          <IconWrapper :name="item.icon" size="4" />
-          {{ item.label }}
-        </div>
-      </template>
-    </UTabs>
+    <UTabs :items="mediaTabs" @change="activeTab = $event" />
 
     <!-- FILES TAB -->
     <div v-if="activeTab === 0" class="collector-ctn flex flex-col gap-3 mt-4">

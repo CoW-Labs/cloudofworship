@@ -1,13 +1,6 @@
 <template>
   <div class="personal-library-main min-h-[80vh] h-[100%]" ref="quickActions">
-    <UTabs :items="libraryTabs" @change="activeLibraryTab = $event">
-      <template #default="{ item }">
-        <div class="flex gap-2 capitalize">
-          <IconWrapper :name="item.icon" size="4" />
-          {{ item.label }}s
-        </div>
-      </template>
-    </UTabs>
+    <UTabs :items="libraryTabs" @change="activeLibraryTab = $event" />
     <UButton
       v-if="activeLibraryTab === 0"
       class="mb-2 capitalize transition-all"
@@ -18,14 +11,14 @@
       @click="page === 'add-song' ? (page = '') : (page = 'add-song')"
     >
       <span v-if="page !== 'add-song'"
-        >Add new {{ libraryTabs[activeLibraryTab].label }}</span
+        >Add new {{ libraryTabs[activeLibraryTab].singular }}</span
       >
       <span v-else>View saved songs</span>
     </UButton>
     <div v-if="page !== 'add-song'" class="flex gap-2 come-up-1">
       <UInput
         icon="i-bx-search"
-        :placeholder="`Search all saved ${libraryTabs[activeLibraryTab].label}s`"
+        :placeholder="`Search all saved ${libraryTabs[activeLibraryTab].label}`"
         v-model="searchInput"
         class="w-[100%]"
         @input="onSearchInput"
@@ -208,8 +201,8 @@ const {
 } = useLibrary()
 
 const libraryTabs = [
-  { label: "song", icon: "i-bx-music" },
-  { label: "slide", icon: "i-bx-slideshow" },
+  { label: "Songs", icon: "i-bx-music", singular: "song" },
+  { label: "Slides", icon: "i-bx-slideshow", singular: "slide" },
 ]
 const activeLibraryTab = ref<number>(0)
 const searchInput = ref<string>("")
