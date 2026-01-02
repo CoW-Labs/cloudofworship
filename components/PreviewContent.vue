@@ -268,23 +268,31 @@ emitter.on("new-song-search", (query: string) => {
 })
 
 emitter.on("new-media", async (data: ExtendedFileT[]) => {
-  if (data) {
-    if (data?.length > 0) {
-      const newSlides = await createMultipleMediaSlides(data)
+  if (data && data?.length > 0) {
+    let newSlides
 
-      // Update slides with new slides
-      const updatedSlides = useMergeObjectArray(newSlides, [
-        ...appStore.currentState.activeSlides,
-      ])
-      // Sort updated slides by createdAt
-      updatedSlides.sort((a, b) => {
-        if (!a.createdAt) return 1
-        if (!b.createdAt) return -1
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    if (data?.[0]?.fromTemplate) {
+      newSlides = data
+      newSlides.forEach((slide) => {
+        delete slide._id
+        slide.id = useObjectID()
       })
-      appStore.setActiveSlides(updatedSlides)
-      uploadOfflineSlides()
+    } else if (data?.length > 0) {
+      newSlides = await createMultipleMediaSlides(data)
     }
+
+    // Update slides with new slides
+    const updatedSlides = useMergeObjectArray(newSlides, [
+      ...appStore.currentState.activeSlides,
+    ])
+    // Sort updated slides by createdAt
+    updatedSlides.sort((a, b) => {
+      if (!a.createdAt) return 1
+      if (!b.createdAt) return -1
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
+    appStore.setActiveSlides(updatedSlides)
+    uploadOfflineSlides()
   }
 })
 
