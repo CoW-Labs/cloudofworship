@@ -142,14 +142,7 @@
           <UTabs
             :items="slideBackgroundTabs"
             v-model:model-value="activeSlideBackgroundTab"
-          >
-            <template #default="{ item }">
-              <div class="flex gap-2 capitalize">
-                <IconWrapper :name="item.icon" size="4" />
-                {{ item.label }}
-              </div>
-            </template>
-          </UTabs>
+          />
           <Transition class="fade">
             <div class="tab-content">
               <BgVideoSelection
