@@ -70,6 +70,17 @@ export const quickActionsArr: QuickAction[] = [
     meta: "",
     bibleBookIndex: "1",
     type: slideTypes.bible,
+    tier: "free",
+  },
+  {
+    icon: "i-bx-search",
+    name: "Search Whole Bible",
+    desc: "Full text search of the scriptures",
+    action: appWideActions.newSearchBible,
+    meta: "",
+    unreleased: false,
+    type: slideTypes.bible,
+    tier: "free",
   },
   {
     icon: "i-bx-church",
@@ -78,14 +89,16 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newHymn,
     meta: "",
     type: slideTypes.hymn,
+    tier: "free",
   },
   {
     icon: "i-bx-music",
-    name: "Display Song Lyrics",
+    name: "Search song lyrics",
     desc: "Find lyrics to any song, native too",
     action: appWideActions.newSong,
     meta: "",
     type: slideTypes.song,
+    tier: "teams",
   },
   {
     icon: "i-bx-text",
@@ -94,15 +107,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newSlide,
     meta: "",
     type: slideTypes.text,
-  },
-  {
-    icon: "i-bx-image",
-    name: "Add Media",
-    desc: "Display image, video or audio media",
-    action: appWideActions.newMedia,
-    meta: "",
-    type: slideTypes.media,
-    // type: slideTypes.text
+    tier: "free",
   },
   {
     icon: "i-bx-library",
@@ -111,6 +116,17 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newLibrary,
     meta: "save files images pictures videos songs documents",
     type: slideTypes.media,
+    tier: "free",
+    // type: slideTypes.text
+  },
+  {
+    icon: "i-bx-image",
+    name: "Add Media",
+    desc: "Display image, video or audio media",
+    action: appWideActions.newMedia,
+    meta: "",
+    type: slideTypes.media,
+    tier: "teams",
     // type: slideTypes.text
   },
   {
@@ -119,6 +135,7 @@ export const quickActionsArr: QuickAction[] = [
     desc: "Use pre-made, fancy slide templates",
     action: appWideActions.newTemplates,
     meta: "template preset saved design layout",
+    tier: "teams",
     // type: slideTypes.text
   },
   {
@@ -127,6 +144,7 @@ export const quickActionsArr: QuickAction[] = [
     desc: "Notify your audience without disruption",
     action: appWideActions.newAlert,
     meta: "",
+    tier: "teams",
     // unreleased: true,
     // type: slideTypes.text
   },
@@ -136,6 +154,7 @@ export const quickActionsArr: QuickAction[] = [
     desc: "Save songs to your personal library",
     action: appWideActions.addSong,
     meta: "",
+    tier: "free",
     // unreleased: true,
     // type: slideTypes.text
   },
@@ -146,6 +165,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.removeAlert,
     searchableOnly: true,
     meta: "trash alert remove banner",
+    tier: "teams",
     // unreleased: true,
     // type: slideTypes.text
   },
@@ -156,32 +176,26 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newCountdown,
     meta: "",
     type: slideTypes.countdown,
+    tier: "teams",
     // unreleased: true,
   },
   {
-    icon: "i-bx-search",
-    name: "Search Whole Bible",
-    desc: "Find scriptures with familiar words",
-    action: appWideActions.newSearchBible,
-    meta: "",
-    unreleased: false,
-    type: slideTypes.bible,
-  },
-  {
-    icon: "i-bxl-youtube",
+    icon: "i-mdi-youtube",
     name: "Add YouTube Video",
     desc: "Embed YouTube videos in your schedule",
     action: appWideActions.newYouTubeVideo,
     meta: "youtube external video embed",
     type: slideTypes.media,
+    tier: "teams",
   },
   {
-    icon: "i-bxl-vimeo",
+    icon: "i-mdi-vimeo",
     name: "Add Vimeo Video",
     desc: "Embed Vimeo videos in your schedule",
     action: appWideActions.newVimeoVideo,
     meta: "vimeo external video embed",
     type: slideTypes.media,
+    tier: "teams",
   },
   {
     icon: "i-bx-cog",
@@ -189,6 +203,7 @@ export const quickActionsArr: QuickAction[] = [
     desc: "Customize account, profile, slide, bible settings",
     action: appWideActions.openSettings,
     meta: "app payment bible slide profile settings",
+    tier: "free",
     // unreleased: true,
     // type: slideTypes.text
   },
@@ -198,6 +213,7 @@ export const quickActionsArr: QuickAction[] = [
     desc: "Start a whole new service project",
     action: appWideActions.openScheduleModal,
     meta: "new schedule service fresh start",
+    tier: "free",
     // unreleased: true,
     // type: slideTypes.text
   },
@@ -208,6 +224,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.toggleDarkMode,
     meta: "toggle dark light mode app settings theme",
     searchableOnly: true,
+    tier: "free",
     // unreleased: true,
     // type: slideTypes.text
   },
@@ -218,6 +235,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.openInviteModal,
     meta: "teammates share link invite workspace",
     searchableOnly: true,
+    tier: "teams",
     // unreleased: true,
     // type: slideTypes.text
   },
@@ -228,6 +246,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.openShortcutsModal,
     meta: "shortcut Cmd Ctrl hotkey keyboard mouse",
     searchableOnly: true,
+    tier: "free",
     // unreleased: true,
     // type: slideTypes.text
   },
@@ -238,6 +257,7 @@ export const quickActionsArr: QuickAction[] = [
     action: "new-ppt",
     meta: "power point Google slides",
     unreleased: true,
+    tier: 'teams',
     // type: slideTypes.text
   },
   // {
@@ -247,6 +267,7 @@ export const quickActionsArr: QuickAction[] = [
   //   action: "new-carousel",
   //   meta: "",
   //   unreleased: true,
+  // tier: 'teams',
   //   type: slideTypes.text,
   // },
   // {
@@ -256,6 +277,7 @@ export const quickActionsArr: QuickAction[] = [
   //   action: "new-transcribe",
   //   meta: "",
   //   unreleased: true,
+  // tier: 'teams',
   //   // type: slideTypes.text
   // },
   // {
@@ -265,6 +287,7 @@ export const quickActionsArr: QuickAction[] = [
   //   action: "new-overlay",
   //   meta: "",
   //   unreleased: true,
+  // tier: 'teams',
   //   // type: slideTypes.text
   // },
 ]

@@ -211,6 +211,28 @@ const createScheduleOnline = async (schedule: Schedule) => {
 }
 
 const createNewSchedule = () => {
+  // Check subscription limits for free users
+  const { hasAccessToFeature, isFreePlan } = useSubscription()
+  const scheduleCount = appStore.currentState.schedules.length
+
+  if (isFreePlan.value && scheduleCount >= 5) {
+    useGlobalEmit("show-upgrade-modal")
+    usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+      feature: "Create Schedule",
+      location: "schedule_modal",
+      currentCount: scheduleCount,
+      limit: 3,
+    })
+    useToast().add({
+      icon: "i-heroicons-exclamation-triangle",
+      title: "Schedule Limit Reached",
+      description:
+        "Free plan allows up to 5 schedules. Upgrade to create unlimited schedules.",
+      color: "orange",
+    })
+    return
+  }
+
   const scheduleId = useObjectID()
   const schedule: Schedule = {
     _id: scheduleId,

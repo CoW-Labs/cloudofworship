@@ -3,30 +3,6 @@
     v-if="!loadingResources"
     class="app-ctn max-h-[100vh] overflow-hidden text"
   >
-    <!-- TODO: Remove this banner after 0.7.9 and make it a component -->
-    <div
-      v-if="!authStore.user?.emailVerified && authStore.user?.email"
-      class="banner text-center text-sm px-4 h-[50px] bg-[#FF8980] text-black items-center flex justify-between gap-1 fixed inset-0 z-10"
-    >
-      <!-- <UButton variant="ghost" class="pointer-events-none opacity-0 w-8 h-8">
-        <IconWrapper name="i-mdi-close" class="w-4 h-4" />
-      </UButton> -->
-      <div class="logo flex items-center gap-2 w-[40px]">
-        <Logo class="w-[38px]" />
-      </div>
-      <div class="text">
-        Your email is not verified, please verify
-        <a class="border-b font-bold border-black" href="/verify">here</a>.
-      </div>
-      <UButton
-        variant="ghost"
-        @click="appStore.setBannerVisible(false)"
-        color="black"
-        class="p-0 flex items-center justify-center w-[40px] h-8 mb-2 mr-2"
-      >
-        <!-- <IconWrapper name="i-mdi-close" class="w-4 h-4 text-black p-0" /> -->
-      </UButton>
-    </div>
     <Navbar :app-version="appVersion" :online="isAppOnline" />
     <slot />
     <FullScreenLoader v-if="fullScreenLoading" />
@@ -98,6 +74,7 @@
       </Transition>
 
       <AdvertModal :active-advert="currentState.activeAdvert" />
+      <UpgradePlanModal />
     </ClientOnly>
   </div>
   <div
@@ -702,13 +679,18 @@ async function openTauriLiveWindow() {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
 
     // Get available monitors
-    const { availableMonitors, currentMonitor } = await import("@tauri-apps/api/window")
+    const { availableMonitors, currentMonitor } = await import(
+      "@tauri-apps/api/window"
+    )
     const monitors = await availableMonitors()
     const current = await currentMonitor()
-    
+
     console.log("Available monitors:", monitors)
     console.log("Current monitor:", current)
-    console.log("Saved mainDisplayLabel:", appStore.currentState.mainDisplayLabel)
+    console.log(
+      "Saved mainDisplayLabel:",
+      appStore.currentState.mainDisplayLabel
+    )
 
     // Check if live window already exists
     const { getAllWebviewWindows } = await import(
@@ -744,7 +726,12 @@ async function openTauriLiveWindow() {
     // Find the target monitor based on saved settings
     let targetMonitor = monitors.find((monitor: any) => {
       const monitorId = useScreenId(monitor)
-      console.log("Checking monitor ID:", monitorId, "against saved:", appStore.currentState.mainDisplayLabel)
+      console.log(
+        "Checking monitor ID:",
+        monitorId,
+        "against saved:",
+        appStore.currentState.mainDisplayLabel
+      )
       return monitorId === appStore.currentState.mainDisplayLabel
     })
 
@@ -753,11 +740,11 @@ async function openTauriLiveWindow() {
     // Fallback strategy: Select a monitor that's NOT the current monitor
     if (!targetMonitor) {
       console.log("Target monitor not found, using fallback strategy")
-      
+
       // Get current monitor ID for comparison
       const currentMonitorId = current ? useScreenId(current) : null
       console.log("Current monitor ID:", currentMonitorId)
-      
+
       // Try to find a monitor that is NOT the current monitor
       if (current && monitors.length > 1) {
         targetMonitor = monitors.find((monitor: any) => {
@@ -766,7 +753,7 @@ async function openTauriLiveWindow() {
         })
         console.log("Found non-current monitor:", targetMonitor)
       }
-      
+
       // Final fallback: use second monitor if available, otherwise first
       if (!targetMonitor) {
         targetMonitor = monitors.length > 1 ? monitors[1] : monitors[0]

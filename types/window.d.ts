@@ -27,6 +27,27 @@ interface ScreenDetailed {
 
 interface Window {
   getScreenDetails(): Promise<ScreenDetails>
+  PaystackPop?: {
+    setup: (config: {
+      key: string
+      email: string
+      amount: number
+      currency: string
+      plan?: string
+      ref: string
+      metadata?: {
+        custom_fields: Array<{
+          display_name: string
+          variable_name: string
+          value: string
+        }>
+      }
+      onClose: () => void
+      callback: (response: { reference: string; status: string }) => void
+    }) => {
+      openIframe: () => void
+    }
+  }
 }
 
 export { }

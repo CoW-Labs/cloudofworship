@@ -109,10 +109,10 @@ onMounted(() => {
     email: email.value,
   })
 
-  // TODO: Payments & Subscriptions
-  // const { fetchPlans, detectCurrency } = useSubscriptionPlans()
-  // detectCurrency() // Start currency detection in background
-  // fetchPlans()
+  // Fetch subscription plans and detect currency early
+  const { fetchPlans, detectCurrency } = useSubscriptionPlans()
+  detectCurrency() // Start currency detection in background
+  fetchPlans()
 
   // Check if there's a pending plan_id from signup
   const storedPlanId = localStorage.getItem("pending_plan_id")

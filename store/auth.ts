@@ -14,6 +14,11 @@ export interface User {
   updatedAt: string
   churchId: string
   emailVerified?: boolean
+  subscription?: {
+    plan: 'free' | 'teams'
+    startDate: string
+    endDate: string | null
+  }
 }
 
 export interface Church {
