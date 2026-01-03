@@ -56,8 +56,9 @@
         <div class="info">
           <div class="text-sm font-semibold">Open in Fullscreen Mode</div>
           <div class="text-xs opacity-70 mt-1">
-            When enabled, the live window opens in fullscreen without window decorations.
-            When disabled, it opens as a resizable window with title bar controls.
+            When enabled, the live window opens in fullscreen without window
+            decorations. When disabled, it opens as a resizable window with
+            title bar controls.
           </div>
         </div>
         <UToggle
@@ -252,10 +253,10 @@ const getTauriDisplays = async () => {
       currentScreen.value = allScreens.value[0]
     }
 
-    useToast().add({
-      title: "Screens updated",
-      icon: "i-bx-check-circle",
-    })
+    // useToast().add({
+    //   title: "Screens updated",
+    //   icon: "i-bx-check-circle",
+    // })
   } catch (error) {
     console.error("Failed to get Tauri displays:", error)
     useToast().add({
@@ -278,10 +279,10 @@ const getBrowserDisplays = async () => {
     currentScreen.value = screenDetails?.currentScreen as Screen
     allScreens.value = screenDetails?.screens
 
-    useToast().add({
-      title: "Screens updated",
-      icon: "i-bx-check-circle",
-    })
+    // useToast().add({
+    //   title: "Screens updated",
+    //   icon: "i-bx-check-circle",
+    // })
   } catch (error) {
     console.error("Failed to get browser displays:", error)
     useToast().add({

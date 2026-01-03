@@ -1,14 +1,14 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
     <div
-      :class="{ 'gap-4 grid-cols-5': settingsPage }"
+      :class="{ 'gap-4 grid-cols-3': settingsPage }"
       class="bg-image-selection grid gap-2 grid-cols-3 max-h-[200px] overflow-y-auto overflow-x-hidden"
     >
       <UButton
         v-for="video in backgroundVideos"
         :key="video?.id"
         @click="$emit('select', { video: video?.url, key: video?.id })"
-        class="w-[100px] h-[60px] p-0 text-black bg-cover transition-all overflow-hidden relative"
+        class="w-[180px] h-[100px] p-0 text-black bg-cover transition-all overflow-hidden relative"
       >
         <video
           class="bg-image w-[100%] h-[100%] transition rounded-md opacity-100 hover:opacity-30 object-cover"
@@ -52,7 +52,11 @@
           :icon="videoUploadLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
           :loading="videoUploadLoading"
           size="sm"
-          >{{ videoUploadLoading ? `Adding ${currentVideoIndex}/${totalVideos}...` : 'Add from device' }}</UButton
+          >{{
+            videoUploadLoading
+              ? `Adding ${currentVideoIndex}/${totalVideos}...`
+              : "Add from device"
+          }}</UButton
         >
       </label>
     </div>
@@ -103,7 +107,7 @@ const getAllLocallySavedVideos = async () => {
 
   // Create Object URLs from locally saved videos - process in batches
   const locallySavedVideos: BackgroundVideo[] = []
-  
+
   // Process videos in smaller chunks to avoid blocking
   const chunkSize = 15
   for (let i = 0; i < videos.length; i += chunkSize) {
@@ -126,13 +130,13 @@ const getAllLocallySavedVideos = async () => {
         return // Ignore non-video files
       }
     })
-    
+
     // Allow UI to breathe between chunks
     if (i + chunkSize < videos.length) {
-      await new Promise(resolve => setTimeout(resolve, 0))
+      await new Promise((resolve) => setTimeout(resolve, 0))
     }
   }
-  
+
   locallySavedVideos.forEach((video) => {
     if (backgroundVideos.value.find((bgVideo) => bgVideo.id === video.id)) {
       return
@@ -143,17 +147,17 @@ const getAllLocallySavedVideos = async () => {
 
 const saveAndSelectVideos = async (files: File[]) => {
   if (!files || files.length === 0) return
-  
+
   const db = useIndexedDB()
-  
+
   videoUploadLoading.value = true
   totalVideos.value = files.length
-  
+
   try {
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       currentVideoIndex.value = i + 1
-      
+
       const randomId = useID(6)
       const tempMedia: Media = {
         id: `/custom-video-bg-${randomId}.${file.type?.split("/")?.[1]}`,
@@ -162,20 +166,23 @@ const saveAndSelectVideos = async (files: File[]) => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
-      
-      await db.cached.add(tempMedia).catch(err => 
-        console.error('Failed to save custom video:', err)
-      )
-      
+
+      await db.cached
+        .add(tempMedia)
+        .catch((err) => console.error("Failed to save custom video:", err))
+
       // Select the last added video
       if (i === files.length - 1) {
         bgVideoToBeSelected.value = tempMedia.id
       }
     }
-    
+
     await getAllLocallySavedVideos()
     if (bgVideoToBeSelected.value) {
-      emit("select", { video: bgVideoToBeSelected.value, key: bgVideoToBeSelected.value })
+      emit("select", {
+        video: bgVideoToBeSelected.value,
+        key: bgVideoToBeSelected.value,
+      })
     }
   } finally {
     videoUploadLoading.value = false

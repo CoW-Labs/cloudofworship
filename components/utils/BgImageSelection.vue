@@ -1,17 +1,17 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
     <div
-      :class="{ 'gap-4 grid-cols-7 max-h-full': settingsPage }"
+      :class="{ 'gap-4 grid-cols-3 max-h-full': settingsPage }"
       class="bg-image-selection grid gap-2 grid-cols-3 max-h-[190px] overflow-y-auto overflow-x-hidden"
     >
       <UButton
         v-for="image in backgroundImages"
         :key="image"
         @click="$emit('select', { image })"
-        class="w-[70px] h-[70px] p-0 text-black bg-cover transition-all overflow-hidden relative"
+        class="w-[180px] h-[100px] p-0 text-black bg-cover transition-all overflow-hidden relative"
       >
         <div
-          class="bg-image min-w-[70px] h-[70px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
+          class="bg-image min-w-[180px] h-[100px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
           :class="{ 'opacity-30': image === value }"
           :style="`background-image: url(${image})`"
         ></div>
@@ -43,7 +43,9 @@
         accept="image/*"
         multiple
         @change="
-          saveAndSelectImages(Array.from(($event.target as HTMLInputElement)?.files || []))
+          saveAndSelectImages(
+            Array.from(($event.target as HTMLInputElement)?.files || [])
+          )
         "
       />
       <UButton
@@ -53,7 +55,11 @@
         :icon="imageCompressionLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
         :loading="imageCompressionLoading"
         size="sm"
-        >{{ imageCompressionLoading ? `Adding ${currentImageIndex}/${totalImages}...` : 'Add from device' }}</UButton
+        >{{
+          imageCompressionLoading
+            ? `Adding ${currentImageIndex}/${totalImages}...`
+            : "Add from device"
+        }}</UButton
       >
     </label>
   </div>
@@ -112,7 +118,7 @@ const getAllLocallySavedImages = async () => {
 
   // Create Object URLs from locally saved images - process in batches
   const imageURLs: string[] = []
-  
+
   // Process images in smaller chunks to avoid blocking
   const chunkSize = 20
   for (let i = 0; i < images.length; i += chunkSize) {
@@ -129,30 +135,30 @@ const getAllLocallySavedImages = async () => {
         bgImageToBeSelected.value = blobURL
       }
     })
-    
+
     // Allow UI to breathe between chunks
     if (i + chunkSize < images.length) {
-      await new Promise(resolve => setTimeout(resolve, 0))
+      await new Promise((resolve) => setTimeout(resolve, 0))
     }
   }
-  
+
   backgroundImages.value = backgroundImages.value.concat(imageURLs)
 }
 
 const saveAndSelectImages = async (files: File[]) => {
   if (!files || files.length === 0) return
-  
+
   const online = useOnline()
   const db = useIndexedDB()
-  
+
   imageCompressionLoading.value = true
   totalImages.value = files.length
-  
+
   try {
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       currentImageIndex.value = i + 1
-      
+
       const compressedFile = await useCompressedImage(file)
       let uploadedFile = null
       const randomId = useID(6)
@@ -170,17 +176,17 @@ const saveAndSelectImages = async (files: File[]) => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
-      
-      await db.cached.add(tempMedia).catch(err => 
-        console.error('Failed to save custom image:', err)
-      )
-      
+
+      await db.cached
+        .add(tempMedia)
+        .catch((err) => console.error("Failed to save custom image:", err))
+
       // Select the last added image
       if (i === files.length - 1) {
         bgImageToBeSelected.value = tempMedia.id
       }
     }
-    
+
     await getAllLocallySavedImages()
     if (bgImageToBeSelected.value) {
       emit("select", bgImageToBeSelected.value)
