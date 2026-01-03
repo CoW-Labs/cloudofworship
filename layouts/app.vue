@@ -391,6 +391,11 @@ emitter.on("go-live", async () => {
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
 
+emitter.on("close-live-window", async () => {
+  await closeAllWindows()
+  usePosthogCapture("CLOSE_LIVE_WINDOW_BUTTON_CLICKED")
+})
+
 const saveAllBackgroundVideos = async () => {
   // Use Promise.all to fetch all videos in parallel - non-blocking
   const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
@@ -697,9 +702,13 @@ async function openTauriLiveWindow() {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
 
     // Get available monitors
-    const { availableMonitors } = await import("@tauri-apps/api/window")
+    const { availableMonitors, currentMonitor } = await import("@tauri-apps/api/window")
     const monitors = await availableMonitors()
-    // console.log("Available monitors:", monitors)
+    const current = await currentMonitor()
+    
+    console.log("Available monitors:", monitors)
+    console.log("Current monitor:", current)
+    console.log("Saved mainDisplayLabel:", appStore.currentState.mainDisplayLabel)
 
     // Check if live window already exists
     const { getAllWebviewWindows } = await import(
@@ -735,12 +744,34 @@ async function openTauriLiveWindow() {
     // Find the target monitor based on saved settings
     let targetMonitor = monitors.find((monitor: any) => {
       const monitorId = useScreenId(monitor)
+      console.log("Checking monitor ID:", monitorId, "against saved:", appStore.currentState.mainDisplayLabel)
       return monitorId === appStore.currentState.mainDisplayLabel
     })
 
-    // Fallback to secondary monitor or current monitor
+    console.log("Target monitor found:", targetMonitor)
+
+    // Fallback strategy: Select a monitor that's NOT the current monitor
     if (!targetMonitor) {
-      targetMonitor = monitors.length > 1 ? monitors[1] : monitors[0]
+      console.log("Target monitor not found, using fallback strategy")
+      
+      // Get current monitor ID for comparison
+      const currentMonitorId = current ? useScreenId(current) : null
+      console.log("Current monitor ID:", currentMonitorId)
+      
+      // Try to find a monitor that is NOT the current monitor
+      if (current && monitors.length > 1) {
+        targetMonitor = monitors.find((monitor: any) => {
+          const monitorId = useScreenId(monitor)
+          return monitorId !== currentMonitorId
+        })
+        console.log("Found non-current monitor:", targetMonitor)
+      }
+      
+      // Final fallback: use second monitor if available, otherwise first
+      if (!targetMonitor) {
+        targetMonitor = monitors.length > 1 ? monitors[1] : monitors[0]
+        console.log("Using final fallback monitor:", targetMonitor)
+      }
     }
 
     // Get fullscreen setting from store
@@ -768,6 +799,8 @@ async function openTauriLiveWindow() {
     // Listen for window close
     await liveWindow.once("tauri://close-requested", async () => {
       console.log("Live window closed")
+      // Clean up windowRefs when window is closed
+      windowRefs.value = []
     })
 
     // Add windowRef to track if live window is active
@@ -824,14 +857,24 @@ async function closeAllWindows() {
     )
     const existingWindows = await getAllWebviewWindows()
     const existingLiveWindow = existingWindows.find(
-      (w: any) => w.label === appStore.currentState.mainDisplayLabel
+      (w: any) => w.label === "live-output"
     )
     if (existingLiveWindow) {
-      await existingLiveWindow.close()
+      try {
+        await existingLiveWindow.close()
+      } catch (error) {
+        console.log("Window already closed or error closing:", error)
+      }
     }
   } else {
     windowRefs.value.forEach((windowRef: any) => {
-      windowRef.close()
+      try {
+        if (windowRef && !windowRef.closed) {
+          windowRef.close()
+        }
+      } catch (error) {
+        console.log("Error closing window:", error)
+      }
     })
   }
   windowRefs.value = []
