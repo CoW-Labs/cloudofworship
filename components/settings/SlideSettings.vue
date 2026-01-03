@@ -138,61 +138,6 @@
             "
           />
         </UFormGroup>
-        <UFormGroup label="Set default slide background" class="px-2 py-3">
-          <UTabs
-            :items="slideBackgroundTabs"
-            v-model:model-value="activeSlideBackgroundTab"
-          />
-          <Transition class="fade">
-            <div class="tab-content">
-              <BgVideoSelection
-                v-if="activeSlideBackgroundTab === 0"
-                settings-page
-                :value="
-                  appStore.currentState.settings.defaultBackground.default
-                    ?.background
-                "
-                @select="
-                  appStore.setDefaultSlideBackground(
-                    backgroundTypes.video,
-                    $event.video,
-                    $event.key
-                  )
-                "
-              />
-              <BgImageSelection
-                v-else-if="activeSlideBackgroundTab === 1"
-                settings-page
-                :value="
-                  appStore.currentState.settings.defaultBackground.default
-                    ?.background
-                "
-                @select="
-                  appStore.setDefaultSlideBackground(
-                    backgroundTypes.image,
-                    $event.image,
-                    null
-                  )
-                "
-              />
-              <BgColorSelection
-                v-else-if="activeSlideBackgroundTab === 2"
-                :count="12"
-                :value="
-                  appStore.currentState.settings.defaultBackground.default
-                    ?.background
-                "
-                @select="
-                  appStore.setDefaultSlideBackground(
-                    backgroundTypes.solid,
-                    $event.color,
-                    null
-                  )
-                "
-              />
-            </div>
-          </Transition>
-        </UFormGroup>
         <!-- flex items-center justify-between -->
       </UForm>
     </div>
@@ -571,12 +516,6 @@ const appStore = useAppStore()
 
 const MAX_FONT_SIZE = 150
 const MIN_FONT_SIZE = 50
-const slideBackgroundTabs = [
-  { label: "video", icon: "i-bx-video" },
-  { label: "image", icon: "i-bx-image" },
-  { label: "color", icon: "i-bx-paint" },
-]
-const activeSlideBackgroundTab = ref<number>(0)
 const font = ref(appStore.currentState.settings.defaultFont)
 const lines = ref<number>(
   appStore.currentState.settings.slideStyles.linesPerSlide || 4
@@ -599,21 +538,6 @@ const bibleVersionSelectOptions = computed(() =>
     ?.filter((version) => version?.isDownloaded)
     ?.map((version) => version?.id)
 )
-
-// Set default activeSlideBackgroundTab
-switch (
-  appStore.currentState.settings.defaultBackground.default?.backgroundType
-) {
-  case backgroundTypes.video:
-    activeSlideBackgroundTab.value = 0
-    break
-  case backgroundTypes.image:
-    activeSlideBackgroundTab.value = 1
-    break
-  case backgroundTypes.solid:
-    activeSlideBackgroundTab.value = 2
-    break
-}
 
 const getActivePaddingValue = (side: string) => {
   side = side as "top" | "right" | "bottom" | "left"

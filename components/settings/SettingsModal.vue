@@ -72,6 +72,10 @@
               v-else-if="activeTab === 'Slide Settings'"
               @select-active-tab="activeTab = $event"
             />
+            <!-- BACKGROUND SETTINGS -->
+            <BackgroundSettings
+              v-else-if="activeTab === 'Slide Background Settings'"
+            />
             <!-- BIBLE VERSION SETTINGS -->
             <BibleVersionSettings
               v-else-if="activeTab === 'Bible Version Settings'"
@@ -100,6 +104,7 @@ const tabs = [
   { name: "Profile Settings", active: false },
   { name: "Display Settings", active: false },
   { name: "Slide Settings", active: false },
+  { name: "Slide Background Settings", active: false },
   { name: "Bible Version Settings", active: false },
   { name: "Storage Settings", active: false },
   { name: "Other Settings", active: false },

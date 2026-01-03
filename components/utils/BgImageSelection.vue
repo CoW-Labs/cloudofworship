@@ -1,17 +1,18 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
     <div
-      :class="{ 'gap-4 grid-cols-7 max-h-full': settingsPage }"
+      :class="{ 'gap-4 grid-cols-3 max-h-full': settingsPage }"
       class="bg-image-selection grid gap-2 grid-cols-3 max-h-[190px] overflow-y-auto overflow-x-hidden"
     >
       <UButton
         v-for="image in backgroundImages"
         :key="image"
         @click="$emit('select', { image })"
-        class="w-[70px] h-[70px] p-0 text-black bg-cover transition-all overflow-hidden relative"
+        class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
+        :class="[settingsPage ? 'w-[180px] h-[100px]' : 'w-[90px] h-[50px]']"
       >
         <div
-          class="bg-image min-w-[70px] h-[70px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
+          class="bg-image min-w-[180px] h-[100px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
           :class="{ 'opacity-30': image === value }"
           :style="`background-image: url(${image})`"
         ></div>
@@ -22,6 +23,16 @@
           :rounded-bg="true"
           class="absolute text-primary-500 scale-50 bottom-2 right-2"
         />
+        <!-- Delete button for custom images in settings page -->
+        <!-- <UButton
+          v-if="settingsPage && isCustomImage(image)"
+          icon="i-tabler-trash"
+          size="xs"
+          variant="solid"
+          class="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity px-1.5"
+          :loading="deletingImageId === image"
+          @click.stop.prevent="handleDeleteImage(image)"
+        /> -->
       </UButton>
     </div>
   </div>
@@ -29,9 +40,10 @@
     <FileDropzone
       v-if="!settingsPage"
       size="sm"
-      @change="saveAndSelectImage($event?.[0])"
-      class="max-w-[230px]"
+      @change="saveAndSelectImages($event)"
+      class="max-w-[300px]"
       :class="{ 'max-w-full': settingsPage }"
+      :loading="imageCompressionLoading"
     />
     <label v-else class="relative">
       <input
@@ -40,17 +52,25 @@
         id=""
         class="absolute inset-0 opacity-0 cursor-pointer"
         accept="image/*"
+        multiple
         @change="
-          saveAndSelectImage(($event.target as HTMLInputElement)?.files?.[0])
+          saveAndSelectImages(
+            Array.from(($event.target as HTMLInputElement)?.files || [])
+          )
         "
       />
       <UButton
         class="z-1 mt-2"
         block
         variant="outline"
-        icon="i-bx-plus"
+        :icon="imageCompressionLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
+        :loading="imageCompressionLoading"
         size="sm"
-        >Add from device</UButton
+        >{{
+          imageCompressionLoading
+            ? `Adding ${currentImageIndex}/${totalImages}...`
+            : "Add from device"
+        }}</UButton
       >
     </label>
   </div>
@@ -58,6 +78,7 @@
 
 <script setup lang="ts">
 import { useOnline } from "@vueuse/core"
+import { useAuthStore } from "~/store/auth"
 import type { Media } from "~/types"
 
 defineProps<{
@@ -66,7 +87,13 @@ defineProps<{
 }>()
 
 const emit = defineEmits(["select"])
+const authStore = useAuthStore()
+const toast = useToast()
+const db = useIndexedDB()
 const imageCompressionLoading = ref(false)
+const currentImageIndex = ref(0)
+const totalImages = ref(0)
+const deletingImageId = ref<string | null>(null)
 
 const bgImageToBeSelected = ref<string | null>(null)
 const backgroundImages = ref<string[]>([
@@ -107,7 +134,7 @@ const getAllLocallySavedImages = async () => {
 
   // Create Object URLs from locally saved images - process in batches
   const imageURLs: string[] = []
-  
+
   // Process images in smaller chunks to avoid blocking
   const chunkSize = 20
   for (let i = 0; i < images.length; i += chunkSize) {
@@ -124,46 +151,92 @@ const getAllLocallySavedImages = async () => {
         bgImageToBeSelected.value = blobURL
       }
     })
-    
+
     // Allow UI to breathe between chunks
     if (i + chunkSize < images.length) {
-      await new Promise(resolve => setTimeout(resolve, 0))
+      await new Promise((resolve) => setTimeout(resolve, 0))
     }
   }
-  
+
   backgroundImages.value = backgroundImages.value.concat(imageURLs)
 }
 
-const saveAndSelectImage = async (file: any) => {
+const saveAndSelectImages = async (files: File[]) => {
+  if (!files || files.length === 0) return
+
   const online = useOnline()
-  imageCompressionLoading.value = true
-  const compressedFile = await useCompressedImage(file)
-  let uploadedFile = null
-  // console.log("file", file)
   const db = useIndexedDB()
-  const randomId = useID(6)
 
-  // Save to S3
-  if (online.value) {
-    uploadedFile = await useUploadImage(compressedFile)
-  }
+  imageCompressionLoading.value = true
+  totalImages.value = files.length
 
-  // Save to IndexedDB
-  const tempMedia: Media = {
-    id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
-    data: uploadedFile ? uploadedFile?.file?.url : compressedFile,
-    content: "image",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      currentImageIndex.value = i + 1
+
+      const compressedFile = await useCompressedImage(file)
+      let uploadedFile = null
+      const randomId = useID(6)
+
+      // Save to S3
+      if (online.value) {
+        uploadedFile = await useUploadImage(compressedFile)
+      }
+
+      // Save to IndexedDB
+      const tempMedia: Media = {
+        id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
+        data: uploadedFile ? uploadedFile?.file?.url : compressedFile,
+        content: "image",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+
+      await db.cached
+        .add(tempMedia)
+        .catch((err) => console.error("Failed to save custom image:", err))
+
+      // Select the last added image
+      if (i === files.length - 1) {
+        bgImageToBeSelected.value = tempMedia.id
+      }
+    }
+
+    await getAllLocallySavedImages()
+    if (bgImageToBeSelected.value) {
+      emit("select", bgImageToBeSelected.value)
+    }
+  } finally {
+    imageCompressionLoading.value = false
+    currentImageIndex.value = 0
+    totalImages.value = 0
   }
-  // console.log("tempMedia", tempMedia)
-  await db.cached.add(tempMedia).catch(err => 
-    console.error('Failed to save custom image:', err)
-  )
-  bgImageToBeSelected.value = tempMedia.id
-  await getAllLocallySavedImages()
-  imageCompressionLoading.value = false
-  emit("select", bgImageToBeSelected.value)
+}
+
+// Check if image is a custom uploaded image
+const isCustomImage = (imageUrl: string) => {
+  return !imageUrl.includes("images.unsplash.com")
+}
+
+// Delete custom background image
+const handleDeleteImage = async (imageUrl: string) => {
+  try {
+    deletingImageId.value = imageURLs
+
+    // Refresh images after deletion
+    await getAllLocallySavedImages()
+  } catch (error: any) {
+    console.error("Error deleting background image:", error)
+    toast.add({
+      icon: "i-bx-error",
+      title: "Failed to delete background image",
+      description: error.message,
+      color: "red",
+    })
+  } finally {
+    deletingImageId.value = null
+  }
 }
 
 getAllLocallySavedImages()
