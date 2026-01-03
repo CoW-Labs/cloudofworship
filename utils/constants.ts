@@ -33,6 +33,7 @@ export const appWideActions = {
   newCountdown: 'new-countdown',
   newSearchBible: 'new-search-bible',
   goLive: 'go-live',
+  closeLiveWindow: 'close-live-window',
   openSettings: 'open-settings',
   newActiveSlide: 'new-active-slide',
   deleteSlide: 'delete-slide',
