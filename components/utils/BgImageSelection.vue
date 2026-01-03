@@ -29,9 +29,10 @@
     <FileDropzone
       v-if="!settingsPage"
       size="sm"
-      @change="saveAndSelectImage($event?.[0])"
+      @change="saveAndSelectImages($event)"
       class="max-w-[230px]"
       :class="{ 'max-w-full': settingsPage }"
+      :loading="imageCompressionLoading"
     />
     <label v-else class="relative">
       <input
@@ -40,17 +41,19 @@
         id=""
         class="absolute inset-0 opacity-0 cursor-pointer"
         accept="image/*"
+        multiple
         @change="
-          saveAndSelectImage(($event.target as HTMLInputElement)?.files?.[0])
+          saveAndSelectImages(Array.from(($event.target as HTMLInputElement)?.files || []))
         "
       />
       <UButton
         class="z-1 mt-2"
         block
         variant="outline"
-        icon="i-bx-plus"
+        :icon="imageCompressionLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
+        :loading="imageCompressionLoading"
         size="sm"
-        >Add from device</UButton
+        >{{ imageCompressionLoading ? `Adding ${currentImageIndex}/${totalImages}...` : 'Add from device' }}</UButton
       >
     </label>
   </div>
@@ -67,6 +70,8 @@ defineProps<{
 
 const emit = defineEmits(["select"])
 const imageCompressionLoading = ref(false)
+const currentImageIndex = ref(0)
+const totalImages = ref(0)
 
 const bgImageToBeSelected = ref<string | null>(null)
 const backgroundImages = ref<string[]>([
@@ -134,36 +139,57 @@ const getAllLocallySavedImages = async () => {
   backgroundImages.value = backgroundImages.value.concat(imageURLs)
 }
 
-const saveAndSelectImage = async (file: any) => {
+const saveAndSelectImages = async (files: File[]) => {
+  if (!files || files.length === 0) return
+  
   const online = useOnline()
-  imageCompressionLoading.value = true
-  const compressedFile = await useCompressedImage(file)
-  let uploadedFile = null
-  // console.log("file", file)
   const db = useIndexedDB()
-  const randomId = useID(6)
+  
+  imageCompressionLoading.value = true
+  totalImages.value = files.length
+  
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      currentImageIndex.value = i + 1
+      
+      const compressedFile = await useCompressedImage(file)
+      let uploadedFile = null
+      const randomId = useID(6)
 
-  // Save to S3
-  if (online.value) {
-    uploadedFile = await useUploadImage(compressedFile)
-  }
+      // Save to S3
+      if (online.value) {
+        uploadedFile = await useUploadImage(compressedFile)
+      }
 
-  // Save to IndexedDB
-  const tempMedia: Media = {
-    id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
-    data: uploadedFile ? uploadedFile?.file?.url : compressedFile,
-    content: "image",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+      // Save to IndexedDB
+      const tempMedia: Media = {
+        id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
+        data: uploadedFile ? uploadedFile?.file?.url : compressedFile,
+        content: "image",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      
+      await db.cached.add(tempMedia).catch(err => 
+        console.error('Failed to save custom image:', err)
+      )
+      
+      // Select the last added image
+      if (i === files.length - 1) {
+        bgImageToBeSelected.value = tempMedia.id
+      }
+    }
+    
+    await getAllLocallySavedImages()
+    if (bgImageToBeSelected.value) {
+      emit("select", bgImageToBeSelected.value)
+    }
+  } finally {
+    imageCompressionLoading.value = false
+    currentImageIndex.value = 0
+    totalImages.value = 0
   }
-  // console.log("tempMedia", tempMedia)
-  await db.cached.add(tempMedia).catch(err => 
-    console.error('Failed to save custom image:', err)
-  )
-  bgImageToBeSelected.value = tempMedia.id
-  await getAllLocallySavedImages()
-  imageCompressionLoading.value = false
-  emit("select", bgImageToBeSelected.value)
 }
 
 getAllLocallySavedImages()

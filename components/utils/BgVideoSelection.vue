@@ -32,7 +32,8 @@
         v-if="!settingsPage"
         size="sm"
         icon="i-bx-film"
-        @change="saveAndSelectVideo($event?.[0])"
+        @change="saveAndSelectVideos($event)"
+        :loading="videoUploadLoading"
       />
       <label class="relative" v-else>
         <input
@@ -41,15 +42,17 @@
           id=""
           class="absolute inset-0 opacity-0 cursor-pointer"
           accept="video/*"
-          @change="saveAndSelectVideo($event.target?.files?.[0])"
+          multiple
+          @change="saveAndSelectVideos(Array.from($event.target?.files || []))"
         />
         <UButton
           class="z-1 mt-2"
           block
           variant="outline"
-          icon="i-bx-plus"
+          :icon="videoUploadLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
+          :loading="videoUploadLoading"
           size="sm"
-          >Add from device</UButton
+          >{{ videoUploadLoading ? `Adding ${currentVideoIndex}/${totalVideos}...` : 'Add from device' }}</UButton
         >
       </label>
     </div>
@@ -67,6 +70,9 @@ defineProps<{
 }>()
 
 const emit = defineEmits(["select"])
+const videoUploadLoading = ref(false)
+const currentVideoIndex = ref(0)
+const totalVideos = ref(0)
 
 // const backgroundVideoKeys = [
 //   "/video-bg-1.mp4",
@@ -135,23 +141,47 @@ const getAllLocallySavedVideos = async () => {
   })
 }
 
-const saveAndSelectVideo = async (file: any) => {
+const saveAndSelectVideos = async (files: File[]) => {
+  if (!files || files.length === 0) return
+  
   const db = useIndexedDB()
-  const randomId = useID(6)
-  const tempMedia: Media = {
-    id: `/custom-video-bg-${randomId}.${file.type?.split("/")?.[1]}`,
-    data: file,
-    content: "video",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+  
+  videoUploadLoading.value = true
+  totalVideos.value = files.length
+  
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      currentVideoIndex.value = i + 1
+      
+      const randomId = useID(6)
+      const tempMedia: Media = {
+        id: `/custom-video-bg-${randomId}.${file.type?.split("/")?.[1]}`,
+        data: file,
+        content: "video",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      
+      await db.cached.add(tempMedia).catch(err => 
+        console.error('Failed to save custom video:', err)
+      )
+      
+      // Select the last added video
+      if (i === files.length - 1) {
+        bgVideoToBeSelected.value = tempMedia.id
+      }
+    }
+    
+    await getAllLocallySavedVideos()
+    if (bgVideoToBeSelected.value) {
+      emit("select", { video: bgVideoToBeSelected.value, key: bgVideoToBeSelected.value })
+    }
+  } finally {
+    videoUploadLoading.value = false
+    currentVideoIndex.value = 0
+    totalVideos.value = 0
   }
-  await db.cached.add(tempMedia).catch(err => 
-    console.error('Failed to save custom video:', err)
-  )
-  bgVideoToBeSelected.value = tempMedia.id
-  await getAllLocallySavedVideos()
-  // console.log(bgVideoToBeSelected.value, tempMedia.id)
-  emit("select", { video: bgVideoToBeSelected.value, key: tempMedia.id })
 }
 
 getAllLocallySavedVideos()
