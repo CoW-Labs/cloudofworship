@@ -1,14 +1,15 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
     <div
-      :class="{ 'gap-4 grid-cols-3': settingsPage }"
+      :class="{ 'gap-4 grid-cols-3 max-h-full': settingsPage }"
       class="bg-image-selection grid gap-2 grid-cols-3 max-h-[200px] overflow-y-auto overflow-x-hidden"
     >
       <UButton
         v-for="video in backgroundVideos"
         :key="video?.id"
         @click="$emit('select', { video: video?.url, key: video?.id })"
-        class="w-[180px] h-[100px] p-0 text-black bg-cover transition-all overflow-hidden relative"
+        class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
+        :class="[settingsPage ? 'w-[180px] h-[100px]' : 'w-[90px] h-[50px]']"
       >
         <video
           class="bg-image w-[100%] h-[100%] transition rounded-md opacity-100 hover:opacity-30 object-cover"
@@ -25,6 +26,17 @@
           :rounded-bg="true"
           class="absolute text-primary-500 scale-50 bottom-2 right-2"
         />
+        <!-- Delete button for custom videos in settings page -->
+        <!-- <UButton
+          v-if="settingsPage && isCustomVideo(video?.id)"
+          icon="i-tabler-trash"
+          size="xs"
+          color="red"
+          variant="solid"
+          class="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity px-1.5"
+          :loading="deletingVideoId === video?.id"
+          @click.stop.prevent="handleDeleteVideo(video)"
+        /> -->
       </UButton>
     </div>
     <div class="button-ctn pt-2">
@@ -65,8 +77,13 @@
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
 import type { Media, BackgroundVideo } from "~/types"
+
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const toast = useToast()
+const db = useIndexedDB()
 
 defineProps<{
   value?: string
@@ -77,15 +94,8 @@ const emit = defineEmits(["select"])
 const videoUploadLoading = ref(false)
 const currentVideoIndex = ref(0)
 const totalVideos = ref(0)
+const deletingVideoId = ref<string | null>(null)
 
-// const backgroundVideoKeys = [
-//   "/video-bg-1.mp4",
-//   "/video-bg-2.mp4",
-//   "/video-bg-3.mp4",
-//   "/video-bg-4.mp4",
-//   "/video-bg-5.mp4",
-//   "/video-bg-6.mp4",
-// ]
 const bgVideoToBeSelected = ref<string | null>(null)
 const backgroundVideos = ref<BackgroundVideo[]>(
   appStore.currentState.backgroundVideos
@@ -191,11 +201,30 @@ const saveAndSelectVideos = async (files: File[]) => {
   }
 }
 
-getAllLocallySavedVideos()
+// Check if video is a custom uploaded video
+const isCustomVideo = (videoId: string) => {
+  return videoId?.includes("custom-video-bg-")
+}
 
-// onBeforeUnmount(() => {
-//   backgroundVideos?.value?.forEach((url) => {
-//     URL.revokeObjectURL(url)
-//   })
-// })
+// Delete custom background video
+const handleDeleteVideo = async (video: BackgroundVideo) => {
+  try {
+    deletingVideoId.value = video.id
+
+    // Reload the backgrounds
+    await getAllLocallySavedVideos()
+  } catch (error: any) {
+    console.error("Error deleting background video:", error)
+    toast.add({
+      icon: "i-bx-error",
+      title: "Failed to delete background video",
+      description: error.message,
+      color: "red",
+    })
+  } finally {
+    deletingVideoId.value = null
+  }
+}
+
+getAllLocallySavedVideos()
 </script>

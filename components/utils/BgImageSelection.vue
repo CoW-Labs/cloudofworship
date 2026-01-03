@@ -8,7 +8,8 @@
         v-for="image in backgroundImages"
         :key="image"
         @click="$emit('select', { image })"
-        class="w-[180px] h-[100px] p-0 text-black bg-cover transition-all overflow-hidden relative"
+        class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
+        :class="[settingsPage ? 'w-[180px] h-[100px]' : 'w-[90px] h-[50px]']"
       >
         <div
           class="bg-image min-w-[180px] h-[100px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
@@ -22,6 +23,16 @@
           :rounded-bg="true"
           class="absolute text-primary-500 scale-50 bottom-2 right-2"
         />
+        <!-- Delete button for custom images in settings page -->
+        <!-- <UButton
+          v-if="settingsPage && isCustomImage(image)"
+          icon="i-tabler-trash"
+          size="xs"
+          variant="solid"
+          class="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity px-1.5"
+          :loading="deletingImageId === image"
+          @click.stop.prevent="handleDeleteImage(image)"
+        /> -->
       </UButton>
     </div>
   </div>
@@ -30,7 +41,7 @@
       v-if="!settingsPage"
       size="sm"
       @change="saveAndSelectImages($event)"
-      class="max-w-[230px]"
+      class="max-w-[300px]"
       :class="{ 'max-w-full': settingsPage }"
       :loading="imageCompressionLoading"
     />
@@ -67,6 +78,7 @@
 
 <script setup lang="ts">
 import { useOnline } from "@vueuse/core"
+import { useAuthStore } from "~/store/auth"
 import type { Media } from "~/types"
 
 defineProps<{
@@ -75,9 +87,13 @@ defineProps<{
 }>()
 
 const emit = defineEmits(["select"])
+const authStore = useAuthStore()
+const toast = useToast()
+const db = useIndexedDB()
 const imageCompressionLoading = ref(false)
 const currentImageIndex = ref(0)
 const totalImages = ref(0)
+const deletingImageId = ref<string | null>(null)
 
 const bgImageToBeSelected = ref<string | null>(null)
 const backgroundImages = ref<string[]>([
@@ -195,6 +211,31 @@ const saveAndSelectImages = async (files: File[]) => {
     imageCompressionLoading.value = false
     currentImageIndex.value = 0
     totalImages.value = 0
+  }
+}
+
+// Check if image is a custom uploaded image
+const isCustomImage = (imageUrl: string) => {
+  return !imageUrl.includes("images.unsplash.com")
+}
+
+// Delete custom background image
+const handleDeleteImage = async (imageUrl: string) => {
+  try {
+    deletingImageId.value = imageURLs
+
+    // Refresh images after deletion
+    await getAllLocallySavedImages()
+  } catch (error: any) {
+    console.error("Error deleting background image:", error)
+    toast.add({
+      icon: "i-bx-error",
+      title: "Failed to delete background image",
+      description: error.message,
+      color: "red",
+    })
+  } finally {
+    deletingImageId.value = null
   }
 }
 
