@@ -28,27 +28,27 @@ const TEAMS_FEATURES = [
  */
 const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   // Teams tier features
-  'Create Text Slide': 'teams',
-  'Add Media': 'teams',
-  'My Library': 'teams',
-  'Slide Templates': 'teams',
-  'Add Banners/Alert': 'teams',
-  'Add Song': 'teams',
-  'Remove Alert': 'teams',
-  'Add Countdown Timer': 'teams',
-  'Add YouTube Video': 'teams',
-  'Add Vimeo Video': 'teams',
-  'Invite to Workspace': 'teams',
-  'Shortcuts & Hotkeys': 'teams',
+  'new-slide': 'teams',
+  'new-media': 'teams',
+  'new-library': 'teams',
+  'new-templates': 'teams',
+  'new-alert': 'teams',
+  'add-song': 'teams',
+  'remove-alert': 'teams',
+  'new-countdown': 'teams',
+  'new-youtube-video': 'teams',
+  'new-vimeo-video': 'teams',
+  'open-invite-modal': 'teams',
 
   // Free tier features
-  'Display Bible': 'free',
-  'Display Hymns': 'free',
-  'Display Song Lyrics': 'free',
-  'Search Whole Bible': 'free',
-  'Open App Settings': 'free',
-  'Create New Schedule': 'free',
-  'Toggle Dark Mode': 'free',
+  'new-bible': 'free',
+  'new-hymn': 'free',
+  'new-song': 'free',
+  'new-search-bible': 'free',
+  'open-settings': 'free',
+  'new-schedule': 'free',
+  'toggle-dark-mode': 'free',
+  'open-shortcuts': 'free',
 }
 
 export default function useSubscription() {
@@ -60,7 +60,7 @@ export default function useSubscription() {
    */
   const getCurrentPlan = (): SubscriptionPlan => {
     // Check user's personal subscription
-    return authStore.user?.subscription?.plan || 'free'
+    return authStore.church?.subscriptionPlan || 'free'
   }
 
   /**

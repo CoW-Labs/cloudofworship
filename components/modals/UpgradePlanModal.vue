@@ -380,6 +380,7 @@ const handleUpgrade = async () => {
     plan: selectedPlan.value,
     onSuccess: async (reference) => {
       visible.value = false
+      useChurch().fetchChurch()
     },
     onCancel: () => {
       useToast().add({

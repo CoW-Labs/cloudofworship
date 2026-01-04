@@ -213,9 +213,11 @@ const createScheduleOnline = async (schedule: Schedule) => {
 const createNewSchedule = () => {
   // Check subscription limits for free users
   const { hasAccessToFeature, isFreePlan } = useSubscription()
+  const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
+
   const scheduleCount = appStore.currentState.schedules.length
 
-  if (isFreePlan.value && scheduleCount >= 5) {
+  if (isFreePlan.value && scheduleCount >= 5 && isPremiumFeatureEnabled.value) {
     useGlobalEmit("show-upgrade-modal")
     usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
       feature: "Create Schedule",

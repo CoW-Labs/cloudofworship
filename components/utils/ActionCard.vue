@@ -62,14 +62,18 @@ const emitParameter = computed(() => {
 
 // Show teams badge if the action requires teams subscription
 const showTeamsBadge = computed(() => {
-  return requiresTeams(props.action?.name || "") && isPremiumFeatureEnabled
+  return (
+    requiresTeams(props.action?.action || "") &&
+    isPremiumFeatureEnabled.value &&
+    !hasAccessToFeature(props.action?.action || "")
+  )
 })
 
 const handleActionClick = () => {
-  const actionName = props.action?.name || ""
+  const actionName = props.action?.action || ""
 
   // Check if user has access to this feature
-  if (!hasAccessToFeature(actionName) && isPremiumFeatureEnabled) {
+  if (!hasAccessToFeature(actionName) && isPremiumFeatureEnabled.value) {
     // Show upgrade modal instead of executing the action
     emitter.emit("show-upgrade-modal")
     usePosthogCapture("TEAMS_FEATURE_BLOCKED", {

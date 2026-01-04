@@ -179,7 +179,7 @@ const emit = defineEmits([
 ])
 
 const handleSaveConfirm = () => {
-  if (!hasAccessToFeature("My Library")) {
+  if (!hasAccessToFeature("new-library")) {
     useGlobalEmit("show-upgrade-modal")
     usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
       feature: "My Library",
@@ -191,7 +191,7 @@ const handleSaveConfirm = () => {
 }
 
 const handleSaveAsTemplateClick = () => {
-  if (!hasAccessToFeature("Slide Templates")) {
+  if (!hasAccessToFeature("new-templates")) {
     useGlobalEmit("show-upgrade-modal")
     usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
       feature: "Slide Templates",

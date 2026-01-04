@@ -184,9 +184,6 @@ export const usePayment = () => {
             successPlanName.value = planDetails.name
             showSuccessModal.value = true
 
-            console.log('fetching church')
-            useChurch().fetchChurch()
-
             onSuccess?.(response.reference)
           },
         })

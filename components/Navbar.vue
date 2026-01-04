@@ -168,20 +168,25 @@ const shortcutsModalVisible = ref(false)
 
 // Subscription check
 const { hasAccessToFeature } = useSubscription()
+const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 
 const { user, church } = storeToRefs(authStore)
 const { currentState } = storeToRefs(appStore)
 
 const handleInviteClick = () => {
-  if (hasAccessToFeature("Invite to Workspace")) {
-    inviteModalVisible.value = true
+  if (isPremiumFeatureEnabled.value) {
+    if (hasAccessToFeature("open-invite-modal")) {
+      inviteModalVisible.value = true
+    } else {
+      // Show upgrade modal
+      useGlobalEmit("show-upgrade-modal")
+      usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+        feature: "Invite to Workspace",
+        location: "navbar",
+      })
+    }
   } else {
-    // Show upgrade modal
-    useGlobalEmit("show-upgrade-modal")
-    usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
-      feature: "Invite to Workspace",
-      location: "navbar",
-    })
+    inviteModalVisible.value = true
   }
 }
 
