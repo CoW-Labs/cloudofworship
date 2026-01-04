@@ -27,14 +27,18 @@ export const usePayment = () => {
 
   // Pricing in NGN
   const PRICING = {
-    yearly: 49999, // ₦50,000/year
-    monthly: 4999, // ₦5,000/month
+    yearly: 49999.99, // ₦50,000/year
+    monthly: 4999.99, // ₦5,000/month
+    yearly_usd: 99999.99, // $69.99/year
+    monthly_usd: 9999.99 // $6.99/month
   }
 
   // Paystack plan codes
   const PLAN_CODES = {
     yearly: 'PLN_6e4bp22j2mue1u3',
     monthly: 'PLN_yah7hgphd0vtmpx',
+    yearly_usd: 'PLN_lu1h98z4ure9qsq',
+    monthly_usd: 'PLN_oqvb3f5m7bu3wtv'
   }
 
   // Paystack public key - TODO: Replace with actual key
@@ -133,23 +137,7 @@ export const usePayment = () => {
           plan: planDetails.code,
           ref: reference,
           metadata: {
-            custom_fields: [
-              {
-                display_name: 'User ID',
-                variable_name: 'user_id',
-                value: authStore.user._id,
-              },
-              {
-                display_name: 'Plan',
-                variable_name: 'plan',
-                value: plan,
-              },
-              {
-                display_name: 'User Name',
-                variable_name: 'user_name',
-                value: authStore.user.fullname,
-              },
-            ],
+            user_id: authStore.user._id
           },
           onClose: function () {
             loading.value = false

@@ -168,11 +168,12 @@
         <div
           class="hidden md:block bg-cover bg-center relative overflow-hidden"
         >
-          <div class="overlay"></div>
           <div
-            class="absolute inset-0 bg-gradient-to-t from-black/60 to-black/20"
+            class="absolute inset-0"
+            :style="`background-image: url('https://images.unsplash.com/photo-1532140225690-f6d25ab4c891?q=80&w=1740'); background-size: cover; background-position: center;`"
           ></div>
-          <div class="absolute bottom-6 left-0 right-0 p-8 text-white">
+          <div class="absolute inset-0 bg-primary/40"></div>
+          <div class="absolute top-6 left-0 right-0 p-8 text-white">
             <p class="text-xl mb-4">
               "The app’s ability for different users to create accounts and
               share lyrics fosters community. Cloud of Worship is indispensable,
@@ -242,7 +243,7 @@ const yearlyPrice = computed(() => {
     ? plan.amount
     : selectedCurrency.value === "NGN"
     ? PRICING.yearly
-    : 99
+    : PRICING.yearly_usd
 })
 
 const monthlyPrice = computed(() => {
@@ -251,7 +252,7 @@ const monthlyPrice = computed(() => {
     ? plan.amount
     : selectedCurrency.value === "NGN"
     ? PRICING.monthly
-    : 9.99
+    : PRICING.monthly_usd
 })
 
 const currencySymbol = computed(() => {
