@@ -62,13 +62,22 @@ export const useSubscriptionPlans = () => {
       // Try multiple detection services for reliability
       let currency: 'NGN' | 'USD' = 'USD' // Default fallback
 
+      // African countries (excluding South Africa) that should use NGN
+      const africanCountriesForNGN = [
+        'NG', 'GH', 'KE', 'TZ', 'UG', 'RW', 'ET', 'EG', 'DZ', 'MA', 
+        'TN', 'LY', 'SD', 'SS', 'SO', 'DJ', 'ER', 'SN', 'ML', 'BF',
+        'NE', 'TD', 'MR', 'GM', 'GW', 'SL', 'LR', 'CI', 'BJ', 'TG',
+        'CM', 'CF', 'GQ', 'GA', 'CG', 'CD', 'AO', 'ZM', 'ZW', 'MW',
+        'MZ', 'MG', 'MU', 'SC', 'KM', 'BW', 'NA', 'LS', 'SZ', 'BI'
+      ]
+
       try {
         // Try ipapi.co first (free, reliable)
         const response = await fetch('https://ipapi.co/json/')
         const data = await response.json()
 
-        // Check if user is in Nigeria
-        if (data.country_code === 'NG' || data.country === 'Nigeria') {
+        // Check if user is in African countries (except South Africa)
+        if (africanCountriesForNGN.includes(data.country_code)) {
           currency = 'NGN'
         } else {
           currency = 'USD'
@@ -81,7 +90,7 @@ export const useSubscriptionPlans = () => {
           const response = await fetch('http://ip-api.com/json/')
           const data = await response.json()
 
-          if (data.countryCode === 'NG' || data.country === 'Nigeria') {
+          if (africanCountriesForNGN.includes(data.countryCode)) {
             currency = 'NGN'
           } else {
             currency = 'USD'
