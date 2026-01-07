@@ -64,7 +64,7 @@ export const useSubscriptionPlans = () => {
 
       // African countries (excluding South Africa) that should use NGN
       const africanCountriesForNGN = [
-        'NG', 'GH', 'KE', 'TZ', 'UG', 'RW', 'ET', 'EG', 'DZ', 'MA', 
+        'NG', 'GH', 'KE', 'TZ', 'UG', 'RW', 'ET', 'EG', 'DZ', 'MA',
         'TN', 'LY', 'SD', 'SS', 'SO', 'DJ', 'ER', 'SN', 'ML', 'BF',
         'NE', 'TD', 'MR', 'GM', 'GW', 'SL', 'LR', 'CI', 'BJ', 'TG',
         'CM', 'CF', 'GQ', 'GA', 'CG', 'CD', 'AO', 'ZM', 'ZW', 'MW',

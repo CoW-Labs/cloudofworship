@@ -39,6 +39,9 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-youtube-video': 'teams',
   'new-vimeo-video': 'teams',
   'open-invite-modal': 'teams',
+  'space-management': 'teams',
+  'animations-transitions': 'teams',
+  'overlays-themes': 'teams',
 
   // Free tier features
   'new-bible': 'free',

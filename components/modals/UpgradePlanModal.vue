@@ -113,6 +113,20 @@
                 />
                 <span>{{ feature }}</span>
               </div>
+              <div class="flex items-center gap-2 text-sm">
+                <IconWrapper
+                  name="i-heroicons-check-circle-20-solid"
+                  class="w-5 h-5 text-primary-500 flex-shrink-0"
+                />
+                <span>
+                  <a
+                    href="https://cloudofworship.com/pricing"
+                    class="text-primary-500 hover:underline"
+                  >
+                    See more benefits for your church.
+                  </a>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -266,7 +280,7 @@ const features = computed(() => {
   )
 
   if (plan?.features && plan.features.length > 0) {
-    return plan.features
+    return plan.features.slice(1, 6)
   }
 
   // Fallback features if API doesn't provide them

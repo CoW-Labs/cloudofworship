@@ -50,21 +50,8 @@
             {{ activeTab }}
           </h3>
           <Transition name="fade-sm">
-            <!-- ACCOUNT SETTINGS -->
-            <div
-              class="settings-ctn h-[100%]"
-              v-if="activeTab === 'Account Settings'"
-            >
-              <EmptyState
-                icon="i-mdi-timer-sand-empty"
-                sub="Nothing to see for now"
-                action=""
-                action-text=""
-                class="pb-4"
-              />
-            </div>
-            <!-- PROFILE SETTINGS -->
-            <ProfileSettings v-else-if="activeTab === 'Profile Settings'" />
+            <!-- ACCOUNT & PROFILE SETTINGS -->
+            <ProfileSettings v-if="activeTab === 'Account/Profile Settings'" />
             <!-- DISPLAY SETTINGS -->
             <DisplaySettings v-else-if="activeTab === 'Display Settings'" />
             <!-- SLIDE SETTINGS -->
@@ -100,8 +87,7 @@ const props = defineProps<{
 
 const settingsModalOpen = ref(props.isOpen)
 const tabs = [
-  { name: "Account Settings", active: false },
-  { name: "Profile Settings", active: false },
+  { name: "Account/Profile Settings", active: false },
   { name: "Display Settings", active: false },
   { name: "Slide Settings", active: false },
   { name: "Slide Background Settings", active: false },
