@@ -223,7 +223,7 @@ const createNewSchedule = () => {
       feature: "Create Schedule",
       location: "schedule_modal",
       currentCount: scheduleCount,
-      limit: 3,
+      limit: 5,
     })
     useToast().add({
       icon: "i-heroicons-exclamation-triangle",

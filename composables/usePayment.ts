@@ -127,18 +127,24 @@ export const usePayment = () => {
 
       // Initialize Paystack payment
       if (typeof window !== 'undefined' && (window as any).PaystackPop) {
+        const nameParts =
+          authStore.user.fullname?.trim().split(/\s+/).filter(Boolean) ?? []
+        const firstName =
+          nameParts[0] ||
+          authStore.user.email?.split('@')?.[0] ||
+          'User'
+        const lastName = nameParts.slice(1).join(' ') || 'User'
+
         const handler = (window as any).PaystackPop.setup({
           key: PAYSTACK_PUBLIC_KEY,
           email: authStore.user.email,
-          firstName: authStore.user.fullname?.split(' ')?.at(0),
-          lastName: authStore.user.fullname?.split(' ')?.at(1),
+          firstName,
+          lastName,
           amount: planDetails.amount * 100,
           currency: 'NGN',
           plan: planDetails.code,
           ref: reference,
-          metadata: {
-            user_id: authStore.user._id
-          },
+          metadata: {},
           onClose: function () {
             loading.value = false
 

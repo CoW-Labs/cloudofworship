@@ -287,13 +287,9 @@ const features = computed(() => {
   return [
     "Access 9,000+ growing songs library",
     "Create custom text slides",
-    // "Add unlimited media files",
     "YouTube & Vimeo video support",
-    // "Professional slide templates",
     "Dynamic countdown timers",
-    // "Team collaboration tools",
     "5GB cloud storage",
-    // "Early access to new features",
   ]
 })
 
@@ -384,7 +380,7 @@ const handleUpgrade = async () => {
       icon: "i-heroicons-information-circle",
       title: "USD Payment Coming Soon",
       description:
-        "USD payments will be available soon. We detected you're outside Nigeria. Contact support for assistance.",
+        "USD payments will be available soon. Contact support for assistance.",
       color: "blue",
       timeout: 8000,
     })
@@ -425,7 +421,6 @@ const handleSuccessModalClose = () => {
 .overlay {
   position: absolute;
   background: url("/images/slide-bg.jpeg") center/cover no-repeat;
-  /* background-size: 130%; */
   inset: 0;
   width: 100%;
   height: 100%;
@@ -434,11 +429,6 @@ const handleSuccessModalClose = () => {
   animation: rotateScale 90s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
   transform-origin: center center;
   transform: scale(1.15);
-  /* background: linear-gradient(
-    135deg,
-    rgba(var(--color-primary-500), 0.3) 0%,
-    rgba(var(--color-primary-700), 0.5) 100%
-  ); */
 }
 
 @keyframes rotateScale {

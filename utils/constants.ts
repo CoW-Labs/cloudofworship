@@ -92,6 +92,26 @@ export const quickActionsArr: QuickAction[] = [
     tier: "free",
   },
   {
+    icon: "i-lucide-music-2",
+    name: "Add Song",
+    desc: "Save songs to your personal library",
+    action: appWideActions.addSong,
+    meta: "",
+    tier: "free",
+    // unreleased: true,
+    // type: slideTypes.text
+  },
+  {
+    icon: "i-bx-library",
+    name: "My Library",
+    desc: "Save your favorite songs, slides",
+    action: appWideActions.newLibrary,
+    meta: "save files images pictures videos songs documents",
+    type: slideTypes.media,
+    tier: "free",
+    // type: slideTypes.text
+  },
+  {
     icon: "i-bx-music",
     name: "Search song lyrics",
     desc: "Find lyrics to any song, native too",
@@ -108,16 +128,6 @@ export const quickActionsArr: QuickAction[] = [
     meta: "",
     type: slideTypes.text,
     tier: "free",
-  },
-  {
-    icon: "i-bx-library",
-    name: "My Library",
-    desc: "Save your favorite songs, slides",
-    action: appWideActions.newLibrary,
-    meta: "save files images pictures videos songs documents",
-    type: slideTypes.media,
-    tier: "free",
-    // type: slideTypes.text
   },
   {
     icon: "i-bx-image",
@@ -145,16 +155,6 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newAlert,
     meta: "",
     tier: "teams",
-    // unreleased: true,
-    // type: slideTypes.text
-  },
-  {
-    icon: "i-lucide-music-2",
-    name: "Add Song",
-    desc: "Save songs to your personal library",
-    action: appWideActions.addSong,
-    meta: "",
-    tier: "free",
     // unreleased: true,
     // type: slideTypes.text
   },

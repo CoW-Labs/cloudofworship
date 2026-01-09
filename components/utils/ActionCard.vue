@@ -78,7 +78,6 @@ const handleActionClick = () => {
     emitter.emit("show-upgrade-modal")
     usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
       feature: actionName,
-      action: props.action?.action,
     })
     return
   }
