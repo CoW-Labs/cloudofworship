@@ -41,8 +41,22 @@
               @confirm="$emit(secondaryButton.action)"
             >
             </ConfirmDialog>
+            <!-- Direct button when live (no popover) -->
+            <UButton
+              v-if="secondaryButton.visible && !secondaryButton.confirmAction && secondaryButton.action === appWideActions.goLive && isLiveWindowActive"
+              class="p-1 px-2 whitespace-nowrap"
+              size="md"
+              :variant="secondaryButton?.variant || 'ghost'"
+              :color="secondaryButton.color"
+              :icon="secondaryButton.icon"
+              @click.stop="useGlobalEmit(appWideActions.closeLiveWindow)"
+            >
+              End Live Session
+            </UButton>
+            
+            <!-- Popover when not live -->
             <UPopover
-              v-if="secondaryButton.visible && !secondaryButton.confirmAction"
+              v-else-if="secondaryButton.visible && !secondaryButton.confirmAction"
               mode="click"
               v-model:open="secondaryActionPopoverOpen"
               :ui="{
@@ -56,23 +70,14 @@
                 :variant="secondaryButton?.variant || 'ghost'"
                 :color="secondaryButton.color"
                 :icon="secondaryButton.icon"
-                :to="
-                  secondaryButton.action === appWideActions.goLive
-                    ? undefined
-                    : '#'
-                "
                 @click.stop="
                   secondaryButton.action !== appWideActions.goLive
                     ? useGlobalEmit(secondaryButton.action)
                     : (secondaryActionPopoverOpen = true)
                 "
-                >{{
-                  isLiveWindowActive &&
-                  secondaryButton.action === appWideActions.goLive
-                    ? "You are live"
-                    : secondaryButton.label
-                }}</UButton
               >
+                {{ secondaryButton.label }}
+              </UButton>
               <template #panel>
                 <div class="actions max-w-[270px]">
                   <UButton

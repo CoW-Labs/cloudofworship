@@ -125,7 +125,7 @@
             variant="outline"
             class="h-8"
             icon="i-bx-user-plus"
-            @click="inviteModalVisible = true"
+            @click="handleInviteClick"
           >
             Invite
           </UButton>
@@ -166,8 +166,29 @@ const inviteModalVisible = ref(false)
 const scheduleModalVisible = ref(false)
 const shortcutsModalVisible = ref(false)
 
+// Subscription check
+const { hasAccessToFeature } = useSubscription()
+const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
+
 const { user, church } = storeToRefs(authStore)
 const { currentState } = storeToRefs(appStore)
+
+const handleInviteClick = () => {
+  if (isPremiumFeatureEnabled.value) {
+    if (hasAccessToFeature("open-invite-modal")) {
+      inviteModalVisible.value = true
+    } else {
+      // Show upgrade modal
+      useGlobalEmit("show-upgrade-modal")
+      usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+        feature: "Invite to Workspace",
+        location: "navbar",
+      })
+    }
+  } else {
+    inviteModalVisible.value = true
+  }
+}
 
 defineProps({
   appVersion: String,

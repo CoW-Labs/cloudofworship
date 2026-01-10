@@ -160,7 +160,7 @@ const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 
 // Subscription check
-// const { hasAccessToFeature } = useSubscription()
+const { hasAccessToFeature } = useSubscription()
 
 const props = defineProps<{
   slide: Slide
@@ -179,29 +179,27 @@ const emit = defineEmits([
 ])
 
 const handleSaveConfirm = () => {
-  emit("save-slide", props.slide?.id)
-  // if (!hasAccessToFeature("My Library")) {
-  //   useGlobalEmit("show-upgrade-modal")
-  //   usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
-  //     feature: "My Library",
-  //     location: "slide_card_save",
-  //   })
-  // } else {
-  //   emit("save-slide", props.slide?.id)
-  // }
+  if (!hasAccessToFeature("new-library")) {
+    useGlobalEmit("show-upgrade-modal")
+    usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+      feature: "My Library",
+      location: "slide_card_save",
+    })
+  } else {
+    emit("save-slide", props.slide?.id)
+  }
 }
 
 const handleSaveAsTemplateClick = () => {
-  emit("save-as-template", props.slide)
-  // if (!hasAccessToFeature("Slide Templates")) {
-  //   useGlobalEmit("show-upgrade-modal")
-  //   usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
-  //     feature: "Slide Templates",
-  //     location: "slide_card_template",
-  //   })
-  // } else {
-  //   emit("save-as-template", props.slide)
-  // }
+  if (!hasAccessToFeature("new-templates")) {
+    useGlobalEmit("show-upgrade-modal")
+    usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+      feature: "Slide Templates",
+      location: "slide_card_template",
+    })
+  } else {
+    emit("save-as-template", props.slide)
+  }
 }
 </script>
 

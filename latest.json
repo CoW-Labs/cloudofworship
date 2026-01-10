@@ -1,15 +1,15 @@
 {
-  "version": "0.36.10-beta",
-  "tag": "v0.36.10-beta",
-  "releaseDate": "2026-01-02T02:07:01Z",
-  "releaseNotes": "- fix: media slides templates render\n- fix: Tabs UI inconsistency\n- Update latest.json for release v0.36.9-beta\n",
+  "version": "0.37.0-beta",
+  "tag": "v0.37.0-beta",
+  "releaseDate": "2026-01-03T08:43:21Z",
+  "releaseNotes": "- feat: updated placement for slide background settings\n- fix: update storage setting to include local and cloud storage\n- fix: Add multiple images/videos at once for slide backgrounds\n- Update latest.json for release v0.36.10-beta\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.36.10-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.37.0-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.36.10-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.37.0-beta/",
       "signature": ""
     }
   }
