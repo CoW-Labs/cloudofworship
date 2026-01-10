@@ -4,6 +4,7 @@ export type PaymentPlan = 'yearly' | 'monthly'
 
 export interface PaymentConfig {
   plan: PaymentPlan
+  currency?: 'NGN' | 'USD'
   onSuccess?: (reference: string) => void
   onCancel?: () => void
   onError?: (error: string) => void
@@ -14,6 +15,7 @@ export interface PlanDetails {
   amount: number
   name: string
   discount?: string
+  currency: string
 }
 
 /**
@@ -21,28 +23,16 @@ export interface PlanDetails {
  */
 export const usePayment = () => {
   const authStore = useAuthStore()
+  const config = useRuntimeConfig()
   const loading = ref(false)
   const showSuccessModal = ref(false)
   const successPlanName = ref('')
 
-  // Pricing in NGN
-  const PRICING = {
-    yearly: 49999.99, // ₦50,000/year
-    monthly: 4999.99, // ₦5,000/month
-    yearly_usd: 99999.99, // $69.99/year
-    monthly_usd: 9999.99 // $6.99/month
-  }
+  // Use the subscription plans composable for all plans data
+  const subscriptionPlans = useSubscriptionPlans()
 
-  // Paystack plan codes
-  const PLAN_CODES = {
-    yearly: 'PLN_6e4bp22j2mue1u3',
-    monthly: 'PLN_yah7hgphd0vtmpx',
-    yearly_usd: 'PLN_lu1h98z4ure9qsq',
-    monthly_usd: 'PLN_oqvb3f5m7bu3wtv'
-  }
-
-  // Paystack public key - TODO: Replace with actual key
-  const PAYSTACK_PUBLIC_KEY = 'pk_test_7f0eaec4dd1d7f8b495b56de974c9e98fdf43244'
+  // Get Paystack public key from runtime config
+  const PAYSTACK_PUBLIC_KEY = config.public.PAYSTACK_PUBLIC_KEY as string
 
   /**
    * Load Paystack inline script
@@ -72,12 +62,26 @@ export const usePayment = () => {
   /**
    * Get plan details by plan type
    */
-  const getPlanDetails = (plan: PaymentPlan): PlanDetails => {
+  const getPlanDetails = async (plan: PaymentPlan, currency: 'NGN' | 'USD' = 'NGN'): Promise<PlanDetails | null> => {
+    // Ensure plans are loaded
+    if (subscriptionPlans.plans.value.length === 0) {
+      await subscriptionPlans.fetchPlans(currency)
+    }
+
+    // Find the matching plan using the subscription plans composable
+    const backendPlan = subscriptionPlans.getPlanByIntervalAndCurrency(plan, currency)
+
+    if (!backendPlan) {
+      console.error(`No plan found for ${plan} in ${currency}`)
+      return null
+    }
+
     return {
-      code: PLAN_CODES[plan],
-      amount: PRICING[plan],
+      code: backendPlan.paystackCode,
+      amount: backendPlan.amount,
       name: plan === 'yearly' ? 'Yearly' : 'Monthly',
-      discount: plan === 'yearly' ? '16%' : undefined,
+      discount: backendPlan.discount || undefined,
+      currency: backendPlan.currency,
     }
   }
 
@@ -92,7 +96,7 @@ export const usePayment = () => {
    * Initiate Paystack payment
    */
   const initiatePayment = async (config: PaymentConfig) => {
-    const { plan, onSuccess, onCancel, onError } = config
+    const { plan, currency = 'NGN', onSuccess, onCancel, onError } = config
 
     // Validate user authentication
     if (!authStore.user?.email) {
@@ -111,7 +115,13 @@ export const usePayment = () => {
       // Ensure Paystack script is loaded
       await loadPaystackScript()
 
-      const planDetails = getPlanDetails(plan)
+      // Get plan details from backend using the specified currency
+      const planDetails = await getPlanDetails(plan, currency)
+
+      if (!planDetails) {
+        throw new Error('Selected plan is not available')
+      }
+
       const reference = generateReference(authStore.user._id)
 
       // Track payment initiation
@@ -119,7 +129,7 @@ export const usePayment = () => {
         plan,
         planCode: planDetails.code,
         amount: planDetails.amount,
-        currency: 'NGN',
+        currency: planDetails.currency,
         discount: planDetails.discount || 'none',
       })
 
@@ -141,7 +151,7 @@ export const usePayment = () => {
           firstName,
           lastName,
           amount: planDetails.amount * 100,
-          currency: 'NGN',
+          currency: planDetails.currency,
           plan: planDetails.code,
           ref: reference,
           metadata: {},
@@ -152,6 +162,7 @@ export const usePayment = () => {
             usePosthogCapture('PAYMENT_CANCELLED', {
               plan,
               amount: planDetails.amount,
+              currency: planDetails.currency,
             })
 
             useToast().add({
@@ -170,6 +181,7 @@ export const usePayment = () => {
             usePosthogCapture('PAYMENT_SUCCESSFUL', {
               plan,
               amount: planDetails.amount,
+              currency: planDetails.currency,
               reference: response.reference,
               status: response.status,
             })
@@ -206,8 +218,10 @@ export const usePayment = () => {
     loading: readonly(loading),
     showSuccessModal,
     successPlanName: readonly(successPlanName),
-    PRICING,
-    PLAN_CODES,
+    // Expose subscription plans data and methods
+    plansLoading: subscriptionPlans.loading,
+    plansData: subscriptionPlans.plans,
+    fetchPlans: subscriptionPlans.fetchPlans,
     getPlanDetails,
     initiatePayment,
     loadPaystackScript,

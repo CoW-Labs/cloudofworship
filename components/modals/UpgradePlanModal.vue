@@ -231,8 +231,9 @@ const {
   loading,
   showSuccessModal,
   successPlanName,
-  PRICING,
-  PLAN_CODES,
+  plansData,
+  plansLoading,
+  fetchPlans: fetchPaymentPlans,
   initiatePayment,
   loadPaystackScript,
 } = usePayment()
@@ -250,23 +251,15 @@ const {
   formatAmount,
 } = useSubscriptionPlans()
 
-// Get pricing from API or fallback to composable
+// Get pricing from API
 const yearlyPrice = computed(() => {
   const plan = getPlanByIntervalAndCurrency("yearly", selectedCurrency.value)
-  return plan
-    ? plan.amount
-    : selectedCurrency.value === "NGN"
-    ? PRICING.yearly
-    : PRICING.yearly_usd
+  return plan?.amount || 0
 })
 
 const monthlyPrice = computed(() => {
   const plan = getPlanByIntervalAndCurrency("monthly", selectedCurrency.value)
-  return plan
-    ? plan.amount
-    : selectedCurrency.value === "NGN"
-    ? PRICING.monthly
-    : PRICING.monthly_usd
+  return plan?.amount || 0
 })
 
 const currencySymbol = computed(() => {
@@ -325,19 +318,21 @@ onMounted(async () => {
           })
         }
       } else if (data?.planCode) {
-        // Legacy support for plan_code
-        if (data.planCode === PLAN_CODES.yearly) {
-          selectedPlan.value = "yearly"
-        } else if (data.planCode === PLAN_CODES.monthly) {
-          selectedPlan.value = "monthly"
-        }
+        // Legacy support for plan_code - find plan by paystackCode
+        const plan = plans.value.find((p) => p.paystackCode === data.planCode)
+        if (plan) {
+          selectedPlan.value = plan.interval
+          selectedCurrency.value = plan.currency
 
-        usePosthogCapture("UPGRADE_MODAL_OPENED", {
-          planCode: data.planCode,
-          currency: selectedCurrency.value,
-          autoDetectedCurrency: detectedCurrency.value,
-          source: "signup",
-        })
+          usePosthogCapture("UPGRADE_MODAL_OPENED", {
+            planCode: data.planCode,
+            planId: plan.id,
+            interval: plan.interval,
+            currency: plan.currency,
+            autoDetectedCurrency: detectedCurrency.value,
+            source: "signup",
+          })
+        }
       } else {
         // No specific plan provided, use auto-detected currency
         usePosthogCapture("UPGRADE_MODAL_OPENED", {
@@ -389,6 +384,7 @@ const handleUpgrade = async () => {
 
   await initiatePayment({
     plan: selectedPlan.value,
+    currency: selectedCurrency.value,
     onSuccess: async (reference) => {
       visible.value = false
       useChurch().fetchChurch()

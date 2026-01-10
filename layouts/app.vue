@@ -176,6 +176,7 @@ const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
 const appInfo = ref<AppSettings>()
 const { refreshLibrary } = useLibrary()
+const { fetchPlans } = useSubscriptionPlans()
 
 const { currentState } = storeToRefs(appStore)
 
@@ -966,6 +967,7 @@ if (isAppOnline.value) {
   fetchAppInfo()
   fetchHymns()
   refreshLibrary()
+  fetchPlans()
 }
 </script>
 

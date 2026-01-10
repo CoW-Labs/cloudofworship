@@ -104,6 +104,7 @@ export default defineNuxtConfig({
       NODE_ENV: process.env.NODE_ENV || "production",
       GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID || "",
       GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET || "",
+      PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY
     },
   },
 
