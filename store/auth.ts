@@ -14,6 +14,11 @@ export interface User {
   updatedAt: string
   churchId: string
   emailVerified?: boolean
+  subscription?: {
+    plan: 'free' | 'teams'
+    startDate: string
+    endDate: string | null
+  }
 }
 
 export interface Church {
@@ -25,6 +30,7 @@ export interface Church {
   userIds?: string[]
   users: User[]
   storageUsed?: number
+  subscriptionPlan: 'free' | 'teams'
 }
 
 export const useAuthStore = defineStore('auth', {
