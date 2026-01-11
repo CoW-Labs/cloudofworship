@@ -25,6 +25,10 @@ logs
 .env.*
 !.env.example
 
+# Wrangler
+.wrangler/
+wrangler.toml.backup
+
 # local large assets
 large_assets
 
