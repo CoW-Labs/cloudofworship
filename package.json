@@ -1,9 +1,9 @@
 {
-  "name": "cloud-of-worshippers",
+  "name": "cloud-of-worship",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.19.5"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "build": "nuxt generate",
@@ -13,7 +13,11 @@
     "postinstall": "nuxt prepare",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "cf:preview": "wrangler dev"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",
