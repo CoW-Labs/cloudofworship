@@ -22,6 +22,35 @@
             <IconWrapper name="i-heroicons-x-mark-20-solid" class="w-5 h-5" />
           </button>
 
+          <!-- Currency Switcher for Testing (Development Only) -->
+          <!-- <div
+            v-if="$config.public.NODE_ENV !== 'production'"
+            class="absolute top-4 left-4 flex gap-1 text-xs z-10"
+          >
+            <button
+              @click="switchCurrency('NGN')"
+              class="px-2 py-1 rounded transition-colors"
+              :class="
+                selectedCurrency === 'NGN'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
+              "
+            >
+              NGN
+            </button>
+            <button
+              @click="switchCurrency('USD')"
+              class="px-2 py-1 rounded transition-colors"
+              :class="
+                selectedCurrency === 'USD'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
+              "
+            >
+              USD
+            </button>
+          </div> -->
+
           <h2 class="text-2xl font-bold mb-6">Do more for your ministry</h2>
 
           <!-- Yearly Plan -->
@@ -249,17 +278,40 @@ const {
   getPlanByIntervalAndCurrency,
   getCurrencySymbol,
   formatAmount,
+  setTestCurrency,
+  getTestCurrency,
 } = useSubscriptionPlans()
+
+// Helper for testing: Allow manual currency switch
+const switchCurrency = (currency: "NGN" | "USD") => {
+  setTestCurrency(currency)
+  selectedCurrency.value = currency
+  detectedCurrency.value = currency
+}
 
 // Get pricing from API
 const yearlyPrice = computed(() => {
   const plan = getPlanByIntervalAndCurrency("yearly", selectedCurrency.value)
-  return plan?.amount || 0
+  if (!plan) return 0
+
+  // For USD, use amountCents if available
+  if (plan.currency === "USD" && plan.amountCents) {
+    return plan.amountCents / 100 // Convert cents to dollars
+  }
+
+  return plan.amount
 })
 
 const monthlyPrice = computed(() => {
   const plan = getPlanByIntervalAndCurrency("monthly", selectedCurrency.value)
-  return plan?.amount || 0
+  if (!plan) return 0
+
+  // For USD, use amountCents if available
+  if (plan.currency === "USD" && plan.amountCents) {
+    return plan.amountCents / 100 // Convert cents to dollars
+  }
+
+  return plan.amount
 })
 
 const currencySymbol = computed(() => {
@@ -294,6 +346,10 @@ onMounted(async () => {
 
   // Fetch all subscription plans from API (both NGN and USD)
   await fetchPlans()
+
+  // For local testing: Override currency detection by setting in console
+  // localStorage.setItem('test_currency', 'USD') or localStorage.setItem('test_currency', 'NGN')
+  // Then refresh the page
 
   emitter.on(
     "show-upgrade-modal",
@@ -359,28 +415,30 @@ const handleUpgrade = async () => {
     selectedCurrency.value
   )
 
+  if (!planDetails) {
+    useToast().add({
+      icon: "i-heroicons-exclamation-triangle",
+      title: "Plan Not Found",
+      description: "The selected plan is not available. Please try again.",
+      color: "red",
+    })
+    return
+  }
+
+  // Get the actual amount to charge (using amountCents for USD)
+  const amount =
+    selectedCurrency.value === "USD" && planDetails.amountCents
+      ? backendPlan.amountCents || 0
+      : backendPlan.amountKobo || 0
+
   // Track upgrade attempt with currency
   usePosthogCapture("UPGRADE_INITIATED", {
     plan: selectedPlan.value,
     currency: selectedCurrency.value,
     autoDetectedCurrency: detectedCurrency.value,
-    amount: planDetails?.amount,
+    amount: amount,
     planId: planDetails?.id,
   })
-
-  // Note: USD payment processing will be enabled once Paystack USD plans are configured
-  // For now, show informative message for USD
-  if (selectedCurrency.value === "USD") {
-    useToast().add({
-      icon: "i-heroicons-information-circle",
-      title: "USD Payment Coming Soon",
-      description:
-        "USD payments will be available soon. Contact support for assistance.",
-      color: "blue",
-      timeout: 8000,
-    })
-    return
-  }
 
   await initiatePayment({
     plan: selectedPlan.value,
