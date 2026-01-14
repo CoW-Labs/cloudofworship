@@ -428,8 +428,8 @@ const handleUpgrade = async () => {
   // Get the actual amount to charge (using amountCents for USD)
   const amount =
     selectedCurrency.value === "USD" && planDetails.amountCents
-      ? backendPlan.amountCents || 0
-      : backendPlan.amountKobo || 0
+      ? planDetails?.amountCents || 0
+      : planDetails?.amountKobo || 0
 
   // Track upgrade attempt with currency
   usePosthogCapture("UPGRADE_INITIATED", {
