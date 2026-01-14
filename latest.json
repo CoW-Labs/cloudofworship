@@ -1,15 +1,15 @@
 {
-  "version": "0.38.2-beta",
-  "tag": "v0.38.2-beta",
-  "releaseDate": "2026-01-14T06:02:22Z",
-  "releaseNotes": "- fix: international subscriptions allowance\n- chore: removed unnecessary dependencies\n- chore: updated build commands\n- chore: cloudflare build instructions\n- Update latest.json for release v0.38.1-beta\n",
+  "version": "0.38.3-beta",
+  "tag": "v0.38.3-beta",
+  "releaseDate": "2026-01-14T06:33:36Z",
+  "releaseNotes": "- fix: lint issue\n- Update latest.json for release v0.38.2-beta\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.38.2-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.38.3-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.38.2-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.38.3-beta/",
       "signature": ""
     }
   }
