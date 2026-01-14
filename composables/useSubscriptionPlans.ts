@@ -30,11 +30,41 @@ export const useSubscriptionPlans = () => {
   const selectedCurrency = ref<'NGN' | 'USD'>('USD') // Default to USD
   const detectedCurrency = ref<'NGN' | 'USD' | null>(null)
   const isDetectingCurrency = ref(false)
+  
+  // Allow local testing by setting currency in localStorage
+  const getTestCurrency = (): 'NGN' | 'USD' | null => {
+    if (process.client) {
+      const testCurrency = localStorage.getItem('test_currency')
+      if (testCurrency === 'NGN' || testCurrency === 'USD') {
+        return testCurrency
+      }
+    }
+    return null
+  }
+  
+  const setTestCurrency = (currency: 'NGN' | 'USD' | null) => {
+    if (process.client) {
+      if (currency) {
+        localStorage.setItem('test_currency', currency)
+      } else {
+        localStorage.removeItem('test_currency')
+      }
+    }
+  }
 
   /**
    * Detect user's currency based on IP/location
    */
   const detectCurrency = async (): Promise<'NGN' | 'USD'> => {
+    // Check for test currency override first (for local testing)
+    const testCurrency = getTestCurrency()
+    if (testCurrency) {
+      console.log('Using test currency override:', testCurrency)
+      detectedCurrency.value = testCurrency
+      selectedCurrency.value = testCurrency
+      return testCurrency
+    }
+    
     // Check if already detected in this session
     if (detectedCurrency.value) {
       return detectedCurrency.value
@@ -235,5 +265,7 @@ export const useSubscriptionPlans = () => {
     getPlanById,
     getCurrencySymbol,
     formatAmount,
+    setTestCurrency, // Expose for testing
+    getTestCurrency,
   }
 }

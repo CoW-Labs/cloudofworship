@@ -76,9 +76,14 @@ export const usePayment = () => {
       return null
     }
 
+    // For USD, use amountCents if available, otherwise fall back to amount
+    const planAmount = currency === 'USD' && backendPlan.amountCents
+      ? (backendPlan.amountCents || 0)
+      : (backendPlan.amountKobo || 0)
+
     return {
       code: backendPlan.paystackCode,
-      amount: backendPlan.amount,
+      amount: planAmount,
       name: plan === 'yearly' ? 'Yearly' : 'Monthly',
       discount: backendPlan.discount || undefined,
       currency: backendPlan.currency,
