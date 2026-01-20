@@ -117,17 +117,42 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn } from "@vueuse/core"
+import { useDebounceFn, useOnline } from "@vueuse/core"
 import draggable from "vuedraggable"
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
 import type { Slide } from "~/types"
+import { tabSessionId } from '~/composables/useRealtimeSlides'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const toast = useToast()
 const ctrlOrMetaActive = ref(false)
 const { currentState } = storeToRefs(appStore)
 const windowRefs = inject("windowRefs") as any[]
+
+const online = useOnline()
+
+/**
+ * Broadcast slide reorder via WebSocket for realtime collaboration
+ */
+const broadcastSlideReorder = (slideOrder: string[]) => {
+  if (!online.value) return
+
+  const nuxtApp = useNuxtApp()
+  const socket = nuxtApp.$socket as WebSocket
+  if (socket?.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      action: 'reorder-slides',
+      data: {
+        slideOrder,
+        reorderedByName: authStore.user?.fullname || 'Anonymous',
+        tabId: tabSessionId,
+      },
+    }))
+  }
+}
 
 const liveSlide = computed(() => {
   return currentState.value?.activeSlides.find(
@@ -155,7 +180,10 @@ const liveOutputSlides = computed({
       return slide
     })
     useGlobalEmit(appWideActions.batchUpdateSlides, tempSlides)
-    // toast.add({ icon: "i-bx-slideshow", title: "Slide order has been updated" })
+    
+    // Broadcast the reorder to other tabs/devices
+    const slideOrder = tempSlides.map((slide) => slide.id)
+    broadcastSlideReorder(slideOrder)
   },
 })
 

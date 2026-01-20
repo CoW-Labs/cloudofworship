@@ -231,18 +231,20 @@ const setCachedVideosURL = async () => {
 }
 
 const updateBlobBackgroundURl = (slide: Slide) => {
+  const updatedSlide = { ...slide }
   if (
-    slide.background?.startsWith("blob:") &&
-    slide.backgroundType === backgroundTypes.video
+    updatedSlide.background?.startsWith("blob:") &&
+    updatedSlide.backgroundType === backgroundTypes.video
   ) {
-    slide.background = currentState.value.backgroundVideos?.find(
-      (video) => video.id === slide.backgroundVideoKey
+    updatedSlide.background = currentState.value.backgroundVideos?.find(
+      (video) => video.id === updatedSlide.backgroundVideoKey
     )?.url
   }
-  return slide
+  return updatedSlide
 }
 
 const updateBlobBackgroundURls = (slides: Slide[]) => {
+  if (!Array.isArray(slides)) return slides
   return slides?.map((slide) => updateBlobBackgroundURl(slide))
 }
 
@@ -251,19 +253,27 @@ const handleWebSocketMessage = (parsedData: any) => {
 
   switch (action) {
     case "connected":
-      updateBlobBackgroundURls(data)
+      // Only process if data contains slides array
+      if (Array.isArray(data)) {
+        updateBlobBackgroundURls(data)
+      }
       break
     case "live-slide":
-      const tempSlide = updateBlobBackgroundURl(data)
-      liveSlide.value = tempSlide
+      const tempSlide = updateBlobBackgroundURl({ ...data })
+      liveSlide.value = { ...tempSlide }
+      console.log('🎯 Live slide changed:', tempSlide.name || tempSlide.title)
       break
     case "new-slide":
       // Do nothing for now as live-slide covers it
       break
     case "update-slide":
-      if (liveSlide.value?.id === data.id) {
-        const slideData = updateBlobBackgroundURl(data)
-        liveSlide.value = slideData
+      // Update the livestream slide when any edit is made to the current live slide
+      // This ensures real-time updates for content changes, not just live slide selections
+      if (liveSlide.value?.id === data.id || liveSlide.value?.id === data.slideId) {
+        // Create a new object to trigger Vue reactivity
+        const slideData = updateBlobBackgroundURl({ ...data })
+        liveSlide.value = { ...slideData }
+        console.log('🔄 Livestream slide updated:', slideData.name || slideData.title)
       }
       break
     case "add-alert":
