@@ -56,7 +56,6 @@ const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<S
     const lyricLines = song.lyrics?.replaceAll('\n \n', '\n\n')?.split('\n')
 
     for (let i = 0; i < lyricLines.length; i++) {
-      console.log('lineCount', lineCount)
       let line = lyricLines[i]
 
       // Clean up line

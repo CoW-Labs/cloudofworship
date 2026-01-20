@@ -96,7 +96,6 @@ const connectWebSocket = async () => {
   socketInstance.value = useSocket({
     scheduleId,
     onMessage: (data) => {
-      console.log("WebSocket message received:", data)
       // Handle realtime slide updates
       handleWebSocketMessage(data)
     },
