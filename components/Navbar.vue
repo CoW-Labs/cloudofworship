@@ -117,27 +117,12 @@
             </div>
           </UTooltip>
         </div>
-        <UTooltip v-else :text="online ? 'Force sync' : 'You are offline'">
+        <UTooltip v-else-if="!online" text="You are offline">
           <UButton
             variant="ghost"
             class="h-10 w-48 opacity-65 transition-all"
             :class="{ 'w-12': !online }"
-            @click="useGlobalEmit(appWideActions.refreshSlides)"
           >
-            <div v-show="online" class="last-synced-ctn flex">
-              <UButton variant="ghost" class="h-10">
-                <IconWrapper
-                  name="i-tabler-refresh"
-                  :class="{ 'animate-spin': currentState.slidesLoading }"
-                />
-                <span class="text-xs">
-                  Last sync:
-                  <span class="font-bold capitalize">
-                    {{ new Date(currentState.lastSynced).toLocaleTimeString() }}
-                  </span>
-                </span>
-              </UButton>
-            </div>
             <IconWrapper
               v-show="!online"
               name="i-tabler-cloud-off"

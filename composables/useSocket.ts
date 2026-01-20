@@ -71,7 +71,7 @@ export const useSocket = (options: WebSocketOptions) => {
     const userId = authStore.user?._id || ''
     const userName = encodeURIComponent(authStore.user?.fullname || 'Anonymous')
     const avatar = encodeURIComponent(authStore.user?.avatar || '')
-    const theme = encodeURIComponent(authStore.user?.theme || '#6366f1')
+    const theme = encodeURIComponent(authStore.user?.theme ? `#${authStore.user?.theme}` : '#6366f1')
 
     return `${protocol}://${baseUrl}/schedules?schedule_id=${scheduleId}&church_id=${churchId}&user_id=${userId}&user_name=${userName}&avatar=${avatar}&theme=${theme}`
   }
