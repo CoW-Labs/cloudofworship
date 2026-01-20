@@ -1,4 +1,4 @@
-import { useDebounceFn } from "@vueuse/core"
+import { useDebounceFn, useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
@@ -7,6 +7,7 @@ export default function useSlides() {
   const appStore = useAppStore()
   const authStore = useAuthStore()
   const toast = useToast()
+  const online = useOnline()
   const churchId = authStore.church?._id
   const slides = ref<Array<Slide>>(appStore.currentState.activeSlides || [])
   const loading = ref<boolean>(false)
@@ -25,6 +26,12 @@ export default function useSlides() {
    * Fetch slides for the active schedule
    */
   const fetchScheduleSlides = async (scheduleId?: string): Promise<Slide[]> => {
+    // Don't fetch when offline
+    if (!online.value) {
+      console.warn('Device is offline. Skipping fetch.')
+      return []
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
       const targetScheduleId = scheduleId || activeSchedule?._id
@@ -69,6 +76,11 @@ export default function useSlides() {
    * Fetch saved slides from the API
    */
   const fetchSavedSlides = async (): Promise<Slide[]> => {
+    if (!online.value) {
+      console.warn('Cannot fetch saved slides while offline')
+      return []
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
 
@@ -112,6 +124,12 @@ export default function useSlides() {
    * Create a single slide online
    */
   const createSlide = async (slide: Slide): Promise<Slide | null> => {
+    // Don't make API calls when offline
+    if (!online.value) {
+      console.warn('Device is offline. Skipping create.')
+      return null
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
 
@@ -156,6 +174,11 @@ export default function useSlides() {
    * Batch create slides online
    */
   const batchCreateSlides = async (slides: Slide[]): Promise<Slide[]> => {
+    if (!online.value) {
+      console.warn('Cannot batch create slides while offline')
+      return []
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
 
@@ -205,6 +228,11 @@ export default function useSlides() {
    * Update a single slide online
    */
   const updateSlide = async (slide: Slide): Promise<Slide | null> => {
+    if (!online.value) {
+      console.warn('Cannot update slide while offline')
+      return null
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
 
@@ -241,6 +269,11 @@ export default function useSlides() {
    * Batch update slides online
    */
   const batchUpdateSlides = async (slides: Slide[]): Promise<Slide[]> => {
+    if (!online.value) {
+      console.warn('Cannot batch update slides while offline')
+      return []
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
 
@@ -286,6 +319,11 @@ export default function useSlides() {
    * Delete a slide online
    */
   const deleteSlide = async (slide: Slide): Promise<boolean> => {
+    if (!online.value) {
+      console.warn('Cannot delete slide while offline')
+      return false
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
 
@@ -329,6 +367,11 @@ export default function useSlides() {
    * Batch delete slides online
    */
   const batchDeleteSlides = async (slideIds: string[]): Promise<boolean> => {
+    if (!online.value) {
+      console.warn('Cannot batch delete slides while offline')
+      return false
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
 
@@ -377,6 +420,11 @@ export default function useSlides() {
    * Save a slide to the saved slides collection
    */
   const saveSlideOnline = async (slide: Slide): Promise<boolean> => {
+    if (!online.value) {
+      console.warn('Cannot save slide while offline')
+      return false
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
 
@@ -409,6 +457,11 @@ export default function useSlides() {
    * Unsave a slide from the saved slides collection
    */
   const unsaveSlideOnline = async (slideId: string): Promise<boolean> => {
+    if (!online.value) {
+      console.warn('Cannot unsave slide while offline')
+      return false
+    }
+
     try {
       const activeSchedule = appStore.currentState.activeSchedule
 

@@ -237,6 +237,15 @@ export interface AppSettings {
   alertLimit?: number
 }
 
+export interface OnlineUser {
+  userId: string
+  userName: string
+  avatar: string
+  scheduleId: string
+  joinedAt: string
+  theme: string
+}
+
 export interface AppState {
   activeAdvert: Advert | null
   schedules: Array<Schedule>
@@ -259,4 +268,7 @@ export interface AppState {
   activeSocket: WebSocket | null
   mainDisplayLabel: string
   mainDisplayScreen: Screen | null
+  // Realtime collaboration
+  onlineUsers: Array<OnlineUser>
+  slidesBeingEdited: Record<string, { userId: string; userName: string }>
 }

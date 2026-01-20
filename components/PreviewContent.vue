@@ -42,6 +42,7 @@
           :selectable="bulkSelectSlides"
           :id="slide?.id?.replace(/\d+/g, '')"
           :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
+          :editing-by="getSlideEditor(slide.id)"
           grid-type
           :selected="activeSlide?.id === slide?.id"
           @click="
@@ -98,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn, useThrottleFn } from "@vueuse/core"
+import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
@@ -142,6 +143,35 @@ const {
   duplicateSlide,
 } = useSlideCreation()
 const { gotoVerse, gotoChorus: gotoChorusNav } = useSlideNavigation()
+
+// Online status for conditional API/WS calls
+const online = useOnline()
+
+/**
+ * Send slide update via WebSocket for realtime collaboration
+ * Only sends when online
+ */
+const broadcastSlideUpdate = (action: string, data: any) => {
+  // Don't broadcast when offline
+  if (!online.value) return
+
+  const nuxtApp = useNuxtApp()
+  const socket = nuxtApp.$socket as WebSocket
+  if (socket?.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ action, data }))
+  }
+}
+
+/**
+ * Get the name of the user currently editing a slide (if any)
+ */
+const getSlideEditor = (slideId: string): string | undefined => {
+  const editInfo = appStore.currentState.slidesBeingEdited?.[slideId]
+  if (editInfo && editInfo.userId !== authStore.user?._id) {
+    return editInfo.userName
+  }
+  return undefined
+}
 
 // Countdown state - kept in component for tight coupling with slide updates
 const activeCountdownInterval = ref<any>(null)
@@ -416,6 +446,9 @@ const uploadOfflineSlides = async () => {
     .filter((slide) => slide._id === undefined)
     ?.filter((slide) => slide.scheduleId)
   if (offlineSlides.length > 0) {
+    // Broadcast new slides via WebSocket for realtime collaboration
+    broadcastSlideUpdate("batch-create-slides", { slides: offlineSlides })
+
     const uploadedSlides = await batchCreateSlides(offlineSlides)
 
     if (isArrayOfStrings(uploadedSlides)) {
@@ -568,6 +601,9 @@ watch(
 
 const updateSlideOnline = useThrottleFn(
   async (slide: Slide) => {
+    // Don't make API calls when offline
+    if (!online.value) return
+
     const tempSlide: Slide | any = { ...slide }
     delete tempSlide._id
 
@@ -588,18 +624,13 @@ const updateSlideOnline = useThrottleFn(
         slide.backgroundType === backgroundTypes.video
       )
     ) {
-      // UPDATE OVER WEBSOCKET
-      // const socket = useNuxtApp().$socket as WebSocket
-      // socket.send(
-      //   JSON.stringify({
-      //     action: "update-slide",
-      //     data: slide,
-      //   })
-      // )
+      // Broadcast update via WebSocket for realtime collaboration
+      broadcastSlideUpdate("update-slide", {
+        ...slide,
+        slideId: slide.id,
+      })
 
-      // UPDATE OVER HTTP
-      // TODO: Take out http update in future when WS is stable and can store in DB
-      // appStore.setSlidesLoading(true)
+      // UPDATE OVER HTTP for persistence
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
         {
@@ -608,7 +639,6 @@ const updateSlideOnline = useThrottleFn(
         }
       )
       if (!error.value) {
-        // appStore.setSlidesLoading(false)
         appStore.setLastSynced(new Date().toISOString())
         return data.value
       } else {
@@ -632,6 +662,9 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   slides.value.splice(slideIndex, 1)
   appStore.removeActiveSlide(tempSlide)
 
+  // Broadcast deletion via WebSocket for realtime collaboration
+  broadcastSlideUpdate("delete-slide", { slideId })
+
   // Delete slide online if it has an _id
   if (tempSlide?._id) {
     await deleteSlideAPI(tempSlide)
@@ -653,6 +686,9 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 }
 
 const deleteMultipleSlides = (slideIds: Array<string>) => {
+  // Broadcast batch deletion via WebSocket
+  broadcastSlideUpdate("batch-delete-slides", { slideIds })
+
   slideIds.forEach((slideId) => {
     deleteSlide(slideId, false)
   })
