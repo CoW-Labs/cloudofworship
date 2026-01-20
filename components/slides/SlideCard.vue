@@ -32,6 +32,15 @@
         </h4>
         <SlideChip :slide-type="slide?.type" class="mt-1" dark-mode />
       </div>
+      
+      <!-- Editing indicator -->
+      <div
+        v-if="editingBy"
+        class="absolute bottom-2 left-2 flex items-center gap-1 bg-amber-500/90 text-white text-xs px-2 py-0.5 rounded-full"
+      >
+        <UIcon name="i-tabler-pencil" class="w-3 h-3 animate-pulse" />
+        <span class="truncate max-w-[80px]">{{ editingBy }}</span>
+      </div>
     </button>
 
     <!-- DELETE AND DUPLICATE SLIDE BUTTON -->
@@ -169,6 +178,7 @@ const props = defineProps<{
   selected: boolean
   selectable: boolean
   checkboxSelected: boolean
+  editingBy?: string // Name of user currently editing this slide
 }>()
 
 const emit = defineEmits([

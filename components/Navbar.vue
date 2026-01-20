@@ -59,7 +59,65 @@
         />
 
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
-        <UTooltip :text="online ? 'Force sync' : 'You are offline'">
+        <div
+          v-if="onlineUsersExcludingSelf.length > 0"
+          class="online-users-ctn flex items-center"
+        >
+          <UTooltip>
+            <template #text>
+              <div class="text-sm">
+                <div
+                  v-for="user in onlineUsersExcludingSelf"
+                  :key="user.userId"
+                  class="py-0.5"
+                >
+                  {{ user.userName }}
+                </div>
+              </div>
+            </template>
+            <div class="flex items-center gap-1 mr-2">
+              <div class="flex -space-x-2">
+                <div
+                  class="relative h-8 w-8 grid place-items-center"
+                  v-for="(user, index) in displayOnlineUsers"
+                  :key="user.userId"
+                >
+                  <UAvatar
+                    :src="user.avatar"
+                    :alt="user.userName"
+                    :text="
+                      !user.avatar
+                        ? user.userName?.charAt(0)?.toUpperCase()
+                        : undefined
+                    "
+                    size="sm"
+                    class="ring-2 ring-white dark:ring-gray-900 transition-all duration-300"
+                    :class="{ 'grayscale opacity-50': !online }"
+                    :style="{
+                      zIndex: displayOnlineUsers.length - index,
+                      borderColor: user?.theme || '#6366f1',
+                      backgroundColor: (user?.theme || '#6366f1') + '20',
+                      color: !user.avatar
+                        ? user?.theme || '#6366f1'
+                        : undefined,
+                    }"
+                  />
+                  <span
+                    v-if="online"
+                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"
+                  ></span>
+                </div>
+              </div>
+              <span
+                v-if="onlineUsersExcludingSelf.length > 3"
+                class="text-xs text-gray-500 ml-1"
+              >
+                +{{ onlineUsersExcludingSelf.length - 3 }}
+              </span>
+            </div>
+          </UTooltip>
+        </div>
+        <UTooltip v-else :text="online ? 'Force sync' : 'You are offline'">
           <UButton
             variant="ghost"
             class="h-10 w-48 opacity-65 transition-all"
@@ -172,6 +230,19 @@ const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 
 const { user, church } = storeToRefs(authStore)
 const { currentState } = storeToRefs(appStore)
+
+// Online users (excluding current user)
+const onlineUsersExcludingSelf = computed(
+  () =>
+    currentState.value.onlineUsers?.filter(
+      (u) => u.userId !== user.value?._id
+    ) || []
+)
+
+// Show max 3 avatars in the navbar
+const displayOnlineUsers = computed(() =>
+  onlineUsersExcludingSelf.value.slice(0, 3)
+)
 
 const handleInviteClick = () => {
   if (isPremiumFeatureEnabled.value) {
