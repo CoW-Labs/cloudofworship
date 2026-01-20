@@ -19,28 +19,110 @@ useHead({
   ],
 })
 import { useAppStore } from "~/store/app"
-import { ref } from "vue"
+import { useAuthStore } from "~/store/auth"
+import { ref, computed } from "vue"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import type { Slide } from "~/types"
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const emitter = useNuxtApp().$emitter as Emitter<any>
+const toast = useToast()
 const socket = ref<WebSocket | null>(null)
+const socketInstance = ref<ReturnType<typeof useSocket> | null>(null)
 const MAX_RETRIES = 10
 let retryCount = 0
+
+// Realtime slides handling
+const {
+  handleWebSocketMessage,
+  updateOnlineUsers,
+  cleanup: cleanupRealtimeSlides,
+} = useRealtimeSlides({
+  onSlideCreated: (slide, createdByName) => {
+    toast.add({
+      title: `${createdByName} added a new slide`,
+      icon: "i-tabler-plus",
+      color: "blue",
+      timeout: 3000,
+    })
+  },
+  onSlideUpdated: (slide, updatedByName) => {
+    // Silent update - no toast for every update to avoid noise
+  },
+  onSlideDeleted: (slideId, deletedByName) => {
+    toast.add({
+      title: `${deletedByName} deleted a slide`,
+      icon: "i-tabler-trash",
+      color: "amber",
+      timeout: 3000,
+    })
+  },
+  onBatchSlidesCreated: (slides, createdByName) => {
+    toast.add({
+      title: `${createdByName} added ${slides.length} slides`,
+      icon: "i-tabler-plus",
+      color: "blue",
+      timeout: 3000,
+    })
+  },
+  onUserJoined: (user) => {
+    // toast.add({
+    //   title: `${user.userName} joined the schedule`,
+    //   icon: 'i-tabler-user-plus',
+    //   color: 'green',
+    //   timeout: 3000,
+    // })
+  },
+  onUserLeft: (userId, userName) => {
+    // toast.add({
+    //   title: `${userName} left the schedule`,
+    //   icon: 'i-tabler-user-minus',
+    //   color: 'gray',
+    //   timeout: 3000,
+    // })
+  },
+})
 
 const uploadOfflineSlides = useDebounceFn(() => {
   useGlobalEmit(appWideActions.uploadOfflineSlides)
 }, 2000)
 
 const connectWebSocket = async () => {
-  const socketInstance = useSocket({
-    scheduleId: appStore.currentState.activeSchedule?._id!!,
-  }).connect()
-  if (socketInstance) {
-    socket.value = socketInstance
+  const scheduleId = appStore.currentState.activeSchedule?._id
+  if (!scheduleId) return
+
+  socketInstance.value = useSocket({
+    scheduleId,
+    onMessage: (data) => {
+      console.log("WebSocket message received:", data)
+      // Handle realtime slide updates
+      handleWebSocketMessage(data)
+    },
+    onConnected: () => {
+      console.log("WebSocket connected for realtime collaboration")
+    },
+    onDisconnected: () => {
+      console.log("WebSocket disconnected")
+    },
+    onOnlineUsersChanged: (users) => {
+      updateOnlineUsers(users)
+      appStore.setOnlineUsers(users)
+    },
+  })
+
+  const ws = socketInstance.value.connect()
+  if (ws) {
+    socket.value = ws
   }
+}
+
+const disconnectWebSocket = () => {
+  socketInstance.value?.disconnect()
+  socket.value = null
+  cleanupRealtimeSlides()
+  appStore.setOnlineUsers([])
 }
 
 const sendLiveSlideToWebsocket = (slide: Slide) => {
@@ -164,8 +246,26 @@ onMounted(async () => {
 
   // Connect to websocket
   if (appStore.currentState.activeSchedule) {
-    // connectWebSocket()
+    connectWebSocket()
   }
+})
+
+// Watch for schedule changes to reconnect WebSocket
+watch(
+  () => appStore.currentState.activeSchedule?._id,
+  (newScheduleId, oldScheduleId) => {
+    if (newScheduleId && newScheduleId !== oldScheduleId) {
+      disconnectWebSocket()
+      setTimeout(() => {
+        connectWebSocket()
+      }, 500)
+    }
+  }
+)
+
+// Cleanup on unmount
+onBeforeUnmount(() => {
+  disconnectWebSocket()
 })
 
 emitter.on("refresh-slides", () => {
@@ -173,7 +273,7 @@ emitter.on("refresh-slides", () => {
     socket.value?.readyState === WebSocket.CLOSED ||
     socket.value?.readyState === WebSocket.CLOSING
   ) {
-    // connectWebSocket()
+    connectWebSocket()
   }
 })
 </script>

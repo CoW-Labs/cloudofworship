@@ -9,6 +9,7 @@ import type {
   Advert,
   BibleVersion,
   AppState,
+  OnlineUser,
 } from "~/types/index"
 import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
@@ -122,6 +123,8 @@ export const useAppStore = defineStore("app", {
         activeSocket: null,
         mainDisplayLabel: "",
         mainDisplayScreen: null,
+        onlineUsers: [] as OnlineUser[],
+        slidesBeingEdited: {} as Record<string, { userId: string; userName: string }>,
         // activeLiveWindows: [] as any[]
       },
       // Undo/Redo stacks
@@ -536,6 +539,44 @@ export const useAppStore = defineStore("app", {
     refreshAppActionsStack() {
       this.pastStates = []
       this.futureStates = []
+    },
+    setOnlineUsers(users: OnlineUser[]) {
+      this.currentState.onlineUsers = users
+    },
+    addOnlineUser(user: OnlineUser) {
+      const existingIndex = this.currentState.onlineUsers.findIndex(
+        (u) => u.userId === user.userId
+      )
+      if (existingIndex === -1) {
+        this.currentState.onlineUsers.push(user)
+      }
+    },
+    removeOnlineUser(userId: string) {
+      this.currentState.onlineUsers = this.currentState.onlineUsers.filter(
+        (u) => u.userId !== userId
+      )
+    },
+    setSlideBeingEdited(slideId: string, userId: string, userName: string) {
+      this.currentState.slidesBeingEdited[slideId] = { userId, userName }
+    },
+    clearSlideBeingEdited(slideId: string) {
+      delete this.currentState.slidesBeingEdited[slideId]
+    },
+    clearAllSlidesBeingEdited() {
+      this.currentState.slidesBeingEdited = {}
+    },
+    // Update a specific slide in the active slides array (for realtime updates)
+    updateSlideInActiveSlides(updatedSlide: Slide) {
+      const slideIndex = this.currentState.activeSlides.findIndex(
+        (s) => s.id === updatedSlide.id || s._id === updatedSlide._id
+      )
+      if (slideIndex !== -1) {
+        const existingSlide = this.currentState.activeSlides[slideIndex]
+        this.currentState.activeSlides.splice(slideIndex, 1, {
+          ...existingSlide,
+          ...updatedSlide,
+        })
+      }
     },
   },
   persist: {

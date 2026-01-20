@@ -1,4 +1,5 @@
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
 import { useOnline } from "@vueuse/core"
 
 interface WebSocketOptions {
@@ -9,10 +10,26 @@ interface WebSocketOptions {
   connectionTimeout?: number
   heartbeatInterval?: number
   onMessage?: (data: any) => void
-  onConnected?: () => void
+  onConnected?: (data?: any) => void
   onDisconnected?: () => void
   onError?: (error: Event) => void
   onMaxRetriesReached?: () => void
+  onOnlineUsersChanged?: (users: OnlineUser[]) => void
+}
+
+export interface OnlineUser {
+  userId: string
+  userName: string
+  avatar: string
+  scheduleId: string
+  joinedAt: string
+  theme: string
+}
+
+export interface SlideEditLock {
+  slideId: string
+  lockedBy: string
+  lockedByName: string
 }
 
 export const useSocket = (options: WebSocketOptions) => {
@@ -28,11 +45,13 @@ export const useSocket = (options: WebSocketOptions) => {
     onDisconnected,
     onError,
     onMaxRetriesReached,
+    onOnlineUsersChanged,
   } = options
 
   const runtimeConfig = useRuntimeConfig()
   const online = useOnline()
   const nuxtApp = useNuxtApp()
+  const authStore = useAuthStore()
 
   let socket: WebSocket | null = null
   let retryCount = 0
@@ -42,10 +61,19 @@ export const useSocket = (options: WebSocketOptions) => {
   let isIntentionallyClosed = false
   let isConnecting = false
 
+  // Offline message queue
+  const messageQueue: any[] = []
+
   const getWebSocketUrl = () => {
     const protocol = process.env.NODE_ENV === 'development' ? 'ws' : 'wss'
     const baseUrl = runtimeConfig.public.BASE_URL?.split('://')?.[1]
-    return `${protocol}://${baseUrl}/schedules?schedule_id=${scheduleId}`
+    const churchId = authStore.church?._id || ''
+    const userId = authStore.user?._id || ''
+    const userName = encodeURIComponent(authStore.user?.fullname || 'Anonymous')
+    const avatar = encodeURIComponent(authStore.user?.avatar || '')
+    const theme = encodeURIComponent(authStore.user?.theme || '#6366f1')
+
+    return `${protocol}://${baseUrl}/schedules?schedule_id=${scheduleId}&church_id=${churchId}&user_id=${userId}&user_name=${userName}&avatar=${avatar}&theme=${theme}`
   }
 
   const clearTimers = () => {
@@ -86,6 +114,22 @@ export const useSocket = (options: WebSocketOptions) => {
         }
       }
     }, heartbeatInterval)
+  }
+
+  /**
+   * Flush queued messages when connection is restored
+   */
+  const flushMessageQueue = () => {
+    while (messageQueue.length > 0 && socket?.readyState === WebSocket.OPEN) {
+      const message = messageQueue.shift()
+      try {
+        socket.send(JSON.stringify(message))
+      } catch (error) {
+        console.error('Failed to send queued message:', error)
+        messageQueue.unshift(message) // Put it back
+        break
+      }
+    }
   }
 
   const connect = () => {
@@ -139,6 +183,7 @@ export const useSocket = (options: WebSocketOptions) => {
         clearTimeout(connectionTimer!)
         console.log('WebSocket connection opened successfully')
         startHeartbeat()
+        flushMessageQueue() // Send any queued messages
         onConnected?.()
       }
 
@@ -149,6 +194,16 @@ export const useSocket = (options: WebSocketOptions) => {
           // Handle pong responses
           if (parsedData.action === 'pong') {
             return
+          }
+
+          // Handle connected event with online users
+          if (parsedData.action === 'connected' && parsedData.data?.onlineUsers) {
+            onOnlineUsersChanged?.(parsedData.data.onlineUsers)
+          }
+
+          // Handle user joined/left events
+          if ((parsedData.action === 'user-joined' || parsedData.action === 'user-left') && parsedData.data?.onlineUsers) {
+            onOnlineUsersChanged?.(parsedData.data.onlineUsers)
           }
 
           onMessage?.(parsedData)
@@ -238,18 +293,128 @@ export const useSocket = (options: WebSocketOptions) => {
   }
 
   const send = (data: any) => {
+    // Don't send or queue messages when offline
+    if (!online.value) {
+      console.warn('Device is offline. Message not sent.')
+      return false
+    }
+
     if (socket?.readyState === WebSocket.OPEN) {
       try {
         socket.send(JSON.stringify(data))
         return true
       } catch (error) {
         console.error('Failed to send message:', error)
+        // Queue message for later if send fails
+        messageQueue.push(data)
         return false
       }
     } else {
-      console.warn('WebSocket is not connected. Cannot send message.')
+      console.warn('WebSocket is not connected. Queueing message for later.')
+      // Queue message for when connection is restored
+      messageQueue.push(data)
       return false
     }
+  }
+
+  /**
+   * Send slide creation event
+   */
+  const sendSlideCreated = (slide: any) => {
+    return send({
+      action: 'create-slide',
+      data: slide,
+    })
+  }
+
+  /**
+   * Send slide update event
+   */
+  const sendSlideUpdated = (slide: any) => {
+    return send({
+      action: 'update-slide',
+      data: slide,
+    })
+  }
+
+  /**
+   * Send slide deletion event
+   */
+  const sendSlideDeleted = (slideId: string) => {
+    return send({
+      action: 'delete-slide',
+      data: { slideId },
+    })
+  }
+
+  /**
+   * Send batch slides created event
+   */
+  const sendBatchSlidesCreated = (slides: any[]) => {
+    return send({
+      action: 'batch-create-slides',
+      data: { slides },
+    })
+  }
+
+  /**
+   * Send batch slides updated event
+   */
+  const sendBatchSlidesUpdated = (slides: any[]) => {
+    return send({
+      action: 'batch-update-slides',
+      data: { slides },
+    })
+  }
+
+  /**
+   * Send batch slides deleted event
+   */
+  const sendBatchSlidesDeleted = (slideIds: string[]) => {
+    return send({
+      action: 'batch-delete-slides',
+      data: { slideIds },
+    })
+  }
+
+  /**
+   * Request a lock on a slide for editing
+   */
+  const lockSlide = (slideId: string) => {
+    return send({
+      action: 'lock-slide',
+      data: { slideId },
+    })
+  }
+
+  /**
+   * Release a lock on a slide
+   */
+  const unlockSlide = (slideId: string) => {
+    return send({
+      action: 'unlock-slide',
+      data: { slideId },
+    })
+  }
+
+  /**
+   * Refresh a lock to prevent timeout
+   */
+  const refreshLock = (slideId: string) => {
+    return send({
+      action: 'refresh-lock',
+      data: { slideId },
+    })
+  }
+
+  /**
+   * Send live slide update
+   */
+  const sendLiveSlide = (slide: any) => {
+    return send({
+      action: 'live-slide',
+      data: slide,
+    })
   }
 
   const getState = () => {
@@ -259,6 +424,7 @@ export const useSocket = (options: WebSocketOptions) => {
       isConnecting,
       isIntentionallyClosed,
       isOnline: online.value,
+      queuedMessages: messageQueue.length,
     }
   }
 
@@ -279,5 +445,18 @@ export const useSocket = (options: WebSocketOptions) => {
     disconnect,
     send,
     getState,
+    // Slide operations
+    sendSlideCreated,
+    sendSlideUpdated,
+    sendSlideDeleted,
+    sendBatchSlidesCreated,
+    sendBatchSlidesUpdated,
+    sendBatchSlidesDeleted,
+    // Locking
+    lockSlide,
+    unlockSlide,
+    refreshLock,
+    // Live slide
+    sendLiveSlide,
   }
 }
