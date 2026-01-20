@@ -10,12 +10,23 @@ interface RealtimeSlidesOptions {
   onBatchSlidesCreated?: (slides: Slide[], createdByName: string) => void
   onBatchSlidesUpdated?: (slides: Slide[], updatedByName: string) => void
   onBatchSlidesDeleted?: (slideIds: string[], deletedByName: string) => void
+  onSlidesReordered?: (slideOrder: string[], reorderedByName: string) => void
   onSlideEditing?: (slideId: string, userName: string) => void
   onSlideLocked?: (lock: SlideEditLock) => void
   onSlideUnlocked?: (slideId: string) => void
   onUserJoined?: (user: OnlineUser) => void
   onUserLeft?: (userId: string, userName: string) => void
 }
+
+/**
+ * Generate a unique tab/session ID for this browser tab
+ * This allows the same user to collaborate across multiple tabs/devices
+ * Each tab gets its own unique ID that persists for the session
+ */
+const tabSessionId = `tab-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+
+// Export the tab session ID for use in other modules
+export { tabSessionId }
 
 export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const appStore = useAppStore()
@@ -75,12 +86,13 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
    */
   const handleWebSocketMessage = (message: any) => {
     const { action, data } = message
-    const currentUserId = authStore.user?._id
 
     switch (action) {
       case 'slide-created':
-        // Don't process our own updates
-        if (data.createdBy === currentUserId) return
+      case 'create-slide':
+        // Don't process updates from the same tab (tabId check)
+        // This allows same user on different tabs/devices to receive updates
+        if (data.tabId === tabSessionId) return
 
         // Add slide to store
         if (data && data.id) {
@@ -88,6 +100,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           delete (newSlide as any).createdBy
           delete (newSlide as any).createdByName
           delete (newSlide as any).timestamp
+          delete (newSlide as any).tabId
 
           appStore.appendActiveSlide(newSlide)
           options.onSlideCreated?.(newSlide, data.createdByName)
@@ -95,11 +108,14 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         break
 
       case 'slide-updated':
-        if (data.updatedBy === currentUserId) return
+      case 'update-slide':
+        // Don't process updates from the same tab
+        // This allows same user on different tabs/devices to receive updates
+        if (data.tabId === tabSessionId) return
 
         // Update slide in store
-        if (data && (data.id || data._id)) {
-          const slideId = data.id || data._id
+        if (data && (data.id || data._id || data.slideId)) {
+          const slideId = data.slideId || data.id || data._id
           const slideIndex = appStore.currentState.activeSlides.findIndex(
             (s) => s.id === slideId || s._id === data._id
           )
@@ -109,6 +125,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             delete (updatedSlide as any).updatedBy
             delete (updatedSlide as any).updatedByName
             delete (updatedSlide as any).timestamp
+            delete (updatedSlide as any).tabId
 
             // Merge with existing slide to preserve local-only properties
             const existingSlide = appStore.currentState.activeSlides[slideIndex]
@@ -121,7 +138,9 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         break
 
       case 'slide-deleted':
-        if (data.deletedBy === currentUserId) return
+      case 'delete-slide':
+        // Don't process updates from the same tab
+        if (data.tabId === tabSessionId) return
 
         if (data.slideId) {
           const slideToRemove = appStore.currentState.activeSlides.find(
@@ -135,7 +154,9 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         break
 
       case 'slides-batch-created':
-        if (data.createdBy === currentUserId) return
+      case 'batch-create-slides':
+        // Don't process updates from the same tab
+        if (data.tabId === tabSessionId) return
 
         if (data.slides && Array.isArray(data.slides)) {
           const newSlides = data.slides.map((s: any) => {
@@ -143,6 +164,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             delete slide.createdBy
             delete slide.createdByName
             delete slide.timestamp
+            delete slide.tabId
             return slide
           })
           appStore.appendActiveSlides(newSlides)
@@ -151,7 +173,9 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         break
 
       case 'slides-batch-updated':
-        if (data.updatedBy === currentUserId) return
+      case 'batch-update-slides':
+        // Don't process updates from the same tab
+        if (data.tabId === tabSessionId) return
 
         if (data.slides && Array.isArray(data.slides)) {
           data.slides.forEach((updatedSlide: Slide) => {
@@ -169,7 +193,9 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         break
 
       case 'slides-batch-deleted':
-        if (data.deletedBy === currentUserId) return
+      case 'batch-delete-slides':
+        // Don't process updates from the same tab
+        if (data.tabId === tabSessionId) return
 
         if (data.slideIds && Array.isArray(data.slideIds)) {
           data.slideIds.forEach((slideId: string) => {
@@ -184,8 +210,29 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         }
         break
 
+      case 'reorder-slides':
+        // Don't process updates from the same tab
+        if (data.tabId === tabSessionId) return
+
+        // Handle slide reorder from other tabs/devices
+        if (data.slideOrder && Array.isArray(data.slideOrder)) {
+          const reorderedSlides = data.slideOrder
+            .map((slideId: string) => 
+              appStore.currentState.activeSlides.find((s) => s.id === slideId)
+            )
+            .filter((s: Slide | undefined): s is Slide => s !== undefined)
+            .map((slide: Slide, index: number) => ({ ...slide, index }))
+
+          if (reorderedSlides.length > 0) {
+            appStore.replaceScheduleActiveSlides(reorderedSlides)
+            options.onSlidesReordered?.(data.slideOrder, data.reorderedByName)
+          }
+        }
+        break
+
       case 'slide-editing':
-        if (data.userId === currentUserId) return
+        // Don't process updates from the same tab
+        if (data.tabId === tabSessionId) return
 
         slidesBeingEdited.value[data.slideId] = {
           userId: data.userId,
@@ -241,25 +288,23 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         break
 
       case 'user-joined':
-        if (data.userId !== currentUserId) {
-          options.onUserJoined?.({
-            userId: data.userId,
-            userName: data.userName,
-            avatar: data.avatar,
-            scheduleId: data.scheduleId,
-            joinedAt: new Date().toISOString(),
-            theme: data.theme,
-          })
-        }
+        // User joined events should be processed for all users
+        options.onUserJoined?.({
+          userId: data.userId,
+          userName: data.userName,
+          avatar: data.avatar,
+          scheduleId: data.scheduleId,
+          joinedAt: new Date().toISOString(),
+          theme: data.theme,
+        })
         if (data.onlineUsers) {
           onlineUsers.value = data.onlineUsers
         }
         break
 
       case 'user-left':
-        if (data.userId !== currentUserId) {
-          options.onUserLeft?.(data.userId, data.userName)
-        }
+        // User left events should be processed for all users
+        options.onUserLeft?.(data.userId, data.userName)
         if (data.onlineUsers) {
           onlineUsers.value = data.onlineUsers
         }

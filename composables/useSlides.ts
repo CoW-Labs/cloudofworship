@@ -138,7 +138,7 @@ export default function useSlides() {
       }
 
       loading.value = true
-      appStore.setSlidesLoading(true)
+      // appStore.setSlidesLoading(true)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides`,
@@ -166,7 +166,7 @@ export default function useSlides() {
       return null
     } finally {
       loading.value = false
-      appStore.setSlidesLoading(false)
+      // appStore.setSlidesLoading(false)
     }
   }
 
@@ -187,7 +187,7 @@ export default function useSlides() {
       }
 
       loading.value = true
-      appStore.setSlidesLoading(true)
+      // appStore.setSlidesLoading(true)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/batch`,
@@ -220,7 +220,7 @@ export default function useSlides() {
       return []
     } finally {
       loading.value = false
-      appStore.setSlidesLoading(false)
+      // appStore.setSlidesLoading(false)
     }
   }
 
@@ -282,7 +282,7 @@ export default function useSlides() {
       }
 
       loading.value = true
-      appStore.setSlidesLoading(true)
+      // appStore.setSlidesLoading(true)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/batch`,
@@ -311,7 +311,7 @@ export default function useSlides() {
       return []
     } finally {
       loading.value = false
-      appStore.setSlidesLoading(false)
+      // appStore.setSlidesLoading(false)
     }
   }
 

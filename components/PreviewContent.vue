@@ -114,6 +114,7 @@ import type {
   ExtendedFileT,
 } from "~/types"
 import { appWideActions } from "~/utils/constants"
+import { tabSessionId } from '~/composables/useRealtimeSlides'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -149,7 +150,7 @@ const online = useOnline()
 
 /**
  * Send slide update via WebSocket for realtime collaboration
- * Only sends when online
+ * Only sends when online. Includes tabId to allow same user on different tabs/devices to receive updates
  */
 const broadcastSlideUpdate = (action: string, data: any) => {
   // Don't broadcast when offline
@@ -158,7 +159,7 @@ const broadcastSlideUpdate = (action: string, data: any) => {
   const nuxtApp = useNuxtApp()
   const socket = nuxtApp.$socket as WebSocket
   if (socket?.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ action, data }))
+    socket.send(JSON.stringify({ action, data: { ...data, tabId: tabSessionId } }))
   }
 }
 
