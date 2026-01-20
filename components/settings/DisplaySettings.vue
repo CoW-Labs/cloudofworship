@@ -142,6 +142,8 @@
                   height: screen.height,
                   availWidth: screen.availWidth,
                   availHeight: screen.availHeight,
+                  availLeft: screen.availLeft,
+                  availTop: screen.availTop,
                   isExtended: screen.isExtended,
                   isInternal: screen.isInternal,
                   devicePixelRatio: screen.devicePixelRatio,

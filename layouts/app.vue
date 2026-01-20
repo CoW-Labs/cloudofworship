@@ -736,23 +736,43 @@ async function openTauriLiveWindow() {
       return monitorId === appStore.currentState.mainDisplayLabel
     })
 
-    console.log("Target monitor found:", targetMonitor)
-
     // Fallback strategy: Select a monitor that's NOT the current monitor
     if (!targetMonitor) {
       console.log("Target monitor not found, using fallback strategy")
 
-      // Get current monitor ID for comparison
-      const currentMonitorId = current ? useScreenId(current) : null
-      console.log("Current monitor ID:", currentMonitorId)
-
-      // Try to find a monitor that is NOT the current monitor
-      if (current && monitors.length > 1) {
+      // First try to use stored mainDisplayScreen position
+      const savedScreen = appStore.currentState.mainDisplayScreen
+      if (
+        savedScreen?.availLeft !== undefined &&
+        savedScreen?.availTop !== undefined
+      ) {
+        console.log(
+          "Using saved mainDisplayScreen position:",
+          savedScreen.availLeft,
+          savedScreen.availTop
+        )
         targetMonitor = monitors.find((monitor: any) => {
-          const monitorId = useScreenId(monitor)
-          return monitorId !== currentMonitorId
+          return (
+            monitor.position.x === savedScreen.availLeft &&
+            monitor.position.y === savedScreen.availTop
+          )
         })
-        console.log("Found non-current monitor:", targetMonitor)
+        console.log("Found monitor by position:", targetMonitor)
+      }
+
+      // If still not found, get current monitor ID for comparison
+      if (!targetMonitor) {
+        const currentMonitorId = current ? useScreenId(current) : null
+        console.log("Current monitor ID:", currentMonitorId)
+
+        // Try to find a monitor that is NOT the current monitor
+        if (current && monitors.length > 1) {
+          targetMonitor = monitors.find((monitor: any) => {
+            const monitorId = useScreenId(monitor)
+            return monitorId !== currentMonitorId
+          })
+          console.log("Found non-current monitor:", targetMonitor)
+        }
       }
 
       // Final fallback: use second monitor if available, otherwise first
