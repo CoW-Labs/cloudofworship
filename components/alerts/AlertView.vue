@@ -43,6 +43,10 @@ const props = defineProps<{
 const { currentState } = storeToRefs(appStore)
 const animationDuration = computed(() => {
   // 1 char = 0.25s - Standard Calc
-  return `${currentState.value?.activeAlert?.title.length}s`
+  // Speed multiplier: lower value = slower, higher value = faster
+  const baseSpeed = currentState.value?.activeAlert?.title.length || 10
+  const speedMultiplier = currentState.value?.activeAlert?.speed || 1
+  // Invert speed: speed of 2 should be faster (shorter duration), speed of 0.5 should be slower (longer duration)
+  return `${baseSpeed / speedMultiplier}s`
 })
 </script>

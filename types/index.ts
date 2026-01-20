@@ -56,6 +56,7 @@ export interface Alert {
   icon: string
   style: string
   background: string
+  speed?: number // Animation speed multiplier (0.5 = slow, 2 = fast)
   // position: string // top, bottom
 }
 
