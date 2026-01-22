@@ -183,6 +183,7 @@ export interface SlideStyle {
   lettercase?: string
   lineSpacing?: string
   textOutlined?: boolean
+  textBold?: boolean
   bibleVersion?: string
 }
 

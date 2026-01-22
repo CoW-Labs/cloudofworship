@@ -54,6 +54,7 @@ export default function useSlideCreation() {
         lettercase: appStore.currentState.settings.slideStyles.lettercase,
         lineSpacing: appStore.currentState.settings.slideStyles.lineSpacing,
         textOutlined: appStore.currentState.settings.slideStyles.textOutlined,
+        textBold: appStore.currentState.settings.slideStyles.textBold,
         backgroundFillType: appStore.currentState.settings.slideStyles.backgroundFillType
       },
     }

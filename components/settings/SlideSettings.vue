@@ -139,6 +139,21 @@
           />
         </UFormGroup>
         <UFormGroup
+          label="Bold Text"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
+          <UToggle
+            size="lg"
+            :model-value="appStore.currentState.settings.slideStyles.textBold"
+            @change="
+              appStore.setSlideStyles({
+                ...appStore.currentState.settings.slideStyles,
+                textBold: $event,
+              })
+            "
+          />
+        </UFormGroup>
+        <UFormGroup
           label="Set default background fill type"
           class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
         >
@@ -147,7 +162,10 @@
             select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white capitalize"
             size="md"
             :options="Object.values(backgroundFillTypes)"
-            :model-value="appStore.currentState.settings.slideStyles.backgroundFillType || backgroundFillTypes.crop"
+            :model-value="
+              appStore.currentState.settings.slideStyles.backgroundFillType ||
+              backgroundFillTypes.crop
+            "
             variant="none"
             color="primary"
             clear-search-on-close
