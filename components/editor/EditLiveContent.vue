@@ -227,6 +227,25 @@
                   />
                 </template>
               </UPopover>
+              <UPopover
+                v-if="slide?.type === slideTypes.bible"
+                v-model:open="themePopoverOpen"
+              >
+                <UTooltip text="Slide Themes" :popper="{ arrow: true }">
+                  <UButton
+                    variant="ghost"
+                    class="px-1.5"
+                    icon="i-mdi-theme"
+                    :disabled="!slide"
+                  />
+                </UTooltip>
+                <template #panel>
+                  <BibleThemeSelection
+                    :value="slide?.slideStyle?.theme"
+                    @select="onSelectTheme"
+                  />
+                </template>
+              </UPopover>
             </div>
             <!-- <UButton
           class="px-2 pr-3 ml-1 text-xs"
@@ -343,6 +362,7 @@ const bgEditBgPopoverOpen = ref<boolean>(false)
 const bgImagePopoverOpen = ref<boolean>(false)
 const bgVideoPopoverOpen = ref<boolean>(false)
 const bgColorPopoverOpen = ref<boolean>(false)
+const themePopoverOpen = ref<boolean>(false)
 const slideContents = ref<Array<string>>([])
 const verse = ref<string>(props.slide?.title || "")
 const searchedBibleBookOptions = ref<string[]>([])
@@ -437,6 +457,19 @@ const onSelectBackground = (
     backgroundVideoKey: data.key || undefined,
     backgroundType,
   } as Slide
+  emit("slide-update", tempSlide)
+}
+
+const onSelectTheme = (themeId: string) => {
+  themePopoverOpen.value = false
+
+  const tempSlide: Slide = {
+    ...props.slide!!,
+    slideStyle: {
+      ...props.slide?.slideStyle,
+      theme: themeId,
+    },
+  }
   emit("slide-update", tempSlide)
 }
 

@@ -92,7 +92,7 @@ export const useAppStore = defineStore("app", {
             },
           },
           animations: true,
-          footnotes: true,
+          footnotes: false,
           songAndHymnLabelsVisibility: false,
           liveWindowFullscreen: true, // Default to fullscreen mode
           // motionlessSlides: true,

@@ -1,15 +1,15 @@
 {
-  "version": "0.39.1-beta",
-  "tag": "v0.39.1-beta",
-  "releaseDate": "2026-01-20T01:45:32Z",
-  "releaseNotes": "- chore: removed loggers\n- fix: made changes to realtime updates and livestream\n- chore: sockets and UI update\n- Update latest.json for release v0.39.0-beta\n",
+  "version": "0.39.2-beta",
+  "tag": "v0.39.2-beta",
+  "releaseDate": "2026-01-24T07:12:01Z",
+  "releaseNotes": "- fix: included subscription settings\n- fix: Setting to bolden text on songs, hymns and bible slides\n- chore: create releases for just windows\n- chore: Resolves issues around secondary monitor ID\n- fix: Included slide setting for default background fill type for images/videos\n- fix: Speed of alert view and banners can now be increased\n- Update latest.json for release v0.39.1-beta\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.39.1-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.39.2-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.39.1-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.39.2-beta/",
       "signature": ""
     }
   }
