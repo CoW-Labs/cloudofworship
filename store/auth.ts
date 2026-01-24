@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { useAppStore } from './app'
 import posthog from 'posthog-js'
+import type { SubscriptionDetails } from '~/types'
 
 
 export interface User {
@@ -34,11 +35,14 @@ export interface Church {
 }
 
 export const useAuthStore = defineStore('auth', {
+
   state: () => {
     return {
       user: null as User | null,
       church: null as Church | null,
-      token: null as string | null // Store token for Tauri
+      token: null as string | null, // Store token for Tauri
+      subscriptionDetails: null as SubscriptionDetails | null, // Cached subscription details
+      subscriptionDetailsLastFetched: null as number | null // Timestamp of last fetch
     }
   },
   actions: {
@@ -50,6 +54,14 @@ export const useAuthStore = defineStore('auth', {
     },
     setToken(token: string | null) {
       this.token = token
+    },
+    setSubscriptionDetails(details: SubscriptionDetails) {
+      this.subscriptionDetails = details
+      this.subscriptionDetailsLastFetched = Date.now()
+    },
+    clearSubscriptionDetails() {
+      this.subscriptionDetails = null
+      this.subscriptionDetailsLastFetched = null
     },
     signOut() {
       const appStore = useAppStore()
@@ -65,6 +77,8 @@ export const useAuthStore = defineStore('auth', {
 
       this.user = null
       this.church = null
+      this.subscriptionDetails = null
+      this.subscriptionDetailsLastFetched = null
       navigateTo('/login')
       setTimeout(() => {
         appStore.signOut()

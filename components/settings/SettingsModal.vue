@@ -52,6 +52,10 @@
           <Transition name="fade-sm">
             <!-- ACCOUNT & PROFILE SETTINGS -->
             <ProfileSettings v-if="activeTab === 'Account/Profile Settings'" />
+            <!-- SUBSCRIPTION SETTINGS -->
+            <SubscriptionSettings
+              v-else-if="activeTab === 'Subscription Settings'"
+            />
             <!-- DISPLAY SETTINGS -->
             <DisplaySettings v-else-if="activeTab === 'Display Settings'" />
             <!-- SLIDE SETTINGS -->
@@ -88,6 +92,7 @@ const props = defineProps<{
 const settingsModalOpen = ref(props.isOpen)
 const tabs = [
   { name: "Account/Profile Settings", active: false },
+  { name: "Subscription Settings", active: false },
   { name: "Display Settings", active: false },
   { name: "Slide Settings", active: false },
   { name: "Slide Background Settings", active: false },

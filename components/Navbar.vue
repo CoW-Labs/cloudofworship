@@ -61,7 +61,7 @@
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
         <div
           v-if="onlineUsersExcludingSelf.length > 0"
-          class="online-users-ctn flex items-center"
+          class="online-users-ctn flex items-center relative left-6"
         >
           <UTooltip>
             <template #text>
@@ -78,9 +78,12 @@
             <div class="flex items-center gap-1 mr-2">
               <div class="flex -space-x-2">
                 <div
-                  class="relative h-8 w-8 grid place-items-center"
+                  class="relative h-8 w-8 grid place-items-center transition-all duration-200 ease-out hover:z-50 hover:translate-x-1"
                   v-for="(user, index) in displayOnlineUsers"
                   :key="user.userId"
+                  :style="{
+                    zIndex: displayOnlineUsers.length - index,
+                  }"
                 >
                   <UAvatar
                     :src="user.avatar"
@@ -91,12 +94,11 @@
                         : undefined
                     "
                     size="sm"
-                    class="ring-2 ring-white dark:ring-gray-900 transition-all duration-300"
+                    class="ring-2 transition-all duration-200 cursor-pointer hover:scale-110"
                     :class="{ 'grayscale opacity-50': !online }"
                     :style="{
-                      zIndex: displayOnlineUsers.length - index,
-                      borderColor: user?.theme || '#6366f1',
-                      backgroundColor: (user?.theme || '#6366f1') + '20',
+                      '--tw-ring-color': user?.theme || '#6366f1',
+                      backgroundColor: user?.theme || '#6366f1',
                       color: !user.avatar
                         ? user?.theme || '#6366f1'
                         : undefined,
@@ -104,7 +106,7 @@
                   />
                   <span
                     v-if="online"
-                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"
+                    class="animate-ping absolute inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75"
                   ></span>
                 </div>
               </div>
@@ -224,9 +226,14 @@ const onlineUsersExcludingSelf = computed(
     ) || []
 )
 
-// Show max 3 avatars in the navbar
+// Show max 5 avatars in the navbar
 const displayOnlineUsers = computed(() =>
-  onlineUsersExcludingSelf.value.slice(0, 3)
+  onlineUsersExcludingSelf.value
+    .map((user) => ({
+      ...user,
+      theme: user.theme?.replace("##", "#"),
+    }))
+    .slice(0, 5)
 )
 
 const handleInviteClick = () => {
@@ -243,6 +250,7 @@ const handleInviteClick = () => {
     }
   } else {
     inviteModalVisible.value = true
+    usePosthogCapture("OPEN_INVITE_MODAL")
   }
 }
 
