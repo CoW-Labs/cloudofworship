@@ -218,6 +218,7 @@ export interface SlideStyle {
   textOutlined?: boolean
   textBold?: boolean
   bibleVersion?: string
+  theme?: string // Theme ID for slide styling (e.g., for Bible slides)
 }
 
 export interface Advert {

@@ -467,27 +467,33 @@ body {
 }
 .bold-live-content > .slide-layout-ctn > div:nth-child(1),
 .bold-live-content > .slide-layout-ctn > div:nth-child(1) > p,
+.bold-live-content > .slide-layout-ctn .bible-content > .scripture-content,
 .bold-live-content > div:nth-child(1) > .tiptap,
 .bold-live-content > div:nth-child(1) > .tiptap > p {
   font-weight: 850;
 }
 .uppercase-live-content > .slide-layout-ctn > div:nth-child(1),
 .uppercase-live-content > div:nth-child(1) > .tiptap,
+.bold-live-content > .slide-layout-ctn .bible-content > .scripture-content,
 .uppercase-live-content > div:nth-child(1) > .tiptap > p {
   text-transform: uppercase;
 }
 .double-line-spacing > .slide-layout-ctn > div:nth-child(1),
+.bold-live-content > .slide-layout-ctn .bible-content > .scripture-content,
 .double-line-spacing > div:nth-child(1) > .tiptap {
   line-height: 200%;
 }
 .normal-line-spacing > .slide-layout-ctn > div:nth-child(1),
+.bold-live-content > .slide-layout-ctn .bible-content > .scripture-content,
 .normal-line-spacing > div:nth-child(1) > .tiptap {
   line-height: normal;
 }
 .single-line-spacing > .slide-layout-ctn > div:nth-child(1),
+.bold-live-content > .slide-layout-ctn .bible-content > .scripture-content,
 .single-line-spacing > div:nth-child(1) > .tiptap {
   line-height: 1;
 }
+
 .outlined-live-content > div > .tiptap {
   text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000,
     -1px 1px 0 #000;
@@ -842,4 +848,50 @@ body {
     font-size: 1.5vw;
     line-height: 2.7vw;
   }
+}
+
+/* =====================================================
+   BIBLE SLIDE THEMES
+   ===================================================== */
+
+/* Writing mode for vertical text (side reference themes) */
+.writing-mode-vertical {
+  writing-mode: vertical-rl;
+}
+
+/* Theme: Label Large (2x size) */
+.bible-label-large .scripture-label {
+  font-size: 3vw !important;
+}
+
+.bible-label-xlarge .scripture-label {
+  font-size: 4vw !important;
+}
+
+/* Theme: Side Reference - vertical text adjustments */
+.bible-theme-side .bible-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bible-theme-side .scripture-label {
+  font-size: 1.5vw !important;
+  margin-top: 0 !important;
+}
+
+/* Responsive theme adjustments for previews */
+.lg-preview .bible-label-large .scripture-label,
+.lg-preview .bible-label-xlarge .scripture-label {
+  font-size: 0.5vw !important;
+}
+
+.md-preview .bible-label-large .scripture-label,
+.md-preview .bible-label-xlarge .scripture-label {
+  font-size: 0.15vw !important;
+}
+
+.sm-preview .bible-label-large .scripture-label,
+.sm-preview .bible-label-xlarge .scripture-label {
+  font-size: 0.075vw !important;
 }
