@@ -94,7 +94,9 @@
         </UButton>
       </div>
       <div class="no-screens" v-if="!externalScreens?.length">
-        <div class="text-center max-w-[150px] mx-auto mt-[5%]">
+        <div
+          class="text-center flex flex-col items-center justify-center max-w-[150px] mx-auto mt-[5%]"
+        >
           <IconWrapper name="i-lucide-monitor-x" size="7" class="pb-2" />
           <div class="text-sm">No external screens detected</div>
         </div>
@@ -142,6 +144,8 @@
                   height: screen.height,
                   availWidth: screen.availWidth,
                   availHeight: screen.availHeight,
+                  availLeft: screen.availLeft,
+                  availTop: screen.availTop,
                   isExtended: screen.isExtended,
                   isInternal: screen.isInternal,
                   devicePixelRatio: screen.devicePixelRatio,

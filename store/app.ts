@@ -105,7 +105,9 @@ export const useAppStore = defineStore("app", {
             windowPadding: { left: 24, right: 24, top: 24, bottom: 24 },
             lettercase: "",
             lineSpacing: "normal",
-            fontSizePercent: 100
+            fontSizePercent: 100,
+            textOutlined: false,
+            textBold: false
           },
           bibleVersions: [], // Check app.vue for bible versions array in a list
           alertLimit: 5,

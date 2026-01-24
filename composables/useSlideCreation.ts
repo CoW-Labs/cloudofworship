@@ -54,6 +54,8 @@ export default function useSlideCreation() {
         lettercase: appStore.currentState.settings.slideStyles.lettercase,
         lineSpacing: appStore.currentState.settings.slideStyles.lineSpacing,
         textOutlined: appStore.currentState.settings.slideStyles.textOutlined,
+        textBold: appStore.currentState.settings.slideStyles.textBold,
+        backgroundFillType: appStore.currentState.settings.slideStyles.backgroundFillType
       },
     }
     return tempSlide
@@ -224,10 +226,6 @@ export default function useSlideCreation() {
     const randomImage =
       "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740"
     tempSlide.type = slideTypes.media
-    tempSlide.slideStyle = {
-      ...tempSlide.slideStyle,
-      backgroundFillType: backgroundFillTypes.crop,
-    }
 
     // Handle external videos (YouTube/Vimeo)
     if (file.isExternal) {

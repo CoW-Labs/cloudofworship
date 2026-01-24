@@ -3,6 +3,7 @@
     v-if="slide?.layout === slideLayoutTypes.heading_sub"
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
+      'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
@@ -23,6 +24,7 @@
     v-else-if="slide?.layout === slideLayoutTypes.full_text"
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
+      'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
@@ -43,6 +45,7 @@
     class="slide-layout-ctn flex gap-4 h-[100%] justify-around items-center rounded-md px-12"
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
+      'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
@@ -62,6 +65,7 @@
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
+      'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
@@ -85,6 +89,7 @@
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
+      'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',

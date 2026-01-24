@@ -465,8 +465,15 @@ body {
   text-shadow: -4px -4px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000,
     -4px 2px 0 #000;
 }
+.bold-live-content > .slide-layout-ctn > div:nth-child(1),
+.bold-live-content > .slide-layout-ctn > div:nth-child(1) > p,
+.bold-live-content > div:nth-child(1) > .tiptap,
+.bold-live-content > div:nth-child(1) > .tiptap > p {
+  font-weight: 850;
+}
 .uppercase-live-content > .slide-layout-ctn > div:nth-child(1),
-.uppercase-live-content > div:nth-child(1) > .tiptap {
+.uppercase-live-content > div:nth-child(1) > .tiptap,
+.uppercase-live-content > div:nth-child(1) > .tiptap > p {
   text-transform: uppercase;
 }
 .double-line-spacing > .slide-layout-ctn > div:nth-child(1),

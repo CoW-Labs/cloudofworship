@@ -32,7 +32,9 @@
         v-model="liveOutputSlides"
         group="slides"
         class="slides-ctn h-[calc(100vh-80px-220px-80px)] overflow-auto mb-4 overflow-x-hidden"
-        item-key="name"
+        item-key="id"
+        :animation="200"
+        ghost-class="opacity-50"
       >
         <!-- SLIDE CARD (DUPLICATED FROM THE SLIDECARD.VUE, TO MAKE DRAGGABLE WORK AS IT COULD NOT WORK IN COMPONENT) -->
         <template #item="{ element: slide, index }">

@@ -102,6 +102,20 @@
         />
       </UFormGroup>
 
+      <UFormGroup size="lg" label="Speed">
+        <div class="flex items-center gap-3 px-2">
+          <span class="text-xs whitespace-nowrap">Slow</span>
+          <URange
+            v-model="speed"
+            :min="0.5"
+            :max="5"
+            :step="0.25"
+            class="flex-1"
+          />
+          <span class="text-xs whitespace-nowrap">Fast</span>
+        </div>
+      </UFormGroup>
+
       <UButton
         block
         trailing-icon="i-bx-send"
@@ -132,6 +146,7 @@ const alertsRef = ref<HTMLDivElement>()
 const content = ref<string>("")
 const position = ref<string>("Bottom")
 const bgColor = ref<string>("#a855f7")
+const speed = ref<number>(1)
 const toast = useToast()
 const emit = defineEmits(["go-home"])
 
@@ -175,6 +190,7 @@ const addAlert = async () => {
       style: `${position.value.toLowerCase()}-0`,
       icon: "i-bx-info-circle",
       background: bgColor.value,
+      speed: speed.value,
     }
     appStore.setAlerts([...currentState.value?.alerts, alert])
     appStore.setActiveAlert(alert)
