@@ -177,6 +177,7 @@ const db = useIndexedDB()
 const appInfo = ref<AppSettings>()
 const { refreshLibrary } = useLibrary()
 const { fetchPlans } = useSubscriptionPlans()
+const { fetchUserSettings } = useUserSettings()
 
 const { currentState } = storeToRefs(appStore)
 
@@ -978,6 +979,11 @@ onMounted(() => {
   fetchActiveAdvert()
   if (location.hostname !== "localhost") {
     useGtag()
+  }
+
+  // Fetch user settings after essential resources are loaded
+  if (isAppOnline.value && authStore.user?._id) {
+    fetchUserSettings()
   }
 })
 

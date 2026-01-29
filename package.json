@@ -51,6 +51,7 @@
     "pinia-shared-state": "^1.0.1",
     "posthog-js": "^1.239.0",
     "rxjs": "^7.8.1",
+    "socket.io-client": "^4.8.3",
     "timeago.js": "^4.0.2",
     "vite-plugin-pwa": "^1.2.0",
     "vue": "^3.4.27",

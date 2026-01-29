@@ -24,13 +24,13 @@ import { ref, computed } from "vue"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import type { Slide } from "~/types"
+import type { Socket } from "socket.io-client"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const toast = useToast()
-const socket = ref<WebSocket | null>(null)
-const socketInstance = ref<ReturnType<typeof useSocket> | null>(null)
+const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
 const MAX_RETRIES = 10
 let retryCount = 0
 
@@ -89,56 +89,81 @@ const uploadOfflineSlides = useDebounceFn(() => {
   useGlobalEmit(appWideActions.uploadOfflineSlides)
 }, 2000)
 
-const connectWebSocket = async () => {
+const connectSocket = async () => {
   const scheduleId = appStore.currentState.activeSchedule?._id
   if (!scheduleId) return
 
-  socketInstance.value = useSocket({
+  socketInstance.value = useSocketIO({
     scheduleId,
-    onMessage: (data) => {
-      // Handle realtime slide updates
+    onMessage: (event, data) => {
       handleWebSocketMessage(data)
     },
     onConnected: () => {
-      console.log("WebSocket connected for realtime collaboration")
+      // Show toast on reconnection (only if we were previously connected and lost connection)
+      const wasReconnected = socketInstance.value?.isReconnecting?.value === false && 
+        socketInstance.value?.isConnectedRef?.value === true
+      
+      // Check if this is a reconnection after a disconnect
+      if (wasReconnected) {
+        toast.add({
+          title: 'Connection restored',
+          icon: 'i-tabler-wifi',
+          color: 'green',
+          timeout: 3000,
+        })
+      }
     },
     onDisconnected: () => {
-      console.log("WebSocket disconnected")
+      // Optionally show disconnect notification
     },
     onOnlineUsersChanged: (users) => {
       updateOnlineUsers(users)
       appStore.setOnlineUsers(users)
     },
+    onUserJoined: (user) => {
+      appStore.triggerUserJoinedAnimation(user)
+    },
   })
 
-  const ws = socketInstance.value.connect()
-  if (ws) {
-    socket.value = ws
-  }
+  socketInstance.value.connect()
+  
+  // Watch for reconnection state changes to show toast
+  watch(
+    () => socketInstance.value?.isConnectedRef?.value,
+    (isConnected, wasConnected) => {
+      if (isConnected && wasConnected === false) {
+        toast.add({
+          title: 'Connection restored',
+          icon: 'i-tabler-wifi',
+          color: 'green',
+          timeout: 3000,
+        })
+      } else if (!isConnected && wasConnected === true) {
+        toast.add({
+          title: 'Connection lost. Reconnecting...',
+          icon: 'i-tabler-wifi-off',
+          color: 'yellow',
+          timeout: 3000,
+        })
+      }
+    }
+  )
 }
 
-const disconnectWebSocket = () => {
+const disconnectSocket = () => {
   socketInstance.value?.disconnect()
-  socket.value = null
   cleanupRealtimeSlides()
   appStore.setOnlineUsers([])
 }
 
-const sendLiveSlideToWebsocket = (slide: Slide) => {
-  if (
-    socket.value?.readyState === WebSocket.CLOSED ||
-    socket.value?.readyState === WebSocket.CLOSING
-  ) {
-    console.error("Error sending live slide to websocket", "WebSocket closed")
-    // socket.value.close() // Close on error to trigger the onclose event
-    // connectWebSocket()
-  } else {
-    socket.value?.send(
-      JSON.stringify({
-        action: "live-slide",
-        data: slide,
-      })
+const sendLiveSlideToSocket = (slide: Slide) => {
+  if (!socketInstance.value?.isConnected()) {
+    console.error(
+      "Error sending live slide to socket",
+      "Socket.IO not connected"
     )
+  } else {
+    socketInstance.value.sendLiveSlide(slide)
   }
 }
 
@@ -149,7 +174,7 @@ watch(
       (slide) => slide.id === liveSlideId
     )
     if (liveSlide) {
-      sendLiveSlideToWebsocket(liveSlide)
+      sendLiveSlideToSocket(liveSlide)
     }
   },
   { deep: true }
@@ -243,20 +268,20 @@ onMounted(async () => {
     }
   )
 
-  // Connect to websocket
+  // Connect to Socket.IO
   if (appStore.currentState.activeSchedule) {
-    connectWebSocket()
+    connectSocket()
   }
 })
 
-// Watch for schedule changes to reconnect WebSocket
+// Watch for schedule changes to reconnect Socket
 watch(
   () => appStore.currentState.activeSchedule?._id,
   (newScheduleId, oldScheduleId) => {
     if (newScheduleId && newScheduleId !== oldScheduleId) {
-      disconnectWebSocket()
+      disconnectSocket()
       setTimeout(() => {
-        connectWebSocket()
+        connectSocket()
       }, 500)
     }
   }
@@ -264,15 +289,12 @@ watch(
 
 // Cleanup on unmount
 onBeforeUnmount(() => {
-  disconnectWebSocket()
+  disconnectSocket()
 })
 
 emitter.on("refresh-slides", () => {
-  if (
-    socket.value?.readyState === WebSocket.CLOSED ||
-    socket.value?.readyState === WebSocket.CLOSING
-  ) {
-    connectWebSocket()
+  if (!socketInstance.value?.isConnected()) {
+    connectSocket()
   }
 })
 </script>

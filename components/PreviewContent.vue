@@ -114,7 +114,7 @@ import type {
   ExtendedFileT,
 } from "~/types"
 import { appWideActions } from "~/utils/constants"
-import { tabSessionId } from '~/composables/useRealtimeSlides'
+import { tabSessionId } from "~/composables/useRealtimeSlides"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -149,7 +149,7 @@ const { gotoVerse, gotoChorus: gotoChorusNav } = useSlideNavigation()
 const online = useOnline()
 
 /**
- * Send slide update via WebSocket for realtime collaboration
+ * Send slide update via Socket.IO for realtime collaboration
  * Only sends when online. Includes tabId to allow same user on different tabs/devices to receive updates
  */
 const broadcastSlideUpdate = (action: string, data: any) => {
@@ -157,10 +157,17 @@ const broadcastSlideUpdate = (action: string, data: any) => {
   if (!online.value) return
 
   const nuxtApp = useNuxtApp()
-  const socket = nuxtApp.$socket as WebSocket
-  if (socket?.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ action, data: { ...data, tabId: tabSessionId } }))
+  const socket = nuxtApp.$socketio as any
+  if (socket?.connected) {
+    socket.emit(action, { ...data, tabId: tabSessionId })
   }
+}
+
+/**
+ * Broadcast a single slide creation for immediate real-time feedback
+ */
+const broadcastSlideCreated = (slide: any) => {
+  broadcastSlideUpdate("create-slide", slide)
 }
 
 /**
@@ -237,6 +244,8 @@ emitter.on("new-text", (slide: Slide[]) => {
   }
   slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  // Broadcast slide creation immediately for real-time sync
+  broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
 })
 
@@ -251,6 +260,8 @@ emitter.on("new-bible", async (data: string) => {
         newlyCreated: true,
       })
       appStore.setRecentBibleSearches(data)
+      // Broadcast slide creation immediately for real-time sync
+      broadcastSlideCreated(newSlide)
       uploadOfflineSlides()
     }
   }
@@ -266,6 +277,8 @@ emitter.on("new-bible-whole-search", async (data: string) => {
       newlyCreated: true,
     })
     appStore.setRecentBibleSearches(data)
+    // Broadcast slide creation immediately for real-time sync
+    broadcastSlideCreated(newSlide)
     uploadOfflineSlides()
   }
 })
@@ -276,6 +289,8 @@ emitter.on("new-hymn", async (data: string) => {
     const newSlide = createHymnSlide(hymn)
     slides.value?.push(newSlide)
     makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    // Broadcast slide creation immediately for real-time sync
+    broadcastSlideCreated(newSlide)
     uploadOfflineSlides()
   }
 })
@@ -289,6 +304,8 @@ emitter.on("new-song", async (data: Song) => {
       makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
       // Save song to Library if it is added to schedule
       saveSlide(newSlide)
+      // Broadcast slide creation immediately for real-time sync
+      broadcastSlideCreated(newSlide)
       uploadOfflineSlides()
     }
   }
@@ -323,6 +340,10 @@ emitter.on("new-media", async (data: ExtendedFileT[]) => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
     appStore.setActiveSlides(updatedSlides)
+    // Broadcast batch slide creation for real-time sync
+    if (newSlides && newSlides.length > 0) {
+      broadcastSlideUpdate("batch-create-slides", { slides: newSlides })
+    }
     uploadOfflineSlides()
   }
 })
@@ -351,6 +372,8 @@ emitter.on("new-countdown", (data: Countdown) => {
     } else {
       makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
     }
+    // Broadcast slide creation immediately for real-time sync
+    broadcastSlideCreated(newSlide)
     uploadOfflineSlides()
   }
 })
