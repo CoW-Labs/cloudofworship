@@ -211,7 +211,10 @@ export const useSocketIO = (options: SocketIOOptions) => {
       socket = io(getSocketUrl(), {
         path: '/socket.io/',
         query: getConnectionQuery(),
-        transports: ['websocket', 'polling'],
+        // Start with polling first (more reliable behind proxies/load balancers)
+        // then upgrade to websocket
+        transports: ['polling', 'websocket'],
+        upgrade: true,
         timeout: connectionTimeout,
         reconnection: true,
         reconnectionAttempts: maxRetries,
@@ -219,6 +222,8 @@ export const useSocketIO = (options: SocketIOOptions) => {
         reconnectionDelayMax: maxRetryDelay,
         autoConnect: true,
         forceNew: true,
+        // Increase timeouts for production environments with proxies
+        rememberUpgrade: true,
       })
 
       // Provide socket to Nuxt app
@@ -270,8 +275,14 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMaxRetriesReached?.()
       })
 
-      socket.on('connect_error', (error) => {
-        console.error('Socket.IO connection error:', error)
+      socket.on('connect_error', (error: any) => {
+        console.error('Socket.IO connection error:', error.message)
+        console.error('Socket.IO error details:', {
+          type: error?.type,
+          description: error?.description,
+          context: error?.context,
+          transport: socket?.io?.engine?.transport?.name,
+        })
         isConnectedRef.value = false
         onError?.(error)
 
