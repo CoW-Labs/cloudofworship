@@ -125,7 +125,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
 import type { Slide } from "~/types"
-import { tabSessionId } from '~/composables/useRealtimeSlides'
+import { tabSessionId } from "~/composables/useRealtimeSlides"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -137,22 +137,19 @@ const windowRefs = inject("windowRefs") as any[]
 const online = useOnline()
 
 /**
- * Broadcast slide reorder via WebSocket for realtime collaboration
+ * Broadcast slide reorder via Socket.IO for realtime collaboration
  */
 const broadcastSlideReorder = (slideOrder: string[]) => {
   if (!online.value) return
 
   const nuxtApp = useNuxtApp()
-  const socket = nuxtApp.$socket as WebSocket
-  if (socket?.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({
-      action: 'reorder-slides',
-      data: {
-        slideOrder,
-        reorderedByName: authStore.user?.fullname || 'Anonymous',
-        tabId: tabSessionId,
-      },
-    }))
+  const socket = nuxtApp.$socketio as any
+  if (socket?.connected) {
+    socket.emit("reorder-slides", {
+      slideOrder,
+      reorderedByName: authStore.user?.fullname || "Anonymous",
+      tabId: tabSessionId,
+    })
   }
 }
 
@@ -182,7 +179,7 @@ const liveOutputSlides = computed({
       return slide
     })
     useGlobalEmit(appWideActions.batchUpdateSlides, tempSlides)
-    
+
     // Broadcast the reorder to other tabs/devices
     const slideOrder = tempSlides.map((slide) => slide.id)
     broadcastSlideReorder(slideOrder)

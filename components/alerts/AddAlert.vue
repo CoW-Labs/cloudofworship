@@ -205,22 +205,17 @@ const addAlert = async () => {
 }
 
 const sendAlertToWebsocket = (alert: Alert) => {
-  const socket = useNuxtApp().$socket as WebSocket
-  socket.send(
-    JSON.stringify({
-      action: "add-alert",
-      data: alert,
-    })
-  )
+  const socket = useNuxtApp().$socketio as any
+  if (socket?.connected) {
+    socket.emit("add-alert", alert)
+  }
 }
 
 const removeAlertFromWebsocket = () => {
-  const socket = useNuxtApp().$socket as WebSocket
-  socket.send(
-    JSON.stringify({
-      action: "remove-alert",
-    })
-  )
+  const socket = useNuxtApp().$socketio as any
+  if (socket?.connected) {
+    socket.emit("remove-alert", {})
+  }
 }
 </script>
 

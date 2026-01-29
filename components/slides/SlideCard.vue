@@ -33,13 +33,27 @@
         <SlideChip :slide-type="slide?.type" class="mt-1" dark-mode />
       </div>
       
-      <!-- Editing indicator -->
+      <!-- Editing indicator - avatar circle -->
       <div
         v-if="editingBy"
-        class="absolute bottom-2 left-2 flex items-center gap-1 bg-amber-500/90 text-white text-xs px-2 py-0.5 rounded-full"
+        class="absolute bottom-2 left-2 group/editing"
       >
-        <UIcon name="i-tabler-pencil" class="w-3 h-3 animate-pulse" />
-        <span class="truncate max-w-[80px]">{{ editingBy }}</span>
+        <UTooltip :text="`${editingBy.userName} is editing`" :popper="{ placement: 'top' }">
+          <div
+            class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow-lg animate-pulse"
+            :style="{ 
+              backgroundColor: editingBy.theme || '#f59e0b',
+            }"
+          >
+            <img 
+              v-if="editingBy.avatar" 
+              :src="editingBy.avatar" 
+              :alt="editingBy.userName"
+              class="w-full h-full rounded-full object-cover"
+            />
+            <span v-else>{{ editingBy.userName?.charAt(0)?.toUpperCase() || '?' }}</span>
+          </div>
+        </UTooltip>
       </div>
     </button>
 
@@ -178,7 +192,7 @@ const props = defineProps<{
   selected: boolean
   selectable: boolean
   checkboxSelected: boolean
-  editingBy?: string // Name of user currently editing this slide
+  editingBy?: { userId: string; userName: string; avatar?: string; theme?: string } | null // User currently editing this slide
 }>()
 
 const emit = defineEmits([

@@ -1,7 +1,8 @@
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
-import type { OnlineUser, SlideEditLock } from "./useSocket"
+import type { OnlineUser, SlideEditLock } from "./useSocketIO"
+import type { Socket } from "socket.io-client"
 
 interface RealtimeSlidesOptions {
   onSlideCreated?: (slide: Slide, createdByName: string) => void
@@ -217,7 +218,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         // Handle slide reorder from other tabs/devices
         if (data.slideOrder && Array.isArray(data.slideOrder)) {
           const reorderedSlides = data.slideOrder
-            .map((slideId: string) => 
+            .map((slideId: string) =>
               appStore.currentState.activeSlides.find((s) => s.id === slideId)
             )
             .filter((s: Slide | undefined): s is Slide => s !== undefined)
@@ -331,12 +332,9 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     lockRefreshInterval = setInterval(() => {
       if (currentLockedSlideId.value) {
         const nuxtApp = useNuxtApp()
-        const socket = nuxtApp.$socket as WebSocket
-        if (socket?.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({
-            action: 'refresh-lock',
-            data: { slideId: currentLockedSlideId.value },
-          }))
+        const socket = nuxtApp.$socketio as Socket
+        if (socket?.connected) {
+          socket.emit('refresh-lock', { slideId: currentLockedSlideId.value })
         }
       }
     }, 15000) // Refresh every 15 seconds
@@ -358,12 +356,9 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const releaseCurrentLock = () => {
     if (currentLockedSlideId.value) {
       const nuxtApp = useNuxtApp()
-      const socket = nuxtApp.$socket as WebSocket
-      if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({
-          action: 'unlock-slide',
-          data: { slideId: currentLockedSlideId.value },
-        }))
+      const socket = nuxtApp.$socketio as Socket
+      if (socket?.connected) {
+        socket.emit('unlock-slide', { slideId: currentLockedSlideId.value })
       }
       currentLockedSlideId.value = null
       stopLockRefresh()

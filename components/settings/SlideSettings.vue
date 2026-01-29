@@ -671,25 +671,20 @@ const getActivePaddingValue = (side: string) => {
 }
 
 const removeOverlayFromWebsocket = () => {
-  const socket = useNuxtApp().$socket as WebSocket
-  socket.send(
-    JSON.stringify({
-      action: "remove-overlay",
-    })
-  )
+  const socket = useNuxtApp().$socketio as any
+  if (socket?.connected) {
+    socket.emit("remove-overlay", {})
+  }
 }
 
 const sendOverlayToWebsocket = (overlay: string) => {
   if (!overlay) {
     return removeOverlayFromWebsocket()
   }
-  const socket = useNuxtApp().$socket as WebSocket
-  socket.send(
-    JSON.stringify({
-      action: "add-overlay",
-      data: overlay,
-    })
-  )
+  const socket = useNuxtApp().$socketio as any
+  if (socket?.connected) {
+    socket.emit("add-overlay", overlay)
+  }
 }
 
 const selectUI = {

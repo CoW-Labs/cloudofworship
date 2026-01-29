@@ -77,38 +77,40 @@
             </template>
             <div class="flex items-center gap-1 mr-2">
               <div class="flex -space-x-2">
-                <div
-                  class="relative h-8 w-8 grid place-items-center transition-all duration-200 ease-out hover:z-50 hover:translate-x-1"
-                  v-for="(user, index) in displayOnlineUsers"
-                  :key="user.userId"
-                  :style="{
-                    zIndex: displayOnlineUsers.length - index,
-                  }"
-                >
-                  <UAvatar
-                    :src="user.avatar"
-                    :alt="user.userName"
-                    :text="
-                      !user.avatar
-                        ? user.userName?.charAt(0)?.toUpperCase()
-                        : undefined
-                    "
-                    size="sm"
-                    class="ring-2 transition-all duration-200 cursor-pointer hover:scale-110"
-                    :class="{ 'grayscale opacity-50': !online }"
+                <TransitionGroup name="user-joined">
+                  <div
+                    class="relative h-8 w-8 grid place-items-center transition-all duration-200 ease-out hover:z-50 hover:translate-x-1"
+                    v-for="(user, index) in displayOnlineUsers"
+                    :key="user.userId"
                     :style="{
-                      '--tw-ring-color': user?.theme || '#6366f1',
-                      backgroundColor: user?.theme || '#6366f1',
-                      color: !user.avatar
-                        ? user?.theme || '#6366f1'
-                        : undefined,
+                      zIndex: displayOnlineUsers.length - index,
                     }"
-                  />
-                  <span
-                    v-if="online"
-                    class="animate-ping absolute inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75"
-                  ></span>
-                </div>
+                  >
+                    <UAvatar
+                      :src="user.avatar"
+                      :alt="user.userName"
+                      :text="
+                        !user.avatar
+                          ? user.userName?.charAt(0)?.toUpperCase()
+                          : undefined
+                      "
+                      size="sm"
+                      class="ring-2 transition-all duration-200 cursor-pointer hover:scale-110"
+                      :class="{ 'grayscale opacity-50': !online }"
+                      :style="{
+                        '--tw-ring-color': user?.theme || '#6366f1',
+                        backgroundColor: user?.theme || '#6366f1',
+                        color: !user.avatar
+                          ? user?.theme || '#6366f1'
+                          : undefined,
+                      }"
+                    />
+                    <span
+                      v-if="online"
+                      class="animate-ping absolute inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75"
+                    ></span>
+                  </div>
+                </TransitionGroup>
               </div>
               <span
                 v-if="onlineUsersExcludingSelf.length > 3"
@@ -201,6 +203,7 @@ import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
+
 const route = useRoute()
 const settingsModalOpen = ref(false)
 const settingsPage = ref("")
@@ -310,4 +313,66 @@ emitter?.on("toggle-dark-mode", () => {
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+/* User joined popup zoom-in animation */
+.user-joined-enter-active {
+  animation: zoom-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.user-joined-leave-active {
+  animation: zoom-out 0.2s ease-out;
+}
+
+@keyframes zoom-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes zoom-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8) translateY(-10px);
+  }
+}
+
+/* Avatar zoom-in animation for the avatar list */
+.avatar-zoom-enter-active {
+  animation: avatar-zoom-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.avatar-zoom-leave-active {
+  animation: avatar-zoom-out 0.2s ease-out;
+}
+
+@keyframes avatar-zoom-in {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes avatar-zoom-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+</style>

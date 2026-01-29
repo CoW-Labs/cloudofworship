@@ -567,6 +567,13 @@ export const useAppStore = defineStore("app", {
     clearAllSlidesBeingEdited() {
       this.currentState.slidesBeingEdited = {}
     },
+    triggerUserJoinedAnimation(user: OnlineUser) {
+      const nuxtApp = useNuxtApp()
+      const emitter = nuxtApp.$emitter as any
+      if (emitter) {
+        emitter.emit('user-joined-animation', user)
+      }
+    },
     // Update a specific slide in the active slides array (for realtime updates)
     updateSlideInActiveSlides(updatedSlide: Slide) {
       const slideIndex = this.currentState.activeSlides.findIndex(

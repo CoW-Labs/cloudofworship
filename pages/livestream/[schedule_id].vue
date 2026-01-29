@@ -261,19 +261,22 @@ const handleWebSocketMessage = (parsedData: any) => {
     case "live-slide":
       const tempSlide = updateBlobBackgroundURl({ ...data })
       liveSlide.value = { ...tempSlide }
-      console.log('🎯 Live slide changed:', tempSlide.name || tempSlide.title)
       break
     case "new-slide":
-      // Do nothing for now as live-slide covers it
+    case "slide-created":
+      // New slide created in real-time
       break
     case "update-slide":
+    case "slide-updated":
       // Update the livestream slide when any edit is made to the current live slide
       // This ensures real-time updates for content changes, not just live slide selections
-      if (liveSlide.value?.id === data.id || liveSlide.value?.id === data.slideId) {
+      if (
+        liveSlide.value?.id === data.id ||
+        liveSlide.value?.id === data.slideId
+      ) {
         // Create a new object to trigger Vue reactivity
         const slideData = updateBlobBackgroundURl({ ...data })
         liveSlide.value = { ...slideData }
-        console.log('🔄 Livestream slide updated:', slideData.name || slideData.title)
       }
       break
     case "add-alert":
@@ -295,25 +298,22 @@ const handleWebSocketMessage = (parsedData: any) => {
   }
 }
 
-const socketManager = useSocket({
+const socketManager = useSocketIO({
   scheduleId: route.params.schedule_id as string,
   maxRetries: 30,
-  baseRetryDelay: 3000,
+  baseRetryDelay: 1000,
   maxRetryDelay: 30000,
   connectionTimeout: 10000,
-  heartbeatInterval: 30000,
-  onMessage: handleWebSocketMessage,
+  onMessage: (event, data) => handleWebSocketMessage(data),
   onConnected: () => {
-    console.log("✅ WebSocket connected successfully")
     connectionStatus.value = "connected"
     showConnectionError.value = false
   },
   onDisconnected: () => {
-    console.log("⚠️ WebSocket disconnected")
     connectionStatus.value = "disconnected"
   },
   onError: (error) => {
-    console.error("❌ WebSocket error:", error)
+    console.error("❌ Socket error:", error)
     connectionStatus.value = "disconnected"
   },
   onMaxRetriesReached: () => {
@@ -331,7 +331,7 @@ onBeforeMount(async () => {
   downloadStep.value = 5
   downloadResource.value = "All resources downloaded."
 
-  // Connect to websocket
+  // Connect to Socket.IO
   socketManager.connect()
 
   setTimeout(() => {
@@ -340,7 +340,7 @@ onBeforeMount(async () => {
 })
 
 onBeforeUnmount(() => {
-  // Clean up WebSocket connection
+  // Clean up Socket.IO connection
   socketManager.disconnect()
 
   // Clean up fullscreen event listeners
