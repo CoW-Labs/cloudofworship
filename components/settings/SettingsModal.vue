@@ -84,11 +84,15 @@
 </template>
 
 <script setup lang="ts">
+import { useAppStore } from "~/store/app"
+
 const props = defineProps<{
   isOpen: boolean
   page: string
 }>()
 
+const appStore = useAppStore()
+const { fetchUserSettings, debouncedSaveSettings } = useUserSettings()
 const settingsModalOpen = ref(props.isOpen)
 const tabs = [
   { name: "Account/Profile Settings", active: false },
@@ -104,11 +108,26 @@ const activeTab = ref(props.page || "Slide Settings")
 
 watch(
   () => props.isOpen,
-  () => {
+  async () => {
     settingsModalOpen.value = props.isOpen
     if (props.isOpen) {
       activeTab.value = props.page || "Slide Settings"
+
+      // Fetch latest user settings when modal opens
+      await fetchUserSettings()
     }
   }
+)
+
+// Watch for changes in settings and auto-save
+watch(
+  () => appStore.currentState.settings,
+  (newSettings) => {
+    if (settingsModalOpen.value) {
+      // Debounced auto-save when settings change
+      debouncedSaveSettings(newSettings)
+    }
+  },
+  { deep: true }
 )
 </script>
