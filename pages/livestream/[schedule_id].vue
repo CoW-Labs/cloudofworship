@@ -323,6 +323,28 @@ const socketManager = useSocketIO({
   },
 })
 
+// Watch for reactive connection state changes for seamless reconnection
+watch(
+  () => socketManager.isConnectedRef?.value,
+  (isConnected) => {
+    if (isConnected) {
+      connectionStatus.value = "connected"
+      showConnectionError.value = false
+    } else if (socketManager.isReconnecting?.value) {
+      connectionStatus.value = "disconnected"
+    }
+  }
+)
+
+watch(
+  () => socketManager.isReconnecting?.value,
+  (isReconnecting) => {
+    if (isReconnecting && !socketManager.isConnectedRef?.value) {
+      connectionStatus.value = "disconnected"
+    }
+  }
+)
+
 onBeforeMount(async () => {
   await saveAllBackgroundVideos()
   await setCachedVideosURL()

@@ -1,7 +1,7 @@
 import { io, Socket } from "socket.io-client"
-import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { useOnline } from "@vueuse/core"
+import { watch, onUnmounted, ref } from "vue"
 
 interface SocketIOOptions {
   scheduleId: string
@@ -60,9 +60,62 @@ export const useSocketIO = (options: SocketIOOptions) => {
   let retryCount = 0
   let reconnectTimer: NodeJS.Timeout | null = null
   let isIntentionallyClosed = false
+  let hasBeenConnected = false
+
+  // Connection state for reactivity
+  const isConnectedRef = ref(false)
+  const isReconnecting = ref(false)
 
   // Offline message queue
   const messageQueue: Array<{ event: string; data: any }> = []
+
+  // Watch for online status changes
+  const stopOnlineWatcher = watch(
+    () => online.value,
+    (isOnline, wasOnline) => {
+      if (isOnline && !wasOnline) {
+        // Coming back online
+        isReconnecting.value = true
+
+        // Give the network a moment to stabilize
+        setTimeout(() => {
+          if (!isIntentionallyClosed && hasBeenConnected) {
+            if (!socket?.connected) {
+              retryCount = 0 // Reset retry count for fresh reconnection
+              reconnect()
+            } else {
+              flushMessageQueue()
+              isReconnecting.value = false
+            }
+          }
+        }, 500)
+      } else if (!isOnline && wasOnline) {
+        // Going offline
+        isReconnecting.value = true
+      }
+    },
+    { immediate: false }
+  )
+
+  /**
+   * Reconnect the socket after network restoration
+   */
+  const reconnect = () => {
+    if (isIntentionallyClosed) {
+      isReconnecting.value = false
+      return
+    }
+
+    // Close existing socket if any
+    if (socket) {
+      socket.removeAllListeners()
+      socket.disconnect()
+      socket = null
+    }
+
+    // Reconnect
+    connect()
+  }
 
   const getSocketUrl = () => {
     // For Socket.IO, we need just the origin (protocol + host + port)
@@ -140,26 +193,20 @@ export const useSocketIO = (options: SocketIOOptions) => {
 
   const connect = () => {
     if (isIntentionallyClosed) {
-      console.log('Socket.IO is intentionally closed. Skipping connection.')
       return null
     }
 
     if (!online.value) {
-      console.log('Device is offline. Skipping Socket.IO connection.')
       scheduleReconnect()
       return null
     }
 
     if (socket?.connected) {
-      console.log('Socket.IO already connected')
       return socket
     }
 
     try {
       clearTimers()
-
-      console.log(`Connecting to Socket.IO... (Attempt ${retryCount + 1}/${maxRetries})`)
-      console.log('Socket.IO URL:', getSocketUrl())
 
       socket = io(getSocketUrl(), {
         path: '/socket.io/',
@@ -175,21 +222,22 @@ export const useSocketIO = (options: SocketIOOptions) => {
       })
 
       // Provide socket to Nuxt app
-      if (nuxtApp.$socketio) {
-        // Socket already exists, update reference
-      } else {
+      if (!nuxtApp.$socketio) {
         nuxtApp.provide('socketio', socket)
       }
 
       // Connection events
       socket.on('connect', () => {
         retryCount = 0
-        console.log('Socket.IO connected successfully')
+        hasBeenConnected = true
+        isConnectedRef.value = true
+        isReconnecting.value = false
         flushMessageQueue()
       })
 
       socket.on('connected', (data) => {
-        console.log('Socket.IO connection confirmed:', data)
+        isConnectedRef.value = true
+        isReconnecting.value = false
         if (data?.onlineUsers) {
           onOnlineUsersChanged?.(data.onlineUsers)
         }
@@ -197,16 +245,34 @@ export const useSocketIO = (options: SocketIOOptions) => {
       })
 
       socket.on('disconnect', (reason) => {
-        console.log(`Socket.IO disconnected: ${reason}`)
+        isConnectedRef.value = false
         onDisconnected?.()
 
         if (!isIntentionallyClosed && reason !== 'io client disconnect') {
-          // Will auto-reconnect
+          // Will auto-reconnect via Socket.IO's built-in reconnection
+          // or via our online watcher
+          isReconnecting.value = true
         }
+      })
+
+      socket.on('reconnect', (attemptNumber) => {
+        isConnectedRef.value = true
+        isReconnecting.value = false
+        flushMessageQueue()
+      })
+
+      socket.on('reconnect_attempt', (attemptNumber) => {
+        isReconnecting.value = true
+      })
+
+      socket.on('reconnect_failed', () => {
+        isReconnecting.value = false
+        onMaxRetriesReached?.()
       })
 
       socket.on('connect_error', (error) => {
         console.error('Socket.IO connection error:', error)
+        isConnectedRef.value = false
         onError?.(error)
 
         retryCount++
@@ -217,7 +283,6 @@ export const useSocketIO = (options: SocketIOOptions) => {
 
       // User events - instant notifications
       socket.on('user-joined', (data) => {
-        console.log('User joined:', data.userName)
         if (data?.onlineUsers) {
           onOnlineUsersChanged?.(data.onlineUsers)
         }
@@ -233,7 +298,6 @@ export const useSocketIO = (options: SocketIOOptions) => {
       })
 
       socket.on('user-left', (data) => {
-        console.log('User left:', data.userName)
         if (data?.onlineUsers) {
           onOnlineUsersChanged?.(data.onlineUsers)
         }
@@ -243,7 +307,6 @@ export const useSocketIO = (options: SocketIOOptions) => {
 
       // Slide events
       socket.on('slide-created', (data) => {
-        console.log('Slide created by:', data.createdByName)
         onMessage?.('slide-created', { action: 'slide-created', data })
       })
 
@@ -252,12 +315,10 @@ export const useSocketIO = (options: SocketIOOptions) => {
       })
 
       socket.on('slide-deleted', (data) => {
-        console.log('Slide deleted by:', data.deletedByName)
         onMessage?.('slide-deleted', { action: 'slide-deleted', data })
       })
 
       socket.on('slides-batch-created', (data) => {
-        console.log('Batch slides created by:', data.createdByName)
         onMessage?.('slides-batch-created', { action: 'slides-batch-created', data })
       })
 
@@ -266,7 +327,6 @@ export const useSocketIO = (options: SocketIOOptions) => {
       })
 
       socket.on('slides-batch-deleted', (data) => {
-        console.log('Batch slides deleted by:', data.deletedByName)
         onMessage?.('slides-batch-deleted', { action: 'slides-batch-deleted', data })
       })
 
@@ -348,8 +408,6 @@ export const useSocketIO = (options: SocketIOOptions) => {
       return
     }
 
-    console.log(`Scheduling reconnection attempt ${retryCount}/${maxRetries} in ${(delay / 1000).toFixed(1)}s`)
-
     reconnectTimer = setTimeout(() => {
       if (online.value && !isIntentionallyClosed) {
         connect()
@@ -361,14 +419,16 @@ export const useSocketIO = (options: SocketIOOptions) => {
 
   const disconnect = () => {
     isIntentionallyClosed = true
+    isConnectedRef.value = false
+    isReconnecting.value = false
     clearTimers()
+    stopOnlineWatcher() // Stop watching online status
 
     if (socket) {
+      socket.removeAllListeners()
       socket.disconnect()
       socket = null
     }
-
-    console.log('Socket.IO intentionally disconnected')
   }
 
   const emit = (event: string, data: any) => {
@@ -495,9 +555,15 @@ export const useSocketIO = (options: SocketIOOptions) => {
   return {
     connect,
     disconnect,
+    reconnect,
     emit,
     isConnected,
     getSocket,
+
+    // Reactive state
+    isConnectedRef,
+    isReconnecting,
+    online,
 
     // Slide operations
     sendSlideCreated,
