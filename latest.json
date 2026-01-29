@@ -1,15 +1,15 @@
 {
-  "version": "0.40.0-beta",
-  "tag": "v0.40.0-beta",
-  "releaseDate": "2026-01-24T17:42:02Z",
-  "releaseNotes": "- feat: introduced themes for Bible slides\n- Update latest.json for release v0.39.2-beta\n",
+  "version": "0.41.0-beta",
+  "tag": "v0.41.0-beta",
+  "releaseDate": "2026-01-29T10:56:40Z",
+  "releaseNotes": "- feat: App Settings updated to work on all your devices\n- fix: allow graceful connection when network goes out\n- fix: Improved live updates\n- Update latest.json for release v0.40.0-beta\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.40.0-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.41.0-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.40.0-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.41.0-beta/",
       "signature": ""
     }
   }
