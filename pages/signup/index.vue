@@ -242,6 +242,9 @@ const { token } = useAuthToken()
 const authStore = useAuthStore()
 const route = useRoute()
 
+// Initialize UTM tracking
+const { initUTMTracking, getUTMParams } = useUTMParams()
+
 const step = ref(route.query.registerChurch ? 2 : 1)
 const fullName = ref("")
 const email = ref("")
@@ -273,6 +276,9 @@ const getChurch = async () => {
 }
 
 onMounted(() => {
+  // Initialize UTM tracking on page load
+  initUTMTracking(route)
+
   usePosthogCapture("SIGNUP_PAGE_VIEWED", {
     step: route.query.registerChurch ? 2 : 1,
     hasReferral: !!route.query.from_lyrics,
@@ -332,6 +338,9 @@ const signup = async () => {
       hasFullName: !!fullName.value,
     })
 
+    // Get UTM parameters
+    const utmParams = getUTMParams(route)
+
     const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
       "/auth/signup",
       {
@@ -340,6 +349,7 @@ const signup = async () => {
           fullname: fullName.value,
           email: email.value,
           password: password.value,
+          utmParams,
         },
       }
     )
@@ -366,6 +376,7 @@ const signup = async () => {
         userId: data?.value?.data.newUser?._id,
         email: email.value,
         fullName: fullName.value,
+        utmParams,
       })
 
       step.value = 2
@@ -488,11 +499,17 @@ const handleGoogleSignUp = async () => {
     // Get the ID token from Firebase user
     const idToken = await user.getIdToken()
 
+    // Get UTM parameters
+    const utmParams = getUTMParams(route)
+
     const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
       "/auth/signup/google",
       {
         method: "POST",
         headers: { "x-access-token": `Bearer ${idToken}` },
+        body: {
+          utmParams,
+        },
       }
     )
     if (error.value) {
@@ -520,6 +537,7 @@ const handleGoogleSignUp = async () => {
         userId: data?.value?.data.newUser?._id,
         email: user?.email,
         fullName: user?.displayName,
+        utmParams,
       })
 
       step.value = 2

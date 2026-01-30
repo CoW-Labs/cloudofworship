@@ -144,6 +144,7 @@ const passwordInputHover = ref(false)
 const loading = ref(false)
 const googleLoading = ref(false)
 const { token } = useAuthToken()
+const { appVersion } = useAppVersion()
 
 const login = async (event) => {
   event.preventDefault()
@@ -159,6 +160,7 @@ const login = async (event) => {
     body: {
       email: email.value,
       password: password.value,
+      appVersion: appVersion,
     },
   })
 
@@ -252,6 +254,9 @@ const handleGoogleSignIn = async () => {
       {
         method: "POST",
         headers: { "x-access-token": `Bearer ${idToken}` },
+        body: {
+          appVersion: appVersion,
+        },
       }
     )
 
@@ -329,6 +334,9 @@ onMounted(async () => {
         {
           method: "POST",
           headers: { "x-access-token": `Bearer ${idToken}` },
+          body: {
+            appVersion: appVersion,
+          },
         }
       )
 

@@ -134,6 +134,9 @@ const { token } = useAuthToken()
 const authStore = useAuthStore()
 const route = useRoute()
 
+// Initialize UTM tracking
+const { initUTMTracking, getUTMParams } = useUTMParams()
+
 const step = ref(1)
 const fullName = ref("")
 const email = ref("")
@@ -165,6 +168,9 @@ const getChurch = async () => {
 
 // Check for redirect result on mount (for Tauri)
 onMounted(async () => {
+  // Initialize UTM tracking on page load
+  initUTMTracking(route)
+
   // Check for Google auth redirect result first (Tauri only)
   if (isTauri) {
     loading.value = true
@@ -178,6 +184,9 @@ onMounted(async () => {
       // Get the ID token from Firebase user
       const idToken = await user.getIdToken()
 
+      // Get UTM parameters
+      const utmParams = getUTMParams(route)
+
       const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
         "/auth/signup/google",
         {
@@ -185,6 +194,7 @@ onMounted(async () => {
           headers: { "x-access-token": `Bearer ${idToken}` },
           body: {
             churchId: churchIdParam,
+            utmParams,
           },
         }
       )
@@ -239,6 +249,10 @@ getChurch()
 const signup = async () => {
   const churchId = route.params.church_id.toString()
   loading.value = true
+
+  // Get UTM parameters
+  const utmParams = getUTMParams(route)
+
   const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
     "/auth/signup/teammate",
     {
@@ -248,6 +262,7 @@ const signup = async () => {
         email: email.value,
         password: password.value,
         churchId,
+        utmParams,
       },
     }
   )
@@ -285,6 +300,9 @@ const handleGoogleSignUp = async () => {
     // Get the ID token from Firebase user
     const idToken = await user.getIdToken()
 
+    // Get UTM parameters
+    const utmParams = getUTMParams(route)
+
     const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
       "/auth/signup/google",
       {
@@ -292,6 +310,7 @@ const handleGoogleSignUp = async () => {
         headers: { "x-access-token": `Bearer ${idToken}` },
         body: {
           churchId,
+          utmParams,
         },
       }
     )
