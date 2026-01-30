@@ -1,8 +1,10 @@
 import posthog from "posthog-js"
 import { useAuthStore } from "~/store/auth"
+import { useAppStore } from "~/store/app"
 
 export default defineNuxtPlugin((nuxtApp) => {
   const auth = useAuthStore()
+  const appStore = useAppStore()
 
   if (
     !window.location.host.includes("127.0.0.1") &&
@@ -18,6 +20,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       role: auth.user?.role,
       church: auth.church?.name,
       church_id: auth.church?._id,
+      appVersion: appStore.currentState.settings.appVersion,
     })
     nuxtApp.provide("posthog", posthog)
   }
