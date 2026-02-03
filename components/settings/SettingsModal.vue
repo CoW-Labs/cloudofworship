@@ -122,10 +122,11 @@ watch(
 // Watch for changes in settings and auto-save
 watch(
   () => appStore.currentState.settings,
-  (newSettings) => {
+  () => {
     if (settingsModalOpen.value) {
       // Debounced auto-save when settings change
-      debouncedSaveSettings(newSettings)
+      // Don't pass settings parameter to ensure we always get the latest from store
+      debouncedSaveSettings()
     }
   },
   { deep: true }
