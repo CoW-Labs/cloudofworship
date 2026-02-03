@@ -191,6 +191,49 @@ watch(
   }
 )
 
+watch(
+  () => props.slide?.contents,
+  (newVal, oldVal) => {
+    // Only update if the slide ID hasn't changed and we have new content
+    if (newVal && oldVal && props.slide?.type === slideTypes.text) {
+      // Check if content actually changed to avoid unnecessary updates
+      const content0Changed = newVal[0] !== oldVal[0]
+      const content1Changed = newVal[1] !== oldVal[1]
+      const content2Changed = newVal[2] !== oldVal[2]
+
+      // Update editors only if content changed and editor is not currently focused
+      // This prevents conflicts when user is actively typing
+      if (content0Changed && !editorOne.value?.isFocused) {
+        editorOne.value?.commands.setContent(newVal[0] || "")
+      }
+      if (content1Changed && !editorTwo.value?.isFocused) {
+        editorTwo.value?.commands.setContent(newVal[1] || "")
+      }
+      if (content2Changed && !editorThree.value?.isFocused) {
+        editorThree.value?.commands.setContent(newVal[2] || "")
+      }
+
+      // Always update uneditable editors for preview
+      if (content0Changed) {
+        uneditableEditorOne.value?.commands.setContent(newVal[0] || "")
+
+        console.log("slide-update")
+      }
+      if (content1Changed) {
+        uneditableEditorTwo.value?.commands.setContent(newVal[1] || "")
+
+        console.log("slide-update")
+      }
+      if (content2Changed) {
+        uneditableEditorThree.value?.commands.setContent(newVal[2] || "")
+
+        console.log("slide-update")
+      }
+    }
+  },
+  { deep: true }
+)
+
 onBeforeUnmount(() => {
   editorOne.value?.destroy()
   editorTwo.value?.destroy()
