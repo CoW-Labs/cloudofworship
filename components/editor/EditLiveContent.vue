@@ -23,22 +23,24 @@
                 dark-mode
               />
               <!-- Editing by indicator -->
-              <UTooltip 
-                v-if="editingBy" 
-                :text="`${editingBy.userName} is editing this slide`" 
+              <UTooltip
+                v-if="editingBy"
+                :text="`${editingBy.userName} is editing this slide`"
                 :popper="{ placement: 'bottom' }"
               >
                 <div
                   class="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow animate-pulse ml-2"
                   :style="{ backgroundColor: editingBy.theme || '#f59e0b' }"
                 >
-                  <img 
-                    v-if="editingBy.avatar" 
-                    :src="editingBy.avatar" 
+                  <img
+                    v-if="editingBy.avatar"
+                    :src="editingBy.avatar"
                     :alt="editingBy.userName"
                     class="w-full h-full rounded-full object-cover"
                   />
-                  <span v-else>{{ editingBy.userName?.charAt(0)?.toUpperCase() || '?' }}</span>
+                  <span v-else>{{
+                    editingBy.userName?.charAt(0)?.toUpperCase() || "?"
+                  }}</span>
                 </div>
               </UTooltip>
             </div>
@@ -360,7 +362,12 @@ import type { ExtendedFileT, Slide, SlideStyle, Song } from "~/types"
 
 const props = defineProps<{
   slide?: Slide
-  editingBy?: { userId: string; userName: string; avatar?: string; theme?: string } | null
+  editingBy?: {
+    userId: string
+    userName: string
+    avatar?: string
+    theme?: string
+  } | null
 }>()
 
 const emit = defineEmits([

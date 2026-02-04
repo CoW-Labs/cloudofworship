@@ -18,9 +18,10 @@ export const useUserSettings = () => {
       loading.value = true
       error.value = null
 
+      // Use unique key with timestamp to prevent caching
       const { data, error: fetchError } = await useAPIFetch('/app-config/user-settings', {
         method: 'GET',
-        key: 'fetch-user-settings',
+        key: `fetch-user-settings-${Date.now()}`,
       })
 
       if (fetchError.value) {
@@ -36,8 +37,30 @@ export const useUserSettings = () => {
         const mappedSettings: Partial<AppSettings> = {
           defaultFont: userSettings.defaultFont,
           defaultBibleVersion: userSettings.defaultBibleVersion,
-          defaultBackground: userSettings.defaultBackground,
-          slideStyles: userSettings.slideStyles,
+          // Deep merge defaultBackground to preserve all nested properties
+          defaultBackground: {
+            default: {
+              ...appStore.currentState.settings.defaultBackground?.default,
+              ...userSettings.defaultBackground?.default,
+            },
+            hymn: {
+              ...appStore.currentState.settings.defaultBackground?.hymn,
+              ...userSettings.defaultBackground?.hymn,
+            },
+            bible: {
+              ...appStore.currentState.settings.defaultBackground?.bible,
+              ...userSettings.defaultBackground?.bible,
+            },
+            text: {
+              ...appStore.currentState.settings.defaultBackground?.text,
+              ...userSettings.defaultBackground?.text,
+            },
+          },
+          // Deep merge slideStyles to preserve all properties
+          slideStyles: {
+            ...appStore.currentState.settings.slideStyles,
+            ...userSettings.slideStyles,
+          },
           bibleVersions: userSettings.bibleVersions || appStore.currentState.settings.bibleVersions,
           animations: userSettings.animations,
           footnotes: userSettings.footnotes,
@@ -80,6 +103,12 @@ export const useUserSettings = () => {
 
       const settingsToSave = settings || appStore.currentState.settings
 
+      console.log('💾 Saving user settings:', {
+        textBold: settingsToSave.slideStyles.textBold,
+        lettercase: settingsToSave.slideStyles.lettercase,
+        textOutlined: settingsToSave.slideStyles.textOutlined,
+      })
+
       // Extract only the fields that should be saved to the backend
       const backendSettings = {
         defaultFont: settingsToSave.defaultFont,
@@ -95,10 +124,13 @@ export const useUserSettings = () => {
         alertLimit: settingsToSave.alertLimit,
       }
 
+      // Use unique key with timestamp to prevent caching
+      const timestamp = Date.now()
+
       // Check if settings already exist by trying to fetch first
       const existingSettings = await useAPIFetch('/app-config/user-settings', {
         method: 'GET',
-        key: 'check-user-settings',
+        key: `check-user-settings-${timestamp}`,
       })
 
       let response
@@ -107,14 +139,14 @@ export const useUserSettings = () => {
         response = await useAPIFetch('/app-config/user-settings', {
           method: 'PUT',
           body: backendSettings,
-          key: 'update-user-settings',
+          key: `update-user-settings-${timestamp}`,
         })
       } else {
         // Create new settings
         response = await useAPIFetch('/app-config/user-settings', {
           method: 'POST',
           body: backendSettings,
-          key: 'create-user-settings',
+          key: `create-user-settings-${timestamp}`,
         })
       }
 
@@ -123,14 +155,6 @@ export const useUserSettings = () => {
       }
 
       console.log('✅ User settings saved successfully')
-
-      toast.add({
-        icon: 'i-bx-check-circle',
-        title: 'Settings saved',
-        description: 'Your preferences have been saved successfully',
-        color: 'green',
-        timeout: 3000,
-      })
 
       return true
     } catch (err: any) {

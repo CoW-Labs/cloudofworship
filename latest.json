@@ -1,15 +1,15 @@
 {
-  "version": "0.41.1-beta",
-  "tag": "v0.41.1-beta",
-  "releaseDate": "2026-01-30T18:24:17Z",
-  "releaseNotes": "- fix: Send app version to remote server\n- chore: utm params tracking\n- chore: error logging for WS connection\n- Update latest.json for release v0.41.0-beta\n",
+  "version": "0.41.3-beta",
+  "tag": "v0.41.3-beta",
+  "releaseDate": "2026-02-03T21:17:46Z",
+  "releaseNotes": "- fix: remote user can update slide and have it show automatically\n- chore: updated app settings\n- Update latest.json for release v0.41.2-beta\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.41.1-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.41.3-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.41.1-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.41.3-beta/",
       "signature": ""
     }
   }

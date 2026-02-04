@@ -134,6 +134,11 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
 
             appStore.currentState.activeSlides.splice(slideIndex, 1, mergedSlide)
             options.onSlideUpdated?.(mergedSlide, data.updatedByName)
+
+            // If slide is live, update the live output
+            if (appStore.currentState.liveSlideId === mergedSlide.id) {
+              useBroadcastPost(JSON.stringify(mergedSlide))
+            }
           }
         }
         break
