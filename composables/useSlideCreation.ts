@@ -190,7 +190,7 @@ export default function useSlideCreation() {
       appStore.currentState.settings.defaultBackground.default?.backgroundType ||
       appStore.currentState.settings.defaultBackground.hymn?.backgroundType
     tempSlide.songId = song._id || song.id
-    tempSlide.title = "Verse 1"
+    tempSlide.title = song.sectionLabels?.[0] || "Verse 1"
 
     const currentSongVerse = song.verses?.[0].trim()
 

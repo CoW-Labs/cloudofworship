@@ -158,6 +158,7 @@ export interface Song {
   cover?: string
   author?: string
   verses?: Array<string>
+  sectionLabels?: Array<string> // Labels for each verse: "Verse 1", "Chorus", "Bridge", etc.
   isPublic?: boolean
   createdBy?: string
   churchId?: string

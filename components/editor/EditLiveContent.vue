@@ -413,6 +413,22 @@ const nextVerse = computed(() => {
       : Number(verse.value?.split(":")?.[1]) + 1
     return `${verse.value?.split(":")?.[0]}:${tempVerse}`
   }
+
+  // For songs with sectionLabels, navigate by section index
+  const song = props.slide?.data as Song | undefined
+  if (song?.sectionLabels?.length) {
+    const currentIndex = song.sectionLabels.findIndex(
+      (label) => label.toLowerCase() === verse.value?.toLowerCase()
+    )
+    if (currentIndex !== -1 && currentIndex < song.sectionLabels.length - 1) {
+      return song.sectionLabels[currentIndex + 1]
+    }
+    // If at end or not found, wrap to first or use numeric fallback
+    if (currentIndex === song.sectionLabels.length - 1) {
+      return song.sectionLabels[0] // Wrap to beginning
+    }
+  }
+  // Fallback to numeric increment for songs without sectionLabels
   return `Verse ${Number(verse.value?.split(" ")?.[1]) + 1}`
 })
 
@@ -423,6 +439,22 @@ const previousVerse = computed(() => {
       : Number(verse.value?.split(":")?.[1]) - 1
     return `${verse.value?.split(":")?.[0]}:${tempVerse < 1 ? 1 : tempVerse}`
   }
+
+  // For songs with sectionLabels, navigate by section index
+  const song = props.slide?.data as Song | undefined
+  if (song?.sectionLabels?.length) {
+    const currentIndex = song.sectionLabels.findIndex(
+      (label) => label.toLowerCase() === verse.value?.toLowerCase()
+    )
+    if (currentIndex > 0) {
+      return song.sectionLabels[currentIndex - 1]
+    }
+    // If at beginning or not found, wrap to last or use numeric fallback
+    if (currentIndex === 0) {
+      return song.sectionLabels[song.sectionLabels.length - 1] // Wrap to end
+    }
+  }
+  // Fallback to numeric decrement for songs without sectionLabels
   return `Verse ${Number(verse.value?.split(" ")?.[1]) - 1}`
 })
 
