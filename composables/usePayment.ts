@@ -129,7 +129,7 @@ export const usePayment = () => {
 
       const reference = generateReference(authStore.user._id)
 
-      // Track payment initiation
+      // Track payment initiation in PostHog
       usePosthogCapture('UPGRADE_BUTTON_CLICKED', {
         plan,
         planCode: planDetails.code,
@@ -137,6 +137,10 @@ export const usePayment = () => {
         currency: planDetails.currency,
         discount: planDetails.discount || 'none',
       })
+
+      // Track payment initiation in backend (for n8n)
+      const { trackPaymentInitiated } = useSendEvent()
+      trackPaymentInitiated(planDetails.code, planDetails.amount, planDetails.currency)
 
       loading.value = true
 
@@ -163,12 +167,16 @@ export const usePayment = () => {
           onClose: function () {
             loading.value = false
 
-            // Track cancellation
+            // Track cancellation in PostHog
             usePosthogCapture('PAYMENT_CANCELLED', {
               plan,
               amount: planDetails.amount,
               currency: planDetails.currency,
             })
+
+            // Track cancellation in backend (for n8n)
+            const { trackPaymentCancelled } = useSendEvent()
+            trackPaymentCancelled(planDetails.code, 'User closed payment modal')
 
             useToast().add({
               icon: 'i-heroicons-information-circle',
