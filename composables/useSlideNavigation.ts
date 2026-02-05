@@ -127,7 +127,7 @@ export default function useSlideNavigation() {
   }
 
   /**
-   * Navigate to a specific song verse
+   * Navigate to a specific song verse by section label or index
    */
   const gotoSongVerse = async (
     slide: Slide,
@@ -139,11 +139,26 @@ export default function useSlideNavigation() {
     )
 
     if (song) {
-      const verseIndex = Number(title?.split(" ")?.[1]) - 1
+      // Try to find by exact section label match first (e.g., "Chorus", "Bridge")
+      let verseIndex = song.sectionLabels?.findIndex(
+        (label) => label.toLowerCase() === title.toLowerCase()
+      ) ?? -1
+
+      // Fallback to numeric index extraction (e.g., "Verse 2" -> index 1)
+      if (verseIndex === -1) {
+        verseIndex = Number(title?.split(" ")?.[1]) - 1
+      }
+
+      // Ensure valid index
+      if (verseIndex < 0 || verseIndex >= (song.verses?.length || 0)) {
+        verseIndex = 0
+      }
+
       const nextVerse = song?.verses?.[verseIndex]?.trim()
 
       if (nextVerse) {
-        tempSlide.title = title
+        // Use the section label if available, otherwise use the provided title
+        tempSlide.title = song.sectionLabels?.[verseIndex] || title
         // Calculate font-size of content
         let fontSize = useScreenFontSize(nextVerse)
         tempSlide.slideStyle = {

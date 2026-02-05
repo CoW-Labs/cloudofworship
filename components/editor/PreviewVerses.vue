@@ -26,14 +26,14 @@
         'bg-primary-300 dark:bg-primary-900':
           slide?.type === slideTypes.bible
             ? `${bibleChapter}:${verseTemp?.verse}` === verse
-            : `Verse ${index + 1}` === verse,
+            : (relatedData?.sectionLabels?.[index] || `Verse ${index + 1}`) === verse,
       }"
       @click="
         $emit(
           'goto-verse',
           slide?.type === slideTypes.bible
             ? `${bibleChapter}:${verseTemp?.verse}`
-            : `Verse ${index + 1}`
+            : relatedData?.sectionLabels?.[index] || `Verse ${index + 1}`
         )
       "
     >
@@ -43,7 +43,7 @@
             ? `${bibleChapter?.substring(bibleChapter?.lastIndexOf(" "))}:${
                 verseTemp?.verse
               }`
-            : `Verse ${index + 1}`
+            : relatedData?.sectionLabels?.[index] || `Verse ${index + 1}`
         }}
       </div>
       <div class="flex-initial w-[100%] text-xs">
