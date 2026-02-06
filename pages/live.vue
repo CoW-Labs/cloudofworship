@@ -181,17 +181,30 @@ onMounted(() => {
   // Initialize the slide display
   initializeLiveSlide()
 
-  useBroadcastMessage(async (data: string) => {
-    const updatedSlide = JSON.parse(data) as Slide
-    mostUpdatedLiveSlide.value = updatedSlide
+  // Store cleanup function to properly dispose of BroadcastChannel
+  const cleanupBroadcast = useBroadcastMessage((data: string) => {
+    // Use requestAnimationFrame to batch visual updates and prevent blocking
+    requestAnimationFrame(() => {
+      try {
+        const updatedSlide = JSON.parse(data) as Slide
+        mostUpdatedLiveSlide.value = updatedSlide
 
-    // Added specific emails for Testing purposes only
-    if (
-      useAuthStore().user?.email === "hello@favourfelix.com" ||
-      useAuthStore().user?.email === "fgc.salvationmedia@gmail.com"
-    ) {
-      console.log("broadcasting data received:", updatedSlide.id)
-    }
+        // Added specific emails for Testing purposes only
+        if (
+          useAuthStore().user?.email === "hello@favourfelix.com" ||
+          useAuthStore().user?.email === "fgc.salvationmedia@gmail.com"
+        ) {
+          console.log("broadcasting data received:", updatedSlide.id)
+        }
+      } catch (error) {
+        console.error("Failed to parse broadcast message:", error)
+      }
+    })
+  })
+
+  // Cleanup on unmount
+  onBeforeUnmount(() => {
+    cleanupBroadcast()
   })
 })
 
