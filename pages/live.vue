@@ -183,23 +183,25 @@ onMounted(() => {
 
   // Store cleanup function to properly dispose of BroadcastChannel
   const cleanupBroadcast = useBroadcastMessage((data: string) => {
-    // Use requestAnimationFrame to batch visual updates and prevent blocking
-    requestAnimationFrame(() => {
-      try {
-        const updatedSlide = JSON.parse(data) as Slide
-        mostUpdatedLiveSlide.value = updatedSlide
+    try {
+      const updatedSlide = JSON.parse(data) as Slide
 
-        // Added specific emails for Testing purposes only
-        if (
-          useAuthStore().user?.email === "hello@favourfelix.com" ||
-          useAuthStore().user?.email === "fgc.salvationmedia@gmail.com"
-        ) {
-          console.log("broadcasting data received:", updatedSlide.id)
-        }
-      } catch (error) {
-        console.error("Failed to parse broadcast message:", error)
+      // Check if this is just a content update within the same slide
+      const isSameSlide = mostUpdatedLiveSlide.value?.id === updatedSlide.id
+
+      if (isSameSlide) {
+        // For same-slide updates (verse changes), update immediately without requestAnimationFrame
+        // This prevents jitter when moving between verses
+        mostUpdatedLiveSlide.value = updatedSlide
+      } else {
+        // For different slides, use requestAnimationFrame to batch visual updates
+        requestAnimationFrame(() => {
+          mostUpdatedLiveSlide.value = updatedSlide
+        })
       }
-    })
+    } catch (error) {
+      console.error("Failed to parse broadcast message:", error)
+    }
   })
 
   // Cleanup on unmount

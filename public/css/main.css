@@ -253,12 +253,20 @@ body {
 
 /* ANIMATIONS */
 .come-up-1 {
-  animation: come-up 0.2s ease-in-out forwards;
-  -webkit-animation: come-up 0.2s ease-in-out forwards;
+  animation: come-up 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  -webkit-animation: come-up 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 .come-up-2 {
-  animation: come-up 0.4s ease-in-out forwards;
-  -webkit-animation: come-up 0.4s ease-in-out forwards;
+  animation: come-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  -webkit-animation: come-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 .no-animations {
   .come-up-1 {
@@ -274,19 +282,19 @@ body {
 @keyframes come-up {
   0% {
     opacity: 0;
-    transform: translateY(10px);
-    -webkit-transform: translateY(10px);
-    -moz-transform: translateY(10px);
-    -ms-transform: translateY(10px);
-    -o-transform: translateY(10px);
+    transform: translateY(12px) translateZ(0);
+    -webkit-transform: translateY(12px) translateZ(0);
+    -moz-transform: translateY(12px) translateZ(0);
+    -ms-transform: translateY(12px) translateZ(0);
+    -o-transform: translateY(12px) translateZ(0);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
-    -webkit-transform: translateY(0);
-    -moz-transform: translateY(0);
-    -ms-transform: translateY(0);
-    -o-transform: translateY(0);
+    transform: translateY(0) translateZ(0);
+    -webkit-transform: translateY(0) translateZ(0);
+    -moz-transform: translateY(0) translateZ(0);
+    -ms-transform: translateY(0) translateZ(0);
+    -o-transform: translateY(0) translateZ(0);
   }
 }
 .marquee {

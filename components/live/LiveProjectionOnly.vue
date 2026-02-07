@@ -13,9 +13,10 @@
       v-if="contentVisible"
       @dblclick="activateFullScreen()"
     >
-      <!-- BACKGROUND CONTENT -->
+      <!-- PREVIOUS BACKGROUND (for smooth transitions) -->
       <div
-        class="absolute inset-0 bg-no-repeat transition-all"
+        v-if="backgroundTransitioning && previousBackgroundStyles"
+        class="absolute inset-0 bg-no-repeat transition-opacity duration-300"
         :class="{
           'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
           'h-[88vh] rounded-none border-none min-h-[100%]': fullScreenHeight,
@@ -33,8 +34,38 @@
           'bg-center bg-stretch':
             slide?.slideStyle?.backgroundFillType ===
             backgroundFillTypes.stretch,
+          'opacity-0': backgroundLoaded,
+          'opacity-100': !backgroundLoaded,
+        }"
+        :style="previousBackgroundStyles"
+        style="z-index: 1"
+      ></div>
+
+      <!-- CURRENT BACKGROUND -->
+      <div
+        class="absolute inset-0 bg-no-repeat transition-opacity duration-300"
+        :class="{
+          'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
+          'h-[88vh] rounded-none border-none min-h-[100%]': fullScreenHeight,
+          'bg-cover': slide?.type !== slideTypes.media,
+          'bg-center bg-cover':
+            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
+          'bg-top bg-cover':
+            slide?.slideStyle?.backgroundFillType ===
+            backgroundFillTypes.cropTop,
+          'bg-bottom bg-cover':
+            slide?.slideStyle?.backgroundFillType ===
+            backgroundFillTypes.cropBottom,
+          'bg-center bg-contain':
+            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
+          'bg-center bg-stretch':
+            slide?.slideStyle?.backgroundFillType ===
+            backgroundFillTypes.stretch,
+          'opacity-100': backgroundLoaded,
+          'opacity-0': !backgroundLoaded,
         }"
         :style="backgroundStyles"
+        style="z-index: 2"
       >
         <!-- AUDIO BACKGROUND -->
         <audio
@@ -166,6 +197,7 @@
           crossorigin="anonymous"
         ></video>
       </div>
+      <!-- End of CURRENT BACKGROUND -->
 
       <div
         v-if="!fullScreen || slideLabel"
@@ -189,7 +221,7 @@
         :key="slide?._id"
         :content-visible="foregroundContentVisible"
         :slide="slide"
-        class="relative"
+        class="relative z-10"
         :class="fullScreen ? 'h-screen' : 'min-h-[220px] rounded-md'"
         :padding="
           fullScreen
@@ -288,6 +320,12 @@ const emit = defineEmits(["activate-fullscreen"])
 const mostRecentSlideUpdate = ref<Slide | null>(null)
 const lastComparisonKey = ref<string>("")
 
+// Double-buffered background system for smooth transitions
+const currentBackgroundStyles = ref<string>("")
+const previousBackgroundStyles = ref<string>("")
+const backgroundLoaded = ref<boolean>(true)
+const backgroundTransitioning = ref<boolean>(false)
+
 const props = defineProps<{
   slide: Slide
   contentVisible: Boolean
@@ -350,11 +388,14 @@ watch(
           video.value?.play()
         }
 
-        // Trigger content fade animation on slide change
+        // Trigger smooth content fade animation on slide change
+        // Use requestAnimationFrame for smoother timing
         foregroundContentVisible.value = false
-        setTimeout(() => {
-          foregroundContentVisible.value = true
-        }, 100)
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            foregroundContentVisible.value = true
+          }, 150) // Slightly longer for smoother fade
+        })
       }
     } catch (error) {
       console.error("Error in slide watcher:", error)
@@ -375,10 +416,9 @@ const handleSlideContentChange = useDebounceFn(() => {
     lastComparisonKey.value = newKey
     incrementRenderKey(props.slide)
 
-    foregroundContentVisible.value = false
-    setTimeout(() => {
-      foregroundContentVisible.value = true
-    }, 100)
+    // Don't trigger fade animation for content changes within the same slide
+    // This prevents jitter when moving between verses in Bible slides
+    // The CSS animations (come-up-1, come-up-2) will handle the smooth transitions
   }
 }, 50)
 
@@ -560,16 +600,91 @@ onMounted(() => {
   if (props.fullScreen) {
     video.value?.play()
   }
+
+  // Initialize current background
+  currentBackgroundStyles.value = computeBackgroundStyles(props.slide)
 })
 
-const backgroundStyles = computed(() => {
-  if (props.slide?.type === slideTypes.media) {
-    return useSlideBackground(props.slide)
+const computeBackgroundStyles = (slide: Slide): string => {
+  if (slide?.type === slideTypes.media) {
+    return useSlideBackground(slide)
   }
-  return `${useSlideBackground(props.slide)}; filter: blur(${
+  return `${useSlideBackground(slide)}; filter: blur(${
     props.slideStyles.blur
   }px) brightness(${props.slideStyles.brightness}%);`
+}
+
+const backgroundStyles = computed(() => {
+  // Return current background styles
+  return currentBackgroundStyles.value
 })
+
+// Preload background images to ensure smooth transitions
+const preloadBackgroundImage = async (slide: Slide): Promise<boolean> => {
+  if (slide?.backgroundType !== backgroundTypes.image || !slide?.background) {
+    return true // No image to preload
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve(true)
+    img.onerror = () => resolve(false)
+    img.src = slide.background
+
+    // Timeout after 3 seconds to prevent indefinite waiting
+    setTimeout(() => resolve(true), 3000)
+  })
+}
+
+// Watch for slide changes and handle background transitions
+watch(
+  () => props.slide?.id,
+  async (newId, oldId) => {
+    if (newId !== oldId && oldId) {
+      // Store previous background
+      previousBackgroundStyles.value = currentBackgroundStyles.value
+      backgroundLoaded.value = false
+      backgroundTransitioning.value = true
+
+      // Preload new background if it's an image
+      await preloadBackgroundImage(props.slide)
+
+      // Update to new background
+      currentBackgroundStyles.value = computeBackgroundStyles(props.slide)
+
+      // Mark as loaded and ready to transition
+      await nextTick()
+      backgroundLoaded.value = true
+
+      // Clear previous background after transition completes
+      setTimeout(() => {
+        backgroundTransitioning.value = false
+        previousBackgroundStyles.value = ""
+      }, 300) // Match animation duration
+    } else if (newId && !oldId) {
+      // Initial load
+      currentBackgroundStyles.value = computeBackgroundStyles(props.slide)
+    }
+  },
+  { immediate: false }
+)
+
+// Watch for style changes within the same slide
+watch(
+  () => [
+    props.slide?.background,
+    props.slide?.backgroundType,
+    props.slideStyles.blur,
+    props.slideStyles.brightness,
+  ],
+  () => {
+    if (props.slide?.id === mostRecentSlideUpdate.value?.id) {
+      // Same slide, just update styles immediately (no transition needed)
+      currentBackgroundStyles.value = computeBackgroundStyles(props.slide)
+    }
+  },
+  { deep: true }
+)
 
 const incrementRenderKey = (slide: Slide) => {
   // Use efficient comparison instead of expensive JSON.stringify
