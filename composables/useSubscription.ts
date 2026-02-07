@@ -20,6 +20,7 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'animations-transitions': 'teams',
   'overlays-themes': 'teams',
   'new-song': 'teams',
+  'livestream-url': 'teams',
 
   // Free tier features
   'new-bible': 'free',

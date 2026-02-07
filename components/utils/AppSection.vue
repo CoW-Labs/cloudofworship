@@ -43,7 +43,12 @@
             </ConfirmDialog>
             <!-- Direct button when live (no popover) -->
             <UButton
-              v-if="secondaryButton.visible && !secondaryButton.confirmAction && secondaryButton.action === appWideActions.goLive && isLiveWindowActive"
+              v-if="
+                secondaryButton.visible &&
+                !secondaryButton.confirmAction &&
+                secondaryButton.action === appWideActions.goLive &&
+                isLiveWindowActive
+              "
               class="p-1 px-2 whitespace-nowrap"
               size="md"
               :variant="secondaryButton?.variant || 'ghost'"
@@ -53,10 +58,12 @@
             >
               End Live Session
             </UButton>
-            
+
             <!-- Popover when not live -->
             <UPopover
-              v-else-if="secondaryButton.visible && !secondaryButton.confirmAction"
+              v-else-if="
+                secondaryButton.visible && !secondaryButton.confirmAction
+              "
               mode="click"
               v-model:open="secondaryActionPopoverOpen"
               :ui="{
@@ -106,9 +113,9 @@
                   </UButton>
                   <div class="line border-b dark:border-gray-800"></div>
                   <UButton
-                    class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-primary-900 disabled:opacity-30"
+                    class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-primary-900"
+                    :class="!canUseLivestreamLink ? 'cursor-pointer' : ''"
                     color="black"
-                    :disabled="!canUseLivestreamLink"
                     variant="ghost"
                     :icon="
                       isClipboardCopying
@@ -116,10 +123,22 @@
                         : 'i-bx-clipboard'
                     "
                     size="sm"
-                    @click="copyLivestreamURL"
+                    @click="
+                      canUseLivestreamLink
+                        ? copyLivestreamURL()
+                        : useGlobalEmit('show-upgrade-modal')
+                    "
                   >
                     <div class="pl-2">
-                      <div class="text-sm">Copy livestream URL</div>
+                      <div class="text-sm flex items-center gap-2">
+                        Copy livestream URL
+
+                        <IconWrapper
+                          v-if="!canUseLivestreamLink"
+                          name="i-bxs-award"
+                          class="inline-flex w-6 h-6 text-xs text-[#FF8980]"
+                        />
+                      </div>
                       <div class="text-xs opacity-80">
                         Copy link for OBS, VMix or similar software
                       </div>
@@ -141,7 +160,10 @@
 <script setup lang="ts">
 import { useAppStore } from "@/store/app"
 import { appWideActions } from "~/utils/constants"
-const { isEnabled: canUseLivestreamLink } = useFeatureFlags("livestream-link")
+
+// Check if user has Teams subscription for livestream URL feature
+const { isTeamsPlan } = useSubscription()
+const canUseLivestreamLink = computed(() => isTeamsPlan.value)
 
 defineProps({
   heading: String,
