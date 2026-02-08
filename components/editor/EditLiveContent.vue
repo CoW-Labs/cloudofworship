@@ -440,6 +440,9 @@ watch(
   { immediate: true }
 )
 
+// LISTEN TO EVENTS
+const emitter = useNuxtApp().$emitter as Emitter<any>
+
 onMounted(() => {
   useCreateShortcut("ArrowRight", () => {
     if (nextVerse.value) {
@@ -451,10 +454,20 @@ onMounted(() => {
       emit("goto-verse", previousVerse.value, selectedBibleVersion.value)
     }
   })
+  
+  // Listen for voice command events (next verse / previous verse)
+  emitter.on(appWideActions.nextVerse, () => {
+    if (nextVerse.value) {
+      emit("goto-verse", nextVerse.value, selectedBibleVersion.value)
+    }
+  })
+  emitter.on(appWideActions.previousVerse, () => {
+    if (previousVerse.value) {
+      emit("goto-verse", previousVerse.value, selectedBibleVersion.value)
+    }
+  })
 })
 
-// LISTEN TO EVENTS
-const emitter = useNuxtApp().$emitter as Emitter<any>
 emitter.on("pause-inactive-slide-video", () => {
   if (props.slide?.type === slideTypes.media) {
     // console.log("pausing video")

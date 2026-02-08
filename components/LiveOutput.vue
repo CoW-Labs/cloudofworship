@@ -18,7 +18,12 @@
     <div class="main">
       <div
         v-if="liveOutputSlides?.length === 0 || !liveOutputSlides"
-        class="ctn h-[calc(100vh-80px-220px-80px)] overflow-auto mb-4 overflow-x-hidden"
+        class="ctn overflow-auto mb-4 overflow-x-hidden"
+        :class="
+          showTranscripts
+            ? 'h-[calc(100vh-80px-220px-90px-210px)]'
+            : 'h-[calc(100vh-80px-220px-90px)]'
+        "
       >
         <EmptyState
           icon="i-bx-slideshow"
@@ -31,7 +36,12 @@
         v-show="!(liveOutputSlides?.length === 0 || !liveOutputSlides)"
         v-model="liveOutputSlides"
         group="slides"
-        class="slides-ctn h-[calc(100vh-80px-220px-80px)] overflow-auto mb-4 overflow-x-hidden"
+        class="slides-ctn overflow-auto mb-4 overflow-x-hidden"
+        :class="
+          showTranscripts
+            ? 'h-[calc(100vh-80px-220px-90px-210px)]'
+            : 'h-[calc(100vh-80px-220px-90px)]'
+        "
         item-key="id"
         :animation="200"
         ghost-class="opacity-50"
@@ -106,6 +116,14 @@
           </button>
         </template>
       </draggable>
+
+      <!-- Transcripts Panel -->
+      <TranscriptsPanel
+        v-if="showTranscripts"
+        :visible="showTranscripts"
+        @close="showTranscripts = false"
+      />
+
       <LiveProjectionOnly
         slide-label
         :slide="liveSlide!!"
@@ -131,10 +149,17 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const toast = useToast()
 const ctrlOrMetaActive = ref(false)
+const showTranscripts = ref(false)
 const { currentState } = storeToRefs(appStore)
 const windowRefs = inject("windowRefs") as any[]
 
 const online = useOnline()
+
+// Listen for transcription toggle event
+const emitter = useNuxtApp().$emitter as any
+emitter?.on(appWideActions.newTranscribe, () => {
+  showTranscripts.value = true
+})
 
 /**
  * Broadcast slide reorder via Socket.IO for realtime collaboration

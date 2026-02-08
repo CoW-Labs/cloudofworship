@@ -109,6 +109,7 @@ export interface QuickAction {
   action: string
   type?: string
   unreleased?: boolean
+  featureFlag?: string // PostHog feature flag key to check
   bibleBookIndex?: string
   bibleChapterAndVerse?: string
   hymnIndex?: string

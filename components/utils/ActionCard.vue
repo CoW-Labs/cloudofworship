@@ -1,7 +1,7 @@
 <template>
   <button
     class="action-card flex gap-3 p-2 py-4 border-t first:border-t-0 border-gray-100 dark:border-primary-950 hover:rounded-md hover:bg-primary-50 dark:hover:bg-primary-800 transition-all cursor-pointer text-left w-[100%]"
-    :class="{ 'pointer-events-none opacity-30': action?.unreleased }"
+    :class="{ 'pointer-events-none opacity-30': isActionDisabled }"
     @click="handleActionClick"
   >
     <div class="icon-ctn relative">
@@ -37,6 +37,7 @@
 </template>
 <script setup lang="ts">
 import type { QuickAction } from "~/types"
+import type { FeatureFlagKey } from "~/composables/useFeatureFlags"
 
 const props = defineProps<{
   action: QuickAction
@@ -46,6 +47,26 @@ const props = defineProps<{
 const { requiresTeams, hasAccessToFeature } = useSubscription()
 const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 const emitter = useNuxtApp().$emitter as any
+
+// Check if feature flag is enabled for this action
+const { checkFlag } = useFeatureFlags()
+const isFeatureFlagEnabled = computed(() => {
+  if (!props.action?.featureFlag) return true // No flag required, enabled by default
+  return checkFlag(props.action.featureFlag as FeatureFlagKey)
+})
+
+// Determine if action should be disabled
+const isActionDisabled = computed(() => {
+  // Disable if marked as unreleased and no feature flag is enabled
+  if (props.action?.unreleased && !isFeatureFlagEnabled.value) {
+    return true
+  }
+  // Disable if feature flag is specified but not enabled
+  if (props.action?.featureFlag && !isFeatureFlagEnabled.value) {
+    return true
+  }
+  return false
+})
 
 const emitParameter = computed(() => {
   switch (props.action?.type) {
@@ -71,6 +92,11 @@ const showTeamsBadge = computed(() => {
 
 const handleActionClick = () => {
   const actionName = props.action?.action || ""
+
+  // Check if action is disabled due to feature flag or unreleased status
+  if (isActionDisabled.value) {
+    return
+  }
 
   // Check if user has access to this feature
   if (!hasAccessToFeature(actionName) && isPremiumFeatureEnabled.value) {

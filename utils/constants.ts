@@ -19,6 +19,7 @@ export const libraryTypes = {
 export const appWideActions = {
   liveTransfer: 'live-transfer',
   newBible: 'new-bible',
+  updateOrCreateBible: 'update-or-create-bible',
   newHymn: 'new-hymn',
   newSong: 'new-song',
   newSlide: 'new-slide',
@@ -32,6 +33,7 @@ export const appWideActions = {
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
   newSearchBible: 'new-search-bible',
+  newTranscribe: 'new-transcribe',
   goLive: 'go-live',
   closeLiveWindow: 'close-live-window',
   openSettings: 'open-settings',
@@ -45,6 +47,8 @@ export const appWideActions = {
   mediaSeek: 'media-seek',
   appLoading: 'app-loading',
   gotoVerse: 'goto-verse',
+  nextVerse: 'next-verse',
+  previousVerse: 'previous-verse',
   deleteScheduleSlides: 'delete-schedule-slides',
   selectedSchedule: 'selected-schedule',
   openScheduleModal: 'open-schedule-modal',
@@ -251,6 +255,16 @@ export const quickActionsArr: QuickAction[] = [
     // type: slideTypes.text
   },
   {
+    icon: "i-material-symbols-speech-to-text",
+    name: "Transcribe Sermon",
+    desc: "Transcribe sermon and auto-suggest Bible slides",
+    action: appWideActions.newTranscribe,
+    meta: "transcribe sermon speech text bible audio microphone",
+    tier: 'teams',
+    unreleased: true,
+    featureFlag: 'transcripts-feature',
+  },
+  {
     icon: "i-ph-file-ppt",
     name: "Import Slides",
     desc: "Extract from other apps like PowerPoint",
@@ -269,16 +283,6 @@ export const quickActionsArr: QuickAction[] = [
   //   unreleased: true,
   // tier: 'teams',
   //   type: slideTypes.text,
-  // },
-  // {
-  //   icon: "i-material-symbols-speech-to-text",
-  //   name: "Transcribe Sermon",
-  //   desc: "Start transcribing preacher sermons",
-  //   action: "new-transcribe",
-  //   meta: "",
-  //   unreleased: true,
-  // tier: 'teams',
-  //   // type: slideTypes.text
   // },
   // {
   //   icon: "i-carbon-overlay",
