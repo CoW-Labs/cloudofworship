@@ -51,6 +51,7 @@ export interface Slide {
   title?: string // For hymn and song titles, also for scripture labels (e.g Ephesians 3:1)
   songId?: string // only for hymns/songs, could be [hymn.number] or [song.id]
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
+  hymnVerseIndex?: number // 0-based index of current hymn verse, used for chorus navigation
   data?: Song | Scripture | Hymn | Countdown | ExtendedFileT // for song/bible/hymn/file, Object mapped to Slide only on client
   slideStyle?: SlideStyle
   saved?: boolean

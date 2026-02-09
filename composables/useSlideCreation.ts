@@ -152,6 +152,7 @@ export default function useSlideCreation() {
     tempSlide.songId = hymn.number
     tempSlide.hasChorus = hymn.chorus === "false" ? false : !!hymn.chorus
     tempSlide.title = "Verse 1"
+    tempSlide.hymnVerseIndex = 0
     tempSlide.name = useSlideName(tempSlide)
 
     const currentHymnVerse = hymn.verses?.[0].trim()

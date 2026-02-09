@@ -81,7 +81,6 @@
       @slide-update="onUpdateSlide"
       @inactive-slide-update="onUpdateInactiveSlide"
       @goto-verse="gotoAction"
-      @goto-chorus="gotoChorus"
       @update-bible-version="gotoAction(activeSlide?.title!!, $event)"
       @take-live="
         makeSlideActive(activeSlide!!, {
@@ -143,7 +142,7 @@ const {
   saveSlideToLib,
   duplicateSlide,
 } = useSlideCreation()
-const { gotoVerse, gotoChorus: gotoChorusNav } = useSlideNavigation()
+const { gotoVerse } = useSlideNavigation()
 
 // Online status for conditional API/WS calls
 const online = useOnline()
@@ -904,18 +903,6 @@ const gotoAction = async (title: string, version: string) => {
     slides.value.splice(slideIndex, 1, updatedSlide)
     updateLiveOutput(activeSlide.value)
     updateSlideOnline(activeSlide.value)
-  }
-}
-
-const gotoChorus = async () => {
-  if (!activeSlide.value) return
-
-  const updatedSlide = await gotoChorusNav(activeSlide.value)
-  if (updatedSlide) {
-    const slideIndex = slides.value.findIndex((s) => s.id === updatedSlide.id)
-    activeSlide.value = updatedSlide
-    slides.value.splice(slideIndex, 1, updatedSlide)
-    updateLiveOutput(activeSlide.value)
   }
 }
 

@@ -115,14 +115,6 @@
                   @click="$emit('goto-verse', nextVerse, selectedBibleVersion)"
                 />
               </UTooltip>
-              <UButton
-                v-if="slide?.type === slideTypes?.hymn && slide?.hasChorus"
-                class="rounded-md"
-                size="xs"
-                @click="$emit('goto-chorus', verse, selectedBibleVersion)"
-              >
-                Chorus
-              </UButton>
             </div>
             <!-- Component to Auto complete Bible Books while typing -->
             <BibleAutoComplete
@@ -375,7 +367,6 @@ const emit = defineEmits([
   "inactive-slide-update",
   "update-live-output-slides",
   "goto-verse",
-  "goto-chorus",
   "update-bible-version",
   "update-lines-per-slide",
   "take-live",
@@ -413,6 +404,16 @@ const nextVerse = computed(() => {
       : Number(verse.value?.split(":")?.[1]) + 1
     return `${verse.value?.split(":")?.[0]}:${tempVerse}`
   }
+  // For hymns with chorus: verse -> chorus -> verse -> chorus -> ...
+  if (props.slide?.type === slideTypes.hymn && props.slide?.hasChorus) {
+    if (verse.value === "Chorus") {
+      // From chorus, go to next verse
+      const nextVerseIndex = (props.slide?.hymnVerseIndex ?? 0) + 1
+      return `Verse ${nextVerseIndex + 1}`
+    }
+    // From verse, go to chorus
+    return "Chorus"
+  }
   return `Verse ${Number(verse.value?.split(" ")?.[1]) + 1}`
 })
 
@@ -422,6 +423,22 @@ const previousVerse = computed(() => {
       ? Number(verse.value?.split(":")?.[1]?.split("-")?.[0]) - 1
       : Number(verse.value?.split(":")?.[1]) - 1
     return `${verse.value?.split(":")?.[0]}:${tempVerse < 1 ? 1 : tempVerse}`
+  }
+  // For hymns with chorus: ... -> chorus -> verse -> chorus -> verse
+  if (props.slide?.type === slideTypes.hymn && props.slide?.hasChorus) {
+    if (verse.value === "Chorus") {
+      // From chorus, go back to the current verse
+      const currentVerseIndex = props.slide?.hymnVerseIndex ?? 0
+      return `Verse ${currentVerseIndex + 1}`
+    }
+    // From verse, go to chorus (after previous verse)
+    const currentVerseNum = Number(verse.value?.split(" ")?.[1])
+    if (currentVerseNum <= 1) {
+      // On Verse 1, can't go back further
+      return "Verse 1"
+    }
+    // Go to chorus, but we need to set hymnVerseIndex to previous verse
+    return `Chorus:${currentVerseNum - 2}`
   }
   return `Verse ${Number(verse.value?.split(" ")?.[1]) - 1}`
 })
