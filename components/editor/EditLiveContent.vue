@@ -406,22 +406,80 @@ const animatedSlides = computed(() => {
   return null
 })
 
+// Track total verses in the current Bible chapter for sequential navigation
+const chapterVerseCount = ref<number>(0)
+
+const fetchChapterVerseCount = async () => {
+  if (props.slide?.type !== slideTypes.bible || !verse.value?.includes(":"))
+    return
+  const chapter = await useScriptureChapter(verse.value)
+  chapterVerseCount.value = Array.isArray(chapter?.content)
+    ? (chapter.content as any[]).length
+    : 0
+}
+
 const nextVerse = computed(() => {
   if (props.slide?.type === slideTypes.bible) {
-    const tempVerse = verse.value?.split(":")?.[1]?.includes("-")
-      ? Number(verse.value?.split(":")?.[1]?.split("-")?.[1]) + 1
-      : Number(verse.value?.split(":")?.[1]) + 1
-    return `${verse.value?.split(":")?.[0]}:${tempVerse}`
+    const bookName = verse.value?.split(":")?.[0]
+    const currentVerse = verse.value?.split(":")?.[1]?.includes("-")
+      ? Number(verse.value?.split(":")?.[1]?.split("-")?.[1])
+      : Number(verse.value?.split(":")?.[1])
+    const currentChapter = Number(bookName?.split(" ")?.pop())
+    const bookNameOnly = bookName?.substring(0, bookName?.lastIndexOf(" "))
+    const bookIndex = bibleBooks.findIndex(
+      (b) => b.toLowerCase() === bookNameOnly?.toLowerCase()
+    )
+
+    // If at the last verse of the chapter, go to next chapter verse 1
+    if (
+      chapterVerseCount.value > 0 &&
+      currentVerse >= chapterVerseCount.value
+    ) {
+      const maxChapters = bibleBookChapters[bookIndex] || 999
+
+      if (currentChapter < maxChapters) {
+        // Next chapter in the same book
+        return `${bookNameOnly} ${currentChapter + 1}:1`
+      } else if (bookIndex < bibleBooks.length - 1) {
+        // First chapter of the next book
+        return `${bibleBooks[bookIndex + 1]} 1:1`
+      }
+      // Already at the very end of the Bible
+      return verse.value
+    }
+
+    return `${bookName}:${currentVerse + 1}`
   }
   return `Verse ${Number(verse.value?.split(" ")?.[1]) + 1}`
 })
 
 const previousVerse = computed(() => {
   if (props.slide?.type === slideTypes.bible) {
-    const tempVerse = verse.value?.split(":")?.[1]?.includes("-")
-      ? Number(verse.value?.split(":")?.[1]?.split("-")?.[0]) - 1
-      : Number(verse.value?.split(":")?.[1]) - 1
-    return `${verse.value?.split(":")?.[0]}:${tempVerse < 1 ? 1 : tempVerse}`
+    const bookName = verse.value?.split(":")?.[0]
+    const currentVerse = verse.value?.split(":")?.[1]?.includes("-")
+      ? Number(verse.value?.split(":")?.[1]?.split("-")?.[0])
+      : Number(verse.value?.split(":")?.[1])
+    const currentChapter = Number(bookName?.split(" ")?.pop())
+    const bookNameOnly = bookName?.substring(0, bookName?.lastIndexOf(" "))
+    const bookIndex = bibleBooks.findIndex(
+      (b) => b.toLowerCase() === bookNameOnly?.toLowerCase()
+    )
+
+    if (currentVerse <= 1) {
+      if (currentChapter > 1) {
+        // Go to last verse of the previous chapter (use a high number; gotoScripture will resolve to the last valid verse)
+        // We use the previous chapter and verse 1 as a safe default since we don't know the verse count yet
+        return `${bookNameOnly} ${currentChapter - 1}:1`
+      } else if (bookIndex > 0) {
+        // Go to the first verse of the last chapter of the previous book
+        const prevBookMaxChapter = bibleBookChapters[bookIndex - 1] || 1
+        return `${bibleBooks[bookIndex - 1]} ${prevBookMaxChapter}:1`
+      }
+      // Already at the very beginning of the Bible
+      return verse.value
+    }
+
+    return `${bookName}:${currentVerse - 1}`
   }
   return `Verse ${Number(verse.value?.split(" ")?.[1]) - 1}`
 })
@@ -436,6 +494,9 @@ watch(
     if (props.slide?.type !== slideTypes.text) {
       focusedEditor.value = undefined
     }
+
+    // Fetch chapter verse count for sequential Bible navigation
+    fetchChapterVerseCount()
   },
   { immediate: true }
 )
