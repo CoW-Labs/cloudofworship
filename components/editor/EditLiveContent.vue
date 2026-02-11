@@ -80,9 +80,7 @@
                   variant="ghost"
                   class="p-1"
                   icon="i-bx-chevron-left"
-                  @click="
-                    $emit('goto-verse', previousVerse, selectedBibleVersion)
-                  "
+                  @click="handlePreviousVerse"
                 />
               </UTooltip>
               <UInput
@@ -112,7 +110,7 @@
                   variant="ghost"
                   class="p-1"
                   icon="i-bx-chevron-right"
-                  @click="$emit('goto-verse', nextVerse, selectedBibleVersion)"
+                  @click="handleNextVerse"
                 />
               </UTooltip>
               <UButton
@@ -418,6 +416,19 @@ const fetchChapterVerseCount = async () => {
     : 0
 }
 
+// Helper to resolve ":LAST" marker to actual last verse number
+const resolveLastVerse = async (verseLabel: string): Promise<string> => {
+  if (!verseLabel.includes(":LAST")) return verseLabel
+  
+  const chapterLabel = verseLabel.replace(":LAST", "")
+  const chapter = await useScriptureChapter(chapterLabel)
+  const lastVerseNumber = Array.isArray(chapter?.content)
+    ? (chapter.content as any[]).length
+    : 1
+  
+  return verseLabel.replace(":LAST", `:${lastVerseNumber}`)
+}
+
 const nextVerse = computed(() => {
   if (props.slide?.type === slideTypes.bible) {
     const bookName = verse.value?.split(":")?.[0]
@@ -467,13 +478,12 @@ const previousVerse = computed(() => {
 
     if (currentVerse <= 1) {
       if (currentChapter > 1) {
-        // Go to last verse of the previous chapter (use a high number; gotoScripture will resolve to the last valid verse)
-        // We use the previous chapter and verse 1 as a safe default since we don't know the verse count yet
-        return `${bookNameOnly} ${currentChapter - 1}:1`
+        // Go to previous chapter - will need to fetch last verse in the handler
+        return `${bookNameOnly} ${currentChapter - 1}:LAST`
       } else if (bookIndex > 0) {
-        // Go to the first verse of the last chapter of the previous book
+        // Go to the last chapter of the previous book - will need to fetch last verse in the handler
         const prevBookMaxChapter = bibleBookChapters[bookIndex - 1] || 1
-        return `${bibleBooks[bookIndex - 1]} ${prevBookMaxChapter}:1`
+        return `${bibleBooks[bookIndex - 1]} ${prevBookMaxChapter}:LAST`
       }
       // Already at the very beginning of the Bible
       return verse.value
@@ -502,14 +512,16 @@ watch(
 )
 
 onMounted(() => {
-  useCreateShortcut("ArrowRight", () => {
+  useCreateShortcut("ArrowRight", async () => {
     if (nextVerse.value) {
-      emit("goto-verse", nextVerse.value, selectedBibleVersion.value)
+      const resolvedVerse = await resolveLastVerse(nextVerse.value)
+      emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
     }
   })
-  useCreateShortcut("ArrowLeft", () => {
+  useCreateShortcut("ArrowLeft", async () => {
     if (previousVerse.value) {
-      emit("goto-verse", previousVerse.value, selectedBibleVersion.value)
+      const resolvedVerse = await resolveLastVerse(previousVerse.value)
+      emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
     }
   })
 })
@@ -521,6 +533,21 @@ emitter.on("pause-inactive-slide-video", () => {
     // console.log("pausing video")
   }
 })
+
+// Handlers for navigation buttons
+const handleNextVerse = async () => {
+  if (nextVerse.value) {
+    const resolvedVerse = await resolveLastVerse(nextVerse.value)
+    emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+  }
+}
+
+const handlePreviousVerse = async () => {
+  if (previousVerse.value) {
+    const resolvedVerse = await resolveLastVerse(previousVerse.value)
+    emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+  }
+}
 
 // const onSelectLayout = (data: string) => {
 //   layoutPopoverOpen.value = false
