@@ -1,15 +1,15 @@
 {
-  "version": "0.43.2-beta",
-  "tag": "v0.43.2-beta",
-  "releaseDate": "2026-02-07T22:20:04Z",
-  "releaseNotes": "- chore: livestream link now a teams feature\n- fix: animation performance improvements\n- Update latest.json for release v0.43.1-beta\n",
+  "version": "0.43.4-beta",
+  "tag": "v0.43.4-beta",
+  "releaseDate": "2026-02-11T21:07:32Z",
+  "releaseNotes": "- fix: updated next verse action to go to next chapter with bible slides\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.2-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.4-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.2-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.4-beta/",
       "signature": ""
     }
   }
