@@ -332,6 +332,24 @@ export const bibleBooks = [
   "Revelation"
 ];
 
+// Max chapters per Bible book (aligned with bibleBooks array)
+export const bibleBookChapters = [
+  50, 40, 27, 36, 34, // Genesis, Exodus, Leviticus, Numbers, Deuteronomy
+  24, 21, 4, 31, 24,  // Joshua, Judges, Ruth, 1 Samuel, 2 Samuel
+  22, 25, 29, 36, 10, // 1 Kings, 2 Kings, 1 Chronicles, 2 Chronicles, Ezra
+  13, 10, 42, 150, 31, // Nehemiah, Esther, Job, Psalms, Proverbs
+  12, 8, 66, 52,       // Ecclesiastes, Song of Solomon, Isaiah, Jeremiah
+  5, 48, 12, 14, 3,    // Lamentations, Ezekiel, Daniel, Hosea, Joel
+  9, 1, 4, 7, 3, 3,    // Amos, Obadiah, Jonah, Micah, Nahum, Habakkuk
+  3, 2, 14, 4,          // Zephaniah, Haggai, Zechariah, Malachi
+  28, 16, 24, 21, 28,  // Matthew, Mark, Luke, John, Acts of the Apostles
+  16, 16, 13, 6, 6,    // Romans, 1 Corinthians, 2 Corinthians, Galatians, Ephesians
+  4, 4, 5, 3, 6,       // Philippians, Colossians, 1 Thessalonians, 2 Thessalonians, 1 Timothy
+  4, 3, 1, 13, 5,      // 2 Timothy, Titus, Philemon, Hebrews, James
+  5, 3, 5, 1, 1, 1,    // 1 Peter, 2 Peter, 1 John, 2 John, 3 John, Jude
+  22                     // Revelation
+];
+
 export const bibleVersions = [
   'KJV',
   'NKJV',
