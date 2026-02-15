@@ -40,6 +40,7 @@
     <FileDropzone
       v-if="!settingsPage"
       size="sm"
+      :maxFileSize="maxFileSize"
       @change="saveAndSelectImages($event)"
       class="max-w-[300px]"
       :class="{ 'max-w-full': settingsPage }"
@@ -88,6 +89,9 @@ defineProps<{
 
 const emit = defineEmits(["select"])
 const authStore = useAuthStore()
+const { isFreePlan } = useSubscription()
+
+const maxFileSize = computed(() => (isFreePlan ? 3 : 10))
 const toast = useToast()
 const db = useIndexedDB()
 const imageCompressionLoading = ref(false)
