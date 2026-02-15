@@ -1,5 +1,10 @@
 <template>
   <div class="h-[100%] overflow-y-auto mb-[2.5%]">
+    <div class="mb-4">
+      <p class="text-xs opacity-50">
+        Cloud of Worship does not own any Bible versions. All translations are graciously provided by open source repositories and are free to use without a Teams subscription.
+      </p>
+    </div>
     <div
       v-for="bibleVersion in bibleVersionOptions"
       :key="bibleVersion"

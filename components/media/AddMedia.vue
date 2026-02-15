@@ -25,7 +25,7 @@
         </div>
       </div>
 
-      <FileDropzone @change="files = $event" />
+      <FileDropzone :maxFileSize="maxFileSize" @change="files = $event" />
       <label v-if="isTauri" class="flex flex-col center text-center">
         <div
           class="text-center w-full mx-auto px-2 py-2 mt-1 bg-primary-500 rounded-md flex items-center text-primary-500 cursor-pointer gap-1 border border-primary-500 bg-transparent"
@@ -233,6 +233,10 @@ const props = defineProps<{
 
 const imageCompressionLoading = ref(false)
 const { isTauri } = useTauri()
+const authStore = useAuthStore()
+const { isFreePlan } = useSubscription()
+
+const maxFileSize = computed(() => (isFreePlan ? 3 : 10))
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const files = ref()
 const emit = defineEmits(["close"])

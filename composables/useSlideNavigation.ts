@@ -95,7 +95,7 @@ export default function useSlideNavigation() {
   }
 
   /**
-   * Navigate to a specific hymn verse
+   * Navigate to a specific hymn verse or chorus
    */
   const gotoHymnVerse = async (
     slide: Slide,
@@ -105,11 +105,37 @@ export default function useSlideNavigation() {
     const hymn = await useHymn(tempSlide.songId as string)
 
     if (hymn) {
+      // Handle chorus navigation (supports "Chorus" or "Chorus:N" format)
+      if (title.startsWith("Chorus")) {
+        const chorus = hymn?.chorus as string
+        if (chorus) {
+          tempSlide.title = "Chorus"
+          // Check if hymnVerseIndex is specified (for backward navigation)
+          const parts = title.split(":")
+          if (parts.length > 1) {
+            tempSlide.hymnVerseIndex = Number(parts[1])
+          }
+          // Otherwise hymnVerseIndex stays the same - it tracks the last verse shown
+          let fontSize = useScreenFontSize(chorus)
+          tempSlide.slideStyle = {
+            ...tempSlide.slideStyle,
+            fontSize: Number(fontSize),
+          }
+          tempSlide.contents = useSlideContent(tempSlide, hymn, chorus)
+
+          usePosthogCapture("GOTO_CHORUS_TOOLBAR_USED")
+          return tempSlide
+        }
+        return null
+      }
+
+      // Handle verse navigation
       const verseIndex = Number(title?.split(" ")?.[1]) - 1
       const nextVerse = hymn?.verses?.[verseIndex]?.trim()
 
       if (nextVerse) {
         tempSlide.title = title
+        tempSlide.hymnVerseIndex = verseIndex
         // Calculate font-size of content
         let fontSize = useScreenFontSize(nextVerse)
         tempSlide.slideStyle = {
@@ -161,36 +187,10 @@ export default function useSlideNavigation() {
     return null
   }
 
-  /**
-   * Navigate to the chorus of a hymn
-   */
-  const gotoChorus = async (slide: Slide): Promise<Slide | null> => {
-    const tempSlide = { ...slide }
-    const hymn = await useHymn(tempSlide.songId as string)
-
-    if (hymn) {
-      const chorus = hymn?.chorus as string
-      // Calculate font-size of scripture content
-      let fontSize = useScreenFontSize(chorus)
-      tempSlide.slideStyle = {
-        ...tempSlide.slideStyle,
-        fontSize: Number(fontSize),
-      }
-
-      tempSlide.contents = useSlideContent(tempSlide, hymn, chorus)
-
-      usePosthogCapture("GOTO_CHORUS_TOOLBAR_USED")
-      return tempSlide
-    }
-
-    return null
-  }
-
   return {
     gotoVerse,
     gotoScripture,
     gotoHymnVerse,
     gotoSongVerse,
-    gotoChorus,
   }
 }

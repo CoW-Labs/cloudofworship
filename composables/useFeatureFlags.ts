@@ -26,7 +26,7 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
       console.warn("PostHog is not initialized")
       return false
     }
-    
+
     const flagValue = posthog.isFeatureEnabled(key)
     return flagValue === true
   }
@@ -41,7 +41,7 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
       console.warn("PostHog is not initialized")
       return undefined
     }
-    
+
     return posthog.getFeatureFlag(key) as boolean | string | undefined
   }
 
@@ -56,18 +56,18 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
     }
 
     isLoading.value = true
-    
+
     // Reload feature flags
     posthog.reloadFeatureFlags()
-    
+
     // Wait a bit for flags to be loaded
     await new Promise((resolve) => setTimeout(resolve, 100))
-    
+
     // Update specific flag if provided
     if (flagKey) {
       isEnabled.value = checkFlag(flagKey)
     }
-    
+
     isLoading.value = false
   }
 
@@ -78,11 +78,11 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
    */
   const checkMultipleFlags = (keys: FeatureFlagKey[]): Record<string, boolean> => {
     const result: Record<string, boolean> = {}
-    
+
     keys.forEach((key) => {
       result[key] = checkFlag(key)
     })
-    
+
     return result
   }
 
@@ -100,7 +100,7 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
     isEnabled,
     isLoading,
     flags,
-    
+
     // Methods
     checkFlag,
     getFlagValue,

@@ -44,6 +44,7 @@
         v-if="!settingsPage"
         size="sm"
         icon="i-bx-film"
+        :maxFileSize="maxFileSize"
         @change="saveAndSelectVideos($event)"
         :loading="videoUploadLoading"
       />
@@ -82,6 +83,9 @@ import type { Media, BackgroundVideo } from "~/types"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const { isFreePlan } = useSubscription()
+
+const maxFileSize = computed(() => (isFreePlan ? 3 : 10))
 const toast = useToast()
 const db = useIndexedDB()
 
