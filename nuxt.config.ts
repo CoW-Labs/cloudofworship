@@ -248,7 +248,7 @@ export default defineNuxtConfig({
         // Mingcute
         'mingcute:layout-3-line',
         // Material Symbols
-        'material-symbols:speech-to-text',
+        // 'material-symbols:speech-to-text',
       ]
     },
     serverBundle: false
