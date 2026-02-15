@@ -19,7 +19,6 @@ export const libraryTypes = {
 export const appWideActions = {
   liveTransfer: 'live-transfer',
   newBible: 'new-bible',
-  updateOrCreateBible: 'update-or-create-bible',
   newHymn: 'new-hymn',
   newSong: 'new-song',
   newSlide: 'new-slide',
@@ -33,7 +32,6 @@ export const appWideActions = {
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
   newSearchBible: 'new-search-bible',
-  newTranscribe: 'new-transcribe',
   goLive: 'go-live',
   closeLiveWindow: 'close-live-window',
   openSettings: 'open-settings',
@@ -253,16 +251,6 @@ export const quickActionsArr: QuickAction[] = [
     tier: "free",
     // unreleased: true,
     // type: slideTypes.text
-  },
-  {
-    icon: "i-material-symbols-speech-to-text",
-    name: "Transcribe Sermon",
-    desc: "Transcribe sermon and auto-suggest Bible slides",
-    action: appWideActions.newTranscribe,
-    meta: "transcribe sermon speech text bible audio microphone",
-    tier: 'teams',
-    unreleased: true,
-    featureFlag: 'transcripts-feature',
   },
   {
     icon: "i-ph-file-ppt",

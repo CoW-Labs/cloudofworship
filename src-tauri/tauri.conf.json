@@ -21,13 +21,11 @@
         "resizable": true,
         "fullscreen": false,
         "center": true,
-        "label": "main",
-        "userAgent": null,
-        "incognito": false
+        "label": "main"
       }
     ],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; media-src 'self' https: data: blob: mediastream:; connect-src 'self' https: wss: ws:; img-src 'self' https: data: blob:",
+      "csp": null,
       "capabilities": [
         {
           "identifier": "main-capability",
@@ -45,11 +43,7 @@
             "process:allow-restart"
           ]
         }
-      ],
-      "assetProtocol": {
-        "enable": true,
-        "scope": ["**"]
-      }
+      ]
     },
     "withGlobalTauri": true
   },
@@ -76,14 +70,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "macOS": {
-      "entitlements": "entitlements.plist",
-      "exceptionDomain": null,
-      "frameworks": [],
-      "providerShortName": null,
-      "signingIdentity": null,
-      "minimumSystemVersion": "10.13"
-    },
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
