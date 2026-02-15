@@ -81,7 +81,6 @@
       @slide-update="onUpdateSlide"
       @inactive-slide-update="onUpdateInactiveSlide"
       @goto-verse="gotoAction"
-      @goto-chorus="gotoChorus"
       @update-bible-version="gotoAction(activeSlide?.title!!, $event)"
       @take-live="
         makeSlideActive(activeSlide!!, {
@@ -143,7 +142,7 @@ const {
   saveSlideToLib,
   duplicateSlide,
 } = useSlideCreation()
-const { gotoVerse, gotoChorus: gotoChorusNav } = useSlideNavigation()
+const { gotoVerse } = useSlideNavigation()
 
 // Online status for conditional API/WS calls
 const online = useOnline()
@@ -263,6 +262,42 @@ emitter.on("new-bible", async (data: string) => {
       // Broadcast slide creation immediately for real-time sync
       broadcastSlideCreated(newSlide)
       uploadOfflineSlides()
+    }
+  }
+})
+
+emitter.on("update-or-create-bible", async (data: string) => {
+  if (data) {
+    // Find any existing Bible slide (prefer the live one)
+    const existingBibleSlide = slides.value?.find(
+      (s: Slide) => s.type === slideTypes.bible && s.id === currentState.value?.liveSlideId
+    ) || slides.value?.find((s: Slide) => s.type === slideTypes.bible)
+    
+    const scripture = await useScripture(data)
+    if (scripture) {
+      if (existingBibleSlide) {
+        // Update the existing Bible slide
+        const updatedSlide = await gotoVerse(existingBibleSlide, scripture.label, scripture.version || 'KJV')
+        if (updatedSlide) {
+          const slideIndex = slides.value.findIndex((s: Slide) => s.id === updatedSlide.id)
+          slides.value.splice(slideIndex, 1, updatedSlide)
+          makeSlideActive(updatedSlide, { goLive: true, newlyCreated: false })
+          updateLiveOutput(updatedSlide)
+          updateSlideOnline(updatedSlide)
+        }
+      } else {
+        // No existing Bible slide - create a new one
+        const newSlide = createBibleSlide(scripture)
+        slides.value?.push(newSlide)
+        makeSlideActive(newSlide, {
+          goLive: true,
+          newlyCreated: true,
+        })
+        // Broadcast slide creation immediately for real-time sync
+        broadcastSlideCreated(newSlide)
+        uploadOfflineSlides()
+      }
+      appStore.setRecentBibleSearches(data)
     }
   }
 })
@@ -868,18 +903,6 @@ const gotoAction = async (title: string, version: string) => {
     slides.value.splice(slideIndex, 1, updatedSlide)
     updateLiveOutput(activeSlide.value)
     updateSlideOnline(activeSlide.value)
-  }
-}
-
-const gotoChorus = async () => {
-  if (!activeSlide.value) return
-
-  const updatedSlide = await gotoChorusNav(activeSlide.value)
-  if (updatedSlide) {
-    const slideIndex = slides.value.findIndex((s) => s.id === updatedSlide.id)
-    activeSlide.value = updatedSlide
-    slides.value.splice(slideIndex, 1, updatedSlide)
-    updateLiveOutput(activeSlide.value)
   }
 }
 

@@ -104,7 +104,7 @@ export default defineNuxtConfig({
       NODE_ENV: process.env.NODE_ENV || "production",
       GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID || "",
       GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET || "",
-      PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY
+      PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY,
     },
   },
 
@@ -148,6 +148,8 @@ export default defineNuxtConfig({
         'bx:check-circle',
         'bx:chevron-left',
         'bx:chevron-right',
+        'bx:chevron-down',
+        'bx:chevron-up',
         'bx:church',
         'bx:circle',
         'bx:clipboard',
@@ -175,6 +177,7 @@ export default defineNuxtConfig({
         'bx:list-ol',
         'bx:list-ul',
         'bx:loader-alt',
+        'bx:microphone',
         'bx:moon',
         'bx:movie',
         'bx:music',
@@ -189,6 +192,7 @@ export default defineNuxtConfig({
         'bx:shield',
         'bx:slider',
         'bx:slideshow',
+        'bx:stop',
         'bx:strikethrough',
         'bx:text',
         'bx:time',
@@ -243,6 +247,8 @@ export default defineNuxtConfig({
         'ph:file-ppt',
         // Mingcute
         'mingcute:layout-3-line',
+        // Material Symbols
+        'material-symbols:speech-to-text',
       ]
     },
     serverBundle: false

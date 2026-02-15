@@ -45,6 +45,8 @@ export const appWideActions = {
   mediaSeek: 'media-seek',
   appLoading: 'app-loading',
   gotoVerse: 'goto-verse',
+  nextVerse: 'next-verse',
+  previousVerse: 'previous-verse',
   deleteScheduleSlides: 'delete-schedule-slides',
   selectedSchedule: 'selected-schedule',
   openScheduleModal: 'open-schedule-modal',
@@ -269,16 +271,6 @@ export const quickActionsArr: QuickAction[] = [
   //   unreleased: true,
   // tier: 'teams',
   //   type: slideTypes.text,
-  // },
-  // {
-  //   icon: "i-material-symbols-speech-to-text",
-  //   name: "Transcribe Sermon",
-  //   desc: "Start transcribing preacher sermons",
-  //   action: "new-transcribe",
-  //   meta: "",
-  //   unreleased: true,
-  // tier: 'teams',
-  //   // type: slideTypes.text
   // },
   // {
   //   icon: "i-carbon-overlay",
