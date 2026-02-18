@@ -22,13 +22,13 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-song': 'teams',
   'livestream-url': 'teams',
   'new-transcribe': 'teams',
+  'new-hymn': 'teams',
+  'new-search-bible': 'teams',
 
   // Free tier features
   'new-bible': 'free',
-  'new-hymn': 'free',
   'add-song': 'free',
   'new-library': 'free',
-  'new-search-bible': 'free',
   'open-settings': 'free',
   'new-schedule': 'free',
   'toggle-dark-mode': 'free',
