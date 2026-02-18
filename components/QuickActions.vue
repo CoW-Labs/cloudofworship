@@ -191,6 +191,8 @@ import { useAppStore } from "~/store/app"
 import { quickActionsArr } from "~/utils/constants"
 import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
+const { hasAccessToFeature } = useSubscription()
+const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 
 let searchInputBeforeTwoDigitNumbers = ""
 const searchInputEl = ref<{ input: HTMLInputElement }>()
@@ -362,6 +364,14 @@ const handleInputKeydown = (e: KeyboardEvent) => {
         focusedActionIndex.value
       ] as unknown as QuickAction
       if (action) {
+        const actionName = action?.action || ""
+        if (!hasAccessToFeature(actionName) && isPremiumFeatureEnabled.value) {
+          emitter.emit("show-upgrade-modal")
+          usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
+            feature: actionName,
+          })
+          return
+        }
         useGlobalEmit(
           action?.action,
           action?.type === slideTypes.bible
