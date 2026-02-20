@@ -1,7 +1,7 @@
 <template>
   <AppSection
     heading="Slide Schedule"
-    class="max-w-[400px]"
+    class="w-full"
     :secondary-buttons="[
       {
         label: 'Go Live',

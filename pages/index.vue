@@ -1,8 +1,20 @@
 <template #default="{ defaultProps }">
-  <div class="flex mt-4 gap-2 px-4">
-    <QuickActions />
-    <PreviewContent />
-    <LiveOutput />
+  <div class="flex mt-4 px-4">
+    <div :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }">
+      <QuickActions />
+    </div>
+    <div
+      class="w-[5px] flex-shrink-0 mx-[2px] cursor-ew-resize rounded hover:bg-primary-300/50 dark:hover:bg-primary-700/50 transition-colors"
+      @mousedown.prevent="startResize('left', $event)"
+    />
+    <PreviewContent class="min-w-0" />
+    <div
+      class="w-[5px] flex-shrink-0 mx-[2px] cursor-ew-resize rounded hover:bg-primary-300/50 dark:hover:bg-primary-700/50 transition-colors"
+      @mousedown.prevent="startResize('right', $event)"
+    />
+    <div :style="{ width: liveOutputWidth + 'px', flexShrink: 0 }">
+      <LiveOutput />
+    </div>
   </div>
 </template>
 
@@ -33,6 +45,56 @@ const toast = useToast()
 const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
 const MAX_RETRIES = 10
 let retryCount = 0
+
+// Resizable panel widths
+const QA_MIN_WIDTH = 200
+const QA_MAX_WIDTH = 500
+const QA_DEFAULT_WIDTH = 330
+const LO_MIN_WIDTH = 250
+const LO_MAX_WIDTH = 600
+const LO_DEFAULT_WIDTH = 400
+
+const quickActionsWidth = ref(QA_DEFAULT_WIDTH)
+const liveOutputWidth = ref(LO_DEFAULT_WIDTH)
+
+let resizingPanel: "left" | "right" | null = null
+let resizeStartX = 0
+let resizeStartWidth = 0
+
+const startResize = (panel: "left" | "right", event: MouseEvent) => {
+  resizingPanel = panel
+  resizeStartX = event.clientX
+  resizeStartWidth =
+    panel === "left" ? quickActionsWidth.value : liveOutputWidth.value
+  document.addEventListener("mousemove", onResizeMove)
+  document.addEventListener("mouseup", onResizeEnd)
+  document.body.style.cursor = "ew-resize"
+  document.body.style.userSelect = "none"
+}
+
+const onResizeMove = (event: MouseEvent) => {
+  if (!resizingPanel) return
+  const delta = event.clientX - resizeStartX
+  if (resizingPanel === "left") {
+    quickActionsWidth.value = Math.min(
+      QA_MAX_WIDTH,
+      Math.max(QA_MIN_WIDTH, resizeStartWidth + delta)
+    )
+  } else {
+    liveOutputWidth.value = Math.min(
+      LO_MAX_WIDTH,
+      Math.max(LO_MIN_WIDTH, resizeStartWidth - delta)
+    )
+  }
+}
+
+const onResizeEnd = () => {
+  resizingPanel = null
+  document.removeEventListener("mousemove", onResizeMove)
+  document.removeEventListener("mouseup", onResizeEnd)
+  document.body.style.cursor = ""
+  document.body.style.userSelect = ""
+}
 
 // Realtime slides handling
 const {
@@ -290,6 +352,8 @@ watch(
 // Cleanup on unmount
 onBeforeUnmount(() => {
   disconnectSocket()
+  document.removeEventListener("mousemove", onResizeMove)
+  document.removeEventListener("mouseup", onResizeEnd)
 })
 
 emitter.on("refresh-slides", () => {

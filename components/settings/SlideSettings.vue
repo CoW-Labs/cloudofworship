@@ -326,10 +326,10 @@
         </div>
         <div
           class="sample-monitor bg-gray-100 dark:bg-gray-800 dark:text-white rounded-lg my-4 relative grid place-items-center"
-          :style="`width: ${
-            (appStore.currentState.mainDisplayScreen?.availWidth || 1920) / 6
+          :style="`min-width: 450px; width: ${
+            (appStore.currentState.mainDisplayScreen?.availWidth || 1920) / 4
           }px; height: ${
-            (appStore.currentState.mainDisplayScreen?.availHeight || 1080) / 6
+            (appStore.currentState.mainDisplayScreen?.availHeight || 1080) / 4
           }px`"
         >
           <div class="inner max-w-[60%] mx-auto text-center p-8">
