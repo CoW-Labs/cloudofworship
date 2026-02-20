@@ -269,17 +269,26 @@ emitter.on("new-bible", async (data: string) => {
 emitter.on("update-or-create-bible", async (data: string) => {
   if (data) {
     // Find any existing Bible slide (prefer the live one)
-    const existingBibleSlide = slides.value?.find(
-      (s: Slide) => s.type === slideTypes.bible && s.id === currentState.value?.liveSlideId
-    ) || slides.value?.find((s: Slide) => s.type === slideTypes.bible)
-    
+    const existingBibleSlide =
+      slides.value?.find(
+        (s: Slide) =>
+          s.type === slideTypes.bible &&
+          s.id === currentState.value?.liveSlideId
+      ) || slides.value?.find((s: Slide) => s.type === slideTypes.bible)
+
     const scripture = await useScripture(data)
     if (scripture) {
       if (existingBibleSlide) {
         // Update the existing Bible slide
-        const updatedSlide = await gotoVerse(existingBibleSlide, scripture.label, scripture.version || 'KJV')
+        const updatedSlide = await gotoVerse(
+          existingBibleSlide,
+          scripture.label,
+          scripture.version || "KJV"
+        )
         if (updatedSlide) {
-          const slideIndex = slides.value.findIndex((s: Slide) => s.id === updatedSlide.id)
+          const slideIndex = slides.value.findIndex(
+            (s: Slide) => s.id === updatedSlide.id
+          )
           slides.value.splice(slideIndex, 1, updatedSlide)
           makeSlideActive(updatedSlide, { goLive: true, newlyCreated: false })
           updateLiveOutput(updatedSlide)
@@ -761,10 +770,8 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 const onUpdateSlide = (slide: Slide) => {
   // Always pause countdown slide before updating it
   if (slide.type === slideTypes.countdown) {
-    const { updatedSlide } = startCountdownTimer(slide)
-    if (updatedSlide) {
-      slide = updatedSlide
-    }
+    // pause the active countdown animation so edits don't conflict
+    stopCountdown()
   }
 
   makeSlideActive(slide)
@@ -776,13 +783,9 @@ const onUpdateSlide = (slide: Slide) => {
   updateSlideOnline(slide)
   updateLiveOutput(slide)
 
-  // When updating of countdown slide is done, continue timer
+  // When updating of countdown slide is done, resume timer
   if (slide.type === slideTypes.countdown) {
-    const { updatedSlide } = startCountdownTimer(slide)
-    if (updatedSlide) {
-      slides.value?.splice(slideIndex || 0, 1, updatedSlide)
-      updateLiveOutput(updatedSlide)
-    }
+    startCountdown(slide)
   }
 }
 

@@ -145,20 +145,20 @@ jobs:
           echo "next_version=$next_version" >> $GITHUB_OUTPUT
           echo "skip_release=0" >> $GITHUB_OUTPUT
 
-      - name: Update appVersion, in app.vue and tauri.conf.json
+      - name: Update appVersion, in app/app.vue and tauri.conf.json
         if: env.SKIP_RELEASE != '1'
         run: |
           # Remove 'v' prefix and '-beta' suffix for tauri.conf.json
           tauri_version=$(echo "${{ env.next_version }}" | sed 's/^v//' | sed 's/-beta//')
 
-          # Replace the version string in app.vue
-          sed -i 's/const appVersion = ref<string>("[^"]*")/const appVersion = ref<string>("${{ env.next_version }}")/' app.vue
+          # Replace the version string in app/app.vue
+          sed -i 's/const appVersion = ref<string>("[^"]*")/const appVersion = ref<string>("${{ env.next_version }}")/' app/app.vue
 
           # Replace the version in tauri.conf.json
           sed -i 's/"version": "[^"]*"/"version": "'"$tauri_version"'"/' src-tauri/tauri.conf.json
 
           # Check if there are actually changes to commit
-          if git diff --quiet app.vue src-tauri/tauri.conf.json; then
+          if git diff --quiet app/app.vue src-tauri/tauri.conf.json; then
             echo "No changes detected - versions might already be ${{ env.next_version }}"
             echo "Skipping commit step"
           else
@@ -169,7 +169,7 @@ jobs:
             git config user.email "actions@github.com"
 
             # Commit and push the updated files
-            git add app.vue src-tauri/tauri.conf.json
+            git add app/app.vue src-tauri/tauri.conf.json
             git commit -m "Update appVersion to ${{ env.next_version }}"
             git push
           fi

@@ -29,7 +29,7 @@
 
 <script setup lang="ts">
 import mitt from "mitt"
-import { useAppStore } from "./store/app"
+import { useAppStore } from "~/store/app"
 
 const nuxtApp = useNuxtApp()
 const emitter = mitt()
@@ -43,7 +43,7 @@ if (nuxtApp.$emitter) {
 }
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("v0.43.6-beta")
+const appVersion = ref<string>("v0.43.7-beta")
 
 onMounted(() => {
   initializeTauri()

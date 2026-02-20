@@ -114,11 +114,11 @@
 import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
 import { Color } from "@tiptap/extension-color"
-import TiptapHighlight from "@tiptap/extension-highlight"
-import TiptapTextAlign from "@tiptap/extension-text-align"
-import TiptapPlaceholder from "@tiptap/extension-placeholder"
-import TipTapTextStyle from "@tiptap/extension-text-style"
-import TipTapFontFamily from "@tiptap/extension-font-family"
+import { Highlight as TiptapHighlight } from "@tiptap/extension-highlight"
+import { TextAlign as TiptapTextAlign } from "@tiptap/extension-text-align"
+import { Placeholder as TiptapPlaceholder } from "@tiptap/extension-placeholder"
+import { TextStyle as TipTapTextStyle } from "@tiptap/extension-text-style"
+import { FontFamily as TipTapFontFamily } from "@tiptap/extension-font-family"
 
 const props = defineProps<{
   slide: Slide

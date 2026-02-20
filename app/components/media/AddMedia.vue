@@ -447,7 +447,6 @@ const addMediaEmitter = async () => {
       } as ExtendedFileT
     })
   )
-  // console.log("compressedFiles", compressedFiles)
   imageCompressionLoading.value = false
   useGlobalEmit(appWideActions.newMedia, compressedFiles)
   files.value = []
