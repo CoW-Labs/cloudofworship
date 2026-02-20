@@ -39,7 +39,7 @@
     "bson-objectid": "^2.0.4",
     "canvas-confetti": "^1.9.4",
     "dexie": "^4.0.4",
-    "firebase": "^10.14.0",
+  "firebase": "^12.9.0",
     "fuzzysort": "^2.0.4",
     "gsap": "^3.12.2",
     "mitt": "^3.0.1",
@@ -74,8 +74,8 @@
     "@tauri-apps/cli": "^2.9.3",
     "@types/socket.io-client": "^3.0.0",
     "typescript": "^5.4.5",
-    "vue-tsc": "^2.0.16",
-    "wrangler": "^3.84.1"
+  "vue-tsc": "^3.2.4",
+  "wrangler": "^4.67.0"
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "0.24.0",
