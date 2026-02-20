@@ -1,5 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  compatibilityDate: "2025-01-01",
   devtools: { enabled: false },
 
   imports: {
@@ -21,35 +22,29 @@ export default defineNuxtConfig({
             "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worship is your church's power point.",
         },
         { name: "format-detection", content: "telephone=no" },
-        { hid: "og:type", property: "og:type", content: "website" },
+        { property: "og:type", content: "website" },
         {
-          hid: "og-url",
           name: "og:url",
           content: "https://cloudofworship.com",
         },
         {
-          hid: "og:image",
           property: "og:image",
           content: "https://cloudofworship.com/images/cow-og-image.jpeg",
         },
         {
-          hid: "twitter:image",
           name: "twitter:image",
           content: "https://cloudofworship.com/images/cow-og-image.jpeg",
         },
         {
-          hid: "twitter:domain",
           name: "twitter:domain",
           content: "cloudofworship.com",
         },
         {
-          hid: "twitter:description",
           name: "twitter:description",
           content:
             "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worship is your church's power point.",
         },
         {
-          hid: "twitter:url",
           name: "twitter:url",
           content: "https://cloudofworship.com",
         },
@@ -108,7 +103,7 @@ export default defineNuxtConfig({
     },
   },
 
-  spaLoadingTemplate: "public/loading.html",
+  spaLoadingTemplate: "spa-loading-template.html",
 
   modules: [
     "@nuxt/ui",
@@ -270,7 +265,7 @@ export default defineNuxtConfig({
   },
 
   pinia: {
-    storesDirs: ["./stores/**"],
+    storesDirs: ["./app/stores/**"],
   },
 
   gtag: {

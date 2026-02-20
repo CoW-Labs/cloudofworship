@@ -269,17 +269,26 @@ emitter.on("new-bible", async (data: string) => {
 emitter.on("update-or-create-bible", async (data: string) => {
   if (data) {
     // Find any existing Bible slide (prefer the live one)
-    const existingBibleSlide = slides.value?.find(
-      (s: Slide) => s.type === slideTypes.bible && s.id === currentState.value?.liveSlideId
-    ) || slides.value?.find((s: Slide) => s.type === slideTypes.bible)
-    
+    const existingBibleSlide =
+      slides.value?.find(
+        (s: Slide) =>
+          s.type === slideTypes.bible &&
+          s.id === currentState.value?.liveSlideId
+      ) || slides.value?.find((s: Slide) => s.type === slideTypes.bible)
+
     const scripture = await useScripture(data)
     if (scripture) {
       if (existingBibleSlide) {
         // Update the existing Bible slide
-        const updatedSlide = await gotoVerse(existingBibleSlide, scripture.label, scripture.version || 'KJV')
+        const updatedSlide = await gotoVerse(
+          existingBibleSlide,
+          scripture.label,
+          scripture.version || "KJV"
+        )
         if (updatedSlide) {
-          const slideIndex = slides.value.findIndex((s: Slide) => s.id === updatedSlide.id)
+          const slideIndex = slides.value.findIndex(
+            (s: Slide) => s.id === updatedSlide.id
+          )
           slides.value.splice(slideIndex, 1, updatedSlide)
           makeSlideActive(updatedSlide, { goLive: true, newlyCreated: false })
           updateLiveOutput(updatedSlide)

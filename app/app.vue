@@ -29,7 +29,7 @@
 
 <script setup lang="ts">
 import mitt from "mitt"
-import { useAppStore } from "./store/app"
+import { useAppStore } from "~/store/app"
 
 const nuxtApp = useNuxtApp()
 const emitter = mitt()
