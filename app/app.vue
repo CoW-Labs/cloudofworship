@@ -43,7 +43,7 @@ if (nuxtApp.$emitter) {
 }
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("v0.43.5-beta")
+const appVersion = ref<string>("v0.43.6-beta")
 
 onMounted(() => {
   initializeTauri()
