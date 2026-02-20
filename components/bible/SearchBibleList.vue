@@ -207,6 +207,12 @@ const getDefaultBible = async () => {
 const getVerses = (query: string = "") => {
   if (query?.length >= 2) {
     loading.value = true
+    
+    // Track Bible search
+    usePosthogCapture("BIBLE_SEARCH_PERFORMED", {
+      searchQuery: query,
+      bibleVersion: appStore.currentState.settings.defaultBibleVersion,
+    })
 
     // Prepare search targets with book names for better context
     const searchTargets = formattedDefaultBible.value.map((verse) => ({

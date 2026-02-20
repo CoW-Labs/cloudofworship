@@ -308,9 +308,15 @@ const socketManager = useSocketIO({
   onConnected: () => {
     connectionStatus.value = "connected"
     showConnectionError.value = false
+    usePosthogCapture("REMOTE_CONTROL_CONNECTED", {
+      scheduleId: route.params.schedule_id,
+    })
   },
   onDisconnected: () => {
     connectionStatus.value = "disconnected"
+    usePosthogCapture("REMOTE_CONTROL_DISCONNECTED", {
+      scheduleId: route.params.schedule_id,
+    })
   },
   onError: (error) => {
     console.error("❌ Socket error:", error)
