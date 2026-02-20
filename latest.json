@@ -1,15 +1,15 @@
 {
-  "version": "0.43.4-beta",
-  "tag": "v0.43.4-beta",
-  "releaseDate": "2026-02-11T21:07:32Z",
-  "releaseNotes": "- fix: updated next verse action to go to next chapter with bible slides\n",
+  "version": "0.43.6-beta",
+  "tag": "v0.43.6-beta",
+  "releaseDate": "2026-02-20T08:15:52Z",
+  "releaseNotes": "- fix: issue with selecting default background videos\n- chore: included events for better customer service\n- Move hymns and full-text Bible search behind teams subscription\n- Initial plan\n- chore: performance update\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.4-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.6-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.4-beta/",
+      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.6-beta/",
       "signature": ""
     }
   }
