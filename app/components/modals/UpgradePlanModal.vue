@@ -207,7 +207,7 @@
           </div>
         </div>
 
-        <!-- Right Side - Testimonial -->
+        <!-- Right Side - Testimonial Slideshow -->
         <div
           class="hidden md:block bg-cover bg-center relative overflow-hidden"
         >
@@ -216,23 +216,38 @@
             :style="`background-image: url('https://images.unsplash.com/photo-1532140225690-f6d25ab4c891?q=80&w=1740'); background-size: cover; background-position: center;`"
           ></div>
           <div class="absolute inset-0 bg-primary/40"></div>
-          <div class="absolute top-6 left-0 right-0 p-8 text-white">
-            <p class="text-xl mb-4">
-              "The app’s ability for different users to create accounts and
-              share lyrics fosters community. Cloud of Worship is indispensable,
-              and we highly recommend it for any congregation looking to enhance
-              their worship experience."
-            </p>
-            <div class="flex items-center gap-3 mt-8">
+          <div class="absolute inset-0 flex items-start pt-6 p-8">
+            <div ref="reviewContainer" class="relative w-full">
               <div
-                class="w-10 min-w-10 h-10 rounded-full flex items-center justify-center font-semibold"
-                :style="`background-image: url('/images/testimonials/bro-yinka.jpg'); background-size: cover; background-position: center;`"
-              ></div>
-              <div>
-                <p class="font-semibold text-sm">Yinka Adenikinju</p>
-                <p class="text-xs">
-                  Head of Ministry, Foursquare Church in Lagos, Nigeria
-                </p>
+                v-for="(review, index) in shuffledReviews"
+                :key="index"
+                ref="reviewSlides"
+                class="review-slide text-white"
+                :class="{
+                  'absolute inset-0 opacity-0 pointer-events-none':
+                    index !== currentReviewIndex,
+                }"
+              >
+                <p class="text-xl mb-4 leading-relaxed">"{{ review.text }}"</p>
+                <div class="flex items-center gap-3 mt-8">
+                  <div
+                    v-if="review.avatar"
+                    class="w-10 min-w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold"
+                    :style="`background-image: url('${review.avatar}'); background-size: cover; background-position: center;`"
+                  ></div>
+                  <div
+                    v-else
+                    class="w-10 min-w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold text-sm"
+                  >
+                    {{ review.name.charAt(0) }}
+                  </div>
+                  <div>
+                    <p class="font-semibold text-sm">{{ review.name }}</p>
+                    <p v-if="review.tagline" class="text-xs opacity-80">
+                      {{ review.tagline }}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -251,9 +266,170 @@
 
 <script setup lang="ts">
 import type { PaymentPlan } from "~/composables/usePayment"
+import { gsap } from "gsap"
 
+// Reviews extracted from user testimonials
+const reviews = [
+  {
+    text: "I would definitely recommend CoW anytime! I am able to access my slides from any device, less stress with lyrics and scriptures, and there's the fast support team too. Peak love!",
+    name: "Anonymous",
+    avatar: "",
+    tagline: "",
+  },
+  {
+    text: "Cloud of Worship has been a game-changer for our church services. The intuitive interface makes it easy for our team to manage song lyrics, scriptures, and multimedia content seamlessly. Highly recommended for any church seeking a modern, efficient, and user-friendly presentation solution.",
+    name: "Emmanuel Sebastian",
+    avatar:
+      "https://senja-io.s3.us-west-1.amazonaws.com/public/avatar/14e49738-03e7-4855-9871-77e84f868b0b_1000384827.jpg",
+    tagline: "Media Handler, MFMCF Unijos",
+  },
+  {
+    text: "Cloud of Worship is, without a doubt, one of the best presentation software tools I've used in years. The design is user-friendly and intuitive, making it enjoyable to use, even for those who aren't tech-savvy. It's absolutely a game-changer.",
+    name: "Darlington Letala",
+    avatar:
+      "https://senja-io.s3.us-west-1.amazonaws.com/public/avatar/1744529c-fde0-410e-953d-2df9954851e1_1614239889013.jpg",
+    tagline: "Church in Zimbabwe",
+  },
+  {
+    text: "Love Cloud of Worship! Great interface, amazing tool for spreading the Gospel. Can't wait to see more exciting features!",
+    name: "Adeshina Grace",
+    avatar:
+      "https://senja-io.s3.us-west-1.amazonaws.com/public/avatar/7b0fae18-1467-4281-a2f2-d2af4b5f0d80_IMG_3863.jpeg",
+    tagline: "Media, Fountain of Mercy Christian Church",
+  },
+  {
+    text: "When I suddenly realised a significant improvement in the screen display, such that worship lyrics, Bible references and slides now come up speedily without delay, I knew something different had been added. I strongly recommend it for churches in need of an easy to use, yet efficient and reliable church presentation software.",
+    name: "Engr Adebayo Awoyele",
+    avatar:
+      "https://senja-io.s3.us-west-1.amazonaws.com/public/media/86f4d51b-de77-4860-b579-d31e86b76dc2_4025598a-64f3-484c-9528-c099131a38ff_bayo.jpg",
+    tagline: "Congregant, FGC Ifako (Salvation Chapel)",
+  },
+  {
+    text: "The app's ability for different users to create accounts and share lyrics fosters community. Cloud of Worship is indispensable, and we highly recommend it for any congregation looking to enhance their worship experience.",
+    name: "Yinka Adenikinju",
+    avatar: "/images/testimonials/bro-yinka.jpg",
+    tagline: "Head of Media Ministry, Foursquare Gospel Church",
+  },
+  {
+    text: "It is my pleasure to vet Cloud of Worship to be an excellent user centered application. Its user interface is very intuitive. The fact that it can virtually do what other projecting software does is amazing to me.",
+    name: "Oluwasegun Akindele",
+    avatar:
+      "https://senja-io.s3.us-west-1.amazonaws.com/public/avatar/7ad11edd-5712-4470-89b0-9b061cf04cf0_passport.png",
+    tagline: "IT Support Specialist",
+  },
+  {
+    text: "As a media personnel, finding the right projection software has always been challenging. However, Cloud of Worship has revolutionized our work. The user interface is incredibly intuitive, allowing our team to learn and operate it with ease quickly.",
+    name: "Moshood Olawale Mustapha",
+    avatar:
+      "https://senja-io.s3.us-west-1.amazonaws.com/public/media/f8ce11c2-a830-421d-8af7-d1d09bf9b187_df19ae10-92da-41ce-8eec-387ba2364b72_moshood.jpg",
+    tagline: "Live Streaming Lead, RCF Unilag",
+  },
+  {
+    text: "I love using Cloud of Worship. Despite the problems and challenges I sometimes have using it, the upgrades, features and really adaptable UI makes it one of my best church presentation software.",
+    name: "Daniel",
+    avatar: "",
+    tagline: "",
+  },
+]
+
+// Review slideshow state
+const currentReviewIndex = ref(0)
+const reviewContainer = ref<HTMLElement | null>(null)
+const reviewSlides = ref<HTMLElement[]>([])
 const visible = ref(false)
-const selectedPlan = ref<PaymentPlan>("yearly")
+let reviewInterval: ReturnType<typeof setInterval> | null = null
+
+// Randomized reviews - shuffled each time modal opens
+const shuffledReviews = ref([...reviews])
+
+// Fisher-Yates shuffle algorithm
+const shuffleReviews = () => {
+  const array = [...reviews]
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[array[i], array[j]] = [array[j], array[i]]
+  }
+  shuffledReviews.value = array
+}
+
+const animateToNextReview = () => {
+  if (!reviewSlides.value || reviewSlides.value.length === 0) return
+
+  const currentSlide = reviewSlides.value[currentReviewIndex.value]
+  const nextIndex =
+    (currentReviewIndex.value + 1) % shuffledReviews.value.length
+  const nextSlide = reviewSlides.value[nextIndex]
+
+  if (!currentSlide || !nextSlide) return
+
+  // Animate current slide out
+  gsap.to(currentSlide, {
+    opacity: 0,
+    y: -12,
+    duration: 0.5,
+    ease: "power2.inOut",
+    onComplete: () => {
+      currentSlide.classList.add("absolute", "inset-0", "pointer-events-none")
+      currentSlide.style.opacity = "0"
+
+      // Update index
+      currentReviewIndex.value = nextIndex
+
+      // Prepare next slide
+      nextSlide.classList.remove("absolute", "inset-0", "pointer-events-none")
+
+      // Animate next slide in
+      gsap.fromTo(
+        nextSlide,
+        { opacity: 0, y: 12 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.5,
+          ease: "power2.inOut",
+        }
+      )
+    },
+  })
+}
+
+const startReviewSlideshow = () => {
+  stopReviewSlideshow()
+  reviewInterval = setInterval(animateToNextReview, 6000)
+}
+
+const stopReviewSlideshow = () => {
+  if (reviewInterval) {
+    clearInterval(reviewInterval)
+    reviewInterval = null
+  }
+}
+
+// Watch modal visibility to start/stop slideshow
+watch(visible, (isVisible) => {
+  if (isVisible) {
+    // Shuffle reviews when modal opens
+    shuffleReviews()
+
+    // Reset to first review when modal opens
+    currentReviewIndex.value = 0
+    nextTick(() => {
+      // Reset all slides
+      reviewSlides.value?.forEach((slide, i) => {
+        if (i === 0) {
+          slide.classList.remove("absolute", "inset-0", "pointer-events-none")
+          gsap.set(slide, { opacity: 1, y: 0 })
+        } else {
+          slide.classList.add("absolute", "inset-0", "pointer-events-none")
+          gsap.set(slide, { opacity: 0, y: 0 })
+        }
+      })
+      startReviewSlideshow()
+    })
+  } else {
+    stopReviewSlideshow()
+  }
+})
 
 // Use payment composable
 const {
@@ -406,6 +582,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   emitter.off("show-upgrade-modal")
+  stopReviewSlideshow()
 })
 
 const handleUpgrade = async () => {
@@ -470,6 +647,10 @@ const handleSuccessModalClose = () => {
 .upgrade-modal {
   max-height: 90vh;
   /* overflow: hidden; */
+}
+
+.review-slide {
+  will-change: opacity, transform;
 }
 
 .overlay {
