@@ -336,8 +336,10 @@ const reviews = [
 const currentReviewIndex = ref(0)
 const reviewContainer = ref<HTMLElement | null>(null)
 const reviewSlides = ref<HTMLElement[]>([])
-const visible = ref(false)
 let reviewInterval: ReturnType<typeof setInterval> | null = null
+
+const visible = ref(false)
+const selectedPlan = ref<PaymentPlan>("yearly")
 
 // Randomized reviews - shuffled each time modal opens
 const shuffledReviews = ref([...reviews])
