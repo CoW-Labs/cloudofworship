@@ -82,7 +82,7 @@ export const quickActionsArr: QuickAction[] = [
     meta: "",
     unreleased: false,
     type: slideTypes.bible,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-bx-church",
@@ -91,7 +91,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newHymn,
     meta: "",
     type: slideTypes.hymn,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-lucide-music-2",
