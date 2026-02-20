@@ -298,12 +298,13 @@ export const useAppStore = defineStore("app", {
       this.currentState.backgroundVideos = bgVideos
     },
     setDefaultSlideBackgrounds() {
-
-      this.currentState.settings.defaultBackground.hymn.background =
-        this.currentState.settings.defaultBackground.bible.background =
-        bgVideos?.[2]?.url
-      this.currentState.settings.defaultBackground.text.background =
-        bgVideos?.[3]?.url
+      if (this.currentState.backgroundVideos.length >= 4) {
+        this.currentState.settings.defaultBackground.hymn.background =
+          this.currentState.settings.defaultBackground.bible.background =
+          this.currentState.backgroundVideos[2].url
+        this.currentState.settings.defaultBackground.text.background =
+          this.currentState.backgroundVideos[3].url
+      }
     },
     setRecentBibleSearches(searchQuery: string) {
       if (searchQuery) {
