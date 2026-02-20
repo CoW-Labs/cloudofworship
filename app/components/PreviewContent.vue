@@ -770,10 +770,8 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 const onUpdateSlide = (slide: Slide) => {
   // Always pause countdown slide before updating it
   if (slide.type === slideTypes.countdown) {
-    const { updatedSlide } = startCountdownTimer(slide)
-    if (updatedSlide) {
-      slide = updatedSlide
-    }
+    // pause the active countdown animation so edits don't conflict
+    stopCountdown()
   }
 
   makeSlideActive(slide)
@@ -785,13 +783,9 @@ const onUpdateSlide = (slide: Slide) => {
   updateSlideOnline(slide)
   updateLiveOutput(slide)
 
-  // When updating of countdown slide is done, continue timer
+  // When updating of countdown slide is done, resume timer
   if (slide.type === slideTypes.countdown) {
-    const { updatedSlide } = startCountdownTimer(slide)
-    if (updatedSlide) {
-      slides.value?.splice(slideIndex || 0, 1, updatedSlide)
-      updateLiveOutput(updatedSlide)
-    }
+    startCountdown(slide)
   }
 }
 
