@@ -5,7 +5,6 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "packageManager": "yarn@3.6.3",
   "scripts": {
     "build": "nuxt generate",
     "dev": "nuxt dev --port 3000",
