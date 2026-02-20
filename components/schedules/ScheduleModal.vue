@@ -120,6 +120,10 @@
                 @select="(schedule: Schedule) => {
                   appStore.setActiveSchedule(schedule)
                   useGlobalEmit(appWideActions.selectedSchedule, schedule)
+                  usePosthogCapture('SCHEDULE_SELECTED', {
+                    scheduleName: schedule.name,
+                    scheduleId: schedule._id,
+                  })
                   $emit('close')
                 }"
                 @delete="deleteSchedule($event)"
@@ -256,6 +260,12 @@ const createNewSchedule = () => {
   scheduleName.value = ""
 
   emit("close")
+  
+  // Track schedule creation
+  usePosthogCapture("SCHEDULE_CREATED", {
+    scheduleName: schedule.name,
+    hasSlides: appStore.currentState.activeSlides.length > 0,
+  })
 }
 
 const uploadBatchSchedules = async () => {

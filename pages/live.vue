@@ -186,6 +186,13 @@ onMounted(() => {
     try {
       const updatedSlide = JSON.parse(data) as Slide
 
+      // Track slide presentation
+      usePosthogCapture("SLIDE_PRESENTED_LIVE", {
+        slideType: updatedSlide?.type,
+        slideLayout: updatedSlide?.layout,
+        slideId: updatedSlide?.id,
+      })
+
       // Check if this is just a content update within the same slide
       const isSameSlide = mostUpdatedLiveSlide.value?.id === updatedSlide.id
 
