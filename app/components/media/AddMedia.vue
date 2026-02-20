@@ -224,6 +224,7 @@
 </template>
 <script setup lang="ts">
 import { appWideActions } from "~/utils/constants"
+import { useAuthStore } from "~/store/auth"
 import type { Emitter } from "mitt"
 import type { ExtendedFileT, ExternalVideo } from "~/types"
 
