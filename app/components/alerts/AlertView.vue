@@ -3,7 +3,7 @@
   <Transition name="fade-sm">
     <div
       v-if="currentState?.activeAlert"
-      class="marquee w-[100%] absolute font-bold flex come-up-1"
+      class="marquee w-[100%] absolute font-bold flex come-up-1 z-20"
       :style="`background: ${currentState?.activeAlert.background}`"
       :class="[
         currentState?.activeAlert.style,

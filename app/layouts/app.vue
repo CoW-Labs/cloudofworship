@@ -4,6 +4,7 @@
     class="app-ctn max-h-[100vh] overflow-hidden text"
   >
     <Navbar :app-version="appVersion" :online="isAppOnline" />
+    <SubscriptionExpiryBanner />
     <slot />
     <FullScreenLoader v-if="fullScreenLoading" />
     <ClientOnly>
