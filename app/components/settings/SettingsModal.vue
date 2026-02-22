@@ -92,7 +92,7 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
-const { fetchUserSettings, debouncedSaveSettings } = useUserSettings()
+const { fetchUserSettings, saveSettingsLocally, debouncedSaveSettings } = useUserSettings()
 const settingsModalOpen = ref(props.isOpen)
 const tabs = [
   { name: "Account/Profile Settings", active: false },
@@ -113,19 +113,22 @@ watch(
     if (props.isOpen) {
       activeTab.value = props.page || "Slide Settings"
 
-      // Fetch latest user settings when modal opens
+      // Fetch latest user settings when modal opens.
+      // fetchUserSettings will skip the update if there was a recent local save,
+      // preventing stale server data from overwriting in-progress user edits.
       await fetchUserSettings()
     }
   }
 )
 
-// Watch for changes in settings and auto-save
+// Watch for changes in settings and save
 watch(
   () => appStore.currentState.settings,
-  () => {
+  (newSettings) => {
     if (settingsModalOpen.value) {
-      // Debounced auto-save when settings change
-      // Don't pass settings parameter to ensure we always get the latest from store
+      // Save locally immediately so the change is never lost
+      saveSettingsLocally(newSettings)
+      // Debounce the online save to once every 3 seconds
       debouncedSaveSettings()
     }
   },

@@ -3,6 +3,10 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { useDebounceFn } from "@vueuse/core"
 
+// Track the timestamp of the last local settings change across composable instances
+// so that fetchUserSettings can skip overwriting in-flight user edits
+let lastLocalSaveTimestamp = 0
+
 export const useUserSettings = () => {
   const appStore = useAppStore()
   const authStore = useAuthStore()
@@ -11,9 +15,27 @@ export const useUserSettings = () => {
   const error = ref<string | null>(null)
 
   /**
-   * Fetch user settings from the backend
+   * Save settings immediately to the local store (no network call).
+   * Call this on every settings change for instant local persistence.
    */
-  const fetchUserSettings = async (): Promise<AppSettings | null> => {
+  const saveSettingsLocally = (settings: AppSettings) => {
+    lastLocalSaveTimestamp = Date.now()
+    appStore.setAppSettings(settings)
+  }
+
+  /**
+   * Fetch user settings from the backend.
+   * Skipped if a local save happened within the last 5 seconds to avoid
+   * overwriting in-progress user edits with stale server data.
+   */
+  const fetchUserSettings = async (force = false): Promise<AppSettings | null> => {
+    // Don't overwrite settings that were just edited locally
+    const timeSinceLastSave = Date.now() - lastLocalSaveTimestamp
+    if (!force && timeSinceLastSave < 5000) {
+      console.log('⏭️ Skipping settings fetch — recent local save detected')
+      return null
+    }
+
     try {
       loading.value = true
       error.value = null
@@ -94,7 +116,8 @@ export const useUserSettings = () => {
   }
 
   /**
-   * Save user settings to the backend
+   * Save user settings to the backend (online only).
+   * Always reads the latest settings from the store to avoid stale captures.
    */
   const saveUserSettings = async (settings?: AppSettings): Promise<boolean> => {
     try {
@@ -103,7 +126,7 @@ export const useUserSettings = () => {
 
       const settingsToSave = settings || appStore.currentState.settings
 
-      console.log('💾 Saving user settings:', {
+      console.log('💾 Saving user settings online:', {
         textBold: settingsToSave.slideStyles.textBold,
         lettercase: settingsToSave.slideStyles.lettercase,
         textOutlined: settingsToSave.slideStyles.textOutlined,
@@ -154,7 +177,7 @@ export const useUserSettings = () => {
         throw new Error(response.error.value?.message || 'Failed to save settings')
       }
 
-      console.log('✅ User settings saved successfully')
+      console.log('✅ User settings saved online successfully')
 
       return true
     } catch (err: any) {
@@ -176,17 +199,19 @@ export const useUserSettings = () => {
   }
 
   /**
-   * Auto-save settings with debounce
+   * Debounced online save — fires 3 seconds after the last call.
+   * Always captures the latest store state at call time (no stale closure).
    */
-  const debouncedSaveSettings = useDebounceFn((settings?: AppSettings) => {
-    saveUserSettings(settings)
-  }, 2000)
+  const debouncedSaveSettings = useDebounceFn(() => {
+    saveUserSettings()
+  }, 3000)
 
   return {
     loading,
     error,
     fetchUserSettings,
     saveUserSettings,
+    saveSettingsLocally,
     debouncedSaveSettings,
   }
 }
