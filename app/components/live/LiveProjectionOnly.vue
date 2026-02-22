@@ -374,6 +374,11 @@ watch(
         document.documentElement.requestFullscreen()
       }
 
+      // Guard: slide may be undefined when the watcher fires
+      if (!props.slide) {
+        return
+      }
+
       // Only proceed if this is the active live slide
       if (!appMounted || props.slide.id !== currentState.value?.liveSlideId) {
         return
@@ -405,7 +410,8 @@ watch(
 
 // Separate watcher for slide content/style changes (debounced)
 const handleSlideContentChange = useDebounceFn(() => {
-  if (!appMounted || props.slide.id !== currentState.value?.liveSlideId) {
+  // Guard: slide may be undefined when the debounced callback fires
+  if (!props.slide || !appMounted || props.slide.id !== currentState.value?.liveSlideId) {
     return
   }
 
