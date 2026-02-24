@@ -478,7 +478,7 @@ export const useAppStore = defineStore("app", {
       this.setLiveSlide("")
       this.setEmitter(null)
       this.setAppSettings({
-        appVersion: "0.1.0",
+        appVersion: this.currentState.settings.appVersion, // preserve current version to avoid re-triggering changelog
         defaultBibleVersion: "KJV",
         defaultFont: "Inter",
         defaultBackground: {
@@ -518,6 +518,11 @@ export const useAppStore = defineStore("app", {
       this.setFailedUploadRequests(null)
       this.setSlidesLoading(false)
       this.setLastSynced(new Date().toISOString())
+      this.setMainDisplayLabel("")
+      this.setMainDisplayScreen(null)
+      this.currentState.onlineUsers = []
+      this.currentState.slidesBeingEdited = {}
+      this.refreshAppActionsStack()
       posthog.reset()
     },
     // Undo/Redo Actions

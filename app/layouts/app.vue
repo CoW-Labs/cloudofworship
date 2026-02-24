@@ -501,7 +501,16 @@ const overrideAppSettings = async () => {
   // TODO: When appSettings is editable by user, it must take preference over system settings and override
   if (currentAppSettings.appVersion !== props.appVersion) {
     setTimeout(() => {
-      useGlobalEmit(appWideActions.showChangelog)
+      // Only show changelog modal for major or minor version bumps, not patch updates
+      // e.g. 0.43.8 -> 0.44.0 shows changelog, but 0.43.8 -> 0.43.9 does not
+      const prevParts = (currentAppSettings.appVersion || '0.0.0').split('.').map(Number)
+      const newParts = (props.appVersion || '0.0.0').split('.').map(Number)
+      const isMajorOrMinorUpdate =
+        newParts[0] > prevParts[0] || // major bump
+        (newParts[0] === prevParts[0] && newParts[1] > prevParts[1]) // minor bump
+      if (isMajorOrMinorUpdate) {
+        useGlobalEmit(appWideActions.showChangelog)
+      }
     }, 2000)
 
     // Any setting added here overrides user and previous system setting
@@ -910,13 +919,7 @@ async function openWindows() {
     }
 
     if (noOfScreens === 1) {
-      useToast().add({
-        title:
-          "Only one screen detected. Connect a second screen to project on another display",
-        icon: "i-bx-info-circle",
-      })
-
-      // Two screens or more
+      // No secondary monitor — just open live window on the current/only screen
       const screen1 = screenDetails.screens[0]
       openWindow(
         screen1.availLeft,
@@ -966,11 +969,14 @@ async function openWindows() {
       // TODO: Action when screen count changes
     })
   } else {
-    useToast().add({
-      title: "Your browser does not support automatic displays detection",
-      icon: "i-bx-info-circle",
-      color: "amber",
-    })
+    // Browser doesn't support Screen Details API — open live window in a new tab/window
+    openWindow(
+      0,
+      0,
+      window.screen.availWidth,
+      window.screen.availHeight,
+      `http://${window.location.host}/live`
+    )
   }
 }
 // WINDOW MANAGEMENT CODE ENDS HERE
