@@ -324,12 +324,6 @@ const reviews = [
       "https://senja-io.s3.us-west-1.amazonaws.com/public/media/f8ce11c2-a830-421d-8af7-d1d09bf9b187_df19ae10-92da-41ce-8eec-387ba2364b72_moshood.jpg",
     tagline: "Live Streaming Lead, RCF Unilag",
   },
-  {
-    text: "I love using Cloud of Worship. Despite the problems and challenges I sometimes have using it, the upgrades, features and really adaptable UI makes it one of my best church presentation software.",
-    name: "Daniel",
-    avatar: "",
-    tagline: "",
-  },
 ]
 
 // Review slideshow state
