@@ -33,7 +33,7 @@ const useScriptureChapter = async (label: string = '1:1', version: string = ''):
       labelShortFormat: label
     }
   } catch (err) {
-    // console.log(err)
+    console.log(err)
     toast.add({ title: 'Scripture not found', icon: 'i-bx-error', color: 'red' })
   }
 
