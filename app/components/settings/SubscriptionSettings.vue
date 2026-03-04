@@ -372,7 +372,7 @@ const fetchSubscriptionDetails = async (showLoader = true) => {
   error.value = null
 
   const { data, error: fetchError } = await useAPIFetch(
-    "/subscriptions/details"
+    "/billing/details"
   )
 
   if (fetchError.value) {
@@ -396,7 +396,7 @@ const cancelSubscription = async () => {
   canceling.value = true
 
   const { data, error: cancelError } = await useAPIFetch(
-    "/subscriptions/cancel",
+    "/billing/cancel",
     {
       method: "POST",
     }
