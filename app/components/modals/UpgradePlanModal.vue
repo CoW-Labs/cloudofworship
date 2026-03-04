@@ -265,8 +265,8 @@
 </template>
 
 <script setup lang="ts">
-import type { PaymentPlan } from "~/composables/usePayment"
-import { gsap } from "gsap"
+import type { PaymentPlan } from "~/composables/usePayment";
+import { gsap } from "gsap";
 
 // Reviews extracted from user testimonials
 const reviews = [
@@ -324,39 +324,39 @@ const reviews = [
       "https://senja-io.s3.us-west-1.amazonaws.com/public/media/f8ce11c2-a830-421d-8af7-d1d09bf9b187_df19ae10-92da-41ce-8eec-387ba2364b72_moshood.jpg",
     tagline: "Live Streaming Lead, RCF Unilag",
   },
-]
+];
 
 // Review slideshow state
-const currentReviewIndex = ref(0)
-const reviewContainer = ref<HTMLElement | null>(null)
-const reviewSlides = ref<HTMLElement[]>([])
-let reviewInterval: ReturnType<typeof setInterval> | null = null
+const currentReviewIndex = ref(0);
+const reviewContainer = ref<HTMLElement | null>(null);
+const reviewSlides = ref<HTMLElement[]>([]);
+let reviewInterval: ReturnType<typeof setInterval> | null = null;
 
-const visible = ref(false)
-const selectedPlan = ref<PaymentPlan>("yearly")
+const visible = ref(false);
+const selectedPlan = ref<PaymentPlan>("yearly");
 
 // Randomized reviews - shuffled each time modal opens
-const shuffledReviews = ref([...reviews])
+const shuffledReviews = ref([...reviews]);
 
 // Fisher-Yates shuffle algorithm
 const shuffleReviews = () => {
-  const array = [...reviews]
+  const array = [...reviews];
   for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[array[i], array[j]] = [array[j], array[i]]
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
   }
-  shuffledReviews.value = array
-}
+  shuffledReviews.value = array;
+};
 
 const animateToNextReview = () => {
-  if (!reviewSlides.value || reviewSlides.value.length === 0) return
+  if (!reviewSlides.value || reviewSlides.value.length === 0) return;
 
-  const currentSlide = reviewSlides.value[currentReviewIndex.value]
+  const currentSlide = reviewSlides.value[currentReviewIndex.value];
   const nextIndex =
-    (currentReviewIndex.value + 1) % shuffledReviews.value.length
-  const nextSlide = reviewSlides.value[nextIndex]
+    (currentReviewIndex.value + 1) % shuffledReviews.value.length;
+  const nextSlide = reviewSlides.value[nextIndex];
 
-  if (!currentSlide || !nextSlide) return
+  if (!currentSlide || !nextSlide) return;
 
   // Animate current slide out
   gsap.to(currentSlide, {
@@ -365,14 +365,14 @@ const animateToNextReview = () => {
     duration: 0.5,
     ease: "power2.inOut",
     onComplete: () => {
-      currentSlide.classList.add("absolute", "inset-0", "pointer-events-none")
-      currentSlide.style.opacity = "0"
+      currentSlide.classList.add("absolute", "inset-0", "pointer-events-none");
+      currentSlide.style.opacity = "0";
 
       // Update index
-      currentReviewIndex.value = nextIndex
+      currentReviewIndex.value = nextIndex;
 
       // Prepare next slide
-      nextSlide.classList.remove("absolute", "inset-0", "pointer-events-none")
+      nextSlide.classList.remove("absolute", "inset-0", "pointer-events-none");
 
       // Animate next slide in
       gsap.fromTo(
@@ -383,49 +383,49 @@ const animateToNextReview = () => {
           y: 0,
           duration: 0.5,
           ease: "power2.inOut",
-        }
-      )
+        },
+      );
     },
-  })
-}
+  });
+};
 
 const startReviewSlideshow = () => {
-  stopReviewSlideshow()
-  reviewInterval = setInterval(animateToNextReview, 6000)
-}
+  stopReviewSlideshow();
+  reviewInterval = setInterval(animateToNextReview, 6000);
+};
 
 const stopReviewSlideshow = () => {
   if (reviewInterval) {
-    clearInterval(reviewInterval)
-    reviewInterval = null
+    clearInterval(reviewInterval);
+    reviewInterval = null;
   }
-}
+};
 
 // Watch modal visibility to start/stop slideshow
-watch(visible, (isVisible) => {
+watch(visible, isVisible => {
   if (isVisible) {
     // Shuffle reviews when modal opens
-    shuffleReviews()
+    shuffleReviews();
 
     // Reset to first review when modal opens
-    currentReviewIndex.value = 0
+    currentReviewIndex.value = 0;
     nextTick(() => {
       // Reset all slides
       reviewSlides.value?.forEach((slide, i) => {
         if (i === 0) {
-          slide.classList.remove("absolute", "inset-0", "pointer-events-none")
-          gsap.set(slide, { opacity: 1, y: 0 })
+          slide.classList.remove("absolute", "inset-0", "pointer-events-none");
+          gsap.set(slide, { opacity: 1, y: 0 });
         } else {
-          slide.classList.add("absolute", "inset-0", "pointer-events-none")
-          gsap.set(slide, { opacity: 0, y: 0 })
+          slide.classList.add("absolute", "inset-0", "pointer-events-none");
+          gsap.set(slide, { opacity: 0, y: 0 });
         }
-      })
-      startReviewSlideshow()
-    })
+      });
+      startReviewSlideshow();
+    });
   } else {
-    stopReviewSlideshow()
+    stopReviewSlideshow();
   }
-})
+});
 
 // Use payment composable
 const {
@@ -437,7 +437,7 @@ const {
   fetchPlans: fetchPaymentPlans,
   initiatePayment,
   loadPaystackScript,
-} = usePayment()
+} = usePayment();
 
 // Use subscription plans composable
 const {
@@ -452,52 +452,52 @@ const {
   formatAmount,
   setTestCurrency,
   getTestCurrency,
-} = useSubscriptionPlans()
+} = useSubscriptionPlans();
 
 // Helper for testing: Allow manual currency switch
 const switchCurrency = (currency: "NGN" | "USD") => {
-  setTestCurrency(currency)
-  selectedCurrency.value = currency
-  detectedCurrency.value = currency
-}
+  setTestCurrency(currency);
+  selectedCurrency.value = currency;
+  detectedCurrency.value = currency;
+};
 
 // Get pricing from API
 const yearlyPrice = computed(() => {
-  const plan = getPlanByIntervalAndCurrency("yearly", selectedCurrency.value)
-  if (!plan) return 0
+  const plan = getPlanByIntervalAndCurrency("yearly", selectedCurrency.value);
+  if (!plan) return 0;
 
   // For USD, use amountCents if available
   if (plan.currency === "USD" && plan.amountCents) {
-    return plan.amountCents / 100 // Convert cents to dollars
+    return plan.amountCents / 100; // Convert cents to dollars
   }
 
-  return plan.amount
-})
+  return plan.amount;
+});
 
 const monthlyPrice = computed(() => {
-  const plan = getPlanByIntervalAndCurrency("monthly", selectedCurrency.value)
-  if (!plan) return 0
+  const plan = getPlanByIntervalAndCurrency("monthly", selectedCurrency.value);
+  if (!plan) return 0;
 
   // For USD, use amountCents if available
   if (plan.currency === "USD" && plan.amountCents) {
-    return plan.amountCents / 100 // Convert cents to dollars
+    return plan.amountCents / 100; // Convert cents to dollars
   }
 
-  return plan.amount
-})
+  return plan.amount;
+});
 
 const currencySymbol = computed(() => {
-  return getCurrencySymbol(selectedCurrency.value)
-})
+  return getCurrencySymbol(selectedCurrency.value);
+});
 
 const features = computed(() => {
   const plan = getPlanByIntervalAndCurrency(
     selectedPlan.value,
-    selectedCurrency.value
-  )
+    selectedCurrency.value,
+  );
 
   if (plan?.features && plan.features.length > 0) {
-    return plan.features.slice(1, 6)
+    return plan.features.slice(1, 6);
   }
 
   // Fallback features if API doesn't provide them
@@ -507,17 +507,17 @@ const features = computed(() => {
     "YouTube & Vimeo video support",
     "Dynamic countdown timers",
     "5GB cloud storage",
-  ]
-})
+  ];
+});
 
-const emitter = useNuxtApp().$emitter as any
+const emitter = useNuxtApp().$emitter as any;
 
 onMounted(async () => {
   // Detect user's currency based on location
-  await detectCurrency()
+  await detectCurrency();
 
   // Fetch all subscription plans from API (both NGN and USD)
-  await fetchPlans()
+  await fetchPlans();
 
   // For local testing: Override currency detection by setting in console
   // localStorage.setItem('test_currency', 'USD') or localStorage.setItem('test_currency', 'NGN')
@@ -526,16 +526,16 @@ onMounted(async () => {
   emitter.on(
     "show-upgrade-modal",
     (data?: { planCode?: string; planId?: string }) => {
-      visible.value = true
+      visible.value = true;
 
       // Set plan based on plan_id (preferred) or plan_code (legacy support)
       if (data?.planId) {
         // Use plan_id to find the plan
-        const plan = plans.value.find((p) => p.id === data.planId)
+        const plan = plans.value.find(p => p.id === data.planId);
         if (plan) {
-          selectedPlan.value = plan.interval
+          selectedPlan.value = plan.interval;
           // Override auto-detected currency with plan's currency if specified
-          selectedCurrency.value = plan.currency
+          selectedCurrency.value = plan.currency;
 
           usePosthogCapture("UPGRADE_MODAL_OPENED", {
             planId: data.planId,
@@ -543,14 +543,13 @@ onMounted(async () => {
             currency: plan.currency,
             autoDetectedCurrency: detectedCurrency.value,
             source: "signup",
-          })
+          });
         }
       } else if (data?.planCode) {
-        // Legacy support for plan_code - find plan by paystackCode
-        const plan = plans.value.find((p) => p.paystackCode === data.planCode)
+        const plan = plans.value.find(p => p.planCode === data.planCode);
         if (plan) {
-          selectedPlan.value = plan.interval
-          selectedCurrency.value = plan.currency
+          selectedPlan.value = plan.interval;
+          selectedCurrency.value = plan.currency;
 
           usePosthogCapture("UPGRADE_MODAL_OPENED", {
             planCode: data.planCode,
@@ -559,7 +558,7 @@ onMounted(async () => {
             currency: plan.currency,
             autoDetectedCurrency: detectedCurrency.value,
             source: "signup",
-          })
+          });
         }
       } else {
         // No specific plan provided, use auto-detected currency
@@ -567,26 +566,26 @@ onMounted(async () => {
           source: "feature_gate",
           currency: selectedCurrency.value,
           autoDetectedCurrency: detectedCurrency.value,
-        })
+        });
       }
-    }
-  )
+    },
+  );
 
   // Preload Paystack script
-  loadPaystackScript().catch(console.error)
-})
+  loadPaystackScript().catch(console.error);
+});
 
 onBeforeUnmount(() => {
-  emitter.off("show-upgrade-modal")
-  stopReviewSlideshow()
-})
+  emitter.off("show-upgrade-modal");
+  stopReviewSlideshow();
+});
 
 const handleUpgrade = async () => {
   // Get the selected plan details
   const planDetails = getPlanByIntervalAndCurrency(
     selectedPlan.value,
-    selectedCurrency.value
-  )
+    selectedCurrency.value,
+  );
 
   if (!planDetails) {
     useToast().add({
@@ -594,15 +593,15 @@ const handleUpgrade = async () => {
       title: "Plan Not Found",
       description: "The selected plan is not available. Please try again.",
       color: "red",
-    })
-    return
+    });
+    return;
   }
 
   // Get the actual amount to charge (using amountCents for USD)
   const amount =
     selectedCurrency.value === "USD" && planDetails.amountCents
       ? planDetails?.amountCents || 0
-      : planDetails?.amountKobo || 0
+      : planDetails?.amountKobo || 0;
 
   // Track upgrade attempt with currency
   usePosthogCapture("UPGRADE_INITIATED", {
@@ -611,32 +610,32 @@ const handleUpgrade = async () => {
     autoDetectedCurrency: detectedCurrency.value,
     amount: amount,
     planId: planDetails?.id,
-  })
+  });
 
   await initiatePayment({
     plan: selectedPlan.value,
     currency: selectedCurrency.value,
-    onSuccess: async (reference) => {
-      visible.value = false
-      useChurch().fetchChurch()
+    onSuccess: async reference => {
+      visible.value = false;
+      useChurch().fetchChurch();
     },
     onCancel: () => {
       useToast().add({
         icon: "i-heroicons-x-circle",
         title: "Payment Cancelled",
         color: "orange",
-      })
+      });
     },
-    onError: (error) => {
-      console.error("Payment error:", error)
+    onError: error => {
+      console.error("Payment error:", error);
     },
-  })
-}
+  });
+};
 
 const handleSuccessModalClose = () => {
   // Optionally refresh user data or redirect
   // The modal state is already managed by the composable
-}
+};
 </script>
 
 <style scoped>

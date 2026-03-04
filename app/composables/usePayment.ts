@@ -22,7 +22,7 @@ export interface PlanDetails {
 /**
  * Composable for handling payment operations.
  * - NGN payments → Paystack inline checkout
- * - USD payments → Dodo Payments overlay checkout (no backend call needed)
+ * - USD payments → Dodo Payments overlay checkout (initialize + confirm via backend)
  */
 export const usePayment = () => {
   const authStore = useAuthStore()
@@ -62,11 +62,8 @@ export const usePayment = () => {
       const backendPlan = subscriptionPlans.getPlanByIntervalAndCurrency(plan, currency)
       if (!backendPlan) throw new Error('Selected plan is not available')
 
-      const planCode = backendPlan.planCode
-      if (!planCode) throw new Error('Plan code is not configured')
-
       const planDetails: PlanDetails = {
-        code: planCode,
+        code: backendPlan.alias,
         amount: backendPlan.amountCents || 0,
         name: plan === 'yearly' ? 'Yearly' : 'Monthly',
         discount: backendPlan.discount || undefined,
@@ -86,9 +83,9 @@ export const usePayment = () => {
       trackPaymentInitiated(planDetails.code, planDetails.amount, planDetails.currency)
 
       // Initialize checkout session on the backend
-      const { data: sessionData, error: sessionError } = await useAPIFetch<{ checkoutUrl: string }>('/subscription/initialize', {
+      const { data: sessionData, error: sessionError } = await useAPIFetch<{ message: string; data: { checkoutUrl: string; sessionId: string } }>('/billing/initialize', {
         method: 'POST',
-        body: { plan_code: backendPlan.alias, provider: 'dodo' },
+        body: { planAlias: backendPlan.alias, provider: 'dodo' },
         key: 'dodo-checkout-init',
       })
 
@@ -96,14 +93,15 @@ export const usePayment = () => {
         throw new Error(sessionError.value?.data?.message || sessionError.value?.message || 'Failed to initialize payment session.')
       }
 
-      const checkoutUrl = sessionData.value?.checkoutUrl
-      if (!checkoutUrl) throw new Error('Failed to initialize payment session. Please try again.')
+      const checkoutUrl = sessionData.value?.data?.checkoutUrl
+      const sessionId = sessionData.value?.data?.sessionId
+      if (!checkoutUrl || !sessionId) throw new Error('Failed to initialize payment session. Please try again.')
 
       // Initialise SDK and open overlay
       DodoPayments.Initialize({
         mode: isProduction ? 'live' : 'test',
         displayType: 'overlay',
-        onEvent: (event: any) => {
+        onEvent: async (event: any) => {
           switch (event.event_type) {
             case 'checkout.opened':
               loading.value = false
@@ -127,7 +125,27 @@ export const usePayment = () => {
             case 'checkout.status': {
               const status = event.data?.message?.status as 'succeeded' | 'failed' | 'processing' | undefined
               if (status === 'succeeded') {
+                DodoPayments.Checkout.close()
                 usePosthogCapture('PAYMENT_SUCCESSFUL', { plan, amount: planDetails.amount, currency: planDetails.currency, provider: 'dodo' })
+
+                // Confirm subscription with backend and refresh church state immediately
+                try {
+                  const { data: confirmData } = await useAPIFetch<{ message: string; data: { status: string } }>('/billing/confirm', {
+                    method: 'POST',
+                    body: { sessionId },
+                    key: `dodo-confirm-${sessionId}`,
+                  })
+                  if (confirmData.value?.data?.status === 'active') {
+                    if (authStore.church) {
+                      authStore.setChurch({ ...authStore.church, subscriptionPlan: 'teams' })
+                    }
+                    authStore.clearSubscriptionDetails()
+                  }
+                } catch (confirmErr) {
+                  console.error('Failed to confirm Dodo subscription:', confirmErr)
+                  // Webhook will still activate — don't block success modal
+                }
+
                 successPlanName.value = planDetails.name
                 showSuccessModal.value = true
                 onSuccess?.('dodo_payment_succeeded')
@@ -208,7 +226,7 @@ export const usePayment = () => {
       return null
     }
     return {
-      code: backendPlan.planCode || backendPlan.paystackCode,
+      code: backendPlan.planCode || '',
       amount: backendPlan.amountKobo || 0,
       name: plan === 'yearly' ? 'Yearly' : 'Monthly',
       discount: backendPlan.discount || undefined,
