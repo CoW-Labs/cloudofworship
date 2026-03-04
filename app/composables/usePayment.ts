@@ -227,7 +227,7 @@ export const usePayment = () => {
     }
     return {
       code: backendPlan.planCode || '',
-      amount: backendPlan.amountKobo || 0,
+      amount: backendPlan.amount || 0,
       name: plan === 'yearly' ? 'Yearly' : 'Monthly',
       discount: backendPlan.discount || undefined,
       currency: backendPlan.currency,
