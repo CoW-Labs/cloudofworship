@@ -171,7 +171,7 @@ export const useSubscriptionPlans = () => {
     try {
       const queryParams = currency ? `?currency=${currency}` : ''
       const response = await useAPIFetch<SubscriptionPlansResponse>(
-        `/subscriptions/plans${queryParams}`,
+        `/billing/plans${queryParams}`,
         {
           method: 'GET',
         }
