@@ -17,6 +17,10 @@ const useScriptureChapter = async (label: string = '1:1', version: string = ''):
   let verses: BibleVerse[] = []
 
   try {
+    if (!version) {
+      throw new Error('No Bible version selected. Please download a Bible version in Settings.')
+    }
+
     async function fetchVerses(version: string, db: any, book: number, chapter: number): Promise<any[]> {
       const bibleData = (await db.bibleAndHymns.get(version))?.data as unknown as BibleVerse[];
       return bibleData?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter);

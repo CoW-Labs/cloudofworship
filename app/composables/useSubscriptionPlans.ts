@@ -5,7 +5,7 @@ export interface SubscriptionPlanFeature {
 export interface SubscriptionPlan {
   id: string
   alias: string
-  paystackCode: string
+  planCode: string | null  // Paystack plan code (NGN plans only); null for USD/Dodo plans
   amount: number
   amountKobo: number | null
   amountCents: number | null
@@ -30,7 +30,7 @@ export const useSubscriptionPlans = () => {
   const selectedCurrency = ref<'NGN' | 'USD'>('USD') // Default to USD
   const detectedCurrency = ref<'NGN' | 'USD' | null>(null)
   const isDetectingCurrency = ref(false)
-  
+
   // Allow local testing by setting currency in localStorage
   const getTestCurrency = (): 'NGN' | 'USD' | null => {
     if (process.client) {
@@ -41,7 +41,7 @@ export const useSubscriptionPlans = () => {
     }
     return null
   }
-  
+
   const setTestCurrency = (currency: 'NGN' | 'USD' | null) => {
     if (process.client) {
       if (currency) {
@@ -64,7 +64,7 @@ export const useSubscriptionPlans = () => {
       selectedCurrency.value = testCurrency
       return testCurrency
     }
-    
+
     // Check if already detected in this session
     if (detectedCurrency.value) {
       return detectedCurrency.value
@@ -94,11 +94,12 @@ export const useSubscriptionPlans = () => {
 
       // African countries (excluding South Africa) that should use NGN
       const africanCountriesForNGN = [
-        'NG', 'GH', 'KE', 'TZ', 'UG', 'RW', 'ET', 'EG', 'DZ', 'MA',
-        'TN', 'LY', 'SD', 'SS', 'SO', 'DJ', 'ER', 'SN', 'ML', 'BF',
-        'NE', 'TD', 'MR', 'GM', 'GW', 'SL', 'LR', 'CI', 'BJ', 'TG',
-        'CM', 'CF', 'GQ', 'GA', 'CG', 'CD', 'AO', 'ZM', 'ZW', 'MW',
-        'MZ', 'MG', 'MU', 'SC', 'KM', 'BW', 'NA', 'LS', 'SZ', 'BI'
+        'NG', 'GH', 'KE',
+        // 'TZ', 'UG', 'RW', 'ET', 'EG', 'DZ', 'MA',
+        // 'TN', 'LY', 'SD', 'SS', 'SO', 'DJ', 'ER', 'SN', 'ML', 'BF',
+        // 'NE', 'TD', 'MR', 'GM', 'GW', 'SL', 'LR', 'CI', 'BJ', 'TG',
+        // 'CM', 'CF', 'GQ', 'GA', 'CG', 'CD', 'AO', 'ZM', 'ZW', 'MW',
+        // 'MZ', 'MG', 'MU', 'SC', 'KM', 'BW', 'NA', 'LS', 'SZ', 'BI'
       ]
 
       try {
@@ -221,11 +222,16 @@ export const useSubscriptionPlans = () => {
   }
 
   /**
-   * Get plan by Paystack code
+   * Get a plan by its Paystack plan code (NGN plans only)
    */
-  const getPlanByPaystackCode = (code: string): SubscriptionPlan | undefined => {
-    return plans.value.find((plan) => plan.paystackCode === code)
+  const getPlanByPlanCode = (code: string): SubscriptionPlan | undefined => {
+    return plans.value.find((plan) => plan.planCode === code)
   }
+
+  /**
+   * @deprecated Use getPlanByPlanCode instead
+   */
+  const getPlanByPaystackCode = getPlanByPlanCode
 
   /**
    * Get plan by ID
@@ -261,6 +267,7 @@ export const useSubscriptionPlans = () => {
     getPlansByCurrency,
     getPlanByInterval,
     getPlanByIntervalAndCurrency,
+    getPlanByPlanCode,
     getPlanByPaystackCode,
     getPlanById,
     getCurrencySymbol,
