@@ -1,10 +1,10 @@
-import posthog from "posthog-js"
-import { useAuthStore } from "~/store/auth"
-import { useAppStore } from "~/store/app"
+import posthog from "posthog-js";
+import { useAuthStore } from "~/store/auth";
+import { useAppStore } from "~/store/app";
 
-export default defineNuxtPlugin((nuxtApp) => {
-  const auth = useAuthStore()
-  const appStore = useAppStore()
+export default defineNuxtPlugin(nuxtApp => {
+  const auth = useAuthStore();
+  const appStore = useAppStore();
 
   if (
     !window.location.host.includes("127.0.0.1") &&
@@ -13,7 +13,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     posthog.init("phc_sZj5IKRKRCd6Mv8GrthWQOlWu4ihmCFry3oQAIKrW9T", {
       api_host: "https://us.i.posthog.com",
       person_profiles: "identified_only",
-    })
+    });
     posthog.identify(auth.user?._id, {
       email: auth.user?.email,
       name: auth.user?.fullname,
@@ -21,7 +21,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       church: auth.church?.name,
       church_id: auth.church?._id,
       appVersion: appStore.currentState.settings.appVersion,
-    })
-    nuxtApp.provide("posthog", posthog)
+    });
+    nuxtApp.provide("posthog", posthog);
   }
-})
+});

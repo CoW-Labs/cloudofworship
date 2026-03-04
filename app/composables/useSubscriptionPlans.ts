@@ -5,8 +5,7 @@ export interface SubscriptionPlanFeature {
 export interface SubscriptionPlan {
   id: string
   alias: string
-  planCode: string      // Unified plan code — used for Paystack (NGN), Dodo (USD)
-  paystackCode: string  // @deprecated — use planCode instead
+  planCode: string | null  // Paystack plan code (NGN plans only); null for USD/Dodo plans
   amount: number
   amountKobo: number | null
   amountCents: number | null
@@ -223,19 +222,16 @@ export const useSubscriptionPlans = () => {
   }
 
   /**
-   * Get plan by plan code (works for both Paystack NGN and Dodo USD)
+   * Get a plan by its Paystack plan code (NGN plans only)
    */
   const getPlanByPlanCode = (code: string): SubscriptionPlan | undefined => {
-    return plans.value.find((plan) => plan.planCode === code || plan.paystackCode === code)
+    return plans.value.find((plan) => plan.planCode === code)
   }
 
   /**
-   * Get plan by Paystack code
    * @deprecated Use getPlanByPlanCode instead
    */
-  const getPlanByPaystackCode = (code: string): SubscriptionPlan | undefined => {
-    return plans.value.find((plan) => plan.planCode === code || plan.paystackCode === code)
-  }
+  const getPlanByPaystackCode = getPlanByPlanCode
 
   /**
    * Get plan by ID
