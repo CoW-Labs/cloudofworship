@@ -32,7 +32,6 @@ export const useUserSettings = () => {
     // Don't overwrite settings that were just edited locally
     const timeSinceLastSave = Date.now() - lastLocalSaveTimestamp
     if (!force && timeSinceLastSave < 5000) {
-      console.log('⏭️ Skipping settings fetch — recent local save detected')
       return null
     }
 
@@ -100,8 +99,6 @@ export const useUserSettings = () => {
 
         // Update app store with fetched settings
         appStore.setAppSettings(mergedSettings)
-
-        console.log('✅ User settings loaded successfully')
         return mergedSettings
       }
 
@@ -125,12 +122,6 @@ export const useUserSettings = () => {
       error.value = null
 
       const settingsToSave = settings || appStore.currentState.settings
-
-      console.log('💾 Saving user settings online:', {
-        textBold: settingsToSave.slideStyles.textBold,
-        lettercase: settingsToSave.slideStyles.lettercase,
-        textOutlined: settingsToSave.slideStyles.textOutlined,
-      })
 
       // Extract only the fields that should be saved to the backend
       const backendSettings = {
@@ -176,8 +167,6 @@ export const useUserSettings = () => {
       if (response.error.value) {
         throw new Error(response.error.value?.message || 'Failed to save settings')
       }
-
-      console.log('✅ User settings saved online successfully')
 
       return true
     } catch (err: any) {
