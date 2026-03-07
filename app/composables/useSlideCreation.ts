@@ -316,6 +316,12 @@ export default function useSlideCreation() {
       return newSlides
     }
 
+    // Only upload images to the cloud for teams subscribers
+    const { isTeamsPlan } = useSubscription()
+    if (!isTeamsPlan.value) {
+      return newSlides
+    }
+
     // Upload only image files as backgrounds
     try {
       const uploadedImages = files.map((file: ExtendedFileT) =>

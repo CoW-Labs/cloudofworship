@@ -303,6 +303,26 @@
       action=""
       action-text=""
     />
+    <!-- IMAGE NOT AVAILABLE ON THIS DEVICE NOTICE -->
+    <div
+      v-else-if="imageNotAvailable"
+      class="h-[100%] flex flex-col items-center justify-center gap-4 p-6 text-center bg-primary-900 rounded-b-md"
+    >
+      <IconWrapper name="i-bx-image-alt" size="12" class="text-primary-400" />
+      <div>
+        <h3 class="text-white font-semibold text-md">Image not available on this device</h3>
+        <p class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
+          This image was added on another device and isn't stored in the cloud. Upgrade to Teams to sync media across all your devices.
+        </p>
+      </div>
+      <UButton
+        icon="i-bxs-award"
+        class="mt-1"
+        @click="useGlobalEmit('show-upgrade-modal')"
+      >
+        Upgrade to Teams
+      </UButton>
+    </div>
     <div
       v-else
       class="h-[100%] relative text-white bg-primary-900 bg-no-repeat transition-all rounded-b-md overflow-hidden"
@@ -394,6 +414,52 @@ const animatedSlides = computed(() => {
   }
   return null
 })
+
+/**
+ * Detect if the current media slide has an image that cannot be retrieved from IndexedDB.
+ * This happens when the slide was synced from another device — the background is a stale
+ * blob: URL and there's no matching media entry in IndexedDB on this device.
+ * Only show the upgrade notice when the image truly can't be recovered locally.
+ */
+const imageNotAvailable = ref(false)
+
+watch(
+  () => props.slide?.id,
+  async (newSlideId) => {
+    // Reset immediately when slide changes so the notice doesn't stick
+    imageNotAvailable.value = false
+
+    const newSlide = props.slide
+    if (!newSlide || !newSlideId) return
+    if (newSlide.type !== slideTypes.media) return
+    if (newSlide.backgroundType !== 'image') return
+
+    const bg = newSlide.background
+    if (!bg) return
+
+    // If the background is already a remote URL, it's available everywhere
+    if (bg.startsWith('http://') || bg.startsWith('https://')) return
+
+    // For blob: or data: URLs, check if the media data exists in IndexedDB
+    try {
+      const db = useIndexedDB()
+      const mediaObj = await db.media.get(newSlideId)
+      if (!mediaObj?.data) {
+        // No local media data found — image is not available on this device
+        // Guard against stale watcher: only set if slide hasn't changed
+        if (props.slide?.id === newSlideId) {
+          imageNotAvailable.value = true
+        }
+      }
+    } catch (err) {
+      console.error('Error checking media availability:', err)
+      if (props.slide?.id === newSlideId) {
+        imageNotAvailable.value = true
+      }
+    }
+  },
+  { immediate: true }
+)
 
 // Track total verses in the current Bible chapter for sequential navigation
 const chapterVerseCount = ref<number>(0)
