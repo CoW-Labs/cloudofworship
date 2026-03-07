@@ -91,7 +91,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newHymn,
     meta: "",
     type: slideTypes.hymn,
-    tier: "teams",
+    tier: "free",
   },
   {
     icon: "i-lucide-music-2",
@@ -138,7 +138,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newMedia,
     meta: "",
     type: slideTypes.media,
-    tier: "teams",
+    tier: "free",
     // type: slideTypes.text
   },
   {

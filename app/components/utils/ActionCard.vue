@@ -58,7 +58,7 @@ const isFeatureFlagEnabled = computed(() => {
 // Determine if action should be disabled
 const isActionDisabled = computed(() => {
   // Disable if marked as unreleased and no feature flag is enabled
-  if (props.action?.unreleased && !isFeatureFlagEnabled.value) {
+  if (props.action?.unreleased) {
     return true
   }
   // Disable if feature flag is specified but not enabled
