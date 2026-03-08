@@ -216,18 +216,12 @@ watch(
       // Always update uneditable editors for preview
       if (content0Changed) {
         uneditableEditorOne.value?.commands.setContent(newVal[0] || "")
-
-        console.log("slide-update")
       }
       if (content1Changed) {
         uneditableEditorTwo.value?.commands.setContent(newVal[1] || "")
-
-        console.log("slide-update")
       }
       if (content2Changed) {
         uneditableEditorThree.value?.commands.setContent(newVal[2] || "")
-
-        console.log("slide-update")
       }
     }
   },

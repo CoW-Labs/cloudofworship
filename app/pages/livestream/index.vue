@@ -72,7 +72,7 @@ useHead({
 
 const liveSlide = computed(() => {
   // console.log(activeSlides.value)
-  console.log(currentState.value.liveSlideId)
+  // console.log(currentState.value.liveSlideId)
   return currentState.value.activeSlides.find(
     (slide) => slide.id === currentState.value.liveSlideId
   )
@@ -87,26 +87,13 @@ const checkFullScreen = () => {
 }
 
 onMounted(() => {
-  // const toast = useToast()
-  // toast.add({
-  //   icon: "i-bx-info-circle",
-  //   title: "Double tap display to go full screen",
-  // })
 
   window.addEventListener("fullscreenchange", checkFullScreen)
   window.addEventListener("webkitfullscreenchange", checkFullScreen)
   window.addEventListener("mozfullscreenchange", checkFullScreen)
   window.addEventListener("MSFullscreenChange", checkFullScreen)
 
-  window.addEventListener("DOMContentLoaded", () => {
-    console.log("DOMContentLoaded")
-    // document.documentElement.requestFullscreen()
-  })
-
   checkFullScreen()
-
-  //  Capture screen on load
-  // transmitScreenCapture()
 })
 
 onBeforeUnmount(() => {
@@ -115,26 +102,4 @@ onBeforeUnmount(() => {
   window.removeEventListener("mozfullscreenchange", checkFullScreen)
   window.removeEventListener("MSFullscreenChange", checkFullScreen)
 })
-
-// socket.value = await useSocket(currentState.value.activeSchedule?._id)
-
-// socket.value.onmessage = (event) => {
-//   const data = JSON.parse(event.data)
-//   console.log(data)
-
-//   switch (data.action) {
-//     case "live-slide":
-//       break
-//     case "new-slide":
-//       break
-//     case "updated-slides":
-//       break
-//     default:
-//       console.log("Unknown action:", data.action)
-//   }
-// }
-
-// socket.value.onclose = async () => {
-//   socket.value = await useSocket(currentState.value.activeSchedule?._id)
-// }
 </script>
