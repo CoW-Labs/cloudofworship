@@ -141,28 +141,11 @@ export const useUserSettings = () => {
       // Use unique key with timestamp to prevent caching
       const timestamp = Date.now()
 
-      // Check if settings already exist by trying to fetch first
-      const existingSettings = await useAPIFetch('/app-config/user-settings', {
-        method: 'GET',
-        key: `check-user-settings-${timestamp}`,
+      const response = await useAPIFetch('/app-config/user-settings', {
+        method: 'PUT',
+        body: backendSettings,
+        key: `save-user-settings-${timestamp}`,
       })
-
-      let response
-      if (existingSettings.data.value) {
-        // Update existing settings
-        response = await useAPIFetch('/app-config/user-settings', {
-          method: 'PUT',
-          body: backendSettings,
-          key: `update-user-settings-${timestamp}`,
-        })
-      } else {
-        // Create new settings
-        response = await useAPIFetch('/app-config/user-settings', {
-          method: 'POST',
-          body: backendSettings,
-          key: `create-user-settings-${timestamp}`,
-        })
-      }
 
       if (response.error.value) {
         throw new Error(response.error.value?.message || 'Failed to save settings')
