@@ -459,7 +459,7 @@ const downloadEssentialResources = async () => {
       downloadProgress
     )
     kjvBible = await kjvBible.json()
-    db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
+    await db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
   }
 
   const isBibleVersionDownloaded = async (bibleVersion: string) => {
