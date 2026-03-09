@@ -6,7 +6,7 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
 
   // set default version
   const appStore = useAppStore()
-  version = version || appStore.currentState.settings.defaultBibleVersion
+  version = version || appStore.currentState.settings.defaultBibleVersion || 'KJV'
 
   const toast = useToast()
 
@@ -54,7 +54,9 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
 
     // Fetch scripture and set most recent version as default
     scripture = await fetchScripture(version, db, book, chapter, verses) as string;
-    // appStore.setDefaultBibleVersion(version);
+    if (!appStore.currentState.settings.defaultBibleVersion) {
+      appStore.setDefaultBibleVersion(version);
+    }
 
     if (!scripture) {
       throw new Error('Scripture not found')
