@@ -14,8 +14,8 @@
               <div class="font-semibold">Join 2,200+ churches</div>
               delivering great on-screen experiences to their congregations.
             </h1>
-            <p class="text-lg font-light">
-              Run your weekly services with Cloud of Worship. Project songs, hymns, and scriptures with no installation and no internet required.
+            <p class="text-xl font-light">
+              Run your weekly services with Cloud of Worship. <br/> Project songs, hymns, and scriptures with no installation and no internet required.
             </p>
           </div>
         </div>
