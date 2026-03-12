@@ -11,7 +11,7 @@ export default defineNuxtPlugin(nuxtApp => {
     !window.location.host.includes("localhost:30") // 3000, 3001 etc
   ) {
     posthog.init("phc_sZj5IKRKRCd6Mv8GrthWQOlWu4ihmCFry3oQAIKrW9T", {
-      api_host: "https://us.i.posthog.com",
+      api_host: "https://intel.cloudofworship.com",
       person_profiles: "identified_only",
     });
     posthog.identify(auth.user?._id, {
