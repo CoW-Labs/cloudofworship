@@ -184,7 +184,15 @@ onMounted(() => {
   // Store cleanup function to properly dispose of BroadcastChannel
   const cleanupBroadcast = useBroadcastMessage((data: string) => {
     try {
-      const updatedSlide = JSON.parse(data) as Slide
+      const parsed = JSON.parse(data)
+
+      // null broadcast means the live slide was deleted — blank the projection
+      if (parsed === null) {
+        mostUpdatedLiveSlide.value = null
+        return
+      }
+
+      const updatedSlide = parsed as Slide
 
       // Track slide presentation
       usePosthogCapture("SLIDE_PRESENTED_LIVE", {

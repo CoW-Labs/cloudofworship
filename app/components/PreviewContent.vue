@@ -726,6 +726,17 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     stopCountdown()
   }
 
+  // Clear Edit Content pane if the deleted slide is currently selected
+  if (activeSlide.value?.id === slideId) {
+    activeSlide.value = undefined
+  }
+
+  // Clear live projection if the deleted slide is currently live
+  if (appStore.currentState.liveSlideId === slideId) {
+    appStore.setLiveSlide('')
+    useBroadcastPost(JSON.stringify(null))
+  }
+
   const slideIndex = slides.value.findIndex((s) => s.id === slideId)
   slides.value.splice(slideIndex, 1)
   appStore.removeActiveSlide(tempSlide)
