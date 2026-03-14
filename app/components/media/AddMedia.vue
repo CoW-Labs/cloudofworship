@@ -235,9 +235,10 @@ const props = defineProps<{
 const imageCompressionLoading = ref(false)
 const { isTauri } = useTauri()
 const authStore = useAuthStore()
-const { isFreePlan } = useSubscription()
+const { isTeamsPlan, isFreePlan } = useSubscription()
 
-const maxFileSize = computed(() => (isFreePlan ? 3 : 10))
+// Free plan: 3MB soft-limit for images; Teams plan: larger (10MB) allowed
+const maxFileSize = computed(() => (isFreePlan.value ? 3 : 10))
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const files = ref()
 const emit = defineEmits(["close"])

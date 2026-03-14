@@ -316,31 +316,65 @@ export default function useSlideCreation() {
       return newSlides
     }
 
-    // Only upload images to the cloud for teams subscribers
+    // For images: teams plan should upload to cloud, but do it in background
     const { isTeamsPlan } = useSubscription()
+
     if (!isTeamsPlan.value) {
       return newSlides
     }
 
     // Upload only image files as backgrounds
     try {
-      const uploadedImages = files.map((file: ExtendedFileT) =>
-        file?.blob?.type?.includes("image") ? useUploadImage(file?.blob) : null
-      )
-      const uploadedImagesResp = await Promise.all(uploadedImages)
-
-      // Update background URLs for image slides only
-      newSlides.forEach((slide, index) => {
-        const imageObject = uploadedImagesResp[index]
-        if (imageObject?.file?.url && slide.backgroundType === "image") {
-          slide.background = imageObject.file.url
+      const uploadPromises = files.map(async (file: ExtendedFileT, index: number) => {
+        if (!file?.blob?.type?.includes("image")) return null
+        try {
+          const uploaded = await useUploadImage(file.blob)
+          return { uploaded, index }
+        } catch (err) {
+          console.error('Background image upload failed', err)
+          return null
         }
+      })
+
+      // Wait for all uploads to finish but do it asynchronously (fire-and-forget)
+      Promise.all(uploadPromises).then((results) => {
+        // Update slides with hosted URLs when uploads succeed
+        results.forEach((res) => {
+          if (res && res.uploaded && newSlides[res.index]) {
+            const slide = newSlides[res.index]
+            if (slide.backgroundType === 'image') {
+              slide.background = res.uploaded.file.url
+
+                // Persist update to server if schedule/slide already has an _id
+                ; (async () => {
+                  try {
+                    // Only attempt network call if online
+                    if (!navigator.onLine) return
+                    const { saveSlideOnline } = useSlides()
+                    // If the slide has been created in DB, save update
+                    if (slide._id) {
+                      await saveSlideOnline(slide)
+                      // Broadcast update via sockets for real-time sync
+                      const nuxtApp = useNuxtApp()
+                      const socket = nuxtApp.$socketio as any
+                      if (socket?.connected) {
+                        socket.emit('update-slide', { ...slide, slideId: slide.id })
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Failed to persist uploaded image URL', e)
+                  }
+                })()
+            }
+          }
+        })
       })
     } catch (err) {
       console.log(err)
-      toast.add({ title: 'Error uploading images', icon: 'i-bx-error', color: 'red' })
+      toast.add({ title: 'Error uploading images in background', icon: 'i-bx-error', color: 'red' })
     }
 
+    // Return slides immediately; uploads will replace blob URLs when done
     return newSlides
   }
 
@@ -390,7 +424,7 @@ export default function useSlideCreation() {
         verses.splice(1, 0, hymn?.chorus)
       }
       const lyrics = verses.join("\n")
-      verses.push(verses[0])
+      if (verses[0]) verses.push(verses[0])
       tempSong = {
         id: useID(),
         title: hymn?.title || "",
