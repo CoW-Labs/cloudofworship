@@ -43,8 +43,11 @@ export default function useSubscription() {
    * Checks the user's subscription, not the church's
    */
   const getCurrentPlan = (): SubscriptionPlan => {
-    // Check user's personal subscription
-    return authStore.church?.subscriptionPlan || 'free'
+    // Prefer church-level subscription, fall back to user's personal subscription
+    // (some accounts store plan at user level)
+    return (
+      authStore.church?.subscriptionPlan || authStore.user?.subscription?.plan || 'free'
+    )
   }
 
   /**
