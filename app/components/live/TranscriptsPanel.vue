@@ -1,5 +1,7 @@
 <template>
-  <div class="transcripts-panel">
+  <div
+    class="transcripts-panel border border-primary-100 dark:border-primary-800 rounded-lg overflow-hidden bg-white dark:bg-primary-950 mb-4"
+  >
     <!-- Header -->
     <div
       class="flex items-center justify-between p-3 bg-primary-100 dark:bg-primary-800"
@@ -7,12 +9,13 @@
       <div class="flex items-center gap-2">
         <UIcon name="i-material-symbols-speech-to-text" class="text-lg" />
         <span class="font-medium text-sm">Transcripts</span>
-        
+
         <!-- Waveform when transcribing -->
-        <AudioWaveform v-if="isTranscribing" :active="isTranscribing" :bars="5" />
-        
-        <!-- LIVE indicator -->
-        <LiveSlideIndicator v-if="isTranscribing" :visible="isTranscribing" />
+        <AudioWaveform
+          v-if="isTranscribing"
+          :active="isTranscribing"
+          :bars="5"
+        />
       </div>
       <div class="flex items-center gap-1">
         <!-- Start/Stop Button -->
@@ -119,7 +122,9 @@
 
 <script setup lang="ts">
 import type { BibleReference } from "~/types/transcript"
+import type { Slide } from "~/types"
 import { appWideActions } from "~/utils/constants"
+import { useAppStore } from "~/store/app"
 
 const props = defineProps<{
   visible: boolean
@@ -128,6 +133,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
 }>()
+
+const appStore = useAppStore()
+
+// Tracks the Bible slide ID that was last created/updated from a transcript reference
+const transcriptBibleSlideId = ref<string | null>(null)
 
 const {
   isTranscribing,
@@ -168,7 +178,7 @@ const handleClear = () => {
 
 const handleReferenceClick = (reference: BibleReference) => {
   console.log("Bible reference clicked:", reference)
-  
+
   // Use updateOrCreateBible event - it will reuse existing Bible slide or create a new one
   useGlobalEmit(appWideActions.updateOrCreateBible, reference.shortLabel)
 }
@@ -179,34 +189,39 @@ const handleReferenceClick = (reference: BibleReference) => {
  */
 const findExistingBibleSlide = (): Slide | null => {
   const activeSlides = appStore.currentState?.activeSlides || []
-  
+
   // First, check if the tracked slide still exists
   if (transcriptBibleSlideId.value) {
     const trackedSlide = activeSlides.find(
-      (slide: Slide) => slide.id === transcriptBibleSlideId.value && slide.type === slideTypes.bible
+      (slide: Slide) =>
+        slide.id === transcriptBibleSlideId.value &&
+        slide.type === slideTypes.bible
     )
     if (trackedSlide) {
       return trackedSlide
     }
   }
-  
+
   // Otherwise, find any existing Bible slide (prefer the active/live one)
   const liveSlideId = appStore.currentState?.liveSlideId
   const liveSlide = activeSlides.find(
-    (slide: Slide) => slide.id === liveSlideId && slide.type === slideTypes.bible
+    (slide: Slide) =>
+      slide.id === liveSlideId && slide.type === slideTypes.bible
   )
   if (liveSlide) {
     transcriptBibleSlideId.value = liveSlide.id
     return liveSlide
   }
-  
+
   // Fall back to any Bible slide
-  const anyBibleSlide = activeSlides.find((slide: Slide) => slide.type === slideTypes.bible)
+  const anyBibleSlide = activeSlides.find(
+    (slide: Slide) => slide.type === slideTypes.bible
+  )
   if (anyBibleSlide) {
     transcriptBibleSlideId.value = anyBibleSlide.id
     return anyBibleSlide
   }
-  
+
   return null
 }
 </script>

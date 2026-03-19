@@ -151,7 +151,7 @@
         </div>
       </h2>
     </div>
-    <div :class="`slot-ctn p-3 text-sm ${slotCtnStyles || ''}`">
+    <div :class="`slot-ctn p-3 text-sm flex flex-col h-[calc(100%-44px)] ${slotCtnStyles || ''}`">
       <slot></slot>
     </div>
   </section>

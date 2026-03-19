@@ -21,8 +21,8 @@
         class="ctn overflow-auto mb-4 overflow-x-hidden"
         :class="
           showTranscripts
-            ? 'h-[calc(100vh-80px-220px-90px-210px)]'
-            : 'h-[calc(100vh-80px-220px-90px)]'
+            ? 'h-[calc(100vh-80px-220px-90px-220px)]'
+            : 'h-[calc(100vh-80px-220px-100px)]'
         "
       >
         <EmptyState
@@ -39,8 +39,8 @@
         class="slides-ctn overflow-auto mb-4 overflow-x-hidden"
         :class="
           showTranscripts
-            ? 'h-[calc(100vh-80px-220px-90px-210px)]'
-            : 'h-[calc(100vh-80px-220px-90px)]'
+            ? 'h-[calc(100vh-80px-220px-90px-228px)]'
+            : 'h-[calc(100vh-80px-220px-89px)]'
         "
         item-key="id"
         :animation="200"

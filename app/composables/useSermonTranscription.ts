@@ -62,7 +62,7 @@ interface SpeechRecognitionAlternative {
 }
 
 interface SpeechRecognitionConstructor {
-  new (): SpeechRecognition
+  new(): SpeechRecognition
 }
 
 declare global {
@@ -106,7 +106,7 @@ export default function useSermonTranscription() {
    */
   const detectVoiceCommand = (text: string): 'next-verse' | 'previous-verse' | null => {
     const lowerText = text.toLowerCase().trim()
-    
+
     // Check for "next verse" command
     if (
       lowerText.includes('next verse') ||
@@ -117,7 +117,7 @@ export default function useSermonTranscription() {
     ) {
       return 'next-verse'
     }
-    
+
     // Check for "previous verse" command
     if (
       lowerText.includes('previous verse') ||
@@ -129,7 +129,7 @@ export default function useSermonTranscription() {
     ) {
       return 'previous-verse'
     }
-    
+
     return null
   }
 
@@ -203,7 +203,7 @@ export default function useSermonTranscription() {
       // Handle recognition results
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         let interimTranscript = ''
-        
+
         // Process all results from the current session
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i]
@@ -245,7 +245,7 @@ export default function useSermonTranscription() {
       // Handle errors
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error)
-        
+
         // Don't stop on 'no-speech' error, just log it
         if (event.error === 'no-speech') {
           console.log('No speech detected, continuing...')
@@ -273,7 +273,7 @@ export default function useSermonTranscription() {
         }
 
         state.value.error = event.error
-        
+
         if (event.error !== 'network') {
           toast.add({
             title: 'Transcription error',
@@ -286,11 +286,11 @@ export default function useSermonTranscription() {
 
       // Start recognition
       recognition.start()
-      
-      toast.add({ 
-        title: 'Transcription started', 
+
+      toast.add({
+        title: 'Transcription started',
         description: 'Listening for speech...',
-        icon: 'i-bx-microphone' 
+        icon: 'i-bx-microphone'
       })
     } catch (err: any) {
       console.error('Failed to start transcription:', err)
@@ -313,14 +313,14 @@ export default function useSermonTranscription() {
     if (!text.trim()) return
 
     const cleanedText = text.trim()
-    
+
     // Check for voice commands first
     const voiceCommand = detectVoiceCommand(cleanedText)
     if (voiceCommand) {
       executeVoiceCommand(voiceCommand)
       // Still add to transcript so user can see what was said
     }
-    
+
     const references = useBibleReferenceParser(cleanedText)
 
     const segment: TranscriptSegment = {
@@ -349,8 +349,6 @@ export default function useSermonTranscription() {
 
     state.value.isTranscribing = false
     state.value.isConnecting = false
-
-    toast.add({ title: 'Transcription stopped', icon: 'i-bx-stop' })
   }
 
   /**
