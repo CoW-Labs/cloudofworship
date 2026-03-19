@@ -173,9 +173,14 @@ export default function useSermonTranscription() {
     state.value.error = null
 
     try {
-      // Request microphone permissions first
+      // Request microphone permissions first, using the selected device if set
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const appStore = useAppStore()
+        const deviceId = appStore.currentState.defaultMicrophoneId
+        const audioConstraint: MediaStreamConstraints['audio'] = deviceId
+          ? { deviceId: { exact: deviceId } }
+          : true
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint })
         // Stop the stream immediately - we just needed permission
         stream.getTracks().forEach(track => track.stop())
       } catch (permissionError: any) {

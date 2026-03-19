@@ -306,6 +306,8 @@ export interface AppState {
   activeSocket: WebSocket | null
   mainDisplayLabel: string
   mainDisplayScreen: Screen | null
+  defaultMicrophoneId: string
+  defaultCameraId: string
   // Realtime collaboration
   onlineUsers: Array<OnlineUser>
   slidesBeingEdited: Record<string, { userId: string; userName: string }>
