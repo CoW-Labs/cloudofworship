@@ -1,4 +1,14 @@
 async function useDetailedFetch(url: string, progressRef: Ref<string>, options?: RequestInit) {
+
+  const config = useRuntimeConfig()
+
+  if (options) {
+    options.headers = {
+      ...options?.headers,
+      ...(config.public.NODE_ENV === 'development' ? { "x-dev-token": config.public.DEV_TOKEN } : {})
+    };
+  }
+
   const response = await fetch(url, options);
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);

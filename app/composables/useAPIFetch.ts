@@ -15,10 +15,6 @@ export const useAPIFetch: useFetchType = async (path, options = {}) => {
   const appStore = useAppStore();
   const isDevEnvironment = config.public.BASE_URL?.includes("localhost");
 
-  // const showOfflineToast = useDebounceFn((options: { title: string, color: string, icon: string }) => {
-  //   toast.add(options)
-  // }, 2000)
-
   const addErrorInDevEnvironment = (message: string) => {
     if (isDevEnvironment) {
       toast.add({
@@ -36,6 +32,7 @@ export const useAPIFetch: useFetchType = async (path, options = {}) => {
   options.headers = {
     ...options.headers,
     Authorization: `Bearer ${tokenValue}`,
+    ...(config.public.NODE_ENV === 'development' ? { "x-dev-token": config.public.DEV_TOKEN } : {})
   };
 
   const executeWithDelay = async () => {
