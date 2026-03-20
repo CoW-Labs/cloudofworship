@@ -68,6 +68,7 @@
           action="new-song-search"
           :query="searchInput"
           action-text="Search here"
+          class="h-auto"
         />
       </Transition>
 
