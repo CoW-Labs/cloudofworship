@@ -733,7 +733,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
   // Clear live projection if the deleted slide is currently live
   if (appStore.currentState.liveSlideId === slideId) {
-    appStore.setLiveSlide('')
+    appStore.setLiveSlide("")
     useBroadcastPost(JSON.stringify(null))
   }
 

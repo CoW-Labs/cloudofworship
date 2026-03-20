@@ -228,6 +228,7 @@ const getAllHymns = async () => {
         type: slideTypes.bible,
       }
     }),
+
     hymns.value?.map((hymn: Hymn) => {
       return {
         icon: "i-bx-church",

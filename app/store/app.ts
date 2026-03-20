@@ -125,6 +125,8 @@ export const useAppStore = defineStore("app", {
         activeSocket: null,
         mainDisplayLabel: "",
         mainDisplayScreen: null,
+        defaultMicrophoneId: "",
+        defaultCameraId: "",
         onlineUsers: [] as OnlineUser[],
         slidesBeingEdited: {} as Record<string, { userId: string; userName: string }>,
         // activeLiveWindows: [] as any[]
@@ -368,6 +370,12 @@ export const useAppStore = defineStore("app", {
     },
     setMainDisplayScreen(screen: Screen | null) {
       this.currentState.mainDisplayScreen = screen
+    },
+    setDefaultMicrophone(deviceId: string) {
+      this.currentState.defaultMicrophoneId = deviceId
+    },
+    setDefaultCamera(deviceId: string) {
+      this.currentState.defaultCameraId = deviceId
     },
     setLiveWindowFullscreen(fullscreen: boolean) {
       this.currentState.settings = {

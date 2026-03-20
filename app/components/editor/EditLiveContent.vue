@@ -622,6 +622,18 @@ onMounted(() => {
       emit("goto-verse", previousVerse.value, selectedBibleVersion.value)
     }
   })
+  
+  // Listen for voice command events (next verse / previous verse)
+  emitter.on(appWideActions.nextVerse, () => {
+    if (nextVerse.value) {
+      emit("goto-verse", nextVerse.value, selectedBibleVersion.value)
+    }
+  })
+  emitter.on(appWideActions.previousVerse, () => {
+    if (previousVerse.value) {
+      emit("goto-verse", previousVerse.value, selectedBibleVersion.value)
+    }
+  })
 })
 
 emitter.on("pause-inactive-slide-video", () => {

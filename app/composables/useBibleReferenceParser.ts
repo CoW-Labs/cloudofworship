@@ -211,6 +211,7 @@ function normalizeSpokenNumbers(text: string): string {
  * - "Matthew 3:20-22" (verse ranges)
  * - "second corinthians 5:17" (spoken numbers)
  * - "third john verse 4" (spoken numbers)
+ * - "1st Corinthians 7 um from verse 17 to 24" (filler words between chapter and verse)
  */
 const useBibleReferenceParser = (text: string): BibleReference[] => {
   const references: BibleReference[] = []
@@ -225,8 +226,12 @@ const useBibleReferenceParser = (text: string): BibleReference[] => {
     // Verbose format: "John chapter 3 verse 16" or "Second Corinthians chapter 5 verse 17"
     /(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s+chapter\s+(\d+)\s+verse[s]?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi,
     
-    // Mixed format: "John 3 verse 16"
+    // Mixed format: "John 3 verse 16" or "John 3 verse 16 to 18"
     /(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s+(\d+)\s+verse[s]?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi,
+
+    // Spoken format with filler words: "1st Corinthians 7 um from verse 17 to 24"
+    // Tolerates up to 4 filler/connector words (anything except "verse") between chapter and verse keyword
+    /(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s+(\d+)(?:\s+(?!verses?\b|from\b)\w+){0,4}\s+(?:from\s+)?verses?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi,
   ]
   
   for (const pattern of patterns) {

@@ -58,6 +58,8 @@
             />
             <!-- DISPLAY SETTINGS -->
             <DisplaySettings v-else-if="activeTab === 'Display Settings'" />
+            <!-- CAMERA & MIC SETTINGS -->
+            <CameraAndMicSettings v-else-if="activeTab === 'Camera & Mic Settings'" />
             <!-- SLIDE SETTINGS -->
             <SlideSettings
               v-else-if="activeTab === 'Slide Settings'"
@@ -98,6 +100,7 @@ const tabs = [
   { name: "Account/Profile Settings", active: false },
   { name: "Subscription Settings", active: false },
   { name: "Display Settings", active: false },
+  { name: "Camera & Mic Settings", active: false },
   { name: "Slide Settings", active: false },
   { name: "Slide Background Settings", active: false },
   { name: "Bible Version Settings", active: false },

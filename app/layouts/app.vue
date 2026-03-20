@@ -296,6 +296,9 @@ const fetchHymns = async () => {
   hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
     headers: {
       Authorization: `Bearer ${tokenValue}`,
+      ...(config.public.NODE_ENV === "development"
+        ? { "x-dev-token": config.public.DEV_TOKEN }
+        : {}),
     },
   })
   hymnCount = await hymnCount.json()
@@ -503,8 +506,10 @@ const overrideAppSettings = async () => {
     setTimeout(() => {
       // Only show changelog modal for major or minor version bumps, not patch updates
       // e.g. 0.43.8 -> 0.44.0 shows changelog, but 0.43.8 -> 0.43.9 does not
-      const prevParts = (currentAppSettings.appVersion || '0.0.0').split('.').map(Number)
-      const newParts = (props.appVersion || '0.0.0').split('.').map(Number)
+      const prevParts = (currentAppSettings.appVersion || "0.0.0")
+        .split(".")
+        .map(Number)
+      const newParts = (props.appVersion || "0.0.0").split(".").map(Number)
       const isMajorOrMinorUpdate =
         newParts[0] > prevParts[0] || // major bump
         (newParts[0] === prevParts[0] && newParts[1] > prevParts[1]) // minor bump
