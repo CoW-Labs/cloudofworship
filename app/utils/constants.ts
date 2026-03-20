@@ -262,7 +262,7 @@ export const quickActionsArr: QuickAction[] = [
     meta: "transcribe sermon speech text bible audio microphone",
     tier: 'teams',
     // unreleased: true,
-    // featureFlag: 'transcripts-feature',
+    featureFlag: 'transcripts-feature',
   },
   {
     icon: "i-ph-file-ppt",

@@ -34,7 +34,7 @@
         <!-- Clear Button -->
         <UTooltip text="Clear transcript">
           <UButton
-            icon="i-bx-trash"
+            icon="i-lucide-trash"
             color="gray"
             variant="ghost"
             size="xs"
