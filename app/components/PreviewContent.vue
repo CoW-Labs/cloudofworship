@@ -361,31 +361,26 @@ emitter.on("new-song-search", (query: string) => {
 
 emitter.on("new-media", async (data: ExtendedFileT[]) => {
   if (data && data?.length > 0) {
-    let newSlides
+    let newSlides: Slide[]
 
     if (data?.[0]?.fromTemplate) {
-      newSlides = data
+      newSlides = data as unknown as Slide[]
       newSlides.forEach((slide) => {
         delete slide._id
         slide.id = useObjectID()
       })
-    } else if (data?.length > 0) {
-      newSlides = await createMultipleMediaSlides(data)
+    } else {
+      newSlides = createMultipleMediaSlides(data)
     }
 
-    // Update slides with new slides
-    const updatedSlides = useMergeObjectArray(newSlides, [
-      ...appStore.currentState.activeSlides,
-    ])
-    // Sort updated slides by createdAt
-    updatedSlides.sort((a, b) => {
-      if (!a.createdAt) return 1
-      if (!b.createdAt) return -1
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    // Append new slides to the end of the current slide list
+    newSlides.forEach((slide) => {
+      slides.value?.push(slide)
+      appStore.appendActiveSlide(slide)
     })
-    appStore.setActiveSlides(updatedSlides)
+
     // Broadcast batch slide creation for real-time sync
-    if (newSlides && newSlides.length > 0) {
+    if (newSlides?.length > 0) {
       broadcastSlideUpdate("batch-create-slides", { slides: newSlides })
     }
     uploadOfflineSlides()
