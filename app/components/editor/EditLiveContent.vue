@@ -108,6 +108,7 @@
                   (e) => {
                     if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
                       e.preventDefault()
+                      $emit('take-live')
                     }
                   }
                 "
