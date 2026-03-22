@@ -482,64 +482,102 @@ emitter.on("promote-active-slide-live", () => {
   }
 })
 
+emitter.on("selected-schedule", (data: Schedule) => {
+  // Clear Edit Content pane
+  // activeSlide.value = undefined
+
+  // Clear live projection
+  appStore.setLiveSlide("")
+  useBroadcastPost(JSON.stringify(null))
+})
+
 // Utility functions for offline sync
-const mergeSlides = (
+const mergeSlideIds = (
   offlineSlides: Slide[],
-  uploadedSlides: Slide[]
+  insertedSlides: Slide[],
+  duplicateIds: string[]
 ): Slide[] => {
-  // Create a Map from uploadedSlides with id as the key
-  const uploadedMap = new Map(
-    uploadedSlides.map((slide) => [slide.id, slide._id])
+  // Build a map of id -> _id from successfully inserted slides
+  const insertedMap = new Map(
+    insertedSlides.map((slide) => [slide.id, slide._id])
   )
-  // console.log("uploadedMap", uploadedMap)
 
-  // Iterate over offlineSlides and merge special_id where ids match
-  const tempOfflineSlides = [...offlineSlides]
-  for (let offlineSlide of tempOfflineSlides) {
-    if (uploadedMap.has(offlineSlide.id)) {
-      offlineSlide._id = uploadedMap.get(offlineSlide.id)
+  // Duplicate slides already exist on the server — their _id equals their id
+  // (because the server sets _id = slide.id on creation)
+  const duplicateSet = new Set(duplicateIds)
+
+  return offlineSlides.map((slide) => {
+    const copy = { ...slide }
+    if (insertedMap.has(copy.id)) {
+      copy._id = insertedMap.get(copy.id)
+    } else if (duplicateSet.has(copy.id)) {
+      // Already exists on server, _id is the same as id
+      copy._id = copy.id
     }
-  }
-
-  return tempOfflineSlides
+    return copy
+  })
 }
 
-const isArrayOfStrings = (arr: any[]) => {
-  return arr.every((item) => typeof item === "string")
-}
+// Concurrency guard for uploadOfflineSlides.
+// If a batch upload is already in-flight and new slides arrive, we schedule
+// one more run immediately after the current one finishes rather than dropping them.
+let isUploadingOfflineSlides = false
+let pendingUploadAfterLock = false
 
 const uploadOfflineSlides = async () => {
-  // Retrieve all offline slides (with a scheduleId)
-  const offlineSlides = appStore.currentState.activeSlides
-    .filter((slide) => slide._id === undefined)
-    ?.filter((slide) => slide.scheduleId)
-  if (offlineSlides.length > 0) {
-    // Broadcast new slides via WebSocket for realtime collaboration
-    broadcastSlideUpdate("batch-create-slides", { slides: offlineSlides })
+  // Don't attempt upload when offline
+  if (!online.value) return
 
-    const uploadedSlides = await batchCreateSlides(offlineSlides)
+  // If already uploading, mark that there are new slides waiting and return.
+  // The in-flight call will trigger another run when it finishes.
+  if (isUploadingOfflineSlides) {
+    pendingUploadAfterLock = true
+    return
+  }
 
-    if (isArrayOfStrings(uploadedSlides)) {
-      let slidesWithDuplicateErrors = [...uploadedSlides] as string[]
-      const tempSlides = [...offlineSlides]
-      const updatedTempSlides = []
-      tempSlides.forEach((slide, index) => {
-        if (slidesWithDuplicateErrors.includes(slide.id)) {
-          tempSlides[index]._id = slide.id
-          updatedTempSlides.push(tempSlides[index])
-        }
-      })
+  // Snapshot offline slides at the moment the lock is acquired so that any
+  // slides added while the request is in-flight are picked up on the next run.
+  const offlineSlides = appStore.currentState.activeSlides.filter(
+    (slide) => slide._id === undefined && slide.scheduleId
+  )
+  if (offlineSlides.length === 0) return
 
-      const mergedSlides = mergeSlides([...offlineSlides], [
-        ...uploadedSlides,
-      ] as Slide[])
-      appStore.appendActiveSlides(mergedSlides)
+  isUploadingOfflineSlides = true
+  pendingUploadAfterLock = false
+  try {
+    const { inserted, duplicateIds } = await batchCreateSlides(offlineSlides)
+
+    // Only proceed if something was actually processed
+    if (inserted.length > 0 || duplicateIds.length > 0) {
+      // Merge _id values back into the offline slides
+      const reconciledSlides = mergeSlideIds(
+        offlineSlides,
+        inserted,
+        duplicateIds
+      )
+
+      // Update the store: replace matching slides so they now carry _id
+      const currentSlides = [...appStore.currentState.activeSlides]
+      const reconciledMap = new Map(reconciledSlides.map((s) => [s.id, s]))
+      const updatedSlides = currentSlides.map((slide) =>
+        reconciledMap.has(slide.id) ? reconciledMap.get(slide.id)! : slide
+      )
+      appStore.setActiveSlides(updatedSlides)
+
+      // Broadcast newly created slides via WebSocket after successful upload
+      if (inserted.length > 0) {
+        broadcastSlideUpdate("batch-create-slides", {
+          slides: reconciledSlides,
+        })
+      }
     }
-
-    const mergedSlides = mergeSlides([...offlineSlides], [
-      ...uploadedSlides,
-    ] as Slide[])
-    appStore.appendActiveSlides(mergedSlides)
+  } finally {
+    isUploadingOfflineSlides = false
+    // If new slides arrived while the request was in-flight, run again now
+    if (pendingUploadAfterLock) {
+      pendingUploadAfterLock = false
+      uploadOfflineSlides()
+    }
   }
 }
 
@@ -728,7 +766,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
   // Clear Edit Content pane if the deleted slide is currently selected
   if (activeSlide.value?.id === slideId) {
-    activeSlide.value = undefined
+    // activeSlide.value = undefined
   }
 
   // Clear live projection if the deleted slide is currently live

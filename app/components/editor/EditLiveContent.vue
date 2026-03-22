@@ -311,67 +311,72 @@
       action=""
       action-text=""
     />
-    <!-- IMAGE NOT AVAILABLE ON THIS DEVICE NOTICE -->
-    <div
-      v-else-if="imageNotAvailable"
-      class="h-[100%] flex flex-col items-center justify-center gap-4 p-6 text-center bg-primary-900 rounded-b-md"
-    >
-      <IconWrapper name="i-bx-image-alt" size="12" class="text-primary-400" />
-      <div>
-        <h3 class="text-white font-semibold text-md">
-          Image not available on this device
-        </h3>
-        <p class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
-          This image was added on another device and isn't stored in the cloud.
-          Upgrade to Teams to sync media across all your devices.
-        </p>
-      </div>
-      <UButton
-        icon="i-bxs-award"
-        class="mt-1"
-        @click="useGlobalEmit('show-upgrade-modal')"
+    <template v-else-if="slide">
+      <!-- IMAGE NOT AVAILABLE ON THIS DEVICE NOTICE -->
+      <div
+        v-if="imageNotAvailable"
+        class="h-[100%] flex flex-col items-center justify-center gap-4 p-6 text-center bg-primary-900 rounded-b-md"
       >
-        Upgrade to Teams
-      </UButton>
-    </div>
-    <div
-      v-else
-      class="h-[100%] relative text-white bg-primary-900 bg-no-repeat transition-all rounded-b-md overflow-hidden"
-      :class="{
-        'bg-center bg-cover':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop ||
-          slide?.slideStyle?.backgroundFillType == undefined,
-        'bg-top bg-cover':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.cropTop,
-        'bg-bottom bg-cover':
-          slide?.slideStyle?.backgroundFillType ===
-          backgroundFillTypes.cropBottom,
-        'bg-center bg-contain':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
-        'bg-center bg-stretch':
-          slide?.slideStyle?.backgroundFillType === backgroundFillTypes.stretch,
-        // 'bg-center':
-        //   slide?.slideStyle?.backgroundFillType === backgroundFillTypes.center,
-      }"
-      :style="useSlideBackground(slide)"
-    >
-      <!-- VIDEO BACKGROUND -->
-      <video
-        v-if="slide?.backgroundType === backgroundTypes.video"
-        :src="slide?.background"
-        class="h-[100%] w-[100%] object-cover absolute inset-0"
-        crossorigin="anonymous"
-      ></video>
-      <div class="bg-black opacity-30 absolute inset-0"></div>
-      <TipTap
-        v-if="slide"
-        :slide="slide"
-        @update="onUpdateSlideContent"
-        @change-focused-editor="focusedEditor = $event"
-        :layout="slide?.layout"
-        editable
-      />
-    </div>
+        <IconWrapper name="i-bx-image-alt" size="12" class="text-primary-400" />
+        <div>
+          <h3 class="text-white font-semibold text-md">
+            Image not available on this device
+          </h3>
+          <p class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
+            This image was added on another device and isn't stored in the
+            cloud. Upgrade to Teams to sync media across all your devices.
+          </p>
+        </div>
+        <UButton
+          icon="i-bxs-award"
+          class="mt-1"
+          @click="useGlobalEmit('show-upgrade-modal')"
+        >
+          Upgrade to Teams
+        </UButton>
+      </div>
+      <div
+        v-else
+        class="h-[100%] relative text-white bg-primary-900 bg-no-repeat transition-all rounded-b-md overflow-hidden"
+        :class="{
+          'bg-center bg-cover':
+            slide?.slideStyle?.backgroundFillType ===
+              backgroundFillTypes.crop ||
+            slide?.slideStyle?.backgroundFillType == undefined,
+          'bg-top bg-cover':
+            slide?.slideStyle?.backgroundFillType ===
+            backgroundFillTypes.cropTop,
+          'bg-bottom bg-cover':
+            slide?.slideStyle?.backgroundFillType ===
+            backgroundFillTypes.cropBottom,
+          'bg-center bg-contain':
+            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
+          'bg-center bg-stretch':
+            slide?.slideStyle?.backgroundFillType ===
+            backgroundFillTypes.stretch,
+          // 'bg-center':
+          //   slide?.slideStyle?.backgroundFillType === backgroundFillTypes.center,
+        }"
+        :style="useSlideBackground(slide)"
+      >
+        <!-- VIDEO BACKGROUND -->
+        <video
+          v-if="slide?.backgroundType === backgroundTypes.video"
+          :src="slide?.background"
+          class="h-[100%] w-[100%] object-cover absolute inset-0"
+          crossorigin="anonymous"
+        ></video>
+        <div class="bg-black opacity-30 absolute inset-0"></div>
+        <TipTap
+          v-if="slide"
+          :slide="slide"
+          @update="onUpdateSlideContent"
+          @change-focused-editor="focusedEditor = $event"
+          :layout="slide?.layout"
+          editable
+        />
+      </div>
+    </template>
   </div>
 </template>
 
