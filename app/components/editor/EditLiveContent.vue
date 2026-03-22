@@ -104,6 +104,13 @@
                 @keydown.enter="
                   $emit('goto-verse', verse, selectedBibleVersion)
                 "
+                @keydown="
+                  (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                      e.preventDefault()
+                    }
+                  }
+                "
               />
               <UTooltip text="Next verse" :popper="{ arrow: true }">
                 <UButton
@@ -310,9 +317,12 @@
     >
       <IconWrapper name="i-bx-image-alt" size="12" class="text-primary-400" />
       <div>
-        <h3 class="text-white font-semibold text-md">Image not available on this device</h3>
+        <h3 class="text-white font-semibold text-md">
+          Image not available on this device
+        </h3>
         <p class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
-          This image was added on another device and isn't stored in the cloud. Upgrade to Teams to sync media across all your devices.
+          This image was added on another device and isn't stored in the cloud.
+          Upgrade to Teams to sync media across all your devices.
         </p>
       </div>
       <UButton
@@ -432,13 +442,13 @@ watch(
     const newSlide = props.slide
     if (!newSlide || !newSlideId) return
     if (newSlide.type !== slideTypes.media) return
-    if (newSlide.backgroundType !== 'image') return
+    if (newSlide.backgroundType !== "image") return
 
     const bg = newSlide.background
     if (!bg) return
 
     // If the background is already a remote URL, it's available everywhere
-    if (bg.startsWith('http://') || bg.startsWith('https://')) return
+    if (bg.startsWith("http://") || bg.startsWith("https://")) return
 
     // For blob: or data: URLs, check if the media data exists in IndexedDB
     try {
@@ -452,7 +462,7 @@ watch(
         }
       }
     } catch (err) {
-      console.error('Error checking media availability:', err)
+      console.error("Error checking media availability:", err)
       if (props.slide?.id === newSlideId) {
         imageNotAvailable.value = true
       }
@@ -476,13 +486,13 @@ const fetchChapterVerseCount = async () => {
 // Helper to resolve ":LAST" marker to actual last verse number
 const resolveLastVerse = async (verseLabel: string): Promise<string> => {
   if (!verseLabel.includes(":LAST")) return verseLabel
-  
+
   const chapterLabel = verseLabel.replace(":LAST", "")
   const chapter = await useScriptureChapter(chapterLabel)
   const lastVerseNumber = Array.isArray(chapter?.content)
     ? (chapter.content as any[]).length
     : 1
-  
+
   return verseLabel.replace(":LAST", `:${lastVerseNumber}`)
 }
 
@@ -610,7 +620,7 @@ onMounted(() => {
       emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
     }
   })
-  
+
   // Listen for voice command events (next verse / previous verse)
   emitter.on(appWideActions.nextVerse, () => {
     if (nextVerse.value) {
@@ -622,7 +632,7 @@ onMounted(() => {
       emit("goto-verse", previousVerse.value, selectedBibleVersion.value)
     }
   })
-  
+
   // Listen for voice command events (next verse / previous verse)
   emitter.on(appWideActions.nextVerse, () => {
     if (nextVerse.value) {

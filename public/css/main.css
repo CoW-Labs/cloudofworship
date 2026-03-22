@@ -482,22 +482,21 @@ body {
 }
 .uppercase-live-content > .slide-layout-ctn > div:nth-child(1),
 .uppercase-live-content > div:nth-child(1) > .tiptap,
-.bold-live-content > .slide-layout-ctn .bible-content > .scripture-content,
 .uppercase-live-content > div:nth-child(1) > .tiptap > p {
   text-transform: uppercase;
 }
 .double-line-spacing > .slide-layout-ctn > div:nth-child(1),
-.bold-live-content > .slide-layout-ctn .bible-content > .scripture-content,
+.double-line-spacing > .slide-layout-ctn .bible-content > .scripture-content,
 .double-line-spacing > div:nth-child(1) > .tiptap {
   line-height: 200%;
 }
 .normal-line-spacing > .slide-layout-ctn > div:nth-child(1),
-.bold-live-content > .slide-layout-ctn .bible-content > .scripture-content,
+.normal-line-spacing > .slide-layout-ctn .bible-content > .scripture-content,
 .normal-line-spacing > div:nth-child(1) > .tiptap {
   line-height: normal;
 }
 .single-line-spacing > .slide-layout-ctn > div:nth-child(1),
-.bold-live-content > .slide-layout-ctn .bible-content > .scripture-content,
+.single-line-spacing > .slide-layout-ctn .bible-content > .scripture-content,
 .single-line-spacing > div:nth-child(1) > .tiptap {
   line-height: 1;
 }
