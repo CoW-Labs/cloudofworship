@@ -171,12 +171,17 @@ export default function useSlides() {
   }
 
   /**
-   * Batch create slides online
+   * Batch create slides online.
+   * Returns an object with:
+   * - inserted: Slide[] — slides successfully created on the server
+   * - duplicateIds: string[] — slide ids that already existed (were already uploaded)
    */
-  const batchCreateSlides = async (slides: Slide[]): Promise<Slide[]> => {
+  const batchCreateSlides = async (slides: Slide[]): Promise<{ inserted: Slide[]; duplicateIds: string[] }> => {
+    const emptyResult = { inserted: [], duplicateIds: [] }
+
     if (!online.value) {
       console.warn('Cannot batch create slides while offline')
-      return []
+      return emptyResult
     }
 
     try {
@@ -187,28 +192,35 @@ export default function useSlides() {
       }
 
       loading.value = true
-      // appStore.setSlidesLoading(true)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/batch`,
         {
           method: 'POST',
           body: slides,
-          key: 'batch-create-slides',
-          dedupe: 'defer',
+          key: `batch-create-slides-${Date.now()}`,
         }
       )
 
       if (error.value) {
-        // Return partial success data if available
-        if (error.value?.data?.data) {
-          return error.value.data.data as Slide[]
-        }
         throw new Error(error.value?.message || 'Failed to create slides')
       }
 
       appStore.setLastSynced(new Date().toISOString())
-      return data.value as Slide[]
+
+      const result = data.value as any
+
+      // The server returns either:
+      // 1. An array of slides (all succeeded, no duplicates)
+      // 2. An object { inserted: Slide[], duplicateIds: string[] } (partial duplicates)
+      if (Array.isArray(result)) {
+        return { inserted: result as Slide[], duplicateIds: [] }
+      }
+
+      return {
+        inserted: (result?.inserted || []) as Slide[],
+        duplicateIds: (result?.duplicateIds || []) as string[],
+      }
     } catch (error: any) {
       console.error('Error batch creating slides:', error)
       toast.add({
@@ -217,10 +229,9 @@ export default function useSlides() {
         description: error.message,
         color: 'red',
       })
-      return []
+      return emptyResult
     } finally {
       loading.value = false
-      // appStore.setSlidesLoading(false)
     }
   }
 

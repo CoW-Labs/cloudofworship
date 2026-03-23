@@ -32,6 +32,7 @@ export interface Church {
   users: User[]
   storageUsed?: number
   subscriptionPlan: 'free' | 'teams'
+  trialEligible: boolean
 }
 
 export const useAuthStore = defineStore('auth', {

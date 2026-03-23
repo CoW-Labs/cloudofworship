@@ -257,10 +257,11 @@ const createNewSchedule = () => {
   })
 
   appStore.setActiveSchedule(schedule)
+  useGlobalEmit(appWideActions.selectedSchedule, schedule)
   scheduleName.value = ""
 
   emit("close")
-  
+
   // Track schedule creation
   usePosthogCapture("SCHEDULE_CREATED", {
     scheduleName: schedule.name,
@@ -291,6 +292,7 @@ const deleteSchedule = (scheduleId: string) => {
 
   if (scheduleId === appStore.currentState.activeSchedule?._id) {
     appStore.setActiveSchedule(updatedScheduleList?.at(0)!!)
+    useGlobalEmit(appWideActions.selectedSchedule, null)
   }
   appStore.setSchedules(updatedScheduleList)
 

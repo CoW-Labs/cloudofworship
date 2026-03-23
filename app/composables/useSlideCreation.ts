@@ -215,10 +215,10 @@ export default function useSlideCreation() {
   /**
    * Create a new Media slide (Image/Video/Audio)
    */
-  const createMediaSlide = async (
+  const createMediaSlide = (
     file: ExtendedFileT & { isExternal?: boolean },
     options?: { oneOfManySlides: boolean }
-  ): Promise<Slide> => {
+  ): Slide => {
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.empty
     let data = null
@@ -242,8 +242,8 @@ export default function useSlideCreation() {
       tempSlide.data = externalVideo
       tempSlide.name = file.name || `${file.type} Video`
 
-      // Store external video data in IndexedDB
-      await useIndexedDB()
+      // Store external video data in IndexedDB — fire-and-forget, don't block slide creation
+      useIndexedDB()
         .media.add({
           id: tempSlide.id,
           content: { type: file.type },
@@ -298,18 +298,13 @@ export default function useSlideCreation() {
   /**
    * Create multiple media slides from files array
    */
-  const createMultipleMediaSlides = async (files: ExtendedFileT[]): Promise<Slide[]> => {
+  const createMultipleMediaSlides = (files: ExtendedFileT[]): Slide[] => {
     useGlobalEmit(appWideActions.appLoading, true)
 
-    const multipleSlidesPromise: Promise<any>[] = []
-    files?.forEach((file) => {
-      multipleSlidesPromise.push(
-        createMediaSlide(file, { oneOfManySlides: true })
-      )
-    })
+    const newSlides: Slide[] = files?.map((file) =>
+      createMediaSlide(file, { oneOfManySlides: true })
+    )
 
-    // Wait for all slides to be created
-    const newSlides = await Promise.all(multipleSlidesPromise)
     useGlobalEmit(appWideActions.appLoading, false)
 
     if (files.some((file) => !file?.blob?.type?.includes("image"))) {
@@ -340,8 +335,9 @@ export default function useSlideCreation() {
       Promise.all(uploadPromises).then((results) => {
         // Update slides with hosted URLs when uploads succeed
         results.forEach((res) => {
-          if (res && res.uploaded && newSlides[res.index]) {
+          if (res && res.uploaded) {
             const slide = newSlides[res.index]
+            if (!slide) return
             if (slide.backgroundType === 'image') {
               slide.background = res.uploaded.file.url
 
