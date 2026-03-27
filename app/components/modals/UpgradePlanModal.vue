@@ -514,9 +514,8 @@ const authStore = useAuthStore()
 // Trial eligibility: church must have trialEligible=true AND be in an NGN-currency country (NG, GH, or KE)
 const isTrialEligible = computed(() => {
   const church = authStore.church
-  if (!church?.trialEligible) return false
-  // NGN currency is auto-detected for NG, GH, KE — so if detectedCurrency is NGN, user is in an eligible country
-  return detectedCurrency.value === "NGN"
+  // NGN currency is auto-detected for NG, GH, KE — so if detectedCurrency is USD, user is in an eligible country
+  return church?.trialEligible && detectedCurrency.value === "USD"
 })
 
 // Helper for testing: Allow manual currency switch
