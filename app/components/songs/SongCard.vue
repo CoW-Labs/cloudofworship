@@ -28,7 +28,9 @@
         <h4 class="font-semibold break-all">
           {{ song?.title || "" }}
         </h4>
-        <p class="font-light text-xs mt-1 break-all">
+        <p
+          class="font-light text-xs mt-1 break-all truncate w-[200px] overflow-hidden"
+        >
           {{ (song as Song)?.artist || song?.author || "" }}
         </p>
         <p
