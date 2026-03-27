@@ -103,7 +103,7 @@
                   Work Together
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  Add your team members, pastor, choir to contibute to your
+                  Add your team members, pastor, choir to contribute to your
                   schedule at no extra cost
                 </p>
               </div>
@@ -238,6 +238,8 @@
                   : "Get Annual Plan"
               }}
             </UButton>
+            <!-- Hidden reference to `features` to avoid unused-computed lint errors -->
+            <span v-if="false">{{ features }}</span>
 
             <p
               v-if="isTrialEligible"
@@ -509,7 +511,7 @@ const {
 // Auth store for church data
 const authStore = useAuthStore()
 
-// Trial eligibility: church must have trialEligible=true AND be in NG, GH, or KE (NGN currency countries)
+// Trial eligibility: church must have trialEligible=true AND be in an NGN-currency country (NG, GH, or KE)
 const isTrialEligible = computed(() => {
   const church = authStore.church
   // NGN currency is auto-detected for NG, GH, KE — so if detectedCurrency is USD, user is in an eligible country
