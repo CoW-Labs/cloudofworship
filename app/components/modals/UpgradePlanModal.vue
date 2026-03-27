@@ -3,7 +3,7 @@
     <UModal
       v-model="visible"
       :ui="{
-        base: 'min-w-[800px] w-full max-w-[900px]',
+        base: 'min-w-[800px] w-full max-w-[920px]',
         overlay: {
           background: 'bg-gray-200/75 dark:bg-gray-800/75',
         },
@@ -13,8 +13,164 @@
       <div
         class="upgrade-modal grid grid-cols-1 md:grid-cols-2 overflow-hidden rounded-lg"
       >
-        <!-- Left Side - Pricing -->
-        <div class="bg-white dark:bg-gray-900 p-8 relative">
+        <!-- Left Side - Marketing / Features -->
+        <div
+          class="bg-gray-50 dark:bg-gray-900 p-8 pb-6 relative flex flex-col"
+        >
+          <button
+            class="absolute top-4 right-4 p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors z-10 md:hidden"
+            @click="visible = false"
+          >
+            <IconWrapper name="i-heroicons-x-mark-20-solid" class="w-5 h-5" />
+          </button>
+
+          <!-- Free Trial Badge -->
+          <div v-if="isTrialEligible" class="mb-5">
+            <span
+              class="inline-flex items-center gap-1.5 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs font-semibold px-3 py-1.5 rounded-full"
+              style="font-family: 'Bricolage Grotesque'"
+            >
+              <IconWrapper
+                name="i-heroicons-sparkles-20-solid"
+                class="w-3.5 h-3.5 mb-2"
+              />
+              14-DAY FREE TRIAL
+            </span>
+          </div>
+
+          <!-- Heading -->
+          <h2
+            class="text-2xl font-semibold mb-8 text-gray-900 dark:text-white leading-tight"
+          >
+            Hi {{ authStore.user?.fullname?.split(" ")?.[0] }}, you can do more
+            for
+            <span class="text-primary"
+              >{{ authStore.church?.name }}, {{ authStore.church?.type }}</span
+            >
+          </h2>
+
+          <!-- Feature Items -->
+          <div class="space-y-5 mb-8">
+            <div class="flex items-start gap-3">
+              <div
+                class="w-10 h-10 min-w-10 rounded-xl bg-primary-100 dark:bg-primary-900 flex items-center justify-center"
+              >
+                <IconWrapper
+                  name="i-heroicons-book-open-20-solid"
+                  class="w-5 h-5 text-primary-600 dark:text-primary-400"
+                />
+              </div>
+              <div>
+                <p class="font-semibold text-sm text-gray-900 dark:text-white">
+                  Access to 10,000+ songs
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  Complete library of contemporary and classic hymns,
+                  contributed by churches like yours.
+                </p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div
+                class="w-10 h-10 min-w-10 rounded-xl bg-primary-100 dark:bg-primary-900 flex items-center justify-center"
+              >
+                <IconWrapper
+                  name="i-heroicons-cloud-arrow-down-20-solid"
+                  class="w-5 h-5 text-primary-600 dark:text-primary-400"
+                />
+              </div>
+              <div>
+                <p class="font-semibold text-sm text-gray-900 dark:text-white">
+                  Offline Worship Mode
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  Save online lyrics and create sermon slides accessible fully
+                  offline.
+                </p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div
+                class="w-10 h-10 min-w-10 rounded-xl bg-primary-100 dark:bg-primary-900 flex items-center justify-center"
+              >
+                <IconWrapper
+                  name="i-heroicons-user-group-20-solid"
+                  class="w-5 h-5 text-primary-600 dark:text-primary-400"
+                />
+              </div>
+              <div>
+                <p class="font-semibold text-sm text-gray-900 dark:text-white">
+                  Work Together
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  Add your team members, pastor, choir to contibute to your
+                  schedule at no extra cost
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Testimonial -->
+          <div class="mt-auto">
+            <div
+              class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"
+            >
+              <div ref="reviewContainer" class="relative w-full min-h-[80px]">
+                <div
+                  v-for="(review, index) in shuffledReviews"
+                  :key="index"
+                  ref="reviewSlides"
+                  class="review-slide"
+                  :class="{
+                    'absolute inset-0 opacity-0 pointer-events-none':
+                      index !== currentReviewIndex,
+                  }"
+                >
+                  <p
+                    class="text-sm text-gray-700 dark:text-gray-300 italic leading-relaxed mb-3"
+                  >
+                    "{{
+                      review.text.length > 120
+                        ? review.text.substring(0, 115) + "..."
+                        : review.text
+                    }}"
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <div
+                      v-if="review.avatar"
+                      class="w-8 min-w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center"
+                      :style="`background-image: url('${review.avatar}'); background-size: cover; background-position: center;`"
+                    ></div>
+                    <div
+                      v-else
+                      class="w-8 min-w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-600 dark:text-primary-400 font-semibold text-xs"
+                    >
+                      {{ review.name.charAt(0) }}
+                    </div>
+                    <div>
+                      <p
+                        class="font-semibold text-xs text-gray-900 dark:text-white"
+                      >
+                        {{ review.name }}
+                      </p>
+                      <p
+                        v-if="review.tagline"
+                        class="text-[10px] text-gray-500 dark:text-gray-400"
+                      >
+                        {{ review.tagline }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side - Pricing -->
+        <div
+          class="bg-white dark:bg-gray-950 p-6 relative flex flex-col overflow-y-auto max-h-[90vh]"
+        >
           <button
             class="absolute top-4 right-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors z-10"
             @click="visible = false"
@@ -22,78 +178,99 @@
             <IconWrapper name="i-heroicons-x-mark-20-solid" class="w-5 h-5" />
           </button>
 
-          <!-- Currency Switcher for Testing (Development Only) -->
-          <!-- <div
-            v-if="$config.public.NODE_ENV !== 'production'"
-            class="absolute top-4 left-4 flex gap-1 text-xs z-10"
-          >
-            <button
-              @click="switchCurrency('NGN')"
-              class="px-2 py-1 rounded transition-colors"
-              :class="
-                selectedCurrency === 'NGN'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
-              "
-            >
-              NGN
-            </button>
-            <button
-              @click="switchCurrency('USD')"
-              class="px-2 py-1 rounded transition-colors"
-              :class="
-                selectedCurrency === 'USD'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
-              "
-            >
-              USD
-            </button>
-          </div> -->
-
-          <h2 class="text-2xl font-bold mb-6">Do more for your ministry</h2>
-
-          <!-- Yearly Plan -->
+          <!-- Annual Plan Card -->
           <div
-            class="border-2 rounded-xl p-4 mb-4 cursor-pointer transition-all"
+            class="border-2 rounded-2xl p-5 mb-4 cursor-pointer transition-all relative"
             :class="
               selectedPlan === 'yearly'
-                ? 'border-primary-500 bg-primary-50 dark:bg-primary-950'
+                ? 'border-primary-500 bg-white dark:bg-gray-900 shadow-lg shadow-primary-100 dark:shadow-none'
                 : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
             "
             @click="selectedPlan = 'yearly'"
           >
-            <div class="flex items-start justify-between mb-2">
-              <div>
-                <div class="flex items-center gap-2 mb-1">
-                  <h3 class="font-semibold text-lg">Yearly</h3>
-                  <UBadge color="green" variant="solid" size="xs">
-                    Save 16%
-                  </UBadge>
-                </div>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ currencySymbol }}{{ yearlyPrice.toLocaleString() }} / year
-                </p>
-              </div>
-              <div
-                class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                :class="
-                  selectedPlan === 'yearly'
-                    ? 'border-primary-500 bg-primary-500'
-                    : 'border-gray-300 dark:border-gray-600'
-                "
+            <!-- Recommended Badge -->
+            <div class="absolute -top-3 right-4">
+              <span
+                class="bg-primary-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide"
               >
-                <div
-                  v-if="selectedPlan === 'yearly'"
-                  class="w-2 h-2 bg-white rounded-full"
-                ></div>
-              </div>
+                Recommended
+              </span>
             </div>
+
+            <h3 class="font-bold text-lg mb-1">Annual Plan</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Unrestricted access for one full year.
+            </p>
+
+            <div class="flex items-baseline gap-1 mb-1">
+              <span class="text-3xl font-bold text-gray-900 dark:text-white"
+                >{{ currencySymbol }}{{ yearlyPrice.toLocaleString() }}</span
+              >
+              <span class="text-sm text-gray-500 dark:text-gray-400">/yr</span>
+            </div>
+
+            <p
+              v-if="isTrialEligible"
+              class="text-xs text-primary-600 dark:text-primary-400 font-medium mb-4"
+            >
+              14 Days Free, then pay annually
+            </p>
+            <p v-else class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              Billed annually
+            </p>
+
+            <UButton
+              color="primary"
+              size="lg"
+              block
+              @click.stop="
+                () => {
+                  selectedPlan = 'yearly'
+                  handleUpgrade()
+                }
+              "
+              :loading="loading && selectedPlan === 'yearly'"
+              class="font-semibold rounded-xl"
+            >
+              {{
+                isTrialEligible
+                  ? "Start Your 14-Day Free Trial"
+                  : "Get Annual Plan"
+              }}
+            </UButton>
+
+            <p
+              v-if="isTrialEligible"
+              class="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-2.5 leading-relaxed"
+            >
+              We don't charge you until the 14-day trial period elapses.
+            </p>
           </div>
 
-          <!-- Monthly Plan -->
+          <!-- Ends of Earth Initiative Card -->
           <div
-            class="border-2 rounded-xl p-4 mb-6 cursor-pointer transition-all"
+            class="bg-primary-600 dark:bg-primary-700 rounded-2xl p-5 mb-4 text-white"
+          >
+            <div class="flex items-center gap-2 mb-2">
+              <IconWrapper
+                name="i-heroicons-globe-alt-20-solid"
+                class="w-4 h-4 text-primary-200 mb-2"
+              />
+              <span
+                class="text-[10px] font-semibold uppercase tracking-wider text-primary-200"
+                >Our Mission</span
+              >
+            </div>
+            <h4 class="font-bold text-base mb-2">Ends of Earth Initiative</h4>
+            <p class="text-xs text-primary-100 leading-relaxed mb-3">
+              90% of profits go directly to efforts pushing the gospel forward
+              in churches across Africa and other regions.
+            </p>
+          </div>
+
+          <!-- Monthly Plan Option -->
+          <div
+            class="border rounded-2xl p-4 cursor-pointer transition-all flex items-center justify-between"
             :class="
               selectedPlan === 'monthly'
                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-950'
@@ -101,155 +278,29 @@
             "
             @click="selectedPlan = 'monthly'"
           >
-            <div class="flex items-start justify-between mb-2">
-              <div>
-                <h3 class="font-semibold text-lg">Monthly</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ currencySymbol }}{{ monthlyPrice.toLocaleString() }} /
-                  month
-                </p>
-              </div>
-              <div
-                class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                :class="
-                  selectedPlan === 'monthly'
-                    ? 'border-primary-500 bg-primary-500'
-                    : 'border-gray-300 dark:border-gray-600'
-                "
-              >
-                <div
-                  v-if="selectedPlan === 'monthly'"
-                  class="w-2 h-2 bg-white rounded-full"
-                ></div>
-              </div>
+            <div>
+              <h3 class="font-semibold text-sm text-gray-900 dark:text-white">
+                Monthly Plan
+              </h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ currencySymbol }}{{ monthlyPrice.toLocaleString() }} / month
+              </p>
             </div>
-          </div>
-
-          <!-- Features List -->
-          <div class="mb-6">
-            <h4 class="font-semibold mb-3">
-              Everything you need to elevate your worship experience
-            </h4>
-            <div class="space-y-2">
-              <div
-                v-for="feature in features"
-                :key="feature"
-                class="flex items-center gap-2 text-sm"
-              >
-                <IconWrapper
-                  name="i-heroicons-check-circle-20-solid"
-                  class="w-5 h-5 text-primary-500 flex-shrink-0"
-                />
-                <span>{{ feature }}</span>
-              </div>
-              <div class="flex items-center gap-2 text-sm">
-                <IconWrapper
-                  name="i-heroicons-check-circle-20-solid"
-                  class="w-5 h-5 text-primary-500 flex-shrink-0"
-                />
-                <span>
-                  <a
-                    href="https://cloudofworship.com/pricing"
-                    class="text-primary-500 hover:underline"
-                  >
-                    See more benefits for your church.
-                  </a>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Action Buttons -->
-          <div class="space-y-2">
             <UButton
               color="primary"
-              size="lg"
-              block
-              @click="handleUpgrade"
-              :loading="loading"
-              class="font-semibold"
-            >
-              Continue with
-              {{ selectedPlan === "yearly" ? "Yearly" : "Monthly" }}
-            </UButton>
-            <UButton
-              color="white"
               variant="ghost"
-              size="lg"
-              block
-              @click="visible = false"
+              size="sm"
+              @click.stop="
+                () => {
+                  selectedPlan = 'monthly'
+                  handleUpgrade()
+                }
+              "
+              :loading="loading && selectedPlan === 'monthly'"
+              class="font-medium text-xs"
             >
-              Maybe later
+              Switch to Monthly
             </UButton>
-          </div>
-
-          <!-- Ends of Earth Initiative Disclaimer -->
-          <div
-            class="mb-6 mt-4 p-4 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 rounded-lg"
-          >
-            <div class="flex gap-3">
-              <IconWrapper
-                name="i-heroicons-heart-solid"
-                class="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5"
-              />
-              <div class="text-sm">
-                <p
-                  class="font-semibold text-primary-700 dark:text-primary-400 mb-1 text-xs"
-                >
-                  Ends of Earth Initiative
-                </p>
-                <p class="text-gray-700 dark:text-gray-300 text-xs">
-                  90% of profits go directly to efforts pushing the gospel
-                  forward in churches across Africa and other regions.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right Side - Testimonial Slideshow -->
-        <div
-          class="hidden md:block bg-cover bg-center relative overflow-hidden"
-        >
-          <div
-            class="absolute inset-0"
-            :style="`background-image: url('https://images.unsplash.com/photo-1532140225690-f6d25ab4c891?q=80&w=1740'); background-size: cover; background-position: center;`"
-          ></div>
-          <div class="absolute inset-0 bg-primary/40"></div>
-          <div class="absolute inset-0 flex items-start pt-6 p-8">
-            <div ref="reviewContainer" class="relative w-full">
-              <div
-                v-for="(review, index) in shuffledReviews"
-                :key="index"
-                ref="reviewSlides"
-                class="review-slide text-white"
-                :class="{
-                  'absolute inset-0 opacity-0 pointer-events-none':
-                    index !== currentReviewIndex,
-                }"
-              >
-                <p class="text-xl mb-4 leading-relaxed">"{{ review.text }}"</p>
-                <div class="flex items-center gap-3 mt-8">
-                  <div
-                    v-if="review.avatar"
-                    class="w-10 min-w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold"
-                    :style="`background-image: url('${review.avatar}'); background-size: cover; background-position: center;`"
-                  ></div>
-                  <div
-                    v-else
-                    class="w-10 min-w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold text-sm"
-                  >
-                    {{ review.name.charAt(0) }}
-                  </div>
-                  <div>
-                    <p class="font-semibold text-sm">{{ review.name }}</p>
-                    <p v-if="review.tagline" class="text-xs opacity-80">
-                      {{ review.tagline }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -266,6 +317,7 @@
 
 <script setup lang="ts">
 import type { PaymentPlan } from "~/composables/usePayment"
+import { useAuthStore } from "~/store/auth"
 import { gsap } from "gsap"
 
 // Reviews extracted from user testimonials
@@ -454,6 +506,17 @@ const {
   getTestCurrency,
 } = useSubscriptionPlans()
 
+// Auth store for church data
+const authStore = useAuthStore()
+
+// Trial eligibility: church must have trialEligible=true AND be in NG, GH, or KE (NGN currency countries)
+const isTrialEligible = computed(() => {
+  const church = authStore.church
+  if (!church?.trialEligible) return false
+  // NGN currency is auto-detected for NG, GH, KE — so if detectedCurrency is USD, user is in an eligible country
+  return detectedCurrency.value === "USD"
+})
+
 // Helper for testing: Allow manual currency switch
 const switchCurrency = (currency: "NGN" | "USD") => {
   setTestCurrency(currency)
@@ -641,38 +704,9 @@ const handleSuccessModalClose = () => {
 <style scoped>
 .upgrade-modal {
   max-height: 90vh;
-  /* overflow: hidden; */
 }
 
 .review-slide {
   will-change: opacity, transform;
-}
-
-.overlay {
-  position: absolute;
-  background: url("/images/slide-bg.jpeg") center/cover no-repeat;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  mix-blend-mode: lighten;
-  opacity: 0.5;
-  animation: rotateScale 90s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
-  transform-origin: center center;
-  transform: scale(1.15);
-}
-
-@keyframes rotateScale {
-  0% {
-    transform: rotate(0deg) scale(1.15);
-  }
-  50% {
-    transform: rotate(5deg) scale(1.6);
-  }
-  70% {
-    transform: rotate(-5deg) scale(1.35);
-  }
-  100% {
-    transform: rotate(-5deg) scale(1.15);
-  }
 }
 </style>
