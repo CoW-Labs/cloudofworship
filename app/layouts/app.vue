@@ -483,6 +483,10 @@ const downloadEssentialResources = async () => {
 
   populateBibleVersionOptions()
 
+  // Auto-detect and save the secondary/non-primary monitor so the user
+  // doesn't have to open Display Settings before going live for the first time.
+  await useAutoDetectSecondaryDisplay()
+
   // All computations completed
   downloadStep.value = 5
   downloadResource.value = "All resources downloaded."
@@ -723,21 +727,17 @@ async function openTauriLiveWindow() {
       return
     }
 
-    if (!appStore.currentState.mainDisplayLabel) {
-      useToast().add({
-        title: "Set up your live display first",
-        icon: "i-bx-info-circle",
-      })
-      useGlobalEmit(appWideActions.openSettings, "Display Settings")
-      return
-    }
-
     if (monitors.length === 1) {
       useToast().add({
         title:
           "Only one screen detected. Connect a second screen to project on another display",
         icon: "i-bx-info-circle",
       })
+    }
+
+    // If no display has been configured yet, attempt auto-detection now
+    if (!appStore.currentState.mainDisplayLabel) {
+      await useAutoDetectSecondaryDisplay(true)
     }
 
     // Find the target monitor based on saved settings
@@ -914,17 +914,8 @@ async function openWindows() {
     })
     const noOfScreens = screenDetails.screens.length
 
-    if (!appStore.currentState.mainDisplayLabel) {
-      useToast().add({
-        title: "Set up your live display first",
-        icon: "i-bx-info-circle",
-      })
-      useGlobalEmit(appWideActions.openSettings, "Display Settings")
-      return
-    }
-
     if (noOfScreens === 1) {
-      // No secondary monitor — just open live window on the current/only screen
+      // Only one screen — open live window on it directly
       const screen1 = screenDetails.screens[0]
       openWindow(
         screen1.availLeft,
@@ -934,18 +925,35 @@ async function openWindows() {
         `http://${window.location.host}/live`
       )
     } else {
-      // Two screens or more
-      // const screen1 = screenDetails.screens[0]
-      // const screen2 = screenDetails.screens[1]
-      const mainDisplayScreen = screenDetails.screens?.find(
+      // Multiple screens — try saved label first, then auto-pick the non-primary
+      let targetScreen = screenDetails.screens.find(
         (screen: any) => screen.id === appStore.currentState.mainDisplayLabel
       )
-      if (mainDisplayScreen) {
+
+      // Saved label not found (e.g. monitor was swapped) — re-run auto-detection
+      // and try again with the freshly picked screen
+      if (!targetScreen) {
+        await useAutoDetectSecondaryDisplay(true)
+        targetScreen = screenDetails.screens.find(
+          (screen: any) => screen.id === appStore.currentState.mainDisplayLabel
+        )
+      }
+
+      // Last resort: pick any screen that isn't the current app screen
+      if (!targetScreen) {
+        const currentId = (screenDetails.currentScreen as any).id
+        targetScreen =
+          screenDetails.screens.find((s: any) => s.isPrimary === false) ||
+          screenDetails.screens.find((s: any) => s.id !== currentId) ||
+          screenDetails.screens[0]
+      }
+
+      if (targetScreen) {
         openWindow(
-          mainDisplayScreen.availLeft,
-          mainDisplayScreen.availTop,
-          mainDisplayScreen.availWidth,
-          mainDisplayScreen.availHeight,
+          targetScreen.availLeft,
+          targetScreen.availTop,
+          targetScreen.availWidth,
+          targetScreen.availHeight,
           `http://${window.location.host}/live`
         )
       } else {
