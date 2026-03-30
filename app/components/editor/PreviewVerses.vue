@@ -72,7 +72,7 @@
         v-show="verseTemp?.trim()"
         v-for="(verseTemp, index) in relatedData?.verses"
         :key="`verse-${index}`"
-        :id="convertStringToSlug(verse).replace(/\d+/g, '')"
+        :id="convertStringToSlug(`Verse ${index + 1}`)"
         class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-200 dark:hover:bg-primary-600 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
         :class="{
           'bg-primary-300 dark:bg-primary-900': `Verse ${index + 1}` === verse,
@@ -148,31 +148,83 @@ const getSongOrHymnObj = async () => {
   }
 }
 
+const convertStringToSlug = (str: string) => {
+  return str
+    .toLowerCase()
+    .replaceAll("1 ", "one-")
+    .replaceAll("2 ", "two-")
+    .replaceAll("3 ", "three-")
+    .replaceAll(" ", "-")
+    .replaceAll(":", "-")
+}
+
 onMounted(() => {
   if (props.verse?.includes(":")) {
     getAllChapterVerses()
   }
+  // Scroll active verse into view on first open
+  nextTick(() => scrollActiveVerseIntoView())
 })
+
+const scrollActiveVerseIntoView = () => {
+  if (!versesPreview.value) return
+
+  let selector: string | null = null
+
+  if (props.slide?.type === slideTypes.bible) {
+    // Bible button IDs are generated in the template as:
+    //   convertStringToSlug(`${bibleChapter}-${verseTemp.verse}`)
+    // e.g. bibleChapter="John 3", verse=16 → id="john-3-16"
+    // Reconstruct the exact same ID from props.verse ("John 3:16").
+    const verseNum = props.verse?.split(":")?.[1]?.split("-")?.[0]
+    if (verseNum && bibleChapter.value) {
+      const id = convertStringToSlug(`${bibleChapter.value}-${verseNum}`)
+      selector = `#${id}`
+    }
+  } else if (props.slide?.type === slideTypes.hymn) {
+    // Hymn IDs: "chorus" or "verse-{n}"
+    if (props.verse === "Chorus") {
+      selector = "#chorus"
+    } else {
+      const verseNum = props.verse?.split(" ")?.[1]
+      if (verseNum) selector = `#verse-${verseNum}`
+    }
+  } else {
+    // Song IDs: convertStringToSlug("Verse {n}") — digits get stripped to "verse-"
+    // Match by the data label instead: look for the item at the correct index.
+    const verseNum = props.verse?.split(" ")?.[1]
+    if (verseNum) {
+      // Find the nth .item button (1-indexed)
+      const allItems = versesPreview.value.querySelectorAll(".item")
+      const target = allItems[Number(verseNum) - 1] as HTMLElement | undefined
+      target?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      return
+    }
+  }
+
+  if (selector) {
+    const el = versesPreview.value.querySelector(selector) as HTMLElement | null
+    el?.scrollIntoView({ block: "nearest" })
+  }
+}
 
 watch(
   () => props.slide,
   (newVal, oldVal) => {
-    if (versesPreview.value) {
-      setTimeout(() => {
-        // Scroll down to selected verse
-        const activeVerse =
-          props.slide.type === slideTypes.bible
-            ? versesPreview.value?.querySelector(
-                `#${convertStringToSlug(props.verse).replace(/\d+/g, "")}`
-              )
-            : versesPreview.value?.querySelector(
-                `#${convertStringToSlug(props.verse).replace(/\d+/g, "")}`
-              )
-        activeVerse?.scrollIntoView()
-      }, 100)
+    if (newVal?.id !== oldVal?.id) {
+      // Slide changed — wait for the list to re-render then scroll
+      nextTick(() => scrollActiveVerseIntoView())
     }
   },
-  { deep: true, immediate: true }
+  { immediate: true }
+)
+
+// Scroll whenever the active verse changes (next/prev navigation on the same slide)
+watch(
+  () => props.verse,
+  () => {
+    nextTick(() => scrollActiveVerseIntoView())
+  }
 )
 
 watch(bibleChapter, () => {
@@ -205,16 +257,6 @@ watch(
 //   }
 //   return []
 // })
-
-const convertStringToSlug = (str: string) => {
-  return str
-    .toLowerCase()
-    .replaceAll("1 ", "one-")
-    .replaceAll("2 ", "two-")
-    .replaceAll("3 ", "three-")
-    .replaceAll(" ", "-")
-    .replaceAll(":", "-")
-}
 
 const getNumberRange = (number: number, rangeBound = 20) => {
   const lowerRange = []

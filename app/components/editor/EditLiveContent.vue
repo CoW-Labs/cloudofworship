@@ -595,9 +595,26 @@ const previousVerse = computed(() => {
 
 watch(
   () => props.slide,
-  () => {
-    // Update slide title when Slide is updated
-    verse.value = props.slide?.title || ""
+  (newSlide, oldSlide) => {
+    // Update the verse input when:
+    //  • switching to a different slide (id changed) — always reset
+    //  • the title changed AND the user is not actively editing the input
+    //    (i.e. the document active element is not the verse input field)
+    // This prevents the input from snapping back to the last saved title while
+    // the user is mid-navigation (the "goes back to recently selected verse" bug),
+    // which was caused by the store watcher in PreviewContent re-assigning the
+    // same activeSlide object reference, triggering this watcher unnecessarily.
+    const verseInputFocused =
+      typeof document !== "undefined" &&
+      document.getElementById("bible-verse-input") === document.activeElement
+
+    if (newSlide?.id !== oldSlide?.id) {
+      // Different slide — always reset verse
+      verse.value = newSlide?.title || ""
+    } else if (newSlide?.title !== oldSlide?.title && !verseInputFocused) {
+      // Same slide, title updated (e.g. after a successful gotoVerse) — update
+      verse.value = newSlide?.title || ""
+    }
 
     // Remove toolbar when Slide is updated, if slide.type is not text
     if (props.slide?.type !== slideTypes.text) {
