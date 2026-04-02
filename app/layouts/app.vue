@@ -283,7 +283,6 @@ const fetchAppInfo = async () => {
   const { data } = await useAPIFetch("/app-config/info")
   if (data.value) {
     appInfo.value = data.value as any
-    appStore.setBibleVersions((data.value as any)?.bibleVersions)
   }
 }
 
@@ -469,19 +468,12 @@ const downloadEssentialResources = async () => {
     return (await db.bibleAndHymns.where("id").equals(bibleVersion).count()) > 0
   }
 
-  const populateBibleVersionOptions = async () => {
-    const tempBibleVersions = appInfo.value?.bibleVersions?.length
+  const { populateBibleVersionOptions } = useBibleVersionManager()
+  populateBibleVersionOptions(
+    appInfo.value?.bibleVersions?.length
       ? appInfo.value.bibleVersions
-      : [...appStore.currentState.settings.bibleVersions]
-    for (const bibleVersion of tempBibleVersions) {
-      bibleVersion.isDownloaded = await isBibleVersionDownloaded(
-        bibleVersion.id
-      )
-    }
-    appStore.setBibleVersions(tempBibleVersions)
-  }
-
-  populateBibleVersionOptions()
+      : undefined
+  )
 
   // Auto-detect and save the secondary/non-primary monitor so the user
   // doesn't have to open Display Settings before going live for the first time.
