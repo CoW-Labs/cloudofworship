@@ -472,7 +472,11 @@ const signup = async () => {
         // If email not verified, still go to verify page
         // But store plan_id in localStorage to show modal after verification
         if (planId) {
-          localStorage.setItem("pending_plan_id", planId)
+          try {
+            localStorage.setItem("pending_plan_id", planId)
+          } catch {
+            // localStorage unavailable (private mode / SecurityError)
+          }
         }
         goToVerify()
       }

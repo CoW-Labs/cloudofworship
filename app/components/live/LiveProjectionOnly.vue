@@ -370,14 +370,6 @@ watch(
   () => props.slide?.id,
   (newId, oldId) => {
     try {
-      if (process.client && props.fullScreen && route.name === "live") {
-        try {
-          document.documentElement.requestFullscreen()
-        } catch (error) {
-          console.error("Error auto-requesting fullscreen:", error)
-        }
-      }
-
       // Guard: slide may be undefined when the watcher fires
       if (!props.slide) {
         return
@@ -394,7 +386,11 @@ watch(
 
         // Only play video/audio when in fullScreen mode
         if (props.fullScreen) {
-          video.value?.play()
+          video.value?.play().catch((err) => {
+            if (err.name !== 'AbortError') {
+              console.warn('Video play failed on slide change:', err.name)
+            }
+          })
         }
 
         // Trigger smooth content fade animation on slide change
@@ -532,8 +528,16 @@ watch(
               )
             }
           } else {
-            video.value?.play()
-            audio.value?.play()
+            video.value?.play().catch((err) => {
+              if (err.name !== 'AbortError') {
+                console.warn('Video play failed:', err.name)
+              }
+            })
+            audio.value?.play().catch((err) => {
+              if (err.name !== 'AbortError') {
+                console.warn('Audio play failed:', err.name)
+              }
+            })
           }
         } else if (
           !isPlaying &&
@@ -611,12 +615,13 @@ watch(
 onMounted(() => {
   appMounted.value = true
   // Only play video when in fullScreen mode
-  try {
-    if (props.fullScreen) {
-      video.value?.play()
-    }
-  } catch (err) {
-    console.error("Error playing video:", err)
+  if (props.fullScreen) {
+    video.value?.play().catch((err) => {
+      if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
+        console.warn('Video autoplay failed on mount:', err.name)
+      }
+      // NotAllowedError is expected without user interaction — silently ignore
+    })
   }
 
   // Initialize current background
@@ -721,18 +726,21 @@ const computePadding = (padding: number | undefined) => {
 }
 
 const activateFullScreen = () => {
-  // const toast = useToast()
   const route = useRoute()
   if (props.fullScreen && route.name === "live") {
     if (document.fullscreenElement) {
-      document.exitFullscreen()
+      document.exitFullscreen().catch((err) => {
+        console.warn("Error exiting fullscreen:", err)
+      })
     } else {
-      try {
-        document.documentElement.requestFullscreen()
-      } catch (error) {
-        console.error("Error auto-requesting fullscreen:", error)
-      }
-      emit("activate-fullscreen")
+      document.documentElement.requestFullscreen().then(() => {
+        emit("activate-fullscreen")
+      }).catch((err) => {
+        // NotAllowedError means no transient user activation — shouldn't happen on dblclick,
+        // but guard anyway and emit so the parent knows
+        console.warn("Fullscreen request denied:", err.message)
+        emit("activate-fullscreen")
+      })
     }
   }
 }

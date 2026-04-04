@@ -146,13 +146,13 @@ onMounted(() => {
   // Shortcut to go full screen
   useCreateShortcut("f", () => {
     if (document.fullscreenElement) {
-      document.exitFullscreen()
+      document.exitFullscreen().catch((err) => {
+        console.warn("Error exiting fullscreen:", err)
+      })
     } else {
-      try {
-        document.documentElement.requestFullscreen()
-      } catch (error) {
-        console.error("Error auto-requesting fullscreen:", error)
-      }
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.warn("Fullscreen request denied:", err.message)
+      })
     }
   })
 

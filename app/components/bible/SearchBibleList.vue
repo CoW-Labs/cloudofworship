@@ -224,7 +224,9 @@ const getVerses = (query: string = "") => {
     }))
 
     // Split query into words for multi-word matching
-    const queryWords = query.toLowerCase().trim().split(/\s+/).filter(w => w.length > 0)
+    const queryWords = Array.isArray(query)
+      ? query
+      : query.toLowerCase().trim().split(/\s+/).filter((w) => w.length > 0)
     
     // If single word or phrase, use fuzzy search
     let results: any[] = []

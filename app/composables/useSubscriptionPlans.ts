@@ -34,9 +34,13 @@ export const useSubscriptionPlans = () => {
   // Allow local testing by setting currency in localStorage
   const getTestCurrency = (): 'NGN' | 'USD' | null => {
     if (process.client) {
-      const testCurrency = localStorage.getItem('test_currency')
-      if (testCurrency === 'NGN' || testCurrency === 'USD') {
-        return testCurrency
+      try {
+        const testCurrency = localStorage.getItem('test_currency')
+        if (testCurrency === 'NGN' || testCurrency === 'USD') {
+          return testCurrency
+        }
+      } catch {
+        // localStorage unavailable (private mode / SecurityError)
       }
     }
     return null
@@ -44,10 +48,14 @@ export const useSubscriptionPlans = () => {
 
   const setTestCurrency = (currency: 'NGN' | 'USD' | null) => {
     if (process.client) {
-      if (currency) {
-        localStorage.setItem('test_currency', currency)
-      } else {
-        localStorage.removeItem('test_currency')
+      try {
+        if (currency) {
+          localStorage.setItem('test_currency', currency)
+        } else {
+          localStorage.removeItem('test_currency')
+        }
+      } catch {
+        // localStorage unavailable (private mode / SecurityError)
       }
     }
   }
@@ -72,17 +80,21 @@ export const useSubscriptionPlans = () => {
 
     // Check localStorage for cached currency
     if (process.client) {
-      const cached = localStorage.getItem('detected_currency')
-      const cacheTime = localStorage.getItem('detected_currency_time')
+      try {
+        const cached = localStorage.getItem('detected_currency')
+        const cacheTime = localStorage.getItem('detected_currency_time')
 
-      // Cache for 24 hours
-      if (cached && cacheTime) {
-        const hoursSinceCache = (Date.now() - parseInt(cacheTime)) / (1000 * 60 * 60)
-        if (hoursSinceCache < 24 && (cached === 'NGN' || cached === 'USD')) {
-          detectedCurrency.value = cached as 'NGN' | 'USD'
-          selectedCurrency.value = detectedCurrency.value
-          return detectedCurrency.value
+        // Cache for 24 hours
+        if (cached && cacheTime) {
+          const hoursSinceCache = (Date.now() - parseInt(cacheTime)) / (1000 * 60 * 60)
+          if (hoursSinceCache < 24 && (cached === 'NGN' || cached === 'USD')) {
+            detectedCurrency.value = cached as 'NGN' | 'USD'
+            selectedCurrency.value = detectedCurrency.value
+            return detectedCurrency.value
+          }
         }
+      } catch {
+        // localStorage unavailable (private mode / SecurityError) — skip cache
       }
     }
 
@@ -134,8 +146,12 @@ export const useSubscriptionPlans = () => {
 
       // Cache the detected currency
       if (process.client) {
-        localStorage.setItem('detected_currency', currency)
-        localStorage.setItem('detected_currency_time', Date.now().toString())
+        try {
+          localStorage.setItem('detected_currency', currency)
+          localStorage.setItem('detected_currency_time', Date.now().toString())
+        } catch {
+          // localStorage unavailable (private mode / SecurityError) — skip caching
+        }
       }
 
       detectedCurrency.value = currency

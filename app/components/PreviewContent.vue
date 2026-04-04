@@ -582,7 +582,11 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
     `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
   )
   if (!error.value) {
-    let tempSlides = data.value as Slide[]
+    let tempSlides = (data.value as Slide[]) || []
+    if (!Array.isArray(tempSlides)) {
+      console.warn('retrieveSlidesOnline: unexpected response shape', data.value)
+      return
+    }
     tempSlides.forEach((slide) => {
       if (
         slide.backgroundType === backgroundTypes.video &&
@@ -643,10 +647,15 @@ watch(
   () => {
     nextTick(() => {
       const slideId = activeSlide.value?.id
-      const newestSlide = slidesGrid.value?.querySelector(
-        `#${slideId?.replace(/\d+/g, "")}`
-      )
-      newestSlide?.scrollIntoView({ behavior: "auto" })
+      const selectorId = slideId?.replace(/\d+/g, "")
+      // Guard against an empty or invalid CSS selector (e.g. slide ID is all digits)
+      if (!selectorId || selectorId === "#") return
+      try {
+        const newestSlide = slidesGrid.value?.querySelector(`#${selectorId}`)
+        newestSlide?.scrollIntoView({ behavior: "auto" })
+      } catch (err) {
+        // querySelector throws SyntaxError on invalid selectors — silently ignore
+      }
     })
   }
 )

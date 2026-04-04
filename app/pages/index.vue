@@ -253,18 +253,22 @@ onMounted(async () => {
   }
 
   // Check for pending plan_id from signup flow
-  const pendingPlanId = localStorage.getItem("pending_plan_id")
-  if (pendingPlanId) {
-    localStorage.removeItem("pending_plan_id")
+  try {
+    const pendingPlanId = localStorage.getItem("pending_plan_id")
+    if (pendingPlanId) {
+      localStorage.removeItem("pending_plan_id")
 
-    usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
-      planId: pendingPlanId,
-    })
+      usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
+        planId: pendingPlanId,
+      })
 
-    // Show upgrade modal after a brief delay
-    setTimeout(() => {
-      useGlobalEmit("show-upgrade-modal", { planId: pendingPlanId })
-    }, 1000)
+      // Show upgrade modal after a brief delay
+      setTimeout(() => {
+        useGlobalEmit("show-upgrade-modal", { planId: pendingPlanId })
+      }, 1000)
+    }
+  } catch {
+    // localStorage unavailable (private mode / SecurityError)
   }
 
   // APP-WIDE SHORTCUTS

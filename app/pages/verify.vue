@@ -115,9 +115,13 @@ onMounted(() => {
   fetchPlans()
 
   // Check if there's a pending plan_id from signup
-  const storedPlanId = localStorage.getItem("pending_plan_id")
-  if (storedPlanId) {
-    pendingPlanId.value = storedPlanId
+  try {
+    const storedPlanId = localStorage.getItem("pending_plan_id")
+    if (storedPlanId) {
+      pendingPlanId.value = storedPlanId
+    }
+  } catch {
+    // localStorage unavailable (private mode / SecurityError)
   }
 
   resendCode()
@@ -165,7 +169,11 @@ const verifyEmail = async () => {
     // Check if there's a pending plan_id to show upgrade modal
     if (pendingPlanId.value) {
       // Clear the stored plan_id
-      localStorage.removeItem("pending_plan_id")
+      try {
+        localStorage.removeItem("pending_plan_id")
+      } catch {
+        // localStorage unavailable
+      }
 
       usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
         planId: pendingPlanId.value,
