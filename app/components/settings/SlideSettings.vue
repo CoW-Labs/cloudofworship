@@ -185,59 +185,6 @@
 
     <UDivider class="mt-4" />
 
-    <!-- BIBLE SLIDES -->
-    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">
-          Bible Slides
-          <div class="text-primary">Settings ONLY apply to new slides</div>
-        </h3>
-      </div>
-      <UForm :state="{}">
-        <div class="flex items-center gap-2">
-          <UFormGroup
-            label="Set default Bible Version"
-            class="flex items-center w-full justify-between py-1 px-2 hover:bg-primary/10"
-          >
-            <USelectMenu
-              class="border-0 shadow-none max-w-[200px]"
-              searchable
-              searchable-placeholder="Search version"
-              select-class="w-[200px]  bg-gray-100 dark:bg-gray-800 dark:text-white"
-              size="md"
-              :options="bibleVersionSelectOptions"
-              :model-value="appStore.currentState.settings.defaultBibleVersion"
-              variant="none"
-              color="primary"
-              clear-search-on-close
-              :ui="selectUI"
-              :ui-menu="selectMenuUI"
-              @change="
-                $event === '+ More Versions'
-                  ? useGlobalEmit(
-                      appWideActions.openSettings,
-                      'Bible Version Settings'
-                    )
-                  : appStore.setDefaultBibleVersion($event)
-              "
-            >
-            </USelectMenu>
-          </UFormGroup>
-          <UButton
-            size="md"
-            icon="i-bx-plus"
-            variant="outline"
-            class="mt-1"
-            @click="$emit('select-active-tab', 'Bible Version Settings')"
-          >
-            Add more
-          </UButton>
-        </div>
-      </UForm>
-    </div>
-
-    <UDivider class="mt-4" />
-
     <!-- FOOTNOTES & CREDITS -->
     <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
       <div class="flex items-center justify-between mb-4">
@@ -642,22 +589,7 @@ const handleUpgradeClick = () => {
   })
 }
 
-const bibleVersionSelectOptions = computed(() =>
-  [
-    ...currentState.value.settings.bibleVersions,
-    currentState.value.settings.bibleVersions?.find(
-      (version) => !version?.isDownloaded
-    )
-      ? {
-          id: "+ More Versions",
-          name: "Add more versions",
-          isDownloaded: false,
-        }
-      : null,
-  ]
-    ?.filter((version) => version?.isDownloaded)
-    ?.map((version) => version?.id)
-)
+const { populateBibleVersionOptions } = useBibleVersionManager()
 
 const getActivePaddingValue = (side: string) => {
   side = side as "top" | "right" | "bottom" | "left"
@@ -704,4 +636,8 @@ const libraryTabs = [
   { label: "Still Background", icon: "i-bx-image" },
   { label: "Motion Background", icon: "i-bx-film" },
 ]
+
+onMounted(() => {
+  populateBibleVersionOptions()
+})
 </script>

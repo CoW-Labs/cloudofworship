@@ -283,7 +283,6 @@ const fetchAppInfo = async () => {
   const { data } = await useAPIFetch("/app-config/info")
   if (data.value) {
     appInfo.value = data.value as any
-    appStore.setBibleVersions((data.value as any)?.bibleVersions)
   }
 }
 
@@ -469,19 +468,12 @@ const downloadEssentialResources = async () => {
     return (await db.bibleAndHymns.where("id").equals(bibleVersion).count()) > 0
   }
 
-  const populateBibleVersionOptions = async () => {
-    const tempBibleVersions = appInfo.value?.bibleVersions?.length
+  const { populateBibleVersionOptions } = useBibleVersionManager()
+  populateBibleVersionOptions(
+    appInfo.value?.bibleVersions?.length
       ? appInfo.value.bibleVersions
-      : [...appStore.currentState.settings.bibleVersions]
-    for (const bibleVersion of tempBibleVersions) {
-      bibleVersion.isDownloaded = await isBibleVersionDownloaded(
-        bibleVersion.id
-      )
-    }
-    appStore.setBibleVersions(tempBibleVersions)
-  }
-
-  populateBibleVersionOptions()
+      : undefined
+  )
 
   // Auto-detect and save the secondary/non-primary monitor so the user
   // doesn't have to open Display Settings before going live for the first time.
@@ -615,6 +607,31 @@ const retrieveAllMediaFilesFromDB = async () => {
                 slide.background = fileUrl
               }
             }
+          } else if (
+            slide.type === slideTypes.presentation &&
+            slide.presentationObjects?.length
+          ) {
+            // Restore blob URLs for each presentation page from IndexedDB
+            const restored: typeof slide.presentationObjects = []
+            for (const obj of slide.presentationObjects) {
+              const key = `${slide.id}-page-${obj.page}`
+              const mediaObj = await db.media.get(key)
+              if (mediaObj?.data) {
+                const blob = new Blob([mediaObj.data as ArrayBuffer], {
+                  type: "image/png",
+                })
+                restored.push({
+                  page: obj.page,
+                  imageUrl: URL.createObjectURL(blob),
+                })
+              } else {
+                restored.push(obj)
+              }
+            }
+            slide.presentationObjects = restored
+            slide.background =
+              restored[slide.presentationPageIndex ?? 0]?.imageUrl ||
+              slide.background
           } else if (slide?.backgroundVideoKey) {
             const cachedBackgroundVideo = await db.cached.get(
               slide?.backgroundVideoKey

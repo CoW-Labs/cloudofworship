@@ -7,6 +7,7 @@ export const slideTypes = {
   text: 'text',
   media: 'media',
   countdown: 'countdown',
+  presentation: 'presentation',
   // sermon: 'sermon',
   // carousel: 'carousel',
 }
@@ -61,7 +62,8 @@ export const appWideActions = {
   quickActionsFocus: 'quick-actions-focus',
   uploadOfflineSlides: 'upload-offline-slides',
   batchUpdateSlides: 'batch-update-slides',
-  openShortcutsModal: 'open-shortcuts'
+  openShortcutsModal: 'open-shortcuts',
+  newPresentation: 'new-presentation',
 }
 
 export const quickActionsArr: QuickAction[] = [
@@ -267,12 +269,9 @@ export const quickActionsArr: QuickAction[] = [
   {
     icon: "i-ph-file-ppt",
     name: "Import Slides",
-    desc: "Extract from other apps like PowerPoint",
-    action: "new-ppt",
-    meta: "power point Google slides",
-    unreleased: true,
-    tier: 'teams',
-    // type: slideTypes.text
+    desc: "Import from PowerPoint or PDF",
+    action: appWideActions.newPresentation,
+    meta: "power point Google slides pdf presentation canva",
   },
   // {
   //   icon: "i-bx-carousel",

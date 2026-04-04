@@ -6,7 +6,7 @@
       searchable-placeholder="Search version"
       select-class="bg-white dark:bg-primary-800 border-3 shadow-none outline-none w-[16ch] text-center"
       size="xs"
-      :options="bibleVersionOptions"
+      :options="bibleVersionSelectOptions"
       :model-value="bibleVersion"
       variant="none"
       color="primary"
@@ -69,18 +69,8 @@ const bibleVersion = ref<string>(
   props.bibleVersionInherited || currentState.value.settings.defaultBibleVersion
 )
 const emit = defineEmits(["change", "open", "close"])
-const bibleVersionOptions = computed(() =>
-  [
-    ...currentState.value.settings.bibleVersions,
-    currentState.value.settings.bibleVersions?.find(
-      (version) => !version?.isDownloaded
-    )
-      ? { id: "+ More Versions", name: "Add more versions", isDownloaded: true }
-      : null,
-  ]
-    ?.filter((version) => version?.isDownloaded)
-    ?.map((version) => version?.id)
-)
+
+const { bibleVersionSelectOptions } = useBibleVersionManager()
 
 watch(
   () => props.bibleVersionInherited,

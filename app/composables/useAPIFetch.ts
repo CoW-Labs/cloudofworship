@@ -55,15 +55,20 @@ export const useAPIFetch: useFetchType = async (path, options = {}) => {
         color: "red",
         icon: "i-bx-error",
       });
+    } else if (response.status === 403) {
+      // Permission denied — the token is valid but access is revoked for this resource
+      console.warn(`[API 403] Access forbidden: ${path}`);
+      addErrorInDevEnvironment(`${path}: 403 Forbidden`);
+    } else if (response.status === 404) {
+      // Resource not found — log so we can identify stale IDs
+      console.warn(`[API 404] Resource not found: ${path}`);
+      addErrorInDevEnvironment(`${path}: 404 Not Found`);
     } else if (
       response.status === 500 &&
       (options.method === "POST" || options.method === "PUT")
     ) {
       addErrorInDevEnvironment(`${path}: Failed with 500`);
-      // Track failed POST/PUT requests
-      // console.log(response)
     }
-    // console.log(response.status)
   };
 
   const { onBackOnline } = useOnlineStatus();

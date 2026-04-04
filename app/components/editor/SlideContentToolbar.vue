@@ -1,5 +1,6 @@
 <template>
   <div
+    v-show="slide?.type !== slideTypes.presentation"
     class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] py-1 right-0 left-0 top-[45px]"
     :class="containerOverflow"
   >
@@ -50,6 +51,7 @@
         </template>
       </USelectMenu>
     </UTooltip>
+
     <!-- VIDEO MEDIA SLIDE OPTIONS -->
     <template
       v-if="
@@ -170,7 +172,12 @@
       </div>
     </template>
     <FontSelect
-      v-if="slide?.type !== slideTypes?.media"
+      v-if="
+        !(
+          slide?.type === slideTypes?.media ||
+          slide?.type === slideTypes?.presentation
+        )
+      "
       size="lg"
       :selected-font="slide?.slideStyle?.font"
       class="min-w-[170px] top-[-4px]"
@@ -179,7 +186,12 @@
       @change="$emit('update-font', $event)"
     />
     <div
-      v-if="slide?.type !== slideTypes?.media"
+      v-if="
+        !(
+          slide?.type === slideTypes?.media ||
+          slide?.type === slideTypes?.presentation
+        )
+      "
       class="button-group rounded-md p-1 flex items-center gap-1"
     >
       <UTooltip text="Decrease font size">
@@ -236,7 +248,11 @@
     <!-- SLIDE CONTENT LINE HEIGHT CONTROLS -->
     <UTooltip
       v-if="
-        !(slide?.type === slideTypes.text || slide?.type === slideTypes.media)
+        !(
+          slide?.type === slideTypes.text ||
+          slide?.type === slideTypes.media ||
+          slide?.type === slideTypes.presentation
+        )
       "
       text="Set line spacing"
       :popper="{ placement: 'top' }"
@@ -294,7 +310,11 @@
       text="Uppercase"
       :popper="{ placement: 'top' }"
       v-if="
-        !(slide?.type === slideTypes.text || slide?.type === slideTypes.media)
+        !(
+          slide?.type === slideTypes.text ||
+          slide?.type === slideTypes.media ||
+          slide?.type === slideTypes.presentation
+        )
       "
     >
       <UButton
@@ -321,7 +341,11 @@
       text="Bold text"
       :popper="{ placement: 'top' }"
       v-if="
-        !(slide?.type === slideTypes.text || slide?.type === slideTypes.media)
+        !(
+          slide?.type === slideTypes.text ||
+          slide?.type === slideTypes.media ||
+          slide?.type === slideTypes.presentation
+        )
       "
     >
       <UButton
@@ -374,7 +398,12 @@
 
     <!-- SLIDE CONTENT ALIGNMENT -->
     <div
-      v-if="slide?.type !== slideTypes?.media"
+      v-if="
+        !(
+          slide?.type === slideTypes?.media ||
+          slide?.type === slideTypes?.presentation
+        )
+      "
       class="button-group rounded-md p-1 flex items-center gap-1"
     >
       <UTooltip text="Align left">

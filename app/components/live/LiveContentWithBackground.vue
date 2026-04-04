@@ -3,6 +3,19 @@
     class="live-output w-[100%] rounded-md absolute inset-0 overflow-hidden border dark:border-primary-900 bg-cover bg-no-repeat transition-all backdrop-blur-0 bg-black"
     :style="useSlideBackground(slide)"
   >
+    <!-- PRESENTATION SLIDE: render the current page as a fullscreen image -->
+    <div
+      v-if="slide?.type === slideTypes.presentation"
+      class="absolute inset-0"
+    >
+      <img
+        v-if="currentPresentationPageUrl"
+        :src="currentPresentationPageUrl"
+        class="w-full h-full object-contain"
+        alt="Presentation page"
+      />
+    </div>
+
     <!-- EXTERNAL VIDEO PLACEHOLDER -->
     <div
       v-if="
@@ -40,7 +53,7 @@
       :slide="slide"
       :padding="{ top: 0, right: 0, bottom: 0, left: 0 }"
       :style="
-        slide?.type === slideTypes.media
+        slide?.type === slideTypes.media || slide?.type === slideTypes.presentation
           ? ''
           : `backdrop-filter: blur(${slideStyles.blur}px) brightness(${slideStyles.brightness}%);`
       "
@@ -57,6 +70,11 @@ const props = defineProps<{
   slide: Slide
   slideStyles: SlideStyle
 }>()
+
+const currentPresentationPageUrl = computed(() => {
+  const idx = props.slide?.presentationPageIndex ?? 0
+  return props.slide?.presentationObjects?.[idx]?.imageUrl ?? null
+})
 
 watch(
   () => props.slide,
