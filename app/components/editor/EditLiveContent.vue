@@ -685,11 +685,13 @@ const handleGotoPage = (page: number) => {
 
 const handleNextPage = () => {
   const idx = (props.slide?.presentationPageIndex ?? 0) + 1
+  if (idx >= props.slide?.presentationObjects?.length!) return
   handleGotoPage(idx + 1)
 }
 
 const handlePreviousPage = () => {
   const idx = (props.slide?.presentationPageIndex ?? 0) - 1
+  if (idx < 0) return
   handleGotoPage(idx + 1)
 }
 

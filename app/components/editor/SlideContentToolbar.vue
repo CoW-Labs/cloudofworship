@@ -5,7 +5,7 @@
     :class="containerOverflow"
   >
     <UTooltip
-      v-if="isMediaFileButNotExternalMediaAndIsPresentation"
+      v-if="isMediaFileButNotExternalMedia"
       text="Background fill type"
       :popper="{ placement: 'top' }"
     >
@@ -516,13 +516,12 @@ const emit = defineEmits([
   "update-media-seek",
 ])
 
-const isMediaFileButNotExternalMediaAndIsPresentation = computed(() => {
+const isMediaFileButNotExternalMedia = computed(() => {
   const mediaType = (props.slide?.data as ExternalVideo)?.type
   return (
-    (props.slide?.type === "media" &&
-      mediaType !== "youtube" &&
-      mediaType !== "vimeo") ||
-    props.slide?.type === "presentation"
+    props.slide?.type === "media" &&
+    mediaType !== "youtube" &&
+    mediaType !== "vimeo"
   )
 })
 
