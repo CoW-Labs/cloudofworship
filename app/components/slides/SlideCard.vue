@@ -25,33 +25,35 @@
         :class="{ 'border-4 border-primary': selected }"
       ></div>
       <div
-        class="texts flex items-center gap-2 text-white absolute top-1 right-2 left-2"
+        class="texts flex items-start gap-2 text-white absolute top-1 right-2 left-2"
       >
-        <h4 class="font-medium ws-nowrap mt-1 text-left text-xs">
+        <h4 class="font-medium ws-nowrap mt-2 text-left text-xs">
           {{ useShortSlideName(slide) }}
         </h4>
         <SlideChip :slide-type="slide?.type" class="mt-1" dark-mode />
       </div>
-      
+
       <!-- Editing indicator - avatar circle -->
-      <div
-        v-if="editingBy"
-        class="absolute bottom-2 left-2 group/editing"
-      >
-        <UTooltip :text="`${editingBy.userName} is editing`" :popper="{ placement: 'top' }">
+      <div v-if="editingBy" class="absolute bottom-2 left-2 group/editing">
+        <UTooltip
+          :text="`${editingBy.userName} is editing`"
+          :popper="{ placement: 'top' }"
+        >
           <div
             class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow-lg animate-pulse"
-            :style="{ 
+            :style="{
               backgroundColor: editingBy.theme || '#f59e0b',
             }"
           >
-            <img 
-              v-if="editingBy.avatar" 
-              :src="editingBy.avatar" 
+            <img
+              v-if="editingBy.avatar"
+              :src="editingBy.avatar"
               :alt="editingBy.userName"
               class="w-full h-full rounded-full object-cover"
             />
-            <span v-else>{{ editingBy.userName?.charAt(0)?.toUpperCase() || '?' }}</span>
+            <span v-else>{{
+              editingBy.userName?.charAt(0)?.toUpperCase() || "?"
+            }}</span>
           </div>
         </UTooltip>
       </div>
@@ -192,7 +194,12 @@ const props = defineProps<{
   selected: boolean
   selectable: boolean
   checkboxSelected: boolean
-  editingBy?: { userId: string; userName: string; avatar?: string; theme?: string } | null // User currently editing this slide
+  editingBy?: {
+    userId: string
+    userName: string
+    avatar?: string
+    theme?: string
+  } | null // User currently editing this slide
 }>()
 
 const emit = defineEmits([

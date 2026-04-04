@@ -2,9 +2,42 @@
   <div class="h-[100%] overflow-y-auto mb-[2.5%]">
     <div class="mb-4">
       <p class="text-xs opacity-50">
-        Cloud of Worship does not own any Bible versions. All translations are graciously provided by open source repositories and are free to use without a Teams subscription.
+        Cloud of Worship does not own any Bible versions. All translations are
+        graciously provided by open source repositories and are free to use
+        without a Teams subscription.
       </p>
     </div>
+    <!-- BIBLE SLIDES -->
+    <div class="settings-group border-gray-200 dark:border-gray-800 mb-6">
+      <UForm :state="{}">
+        <UFormGroup
+          label="Set default Bible Version"
+          class="flex items-center w-full justify-between py-1 px-0 hover:bg-primary/10"
+        >
+          <USelectMenu
+            class="border-0 shadow-none max-w-[200px]"
+            searchable
+            searchable-placeholder="Search version"
+            select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
+            size="md"
+            :options="
+              bibleVersionOptions
+                ?.filter((version) => version.isDownloaded)
+                .map((version) => version.id)
+            "
+            :model-value="appStore.currentState.settings.defaultBibleVersion"
+            variant="none"
+            color="primary"
+            clear-search-on-close
+            :ui="selectUI"
+            :ui-menu="selectMenuUI"
+            @focus="populateBibleVersionOptions()"
+            @change="appStore.setDefaultBibleVersion($event)"
+          />
+        </UFormGroup>
+      </UForm>
+    </div>
+    <UDivider class="mb-6" />
     <div
       v-for="bibleVersion in bibleVersionOptions"
       :key="bibleVersion"
@@ -43,62 +76,32 @@
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
 const appStore = useAppStore()
-const db = useIndexedDB()
 
-const bibleDownloadProgress = ref<string>("0")
-const bibleVersion = ref(appStore.currentState.settings.defaultBibleVersion)
-const bibleVersionLoading = ref<boolean | string>(false)
-const { currentState } = storeToRefs(appStore)
-const bibleVersionOptions = ref<Array<any>>(
-  currentState.value.settings.bibleVersions
-)
-const bibleVersionSelectOptions = computed(() =>
-  [
-    ...currentState.value.settings.bibleVersions,
-    currentState.value.settings.bibleVersions?.find(
-      (version) => !version?.isDownloaded
-    )
-      ? {
-          id: "+ More Versions",
-          name: "Add more versions",
-          isDownloaded: false,
-        }
-      : null,
-  ]
-    ?.filter((version) => version?.isDownloaded)
-    ?.map((version) => version?.id)
-)
+const {
+  bibleVersionOptions,
+  downloadProgress: bibleDownloadProgress,
+  bibleVersionLoading,
+  downloadBibleVersion,
+  populateBibleVersionOptions,
+} = useBibleVersionManager()
 
-const isBibleVersionDownloaded = async (bibleVersion: string) => {
-  return (await db.bibleAndHymns.where("id").equals(bibleVersion).count()) > 0
+const selectUI = {
+  base: "bg-primary-500",
+  input: "bg-primary-500",
+  color: {
+    primary: {
+      outline: "shadow-sm bg-primary-500 ",
+    },
+  },
+}
+const selectMenuUI = {
+  width: "w-[200px]",
+  input: "text-xs",
+  empty: "text-xs",
+  option: {
+    size: "text-xs",
+  },
 }
 
-const populateBibleVersionOptions = async () => {
-  const tempBibleVersions = [...currentState.value.settings.bibleVersions]
-  for (const bibleVersion of tempBibleVersions) {
-    bibleVersion.isDownloaded = await isBibleVersionDownloaded(bibleVersion.id)
-  }
-  bibleVersionOptions.value = tempBibleVersions
-}
-
-const downloadBibleVersion = async (bibleVersion: string) => {
-  const tempBibleVersion = (version: string, data: any) => ({
-    id: version,
-    data,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  })
-  bibleVersionLoading.value = bibleVersion
-  let bibleResponse = await useDetailedFetch(
-    `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/${bibleVersion?.toLowerCase()}.json`,
-    bibleDownloadProgress
-  )
-  bibleResponse = await bibleResponse.json()
-  await db.bibleAndHymns.add(tempBibleVersion(bibleVersion, bibleResponse))
-  bibleVersionLoading.value = false
-  populateBibleVersionOptions()
-}
-
-// Function Invocations
 populateBibleVersionOptions()
 </script>

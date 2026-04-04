@@ -203,8 +203,14 @@ const scrollActiveVerseIntoView = () => {
   }
 
   if (selector) {
-    const el = versesPreview.value.querySelector(selector) as HTMLElement | null
-    el?.scrollIntoView({ block: "nearest" })
+    try {
+      const el = versesPreview.value.querySelector(selector) as HTMLElement | null
+      el?.scrollIntoView({ block: "nearest" })
+    } catch (err) {
+      // querySelector throws SyntaxError for invalid selectors (e.g. book names
+      // with dots or leading hyphens). This is safe to ignore — the list remains
+      // visible; only the auto-scroll is skipped.
+    }
   }
 }
 
