@@ -371,7 +371,11 @@ watch(
   (newId, oldId) => {
     try {
       if (process.client && props.fullScreen && route.name === "live") {
-        document.documentElement.requestFullscreen()
+        try {
+          document.documentElement.requestFullscreen()
+        } catch (error) {
+          console.error("Error auto-requesting fullscreen:", error)
+        }
       }
 
       // Guard: slide may be undefined when the watcher fires
@@ -411,7 +415,11 @@ watch(
 // Separate watcher for slide content/style changes (debounced)
 const handleSlideContentChange = useDebounceFn(() => {
   // Guard: slide may be undefined when the debounced callback fires
-  if (!props.slide || !appMounted || props.slide.id !== currentState.value?.liveSlideId) {
+  if (
+    !props.slide ||
+    !appMounted ||
+    props.slide.id !== currentState.value?.liveSlideId
+  ) {
     return
   }
 
@@ -603,8 +611,12 @@ watch(
 onMounted(() => {
   appMounted.value = true
   // Only play video when in fullScreen mode
-  if (props.fullScreen) {
-    video.value?.play()
+  try {
+    if (props.fullScreen) {
+      video.value?.play()
+    }
+  } catch (err) {
+    console.error("Error playing video:", err)
   }
 
   // Initialize current background
@@ -612,7 +624,7 @@ onMounted(() => {
 })
 
 const computeBackgroundStyles = (slide: Slide): string => {
-  if (slide?.type === slideTypes.media) {
+  if (slide?.type === slideTypes.media || slide?.type === slideTypes.presentation) {
     return useSlideBackground(slide)
   }
   return `${useSlideBackground(slide)}; filter: blur(${
@@ -715,7 +727,11 @@ const activateFullScreen = () => {
     if (document.fullscreenElement) {
       document.exitFullscreen()
     } else {
-      document.documentElement.requestFullscreen()
+      try {
+        document.documentElement.requestFullscreen()
+      } catch (error) {
+        console.error("Error auto-requesting fullscreen:", error)
+      }
       emit("activate-fullscreen")
     }
   }

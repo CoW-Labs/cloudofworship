@@ -607,6 +607,31 @@ const retrieveAllMediaFilesFromDB = async () => {
                 slide.background = fileUrl
               }
             }
+          } else if (
+            slide.type === slideTypes.presentation &&
+            slide.presentationObjects?.length
+          ) {
+            // Restore blob URLs for each presentation page from IndexedDB
+            const restored: typeof slide.presentationObjects = []
+            for (const obj of slide.presentationObjects) {
+              const key = `${slide.id}-page-${obj.page}`
+              const mediaObj = await db.media.get(key)
+              if (mediaObj?.data) {
+                const blob = new Blob([mediaObj.data as ArrayBuffer], {
+                  type: "image/png",
+                })
+                restored.push({
+                  page: obj.page,
+                  imageUrl: URL.createObjectURL(blob),
+                })
+              } else {
+                restored.push(obj)
+              }
+            }
+            slide.presentationObjects = restored
+            slide.background =
+              restored[slide.presentationPageIndex ?? 0]?.imageUrl ||
+              slide.background
           } else if (slide?.backgroundVideoKey) {
             const cachedBackgroundVideo = await db.cached.get(
               slide?.backgroundVideoKey

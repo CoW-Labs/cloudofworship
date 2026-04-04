@@ -181,6 +181,13 @@
       class="come-up-1"
       @close="page = ''"
     />
+
+    <!-- IMPORT SLIDES (PRESENTATION) SECTION-->
+    <AddPresentation
+      v-else-if="page === 'presentation'"
+      class="come-up-1"
+      @close="page = ''"
+    />
     <!-- </Transition> -->
   </AppSection>
 </template>
@@ -336,6 +343,10 @@ emitter.on("add-song", () => {
 
 emitter.on("new-countdown", () => {
   page.value = "countdown"
+})
+
+emitter.on("new-presentation", () => {
+  page.value = "presentation"
 })
 
 const handleInputKeydown = (e: KeyboardEvent) => {

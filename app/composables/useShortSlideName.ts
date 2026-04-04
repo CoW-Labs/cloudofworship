@@ -23,6 +23,12 @@ const useShortSlideName = (slide: Slide, options?: { longer: boolean }) => {
       } else {
         return `${slide?.name?.slice(0, options?.longer ? 20 : 10)}...`
       }
+    case slideTypes.presentation:
+      if (slide?.name?.length <= 15) {
+        return slide.name
+      } else {
+        return `${slide?.name?.slice(0, options?.longer ? 20 : 10)}...`
+      }
     case slideTypes.media:
       if (slide?.name?.length <= 12) {
         return slide.name
