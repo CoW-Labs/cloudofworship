@@ -4,7 +4,7 @@
     :class="[getBGBySlideType(slideType)]"
   >
     <IconWrapper :name="getIconBySlideType(slideType)" size="4" />
-    {{ slideType === slideTypes.presentation ? "PPT" : slideType }}
+    {{ slideType === slideTypes.presentation ? "PPT/PDF" : slideType }}
     {{ slideSubType ? ` (${slideSubType})` : "" }}
   </p>
 </template>

@@ -73,7 +73,11 @@ const markAsSeen = (key: string) => {
   const seen = getSeenFeatures()
   if (!seen.includes(key)) {
     seen.push(key)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seen))
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(seen))
+    } catch {
+      // Ignore storage failures (e.g. private mode, quota, SecurityError).
+    }
   }
 }
 
