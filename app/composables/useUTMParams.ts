@@ -40,8 +40,12 @@ export const useUTMParams = () => {
     const expiryDate = new Date()
     expiryDate.setDate(expiryDate.getDate() + UTM_EXPIRY_DAYS)
 
-    localStorage.setItem(UTM_STORAGE_KEY, JSON.stringify(utmParams))
-    localStorage.setItem(UTM_EXPIRY_KEY, expiryDate.toISOString())
+    try {
+      localStorage.setItem(UTM_STORAGE_KEY, JSON.stringify(utmParams))
+      localStorage.setItem(UTM_EXPIRY_KEY, expiryDate.toISOString())
+    } catch {
+      // localStorage unavailable (private mode / SecurityError)
+    }
   }
 
   /**
@@ -51,8 +55,16 @@ export const useUTMParams = () => {
   const getStoredUTMParams = () => {
     if (typeof window === 'undefined') return null
 
-    const storedParams = localStorage.getItem(UTM_STORAGE_KEY)
-    const expiryDate = localStorage.getItem(UTM_EXPIRY_KEY)
+    let storedParams: string | null = null
+    let expiryDate: string | null = null
+
+    try {
+      storedParams = localStorage.getItem(UTM_STORAGE_KEY)
+      expiryDate = localStorage.getItem(UTM_EXPIRY_KEY)
+    } catch {
+      // localStorage unavailable (private mode / SecurityError)
+      return null
+    }
 
     if (!storedParams || !expiryDate) return null
 
@@ -75,8 +87,12 @@ export const useUTMParams = () => {
   const clearUTMParams = () => {
     if (typeof window === 'undefined') return
 
-    localStorage.removeItem(UTM_STORAGE_KEY)
-    localStorage.removeItem(UTM_EXPIRY_KEY)
+    try {
+      localStorage.removeItem(UTM_STORAGE_KEY)
+      localStorage.removeItem(UTM_EXPIRY_KEY)
+    } catch {
+      // localStorage unavailable (private mode / SecurityError)
+    }
   }
 
   /**
