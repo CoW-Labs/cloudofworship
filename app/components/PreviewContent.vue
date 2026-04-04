@@ -795,9 +795,20 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   const db = useIndexedDB()
   const itemSaved = await getLibraryItem(slideId)
   if (!itemSaved) {
-    await db.media
-      .delete(slideId)
-      .catch((err) => console.error("Failed to delete media:", err))
+    if (tempSlide?.type === slideTypes.presentation) {
+      // Presentation slides write one IndexedDB record per page, keyed as
+      // `${slideId}-page-${n}`. A single .delete(slideId) would miss all of
+      // them, so we delete every record whose key starts with the slide ID.
+      await db.media
+        .where("id")
+        .startsWith(`${slideId}-page-`)
+        .delete()
+        .catch((err) => console.error("Failed to delete presentation media pages:", err))
+    } else {
+      await db.media
+        .delete(slideId)
+        .catch((err) => console.error("Failed to delete media:", err))
+    }
   }
 
   if (addToast) {
