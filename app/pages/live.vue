@@ -148,7 +148,11 @@ onMounted(() => {
     if (document.fullscreenElement) {
       document.exitFullscreen()
     } else {
-      document.documentElement.requestFullscreen()
+      try {
+        document.documentElement.requestFullscreen()
+      } catch (error) {
+        console.error("Error auto-requesting fullscreen:", error)
+      }
     }
   })
 

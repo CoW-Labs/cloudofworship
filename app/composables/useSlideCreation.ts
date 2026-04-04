@@ -7,6 +7,7 @@ import type {
   Song,
   Countdown,
   ExtendedFileT,
+  PresentationObject,
 } from "~/types"
 
 /**
@@ -375,6 +376,98 @@ export default function useSlideCreation() {
   }
 
   /**
+   * Create a new Presentation slide from an array of PresentationObjects.
+   * Each object contains a page number and a blob URL for the rendered image.
+   */
+  const createPresentationSlide = (
+    fileName: string,
+    presentationObjects: PresentationObject[]
+  ): Slide => {
+    const tempSlide = { ...preSlideCreation() }
+    tempSlide.layout = slideLayoutTypes.empty
+    tempSlide.type = slideTypes.presentation
+    tempSlide.name = fileName.replace(/\.[^/.]+$/, "") || "Presentation"
+    tempSlide.presentationObjects = presentationObjects
+    tempSlide.presentationPageIndex = 0
+    // Use the first page as the preview background
+    tempSlide.backgroundType = "image"
+    tempSlide.background = presentationObjects[0]?.imageUrl || ""
+    tempSlide.contents = []
+
+      // Persist each page's blob URL as an ArrayBuffer in IndexedDB so the
+      // images survive a page reload (blob: URLs are session-scoped).
+      // On Teams plan, also upload each page to the cloud and swap in the hosted
+      // URL — mirroring the createMultipleMediaSlides background-upload pattern.
+      // Key pattern: `${slideId}-page-${pageNum}`
+      ; (async () => {
+        const db = useIndexedDB()
+        const { isTeamsPlan } = useSubscription()
+        const nuxtApp = useNuxtApp()
+        const socket = nuxtApp.$socketio as any
+
+        for (const obj of presentationObjects) {
+          try {
+            const blobResponse = await fetch(obj.imageUrl)
+            const arrayBuffer = await blobResponse.arrayBuffer()
+            const blob = new Blob([arrayBuffer], { type: "image/png" })
+
+            // Persist to IndexedDB (fallback for non-Teams / offline)
+            await db.media
+              .add({
+                id: `${tempSlide.id}-page-${obj.page}`,
+                content: { type: "image/png", slideId: tempSlide.id },
+                data: arrayBuffer,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              })
+              .catch((err) =>
+                console.error(`Failed to persist presentation page ${obj.page}:`, err)
+              )
+
+            // Teams plan: upload to cloud and replace blob URL with hosted URL
+            if (isTeamsPlan.value && navigator.onLine) {
+              try {
+                const uploaded = await useUploadImage(blob)
+                const hostedUrl = uploaded.file.url
+
+                // Patch the object in-place so LiveContentWithBackground picks it up
+                obj.imageUrl = hostedUrl
+
+                // Keep the slide's preview background up to date
+                if (obj.page === 1) {
+                  tempSlide.background = hostedUrl
+                }
+
+                // If the slide has already been saved to the server, sync the update
+                if (tempSlide._id && navigator.onLine) {
+                  const { saveSlideOnline } = useSlides()
+                  await saveSlideOnline(tempSlide).catch((e) =>
+                    console.error("Failed to sync presentation slide after upload:", e)
+                  )
+                  if (socket?.connected) {
+                    socket.emit("update-slide", { ...tempSlide, slideId: tempSlide.id })
+                  }
+                }
+              } catch (uploadErr) {
+                console.error(`Cloud upload failed for page ${obj.page}:`, uploadErr)
+                // Non-fatal: blob URL + IndexedDB copy still works locally
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to process presentation page ${obj.page}:`, err)
+          }
+        }
+      })()
+
+    toast.add({ title: "Presentation slide created", icon: "i-ph-file-ppt" })
+    usePosthogCapture("NEW_PRESENTATION_SLIDE_CREATED", {
+      page_count: presentationObjects.length,
+    })
+
+    return tempSlide
+  }
+
+  /**
    * Create a new Countdown slide
    */
   const createCountdownSlide = (countdown: Countdown): Slide => {
@@ -459,6 +552,7 @@ export default function useSlideCreation() {
     createMediaSlide,
     createMultipleMediaSlides,
     createCountdownSlide,
+    createPresentationSlide,
     saveSlideToLib,
     duplicateSlide
   }

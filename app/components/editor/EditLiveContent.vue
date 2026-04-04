@@ -140,6 +140,46 @@
               :verse="verse"
               @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
             />
+
+            <!-- PAGE SWITCH — presentation slides -->
+            <div
+              v-if="slide?.type === slideTypes.presentation"
+              class="page-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-1 mr-0 relative"
+            >
+              <UTooltip text="Previous page" :popper="{ arrow: true }">
+                <UButton
+                  variant="ghost"
+                  class="p-1"
+                  icon="i-bx-chevron-left"
+                  :disabled="(slide.presentationPageIndex ?? 0) <= 0"
+                  @click="handlePreviousPage"
+                />
+              </UTooltip>
+              <span
+                class="text-xs font-medium px-1 text-primary-900 dark:text-primary-100 min-w-[5ch] text-center"
+              >
+                {{ (slide.presentationPageIndex ?? 0) + 1 }} /
+                {{ slide.presentationObjects?.length ?? 1 }}
+              </span>
+              <UTooltip text="Next page" :popper="{ arrow: true }">
+                <UButton
+                  variant="ghost"
+                  class="p-1"
+                  icon="i-bx-chevron-right"
+                  :disabled="
+                    (slide.presentationPageIndex ?? 0) >=
+                    (slide.presentationObjects?.length ?? 1) - 1
+                  "
+                  @click="handleNextPage"
+                />
+              </UTooltip>
+            </div>
+            <PreviewPages
+              v-if="slide?.type === slideTypes.presentation"
+              class="preview-pages"
+              :slide="slide"
+              @goto-page="handleGotoPage"
+            />
             <BibleVersionSelect
               v-if="slide?.type === slideTypes?.bible"
               class="bg-primary-200 dark:bg-primary-900 rounded-r-md mr-1 flex items-center gap-1 h-[36px] relative min-w-[80px]"
@@ -168,9 +208,9 @@
             </UPopover> -->
             <div
               v-show="
-                slide?.type !== slideTypes.media ||
+                slide?.type !== slideTypes.presentation &&(slide?.type !== slideTypes.media ||
                 (slide?.type === slideTypes.media &&
-                  (slide?.data as ExtendedFileT)?.type?.includes('audio'))
+                  (slide?.data as ExtendedFileT)?.type?.includes('audio')))
               "
               class="button-group flex rounded-md mx-1 p-1"
               :class="{
@@ -630,14 +670,45 @@ watch(
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
 
+// Presentation page navigation
+const handleGotoPage = (page: number) => {
+  if (!props.slide) return
+  const idx = page - 1
+  const objects = props.slide.presentationObjects ?? []
+  const updatedSlide: Slide = {
+    ...props.slide,
+    presentationPageIndex: idx,
+    background: objects[idx]?.imageUrl || props.slide.background,
+  }
+  emit("slide-update", updatedSlide)
+}
+
+const handleNextPage = () => {
+  const idx = (props.slide?.presentationPageIndex ?? 0) + 1
+  handleGotoPage(idx + 1)
+}
+
+const handlePreviousPage = () => {
+  const idx = (props.slide?.presentationPageIndex ?? 0) - 1
+  handleGotoPage(idx + 1)
+}
+
 onMounted(() => {
   useCreateShortcut("ArrowRight", async () => {
+    if (props.slide?.type === slideTypes.presentation) {
+      handleNextPage()
+      return
+    }
     if (nextVerse.value) {
       const resolvedVerse = await resolveLastVerse(nextVerse.value)
       emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
     }
   })
   useCreateShortcut("ArrowLeft", async () => {
+    if (props.slide?.type === slideTypes.presentation) {
+      handlePreviousPage()
+      return
+    }
     if (previousVerse.value) {
       const resolvedVerse = await resolveLastVerse(previousVerse.value)
       emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
@@ -899,6 +970,19 @@ const predictVerseInput = (
 .verse-switch:focus-within + .books-preview,
 .verse-preview:hover,
 .books-preview:hover {
+  opacity: 1;
+  visibility: visible;
+  max-height: 350px;
+}
+
+.preview-pages {
+  visibility: hidden;
+  max-height: 0px;
+  transition: 0.2s;
+}
+.page-switch:hover + .preview-pages,
+.page-switch:focus-within + .preview-pages,
+.preview-pages:hover {
   opacity: 1;
   visibility: visible;
   max-height: 350px;

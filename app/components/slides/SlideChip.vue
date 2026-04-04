@@ -4,7 +4,8 @@
     :class="[getBGBySlideType(slideType)]"
   >
     <IconWrapper :name="getIconBySlideType(slideType)" size="4" />
-    {{ slideType }} {{ slideSubType ? ` (${slideSubType})` : "" }}
+    {{ slideType === slideTypes.presentation ? "PPT" : slideType }}
+    {{ slideSubType ? ` (${slideSubType})` : "" }}
   </p>
 </template>
 
@@ -32,6 +33,8 @@ const getIconBySlideType = (slideType?: string) => {
     //   return "i-bx-carousel"
     case slideTypes.countdown:
       return "i-bx-time"
+    case slideTypes.presentation:
+      return "i-ph-file-ppt"
   }
   return ""
 }
@@ -67,6 +70,11 @@ const getBGBySlideType = (slideType?: string) => {
         return "bg-gray-700 text-gray-100"
       }
       return "bg-gray-100 border border-gray-500 text-gray-700"
+    case slideTypes.presentation:
+      if (props.darkMode) {
+        return "bg-blue-700 text-blue-100"
+      }
+      return "bg-blue-100 border border-blue-500 text-blue-700"
   }
   return ""
 }
