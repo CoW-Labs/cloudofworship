@@ -584,7 +584,10 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
   if (!error.value) {
     let tempSlides = (data.value as Slide[]) || []
     if (!Array.isArray(tempSlides)) {
-      console.warn('retrieveSlidesOnline: unexpected response shape', data.value)
+      console.warn(
+        "retrieveSlidesOnline: unexpected response shape",
+        data.value
+      )
       return
     }
     tempSlides.forEach((slide) => {
@@ -803,7 +806,9 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
         .where("id")
         .startsWith(`${slideId}-page-`)
         .delete()
-        .catch((err) => console.error("Failed to delete presentation media pages:", err))
+        .catch((err) =>
+          console.error("Failed to delete presentation media pages:", err)
+        )
     } else {
       await db.media
         .delete(slideId)

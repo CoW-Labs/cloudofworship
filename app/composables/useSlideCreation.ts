@@ -127,7 +127,7 @@ export default function useSlideCreation() {
     }
     tempSlide.contents = useSlideContent(tempSlide, scripture)
 
-    toast.add({ title: "Bible slide created", icon: "i-bx-bible" })
+    // toast.add({ title: "Bible slide created", icon: "i-bx-bible" })
     usePosthogCapture("NEW_BIBLE_SLIDE_CREATED")
 
     return tempSlide
@@ -168,7 +168,7 @@ export default function useSlideCreation() {
     tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
     tempSlide.name = useSlideName(tempSlide)
 
-    toast.add({ title: "Hymn slide created", icon: "i-bx-church" })
+    // toast.add({ title: "Hymn slide created", icon: "i-bx-church" })
     usePosthogCapture("NEW_HYMN_SLIDE_CREATED")
 
     return tempSlide
@@ -207,7 +207,7 @@ export default function useSlideCreation() {
     tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
     tempSlide.name = useSlideName(tempSlide)
 
-    toast.add({ title: "Song slide created", icon: "i-bx-music" })
+    // toast.add({ title: "Song slide created", icon: "i-bx-music" })
     usePosthogCapture("NEW_SONG_SLIDE_CREATED")
 
     return tempSlide
@@ -286,7 +286,7 @@ export default function useSlideCreation() {
     }
 
     if (!options?.oneOfManySlides) {
-      toast.add({ title: "Media slide created", icon: "i-bx-image" })
+      // toast.add({ title: "Media slide created", icon: "i-bx-image" })
     }
 
     usePosthogCapture("NEW_MEDIA_SLIDE_CREATED", {
@@ -459,7 +459,7 @@ export default function useSlideCreation() {
         }
       })()
 
-    toast.add({ title: "Presentation slide created", icon: "i-ph-file-ppt" })
+    // toast.add({ title: "Presentation slide created", icon: "i-ph-file-ppt" })
     usePosthogCapture("NEW_PRESENTATION_SLIDE_CREATED", {
       page_count: presentationObjects.length,
     })
@@ -491,7 +491,7 @@ export default function useSlideCreation() {
       font: appStore.currentState.settings.defaultFont,
     }
 
-    toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
+    // toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
     usePosthogCapture("NEW_COUNTDOWN_SLIDE_CREATED")
 
     return tempSlide

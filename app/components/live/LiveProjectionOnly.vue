@@ -387,8 +387,8 @@ watch(
         // Only play video/audio when in fullScreen mode
         if (props.fullScreen) {
           video.value?.play().catch((err) => {
-            if (err.name !== 'AbortError') {
-              console.warn('Video play failed on slide change:', err.name)
+            if (err.name !== "AbortError") {
+              console.warn("Video play failed on slide change:", err.name)
             }
           })
         }
@@ -529,13 +529,13 @@ watch(
             }
           } else {
             video.value?.play().catch((err) => {
-              if (err.name !== 'AbortError') {
-                console.warn('Video play failed:', err.name)
+              if (err.name !== "AbortError") {
+                console.warn("Video play failed:", err.name)
               }
             })
             audio.value?.play().catch((err) => {
-              if (err.name !== 'AbortError') {
-                console.warn('Audio play failed:', err.name)
+              if (err.name !== "AbortError") {
+                console.warn("Audio play failed:", err.name)
               }
             })
           }
@@ -617,8 +617,8 @@ onMounted(() => {
   // Only play video when in fullScreen mode
   if (props.fullScreen) {
     video.value?.play().catch((err) => {
-      if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
-        console.warn('Video autoplay failed on mount:', err.name)
+      if (err.name !== "AbortError" && err.name !== "NotAllowedError") {
+        console.warn("Video autoplay failed on mount:", err.name)
       }
       // NotAllowedError is expected without user interaction — silently ignore
     })
@@ -629,7 +629,10 @@ onMounted(() => {
 })
 
 const computeBackgroundStyles = (slide: Slide): string => {
-  if (slide?.type === slideTypes.media || slide?.type === slideTypes.presentation) {
+  if (
+    slide?.type === slideTypes.media ||
+    slide?.type === slideTypes.presentation
+  ) {
     return useSlideBackground(slide)
   }
   return `${useSlideBackground(slide)}; filter: blur(${
@@ -733,14 +736,17 @@ const activateFullScreen = () => {
         console.warn("Error exiting fullscreen:", err)
       })
     } else {
-      document.documentElement.requestFullscreen().then(() => {
-        emit("activate-fullscreen")
-      }).catch((err) => {
-        // NotAllowedError means no transient user activation — shouldn't happen on dblclick,
-        // but guard anyway and emit so the parent knows
-        console.warn("Fullscreen request denied:", err.message)
-        emit("activate-fullscreen")
-      })
+      document.documentElement
+        .requestFullscreen()
+        .then(() => {
+          emit("activate-fullscreen")
+        })
+        .catch((err) => {
+          // NotAllowedError means no transient user activation — shouldn't happen on dblclick,
+          // but guard anyway and emit so the parent knows
+          console.warn("Fullscreen request denied:", err.message)
+          emit("activate-fullscreen")
+        })
     }
   }
 }

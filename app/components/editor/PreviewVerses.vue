@@ -204,7 +204,9 @@ const scrollActiveVerseIntoView = () => {
 
   if (selector) {
     try {
-      const el = versesPreview.value.querySelector(selector) as HTMLElement | null
+      const el = versesPreview.value.querySelector(
+        selector
+      ) as HTMLElement | null
       el?.scrollIntoView({ block: "nearest" })
     } catch (err) {
       // querySelector throws SyntaxError for invalid selectors (e.g. book names
