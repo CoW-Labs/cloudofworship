@@ -165,7 +165,10 @@ const safeEditorCommand = (editor: any, fn: (e: any) => void) => {
       fn(editor)
     } catch (err) {
       // The editor view may not yet be available (e.g. rapid slide switching before mount)
-      console.warn('[TipTap] Editor command failed, editor may not be mounted yet:', err)
+      console.warn(
+        "[TipTap] Editor command failed, editor may not be mounted yet:",
+        err
+      )
     }
   }
 }
@@ -179,19 +182,43 @@ watch(
   () => props.slide,
   (newVal, oldVal) => {
     if (newVal?.id !== oldVal?.id && newVal.type === slideTypes.text) {
-      safeEditorCommand(editorOne.value, (e) => e.commands.setContent(newVal?.contents[0]))
-      safeEditorCommand(editorTwo.value, (e) => e.commands.setContent(newVal?.contents[1]))
-      safeEditorCommand(editorThree.value, (e) => e.commands.setContent(newVal?.contents[2]))
-      safeEditorCommand(uneditableEditorOne.value, (e) => e.commands.setContent(newVal?.contents[0]))
-      safeEditorCommand(uneditableEditorTwo.value, (e) => e.commands.setContent(newVal?.contents[1]))
-      safeEditorCommand(uneditableEditorThree.value, (e) => e.commands.setContent(newVal?.contents[2]))
+      safeEditorCommand(editorOne.value, (e) =>
+        e.commands.setContent(newVal?.contents[0])
+      )
+      safeEditorCommand(editorTwo.value, (e) =>
+        e.commands.setContent(newVal?.contents[1])
+      )
+      safeEditorCommand(editorThree.value, (e) =>
+        e.commands.setContent(newVal?.contents[2])
+      )
+      safeEditorCommand(uneditableEditorOne.value, (e) =>
+        e.commands.setContent(newVal?.contents[0])
+      )
+      safeEditorCommand(uneditableEditorTwo.value, (e) =>
+        e.commands.setContent(newVal?.contents[1])
+      )
+      safeEditorCommand(uneditableEditorThree.value, (e) =>
+        e.commands.setContent(newVal?.contents[2])
+      )
     } else if (newVal.type !== slideTypes.text) {
-      safeEditorCommand(editorOne.value, (e) => e.commands.setContent(newVal?.contents[0]))
-      safeEditorCommand(editorTwo.value, (e) => e.commands.setContent(newVal?.contents[1]))
-      safeEditorCommand(editorThree.value, (e) => e.commands.setContent(newVal?.contents[2]))
-      safeEditorCommand(uneditableEditorOne.value, (e) => e.commands.setContent(newVal?.contents[0]))
-      safeEditorCommand(uneditableEditorTwo.value, (e) => e.commands.setContent(newVal?.contents[1]))
-      safeEditorCommand(uneditableEditorThree.value, (e) => e.commands.setContent(newVal?.contents[2]))
+      safeEditorCommand(editorOne.value, (e) =>
+        e.commands.setContent(newVal?.contents[0])
+      )
+      safeEditorCommand(editorTwo.value, (e) =>
+        e.commands.setContent(newVal?.contents[1])
+      )
+      safeEditorCommand(editorThree.value, (e) =>
+        e.commands.setContent(newVal?.contents[2])
+      )
+      safeEditorCommand(uneditableEditorOne.value, (e) =>
+        e.commands.setContent(newVal?.contents[0])
+      )
+      safeEditorCommand(uneditableEditorTwo.value, (e) =>
+        e.commands.setContent(newVal?.contents[1])
+      )
+      safeEditorCommand(uneditableEditorThree.value, (e) =>
+        e.commands.setContent(newVal?.contents[2])
+      )
     }
   }
 )
@@ -209,24 +236,36 @@ watch(
       // Update editors only if content changed and editor is not currently focused
       // This prevents conflicts when user is actively typing
       if (content0Changed && !editorOne.value?.isFocused) {
-        safeEditorCommand(editorOne.value, (e) => e.commands.setContent(newVal[0] || ""))
+        safeEditorCommand(editorOne.value, (e) =>
+          e.commands.setContent(newVal[0] || "")
+        )
       }
       if (content1Changed && !editorTwo.value?.isFocused) {
-        safeEditorCommand(editorTwo.value, (e) => e.commands.setContent(newVal[1] || ""))
+        safeEditorCommand(editorTwo.value, (e) =>
+          e.commands.setContent(newVal[1] || "")
+        )
       }
       if (content2Changed && !editorThree.value?.isFocused) {
-        safeEditorCommand(editorThree.value, (e) => e.commands.setContent(newVal[2] || ""))
+        safeEditorCommand(editorThree.value, (e) =>
+          e.commands.setContent(newVal[2] || "")
+        )
       }
 
       // Always update uneditable editors for preview
       if (content0Changed) {
-        safeEditorCommand(uneditableEditorOne.value, (e) => e.commands.setContent(newVal[0] || ""))
+        safeEditorCommand(uneditableEditorOne.value, (e) =>
+          e.commands.setContent(newVal[0] || "")
+        )
       }
       if (content1Changed) {
-        safeEditorCommand(uneditableEditorTwo.value, (e) => e.commands.setContent(newVal[1] || ""))
+        safeEditorCommand(uneditableEditorTwo.value, (e) =>
+          e.commands.setContent(newVal[1] || "")
+        )
       }
       if (content2Changed) {
-        safeEditorCommand(uneditableEditorThree.value, (e) => e.commands.setContent(newVal[2] || ""))
+        safeEditorCommand(uneditableEditorThree.value, (e) =>
+          e.commands.setContent(newVal[2] || "")
+        )
       }
     }
   },

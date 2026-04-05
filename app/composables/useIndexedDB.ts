@@ -55,17 +55,17 @@ const useIndexedDB = () => {
  * await safeDBOperation(() => db.media.delete(slideId))
  */
 export const safeDBOperation = async <T>(
-  operation: () => Promise<T>
+  operation: (db: WorshipCloudDatabase) => Promise<T>
 ): Promise<T | undefined> => {
   try {
-    return await operation()
+    return await operation(useIndexedDB())
   } catch (err: any) {
     if (err?.name === 'DatabaseClosedError') {
       // Reset the singleton so the next call to useIndexedDB() opens a fresh connection
       dbInstance = null
       try {
         const db = useIndexedDB()
-        return await operation()
+        return await operation(db)
       } catch (retryErr: any) {
         console.error('DB operation failed after re-open:', retryErr)
         return undefined

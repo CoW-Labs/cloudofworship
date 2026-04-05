@@ -162,15 +162,16 @@ const connectSocket = async () => {
     },
     onConnected: () => {
       // Show toast on reconnection (only if we were previously connected and lost connection)
-      const wasReconnected = socketInstance.value?.isReconnecting?.value === false && 
+      const wasReconnected =
+        socketInstance.value?.isReconnecting?.value === false &&
         socketInstance.value?.isConnectedRef?.value === true
-      
+
       // Check if this is a reconnection after a disconnect
       if (wasReconnected) {
         toast.add({
-          title: 'Connection restored',
-          icon: 'i-tabler-wifi',
-          color: 'green',
+          title: "Connection restored",
+          icon: "i-tabler-wifi",
+          color: "green",
           timeout: 3000,
         })
       }
@@ -188,23 +189,23 @@ const connectSocket = async () => {
   })
 
   socketInstance.value.connect()
-  
+
   // Watch for reconnection state changes to show toast
   watch(
     () => socketInstance.value?.isConnectedRef?.value,
     (isConnected, wasConnected) => {
       if (isConnected && wasConnected === false) {
         toast.add({
-          title: 'Connection restored',
-          icon: 'i-tabler-wifi',
-          color: 'green',
+          title: "Connection restored",
+          icon: "i-tabler-wifi",
+          color: "green",
           timeout: 3000,
         })
       } else if (!isConnected && wasConnected === true) {
         toast.add({
-          title: 'Connection lost. Reconnecting...',
-          icon: 'i-tabler-wifi-off',
-          color: 'yellow',
+          title: "Connection lost. Reconnecting...",
+          icon: "i-tabler-wifi-off",
+          color: "yellow",
           timeout: 3000,
         })
       }

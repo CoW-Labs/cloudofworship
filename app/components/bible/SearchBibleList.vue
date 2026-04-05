@@ -207,7 +207,7 @@ const getDefaultBible = async () => {
 const getVerses = (query: string = "") => {
   if (query?.length >= 2) {
     loading.value = true
-    
+
     // Track Bible search
     usePosthogCapture("BIBLE_SEARCH_PERFORMED", {
       searchQuery: query,
@@ -226,11 +226,15 @@ const getVerses = (query: string = "") => {
     // Split query into words for multi-word matching
     const queryWords = Array.isArray(query)
       ? query
-      : query.toLowerCase().trim().split(/\s+/).filter((w) => w.length > 0)
-    
+      : query
+          .toLowerCase()
+          .trim()
+          .split(/\s+/)
+          .filter((w) => w.length > 0)
+
     // If single word or phrase, use fuzzy search
     let results: any[] = []
-    
+
     if (queryWords.length === 1) {
       // Single word fuzzy search
       const fuzzyResults = fuzzysort.go(query, searchTargets, {
@@ -252,26 +256,26 @@ const getVerses = (query: string = "") => {
         const bookNameLower = verse.bookName.toLowerCase()
         const fullReferenceLower = verse.fullReference.toLowerCase()
         const combinedText = `${scriptureLower} ${bookNameLower} ${fullReferenceLower}`
-        
+
         // Check if all query words are present in any field
-        return queryWords.every(word => combinedText.includes(word))
+        return queryWords.every((word) => combinedText.includes(word))
       })
-      
+
       // Score and sort results based on word proximity and frequency
       results = results.map((verse) => {
         const scriptureLower = verse.scripture.toLowerCase()
         const bookNameLower = verse.bookName.toLowerCase()
-        
+
         let score = 0
-        
+
         // Higher score for exact phrase match
         if (scriptureLower.includes(query.toLowerCase())) {
           score += 1000
         }
-        
+
         // Score based on word positions (closer words = higher score)
         const positions: number[] = []
-        queryWords.forEach(word => {
+        queryWords.forEach((word) => {
           const pos = scriptureLower.indexOf(word)
           if (pos !== -1) {
             positions.push(pos)
@@ -280,7 +284,7 @@ const getVerses = (query: string = "") => {
             score += 50 // Word in book name
           }
         })
-        
+
         // Bonus for words appearing close together
         if (positions.length > 1) {
           positions.sort((a, b) => a - b)
@@ -288,15 +292,15 @@ const getVerses = (query: string = "") => {
           // Shorter distance = higher score
           score += Math.max(0, 100 - maxDistance)
         }
-        
+
         // Bonus for matching word count
         const wordCount = scriptureLower.split(/\s+/).length
         const matchRatio = queryWords.length / wordCount
         score += matchRatio * 50
-        
+
         return { ...verse, searchScore: score }
       })
-      
+
       // Sort by score descending
       results.sort((a: any, b: any) => b.searchScore - a.searchScore)
     }
