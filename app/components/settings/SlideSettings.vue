@@ -589,8 +589,6 @@ const handleUpgradeClick = () => {
   })
 }
 
-const { populateBibleVersionOptions } = useBibleVersionManager()
-
 const getActivePaddingValue = (side: string) => {
   side = side as "top" | "right" | "bottom" | "left"
   return appStore.currentState.settings.slideStyles.windowPadding?.[
@@ -637,7 +635,4 @@ const libraryTabs = [
   { label: "Motion Background", icon: "i-bx-film" },
 ]
 
-onMounted(() => {
-  populateBibleVersionOptions()
-})
 </script>
