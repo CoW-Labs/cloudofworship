@@ -110,8 +110,7 @@
       <div
         v-if="
           subscriptionData?.activeSubscription &&
-          subscriptionData?.subscriptionPlan === 'teams' &&
-          !isFreeTrial
+          subscriptionData?.subscriptionPlan === 'teams'
         "
         class="subscription-details bg-primary-50 dark:bg-gray-800/50 rounded-lg p-4 mb-6"
       >
@@ -166,7 +165,7 @@
 
         <!-- Cancel Subscription -->
         <div
-          v-if="subscriptionData.activeSubscription.status === 'active'"
+          v-if="subscriptionData.activeSubscription.status === 'active' || subscriptionData.activeSubscription.status === 'trialing'"
           class="mt-6"
         >
           <UButton
@@ -179,7 +178,11 @@
             Cancel Subscription
           </UButton>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            You will have access until the end of your current billing period.
+            {{
+              subscriptionData.activeSubscription.status === 'trialing'
+                ? 'You will keep access until your trial ends. You will not be charged.'
+                : 'You will have access until the end of your current billing period.'
+            }}
           </p>
         </div>
 
