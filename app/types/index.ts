@@ -4,7 +4,7 @@ import type { User } from "~/store/auth"
 export interface SubscriptionActiveDetails {
   id: string
   plan: string
-  status: "active" | "inactive" | "canceled"
+  status: "active" | "trialing" | "inactive" | "canceled"
   expiresAt: string | null
   lastPaidAt: string | null
   canceledAt: string | null
