@@ -86,7 +86,7 @@ export const usePayment = () => {
       const { data: sessionData, error: sessionError } = await useAPIFetch<{ message: string; data: { checkoutUrl: string; checkoutReference: string } }>('/billing/initialize', {
         method: 'POST',
         body: { planAlias: backendPlan.alias, provider: 'dodo' },
-        key: 'dodo-checkout-init',
+        key: `dodo-checkout-init-${new Date().getTime()}`, // prevent caching
       })
 
       if (sessionError.value) {
