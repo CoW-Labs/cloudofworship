@@ -83,7 +83,7 @@ export const usePayment = () => {
       trackPaymentInitiated(planDetails.code, planDetails.amount, planDetails.currency)
 
       // Initialize checkout session on the backend
-      const { data: sessionData, error: sessionError } = await useAPIFetch<{ message: string; data: { checkoutUrl: string; sessionId: string } }>('/billing/initialize', {
+      const { data: sessionData, error: sessionError } = await useAPIFetch<{ message: string; data: { checkoutUrl: string; checkoutReference: string } }>('/billing/initialize', {
         method: 'POST',
         body: { planAlias: backendPlan.alias, provider: 'dodo' },
         key: `dodo-checkout-init-${new Date().getTime()}`, // prevent caching
@@ -94,8 +94,8 @@ export const usePayment = () => {
       }
 
       const checkoutUrl = sessionData.value?.data?.checkoutUrl
-      const sessionId = sessionData.value?.data?.sessionId
-      if (!checkoutUrl || !sessionId) throw new Error('Failed to initialize payment session. Please try again.')
+      const checkoutReference = sessionData.value?.data?.checkoutReference
+      if (!checkoutUrl || !checkoutReference) throw new Error('Failed to initialize payment session. Please try again.')
 
       // Initialise SDK and open overlay
       DodoPayments.Initialize({
@@ -132,8 +132,8 @@ export const usePayment = () => {
                 try {
                   const { data: confirmData } = await useAPIFetch<{ message: string; data: { status: string } }>('/billing/confirm', {
                     method: 'POST',
-                    body: { sessionId },
-                    key: `dodo-confirm-${sessionId}`,
+                    body: { provider: 'dodo', checkoutReference },
+                    key: `dodo-confirm-${checkoutReference}`,
                   })
                   if (confirmData.value?.data?.status === 'active') {
                     if (authStore.church) {
@@ -177,7 +177,7 @@ export const usePayment = () => {
         },
       })
 
-      await DodoPayments.Checkout.open({
+      DodoPayments.Checkout.open({
         checkoutUrl,
         options: { manualRedirect: true },
       })
@@ -196,7 +196,7 @@ export const usePayment = () => {
    */
   const loadPaystackScript = (): Promise<void> => {
     return new Promise((resolve, reject) => {
-      if (process.client) {
+      if (import.meta.client) {
         if ((window as any).PaystackPop) {
           resolve()
           return
@@ -234,7 +234,6 @@ export const usePayment = () => {
     }
   }
 
-  const generateReference = (userId: string): string => `cow_${Date.now()}_${userId}`
 
   /**
    * Initiate Paystack payment (NGN)
@@ -255,7 +254,7 @@ export const usePayment = () => {
       const planDetails = await getPlanDetails(plan, currency)
       if (!planDetails) throw new Error('Selected plan is not available')
 
-      const reference = generateReference(authStore.user._id)
+      const reference = `cow_${Date.now()}_${authStore.user._id}`
 
       usePosthogCapture('UPGRADE_BUTTON_CLICKED', {
         plan, planCode: planDetails.code, amount: planDetails.amount,
@@ -280,7 +279,6 @@ export const usePayment = () => {
           currency: planDetails.currency,
           plan: planDetails.code,
           ref: reference,
-          metadata: {},
           onClose: function () {
             loading.value = false
             usePosthogCapture('PAYMENT_CANCELLED', { plan, amount: planDetails.amount, currency: planDetails.currency })
@@ -298,6 +296,23 @@ export const usePayment = () => {
             successPlanName.value = planDetails.name
             showSuccessModal.value = true
             onSuccess?.(response.reference)
+
+            // Confirm with backend in the background — activates immediately without waiting for the webhook
+            useAPIFetch<{ message: string; data: { status: string } }>('/billing/confirm', {
+              method: 'POST',
+              body: { provider: 'paystack', checkoutReference: response.reference },
+              key: `paystack-confirm-${response.reference}`,
+            }).then(({ data: confirmData }) => {
+              if (confirmData.value?.data?.status === 'active') {
+                if (authStore.church) {
+                  authStore.setChurch({ ...authStore.church, subscriptionPlan: 'teams' })
+                }
+                authStore.clearSubscriptionDetails()
+              }
+            }).catch(err => {
+              console.error('Failed to confirm Paystack subscription:', err)
+              // Webhook will still activate — not a blocker
+            })
           },
         })
 
