@@ -83,18 +83,20 @@ export const usePayment = () => {
       trackPaymentInitiated(planDetails.code, planDetails.amount, planDetails.currency)
 
       // Initialize checkout session on the backend
-      const { data: sessionData, error: sessionError } = await useAPIFetch<{ message: string; data: { checkoutUrl: string; checkoutReference: string } }>('/billing/initialize', {
+      const runtimeConfig = useRuntimeConfig()
+      const { getToken } = useAuthToken()
+      const sessionData = await $fetch<{ message: string; data: { checkoutUrl: string; checkoutReference: string } }>('/billing/initialize', {
         method: 'POST',
         body: { planAlias: backendPlan.alias, provider: 'dodo' },
-        key: 'dodo-checkout-init',
+        baseURL: runtimeConfig.public.BASE_URL as string,
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          ...(runtimeConfig.public.NODE_ENV === 'development' ? { 'x-dev-token': runtimeConfig.public.DEV_TOKEN as string } : {}),
+        },
       })
 
-      if (sessionError.value) {
-        throw new Error(sessionError.value?.data?.message || sessionError.value?.message || 'Failed to initialize payment session.')
-      }
-
-      const checkoutUrl = sessionData.value?.data?.checkoutUrl
-      const checkoutReference = sessionData.value?.data?.checkoutReference
+      const checkoutUrl = sessionData?.data?.checkoutUrl
+      const checkoutReference = sessionData?.data?.checkoutReference
       if (!checkoutUrl || !checkoutReference) throw new Error('Failed to initialize payment session. Please try again.')
 
       // Initialise SDK and open overlay
