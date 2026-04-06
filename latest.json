@@ -5,11 +5,11 @@
   "releaseNotes": "- fix: issue with selecting default background videos\n- chore: included events for better customer service\n- Move hymns and full-text Bible search behind teams subscription\n- Initial plan\n- chore: performance update\n",
   "platforms": {
     "darwin": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.6-beta/",
+      "url": "https://github.com/CoW-Labs/cloudofworship/releases/download/v0.43.6-beta/",
       "signature": ""
     },
     "windows": {
-      "url": "https://github.com/felixfavour/minimalist-church-presentation-software/releases/download/v0.43.6-beta/",
+      "url": "https://github.com/CoW-Labs/cloudofworship/releases/download/v0.43.6-beta/",
       "signature": ""
     }
   }

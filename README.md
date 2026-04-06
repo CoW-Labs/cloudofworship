@@ -20,7 +20,7 @@ Cloud of Worship is free to install locally and also accessible via the cloud. I
 
 ## Report an Issue, Request a Feature or Give Feedback
 
-If you encounter any issues or have suggestions for improvements, please feel free to report them on our [GitHub Issues Page](https://github.com/felixfavour/minimalist-church-presentation-software/issues). We would also love to know how this software has been useful, feel free to send feedback [here](https://senja.io/p/cloudofworship/r/9XMjTH).
+If you encounter any issues or have suggestions for improvements, please feel free to report them on our [GitHub Issues Page](https://github.com/CoW-Labs/cloudofworship/issues). We would also love to know how this software has been useful, feel free to send feedback [here](https://senja.io/p/cloudofworship/r/9XMjTH).
 
 ## Join our Growing Community
 
@@ -57,7 +57,7 @@ Contributions are welcome! To get started on your local development environment,
 
 ## License
 
-Cloud of Worship is licensed under the [GNU](https://github.com/felixfavour/minimalist-church-presentation-software/blob/master/LICENSE).
+Cloud of Worship is licensed under the [GNU](https://github.com/CoW-Labs/cloudofworship/blob/master/LICENSE).
 
 ## Project Structure
 
@@ -80,4 +80,4 @@ Cloud of Worship is licensed under the [GNU](https://github.com/felixfavour/mini
 
 ## License
 
-Cloud of Worship is licensed under the [GNU General Public License v3.0](https://github.com/felixfavour/minimalist-church-presentation-software/blob/master/LICENSE).
+Cloud of Worship is licensed under the [GNU General Public License v3.0](https://github.com/CoW-Labs/cloudofworship/blob/master/LICENSE).
