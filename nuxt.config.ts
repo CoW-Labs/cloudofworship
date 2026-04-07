@@ -71,6 +71,12 @@ export default defineNuxtConfig({
   ssr: false,
 
   nitro: {
+    publicAssets: [
+      {
+        dir: 'public',
+        maxAge: 0 // Prevents caching issues during updates
+      }
+    ],
     prerender: {
       routes: ["/"],
     },
@@ -113,11 +119,11 @@ export default defineNuxtConfig({
     "@pinia/nuxt",
     "pinia-plugin-persistedstate/nuxt",
     "nuxt-gtag",
-    // "@nuxthub/core",
   ],
 
   components: [
     {
+
       path: "~/components",
       pathPrefix: false,
     },
@@ -275,7 +281,7 @@ export default defineNuxtConfig({
 
   pwa: {
     registerType: "autoUpdate",
-    injectRegister: false,
+    injectRegister: "auto",
 
     pwaAssets: {
       disabled: false,
@@ -312,6 +318,7 @@ export default defineNuxtConfig({
       globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
       cleanupOutdatedCaches: true,
       clientsClaim: true,
+      navigateFallback: "/",
     },
 
     devOptions: {
