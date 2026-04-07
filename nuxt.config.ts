@@ -334,7 +334,7 @@ export default defineNuxtConfig({
           }
         }
       ]
-    }
+    },
 
     devOptions: {
       enabled: false,
