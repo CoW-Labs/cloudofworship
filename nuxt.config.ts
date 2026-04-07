@@ -315,11 +315,26 @@ export default defineNuxtConfig({
     },
 
     workbox: {
-      globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
+      globPatterns: ["**/*.{js,css,svg,png,ico,woff,woff2}"],
+      globIgnores: ["**/node_modules/**/*", "**/*.map"],
       cleanupOutdatedCaches: true,
       clientsClaim: true,
+      skipWaiting: true,
       navigateFallback: "/",
-    },
+      runtimeCaching: [
+        {
+          urlPattern: "^https://app.cloudofworship.com/.*\\.html$",
+          handler: "NetworkFirst",
+          options: {
+            cacheName: "html-cache",
+            expiration: {
+              maxEntries: 10,
+              maxAgeSeconds: 3600
+            }
+          }
+        }
+      ]
+    }
 
     devOptions: {
       enabled: false,
