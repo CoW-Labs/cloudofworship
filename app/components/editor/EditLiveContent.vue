@@ -102,7 +102,8 @@
                 @keydown.tab.prevent="predictVerseInput($event.target)"
                 @keydown.arrow-right.prevent="predictVerseInput($event.target)"
                 @keydown.enter="
-                  $emit('goto-verse', verse, selectedBibleVersion)
+                  $emit('goto-verse', verse, selectedBibleVersion);
+                  ($event.target as HTMLInputElement).blur()
                 "
                 @keydown="
                   (e) => {
