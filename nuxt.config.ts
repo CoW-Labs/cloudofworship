@@ -71,12 +71,16 @@ export default defineNuxtConfig({
   ssr: false,
 
   nitro: {
-    publicAssets: [
-      {
-        dir: 'public',
-        maxAge: 0 // Prevents caching issues during updates
-      }
-    ],
+    // publicAssets: [
+    //   {
+    //     dir: 'public',
+    //     maxAge: 0 // Prevents caching issues during updates
+    //   }
+    // ],
+    routeRules: {
+      "/sw.js": { headers: { "Cache-Control": "public, max-age=0, must-revalidate" } },
+      "/_expo/**": { proxy: "..." } // Only if you have specific sub-routes
+    },
     prerender: {
       routes: ["/"],
     },
@@ -281,7 +285,7 @@ export default defineNuxtConfig({
 
   pwa: {
     registerType: "autoUpdate",
-    injectRegister: "auto",
+    injectRegister: "script",
 
     pwaAssets: {
       disabled: false,
