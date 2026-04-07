@@ -39,7 +39,7 @@
         class="slides-ctn overflow-auto mb-4 overflow-x-hidden"
         :class="
           showTranscripts
-            ? 'h-[calc(100vh-80px-220px-90px-228px)]'
+            ? 'h-[calc(100vh-80px-220px-90px-228px)] 2xl:h-[calc(100vh-80px-220px-90px-318px)]'
             : 'h-[calc(100vh-80px-220px-89px)]'
         "
         item-key="id"
@@ -197,7 +197,6 @@ const liveOutputSlides = computed({
   },
   set(newVal) {
     appStore.replaceScheduleActiveSlides(newVal)
-    // console.log("slide order updated", newVal)
     // Set Index for each slide
     const tempSlides = [...newVal].map((slide, index) => {
       slide.index = index
