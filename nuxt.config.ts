@@ -77,12 +77,8 @@ export default defineNuxtConfig({
         maxAge: 0 // Prevents caching issues during updates
       }
     ],
-    routeRules: {
-      "/sw.js": { headers: { "Cache-Control": "public, max-age=0, must-revalidate" } },
-      "/_expo/**": { proxy: "..." } // Only if you have specific sub-routes
-    },
     prerender: {
-      routes: ["/"],
+      routes: ["/", "/sw.js"],
     },
   },
 
@@ -285,7 +281,7 @@ export default defineNuxtConfig({
 
   pwa: {
     registerType: "autoUpdate",
-    injectRegister: "script",
+    injectRegister: "auto",
 
     pwaAssets: {
       disabled: false,
