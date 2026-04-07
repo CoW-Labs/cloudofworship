@@ -78,7 +78,7 @@ export default defineNuxtConfig({
       }
     ],
     prerender: {
-      routes: ["/", "/sw.js"],
+      routes: ["/"],
     },
   },
 
@@ -320,20 +320,47 @@ export default defineNuxtConfig({
       cleanupOutdatedCaches: true,
       clientsClaim: true,
       skipWaiting: true,
-      navigateFallback: "/",
+      // For a SPA (ssr: false), Nuxt outputs a single index.html.
+      // We must precache it explicitly so the service worker can serve it offline.
+      additionalManifestEntries: [
+        { url: "/index.html", revision: null },
+      ],
+      // Serve the cached index.html for all navigation requests when offline.
+      navigateFallback: "/index.html",
+      // Only use the navigate fallback for same-origin page navigations.
+      navigateFallbackDenylist: [
+        // Exclude API calls and other non-page requests
+        /^\/api\//,
+        /\.[a-z]{2,4}$/i, // requests with file extensions (assets)
+      ],
       runtimeCaching: [
         {
-          urlPattern: "^https://app.cloudofworship.com/.*\\.html$",
+          // Cache the SPA shell (index.html) with NetworkFirst so users always
+          // get fresh content when online but can still load offline.
+          urlPattern: ({ request }) => request.mode === 'navigate',
           handler: "NetworkFirst",
           options: {
-            cacheName: "html-cache",
+            cacheName: "pages-cache",
+            networkTimeoutSeconds: 5,
             expiration: {
               maxEntries: 10,
-              maxAgeSeconds: 3600
-            }
-          }
-        }
-      ]
+              maxAgeSeconds: 86400, // 24 hours
+            },
+          },
+        },
+        {
+          // Cache static assets (JS, CSS, fonts, images) with StaleWhileRevalidate.
+          urlPattern: /\.(?:js|css|woff2?|png|svg|ico)$/,
+          handler: "StaleWhileRevalidate",
+          options: {
+            cacheName: "assets-cache",
+            expiration: {
+              maxEntries: 200,
+              maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+            },
+          },
+        },
+      ],
     },
 
     devOptions: {
