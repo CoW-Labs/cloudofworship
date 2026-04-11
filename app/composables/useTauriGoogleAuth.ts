@@ -1,8 +1,8 @@
 /**
  * Composable for handling Google OAuth in Tauri
- * Uses tauri-plugin-oauth for Tauri, popup for web
+ * Uses tauri-plugin-oauth for Tauri (localhost server), redirect for web
  */
-import { GoogleAuthProvider, signInWithPopup, signInWithCredential, type UserCredential } from "firebase/auth"
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signInWithCredential, type UserCredential } from "firebase/auth"
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-shell'
@@ -92,13 +92,11 @@ export default function useTauriGoogleAuth() {
         }
       })
     } else {
-      // For web, use popup flow
-      try {
-        return await signInWithPopup(auth, provider)
-      } catch (error) {
-        console.error("Google Sign In popup failed:", error)
-        throw error
-      }
+      // For web, use redirect flow so Google opens in the same tab
+      await signInWithRedirect(auth, provider)
+      // signInWithRedirect navigates away — the result is picked up by
+      // checkRedirectResult() in onMounted after the page reloads.
+      throw new Error("Redirect initiated")
     }
   }
 
@@ -155,10 +153,23 @@ export default function useTauriGoogleAuth() {
   }
 
   /**
-   * Check for redirect result - not needed with OAuth plugin
+   * Check for redirect result after returning from Google sign-in.
+   * Works for both Tauri (no-op — handled via oauth_url event) and web.
    */
   const checkRedirectResult = async (): Promise<UserCredential | null> => {
-    return null
+    if (isTauri) {
+      // Tauri handles the result through the oauth_url event listener; nothing to do here.
+      return null
+    }
+    // Web: pick up the result Firebase stored before redirecting back
+    try {
+      const auth = useFirebaseAuth()
+      const result = await getRedirectResult(auth)
+      return result
+    } catch (error) {
+      console.error('getRedirectResult failed:', error)
+      return null
+    }
   }
 
   return {

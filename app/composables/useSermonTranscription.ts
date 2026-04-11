@@ -73,12 +73,34 @@ declare global {
 }
 
 /**
- * Composable for real-time sermon transcription using Web Speech API
- * Provides offline speech-to-text with automatic Bible reference detection
+ * Composable for real-time sermon transcription.
+ *
+ * - FREE users: uses the browser's built-in Web Speech API (offline, no limit).
+ * - TEAMS users: uses Deepgram via the backend WebSocket proxy (AI, 60 min/week).
+ *
+ * The composable auto-detects the plan and delegates to the appropriate engine.
+ * The returned API surface is identical for both engines so the UI doesn't change.
  */
 export default function useSermonTranscription() {
   const appStore = useAppStore()
   const toast = useToast()
+
+  // Teams plan check — delegate to Deepgram for teams users
+  const { isTeamsPlan } = useSubscription()
+  // Lazily create the Deepgram composable so FREE users don't trigger
+  // its initialisation (which fires an API request for usage stats).
+  let deepgramInstance: ReturnType<typeof useDeepgramTranscription> | null = null
+  const getDeepgram = () => {
+    if (!deepgramInstance) {
+      deepgramInstance = useDeepgramTranscription()
+    }
+    return deepgramInstance
+  }
+  const deepgram = new Proxy({} as ReturnType<typeof useDeepgramTranscription>, {
+    get(_target, prop, receiver) {
+      return Reflect.get(getDeepgram(), prop, receiver)
+    },
+  })
 
   // State
   const state = ref<TranscriptionState>({
@@ -92,6 +114,62 @@ export default function useSermonTranscription() {
   // Web Speech API recognition instance
   let recognition: SpeechRecognition | null = null
   let finalTranscriptBuffer = ''
+
+  // Mic level for the free (Web Speech) path — AnalyserNode driven
+  const micLevel = ref(0)
+  let analyserContext: AudioContext | null = null
+  let analyserNode: AnalyserNode | null = null
+  let analyserStream: MediaStream | null = null
+  let analyserRaf: number | null = null
+
+  const startMicAnalyser = async () => {
+    // Guard against multiple concurrent analyser instances (e.g. from recognition restarts)
+    if (analyserRaf !== null || analyserContext !== null) return
+
+    try {
+      const deviceId = appStore.currentState.defaultMicrophoneId
+      const audioConstraint: MediaStreamConstraints['audio'] = deviceId
+        ? { deviceId: { exact: deviceId } }
+        : true
+      analyserStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint })
+      analyserContext = new AudioContext()
+      const source = analyserContext.createMediaStreamSource(analyserStream)
+      analyserNode = analyserContext.createAnalyser()
+      analyserNode.fftSize = 256
+      source.connect(analyserNode)
+
+      const dataArray = new Uint8Array(analyserNode.frequencyBinCount)
+      const tick = () => {
+        analyserNode!.getByteTimeDomainData(dataArray)
+        // Compute RMS from waveform data (values 0–255, centre at 128)
+        let sum = 0
+        for (let i = 0; i < dataArray.length; i++) {
+          const v = ((dataArray[i] ?? 128) - 128) / 128
+          sum += v * v
+        }
+        const rms = Math.sqrt(sum / dataArray.length)
+        micLevel.value = Math.min(100, Math.round((rms / 0.3) * 100))
+        analyserRaf = requestAnimationFrame(tick)
+      }
+      analyserRaf = requestAnimationFrame(tick)
+    } catch {
+      // Analyser is best-effort; silence errors so the main flow isn't affected
+    }
+  }
+
+  const stopMicAnalyser = () => {
+    if (analyserRaf !== null) {
+      cancelAnimationFrame(analyserRaf)
+      analyserRaf = null
+    }
+    analyserNode?.disconnect()
+    analyserNode = null
+    analyserContext?.close().catch(() => {})
+    analyserContext = null
+    analyserStream?.getTracks().forEach((t) => t.stop())
+    analyserStream = null
+    micLevel.value = 0
+  }
 
   /**
    * Check if Web Speech API is supported
@@ -149,7 +227,9 @@ export default function useSermonTranscription() {
   }
 
   /**
-   * Start transcription session
+   * Start transcription session.
+   * Teams plan → Deepgram (AI, 60 min/week limit).
+   * Free plan  → Web Speech API (offline, no limit).
    */
   const startTranscription = async () => {
     if (state.value.isTranscribing) {
@@ -157,7 +237,12 @@ export default function useSermonTranscription() {
       return
     }
 
-    // Check browser support
+    // Delegate to Deepgram for Teams users
+    if (isTeamsPlan.value) {
+      return deepgram.startTranscription()
+    }
+
+    // Check browser support (free path only)
     if (!isSpeechRecognitionSupported()) {
       state.value.error = 'Speech recognition is not supported in this browser'
       toast.add({
@@ -232,6 +317,7 @@ export default function useSermonTranscription() {
       recognition.onstart = () => {
         state.value.isTranscribing = true
         state.value.isConnecting = false
+        startMicAnalyser()
         console.log('Speech recognition started')
       }
 
@@ -343,6 +429,11 @@ export default function useSermonTranscription() {
    * Stop transcription session
    */
   const stopTranscription = () => {
+    // Delegate to Deepgram for Teams users
+    if (isTeamsPlan.value) {
+      return deepgram.stopTranscription()
+    }
+
     if (!state.value.isTranscribing && !state.value.isConnecting) return
 
     // Finalize any remaining transcript
@@ -369,12 +460,16 @@ export default function useSermonTranscription() {
       recognition = null
     }
     finalTranscriptBuffer = ''
+    stopMicAnalyser()
   }
 
   /**
    * Clear transcript segments
    */
   const clearTranscript = () => {
+    if (isTeamsPlan.value) {
+      return deepgram.clearTranscript()
+    }
     state.value.segments = []
     state.value.currentTranscript = ''
     toast.add({ title: 'Transcript cleared', icon: 'i-bx-trash' })
@@ -384,6 +479,7 @@ export default function useSermonTranscription() {
    * Get all Bible references from the transcript
    */
   const allBibleReferences = computed(() => {
+    if (isTeamsPlan.value) return deepgram.allBibleReferences.value
     const refs: BibleReference[] = []
     for (const segment of state.value.segments) {
       refs.push(...segment.bibleReferences)
@@ -397,14 +493,23 @@ export default function useSermonTranscription() {
   })
 
   return {
-    // State
-    isTranscribing: computed(() => state.value.isTranscribing),
-    isConnecting: computed(() => state.value.isConnecting),
-    error: computed(() => state.value.error),
-    segments: computed(() => state.value.segments),
-    currentTranscript: computed(() => state.value.currentTranscript),
+    // State — delegate to Deepgram state when on Teams plan
+    isTranscribing: computed(() => isTeamsPlan.value ? deepgram.isTranscribing.value : state.value.isTranscribing),
+    isConnecting: computed(() => isTeamsPlan.value ? deepgram.isConnecting.value : state.value.isConnecting),
+    error: computed(() => isTeamsPlan.value ? deepgram.error.value : state.value.error),
+    segments: computed(() => isTeamsPlan.value ? deepgram.segments.value : state.value.segments),
+    currentTranscript: computed(() => isTeamsPlan.value ? deepgram.currentTranscript.value : state.value.currentTranscript),
     allBibleReferences,
     isSpeechRecognitionSupported: isSpeechRecognitionSupported(),
+
+    // Mic loudness level (0–100), live during transcription
+    micLevel: computed(() => isTeamsPlan.value ? deepgram.micLevel.value : micLevel.value),
+
+    // Deepgram usage stats (null for free users)
+    remainingMinutes: deepgram.remainingMinutes,
+    remainingSeconds: deepgram.remainingSeconds,
+    usedMinutes: deepgram.usedMinutes,
+    isTeamsPlan,
 
     // Actions
     startTranscription,
@@ -412,4 +517,3 @@ export default function useSermonTranscription() {
     clearTranscript,
   }
 }
-
