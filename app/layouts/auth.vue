@@ -50,13 +50,18 @@ useHead({
   title: "Cloud of Worship",
 })
 
-const { handleGoogleSignIn: tauriGoogleSignIn } = useTauriGoogleAuth()
+const { handleGoogleSignIn: tauriGoogleSignIn, checkRedirectResult: tauriCheckRedirectResult } = useTauriGoogleAuth()
 
 const handleGoogleSignIn = async (): Promise<UserCredential> => {
   return await tauriGoogleSignIn()
 }
 
+const checkRedirectResult = async (): Promise<UserCredential | null> => {
+  return await tauriCheckRedirectResult()
+}
+
 provide("handleGoogleSignIn", handleGoogleSignIn)
+provide("checkGoogleRedirectResult", checkRedirectResult)
 </script>
 
 <style scoped>

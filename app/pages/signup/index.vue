@@ -235,6 +235,7 @@ useHead({
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
+const checkGoogleRedirectResult = inject("checkGoogleRedirectResult") as () => Promise<any>
 const { isTauri } = useTauri()
 const { checkRedirectResult } = useTauriGoogleAuth()
 
@@ -566,63 +567,60 @@ const handleGoogleSignUp = async () => {
   }
 }
 
-// Check for redirect result on mount (for Tauri)
+// Check for redirect result on mount (web redirect flow + Tauri OAuth redirect)
 onMounted(async () => {
-  if (isTauri) {
-    googleLoading.value = true
-    const result = await checkRedirectResult()
+  googleLoading.value = true
+  const result = await (isTauri ? checkRedirectResult() : checkGoogleRedirectResult())
 
-    if (result?.user) {
-      usePosthogCapture("SIGNUP_STEP1_ATTEMPTED", {
-        method: "google_tauri",
+  if (result?.user) {
+    const method = isTauri ? "google_tauri" : "google"
+    usePosthogCapture("SIGNUP_STEP1_ATTEMPTED", { method })
+
+    const { user } = result
+    const idToken = await user.getIdToken()
+    const utmParams = getUTMParams(route)
+
+    const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
+      "/auth/signup/google",
+      {
+        method: "POST",
+        headers: { "x-access-token": `Bearer ${idToken}` },
+        body: { utmParams },
+      }
+    )
+
+    if (error.value) {
+      usePosthogCapture("SIGNUP_STEP1_FAILED", {
+        method,
+        email: user?.email,
+        error: error.value?.data?.error?.includes("E11000")
+          ? "Email already exists"
+          : error.value?.data?.message,
       })
 
-      // Process the Google auth result
-      const { user } = result
+      useToast().add({
+        title: error.value?.data?.error?.includes("E11000")
+          ? "Email linked to an account. Sign in instead."
+          : error.value?.data?.message,
+        color: "red",
+        icon: "i-bx-error",
+      })
+    } else {
+      token.value = data.value?.token
+      authStore.setUser(data?.value?.data.newUser!!)
 
-      // Get the ID token from Firebase user
-      const idToken = await user.getIdToken()
+      usePosthogCapture("SIGNUP_STEP1_COMPLETED", {
+        method,
+        userId: data?.value?.data.newUser?._id,
+        email: user?.email,
+        fullName: user?.displayName,
+        utmParams,
+      })
 
-      const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
-        "/auth/signup/google",
-        {
-          method: "POST",
-          headers: { "x-access-token": `Bearer ${idToken}` },
-        }
-      )
-
-      if (error.value) {
-        usePosthogCapture("SIGNUP_STEP1_FAILED", {
-          method: "google_tauri",
-          email: user?.email,
-          error: error.value?.data?.error?.includes("E11000")
-            ? "Email already exists"
-            : error.value?.data?.message,
-        })
-
-        useToast().add({
-          title: error.value?.data?.error?.includes("E11000")
-            ? "Email linked to an account. Sign in instead."
-            : error.value?.data?.message,
-          color: "red",
-          icon: "i-bx-error",
-        })
-      } else {
-        token.value = data.value?.token
-        authStore.setUser(data?.value?.data.newUser!!)
-
-        usePosthogCapture("SIGNUP_STEP1_COMPLETED", {
-          method: "google_tauri",
-          userId: data?.value?.data.newUser?._id,
-          email: user?.email,
-          fullName: user?.displayName,
-        })
-
-        step.value = 2
-      }
+      step.value = 2
     }
-    googleLoading.value = false
   }
+  googleLoading.value = false
 })
 </script>
 
