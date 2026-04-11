@@ -49,14 +49,16 @@ export default function useScriptureSearch() {
     const trimmed = query.trim()
     if (!trimmed || trimmed.length < 10) return // skip very short strings
 
-    // Avoid re-fetching the exact same query text
-    if (trimmed === lastQuery.value) return
-    lastQuery.value = trimmed
+    const requestKey = `${version}:${trimmed}`
+
+    // Avoid re-fetching the exact same query text for the same version
+    if (requestKey === lastQuery.value) return
+    lastQuery.value = requestKey
 
     isSearching.value = true
     try {
       const { data } = await useAPIFetch(
-        `/scripture/search?q=${encodeURIComponent(trimmed)}&limit=5`
+        `/scripture/search?q=${encodeURIComponent(trimmed)}&version=${encodeURIComponent(version)}&limit=5`
       )
       if (data.value) {
         const payload = data.value as { results: any[] }

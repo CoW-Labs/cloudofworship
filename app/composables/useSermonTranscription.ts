@@ -87,7 +87,20 @@ export default function useSermonTranscription() {
 
   // Teams plan check — delegate to Deepgram for teams users
   const { isTeamsPlan } = useSubscription()
-  const deepgram = useDeepgramTranscription()
+  // Lazily create the Deepgram composable so FREE users don't trigger
+  // its initialisation (which fires an API request for usage stats).
+  let deepgramInstance: ReturnType<typeof useDeepgramTranscription> | null = null
+  const getDeepgram = () => {
+    if (!deepgramInstance) {
+      deepgramInstance = useDeepgramTranscription()
+    }
+    return deepgramInstance
+  }
+  const deepgram = new Proxy({} as ReturnType<typeof useDeepgramTranscription>, {
+    get(_target, prop, receiver) {
+      return Reflect.get(getDeepgram(), prop, receiver)
+    },
+  })
 
   // State
   const state = ref<TranscriptionState>({
@@ -110,6 +123,9 @@ export default function useSermonTranscription() {
   let analyserRaf: number | null = null
 
   const startMicAnalyser = async () => {
+    // Guard against multiple concurrent analyser instances (e.g. from recognition restarts)
+    if (analyserRaf !== null || analyserContext !== null) return
+
     try {
       const deviceId = appStore.currentState.defaultMicrophoneId
       const audioConstraint: MediaStreamConstraints['audio'] = deviceId

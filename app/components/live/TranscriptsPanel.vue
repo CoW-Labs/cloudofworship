@@ -25,10 +25,17 @@
         <div
           class="flex items-center gap-0 cursor-pointer"
           tabindex="0"
+          role="button"
+          :aria-label="
+            isTranscribing ? 'Stop transcription' : 'Start transcription'
+          "
+          :aria-pressed="isTranscribing"
           :class="{
             'bg-primary-500 rounded-lg text-white pr-2': isTranscribing,
           }"
           @click.stop="toggleTranscription"
+          @keydown.enter.stop.prevent="toggleTranscription"
+          @keydown.space.stop.prevent="toggleTranscription"
         >
           <!-- Remaining time slides in from the left -->
 
@@ -353,7 +360,6 @@
 import type { BibleReference } from "~/types/transcript"
 import type { ScriptureResult } from "~/composables/useScriptureSearch"
 import { appWideActions } from "~/utils/constants"
-import useBibleReferenceParser from "~/composables/useBibleReferenceParser"
 
 defineProps<{ visible: boolean }>()
 defineEmits<{ close: [] }>()
@@ -419,9 +425,8 @@ watch(
       if (parsedSegmentIds.has(segment.id)) continue
       parsedSegmentIds.add(segment.id)
 
-      // Client-side: extract bible references directly from the transcript text
-      const refs = useBibleReferenceParser(segment.text)
-      if (refs.length > 0) addFromBibleReferences(refs)
+      // Use the already-parsed bible references from the segment
+      if (segment.bibleReferences.length > 0) addFromBibleReferences(segment.bibleReferences)
     }
 
     // Also fire the debounced backend search with the last 3 segments
