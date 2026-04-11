@@ -101,7 +101,9 @@ export const useAPIFetch: useFetchType = async (path, options = {}) => {
     }
     appStore.setSlidesLoading(false);
     console.error("No internet connection");
-    return useFetch(path, options);
+
+    // Return an empty response stub so callers don't hit the network at all
+    return { data: ref(null), error: ref(null), pending: ref(false), refresh: () => Promise.resolve(), execute: () => Promise.resolve() } as any;
   }
 
   return useFetch(path, options);
