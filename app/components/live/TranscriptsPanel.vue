@@ -293,6 +293,59 @@
         </button>
       </div>
     </div>
+
+    <!-- Feature Introduction Modal — shown once on first open -->
+    <FeatureIntroductionModal
+      ref="featureIntroModal"
+      feature-key="transcribe-sermon"
+      title="🎙️ Transcribe Sermon"
+    >
+      <div
+        class="flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed"
+      >
+        <p>
+          Transcribe Sermon turns your microphone into a live note-taker;
+          capturing what's being said and surfacing relevant Bible passages
+          automatically as you preach.
+        </p>
+        <ul class="space-y-2">
+          <li class="flex items-start gap-2">
+            <UIcon
+              name="i-bx-microphone"
+              class="text-primary-500 mt-0.5 shrink-0"
+            />
+            <span
+              ><span class="font-semibold">Live transcription</span> — words
+              appear in real-time as you speak, with Bible references
+              highlighted.</span
+            >
+          </li>
+          <li class="flex items-start gap-2">
+            <UIcon name="i-bx-bible" class="text-primary-500 mt-0.5 shrink-0" />
+            <span
+              ><span class="font-semibold">Auto-detect scriptures</span> — any
+              verse mentioned (e.g. "John 3:16") is instantly added to the
+              Scriptures tab. Click it to open the slide.</span
+            >
+          </li>
+          <li class="flex items-start gap-2">
+            <UIcon
+              name="i-bx-search-alt"
+              class="text-primary-500 mt-0.5 shrink-0"
+            />
+            <span
+              ><span class="font-semibold">AI scripture suggestions</span> —
+              related verses are surfaced even when you don't quote them
+              directly
+              <span class="text-xs text-gray-400">(Teams plan)</span>.</span
+            >
+          </li>
+        </ul>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+          Tip: works best with a good microphone in a quiet environment.
+        </p>
+      </div>
+    </FeatureIntroductionModal>
   </div>
 </template>
 
@@ -304,6 +357,15 @@ import useBibleReferenceParser from "~/composables/useBibleReferenceParser"
 
 defineProps<{ visible: boolean }>()
 defineEmits<{ close: [] }>()
+
+// ── Feature intro ──────────────────────────────────────────────────────────
+const featureIntroModal = ref<{
+  show: () => boolean
+  hasBeenSeen: () => boolean
+} | null>(null)
+onMounted(() => {
+  featureIntroModal.value?.show()
+})
 
 // ── Transcription ──────────────────────────────────────────────────────────
 const {
