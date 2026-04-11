@@ -132,6 +132,9 @@ const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<
   UserCredential | any
 >
+const checkGoogleRedirectResult = inject(
+  "checkGoogleRedirectResult"
+) as () => Promise<UserCredential | null>
 const { isTauri } = useTauri()
 const { checkRedirectResult } = useTauriGoogleAuth()
 // console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
@@ -206,11 +209,6 @@ const login = async (event) => {
         emailVerified: data.value?.data?.user?.emailVerified,
       })
 
-      toast.add({
-        title: `Successful login as ${email.value}`,
-        color: "green",
-        icon: "i-bx-check-circle",
-      })
       if (data.value?.data?.user?.emailVerified) {
         navigateTo("/")
       } else {
@@ -282,12 +280,6 @@ const handleGoogleSignIn = async () => {
         email: user?.email,
         emailVerified: data.value?.data?.user?.emailVerified,
       })
-
-      toast.add({
-        title: `Successful login as ${user?.email}`,
-        color: "green",
-        icon: "i-bx-check-circle",
-      })
       navigateTo("/")
     }
   } catch (error: any) {
@@ -310,69 +302,64 @@ const handleGoogleSignIn = async () => {
   }
 }
 
-// Check for redirect result on mount (for Tauri OAuth redirect)
+// Check for redirect result on mount (web redirect flow + Tauri OAuth redirect)
 onMounted(async () => {
   usePosthogCapture("LOGIN_PAGE_VIEWED")
 
-  if (isTauri) {
-    googleLoading.value = true
-    const result = await checkRedirectResult()
+  googleLoading.value = true
+  const result = await (isTauri
+    ? checkRedirectResult()
+    : checkGoogleRedirectResult())
 
-    if (result?.user) {
-      usePosthogCapture("LOGIN_ATTEMPTED", {
-        method: "google_tauri",
+  if (result?.user) {
+    usePosthogCapture("LOGIN_ATTEMPTED", {
+      method: isTauri ? "google_tauri" : "google",
+    })
+
+    // Process the Google auth result
+    const { user } = result
+
+    // Get the ID token from Firebase user
+    const idToken = await user.getIdToken()
+
+    const { data, error } = await useAPIFetch<GoogleAuthResponseT>(
+      "/auth/login/google",
+      {
+        method: "POST",
+        headers: { "x-access-token": `Bearer ${idToken}` },
+        body: {
+          appVersion: appVersion,
+        },
+      }
+    )
+
+    if (error.value) {
+      usePosthogCapture("LOGIN_FAILED", {
+        method: isTauri ? "google_tauri" : "google",
+        email: user?.email,
+        error: error.value?.data?.message,
       })
 
-      // Process the Google auth result
-      const { user } = result
+      toast.add({
+        title: error.value?.data?.message,
+        color: "red",
+        icon: "i-bx-error",
+      })
+    } else {
+      token.value = data.value?.token
+      authStore.setUser(data.value?.data?.user!!)
 
-      // Get the ID token from Firebase user
-      const idToken = await user.getIdToken()
+      usePosthogCapture("LOGIN_SUCCESSFUL", {
+        method: isTauri ? "google_tauri" : "google",
+        userId: data.value?.data?.user?._id,
+        email: user?.email,
+        emailVerified: data.value?.data?.user?.emailVerified,
+      })
 
-      const { data, error } = await useAPIFetch<GoogleAuthResponseT>(
-        "/auth/login/google",
-        {
-          method: "POST",
-          headers: { "x-access-token": `Bearer ${idToken}` },
-          body: {
-            appVersion: appVersion,
-          },
-        }
-      )
-
-      if (error.value) {
-        usePosthogCapture("LOGIN_FAILED", {
-          method: "google_tauri",
-          email: user?.email,
-          error: error.value?.data?.message,
-        })
-
-        toast.add({
-          title: error.value?.data?.message,
-          color: "red",
-          icon: "i-bx-error",
-        })
-      } else {
-        token.value = data.value?.token
-        authStore.setUser(data.value?.data?.user!!)
-
-        usePosthogCapture("LOGIN_SUCCESSFUL", {
-          method: "google_tauri",
-          userId: data.value?.data?.user?._id,
-          email: user?.email,
-          emailVerified: data.value?.data?.user?.emailVerified,
-        })
-
-        toast.add({
-          title: `Successful login as ${user?.email}`,
-          color: "green",
-          icon: "i-bx-check-circle",
-        })
-        navigateTo("/")
-      }
+      navigateTo("/")
     }
-    googleLoading.value = false
   }
+  googleLoading.value = false
 })
 </script>
 

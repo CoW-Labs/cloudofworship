@@ -21,7 +21,7 @@
         class="ctn overflow-auto mb-4 overflow-x-hidden"
         :class="
           showTranscripts
-            ? 'h-[calc(100vh-80px-220px-90px-220px)]'
+            ? 'h-[calc(100vh-80px-220px-90px-220px-40px)]'
             : 'h-[calc(100vh-80px-220px-100px)]'
         "
       >
@@ -39,7 +39,7 @@
         class="slides-ctn overflow-auto mb-4 overflow-x-hidden"
         :class="
           showTranscripts
-            ? 'h-[calc(100vh-80px-220px-90px-228px)] 2xl:h-[calc(100vh-80px-220px-90px-318px)]'
+            ? 'h-[calc(100vh-80px-220px-90px-228px-40px)] 2xl:h-[calc(100vh-80px-220px-90px-318px-40px)]'
             : 'h-[calc(100vh-80px-220px-89px)]'
         "
         item-key="id"
