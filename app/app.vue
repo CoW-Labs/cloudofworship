@@ -61,6 +61,29 @@ onMounted(() => {
       }
     })
   }
+
+  // Handle stale-chunk errors: when a deploy has replaced old hashed JS files,
+  // the current SW may still serve a stale index.html referencing old hashes.
+  // Intercept unhandled promise rejections (dynamic import failures) and do a
+  // hard reload to force the browser/SW to fetch the fresh index.html + assets.
+  window.addEventListener('unhandledrejection', (event) => {
+    const message = event?.reason?.message ?? ''
+    if (
+      message.includes('Failed to fetch dynamically imported module') ||
+      message.includes('Importing a module script failed') ||
+      message.includes('no-response')
+    ) {
+      console.warn('[CoW] Detected stale chunk error — reloading to pick up new build.', message)
+      // Avoid reload loops: only reload if we haven't already reloaded for this build.
+      const reloadKey = 'cow_last_chunk_reload'
+      const lastReload = Number(sessionStorage.getItem(reloadKey) ?? 0)
+      const now = Date.now()
+      if (now - lastReload > 10_000) { // throttle: at most once per 10s
+        sessionStorage.setItem(reloadKey, String(now))
+        window.location.reload()
+      }
+    }
+  })
 })
 </script>
 
