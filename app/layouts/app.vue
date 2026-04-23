@@ -318,22 +318,6 @@ emitter.on("close-live-window", async () => {
 const saveAllBackgroundVideos = async () => {
   // Use Promise.all to fetch all videos in parallel - non-blocking
   const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
-
-  // Read the cache-bust key from PostHog feature flag.
-  // When the flag value changes (e.g. "v2"), all videos are re-downloaded
-  // and the stale IndexedDB entries are replaced.
-  const { getFlagValue } = useFeatureFlags()
-  const cacheKey = (getFlagValue("bg_videos_cache_key") as string | undefined) || "v1"
-  const cacheKeyStorageKey = "cow_bg_videos_cache_key"
-  const storedCacheKey = localStorage.getItem(cacheKeyStorageKey) || "v1"
-  const cacheKeyChanged = cacheKey !== storedCacheKey
-
-  if (cacheKeyChanged) {
-    // Bust the IndexedDB cache so all videos are re-fetched
-    await Promise.all(videoIds.map((id) => db.cached.delete(`/video-bg-${id}.mp4`).catch(() => {})))
-    localStorage.setItem(cacheKeyStorageKey, cacheKey)
-  }
-
   const savedVideos = await Promise.all(
     videoIds.map((id) => db.cached.get(`/video-bg-${id}.mp4`))
   )
@@ -361,8 +345,10 @@ const saveAllBackgroundVideos = async () => {
   const videoDownloadPromises = videoIds
     .filter((id) => !savedBgVideoMap.get(id))
     .map(async (id) => {
-      const url = `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4?v=${encodeURIComponent(cacheKey)}`
-      const bgVideoPromise = await useDetailedFetch(url, downloadProgress)
+      const bgVideoPromise = await useDetailedFetch(
+        `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`,
+        downloadProgress
+      )
       const bgVideoBlob = await bgVideoPromise.blob()
       saveBackground(bgVideoBlob, id)
     })
