@@ -48,11 +48,16 @@ const appVersion = ref<string>("v0.46.0-beta")
 onMounted(() => {
   initializeTauri()
 
-  // Unregister all old service workers to fix offline/caching issues
+  // Unregister stale service workers (old builds with deleted/renamed assets)
+  // but keep the current PWA service worker (/sw.js) intact.
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(registrations => {
       for (const registration of registrations) {
-        registration.unregister()
+        const scriptURL = registration.active?.scriptURL ?? registration.installing?.scriptURL ?? ''
+        const isCurrentSW = scriptURL.includes('/sw.js')
+        if (!isCurrentSW) {
+          registration.unregister()
+        }
       }
     })
   }
