@@ -132,11 +132,7 @@ const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<
   UserCredential | any
 >
-const checkGoogleRedirectResult = inject(
-  "checkGoogleRedirectResult"
-) as () => Promise<UserCredential | null>
 const { isTauri } = useTauri()
-const { checkRedirectResult } = useTauriGoogleAuth()
 // console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()
@@ -283,83 +279,24 @@ const handleGoogleSignIn = async () => {
       navigateTo("/")
     }
   } catch (error: any) {
-    // Only show error if it's not a redirect initiation
-    if (error?.message !== "Redirect initiated") {
-      usePosthogCapture("LOGIN_FAILED", {
-        method: "google",
-        error: error?.message,
-      })
+    usePosthogCapture("LOGIN_FAILED", {
+      method: "google",
+      error: error?.message,
+    })
 
-      toast.add({
-        title: "Google sign in failed",
-        description: error?.message || "An error occurred",
-        color: "red",
-        icon: "i-bx-error",
-      })
-    }
+    toast.add({
+      title: "Google sign in failed",
+      description: error?.message || "An error occurred",
+      color: "red",
+      icon: "i-bx-error",
+    })
   } finally {
     googleLoading.value = false
   }
 }
 
-// Check for redirect result on mount (web redirect flow + Tauri OAuth redirect)
-onMounted(async () => {
+onMounted(() => {
   usePosthogCapture("LOGIN_PAGE_VIEWED")
-
-  googleLoading.value = true
-  const result = await (isTauri
-    ? checkRedirectResult()
-    : checkGoogleRedirectResult())
-
-  if (result?.user) {
-    usePosthogCapture("LOGIN_ATTEMPTED", {
-      method: isTauri ? "google_tauri" : "google",
-    })
-
-    // Process the Google auth result
-    const { user } = result
-
-    // Get the ID token from Firebase user
-    const idToken = await user.getIdToken()
-
-    const { data, error } = await useAPIFetch<GoogleAuthResponseT>(
-      "/auth/login/google",
-      {
-        method: "POST",
-        headers: { "x-access-token": `Bearer ${idToken}` },
-        body: {
-          appVersion: appVersion,
-        },
-      }
-    )
-
-    if (error.value) {
-      usePosthogCapture("LOGIN_FAILED", {
-        method: isTauri ? "google_tauri" : "google",
-        email: user?.email,
-        error: error.value?.data?.message,
-      })
-
-      toast.add({
-        title: error.value?.data?.message,
-        color: "red",
-        icon: "i-bx-error",
-      })
-    } else {
-      token.value = data.value?.token
-      authStore.setUser(data.value?.data?.user!!)
-
-      usePosthogCapture("LOGIN_SUCCESSFUL", {
-        method: isTauri ? "google_tauri" : "google",
-        userId: data.value?.data?.user?._id,
-        email: user?.email,
-        emailVerified: data.value?.data?.user?.emailVerified,
-      })
-
-      navigateTo("/")
-    }
-  }
-  googleLoading.value = false
 })
 </script>
 
