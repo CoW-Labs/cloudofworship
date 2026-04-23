@@ -10,50 +10,6 @@
     <ClientOnly>
       <Transition name="fade-sm">
         <div
-          v-if="$pwa?.offlineReady || $pwa?.needRefresh"
-          class="ctn fixed z-50 right-4 bottom-4"
-          role="alert"
-          aria-labelledby="toast-message"
-        >
-          <NotFoundBanner
-            icon="i-tabler-refresh"
-            :sub="
-              $pwa.offlineReady
-                ? 'App ready to work offline'
-                : 'New version available, click on reload button to update'
-            "
-            :action="$pwa.offlineReady ? 'cancel-pwa-refresh' : 'pwa-refresh'"
-            :action-text="$pwa.offlineReady ? 'Got it' : 'Reload'"
-            secondary-action="cancel-pwa-refresh"
-            secondary-action-text="Close"
-            is-wider
-          />
-        </div>
-      </Transition>
-
-      <Transition name="fade-sm">
-        <div
-          v-if="
-            $pwa?.showInstallPrompt && !$pwa?.offlineReady && !$pwa?.needRefresh
-          "
-          class="ctn fixed z-50 right-4 bottom-4"
-          role="alert"
-          aria-labelledby="install-pwa"
-        >
-          <NotFoundBanner
-            icon="i-tabler-download"
-            sub="Install Cloud of Worship on your computer for easy access."
-            action="pwa-install"
-            action-text="Install"
-            secondary-action="cancel-pwa-install"
-            secondary-action-text="Cancel"
-            is-wider
-          />
-        </div>
-      </Transition>
-
-      <Transition name="fade-sm">
-        <div
           v-show="isOfflineToastOpen"
           class="ctn fixed z-50 right-4 bottom-4"
           role="alert"
@@ -69,11 +25,9 @@
           />
         </div>
       </Transition>
-
       <Transition name="fade-sm">
         <UpdateNotification />
       </Transition>
-
       <AdvertModal :active-advert="currentState.activeAdvert" />
       <UpgradePlanModal />
     </ClientOnly>
@@ -331,24 +285,7 @@ emitter.on("app-loading", (loading) => {
   fullScreenLoading.value = loading
 })
 
-emitter.on("pwa-install", () => {
-  useNuxtApp().$pwa?.install()
-  usePosthogCapture("APP_INSTALLED")
-})
-
-emitter.on("cancel-pwa-install", () => {
-  useNuxtApp().$pwa?.cancelInstall()
-  usePosthogCapture("APP_INSTALL_CANCELLED")
-})
-
-emitter.on("pwa-refresh", () => {
-  useNuxtApp().$pwa?.updateServiceWorker()
-  usePosthogCapture("APP_UPDATED")
-})
-
-emitter.on("cancel-pwa-refresh", () => {
-  useNuxtApp().$pwa?.cancelPrompt()
-})
+// PWA install/refresh/cancel logic removed
 
 emitter.on("close-offline-toast", () => {
   isOfflineToastOpen.value = false

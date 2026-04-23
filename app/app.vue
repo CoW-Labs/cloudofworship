@@ -3,46 +3,18 @@
     <NuxtPwaAssets />
     <NuxtLoadingIndicator />
     <NuxtLayout :app-version="appVersion">
-      <NuxtPage />
-      <UNotifications>
-        <template #title="{ title }">
-          <img
-            v-if="title === 'Still not convinced?'"
-            class="rounded-lg mb-4 w-[100%] h-36 object-cover"
-            src="https://images.ctfassets.net/zkw0qlnf0vqv/psycom_page_fid38375_asset_38354/bae5185f9861ecf68719dae696d3b79d/A_psychological_portrait_of_a_young_confused_female_Black_character__an_anxiety_and_depression_concept__psychotherapy"
-          />
-          <span
-            :class="
-              title === 'Still not convinced?' ? 'font-semibold text-lg' : ''
-            "
-            v-html="title"
-          />
-        </template>
-
-        <template #description="{ description }">
-          <span class="leading-5 text-md" v-html="description" />
-        </template>
-      </UNotifications>
-    </NuxtLayout>
-  </div>
-</template>
-
-<script setup lang="ts">
-import mitt from "mitt"
-import { useAppStore } from "~/store/app"
-
-const nuxtApp = useNuxtApp()
-const emitter = mitt()
-const appStore = useAppStore()
-const { isTauri, initializeTauri } = useTauri()
-
-if (nuxtApp.$emitter) {
-  // nuxtApp.$emitter = emitters
-} else {
-  nuxtApp.provide("emitter", emitter)
-}
-appStore.setEmitter(emitter)
-
+      onMounted(() => {
+        initializeTauri()
+        // Register custom service worker in production only
+        if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js').then((reg) => {
+            // Listen for controllerchange to reload on update
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              window.location.reload();
+            });
+          }).catch(() => {/* ignore */});
+        }
+      })
 const appVersion = ref<string>("v0.46.1-beta")
 
 onMounted(() => {
