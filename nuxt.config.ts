@@ -349,14 +349,30 @@ export default defineNuxtConfig({
           },
         },
         {
-          // Cache static assets (JS, CSS, fonts, images) with StaleWhileRevalidate.
-          urlPattern: /\.(?:js|css|woff2?|png|svg|ico)$/,
-          handler: "StaleWhileRevalidate",
+          // Cache hashed _nuxt/ JS and CSS chunks with NetworkFirst so that after
+          // a new deploy the browser always fetches the latest chunk rather than
+          // serving a stale copy that may 404 on the network.
+          urlPattern: /\/_nuxt\/.*\.(?:js|css)$/,
+          handler: "NetworkFirst",
           options: {
-            cacheName: "assets-cache",
+            cacheName: "nuxt-chunks-cache",
+            networkTimeoutSeconds: 10,
             expiration: {
-              maxEntries: 200,
+              maxEntries: 300,
               maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+            },
+          },
+        },
+        {
+          // Cache static assets (fonts, images, icons) with CacheFirst since
+          // these rarely change and don't have deploy-specific hashes.
+          urlPattern: /\.(?:woff2?|png|svg|ico)$/,
+          handler: "CacheFirst",
+          options: {
+            cacheName: "static-assets-cache",
+            expiration: {
+              maxEntries: 100,
+              maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
             },
           },
         },
