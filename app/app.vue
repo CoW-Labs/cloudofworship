@@ -3,18 +3,46 @@
     <NuxtPwaAssets />
     <NuxtLoadingIndicator />
     <NuxtLayout :app-version="appVersion">
-      onMounted(() => {
-        initializeTauri()
-        // Register custom service worker in production only
-        if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
-          navigator.serviceWorker.register('/sw.js').then((reg) => {
-            // Listen for controllerchange to reload on update
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-              window.location.reload();
-            });
-          }).catch(() => {/* ignore */});
-        }
-      })
+      <NuxtPage />
+      <UNotifications>
+        <template #title="{ title }">
+          <img
+            v-if="title === 'Still not convinced?'"
+            class="rounded-lg mb-4 w-[100%] h-36 object-cover"
+            src="https://images.ctfassets.net/zkw0qlnf0vqv/psycom_page_fid38375_asset_38354/bae5185f9861ecf68719dae696d3b79d/A_psychological_portrait_of_a_young_confused_female_Black_character__an_anxiety_and_depression_concept__psychotherapy"
+          />
+          <span
+            :class="
+              title === 'Still not convinced?' ? 'font-semibold text-lg' : ''
+            "
+            v-html="title"
+          />
+        </template>
+
+        <template #description="{ description }">
+          <span class="leading-5 text-md" v-html="description" />
+        </template>
+      </UNotifications>
+    </NuxtLayout>
+  </div>
+</template>
+
+<script setup lang="ts">
+import mitt from "mitt"
+import { useAppStore } from "~/store/app"
+
+const nuxtApp = useNuxtApp()
+const emitter = mitt()
+const appStore = useAppStore()
+const { isTauri, initializeTauri } = useTauri()
+
+if (nuxtApp.$emitter) {
+  // nuxtApp.$emitter = emitters
+} else {
+  nuxtApp.provide("emitter", emitter)
+}
+appStore.setEmitter(emitter)
+
 const appVersion = ref<string>("v0.46.1-beta")
 
 onMounted(() => {
@@ -22,40 +50,13 @@ onMounted(() => {
 
   // Unregister stale service workers (old builds with deleted/renamed assets)
   // but keep the current PWA service worker (/sw.js) intact.
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      for (const registration of registrations) {
-        const scriptURL = registration.active?.scriptURL ?? registration.installing?.scriptURL ?? ''
-        const isCurrentSW = scriptURL.includes('/sw.js')
-        if (!isCurrentSW) {
-          registration.unregister()
-        }
-      }
-    })
-  }
-
-  // Handle stale-chunk errors: when a deploy has replaced old hashed JS files,
-  // the current SW may still serve a stale index.html referencing old hashes.
-  // Intercept unhandled promise rejections (dynamic import failures) and do a
-  // hard reload to force the browser/SW to fetch the fresh index.html + assets.
-  window.addEventListener('unhandledrejection', (event) => {
-    const message = event?.reason?.message ?? ''
-    if (
-      message.includes('Failed to fetch dynamically imported module') ||
-      message.includes('Importing a module script failed') ||
-      message.includes('no-response')
-    ) {
-      console.warn('[CoW] Detected stale chunk error — reloading to pick up new build.', message)
-      // Avoid reload loops: only reload if we haven't already reloaded for this build.
-      const reloadKey = 'cow_last_chunk_reload'
-      const lastReload = Number(sessionStorage.getItem(reloadKey) ?? 0)
-      const now = Date.now()
-      if (now - lastReload > 10_000) { // throttle: at most once per 10s
-        sessionStorage.setItem(reloadKey, String(now))
-        window.location.reload()
-      }
-    }
-  })
+  // if ("serviceWorker" in navigator) {
+  //   navigator.serviceWorker.getRegistrations().then((registrations) => {
+  //     for (const registration of registrations) {
+  //       registration.unregister()
+  //     }
+  //   })
+  // }
 })
 </script>
 
