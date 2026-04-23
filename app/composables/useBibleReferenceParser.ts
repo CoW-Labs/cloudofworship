@@ -293,44 +293,77 @@ function replaceSpokenNumbers(text: string): string {
  * - "1st Corinthians 7 um from verse 17 to 24" (filler words between chapter and verse)
  */
 /**
- * Map a character index in the pre-processed (number-words-replaced) string back
- * to the corresponding index in the original raw string.
- *
- * Strategy: walk through both strings character-by-character. Wherever a substitution
- * was made (a number word was replaced by its digit equivalent) the processed string is
- * shorter; we advance the raw pointer by the length of the original word while the
- * processed pointer advances by the length of the digit token.
- *
- * Rather than re-implementing the full substitution logic, we regenerate a character-level
- * index map by comparing `rawText` and `processedText` at each aligned position.
+ * Build a processed-to-raw index map once for each raw/processed string pair and use
+ * that map for lookups. This avoids trying to "resync" by scanning for matching
+ * characters, which breaks when preprocessing inserts digits that never appear in
+ * the original raw text (for example, "twenty three" -> "23").
  */
-function mapIndexToRaw(rawText: string, processedText: string, processedIndex: number): number {
-  let r = 0 // cursor in rawText
-  let p = 0 // cursor in processedText
+let lastProcessedToRawIndexMap:
+  | { rawText: string, processedText: string, map: number[] }
+  | null = null
 
-  while (p < processedIndex && r < rawText.length) {
-    if (rawText[r] === processedText[p]) {
-      r++
-      p++
-    } else {
-      // A substitution happened here. Try to match the digit token in processedText
-      // against the number word in rawText.
-      // Walk rawText forward until the next char matches processedText[p] again.
-      let rNext = r + 1
-      while (rNext < rawText.length && rawText[rNext] !== processedText[p]) {
-        rNext++
+function buildProcessedToRawIndexMap(rawText: string, processedText: string): number[] {
+  const rawLength = rawText.length
+  const processedLength = processedText.length
+
+  const lcs: number[][] = Array.from({ length: rawLength + 1 }, () =>
+    Array<number>(processedLength + 1).fill(0),
+  )
+
+  for (let r = rawLength - 1; r >= 0; r--) {
+    for (let p = processedLength - 1; p >= 0; p--) {
+      if (rawText[r] === processedText[p]) {
+        lcs[r][p] = lcs[r + 1][p + 1] + 1
+      } else {
+        lcs[r][p] = Math.max(lcs[r + 1][p], lcs[r][p + 1])
       }
-      // Also advance processedText past the digit token
-      let pNext = p + 1
-      while (pNext < processedText.length && processedText[pNext] !== (rawText[rNext] ?? '') && /\d/.test(processedText[pNext] ?? '')) {
-        pNext++
-      }
-      r = rNext
-      p = pNext
     }
   }
 
-  return r
+  const map = Array<number>(processedLength + 1).fill(rawLength)
+  let r = 0
+  let p = 0
+  map[0] = 0
+
+  while (r < rawLength && p < processedLength) {
+    if (rawText[r] === processedText[p]) {
+      r++
+      p++
+      map[p] = r
+    } else if (lcs[r + 1][p] >= lcs[r][p + 1]) {
+      r++
+    } else {
+      p++
+      map[p] = r
+    }
+  }
+
+  while (p < processedLength) {
+    p++
+    map[p] = r
+  }
+
+  return map
+}
+
+function getProcessedToRawIndexMap(rawText: string, processedText: string): number[] {
+  if (
+    lastProcessedToRawIndexMap
+    && lastProcessedToRawIndexMap.rawText === rawText
+    && lastProcessedToRawIndexMap.processedText === processedText
+  ) {
+    return lastProcessedToRawIndexMap.map
+  }
+
+  const map = buildProcessedToRawIndexMap(rawText, processedText)
+  lastProcessedToRawIndexMap = { rawText, processedText, map }
+  return map
+}
+
+function mapIndexToRaw(rawText: string, processedText: string, processedIndex: number): number {
+  const indexMap = getProcessedToRawIndexMap(rawText, processedText)
+  const clampedIndex = Math.max(0, Math.min(processedIndex, processedText.length))
+  return indexMap[clampedIndex] ?? rawText.length
 }
 
 const useBibleReferenceParser = (rawText: string): BibleReference[] => {
