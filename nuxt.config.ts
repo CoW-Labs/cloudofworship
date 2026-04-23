@@ -114,7 +114,6 @@ export default defineNuxtConfig({
 
   modules: [
     "@nuxt/ui",
-    "@vite-pwa/nuxt",
     "nuxt-tiptap-editor",
     "@pinia/nuxt",
     "pinia-plugin-persistedstate/nuxt",
@@ -279,102 +278,5 @@ export default defineNuxtConfig({
     id: "G-Z23FTMP6WE",
   },
 
-  pwa: {
-    registerType: "autoUpdate",
-    injectRegister: "auto",
-
-    pwaAssets: {
-      disabled: false,
-      config: true,
-    },
-
-    manifest: {
-      name: "Cloud of Worship",
-      short_name: "CoW",
-      description: "Cloud of Worship",
-      theme_color: "#a855f7",
-      start_url: "/",
-      display: "fullscreen",
-      icons: [
-        {
-          src: "/cloud-w-144.png",
-          sizes: "144x144",
-          type: "image/png",
-        },
-        {
-          src: "/cloud-w-192.png",
-          sizes: "192x192",
-          type: "image/png",
-        },
-        {
-          src: "/cloud-w-512.png",
-          sizes: "512x512",
-          type: "image/png",
-        },
-      ],
-    },
-
-    workbox: {
-      globPatterns: ["**/*.{js,css,svg,png,ico,woff,woff2}"],
-      globIgnores: ["**/node_modules/**/*", "**/*.map"],
-      cleanupOutdatedCaches: true,
-      clientsClaim: true,
-      skipWaiting: true,
-      // For a SPA (ssr: false), Nuxt outputs a single index.html.
-      // We must precache it explicitly so the service worker can serve it offline.
-      additionalManifestEntries: [
-        { url: "/index.html", revision: null },
-      ],
-      // Serve the cached index.html for all navigation requests when offline.
-      navigateFallback: "/index.html",
-      // Only use the navigate fallback for same-origin page navigations.
-      navigateFallbackDenylist: [
-        // Exclude API calls and other non-page requests
-        /^\/api\//,
-        /\.[a-z]{2,4}$/i, // requests with file extensions (assets)
-      ],
-      runtimeCaching: [
-        {
-          // Cache the SPA shell (index.html) with NetworkFirst so users always
-          // get fresh content when online but can still load offline.
-          urlPattern: ({ request }) => request.mode === 'navigate',
-          handler: "NetworkFirst",
-          options: {
-            cacheName: "pages-cache",
-            networkTimeoutSeconds: 5,
-            expiration: {
-              maxEntries: 10,
-              maxAgeSeconds: 86400, // 24 hours
-            },
-          },
-        },
-        {
-          // Cache static assets (JS, CSS, fonts, images) with StaleWhileRevalidate.
-          urlPattern: /\.(?:js|css|woff2?|png|svg|ico)$/,
-          handler: "StaleWhileRevalidate",
-          options: {
-            cacheName: "assets-cache",
-            expiration: {
-              maxEntries: 200,
-              maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
-            },
-          },
-        },
-      ],
-    },
-
-    devOptions: {
-      enabled: false,
-      suppressWarnings: true,
-      navigateFallback: "/",
-      navigateFallbackAllowlist: [/^\/$/],
-      type: "module",
-    },
-
-    registerWebManifestInRouteRules: true,
-
-    client: {
-      installPrompt: true,
-    },
-  },
+  // PWA and Workbox config removed for custom service worker
 })

@@ -235,9 +235,7 @@ useHead({
 const runtimeConfig = useRuntimeConfig()
 const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
-const checkGoogleRedirectResult = inject("checkGoogleRedirectResult") as () => Promise<any>
 const { isTauri } = useTauri()
-const { checkRedirectResult } = useTauriGoogleAuth()
 
 const { token } = useAuthToken()
 const authStore = useAuthStore()
@@ -548,80 +546,21 @@ const handleGoogleSignUp = async () => {
       step.value = 2
     }
   } catch (error: any) {
-    // Only show error if it's not a redirect initiation
-    if (error?.message !== "Redirect initiated") {
-      usePosthogCapture("SIGNUP_STEP1_FAILED", {
-        method: "google",
-        error: error?.message,
-      })
+    usePosthogCapture("SIGNUP_STEP1_FAILED", {
+      method: "google",
+      error: error?.message,
+    })
 
-      useToast().add({
-        title: "Google sign up failed",
-        description: error?.message || "An error occurred",
-        color: "red",
-        icon: "i-bx-error",
-      })
-    }
+    useToast().add({
+      title: "Google sign up failed",
+      description: error?.message || "An error occurred",
+      color: "red",
+      icon: "i-bx-error",
+    })
   } finally {
     googleLoading.value = false
   }
 }
-
-// Check for redirect result on mount (web redirect flow + Tauri OAuth redirect)
-onMounted(async () => {
-  googleLoading.value = true
-  const result = await (isTauri ? checkRedirectResult() : checkGoogleRedirectResult())
-
-  if (result?.user) {
-    const method = isTauri ? "google_tauri" : "google"
-    usePosthogCapture("SIGNUP_STEP1_ATTEMPTED", { method })
-
-    const { user } = result
-    const idToken = await user.getIdToken()
-    const utmParams = getUTMParams(route)
-
-    const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
-      "/auth/signup/google",
-      {
-        method: "POST",
-        headers: { "x-access-token": `Bearer ${idToken}` },
-        body: { utmParams },
-      }
-    )
-
-    if (error.value) {
-      usePosthogCapture("SIGNUP_STEP1_FAILED", {
-        method,
-        email: user?.email,
-        error: error.value?.data?.error?.includes("E11000")
-          ? "Email already exists"
-          : error.value?.data?.message,
-      })
-
-      useToast().add({
-        title: error.value?.data?.error?.includes("E11000")
-          ? "Email linked to an account. Sign in instead."
-          : error.value?.data?.message,
-        color: "red",
-        icon: "i-bx-error",
-      })
-    } else {
-      token.value = data.value?.token
-      authStore.setUser(data?.value?.data.newUser!!)
-
-      usePosthogCapture("SIGNUP_STEP1_COMPLETED", {
-        method,
-        userId: data?.value?.data.newUser?._id,
-        email: user?.email,
-        fullName: user?.displayName,
-        utmParams,
-      })
-
-      step.value = 2
-    }
-  }
-  googleLoading.value = false
-})
 </script>
 
 <style scoped></style>

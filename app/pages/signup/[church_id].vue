@@ -330,15 +330,12 @@ const handleGoogleSignUp = async () => {
       }
     }
   } catch (error: any) {
-    // Only show error if it's not a redirect initiation
-    if (error?.message !== "Redirect initiated") {
-      useToast().add({
-        title: "Google sign up failed",
-        description: error?.message || "An error occurred",
-        color: "red",
-        icon: "i-bx-error",
-      })
-    }
+    useToast().add({
+      title: "Google sign up failed",
+      description: error?.message || "An error occurred",
+      color: "red",
+      icon: "i-bx-error",
+    })
   } finally {
     loading.value = false
   }
