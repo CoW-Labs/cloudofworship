@@ -47,6 +47,15 @@ const appVersion = ref<string>("v0.46.0-beta")
 
 onMounted(() => {
   initializeTauri()
+
+  // Unregister all old service workers to fix offline/caching issues
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (const registration of registrations) {
+        registration.unregister()
+      }
+    })
+  }
 })
 </script>
 
