@@ -307,11 +307,31 @@ onMounted(async () => {
   usePosthogCapture("LOGIN_PAGE_VIEWED")
 
   googleLoading.value = true
-  const result = await (isTauri
-    ? checkRedirectResult()
-    : checkGoogleRedirectResult())
-
-  if (result?.user) {
+  let result: any = null
+  try {
+    result = await (isTauri
+      ? checkRedirectResult()
+      : checkGoogleRedirectResult())
+    if (!result) {
+      console.warn("Google login: getRedirectResult returned null (no user, possibly cancelled or blocked)")
+      toast.add({
+        title: "Google login failed",
+        description: "No user was returned from Google. Please try again or check your browser settings.",
+        color: "red",
+        icon: "i-bx-error",
+      })
+      return
+    }
+    if (!result.user) {
+      console.warn("Google login: getRedirectResult returned result with no user", result)
+      toast.add({
+        title: "Google login failed",
+        description: "No user was returned from Google. Please try again or check your browser settings.",
+        color: "red",
+        icon: "i-bx-error",
+      })
+      return
+    }
     usePosthogCapture("LOGIN_ATTEMPTED", {
       method: isTauri ? "google_tauri" : "google",
     })
@@ -339,7 +359,6 @@ onMounted(async () => {
         email: user?.email,
         error: error.value?.data?.message,
       })
-
       toast.add({
         title: error.value?.data?.message,
         color: "red",
@@ -348,18 +367,25 @@ onMounted(async () => {
     } else {
       token.value = data.value?.token
       authStore.setUser(data.value?.data?.user!!)
-
       usePosthogCapture("LOGIN_SUCCESSFUL", {
         method: isTauri ? "google_tauri" : "google",
         userId: data.value?.data?.user?._id,
         email: user?.email,
         emailVerified: data.value?.data?.user?.emailVerified,
       })
-
       navigateTo("/")
     }
+  } catch (e) {
+    console.error("Google login redirect result error", e)
+    toast.add({
+      title: "Google login failed",
+      description: e?.message || "An error occurred during Google login.",
+      color: "red",
+      icon: "i-bx-error",
+    })
+  } finally {
+    googleLoading.value = false
   }
-  googleLoading.value = false
 })
 </script>
 

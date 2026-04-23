@@ -15,8 +15,6 @@ export default defineNuxtRouteMiddleware((to, from) => {
   }
 
   if (!token && to.path === '/') {
-    console.log('No token, redirecting to login')
-    toast.add({ icon: 'i-bx-info-circle', title: 'Log in to continue' })
     return navigateTo('/login')
   }
 })
