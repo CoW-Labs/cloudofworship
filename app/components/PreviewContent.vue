@@ -98,6 +98,25 @@
 </template>
 
 <script setup lang="ts">
+import { useRealtimeSlides } from "~/composables/useRealtimeSlides"
+// Setup real-time slide sync
+const { handleWebSocketMessage } = useRealtimeSlides()
+
+onMounted(() => {
+  // Listen for all incoming socket messages and sync slides
+  const nuxtApp = useNuxtApp()
+  const socket = nuxtApp.$socketio as any
+  if (socket) {
+    socket.onAny((event: string, data: any) => {
+      // Normalize for both Socket.IO and WebSocket style
+      if (data && typeof data === "object" && data.action && data.data) {
+        handleWebSocketMessage(data)
+      } else if (event && data) {
+        handleWebSocketMessage({ action: event, data })
+      }
+    })
+  }
+})
 import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
@@ -373,17 +392,17 @@ emitter.on("new-media", async (data: ExtendedFileT[]) => {
       newSlides = createMultipleMediaSlides(data)
     }
 
-    // Append new slides to the end of the current slide list
+    // Append new slides immediately so the current user sees them right away
     newSlides.forEach((slide) => {
       slides.value?.push(slide)
       appStore.appendActiveSlide(slide)
     })
 
-    // Broadcast batch slide creation for real-time sync
-    if (newSlides?.length > 0) {
-      broadcastSlideUpdate("batch-create-slides", { slides: newSlides })
-    }
-    uploadOfflineSlides()
+    // NOTE: Do NOT call uploadOfflineSlides() here for media slides.
+    // createMultipleMediaSlides handles: upload → patch URLs → batchCreateSlides
+    // → socket broadcast entirely in its own background flow. Calling
+    // uploadOfflineSlides() here would race against that flow and send
+    // batchCreateSlides with blob: URLs before the images have been uploaded.
   }
 })
 

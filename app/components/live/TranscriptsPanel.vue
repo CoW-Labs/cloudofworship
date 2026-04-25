@@ -428,7 +428,8 @@ watch(
       parsedSegmentIds.add(segment.id)
 
       // Use the already-parsed bible references from the segment
-      if (segment.bibleReferences.length > 0) addFromBibleReferences(segment.bibleReferences)
+      if (segment.bibleReferences.length > 0)
+        addFromBibleReferences(segment.bibleReferences)
     }
 
     // Also fire the debounced backend search with the last 3 segments
