@@ -49,21 +49,19 @@ export default function useScriptureSearch() {
     const trimmed = query.trim()
     if (!trimmed || trimmed.length < 10) return // skip very short strings
 
-    const requestKey = `${version}:${trimmed}`
-
-    // Avoid re-fetching the exact same query text for the same version
-    if (requestKey === lastQuery.value) return
-    lastQuery.value = requestKey
+    // Avoid re-fetching the exact same query (version-agnostic, cross-translation search)
+    if (trimmed === lastQuery.value) return
+    lastQuery.value = trimmed
 
     isSearching.value = true
     try {
       const { data } = await useAPIFetch(
-        `/scripture/search?q=${encodeURIComponent(trimmed)}&version=${encodeURIComponent(version)}&limit=5`
+        `/scripture/search?q=${encodeURIComponent(trimmed)}&limit=20`
       )
       if (data.value) {
         const payload = data.value as { results: any[] }
-        payload.results.reverse()
-        const enriched = (payload.results || []).map(enrichResult)
+        // Best match comes last so it appears at the bottom of the list (most prominent)
+        const enriched = (payload.results || []).reverse().map(enrichResult)
 
         // Merge new results, avoiding duplicates by _id
         for (const item of enriched) {

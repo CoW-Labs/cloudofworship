@@ -14,7 +14,10 @@
     </div>
 
     <!-- CHIP GROUP -->
-    <div class="button-row flex flex-nowrap my-4 gap-1 pb-2">
+    <div
+      class="button-row flex flex-nowrap my-4 gap-1 pb-2"
+      v-if="!shouldUseOnlineSearch"
+    >
       <UButton
         :variant="selectedFilter === 'old' ? 'solid' : 'outline'"
         @click="selectedFilter = 'old'"
@@ -69,7 +72,12 @@
 
     <div
       v-if="loading"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-260px)]"
+      class="actions-ctn mt-2 overflow-y-auto"
+      :class="
+        shouldUseOnlineSearch
+          ? 'max-h-[calc(100vh-200px)]'
+          : 'max-h-[calc(100vh-260px)]'
+      "
     >
       <USkeleton
         v-for="i in 15"
@@ -79,7 +87,14 @@
     </div>
     <template v-else>
       <!-- SEARCHING BIBLE VERSES -->
-      <div class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-260px)]">
+      <div
+        class="actions-ctn mt-2 overflow-y-auto"
+        :class="
+          shouldUseOnlineSearch
+            ? 'max-h-[calc(100vh-200px)]'
+            : 'max-h-[calc(100vh-260px)]'
+        "
+      >
         <ActionCard
           v-for="(verse, index) in verses"
           :key="`verse ${index}`"
@@ -91,19 +106,33 @@
               index === focusedActionIndex,
           }"
           @click="focusedActionIndex = index"
-        />
+        >
+          <template v-if="searchInput?.length >= 2" #desc>
+            <span v-html="highlightText(verse.scripture, searchInput)" />
+          </template>
+        </ActionCard>
       </div>
     </template>
   </div>
 </template>
 <script setup lang="ts">
 import type { QuickAction, BibleVerse } from "~/types"
-import { useDebounceFn } from "@vueuse/core"
+import { useDebounceFn, useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import fuzzysort from "fuzzysort"
 import type { SelectVariant } from "@nuxt/ui/dist/runtime/types"
+
 const db = useIndexedDB()
 const appStore = useAppStore()
+const online = useOnline()
+const { checkFlag } = useFeatureFlags()
+const { isTeamsPlan } = useSubscription()
+const {
+  results: onlineSearchResults,
+  isSearching,
+  search: searchOnline,
+  clearResults: clearOnlineResults,
+} = useScriptureSearch()
 
 const defaultBible = ref<BibleVerse[]>([])
 const searchInput = ref<string>("")
@@ -113,6 +142,19 @@ const searchedVerses = ref<BibleVerse[]>([])
 const focusedActionIndex = ref(0)
 const quickActions = ref<HTMLDivElement | null>(null)
 const selectedFilter = ref<string>("")
+
+/**
+ * Whether to use the online scripture search endpoint.
+ *
+ * Logic:
+ *   flag OFF (default) → online search for everyone (when online)
+ *   flag ON            → online search only for Teams plan users
+ */
+const shouldUseOnlineSearch = computed(() => {
+  if (!online.value) return false
+  const teamsOnly = checkFlag("allow-online-scripture-search-for-only-teams")
+  return teamsOnly ? isTeamsPlan.value : true
+})
 
 const turnToBibleTypeAction = (bibleVerse: BibleVerse) => {
   const bibleChapterAndVerse = `${bibleVerse.chapter}:${bibleVerse.verse}`
@@ -214,7 +256,16 @@ const getVerses = (query: string = "") => {
       bibleVersion: appStore.currentState.settings.defaultBibleVersion,
     })
 
-    // Prepare search targets with book names for better context
+    // ── Online search ────────────────────────────────────────────────────
+    if (shouldUseOnlineSearch.value) {
+      // Clear previous results so stale items don't flash before new ones arrive
+      clearOnlineResults()
+      searchOnline(query)
+      // loading state is driven by the isSearching watcher below
+      return
+    }
+
+    // ── Offline / local fuzzy search ─────────────────────────────────────
     const searchTargets = formattedDefaultBible.value.map((verse) => ({
       ...verse,
       bookName: bibleBooks?.[Number(verse.book) - 1] || "",
@@ -313,6 +364,7 @@ const getVerses = (query: string = "") => {
 }
 
 const getPlaceholderByFilter = () => {
+  if (shouldUseOnlineSearch.value) return "Search the Bible across translations"
   switch (selectedFilter.value) {
     case "new":
       return `Search the New Testament (${appStore.currentState.settings.defaultBibleVersion})`
@@ -326,6 +378,20 @@ const getPlaceholderByFilter = () => {
 }
 
 getDefaultBible()
+
+// Keep loading indicator in sync with the online search request state
+watch(isSearching, (val) => {
+  if (shouldUseOnlineSearch.value) loading.value = val
+})
+
+// Populate verses as online search results arrive
+watch(onlineSearchResults, (results) => {
+  if (shouldUseOnlineSearch.value) {
+    const tempResults = results as unknown as BibleVerse[]
+    tempResults.reverse()
+    verses.value = tempResults
+  }
+})
 
 const onSearchInput = useDebounceFn(async () => {
   getVerses(searchInput.value)
