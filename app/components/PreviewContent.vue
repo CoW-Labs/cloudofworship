@@ -988,9 +988,7 @@ const openSaveTemplateModal = (slide: Slide) => {
 }
 
 const addAllSlidesToSelectedSlides = () => {
-  bulkSelectedSlides.value = currentState.value.activeSlides.map(
-    (slide) => slide?.id
-  )
+  bulkSelectedSlides.value = slides.value.map((slide) => slide?.id)
 }
 
 const removeAllSelectedSlides = () => {
@@ -1012,7 +1010,7 @@ const addToSelectedSlides = (slideId: string, isSelected: boolean) => {
 const removeFromSelectedSlides = (slideId: string) => {
   bulkSelectedSlides.value.splice(
     bulkSelectedSlides.value.findIndex((id) => id === slideId),
-    0
+    1
   )
 }
 </script>
