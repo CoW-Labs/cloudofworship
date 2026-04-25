@@ -111,7 +111,11 @@
             'bg-primary-50 dark:bg-primary-800 rounded-md':
               index === focusedActionIndex,
           }"
-        />
+        >
+          <template #desc>
+            <span v-html="highlightText(action.desc ?? '', searchInput)" />
+          </template>
+        </ActionCard>
       </div>
     </div>
 
