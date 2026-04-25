@@ -217,16 +217,10 @@
         </p>
       </div>
 
-      <!-- Segments — newest first -->
+      <!-- Segments — oldest first, newest at bottom -->
       <div v-else class="space-y-3">
         <div
-          v-if="currentTranscript"
-          class="segment text-sm leading-relaxed text-gray-600 dark:text-gray-400 italic"
-        >
-          {{ currentTranscript }}<span class="animate-pulse">▌</span>
-        </div>
-        <div
-          v-for="segment in [...segments].reverse()"
+          v-for="segment in segments"
           :key="segment.id"
           class="segment text-sm leading-relaxed"
         >
@@ -236,6 +230,14 @@
             @reference-click="handleReferenceClick"
           />
         </div>
+        <div
+          v-if="currentTranscript"
+          class="segment text-sm leading-relaxed text-gray-600 dark:text-gray-400 italic"
+        >
+          {{ currentTranscript }}<span class="animate-pulse">▌</span>
+        </div>
+        <!-- Always-visible anchor so the cursor is always at the very bottom -->
+        <div ref="transcriptBottom" />
       </div>
     </div>
 
@@ -441,7 +443,18 @@ watch(
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const transcriptContainer = ref<HTMLElement | null>(null)
+const transcriptBottom = ref<HTMLElement | null>(null)
 const scripturesContainer = ref<HTMLElement | null>(null)
+
+// Auto-scroll transcript to bottom when new content arrives (newest at bottom)
+const scrollTranscriptToBottom = () => {
+  nextTick(() => {
+    transcriptBottom.value?.scrollIntoView({ behavior: "smooth" })
+  })
+}
+
+watch(() => segments.value.length, scrollTranscriptToBottom)
+watch(currentTranscript, scrollTranscriptToBottom)
 
 // ── Actions ────────────────────────────────────────────────────────────────
 const toggleTranscription = () =>
