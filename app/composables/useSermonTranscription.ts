@@ -239,8 +239,11 @@ export default function useSermonTranscription() {
 
     // Delegate to Deepgram for Teams users
     if (isTeamsPlan.value) {
+      usePosthogCapture('TRANSCRIPTION_STARTED', { provider: 'deepgram', plan: 'teams' })
       return deepgram.startTranscription()
     }
+
+    usePosthogCapture('TRANSCRIPTION_STARTED', { provider: 'web-speech-api', plan: 'free' })
 
     // Check browser support (free path only)
     if (!isSpeechRecognitionSupported()) {
@@ -431,10 +434,21 @@ export default function useSermonTranscription() {
   const stopTranscription = () => {
     // Delegate to Deepgram for Teams users
     if (isTeamsPlan.value) {
+      usePosthogCapture('TRANSCRIPTION_STOPPED', {
+        provider: 'deepgram',
+        plan: 'teams',
+        segmentCount: deepgram.segments.value.length,
+      })
       return deepgram.stopTranscription()
     }
 
     if (!state.value.isTranscribing && !state.value.isConnecting) return
+
+    usePosthogCapture('TRANSCRIPTION_STOPPED', {
+      provider: 'web-speech-api',
+      plan: 'free',
+      segmentCount: state.value.segments.length,
+    })
 
     // Finalize any remaining transcript
     if (state.value.currentTranscript.trim()) {
@@ -468,8 +482,14 @@ export default function useSermonTranscription() {
    */
   const clearTranscript = () => {
     if (isTeamsPlan.value) {
+      usePosthogCapture('TRANSCRIPTION_CLEARED', { provider: 'deepgram', plan: 'teams' })
       return deepgram.clearTranscript()
     }
+    usePosthogCapture('TRANSCRIPTION_CLEARED', {
+      provider: 'web-speech-api',
+      plan: 'free',
+      segmentCount: state.value.segments.length,
+    })
     state.value.segments = []
     state.value.currentTranscript = ''
     toast.add({ title: 'Transcript cleared', icon: 'i-bx-trash' })
