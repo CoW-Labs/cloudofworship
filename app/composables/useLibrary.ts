@@ -100,8 +100,16 @@ export default function useLibrary() {
         const { createSlide, saveSlideOnline } = useSlides()
         const uploadResults = await Promise.allSettled(
           localOnlySlides.map(async (slide) => {
-            const serverSlide = slide._id ? slide : await createSlide(slide)
+            if (slide._id) {
+              const wasSaved = await saveSlideOnline(slide)
+              if (wasSaved) return slide
+              return null
+            }
+
+            const { _id, ...slideWithoutServerId } = slide
+            const serverSlide = await createSlide(slideWithoutServerId)
             if (!serverSlide?._id) return null
+
             const wasSaved = await saveSlideOnline(serverSlide)
             return wasSaved ? serverSlide : null
           })

@@ -98,7 +98,23 @@
 </template>
 
 <script setup lang="ts">
-import { useRealtimeSlides } from "~/composables/useRealtimeSlides"
+import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
+import { go } from "fuzzysort"
+import type { Emitter } from "mitt"
+import { tabSessionId, useRealtimeSlides } from "~/composables/useRealtimeSlides"
+import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
+import type {
+  Hymn,
+  Scripture,
+  Slide,
+  Song,
+  Countdown,
+  Schedule,
+  ExtendedFileT,
+} from "~/types"
+import { appWideActions } from "~/utils/constants"
+
 // Setup real-time slide sync
 const { handleWebSocketMessage } = useRealtimeSlides()
 
@@ -126,22 +142,6 @@ onUnmounted(() => {
     previewSocket.offAny(previewSocketAnyHandler)
   }
 })
-import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
-import { go } from "fuzzysort"
-import type { Emitter } from "mitt"
-import { useAppStore } from "~/store/app"
-import { useAuthStore } from "~/store/auth"
-import type {
-  Hymn,
-  Scripture,
-  Slide,
-  Song,
-  Countdown,
-  Schedule,
-  ExtendedFileT,
-} from "~/types"
-import { appWideActions } from "~/utils/constants"
-import { tabSessionId } from "~/composables/useRealtimeSlides"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()

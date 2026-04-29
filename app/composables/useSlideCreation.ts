@@ -338,8 +338,11 @@ export default function useSlideCreation() {
           const sanitizedSlides = newSlides.map((slide) => {
             const sanitizedSlide = { ...slide }
             if (sanitizedSlide.data && typeof sanitizedSlide.data === "object") {
-              sanitizedSlide.data = { ...(sanitizedSlide.data as Record<string, unknown>) } as any
-              delete (sanitizedSlide.data as Record<string, unknown>).blob
+              const sanitizedData = {
+                ...(sanitizedSlide.data as Record<string, unknown>)
+              }
+              delete sanitizedData.blob
+              sanitizedSlide.data = sanitizedData as typeof sanitizedSlide.data
             }
             return sanitizedSlide
           })
