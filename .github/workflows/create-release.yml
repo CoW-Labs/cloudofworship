@@ -63,8 +63,10 @@ jobs:
             local patch="$3"
             local subject="$4"
             local body="$5"
+            local combined_message
+            combined_message="${subject}"$'\n'"${body}"
 
-            if [[ "$subject" == BREAKING* ]] || [[ "$subject"$'\n'"$body" == *"BREAKING CHANGE"* ]]; then
+            if [[ "$subject" == BREAKING* ]] || [[ "$combined_message" == *"BREAKING CHANGE"* ]]; then
               major=$((major + 1))
               minor=0
               patch=0
@@ -124,6 +126,9 @@ ${commit_body}"
               cat /tmp/release-response.json
               echo "Failed to create release for ${next_tag}"
               exit 1
+            fi
+            if [[ "$status_code" == "422" ]]; then
+              echo "Release already exists or was skipped by API validation for ${next_tag}"
             fi
 
             read -r current_major current_minor current_patch <<< "$(parse_version "$next_tag")"
