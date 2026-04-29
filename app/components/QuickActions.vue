@@ -405,7 +405,7 @@ const handleInputKeydown = (e: KeyboardEvent) => {
             ? `${action?.bibleBookIndex}:${bibleChapterAndVerse.value}`
             : action?.type === slideTypes.hymn
             ? action?.hymnIndex
-            : ""
+            : action?.actionArg || ""
         )
       }
       break
