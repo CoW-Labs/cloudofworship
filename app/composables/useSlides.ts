@@ -8,7 +8,7 @@ export default function useSlides() {
   const authStore = useAuthStore()
   const toast = useToast()
   const online = useOnline()
-  const churchId = authStore.church?._id
+  const getChurchId = () => authStore.church?._id || authStore.user?.churchId
   const slides = ref<Array<Slide>>(appStore.currentState.activeSlides || [])
   const loading = ref<boolean>(false)
 
@@ -41,6 +41,12 @@ export default function useSlides() {
         return []
       }
 
+      const churchId = getChurchId()
+      if (!churchId) {
+        console.warn('No church ID available. Skipping slide fetch.')
+        return []
+      }
+
       loading.value = true
       appStore.setSlidesLoading(true)
 
@@ -53,18 +59,12 @@ export default function useSlides() {
       )
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to fetch slides')
+        throw new Error(error.value?.message || 'Unable to refresh slides')
       }
 
       return data.value as Slide[]
     } catch (error: any) {
       console.error('Error fetching schedule slides:', error)
-      toast.add({
-        icon: 'i-bx-error',
-        title: 'Failed to fetch slides',
-        description: error.message,
-        color: 'red',
-      })
       return []
     } finally {
       loading.value = false
@@ -86,6 +86,12 @@ export default function useSlides() {
 
       if (!activeSchedule?._id) {
         console.warn('No active schedule found')
+        return []
+      }
+
+      const churchId = getChurchId()
+      if (!churchId) {
+        console.warn('No church ID available. Skipping saved slide fetch.')
         return []
       }
 
@@ -135,6 +141,11 @@ export default function useSlides() {
 
       if (!activeSchedule?._id) {
         throw new Error('No active schedule found')
+      }
+
+      const churchId = getChurchId()
+      if (!churchId) {
+        throw new Error('No church ID available')
       }
 
       loading.value = true
@@ -189,6 +200,11 @@ export default function useSlides() {
 
       if (!activeSchedule?._id) {
         throw new Error('No active schedule found')
+      }
+
+      const churchId = getChurchId()
+      if (!churchId) {
+        throw new Error('No church ID available')
       }
 
       loading.value = true
@@ -251,6 +267,11 @@ export default function useSlides() {
         throw new Error('Missing schedule or slide ID')
       }
 
+      const churchId = getChurchId()
+      if (!churchId) {
+        throw new Error('No church ID available')
+      }
+
       loading.value = true
 
       const { data, error } = await useAPIFetch(
@@ -290,6 +311,11 @@ export default function useSlides() {
 
       if (!activeSchedule?._id) {
         throw new Error('No active schedule found')
+      }
+
+      const churchId = getChurchId()
+      if (!churchId) {
+        throw new Error('No church ID available')
       }
 
       loading.value = true
@@ -342,6 +368,11 @@ export default function useSlides() {
         return false
       }
 
+      const churchId = getChurchId()
+      if (!churchId) {
+        return false
+      }
+
       loading.value = true
       appStore.setSlidesLoading(true)
 
@@ -388,6 +419,11 @@ export default function useSlides() {
 
       if (!activeSchedule?._id) {
         throw new Error('No active schedule found')
+      }
+
+      const churchId = getChurchId()
+      if (!churchId) {
+        throw new Error('No church ID available')
       }
 
       loading.value = true
@@ -443,6 +479,11 @@ export default function useSlides() {
         return false
       }
 
+      const churchId = getChurchId()
+      if (!churchId) {
+        return false
+      }
+
       loading.value = true
       appStore.setSlidesLoading(true)
 
@@ -477,6 +518,11 @@ export default function useSlides() {
       const activeSchedule = appStore.currentState.activeSchedule
 
       if (!activeSchedule?._id) {
+        return false
+      }
+
+      const churchId = getChurchId()
+      if (!churchId) {
         return false
       }
 

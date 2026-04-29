@@ -1,6 +1,5 @@
 <template>
   <div class="dark:bg-gray-900">
-    <NuxtPwaAssets />
     <NuxtLoadingIndicator />
     <NuxtLayout :app-version="appVersion">
       <NuxtPage />
@@ -45,6 +44,18 @@ appStore.setEmitter(emitter)
 
 const appVersion = ref<string>("v0.46.4-beta")
 
+const warmOfflineRoutes = async () => {
+  await Promise.allSettled([
+    preloadRouteComponents("/"),
+    preloadRouteComponents("/login"),
+  ])
+
+  await Promise.allSettled([
+    fetch("/", { cache: "reload" }),
+    fetch("/login", { cache: "reload" }),
+  ])
+}
+
 onMounted(() => {
   initializeTauri()
 
@@ -57,9 +68,13 @@ onMounted(() => {
         }
       })
     } else {
-      navigator.serviceWorker.register("/sw.js").catch((error) => {
-        console.warn("Service worker registration failed", error)
-      })
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then(() => navigator.serviceWorker.ready)
+        .then(() => warmOfflineRoutes())
+        .catch((error) => {
+          console.warn("Service worker registration failed", error)
+        })
     }
   }
 })

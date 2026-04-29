@@ -453,7 +453,9 @@ emitter.on("delete-slide", (data: Slide) => {
 })
 
 emitter.on("refresh-slides", () => {
-  retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!)
+  retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!).catch(
+    (error) => console.warn("Unable to refresh schedule slides:", error)
+  )
 })
 
 emitter.on("upload-offline-slides", () => {
@@ -596,6 +598,10 @@ const uploadOfflineSlides = async () => {
 }
 
 const retrieveSlidesOnline = async (scheduleId: string) => {
+  if (!online.value || !scheduleId || !authStore.user?.churchId) {
+    return
+  }
+
   // appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(
     `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
@@ -656,7 +662,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
     // appStore.setSlidesLoading(false)
     appStore.setLastSynced(new Date().toISOString())
   } else {
-    throw new Error(error.value?.message)
+    console.warn("Unable to refresh schedule slides:", error.value)
   }
 }
 
@@ -724,7 +730,9 @@ watch(
         createSchedule(currentState.value.activeSchedule as Schedule)
       } else {
         // retrieve all slides online
-        retrieveSlidesOnline(currentState.value.activeSchedule?._id)
+        retrieveSlidesOnline(currentState.value.activeSchedule?._id).catch(
+          (error) => console.warn("Unable to refresh schedule slides:", error)
+        )
       }
     }
   },

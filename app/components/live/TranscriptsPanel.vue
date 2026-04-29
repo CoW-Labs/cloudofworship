@@ -373,7 +373,7 @@ const featureIntroModal = ref<{
 } | null>(null)
 onMounted(() => {
   featureIntroModal.value?.show()
-  usePosthogCapture('TRANSCRIPTION_PANEL_OPENED')
+  usePosthogCapture("TRANSCRIPTION_PANEL_OPENED")
 })
 
 // ── Transcription ──────────────────────────────────────────────────────────
@@ -415,7 +415,7 @@ const {
 
 const scriptureVisibleCount = ref(20)
 const visibleScriptureResults = computed(() =>
-  [...scriptureResults.value].reverse().slice(0, scriptureVisibleCount.value)
+  [...scriptureResults.value].slice(0, scriptureVisibleCount.value)
 )
 
 // Track which segment ids have already been parsed so we only process new ones
@@ -470,14 +470,14 @@ const handleClear = () => {
 }
 
 const handleReferenceClick = (reference: BibleReference) => {
-  usePosthogCapture('TRANSCRIPTION_BIBLE_REFERENCE_CLICKED', {
+  usePosthogCapture("TRANSCRIPTION_BIBLE_REFERENCE_CLICKED", {
     reference: reference.shortLabel,
   })
   useGlobalEmit(appWideActions.updateOrCreateBible, reference.shortLabel)
 }
 
 const handleScriptureClick = (result: ScriptureResult) => {
-  usePosthogCapture('TRANSCRIPTION_SCRIPTURE_SUGGESTION_CLICKED', {
+  usePosthogCapture("TRANSCRIPTION_SCRIPTURE_SUGGESTION_CLICKED", {
     reference: result.shortLabel,
     displayLabel: result.displayLabel,
   })
