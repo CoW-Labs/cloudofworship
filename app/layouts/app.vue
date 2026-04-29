@@ -948,7 +948,7 @@ async function openWindows() {
 }
 // WINDOW MANAGEMENT CODE ENDS HERE
 
-onMounted(() => {
+onMounted(async () => {
   downloadEssentialResources()
   fetchActiveAdvert()
   if (location.hostname !== "localhost") {
@@ -957,7 +957,30 @@ onMounted(() => {
 
   // Fetch user settings after essential resources are loaded
   if (isAppOnline.value && authStore.user?._id) {
-    fetchUserSettings()
+    const userSettings = await fetchUserSettings()
+
+    // If the user has a preferred Bible version that hasn't been downloaded
+    // locally yet, download it now while still on the loading screen.
+    const preferredVersion =
+      userSettings?.defaultBibleVersion ||
+      appStore.currentState.settings.defaultBibleVersion
+    if (preferredVersion && preferredVersion !== "KJV") {
+      const { isBibleVersionDownloaded, downloadBibleVersion } =
+        useBibleVersionManager()
+      const alreadyDownloaded = await isBibleVersionDownloaded(preferredVersion)
+      if (!alreadyDownloaded) {
+        loadingResources.value = true
+        downloadResource.value = `${preferredVersion} Bible`
+        downloadStep.value = 6
+        try {
+          await downloadBibleVersion(preferredVersion)
+        } catch (err) {
+          console.error(`Failed to auto-download ${preferredVersion}:`, err)
+        } finally {
+          loadingResources.value = false
+        }
+      }
+    }
   }
 })
 
