@@ -10,10 +10,10 @@
  * from the query or the verse content can break the page.
  */
 export const highlightText = (text: string, query: string): string => {
-  if (!query?.trim() || !text) return text
-
   const escapeHtml = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  if (!text) return text
+  if (!query?.trim()) return escapeHtml(text)
 
   const escapeRegex = (s: string) =>
     s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
