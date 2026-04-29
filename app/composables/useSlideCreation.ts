@@ -9,6 +9,7 @@ import type {
   ExtendedFileT,
   PresentationObject,
 } from "~/types"
+import { tabSessionId } from "./useRealtimeSlides"
 
 /**
  * Composable for creating different types of slides
@@ -334,8 +335,17 @@ export default function useSlideCreation() {
           }
 
           // 2c — POST all new slides to the backend with their final URLs
+          const sanitizedSlides = newSlides.map((slide) => {
+            const sanitizedSlide = { ...slide }
+            if (sanitizedSlide.data && typeof sanitizedSlide.data === "object") {
+              sanitizedSlide.data = { ...(sanitizedSlide.data as Record<string, unknown>) } as any
+              delete (sanitizedSlide.data as Record<string, unknown>).blob
+            }
+            return sanitizedSlide
+          })
+
           const { batchCreateSlides } = useSlides()
-          const { inserted } = await batchCreateSlides(newSlides)
+          const { inserted } = await batchCreateSlides(sanitizedSlides)
 
           // Backfill _id from the server response onto our local objects
           inserted.forEach((serverSlide) => {
@@ -349,6 +359,7 @@ export default function useSlideCreation() {
           if (socket?.connected && inserted.length > 0) {
             socket.emit("batch-create-slides", {
               slides: inserted.map((s) => ({ ...s })),
+              tabId: tabSessionId,
             })
           }
         } catch (err) {
@@ -380,8 +391,6 @@ export default function useSlideCreation() {
    * │                  c. POST the slide to the backend via   │
    * │                     createSlide.                        │
    * │                  d. Emit create-slide via WebSocket.    │
-   * │                  e. If any uploads happened, also emit  │
-   * │                     update-slide with the final URLs.   │
    * └─────────────────────────────────────────────────────────┘
    *
    * NOTE: The caller must NOT emit its own socket event.
@@ -405,11 +414,9 @@ export default function useSlideCreation() {
       ; (async () => {
         const db = useIndexedDB()
         const { isTeamsPlan } = useSubscription()
-        const { createSlide, updateSlide } = useSlides()
+        const { createSlide } = useSlides()
         const nuxtApp = useNuxtApp()
         const socket = nuxtApp.$socketio as any
-
-        let anyUpload = false
 
         for (const obj of presentationObjects) {
           try {
@@ -435,7 +442,6 @@ export default function useSlideCreation() {
               try {
                 const uploaded = await useUploadImage(blob)
                 obj.imageUrl = uploaded.file.url
-                anyUpload = true
                 if (obj.page === 1) tempSlide.background = uploaded.file.url
               } catch (uploadErr) {
                 console.error(`Cloud upload failed for page ${obj.page}:`, uploadErr)
@@ -461,19 +467,7 @@ export default function useSlideCreation() {
 
         // 2d — Notify other clients that this slide now exists
         if (socket?.connected) {
-          socket.emit("create-slide", { ...createdSlide })
-        }
-
-        // 2e — If uploads happened, push the updated URLs to the server too
-        if (anyUpload) {
-          try {
-            await updateSlide(createdSlide)
-          } catch (err) {
-            console.error("Failed to update presentation slide after upload:", err)
-          }
-          if (socket?.connected) {
-            socket.emit("update-slide", { ...createdSlide, slideId: createdSlide.id })
-          }
+          socket.emit("create-slide", { ...createdSlide, tabId: tabSessionId })
         }
       })()
 

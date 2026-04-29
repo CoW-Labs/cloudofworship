@@ -9,7 +9,7 @@ export default function useLibrary() {
   const authStore = useAuthStore()
   const appStore = useAppStore()
   const toast = useToast()
-  const churchId = authStore.church?._id
+  const getChurchId = () => authStore.church?._id || authStore.user?.churchId
 
   // Reactive loading state
   const loading = ref<boolean>(true)
@@ -56,6 +56,11 @@ export default function useLibrary() {
         console.warn('No schedule available to fetch saved slides')
         return []
       }
+      const churchId = getChurchId()
+      if (!churchId) {
+        console.warn('No church available to fetch saved slides')
+        return []
+      }
 
       loading.value = true
       const { data, error } = await useAPIFetch(
@@ -90,16 +95,37 @@ export default function useLibrary() {
           return id && !remoteIds.has(id)
         })
 
+      const uploadedLocalSlides: Slide[] = []
       if (localOnlySlides.length > 0) {
-        const { saveSlideOnline } = useSlides()
-        await Promise.allSettled(localOnlySlides.map((s) => saveSlideOnline(s)))
+        const { createSlide, saveSlideOnline } = useSlides()
+        const uploadResults = await Promise.allSettled(
+          localOnlySlides.map(async (slide) => {
+            const serverSlide = slide._id ? slide : await createSlide(slide)
+            if (!serverSlide?._id) return null
+            const wasSaved = await saveSlideOnline(serverSlide)
+            return wasSaved ? serverSlide : null
+          })
+        )
+        uploadedLocalSlides.push(
+          ...uploadResults
+            .filter(
+              (result): result is PromiseFulfilledResult<Slide | null> =>
+                result.status === 'fulfilled'
+            )
+            .map((result) => result.value)
+            .filter((slide): slide is Slide => Boolean(slide))
+        )
       }
 
-      // Merge: remote is source of truth for saved status, but include any
-      // local-only slides that were just uploaded
+      // Merge: remote is source of truth for saved status, but include only
+      // local-only slides that were successfully uploaded/saved.
+      const mergedIds = new Set((remoteSlides || []).map((s) => s._id || s.id))
       const mergedSlides = [
         ...(remoteSlides || []),
-        ...localOnlySlides,
+        ...uploadedLocalSlides.filter((slide) => {
+          const id = slide._id || slide.id
+          return Boolean(id) && !mergedIds.has(id)
+        }),
       ]
 
       await cacheSlidesInLibrary(mergedSlides)

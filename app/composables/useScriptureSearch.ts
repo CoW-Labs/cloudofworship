@@ -47,10 +47,16 @@ export default function useScriptureSearch() {
    */
   const search = async (query: string, version = 'nkjv') => {
     const trimmed = query.trim()
-    if (!trimmed || trimmed.length < 10) return // skip very short strings
+    if (!trimmed || trimmed.length < 10) {
+      isSearching.value = false
+      return
+    }
 
     // Avoid re-fetching the exact same query (version-agnostic, cross-translation search)
-    if (trimmed === lastQuery.value) return
+    if (trimmed === lastQuery.value) {
+      isSearching.value = false
+      return
+    }
     lastQuery.value = trimmed
 
     isSearching.value = true

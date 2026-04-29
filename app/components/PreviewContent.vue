@@ -102,19 +102,28 @@ import { useRealtimeSlides } from "~/composables/useRealtimeSlides"
 // Setup real-time slide sync
 const { handleWebSocketMessage } = useRealtimeSlides()
 
+let previewSocket: any = null
+const previewSocketAnyHandler = (event: string, data: any) => {
+  // Normalize for both Socket.IO and WebSocket style
+  if (data && typeof data === "object" && data.action && data.data) {
+    handleWebSocketMessage(data)
+  } else if (event && data) {
+    handleWebSocketMessage({ action: event, data })
+  }
+}
+
 onMounted(() => {
   // Listen for all incoming socket messages and sync slides
   const nuxtApp = useNuxtApp()
-  const socket = nuxtApp.$socketio as any
-  if (socket) {
-    socket.onAny((event: string, data: any) => {
-      // Normalize for both Socket.IO and WebSocket style
-      if (data && typeof data === "object" && data.action && data.data) {
-        handleWebSocketMessage(data)
-      } else if (event && data) {
-        handleWebSocketMessage({ action: event, data })
-      }
-    })
+  previewSocket = nuxtApp.$socketio as any
+  if (previewSocket) {
+    previewSocket.onAny(previewSocketAnyHandler)
+  }
+})
+
+onUnmounted(() => {
+  if (previewSocket) {
+    previewSocket.offAny(previewSocketAnyHandler)
   }
 })
 import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
