@@ -1,147 +1,185 @@
 name: Release Pipeline
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-  workflow_dispatch:
-
-concurrency:
-  group: release-pipeline
-  cancel-in-progress: false
 
 jobs:
   release:
-    runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      next_version: ${{ steps.versioning.outputs.next_version }}
+      skip_release: ${{ steps.versioning.outputs.skip_release }}
+
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Configure git
+      - name: Get Last Tag
+        id: last_tag
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
+          latest=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
+          echo "last_tag=$latest" >> $GITHUB_ENV
 
-      - name: Create releases for unreleased main commits
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get Release Notes
+        id: release_notes
         run: |
-          set -euo pipefail
+          last_tag=${{ env.last_tag }}
 
-          git fetch --tags --force
-
-          last_tag=$(git tag --merged HEAD --list 'v*' --sort=-version:refname | head -n 1 || true)
-          if [[ -n "${last_tag}" ]]; then
-            echo "Latest merged release tag: ${last_tag}"
+          if [[ "$last_tag" == "v0.0.0" ]]; then
+            commits=$(git log --no-merges --pretty=format:"- %s")
           else
-            echo "No previous merged release tag found; backfilling from repository root."
+            commits=$(git log "$last_tag"..HEAD --no-merges --pretty=format:"- %s")
           fi
 
-          if [[ -n "${last_tag}" ]]; then
-            mapfile -t commits < <(git rev-list --reverse "${last_tag}..HEAD")
-          else
-            mapfile -t commits < <(git rev-list --reverse HEAD)
-          fi
+          filtered_commits=""
+          while IFS= read -r line; do
+            if [[ "$line" == *"Update appVersion to"* ]]; then
+              break
+            fi
+            filtered_commits+="$line"$'\n'
+          done <<< "$commits"
 
-          if [[ ${#commits[@]} -eq 0 ]]; then
-            echo "No unreleased commits found on main."
+          printf "%s" "$filtered_commits" > release_notes.txt
+
+      - name: Generate Next Version Tag
+        id: versioning
+        run: |
+          hasMajor=0
+          hasMinor=0
+          hasPatch=0
+
+          while IFS= read -r line; do
+            echo "Processing line: $line"
+
+            # Skip merge commits
+            if [[ $line == "- Merge branch"* ]]; then
+              continue
+            fi
+
+            # Skip version bump commits
+            if [[ $line == "- Update appVersion"* ]]; then
+              continue
+            fi
+
+            # Check for major, minor, and patch updates
+            if [[ $line == "- BREAKING"* ]]; then
+              hasMajor=1
+            elif [[ $line == "- feat:"* ]]; then
+              hasMinor=1
+            elif [[ $line == "- fix:"* ]]; then
+              hasPatch=1
+            fi
+          done < release_notes.txt
+
+          last_tag=${{ env.last_tag }}
+
+          base_tag=$(echo "$last_tag" | sed 's/-beta//')
+
+          major=$(echo $base_tag | awk -F. '{print $1}' | tr -d 'v')
+          minor=$(echo $base_tag | awk -F. '{print $2}')
+          patch=$(echo $base_tag | awk -F. '{print $3}')
+
+          if [[ $hasMajor -eq 1 ]]; then
+            next_major=$((major + 1))
+            next_version="v${next_major}.0.0-beta"
+          elif [[ $hasMinor -eq 1 ]]; then
+            next_minor=$((minor + 1))
+            next_version="v${major}.${next_minor}.0-beta"
+          elif [[ $hasPatch -eq 1 ]]; then
+            next_patch=$((patch + 1))
+            next_version="v${major}.${minor}.${next_patch}-beta"
+          else
+            # No semver-affecting commits detected -> skip release steps
+            echo "No semver changes detected; skipping release steps"
+            echo "SKIP_RELEASE=1" >> $GITHUB_ENV
+            echo "skip_release=1" >> $GITHUB_OUTPUT
+            echo "next_version=$last_tag" >> $GITHUB_ENV
+            echo "next_version=$last_tag" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          parse_version() {
-            local tag="$1"
-            if [[ ! "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-beta)?$ ]]; then
-              echo "Invalid release tag format: ${tag}" >&2
-              exit 1
-            fi
-            echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]}"
-          }
+          echo "Initial next_version: $next_version"
 
-          bump_version() {
-            local major="$1"
-            local minor="$2"
-            local patch="$3"
-            local subject="$4"
-            local body="$5"
-            local combined_message="${subject}"$'\n'"${body}"
-
-            if [[ "$subject" =~ ^[a-zA-Z]+(\(.+\))?!: ]] || \
-               [[ "$subject" == BREAKING* ]] || \
-               [[ "$combined_message" == *"BREAKING CHANGE"* ]]; then
-              major=$((major + 1))
-              minor=0
-              patch=0
-            elif [[ "$subject" =~ ^feat(\(.+\))?: ]]; then
-              minor=$((minor + 1))
-              patch=0
-            else
-              patch=$((patch + 1))
-            fi
-
-            echo "v${major}.${minor}.${patch}-beta"
-          }
-
-          read -r current_major current_minor current_patch <<< \
-            "$(parse_version "${last_tag:-v0.0.0-beta}")"
-
-          for commit_sha in "${commits[@]}"; do
-            commit_subject=$(git log -1 --pretty=%s "$commit_sha")
-            commit_body=$(git log -1 --pretty=%b "$commit_sha")
-
-            next_tag=$(bump_version \
-              "$current_major" "$current_minor" "$current_patch" \
-              "$commit_subject" "$commit_body")
-
-            while git rev-parse --verify --quiet "refs/tags/${next_tag}" 2>/dev/null; do
-              echo "Tag ${next_tag} already exists, incrementing patch to avoid collision..."
-              read -r col_major col_minor col_patch <<< "$(parse_version "$next_tag")"
-              col_patch=$((col_patch + 1))
-              next_tag="v${col_major}.${col_minor}.${col_patch}-beta"
+          # Check if the proposed version already exists as a tag
+          if git tag -l | grep -q "^${next_version}$"; then
+            echo "Tag $next_version already exists, bumping to next patch version"
+            
+            # Extract version components from the proposed version
+            base_next=$(echo "$next_version" | sed 's/-beta//')
+            next_major=$(echo $base_next | awk -F. '{print $1}' | tr -d 'v')
+            next_minor=$(echo $base_next | awk -F. '{print $2}')
+            next_patch=$(echo $base_next | awk -F. '{print $3}')
+            
+            # Keep bumping patch version until we find an unused tag
+            while git tag -l | grep -q "^v${next_major}.${next_minor}.${next_patch}-beta$"; do
+              next_patch=$((next_patch + 1))
+              echo "Checking v${next_major}.${next_minor}.${next_patch}-beta"
             done
+            
+            next_version="v${next_major}.${next_minor}.${next_patch}-beta"
+            echo "Bumped to available version: $next_version"
+          fi
 
-            echo "Creating ${next_tag} for ${commit_sha} (${commit_subject})"
+          # Double-check that our final version doesn't exist
+          if git tag -l | grep -q "^${next_version}$"; then
+            echo "ERROR: Final version $next_version still conflicts with existing tag"
+            exit 1
+          fi
 
-            if ! git rev-parse --verify --quiet "refs/tags/${next_tag}" 2>/dev/null; then
-              git tag -a "$next_tag" "$commit_sha" -m "Release ${next_tag}"
-              git push origin "$next_tag"
-            else
-              echo "Tag ${next_tag} already pushed, skipping tag creation."
-            fi
+          echo "Final next_version: $next_version"
+          echo "next_version=$next_version" >> $GITHUB_ENV
+          echo "next_version=$next_version" >> $GITHUB_OUTPUT
+          echo "skip_release=0" >> $GITHUB_OUTPUT
 
-            release_notes="- ${commit_subject}"$'\n\n'"Commit: ${commit_sha}"
-            if [[ -n "${commit_body}" ]]; then
-              release_notes="${release_notes}"$'\n\n'"${commit_body}"
-            fi
+      - name: Update appVersion in app/app.vue and tauri.conf.json
+        if: env.SKIP_RELEASE != '1'
+        run: |
+          # Remove 'v' prefix and '-beta' suffix for tauri.conf.json
+          tauri_version=$(echo "${{ env.next_version }}" | sed 's/^v//' | sed 's/-beta//')
 
-            payload=$(jq -n \
-              --arg tag "$next_tag" \
-              --arg target "$commit_sha" \
-              --arg name "Release $next_tag" \
-              --arg body "$release_notes" \
-              '{tag_name: $tag, target_commitish: $target, name: $name, body: $body, draft: false, prerelease: false}')
+          # Replace the version string in app/app.vue
+          sed -i 's/const appVersion = ref<string>("[^"]*")/const appVersion = ref<string>("${{ env.next_version }}")/' app/app.vue
 
-            status_code=$(curl -sS -o /tmp/release-response.json -w "%{http_code}" \
-              -X POST \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" \
-              -d "$payload")
+          # Replace the version in tauri.conf.json
+          sed -i 's/"version": "[^"]*"/"version": "'"$tauri_version"'"/' src-tauri/tauri.conf.json
 
-            if [[ "$status_code" != "201" && "$status_code" != "422" ]]; then
-              echo "Release API response:"
-              cat /tmp/release-response.json
-              echo "Failed to create release for ${next_tag} (HTTP ${status_code})"
-              exit 1
-            fi
-            if [[ "$status_code" == "422" ]]; then
-              echo "Release already exists for ${next_tag}, skipping."
-            fi
+          # Check if there are actually changes to commit
+          if git diff --quiet app/app.vue src-tauri/tauri.conf.json; then
+            echo "No changes detected - versions might already be ${{ env.next_version }}"
+            echo "Skipping commit step"
+          else
+            echo "Changes detected, committing..."
+            
+            # Configure Git to commit the changes
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
 
-            read -r current_major current_minor current_patch <<< \
-              "$(parse_version "$next_tag")"
-          done
+            # Commit and push the updated files
+            git add app/app.vue src-tauri/tauri.conf.json
+            git commit -m "Update appVersion to ${{ env.next_version }}"
+            git push
+          fi
+
+      - name: Create Tag
+        if: env.SKIP_RELEASE != '1'
+        run: |
+          git tag -a ${{ env.next_version }} -m "Release version ${{ env.next_version }}"
+          git push origin ${{ env.next_version }}
+
+      - name: Create Release
+        if: env.SKIP_RELEASE != '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ env.next_version }} \
+            --title "Release ${{ env.next_version }}" \
+            --notes-file release_notes.txt \
+            --target ${{ github.event.pull_request.head.ref }}
