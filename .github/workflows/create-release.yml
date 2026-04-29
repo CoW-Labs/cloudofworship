@@ -51,10 +51,11 @@ jobs:
 
           parse_version() {
             local tag="$1"
-            local clean
-            clean=$(echo "$tag" | sed 's/^v//' | sed 's/-beta$//')
-            IFS='.' read -r major minor patch <<< "$clean"
-            echo "${major:-0} ${minor:-0} ${patch:-0}"
+            if [[ ! "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-beta)?$ ]]; then
+              echo "Invalid release tag format: ${tag}" >&2
+              exit 1
+            fi
+            echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]}"
           }
 
           bump_version() {
@@ -66,7 +67,7 @@ jobs:
             local combined_message
             combined_message="${subject}"$'\n'"${body}"
 
-            if [[ "$subject" == BREAKING* ]] || [[ "$combined_message" == *"BREAKING CHANGE"* ]]; then
+            if [[ "$subject" =~ ^[a-zA-Z]+(\(.+\))?!: ]] || [[ "$subject" == BREAKING* ]] || [[ "$combined_message" == *"BREAKING CHANGE"* ]]; then
               major=$((major + 1))
               minor=0
               patch=0
