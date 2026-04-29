@@ -1,7 +1,7 @@
 import { PostHog } from "posthog-js"
 import { ref, onMounted } from "vue"
 
-export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "ppt-conversion" | "bg_videos_cache_key" | "allow-online-scripture-search-for-only-teams"
+export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "ppt-conversion" | "allow-online-scripture-search-for-only-teams" | "force-sw-unregister"
 
 /**
  * Composable for managing PostHog feature flags

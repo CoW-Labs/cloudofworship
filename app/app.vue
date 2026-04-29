@@ -48,15 +48,15 @@ const appVersion = ref<string>("v0.46.2-beta")
 onMounted(() => {
   initializeTauri()
 
-  // TODO: Delete this code block on 1st of June, 2026
-  // Unregister stale service workers (old builds with deleted/renamed assets)
-  // but keep the current PWA service worker (/sw.js) intact.
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      for (const registration of registrations) {
-        registration.unregister()
-      }
-    })
+    const { checkFlag } = useFeatureFlags()
+    if (checkFlag("force-sw-unregister")) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister()
+        }
+      })
+    }
   }
 })
 </script>
