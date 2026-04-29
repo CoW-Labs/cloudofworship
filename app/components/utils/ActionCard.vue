@@ -79,7 +79,7 @@ const emitParameter = computed(() => {
     case slideTypes.hymn:
       return `${props.action?.hymnIndex}`
     default:
-      return ""
+      return props.action?.actionArg || ""
   }
 })
 

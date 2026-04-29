@@ -309,6 +309,14 @@ emitter?.on("toggle-dark-mode", () => {
     mode: isDark.value ? "dark" : "light",
   })
 })
+
+emitter?.on("join-community", () => {
+  window.open("https://chat.whatsapp.com/DeQX11igCSU6YaOoTqY7GY", "_blank")
+})
+
+emitter?.on("sign-out", () => {
+  authStore.signOut()
+})
 </script>
 
 <style scoped>
