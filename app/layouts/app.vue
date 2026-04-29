@@ -236,6 +236,8 @@ const fetchAppInfo = async () => {
 }
 
 const fetchHymns = async () => {
+  if (!online.value) return
+
   let hymnCount: any
   const hymns = await db.bibleAndHymns.get("hymns")
   const tokenValue = getToken()
@@ -340,12 +342,16 @@ const saveAllBackgroundVideos = async () => {
   const videoDownloadPromises = videoIds
     .filter((id) => !savedBgVideoMap.get(id))
     .map(async (id) => {
-      const bgVideoPromise = await useDetailedFetch(
-        `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`,
-        downloadProgress
-      )
-      const bgVideoBlob = await bgVideoPromise.blob()
-      saveBackground(bgVideoBlob, id)
+      try {
+        const bgVideoPromise = await useDetailedFetch(
+          `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`,
+          downloadProgress
+        )
+        const bgVideoBlob = await bgVideoPromise.blob()
+        saveBackground(bgVideoBlob, id)
+      } catch (err) {
+        console.warn(`Failed to download video-bg-${id} (offline?):`, err)
+      }
     })
 
   // Process in batches to avoid blocking
@@ -376,7 +382,9 @@ const downloadEssentialResources = async () => {
 
   // Download background videos
   downloadStep.value = 1
-  await saveAllBackgroundVideos()
+  if (online.value) {
+    await saveAllBackgroundVideos()
+  }
 
   // Download background videos
   downloadStep.value = 2
@@ -384,16 +392,20 @@ const downloadEssentialResources = async () => {
 
   // Download KJV Bible
   let tempBible = await db.bibleAndHymns.get("KJV")
-  if (!tempBible) {
+  if (!tempBible && online.value) {
     downloadResource.value = "KJV Bible"
     downloadStep.value = 3
 
-    let kjvBible = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/kjv.json`,
-      downloadProgress
-    )
-    kjvBible = await kjvBible.json()
-    await db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
+    try {
+      let kjvBible = await useDetailedFetch(
+        `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/kjv.json`,
+        downloadProgress
+      )
+      kjvBible = await kjvBible.json()
+      await db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
+    } catch (err) {
+      console.warn("Failed to download KJV Bible (offline?):", err)
+    }
   }
 
   const isBibleVersionDownloaded = async (bibleVersion: string) => {
