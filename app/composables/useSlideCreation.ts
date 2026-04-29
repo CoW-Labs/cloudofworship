@@ -9,6 +9,7 @@ import type {
   ExtendedFileT,
   PresentationObject,
 } from "~/types"
+import { tabSessionId } from "./useRealtimeSlides"
 
 /**
  * Composable for creating different types of slides
@@ -21,8 +22,12 @@ export default function useSlideCreation() {
   const { saveSlideOnline } = useSlides()
   const { saveSong, saveSlide: saveSlideToLibrary, getLibraryItem } = useLibrary()
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
   /**
-   * Pre-populate slide with default settings
+   * Pre-populate a slide with default settings from the store.
    */
   const preSlideCreation = (): Slide => {
     const tempSlide: Slide = {
@@ -36,19 +41,16 @@ export default function useSlideCreation() {
       churchId: authStore?.user?.churchId as string,
       ...(appStore.currentState.settings.defaultBackground?.default && {
         backgroundType:
-          appStore.currentState.settings.defaultBackground.default
-            ?.backgroundType,
+          appStore.currentState.settings.defaultBackground.default?.backgroundType,
         background:
           appStore.currentState.settings.defaultBackground.default?.background,
         backgroundVideoKey:
-          appStore.currentState.settings.defaultBackground.default
-            ?.backgroundVideoKey,
+          appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey,
       }),
       scheduleId: appStore.currentState.activeSchedule?._id as string,
       slideStyle: {
         alignment: appStore.currentState.settings.slideStyles.alignment,
-        fontSizePercent:
-          appStore.currentState.settings.slideStyles.fontSizePercent,
+        fontSizePercent: appStore.currentState.settings.slideStyles.fontSizePercent,
         font: appStore.currentState.settings.defaultFont,
         isMediaMuted: true,
         isMediaPlaying: false,
@@ -56,48 +58,39 @@ export default function useSlideCreation() {
         lineSpacing: appStore.currentState.settings.slideStyles.lineSpacing,
         textOutlined: appStore.currentState.settings.slideStyles.textOutlined,
         textBold: appStore.currentState.settings.slideStyles.textBold,
-        backgroundFillType: appStore.currentState.settings.slideStyles.backgroundFillType
+        backgroundFillType: appStore.currentState.settings.slideStyles.backgroundFillType,
       },
     }
     return tempSlide
   }
 
-  /**
-   * Create a new text slide
-   */
-  const createTextSlide = (): Slide => {
-    let tempSlide = { ...preSlideCreation() }
+  // ─────────────────────────────────────────────────────────────────────────
+  // Slide creators
+  // ─────────────────────────────────────────────────────────────────────────
 
+  const createTextSlide = (): Slide => {
+    const tempSlide = { ...preSlideCreation() }
     tempSlide.slideStyle = { ...tempSlide.slideStyle, alignment: "left" }
     tempSlide.background =
       appStore.currentState.settings.defaultBackground.default?.background ||
       appStore.currentState.settings.defaultBackground.text?.background
     tempSlide.backgroundType =
-      appStore.currentState.settings.defaultBackground.default
-        ?.backgroundType ||
+      appStore.currentState.settings.defaultBackground.default?.backgroundType ||
       appStore.currentState.settings.defaultBackground.text?.backgroundType
-
     tempSlide.id = useObjectID()
     usePosthogCapture("NEW_TEXT_SLIDE_CREATED")
-
     return tempSlide
   }
 
   const duplicateSlide = (slideToDuplicate?: Slide): Slide | null => {
-    if (!slideToDuplicate) return null;
-
+    if (!slideToDuplicate) return null
     const tempSlide = { ...slideToDuplicate }
     delete tempSlide._id
     tempSlide.id = useObjectID()
-
     usePosthogCapture("SLIDE_DUPLICATED")
-
     return tempSlide
   }
 
-  /**
-   * Create a new Bible slide from scripture
-   */
   const createBibleSlide = (
     scripture: Scripture,
     options?: { fromWholeBibleSearch: boolean }
@@ -109,33 +102,24 @@ export default function useSlideCreation() {
       appStore.currentState.settings.defaultBackground.default?.background ||
       appStore.currentState.settings.defaultBackground.bible?.background
     tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.default
-        ?.backgroundVideoKey ||
+      appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey ||
       appStore.currentState.settings.defaultBackground.bible?.backgroundVideoKey
     tempSlide.backgroundType =
       appStore.currentState.settings.defaultBackground.default?.backgroundType ||
       appStore.currentState.settings.defaultBackground.bible?.backgroundType
     tempSlide.title = scripture?.label
     tempSlide.name = useSlideName(tempSlide)
-
-    // Calculate font-size of scripture content
-    let fontSize = useScreenFontSize(scripture?.content as string)
+    const fontSize = useScreenFontSize(scripture?.content as string)
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
       fontSize: Number(fontSize),
       font: appStore.currentState.settings.defaultFont,
     }
     tempSlide.contents = useSlideContent(tempSlide, scripture)
-
-    // toast.add({ title: "Bible slide created", icon: "i-bx-bible" })
     usePosthogCapture("NEW_BIBLE_SLIDE_CREATED")
-
     return tempSlide
   }
 
-  /**
-   * Create a new Hymn slide
-   */
   const createHymnSlide = (hymn: Hymn): Slide => {
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.bible
@@ -144,8 +128,7 @@ export default function useSlideCreation() {
       appStore.currentState.settings.defaultBackground.default?.background ||
       appStore.currentState.settings.defaultBackground.hymn?.background
     tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.default
-        ?.backgroundVideoKey ||
+      appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey ||
       appStore.currentState.settings.defaultBackground.hymn?.backgroundVideoKey
     tempSlide.backgroundType =
       appStore.currentState.settings.defaultBackground.default?.backgroundType ||
@@ -155,11 +138,8 @@ export default function useSlideCreation() {
     tempSlide.title = "Verse 1"
     tempSlide.hymnVerseIndex = 0
     tempSlide.name = useSlideName(tempSlide)
-
-    const currentHymnVerse = hymn.verses?.[0].trim()
-
-    // Calculate font-size of scripture content
-    let fontSize = useScreenFontSize(currentHymnVerse)
+    const currentHymnVerse = hymn.verses?.[0]?.trim() ?? ""
+    const fontSize = useScreenFontSize(currentHymnVerse)
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
       fontSize: Number(fontSize),
@@ -167,16 +147,10 @@ export default function useSlideCreation() {
     }
     tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
     tempSlide.name = useSlideName(tempSlide)
-
-    // toast.add({ title: "Hymn slide created", icon: "i-bx-church" })
     usePosthogCapture("NEW_HYMN_SLIDE_CREATED")
-
     return tempSlide
   }
 
-  /**
-   * Create a new Song slide
-   */
   const createSongSlide = (song: Song): Slide => {
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.bible
@@ -185,19 +159,15 @@ export default function useSlideCreation() {
       appStore.currentState.settings.defaultBackground.default?.background ||
       appStore.currentState.settings.defaultBackground.hymn?.background
     tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.default
-        ?.backgroundVideoKey ||
+      appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey ||
       appStore.currentState.settings.defaultBackground.hymn?.backgroundVideoKey
     tempSlide.backgroundType =
       appStore.currentState.settings.defaultBackground.default?.backgroundType ||
       appStore.currentState.settings.defaultBackground.hymn?.backgroundType
     tempSlide.songId = song._id || song.id
     tempSlide.title = "Verse 1"
-
-    const currentSongVerse = song.verses?.[0].trim()
-
-    // Calculate font-size of scripture content
-    let fontSize = useScreenFontSize(currentSongVerse as string)
+    const currentSongVerse = song.verses?.[0]?.trim() ?? ""
+    const fontSize = useScreenFontSize(currentSongVerse as string)
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
       fontSize: Number(fontSize),
@@ -206,15 +176,15 @@ export default function useSlideCreation() {
     tempSlide.data = song
     tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
     tempSlide.name = useSlideName(tempSlide)
-
-    // toast.add({ title: "Song slide created", icon: "i-bx-music" })
     usePosthogCapture("NEW_SONG_SLIDE_CREATED")
-
     return tempSlide
   }
 
   /**
-   * Create a new Media slide (Image/Video/Audio)
+   * Build a single media slide object from a file.
+   * Returns immediately with a local Blob URL — no uploads happen here.
+   * Side-effect: saves the raw Blob as an ArrayBuffer in IndexedDB so the
+   * slide can be rendered after a page reload (blob: URLs are session-scoped).
    */
   const createMediaSlide = (
     file: ExtendedFileT & { isExternal?: boolean },
@@ -222,28 +192,25 @@ export default function useSlideCreation() {
   ): Slide => {
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.empty
-    let data = null
-    const blob = { ...file.blob }
+    tempSlide.type = slideTypes.media
 
     const randomImage =
       "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740"
-    tempSlide.type = slideTypes.media
 
-    // Handle external videos (YouTube/Vimeo)
     if (file.isExternal) {
+      // ── External video (YouTube / Vimeo) ──────────────────────────────────
       const externalVideo: any = {
         url: file.url,
-        type: file.type, // 'youtube' or 'vimeo'
-        thumbnail: file.thumbnail,
+        type: file.type,
+        thumbnail: (file as any).thumbnail,
         name: file.name,
       }
       tempSlide.backgroundType = "video"
-      tempSlide.background = randomImage // Placeholder image
+      tempSlide.background = randomImage
       tempSlide.backgroundVideoKey = null
       tempSlide.data = externalVideo
       tempSlide.name = file.name || `${file.type} Video`
 
-      // Store external video data in IndexedDB — fire-and-forget, don't block slide creation
       useIndexedDB()
         .media.add({
           id: tempSlide.id,
@@ -254,154 +221,203 @@ export default function useSlideCreation() {
         })
         .catch((err) => console.error("Failed to add external video slide:", err))
     } else {
-      // Handle regular files
+      // ── Regular file (image / video / audio) ─────────────────────────────
       tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
       tempSlide.background = file.type === "audio" ? randomImage : file.url
       tempSlide.backgroundVideoKey = file.type?.includes("video")
-        ? appStore.currentState.settings.defaultBackground.default
-          ?.backgroundVideoKey
+        ? appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey
         : null
       tempSlide.data = file
       tempSlide.name = useSlideName(tempSlide)
 
-      // Read Blob as array buffer
-      const fileReader = new FileReader()
+      // Persist Blob → ArrayBuffer in IndexedDB for post-reload rendering
       if (file.blob) {
+        const fileReader = new FileReader()
         fileReader.readAsArrayBuffer(file.blob)
-        fileReader.addEventListener("loadend", async (event) => {
-          data = fileReader.result
-          // Store Blob in DB for easy retrieval on reload
+        fileReader.addEventListener("loadend", async () => {
+          const arrayBuffer = fileReader.result as ArrayBuffer
           await useIndexedDB()
             .media.add({
               id: tempSlide.id,
-              content: { size: file?.blob?.size, type: file?.blob?.type },
-              data: data as ArrayBuffer,
+              content: { size: file.blob?.size, type: file.blob?.type },
+              data: arrayBuffer,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             })
-            .catch((err) => console.error("Failed to add media slide:", err))
+            .catch((err) => console.error("Failed to persist media blob:", err))
+          // Remove blob from the in-memory file object after it is stored
           delete file.blob
         })
       }
     }
 
-    if (!options?.oneOfManySlides) {
-      // toast.add({ title: "Media slide created", icon: "i-bx-image" })
-    }
-
     usePosthogCapture("NEW_MEDIA_SLIDE_CREATED", {
-      file_type: tempSlide?.data?.type || file.type,
+      file_type: (tempSlide.data as any)?.type ?? file.type,
     })
 
-    return { ...tempSlide, blob } as Slide
+    return tempSlide
   }
 
   /**
-   * Create multiple media slides from files array
+   * Create multiple media slides from a files array.
+   *
+   * ┌─────────────────────────────────────────────────────────┐
+   * │  Step 1 (sync)   Build slide objects with local Blob    │
+   * │                  URLs → returned immediately so the     │
+   * │                  current user sees them right away.     │
+   * ├─────────────────────────────────────────────────────────┤
+   * │  Step 2 (async,  a. Upload image blobs to the cloud     │
+   * │  background)        (Teams plan only).                  │
+   * │                  b. Patch slides with hosted URLs.      │
+   * │                  c. POST all slides to the backend      │
+   * │                     via batchCreateSlides.              │
+   * │                  d. Emit batch-create-slides via        │
+   * │                     WebSocket so other clients sync.    │
+   * └─────────────────────────────────────────────────────────┘
+   *
+   * NOTE: The caller (PreviewContent.vue) must NOT emit its own
+   * socket event for these slides — the background step handles it.
    */
   const createMultipleMediaSlides = (files: ExtendedFileT[]): Slide[] => {
     useGlobalEmit(appWideActions.appLoading, true)
 
-    const newSlides: Slide[] = files?.map((file) =>
+    // ── Step 1 — build local slide objects synchronously ──────────────────
+    // Capture blob references NOW before createMediaSlide's async FileReader
+    // can delete them (it calls `delete file.blob` after persisting to IndexedDB).
+    const capturedBlobs: Array<Blob | null> = files.map((file) =>
+      file.blob instanceof Blob ? file.blob : null
+    )
+
+    const newSlides: Slide[] = files.map((file) =>
       createMediaSlide(file, { oneOfManySlides: true })
     )
 
     useGlobalEmit(appWideActions.appLoading, false)
 
-    if (files.some((file) => !file?.blob?.type?.includes("image"))) {
-      return newSlides
-    }
-
-    // For images: teams plan should upload to cloud, but do it in background
-    const { isTeamsPlan } = useSubscription()
-
-    if (!isTeamsPlan.value) {
-      return newSlides
-    }
-
-    // Upload only image files as backgrounds
-    try {
-      const uploadPromises = files.map(async (file: ExtendedFileT, index: number) => {
-        if (!file?.blob?.type?.includes("image")) return null
+      // ── Step 2 — background: upload → server create → socket broadcast ────
+      ; (async () => {
         try {
-          const uploaded = await useUploadImage(file.blob)
-          return { uploaded, index }
-        } catch (err) {
-          console.error('Background image upload failed', err)
-          return null
-        }
-      })
+          const { isTeamsPlan } = useSubscription()
 
-      // Wait for all uploads to finish but do it asynchronously (fire-and-forget)
-      Promise.all(uploadPromises).then((results) => {
-        // Update slides with hosted URLs when uploads succeed
-        results.forEach((res) => {
-          if (res && res.uploaded) {
-            const slide = newSlides[res.index]
-            if (!slide) return
-            if (slide.backgroundType === 'image') {
+          // 2a — Upload image blobs to the cloud (Teams plan, images only).
+          // capturedBlobs holds references taken before createMediaSlide's async
+          // FileReader could delete file.blob — so they are always available here.
+          // Promise.all ensures batchCreateSlides never fires until every image
+          // upload has finished.
+          if (isTeamsPlan.value) {
+            const uploadPromises = files.map(async (file: ExtendedFileT, index: number) => {
+              const blob = capturedBlobs[index]
+              // Only upload image files; skip videos, audio, and external files
+              if (!blob?.type?.includes("image")) return null
+              try {
+                const uploaded = await useUploadImage(blob)
+                return { uploaded, index }
+              } catch (err) {
+                console.error("Image upload failed for", file.name, err)
+                return null
+              }
+            })
+
+            // Wait for ALL uploads to complete before proceeding to the batch call
+            const results = await Promise.all(uploadPromises)
+
+            // 2b — Patch local slide objects with hosted URLs
+            results.forEach((res) => {
+              if (!res?.uploaded) return
+              const slide = newSlides[res.index]
+              if (!slide) return
               slide.background = res.uploaded.file.url
-
-                // Persist update to server if schedule/slide already has an _id
-                ; (async () => {
-                  try {
-                    // Only attempt network call if online
-                    if (!navigator.onLine) return
-                    const { saveSlideOnline } = useSlides()
-                    // If the slide has been created in DB, save update
-                    if (slide._id) {
-                      await saveSlideOnline(slide)
-                      // Broadcast update via sockets for real-time sync
-                      const nuxtApp = useNuxtApp()
-                      const socket = nuxtApp.$socketio as any
-                      if (socket?.connected) {
-                        socket.emit('update-slide', { ...slide, slideId: slide.id })
-                      }
-                    }
-                  } catch (e) {
-                    console.error('Failed to persist uploaded image URL', e)
-                  }
-                })()
-            }
+              // Keep data.url in sync so LiveContent renders the hosted URL
+              if (slide.data && (slide.data as any).url) {
+                ; (slide.data as any).url = res.uploaded.file.url
+              }
+            })
           }
-        })
-      })
-    } catch (err) {
-      console.log(err)
-      toast.add({ title: 'Error uploading images in background', icon: 'i-bx-error', color: 'red' })
-    }
 
-    // Return slides immediately; uploads will replace blob URLs when done
+          // 2c — POST all new slides to the backend with their final URLs
+          const sanitizedSlides = newSlides.map((slide) => {
+            const sanitizedSlide = { ...slide }
+            if (sanitizedSlide.data && typeof sanitizedSlide.data === "object") {
+              const sanitizedData = {
+                ...(sanitizedSlide.data as Record<string, unknown>)
+              }
+              delete sanitizedData.blob
+              sanitizedSlide.data = sanitizedData as typeof sanitizedSlide.data
+            }
+            return sanitizedSlide
+          })
+
+          const { batchCreateSlides } = useSlides()
+          const { inserted } = await batchCreateSlides(sanitizedSlides)
+
+          // Backfill _id from the server response onto our local objects
+          inserted.forEach((serverSlide) => {
+            const local = newSlides.find((s) => s.id === serverSlide.id)
+            if (local && serverSlide._id) local._id = serverSlide._id
+          })
+
+          // 2d — Broadcast to other clients only after server confirms creation
+          const nuxtApp = useNuxtApp()
+          const socket = nuxtApp.$socketio as any
+          if (socket?.connected && inserted.length > 0) {
+            socket.emit("batch-create-slides", {
+              slides: inserted.map((s) => ({ ...s })),
+              tabId: tabSessionId,
+            })
+          }
+        } catch (err) {
+          console.error("createMultipleMediaSlides background flow failed", err)
+          toast.add({
+            title: "Error saving media slides",
+            icon: "i-bx-error",
+            color: "red",
+          })
+        }
+      })()
+
+    // Return slides immediately — caller adds them to the active slide list
     return newSlides
   }
 
   /**
-   * Create a new Presentation slide from an array of PresentationObjects.
-   * Each object contains a page number and a blob URL for the rendered image.
+   * Create a presentation slide from an array of rendered page images.
+   *
+   * ┌─────────────────────────────────────────────────────────┐
+   * │  Step 1 (sync)   Build slide object → returned          │
+   * │                  immediately with Blob image URLs.      │
+   * ├─────────────────────────────────────────────────────────┤
+   * │  Step 2 (async,  a. Persist each page as ArrayBuffer    │
+   * │  background)        in IndexedDB (survives reload).     │
+   * │                  b. On Teams plan: upload each page to  │
+   * │                     the cloud, replace Blob URLs with   │
+   * │                     hosted URLs.                        │
+   * │                  c. POST the slide to the backend via   │
+   * │                     createSlide.                        │
+   * │                  d. Emit create-slide via WebSocket.    │
+   * └─────────────────────────────────────────────────────────┘
+   *
+   * NOTE: The caller must NOT emit its own socket event.
    */
   const createPresentationSlide = (
     fileName: string,
     presentationObjects: PresentationObject[]
   ): Slide => {
+    // ── Step 1 — build slide object synchronously ─────────────────────────
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.empty
     tempSlide.type = slideTypes.presentation
     tempSlide.name = fileName.replace(/\.[^/.]+$/, "") || "Presentation"
     tempSlide.presentationObjects = presentationObjects
     tempSlide.presentationPageIndex = 0
-    // Use the first page as the preview background
     tempSlide.backgroundType = "image"
-    tempSlide.background = presentationObjects[0]?.imageUrl || ""
+    tempSlide.background = presentationObjects[0]?.imageUrl ?? ""
     tempSlide.contents = []
 
-      // Persist each page's blob URL as an ArrayBuffer in IndexedDB so the
-      // images survive a page reload (blob: URLs are session-scoped).
-      // On Teams plan, also upload each page to the cloud and swap in the hosted
-      // URL — mirroring the createMultipleMediaSlides background-upload pattern.
-      // Key pattern: `${slideId}-page-${pageNum}`
+      // ── Step 2 — background ───────────────────────────────────────────────
       ; (async () => {
         const db = useIndexedDB()
         const { isTeamsPlan } = useSubscription()
+        const { createSlide } = useSlides()
         const nuxtApp = useNuxtApp()
         const socket = nuxtApp.$socketio as any
 
@@ -411,7 +427,7 @@ export default function useSlideCreation() {
             const arrayBuffer = await blobResponse.arrayBuffer()
             const blob = new Blob([arrayBuffer], { type: "image/png" })
 
-            // Persist to IndexedDB (fallback for non-Teams / offline)
+            // 2a — Persist to IndexedDB (works for all plans / offline)
             await db.media
               .add({
                 id: `${tempSlide.id}-page-${obj.page}`,
@@ -424,42 +440,40 @@ export default function useSlideCreation() {
                 console.error(`Failed to persist presentation page ${obj.page}:`, err)
               )
 
-            // Teams plan: upload to cloud and replace blob URL with hosted URL
+            // 2b — Upload to cloud on Teams plan
             if (isTeamsPlan.value && navigator.onLine) {
               try {
                 const uploaded = await useUploadImage(blob)
-                const hostedUrl = uploaded.file.url
-
-                // Patch the object in-place so LiveContentWithBackground picks it up
-                obj.imageUrl = hostedUrl
-
-                // Keep the slide's preview background up to date
-                if (obj.page === 1) {
-                  tempSlide.background = hostedUrl
-                }
-
-                // If the slide has already been saved to the server, sync the update
-                if (tempSlide._id && navigator.onLine) {
-                  const { saveSlideOnline } = useSlides()
-                  await saveSlideOnline(tempSlide).catch((e) =>
-                    console.error("Failed to sync presentation slide after upload:", e)
-                  )
-                  if (socket?.connected) {
-                    socket.emit("update-slide", { ...tempSlide, slideId: tempSlide.id })
-                  }
-                }
+                obj.imageUrl = uploaded.file.url
+                if (obj.page === 1) tempSlide.background = uploaded.file.url
               } catch (uploadErr) {
                 console.error(`Cloud upload failed for page ${obj.page}:`, uploadErr)
-                // Non-fatal: blob URL + IndexedDB copy still works locally
               }
             }
           } catch (err) {
             console.error(`Failed to process presentation page ${obj.page}:`, err)
           }
         }
+
+        // 2c — Create the slide on the backend (with final hosted URLs if any)
+        let createdSlide: Slide | null = null
+        try {
+          createdSlide = await createSlide(tempSlide)
+        } catch (err) {
+          console.error("Failed to create presentation slide on server:", err)
+        }
+
+        if (!createdSlide) return
+
+        // Backfill the server-assigned _id onto the local object
+        if (createdSlide._id) tempSlide._id = createdSlide._id
+
+        // 2d — Notify other clients that this slide now exists
+        if (socket?.connected) {
+          socket.emit("create-slide", { ...createdSlide, tabId: tabSessionId })
+        }
       })()
 
-    // toast.add({ title: "Presentation slide created", icon: "i-ph-file-ppt" })
     usePosthogCapture("NEW_PRESENTATION_SLIDE_CREATED", {
       page_count: presentationObjects.length,
     })
@@ -467,9 +481,6 @@ export default function useSlideCreation() {
     return tempSlide
   }
 
-  /**
-   * Create a new Countdown slide
-   */
   const createCountdownSlide = (countdown: Countdown): Slide => {
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.countdown
@@ -483,42 +494,35 @@ export default function useSlideCreation() {
     tempSlide.data = countdown
     tempSlide.name = `${countdown.time?.replace("00:", "")}`
     tempSlide.contents = useSlideContent(tempSlide, countdown)
-
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
       fontSize: 17.5,
       alignment: "center",
       font: appStore.currentState.settings.defaultFont,
     }
-
-    // toast.add({ title: "Countdown slide created", icon: "i-bx-time" })
     usePosthogCapture("NEW_COUNTDOWN_SLIDE_CREATED")
-
     return tempSlide
   }
 
-  /**
-   * Save slide to library (handles songs, hymns, and other slides)
-   */
+  // ─────────────────────────────────────────────────────────────────────────
+  // Library
+  // ─────────────────────────────────────────────────────────────────────────
+
   const saveSlideToLib = async (item: Slide): Promise<void> => {
-    const db = useIndexedDB()
     const tempItem = { ...item }
     let tempSong = { ...tempItem?.data } as Song
 
-    // If slide is a hymn slide, convert it to a song
     if (tempItem.type === slideTypes.hymn) {
       const hymn = (await useHymn(tempItem.songId as string)) as Hymn
       const verses = [...hymn?.verses]
-      if (hymn?.chorus !== "false") {
-        verses.splice(1, 0, hymn?.chorus)
-      }
+      if (hymn?.chorus !== "false") verses.splice(1, 0, hymn?.chorus)
       const lyrics = verses.join("\n")
       if (verses[0]) verses.push(verses[0])
       tempSong = {
         id: useID(),
-        title: hymn?.title || "",
-        artist: hymn?.author || "",
-        lyrics: lyrics || "",
+        title: hymn?.title ?? "",
+        artist: hymn?.author ?? "",
+        lyrics: lyrics ?? "",
         createdBy: "me",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -529,12 +533,10 @@ export default function useSlideCreation() {
     tempItem.contents = [...tempItem?.contents]
     tempItem.data = { ...tempItem.data } as any
 
-    // Save song or hymn to library
     if (tempItem.type === slideTypes.song || tempItem.type === slideTypes.hymn) {
-      tempSong.verses = [...tempSong?.verses!!] as []
+      tempSong.verses = [...(tempSong?.verses ?? [])] as []
       await saveSong(tempSong)
     } else {
-      // Save slide to library
       delete (tempItem?.data as ExtendedFileT)?.blob
       await saveSlideToLibrary(tempItem)
       saveSlideOnline(tempItem)
@@ -542,6 +544,10 @@ export default function useSlideCreation() {
 
     usePosthogCapture("LIBRARY_SAVE_SLIDE")
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Public API
+  // ─────────────────────────────────────────────────────────────────────────
 
   return {
     preSlideCreation,
@@ -554,6 +560,6 @@ export default function useSlideCreation() {
     createCountdownSlide,
     createPresentationSlide,
     saveSlideToLib,
-    duplicateSlide
+    duplicateSlide,
   }
 }

@@ -1,6 +1,5 @@
 <template>
   <div class="dark:bg-gray-900">
-    <NuxtPwaAssets />
     <NuxtLoadingIndicator />
     <NuxtLayout :app-version="appVersion">
       <NuxtPage />
@@ -43,20 +42,40 @@ if (nuxtApp.$emitter) {
 }
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("v0.46.2-beta")
+const appVersion = ref<string>("v0.48.1-beta")
+
+const warmOfflineRoutes = async () => {
+  await Promise.allSettled([
+    preloadRouteComponents("/"),
+    preloadRouteComponents("/login"),
+  ])
+
+  await Promise.allSettled([
+    fetch("/", { cache: "reload" }),
+    fetch("/login", { cache: "reload" }),
+  ])
+}
 
 onMounted(() => {
   initializeTauri()
 
-  // TODO: Delete this code block on 1st of June, 2026
-  // Unregister stale service workers (old builds with deleted/renamed assets)
-  // but keep the current PWA service worker (/sw.js) intact.
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      for (const registration of registrations) {
-        registration.unregister()
-      }
-    })
+    const { checkFlag } = useFeatureFlags()
+    if (checkFlag("force-sw-unregister")) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister()
+        }
+      })
+    } else {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then(() => navigator.serviceWorker.ready)
+        .then(() => warmOfflineRoutes())
+        .catch((error) => {
+          console.warn("Service worker registration failed", error)
+        })
+    }
   }
 })
 </script>

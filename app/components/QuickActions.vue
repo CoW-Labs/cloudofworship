@@ -79,7 +79,7 @@
         ref="actionsContainer"
       >
         <ActionCard
-          v-for="(action, index) in actions?.filter((a: QuickAction) => !a?.searchableOnly)"
+          v-for="(action, index) in visibleActions"
           :key="action?.name"
           :action="action"
           :data-action-index="index"
@@ -111,7 +111,11 @@
             'bg-primary-50 dark:bg-primary-800 rounded-md':
               index === focusedActionIndex,
           }"
-        />
+        >
+          <template #desc>
+            <span v-html="highlightText(action.desc ?? '', searchInput)" />
+          </template>
+        </ActionCard>
       </div>
     </div>
 
@@ -219,10 +223,10 @@ const libraryPage = ref<string>("")
 
 const getAllHymns = async () => {
   const allHymns = await db.bibleAndHymns.get("hymns")
-  hymns.value = allHymns?.data as unknown as Hymn[]
+  hymns.value = (allHymns?.data || []) as unknown as Hymn[]
 
   actions.value = quickActionsArr.concat(
-    bibleBooks?.map((book: string, index: number) => {
+    (bibleBooks || []).map((book: string, index: number) => {
       const bibleBookIndex = index + 1 // Does not start from 0, starts from 1
 
       return {
@@ -237,7 +241,7 @@ const getAllHymns = async () => {
       }
     }),
 
-    hymns.value?.map((hymn: Hymn) => {
+    (hymns.value || []).map((hymn: Hymn) => {
       return {
         icon: "i-bx-church",
         name: `${hymn.title}`,
@@ -253,6 +257,16 @@ const getAllHymns = async () => {
 }
 
 getAllHymns()
+
+const validActions = computed(() => {
+  return actions.value.filter((action): action is QuickAction => {
+    return Boolean(action?.name && action?.icon && action?.action)
+  })
+})
+
+const visibleActions = computed(() => {
+  return validActions.value.filter((action) => !action.searchableOnly)
+})
 
 watch(page, () => {
   if (page.value === "") {
@@ -352,9 +366,9 @@ emitter.on("new-presentation", () => {
 const handleInputKeydown = (e: KeyboardEvent) => {
   // Get the current actions list based on search state
   const currentActions =
-    searchInput.value.length >= 2
+    searchInput.value?.length >= 2
       ? searchedActions.value
-      : actions.value?.filter((a: QuickAction) => !a?.searchableOnly)
+      : visibleActions.value
 
   const maxIndex = currentActions.length - 1
 
@@ -391,7 +405,7 @@ const handleInputKeydown = (e: KeyboardEvent) => {
             ? `${action?.bibleBookIndex}:${bibleChapterAndVerse.value}`
             : action?.type === slideTypes.hymn
             ? action?.hymnIndex
-            : ""
+            : action?.actionArg || ""
         )
       }
       break
@@ -458,10 +472,11 @@ const searchedActions = computed(() => {
       ? searchInputBeforeTwoDigitNumbers
       : searchInputBeforeTwoDigitNumbers?.substring(0, colonIndex)
 
-  let results: any = fuzzysort.go(searchInputBeforeColon, actions.value, {
+  let results: any = fuzzysort.go(searchInputBeforeColon, validActions.value, {
     keys: ["name", "desc", "meta"],
   })
   results = results?.map((result: Fuzzysort.Result | any) => result.obj)
+  results = results.filter((action: QuickAction) => action?.name)
 
   // Sort by showing [searchableOnly] actions last
   results.sort((a: QuickAction, b: QuickAction) => {

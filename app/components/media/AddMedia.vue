@@ -2,7 +2,7 @@
   <div
     class="media-main min-h-[75vh] lg:min-h-[75vh] xl:min-h-[80vh] 2xl:min-h-[82.5vh]"
   >
-    <UTabs :items="mediaTabs" @change="activeTab = $event" />
+    <UTabs v-model="activeTab" :items="mediaTabs" />
 
     <!-- FILES TAB -->
     <div v-if="activeTab === 0" class="collector-ctn flex flex-col gap-3 mt-4">

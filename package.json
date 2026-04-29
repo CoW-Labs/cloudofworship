@@ -16,9 +16,7 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.540.0",
     "@fabianlars/tauri-plugin-oauth": "^2.0.0",
-    "@hotjar/browser": "^1.0.9",
     "@nuxt/ui": "npm:@nuxt/ui-edge@latest",
     "@nuxthub/core": "^0.10.7",
     "@pinia/nuxt": "^0.11.0",

@@ -1,7 +1,6 @@
 import { useAuthStore } from "~/store/auth"
 
 export default defineNuxtRouteMiddleware((to, from) => {
-  const toast = useToast()
   const { isTauri } = useTauri()
   const authStore = useAuthStore()
 
@@ -11,10 +10,10 @@ export default defineNuxtRouteMiddleware((to, from) => {
     token = authStore.token
   } else {
     const tokenCookie = useCookie('token')
-    token = tokenCookie.value
+    token = tokenCookie.value || authStore.token
   }
 
-  if (!token && to.path === '/') {
+  if (!token && !authStore.user?._id && to.path === '/') {
     return navigateTo('/login')
   }
 })

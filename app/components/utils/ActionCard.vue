@@ -31,7 +31,9 @@
       <h4 v-else class="font-semibold">
         {{ action?.name || "" }}
       </h4>
-      <p class="font-light text-xs mt-1">{{ action?.desc || "" }}</p>
+      <p class="font-light text-xs mt-1">
+        <slot name="desc">{{ action?.desc || "" }}</slot>
+      </p>
     </div>
   </button>
 </template>
@@ -77,7 +79,7 @@ const emitParameter = computed(() => {
     case slideTypes.hymn:
       return `${props.action?.hymnIndex}`
     default:
-      return ""
+      return props.action?.actionArg || ""
   }
 })
 

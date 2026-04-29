@@ -25,7 +25,11 @@
             index === focusedActionIndex,
         }"
         @click="focusedActionIndex = index"
-      />
+      >
+        <template #desc>
+          <span v-html="highlightText(action.desc ?? '', searchInput)" />
+        </template>
+      </ActionCard>
     </div>
 
     <!-- RECENTLY OPENED SCRIPTURES -->
