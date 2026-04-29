@@ -115,6 +115,7 @@ export interface QuickAction {
   name: string
   desc: string
   action: string
+  actionArg?: string // Optional argument to pass when the action is emitted
   type?: string
   unreleased?: boolean
   featureFlag?: string // PostHog feature flag key to check

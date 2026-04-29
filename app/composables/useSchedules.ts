@@ -1,3 +1,4 @@
+import { useOnline } from '@vueuse/core'
 import { useAuthStore } from '~/store/auth'
 import { useAppStore } from '~/store/app'
 import type { Schedule, Slide } from '~/types'
@@ -6,7 +7,8 @@ export default function useSchedules() {
   const authStore = useAuthStore()
   const appStore = useAppStore()
   const toast = useToast()
-  const churchId = authStore.user?.churchId
+  const online = useOnline()
+  const getChurchId = () => authStore.user?.churchId || authStore.church?._id
 
   // Reactive loading state
   const loading = ref<boolean>(false)
@@ -16,6 +18,11 @@ export default function useSchedules() {
    */
   const createSchedule = async (schedule: Schedule): Promise<Schedule | null> => {
     try {
+      const churchId = getChurchId()
+      if (!churchId) {
+        throw new Error('No church ID available')
+      }
+
       loading.value = true
       const { data, error } = await useAPIFetch(`/church/${churchId}/schedules`, {
         method: 'POST',
@@ -51,6 +58,12 @@ export default function useSchedules() {
    */
   const fetchSchedules = async (): Promise<Schedule[]> => {
     try {
+      const churchId = getChurchId()
+      if (!churchId) {
+        console.warn('No church ID available. Skipping schedules fetch.')
+        return appStore.currentState.schedules || []
+      }
+
       loading.value = true
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules`,
@@ -90,12 +103,6 @@ export default function useSchedules() {
       return mergedSchedules
     } catch (error: any) {
       console.error('Error fetching schedules:', error)
-      toast.add({
-        icon: 'i-bx-error',
-        title: 'Failed to fetch schedules',
-        description: error.message,
-        color: 'red',
-      })
       return []
     } finally {
       loading.value = false
@@ -110,6 +117,11 @@ export default function useSchedules() {
     updateData: Partial<Schedule>
   ): Promise<Schedule | null> => {
     try {
+      const churchId = getChurchId()
+      if (!churchId) {
+        throw new Error('No church ID available')
+      }
+
       loading.value = true
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${scheduleId}`,
@@ -147,6 +159,11 @@ export default function useSchedules() {
    */
   const deleteSchedule = async (scheduleId: string): Promise<boolean> => {
     try {
+      const churchId = getChurchId()
+      if (!churchId) {
+        throw new Error('No church ID available')
+      }
+
       loading.value = true
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${scheduleId}`,
@@ -230,6 +247,12 @@ export default function useSchedules() {
    */
   const getScheduleById = async (scheduleId: string): Promise<Schedule | null> => {
     try {
+      const churchId = getChurchId()
+      if (!churchId) {
+        console.warn('No church ID available. Skipping schedule fetch.')
+        return null
+      }
+
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${scheduleId}`,
         {
@@ -253,7 +276,18 @@ export default function useSchedules() {
    * Fetch slides for a specific schedule
    */
   const fetchScheduleSlides = async (scheduleId: string): Promise<Slide[]> => {
+    if (!online.value) {
+      console.warn('Cannot fetch schedule slides while offline')
+      return []
+    }
+
     try {
+      const churchId = getChurchId()
+      if (!churchId || !scheduleId) {
+        console.warn('Missing church or schedule ID. Skipping slide fetch.')
+        return []
+      }
+
       loading.value = true
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${scheduleId}/slides`,
@@ -264,18 +298,12 @@ export default function useSchedules() {
       )
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to fetch slides')
+        throw new Error(error.value?.message || 'Unable to refresh slides')
       }
 
       return data.value as Slide[]
     } catch (error: any) {
       console.error('Error fetching schedule slides:', error)
-      toast.add({
-        icon: 'i-bx-error',
-        title: 'Failed to fetch slides',
-        description: error.message,
-        color: 'red',
-      })
       return []
     } finally {
       loading.value = false

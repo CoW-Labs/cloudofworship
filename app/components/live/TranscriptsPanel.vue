@@ -217,16 +217,10 @@
         </p>
       </div>
 
-      <!-- Segments — newest first -->
+      <!-- Segments — oldest first, newest at bottom -->
       <div v-else class="space-y-3">
         <div
-          v-if="currentTranscript"
-          class="segment text-sm leading-relaxed text-gray-600 dark:text-gray-400 italic"
-        >
-          {{ currentTranscript }}<span class="animate-pulse">▌</span>
-        </div>
-        <div
-          v-for="segment in [...segments].reverse()"
+          v-for="segment in segments"
           :key="segment.id"
           class="segment text-sm leading-relaxed"
         >
@@ -236,6 +230,14 @@
             @reference-click="handleReferenceClick"
           />
         </div>
+        <div
+          v-if="currentTranscript"
+          class="segment text-sm leading-relaxed text-gray-600 dark:text-gray-400 italic"
+        >
+          {{ currentTranscript }}<span class="animate-pulse">▌</span>
+        </div>
+        <!-- Always-visible anchor so the cursor is always at the very bottom -->
+        <div ref="transcriptBottom" />
       </div>
     </div>
 
@@ -278,15 +280,13 @@
             />
             <span
               class="text-xs font-semibold text-primary-600 dark:text-primary-400 group-hover:underline"
-            >
-              {{ result.displayLabel }}
-            </span>
+              v-html="highlightText(result.displayLabel, scriptureHighlightQuery)"
+            />
           </div>
           <p
             class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2"
-          >
-            {{ result.scripture }}
-          </p>
+            v-html="highlightText(result.scripture, scriptureHighlightQuery)"
+          />
         </button>
 
         <button
@@ -360,6 +360,7 @@
 import type { BibleReference } from "~/types/transcript"
 import type { ScriptureResult } from "~/composables/useScriptureSearch"
 import { appWideActions } from "~/utils/constants"
+import { highlightText } from "~/utils/highlightText"
 
 defineProps<{ visible: boolean }>()
 defineEmits<{ close: [] }>()
@@ -371,6 +372,7 @@ const featureIntroModal = ref<{
 } | null>(null)
 onMounted(() => {
   featureIntroModal.value?.show()
+  usePosthogCapture("TRANSCRIPTION_PANEL_OPENED")
 })
 
 // ── Transcription ──────────────────────────────────────────────────────────
@@ -412,8 +414,17 @@ const {
 
 const scriptureVisibleCount = ref(20)
 const visibleScriptureResults = computed(() =>
-  [...scriptureResults.value].reverse().slice(0, scriptureVisibleCount.value)
+  [...scriptureResults.value]
+    .sort((a, b) => b.insertionOrder - a.insertionOrder)
+    .slice(0, scriptureVisibleCount.value)
 )
+
+// Highlight query: last 8 words from the most recent transcript segment
+const scriptureHighlightQuery = computed(() => {
+  const lastSegment = segments.value.at(-1)
+  if (!lastSegment?.text) return ''
+  return lastSegment.text.trim().split(/\s+/).slice(-8).join(' ')
+})
 
 // Track which segment ids have already been parsed so we only process new ones
 const parsedSegmentIds = new Set<string>()
@@ -426,7 +437,8 @@ watch(
       parsedSegmentIds.add(segment.id)
 
       // Use the already-parsed bible references from the segment
-      if (segment.bibleReferences.length > 0) addFromBibleReferences(segment.bibleReferences)
+      if (segment.bibleReferences.length > 0)
+        addFromBibleReferences(segment.bibleReferences)
     }
 
     // Also fire the debounced backend search with the last 3 segments
@@ -441,7 +453,18 @@ watch(
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const transcriptContainer = ref<HTMLElement | null>(null)
+const transcriptBottom = ref<HTMLElement | null>(null)
 const scripturesContainer = ref<HTMLElement | null>(null)
+
+// Auto-scroll transcript to bottom when new content arrives (newest at bottom)
+const scrollTranscriptToBottom = () => {
+  nextTick(() => {
+    transcriptBottom.value?.scrollIntoView({ behavior: "smooth" })
+  })
+}
+
+watch(() => segments.value.length, scrollTranscriptToBottom)
+watch(currentTranscript, scrollTranscriptToBottom)
 
 // ── Actions ────────────────────────────────────────────────────────────────
 const toggleTranscription = () =>
@@ -454,11 +477,20 @@ const handleClear = () => {
   scriptureVisibleCount.value = 20
 }
 
-const handleReferenceClick = (reference: BibleReference) =>
+const handleReferenceClick = (reference: BibleReference) => {
+  usePosthogCapture("TRANSCRIPTION_BIBLE_REFERENCE_CLICKED", {
+    reference: reference.shortLabel,
+  })
   useGlobalEmit(appWideActions.updateOrCreateBible, reference.shortLabel)
+}
 
-const handleScriptureClick = (result: ScriptureResult) =>
+const handleScriptureClick = (result: ScriptureResult) => {
+  usePosthogCapture("TRANSCRIPTION_SCRIPTURE_SUGGESTION_CLICKED", {
+    reference: result.shortLabel,
+    displayLabel: result.displayLabel,
+  })
   useGlobalEmit(appWideActions.updateOrCreateBible, result.shortLabel)
+}
 </script>
 
 <style scoped>

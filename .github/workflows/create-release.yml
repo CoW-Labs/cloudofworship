@@ -11,7 +11,6 @@ jobs:
       contents: write
     outputs:
       next_version: ${{ steps.versioning.outputs.next_version }}
-      release_notes: ${{ steps.release_notes.outputs.release_notes }}
       skip_release: ${{ steps.versioning.outputs.skip_release }}
 
     runs-on: ubuntu-latest
@@ -48,16 +47,11 @@ jobs:
             filtered_commits+="$line"$'\n'
           done <<< "$commits"
 
-          escaped_commits=$(printf "%s" "$filtered_commits" | jq -Rsa .)
-
-          echo "release_notes=$escaped_commits" >> $GITHUB_ENV
-          echo "release_notes=$escaped_commits" >> $GITHUB_OUTPUT
+          printf "%s" "$filtered_commits" > release_notes.txt
 
       - name: Generate Next Version Tag
         id: versioning
         run: |
-          release_notes=${{ env.release_notes }}
-
           hasMajor=0
           hasMinor=0
           hasPatch=0
@@ -83,7 +77,7 @@ jobs:
             elif [[ $line == "- fix:"* ]]; then
               hasPatch=1
             fi
-          done <<< "$(echo -e "$release_notes")"
+          done < release_notes.txt
 
           last_tag=${{ env.last_tag }}
 
@@ -145,7 +139,7 @@ jobs:
           echo "next_version=$next_version" >> $GITHUB_OUTPUT
           echo "skip_release=0" >> $GITHUB_OUTPUT
 
-      - name: Update appVersion, in app/app.vue and tauri.conf.json
+      - name: Update appVersion in app/app.vue and tauri.conf.json
         if: env.SKIP_RELEASE != '1'
         run: |
           # Remove 'v' prefix and '-beta' suffix for tauri.conf.json
@@ -180,107 +174,12 @@ jobs:
           git tag -a ${{ env.next_version }} -m "Release version ${{ env.next_version }}"
           git push origin ${{ env.next_version }}
 
-  build:
-    needs: release
-    if: needs.release.outputs.skip_release != '1'
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [windows-latest]
-
-    runs-on: ${{ matrix.platform }}
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          # Checkout the branch, not the tag - let tauri-action handle the tag
-          ref: ${{ github.event.pull_request.head.ref }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 20
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build Tauri App
-        uses: tauri-apps/tauri-action@v0
+      - name: Create Release
+        if: env.SKIP_RELEASE != '1'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ needs.release.outputs.next_version }}
-          releaseName: "Release ${{ needs.release.outputs.next_version }}"
-          releaseBody: ${{ fromJSON(needs.release.outputs.release_notes) }}
-          releaseDraft: false
-          prerelease: false
-          # This tells tauri-action to update an existing release
-          includeUpdaterJson: true
-
-  create-latest-json:
-    needs: [release, build]
-    if: needs.release.outputs.skip_release != '1'
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
-
-      - name: Create latest.json
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Remove 'v' prefix for version string
-          version=$(echo "${{ needs.release.outputs.next_version }}" | sed 's/^v//')
-
-          # Create latest.json with release information
-          cat > latest.json << EOF
-          {
-            "version": "${version}",
-            "tag": "${{ needs.release.outputs.next_version }}",
-            "releaseDate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-            "releaseNotes": ${{ needs.release.outputs.release_notes }},
-            "platforms": {
-              "darwin": {
-                "url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.release.outputs.next_version }}/",
-                "signature": ""
-              },
-              "windows": {
-                "url": "https://github.com/${{ github.repository }}/releases/download/${{ needs.release.outputs.next_version }}/",
-                "signature": ""
-              }
-            }
-          }
-          EOF
-
-          cat latest.json
-
-      - name: Commit and Push latest.json
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-
-          git add latest.json
-
-          if git diff --staged --quiet; then
-            echo "No changes to latest.json"
-          else
-            git commit -m "Update latest.json for release ${{ needs.release.outputs.next_version }}"
-            git push
-          fi
+          gh release create ${{ env.next_version }} \
+            --title "Release ${{ env.next_version }}" \
+            --notes-file release_notes.txt \
+            --target ${{ github.event.pull_request.head.ref }}

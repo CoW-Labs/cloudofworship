@@ -200,6 +200,18 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 
 ---
 
+## 🎙️ Sermon Transcription
+| Event Name | Properties | Description | Status |
+|------------|-----------|-------------|---------|
+| `TRANSCRIPTION_PANEL_OPENED` | - | User opens the Transcribe panel | ✅ Added |
+| `TRANSCRIPTION_STARTED` | `provider` (`deepgram`\|`web-speech-api`), `plan` (`teams`\|`free`) | User starts a transcription session | ✅ Added |
+| `TRANSCRIPTION_STOPPED` | `provider`, `plan`, `segmentCount` | User stops a transcription session | ✅ Added |
+| `TRANSCRIPTION_CLEARED` | `provider`, `plan`, `segmentCount` | User clears the transcript | ✅ Added |
+| `TRANSCRIPTION_BIBLE_REFERENCE_CLICKED` | `reference` | User clicks an inline Bible reference in the transcript | ✅ Added |
+| `TRANSCRIPTION_SCRIPTURE_SUGGESTION_CLICKED` | `reference`, `displayLabel` | User clicks a scripture in the Scriptures tab | ✅ Added |
+
+---
+
 ## 📊 Legend
 - ✅ **Exists**: Event is already implemented in codebase
 - ✅ **Added**: Event added during this tracking improvement session

@@ -101,6 +101,7 @@
 import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
+import { tabSessionId, useRealtimeSlides } from "~/composables/useRealtimeSlides"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
@@ -113,7 +114,34 @@ import type {
   ExtendedFileT,
 } from "~/types"
 import { appWideActions } from "~/utils/constants"
-import { tabSessionId } from "~/composables/useRealtimeSlides"
+
+// Setup real-time slide sync
+const { handleWebSocketMessage } = useRealtimeSlides()
+
+let previewSocket: any = null
+const previewSocketAnyHandler = (event: string, data: any) => {
+  // Normalize for both Socket.IO and WebSocket style
+  if (data && typeof data === "object" && data.action && data.data) {
+    handleWebSocketMessage(data)
+  } else if (event && data) {
+    handleWebSocketMessage({ action: event, data })
+  }
+}
+
+onMounted(() => {
+  // Listen for all incoming socket messages and sync slides
+  const nuxtApp = useNuxtApp()
+  previewSocket = nuxtApp.$socketio as any
+  if (previewSocket) {
+    previewSocket.onAny(previewSocketAnyHandler)
+  }
+})
+
+onUnmounted(() => {
+  if (previewSocket) {
+    previewSocket.offAny(previewSocketAnyHandler)
+  }
+})
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -373,17 +401,17 @@ emitter.on("new-media", async (data: ExtendedFileT[]) => {
       newSlides = createMultipleMediaSlides(data)
     }
 
-    // Append new slides to the end of the current slide list
+    // Append new slides immediately so the current user sees them right away
     newSlides.forEach((slide) => {
       slides.value?.push(slide)
       appStore.appendActiveSlide(slide)
     })
 
-    // Broadcast batch slide creation for real-time sync
-    if (newSlides?.length > 0) {
-      broadcastSlideUpdate("batch-create-slides", { slides: newSlides })
-    }
-    uploadOfflineSlides()
+    // NOTE: Do NOT call uploadOfflineSlides() here for media slides.
+    // createMultipleMediaSlides handles: upload → patch URLs → batchCreateSlides
+    // → socket broadcast entirely in its own background flow. Calling
+    // uploadOfflineSlides() here would race against that flow and send
+    // batchCreateSlides with blob: URLs before the images have been uploaded.
   }
 })
 
@@ -434,7 +462,9 @@ emitter.on("delete-slide", (data: Slide) => {
 })
 
 emitter.on("refresh-slides", () => {
-  retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!)
+  retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!).catch(
+    (error) => console.warn("Unable to refresh schedule slides:", error)
+  )
 })
 
 emitter.on("upload-offline-slides", () => {
@@ -577,6 +607,10 @@ const uploadOfflineSlides = async () => {
 }
 
 const retrieveSlidesOnline = async (scheduleId: string) => {
+  if (!online.value || !scheduleId || !authStore.user?.churchId) {
+    return
+  }
+
   // appStore.setSlidesLoading(true)
   const { data, error } = await useAPIFetch(
     `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
@@ -637,7 +671,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
     // appStore.setSlidesLoading(false)
     appStore.setLastSynced(new Date().toISOString())
   } else {
-    throw new Error(error.value?.message)
+    console.warn("Unable to refresh schedule slides:", error.value)
   }
 }
 
@@ -705,7 +739,9 @@ watch(
         createSchedule(currentState.value.activeSchedule as Schedule)
       } else {
         // retrieve all slides online
-        retrieveSlidesOnline(currentState.value.activeSchedule?._id)
+        retrieveSlidesOnline(currentState.value.activeSchedule?._id).catch(
+          (error) => console.warn("Unable to refresh schedule slides:", error)
+        )
       }
     }
   },
@@ -988,9 +1024,7 @@ const openSaveTemplateModal = (slide: Slide) => {
 }
 
 const addAllSlidesToSelectedSlides = () => {
-  bulkSelectedSlides.value = currentState.value.activeSlides.map(
-    (slide) => slide?.id
-  )
+  bulkSelectedSlides.value = slides.value.map((slide) => slide?.id)
 }
 
 const removeAllSelectedSlides = () => {
@@ -1012,7 +1046,7 @@ const addToSelectedSlides = (slideId: string, isSelected: boolean) => {
 const removeFromSelectedSlides = (slideId: string) => {
   bulkSelectedSlides.value.splice(
     bulkSelectedSlides.value.findIndex((id) => id === slideId),
-    0
+    1
   )
 }
 </script>

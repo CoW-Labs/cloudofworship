@@ -9,7 +9,7 @@ export default function useLibrary() {
   const authStore = useAuthStore()
   const appStore = useAppStore()
   const toast = useToast()
-  const churchId = authStore.church?._id
+  const getChurchId = () => authStore.church?._id || authStore.user?.churchId
 
   // Reactive loading state
   const loading = ref<boolean>(true)
@@ -40,19 +40,31 @@ export default function useLibrary() {
   })
 
   /**
-   * Fetch saved slides from the API and cache them in IndexedDB
+   * Fetch saved slides from the API and cache them in IndexedDB.
+   * The backend filters by churchId only and ignores the scheduleId, so we
+   * fall back to the first available schedule if no active one is set.
    */
   const fetchSavedSlides = async () => {
     try {
-      const activeSchedule = appStore.currentState.activeSchedule
-      if (!activeSchedule?._id) {
-        console.warn('No active schedule found')
+      // Backend getSavedSlides only uses req.user.churchId — scheduleId is
+      // required by the URL structure but not used for filtering.
+      const scheduleId =
+        appStore.currentState.activeSchedule?._id ||
+        appStore.currentState.schedules?.[0]?._id
+
+      if (!scheduleId) {
+        console.warn('No schedule available to fetch saved slides')
+        return []
+      }
+      const churchId = getChurchId()
+      if (!churchId) {
+        console.warn('No church available to fetch saved slides')
         return []
       }
 
       loading.value = true
       const { data, error } = await useAPIFetch(
-        `/church/${churchId}/schedules/${activeSchedule._id}/slides/saved`,
+        `/church/${churchId}/schedules/${scheduleId}/slides/saved`,
         {
           method: 'GET',
           key: 'get-saved-slides',
@@ -63,14 +75,70 @@ export default function useLibrary() {
         throw new Error(error.value?.message || 'Failed to fetch saved slides')
       }
 
-      const slides = data.value as Slide[]
+      const remoteSlides = data.value as Slide[]
 
-      // Cache slides in IndexedDB
-      if (slides && slides.length > 0) {
-        await cacheSlidesInLibrary(slides)
+      // Merge local-only slides up to the server before syncing.
+      // A slide may exist only in this user's IndexedDB if it was saved before
+      // the saveSlideOnline fix, or while offline. Upload any such slides so
+      // they aren't silently lost when we overwrite the local cache.
+      const db = useIndexedDB()
+      const localSlideItems = await db.library
+        .where('type')
+        .equals(libraryTypes.slide)
+        .toArray()
+
+      const remoteIds = new Set((remoteSlides || []).map((s) => s._id || s.id))
+      const localOnlySlides = localSlideItems
+        .map((item) => item.content as Slide)
+        .filter((s) => {
+          const id = s._id || s.id
+          return id && !remoteIds.has(id)
+        })
+
+      const uploadedLocalSlides: Slide[] = []
+      if (localOnlySlides.length > 0) {
+        const { createSlide, saveSlideOnline } = useSlides()
+        const uploadResults = await Promise.allSettled(
+          localOnlySlides.map(async (slide) => {
+            if (slide._id) {
+              const wasSaved = await saveSlideOnline(slide)
+              if (wasSaved) return slide
+              return null
+            }
+
+            const { _id, ...slideWithoutServerId } = slide
+            const serverSlide = await createSlide(slideWithoutServerId)
+            if (!serverSlide?._id) return null
+
+            const wasSaved = await saveSlideOnline(serverSlide)
+            return wasSaved ? serverSlide : null
+          })
+        )
+        uploadedLocalSlides.push(
+          ...uploadResults
+            .filter(
+              (result): result is PromiseFulfilledResult<Slide | null> =>
+                result.status === 'fulfilled'
+            )
+            .map((result) => result.value)
+            .filter((slide): slide is Slide => Boolean(slide))
+        )
       }
 
-      return slides
+      // Merge: remote is source of truth for saved status, but include only
+      // local-only slides that were successfully uploaded/saved.
+      const mergedIds = new Set((remoteSlides || []).map((s) => s._id || s.id))
+      const mergedSlides = [
+        ...(remoteSlides || []),
+        ...uploadedLocalSlides.filter((slide) => {
+          const id = slide._id || slide.id
+          return Boolean(id) && !mergedIds.has(id)
+        }),
+      ]
+
+      await cacheSlidesInLibrary(mergedSlides)
+
+      return mergedSlides
     } catch (error) {
       console.error('Error fetching saved slides:', error)
       toast.add({
@@ -85,11 +153,24 @@ export default function useLibrary() {
   }
 
   /**
-   * Cache slides in IndexedDB library
+   * Cache slides in IndexedDB library.
+   * Replaces all existing slide entries so IndexedDB always mirrors the
+   * server exactly — prevents stale locally-saved slides accumulating and
+   * causing different counts across team members.
    */
   const cacheSlidesInLibrary = async (slides: Slide[]) => {
     try {
       const db = useIndexedDB()
+
+      // Delete all existing slide-type entries first so removed saves don't linger
+      const existingSlideIds = await db.library
+        .where('type')
+        .equals(libraryTypes.slide)
+        .primaryKeys()
+      if (existingSlideIds.length > 0) {
+        await db.library.bulkDelete(existingSlideIds)
+      }
+
       const librarySlides: LibraryItem[] = slides.map((slide) => ({
         id: slide._id || slide.id,
         type: libraryTypes.slide,
@@ -98,7 +179,6 @@ export default function useLibrary() {
         updatedAt: slide.updatedAt || new Date().toISOString(),
       }))
 
-      // Bulk add or update slides in library
       await db.library.bulkPut(librarySlides)
     } catch (error) {
       console.error('Error caching slides in library:', error)
@@ -153,6 +233,13 @@ export default function useLibrary() {
       await db.library
         .put(libraryItem)
         .catch((err) => console.error('Failed to add slide to library:', err))
+
+      // Persist to server so all church members can see this saved slide
+      const { saveSlideOnline } = useSlides()
+      await saveSlideOnline(slide)
+
+      // Re-fetch from server so local cache reflects the latest saved set
+      await fetchSavedSlides()
 
       toast.add({ icon: 'i-bx-save', title: 'Slide saved to Library' })
       return libraryItem

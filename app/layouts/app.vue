@@ -34,53 +34,49 @@
   </div>
   <div
     v-else
-    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center dark:bg-gray-900"
+    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center bg-white px-6 text-gray-900 dark:bg-gray-950 dark:text-white"
   >
-    <div class="wrapper flex flex-col gap-6">
-      <div class="logo flex items-center justify-center mb-6 gap-2">
-        <Logo class="w-[64px]" />
-        <h1 class="text-2xl font-semibold">Cloud of Worship</h1>
-      </div>
-      <div class="progress-wrapper text-center relative">
-        <UProgress
-          size="2xl"
-          class="text-center"
-          :value="parseInt(downloadProgress)"
-          :max="100"
-        />
-        <UProgress
-          v-show="downloadStep === 2"
-          size="2xl"
-          class="text-center absolute top-0 left-0 opacity-50"
-          color="white"
-        />
-        <UProgress
-          v-show="downloadStep === 4"
-          size="2xl"
-          class="text-center absolute top-0 left-0 opacity-50"
-          color="white"
-        />
-        <div
-          v-if="downloadStep !== 5"
-          class="text-md font-semibold w-[300px] flex items-center justify-between mt-4"
-        >
-          <span class="font-normal">
-            <div class="text-left">Loading {{ downloadResource }}</div>
-            <div class="opacity-50 text-left">
-              This might take a while
-            </div></span
+    <div class="wrapper w-full max-w-md text-center">
+      <section class="min-w-0">
+        <div class="logo mb-8 flex items-center justify-center gap-3">
+          <Logo class="w-[56px] shrink-0" />
+          <div class="min-w-0">
+            <h1 class="truncate text-2xl font-semibold">Cloud of Worship</h1>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div class="space-y-2 flex items-center justify-between">
+            <div class="min-w-0 text-center">
+              <h2 class="truncate text-sm font-semibold">
+                {{ loadingDetail || currentLoadingTask.description }}
+              </h2>
+            </div>
+            <span class="block text-sm font-semibold tabular-nums">
+              {{ overallLoadingProgress }}%
+            </span>
+          </div>
+
+          <UProgress size="2xl" :value="overallLoadingProgress" :max="100" />
+
+          <div
+            class="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-400"
           >
-          <span>{{ parseInt(downloadProgress) || 0 }}%</span>
+            <UIcon
+              :name="isAppOnline ? 'i-lucide-wifi' : 'i-lucide-wifi-off'"
+              class="h-4 w-4 shrink-0"
+              dynamic
+            />
+            <span>
+              {{
+                isAppOnline
+                  ? "Online refresh enabled. Cached data remains available."
+                  : "Offline mode. Using resources already saved on this device."
+              }}
+            </span>
+          </div>
         </div>
-        <div
-          v-else
-          class="text-md font-semibold w-[300px] flex items-center justify-center mt-4"
-        >
-          <span class="font-normal">
-            {{ downloadResource }}
-          </span>
-        </div>
-      </div>
+      </section>
     </div>
   </div>
 </template>
@@ -136,6 +132,99 @@ const { fetchUserSettings } = useUserSettings()
 
 const { currentState } = storeToRefs(appStore)
 
+const loadingTasks = [
+  {
+    id: "startup",
+    label: "Account and app settings",
+    description: "Checking your saved session and refreshing app settings.",
+    icon: "i-lucide-user-check",
+  },
+  {
+    id: "videos",
+    label: "Background videos",
+    description:
+      "Preparing cached motion backgrounds without blocking the app.",
+    icon: "i-lucide-video",
+  },
+  {
+    id: "schedules",
+    label: "Schedules and slides",
+    description: "Merging online schedules with your local presentation data.",
+    icon: "i-lucide-calendar-days",
+  },
+  {
+    id: "bible",
+    label: "Bible versions",
+    description: "Making sure the default Bible text is available offline.",
+    icon: "i-lucide-book-open",
+  },
+  {
+    id: "hymns",
+    label: "Hymns",
+    description:
+      "Checking the local hymn library and refreshing when possible.",
+    icon: "i-lucide-music",
+  },
+  {
+    id: "display",
+    label: "Display setup",
+    description: "Finding the best screen for live projection.",
+    icon: "i-lucide-monitor-play",
+  },
+  {
+    id: "ready",
+    label: "Ready",
+    description: "Finalizing your workspace.",
+    icon: "i-lucide-check-circle",
+  },
+] as const
+
+type LoadingTaskId = (typeof loadingTasks)[number]["id"]
+
+const loadingTaskId = ref<LoadingTaskId>("startup")
+const loadingDetail = ref<string>("Checking your saved workspace.")
+
+const currentLoadingTaskIndex = computed(() => {
+  const index = loadingTasks.findIndex(
+    (task) => task.id === loadingTaskId.value
+  )
+  return Math.max(index, 0)
+})
+
+const currentLoadingTask = computed(() => {
+  return loadingTasks[currentLoadingTaskIndex.value] || loadingTasks[0]
+})
+
+const currentTaskProgress = computed(() => {
+  const progress = Number.parseInt(downloadProgress.value || "0", 10)
+  return Number.isFinite(progress) ? Math.min(Math.max(progress, 0), 100) : 0
+})
+
+const overallLoadingProgress = computed(() => {
+  const completedSteps = currentLoadingTaskIndex.value
+  const currentStepRatio = currentTaskProgress.value / 100
+  return Math.min(
+    100,
+    Math.round(
+      ((completedSteps + currentStepRatio) / loadingTasks.length) * 100
+    )
+  )
+})
+
+const setLoadingTask = (
+  taskId: LoadingTaskId,
+  detail?: string,
+  progress = 0
+) => {
+  loadingTaskId.value = taskId
+  downloadStep.value = currentLoadingTaskIndex.value
+  downloadResource.value =
+    loadingTasks.find((task) => task.id === taskId)?.label || ""
+  loadingDetail.value =
+    detail || loadingTasks.find((task) => task.id === taskId)?.description || ""
+  downloadProgress.value = `${progress}`
+}
+
 const isAppOnline = computed(() => {
   // TODO: Track WS requests if any fails up to 5 times concurrently, change to offline
   // if() {}
@@ -189,8 +278,8 @@ const fetchChurchSongs = async () => {
       const chunkSize = 50
       for (let i = 0; i < libraryData.length; i += chunkSize) {
         const chunk = libraryData.slice(i, i + chunkSize)
-        await db.library.bulkAdd(chunk).catch((err) => {
-          console.error("Failed to add song chunk:", err)
+        await db.library.bulkPut(chunk).catch((err) => {
+          console.error("Failed to save song chunk:", err)
         })
       }
     }
@@ -212,23 +301,14 @@ const fetchChurch = async () => {
       fetchChurchSongs()
     }
     if (error.value) {
-      useToast().add({
-        icon: "i-mdi-alert-circle-outline",
-        title: "Reach out to support, your church information is corrupted.",
-        color: "red",
-      })
-      authStore.signOut()
-      throw new Error(error.value?.message)
+      console.warn("Unable to refresh church information:", error.value)
     }
   } else {
     if (!authStore.user?._id) {
       navigateTo("/login")
+      return
     }
-    navigateTo("/signup?registerChurch=1")
-    useToast().add({
-      icon: "i-bx-church",
-      title: "Add your church in less than 1 minute to continue.",
-    })
+    console.warn("No church ID available; keeping local app state.")
   }
 }
 
@@ -241,40 +321,62 @@ const fetchAppInfo = async () => {
 }
 
 const fetchHymns = async () => {
-  let hymnCount: any
-  const hymns = await db.bibleAndHymns.get("hymns")
-  const tokenValue = getToken()
-
-  // Download all hymns
-  hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
-    headers: {
-      Authorization: `Bearer ${tokenValue}`,
-      ...(config.public.NODE_ENV === "development"
-        ? { "x-dev-token": config.public.DEV_TOKEN }
-        : {}),
-    },
-  })
-  hymnCount = await hymnCount.json()
-
-  if (hymns?.data?.length !== hymnCount) {
-    await db.bibleAndHymns
-      .delete("hymns")
-      .catch((err) => console.error("Failed to delete hymns:", err))
-    downloadResource.value = "hymns"
-    downloadStep.value = 4
-    let hymns = await useDetailedFetch(
-      `${config.public.BASE_URL}/hymn`,
-      downloadProgress,
-      {
-        headers: {
-          Authorization: `Bearer ${tokenValue}`,
-        },
-      }
+  if (!online.value) {
+    setLoadingTask(
+      "hymns",
+      "Offline: using hymns already saved on this device.",
+      100
     )
-    hymns = await hymns.json()
-    await db.bibleAndHymns
-      .add(tempBibleVersion("hymns", hymns))
-      .catch((err) => console.error("Failed to add hymns:", err))
+    return
+  }
+
+  try {
+    setLoadingTask("hymns", "Checking the local hymn library.", 10)
+    let hymnCount: any
+    const hymns = await db.bibleAndHymns.get("hymns")
+    const tokenValue = getToken()
+
+    hymnCount = await fetch(`${config.public.BASE_URL}/hymn/count`, {
+      headers: {
+        Authorization: `Bearer ${tokenValue}`,
+        ...(config.public.NODE_ENV === "development"
+          ? { "x-dev-token": config.public.DEV_TOKEN }
+          : {}),
+      },
+    })
+    hymnCount = await hymnCount.json()
+
+    if (hymns?.data?.length !== hymnCount) {
+      await db.bibleAndHymns
+        .delete("hymns")
+        .catch((err) => console.error("Failed to delete hymns:", err))
+      setLoadingTask("hymns", "Downloading the latest hymn library.", 0)
+      let hymns = await useDetailedFetch(
+        `${config.public.BASE_URL}/hymn`,
+        downloadProgress,
+        {
+          headers: {
+            Authorization: `Bearer ${tokenValue}`,
+          },
+        }
+      )
+      hymns = await hymns.json()
+      await db.bibleAndHymns
+        .add(tempBibleVersion("hymns", hymns))
+        .catch((err) => console.error("Failed to add hymns:", err))
+    } else {
+      setLoadingTask("hymns", "Hymns are already available offline.", 100)
+    }
+  } catch (err) {
+    console.warn(
+      "Failed to refresh hymns; using local cache if available:",
+      err
+    )
+    setLoadingTask(
+      "hymns",
+      "Unable to refresh hymns. Local cache will be used.",
+      100
+    )
   }
 }
 
@@ -315,8 +417,7 @@ emitter.on("close-live-window", async () => {
   usePosthogCapture("CLOSE_LIVE_WINDOW_BUTTON_CLICKED")
 })
 
-const saveAllBackgroundVideos = async () => {
-  // Use Promise.all to fetch all videos in parallel - non-blocking
+const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
   const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
   const savedVideos = await Promise.all(
     videoIds.map((id) => db.cached.get(`/video-bg-${id}.mp4`))
@@ -335,29 +436,51 @@ const saveAllBackgroundVideos = async () => {
       updatedAt: new Date().toISOString(),
     }
     db.cached
-      .add(tempMedia)
+      .put(tempMedia)
       .catch((err) => console.error(`Failed to save video-bg-${index}:`, err))
   }
 
-  downloadResource.value = "background videos"
+  const missingVideoIds = videoIds.filter((id) => !savedBgVideoMap.get(id))
 
-  // Download videos that aren't cached yet
-  const videoDownloadPromises = videoIds
-    .filter((id) => !savedBgVideoMap.get(id))
-    .map(async (id) => {
-      const bgVideoPromise = await useDetailedFetch(
-        `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`,
-        downloadProgress
-      )
-      const bgVideoBlob = await bgVideoPromise.blob()
-      saveBackground(bgVideoBlob, id)
+  if (missingVideoIds.length === 0) {
+    setLoadingTask("videos", "Background videos are already cached.", 100)
+    return
+  }
+
+  setLoadingTask(
+    "videos",
+    `Caching ${missingVideoIds.length} background videos in the background.`,
+    100
+  )
+
+  const progressRef = options?.wait ? downloadProgress : ref("0")
+  const downloadMissingVideos = async () => {
+    const videoDownloadPromises = missingVideoIds.map(async (id) => {
+      try {
+        const bgVideoPromise = await useDetailedFetch(
+          `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`,
+          progressRef
+        )
+        const bgVideoBlob = await bgVideoPromise.blob()
+        saveBackground(bgVideoBlob, id)
+      } catch (err) {
+        console.warn(`Failed to download video-bg-${id} (offline?):`, err)
+      }
     })
 
-  // Process in batches to avoid blocking
-  const batchSize = 2
-  for (let i = 0; i < videoDownloadPromises.length; i += batchSize) {
-    const batch = videoDownloadPromises.slice(i, i + batchSize)
-    await Promise.all(batch)
+    const batchSize = 2
+    for (let i = 0; i < videoDownloadPromises.length; i += batchSize) {
+      const batch = videoDownloadPromises.slice(i, i + batchSize)
+      await Promise.all(batch)
+    }
+  }
+
+  if (options?.wait) {
+    await downloadMissingVideos()
+  } else {
+    downloadMissingVideos().catch((err) => {
+      console.warn("Failed to cache background videos:", err)
+    })
   }
 }
 
@@ -377,32 +500,52 @@ const downloadEssentialResources = async () => {
   const db = useIndexedDB()
 
   loadingResources.value = true
-  downloadStep.value = 0
+  setLoadingTask("startup", "Refreshing account, church, and app settings.", 5)
 
-  // Download background videos
-  downloadStep.value = 1
-  await saveAllBackgroundVideos()
-
-  // Download background videos
-  downloadStep.value = 2
-  await retrieveSchedules()
-
-  // Download KJV Bible
-  let tempBible = await db.bibleAndHymns.get("KJV")
-  if (!tempBible) {
-    downloadResource.value = "KJV Bible"
-    downloadStep.value = 3
-
-    let kjvBible = await useDetailedFetch(
-      `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/kjv.json`,
-      downloadProgress
+  if (online.value) {
+    await Promise.allSettled([
+      fetchUser(),
+      fetchChurch(),
+      fetchAppInfo(),
+      refreshLibrary(),
+      fetchPlans(),
+    ])
+  } else {
+    setLoadingTask(
+      "startup",
+      "Offline: using saved account and app settings.",
+      100
     )
-    kjvBible = await kjvBible.json()
-    await db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
   }
 
-  const isBibleVersionDownloaded = async (bibleVersion: string) => {
-    return (await db.bibleAndHymns.where("id").equals(bibleVersion).count()) > 0
+  if (online.value) {
+    await saveAllBackgroundVideos()
+  } else {
+    setLoadingTask("videos", "Offline: using cached background videos.", 100)
+  }
+
+  setLoadingTask("schedules", "Loading schedules and slides.", 0)
+  await retrieveSchedules()
+
+  setLoadingTask("bible", "Checking KJV Bible availability.", 10)
+  let tempBible = await db.bibleAndHymns.get("KJV")
+  if (!tempBible && online.value) {
+    setLoadingTask("bible", "Downloading KJV Bible for offline use.", 0)
+
+    try {
+      let kjvBible = await useDetailedFetch(
+        `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/kjv.json`,
+        downloadProgress
+      )
+      kjvBible = await kjvBible.json()
+      await db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
+    } catch (err) {
+      console.warn("Failed to download KJV Bible (offline?):", err)
+    }
+  } else if (tempBible) {
+    setLoadingTask("bible", "KJV Bible is already available offline.", 100)
+  } else {
+    setLoadingTask("bible", "Offline: KJV Bible is not cached yet.", 100)
   }
 
   const { populateBibleVersionOptions } = useBibleVersionManager()
@@ -412,13 +555,34 @@ const downloadEssentialResources = async () => {
       : undefined
   )
 
-  // Auto-detect and save the secondary/non-primary monitor so the user
-  // doesn't have to open Display Settings before going live for the first time.
-  await useAutoDetectSecondaryDisplay()
+  await fetchHymns()
 
-  // All computations completed
-  downloadStep.value = 5
-  downloadResource.value = "All resources downloaded."
+  if (online.value && authStore.user?._id) {
+    setLoadingTask("bible", "Checking your preferred Bible version.", 90)
+    const userSettings = await fetchUserSettings()
+    const preferredVersion =
+      userSettings?.defaultBibleVersion ||
+      appStore.currentState.settings.defaultBibleVersion
+    if (preferredVersion && preferredVersion !== "KJV") {
+      const { isBibleVersionDownloaded, downloadBibleVersion } =
+        useBibleVersionManager()
+      const alreadyDownloaded = await isBibleVersionDownloaded(preferredVersion)
+      if (!alreadyDownloaded) {
+        setLoadingTask("bible", `Downloading ${preferredVersion} Bible.`, 0)
+        try {
+          await downloadBibleVersion(preferredVersion)
+        } catch (err) {
+          console.error(`Failed to auto-download ${preferredVersion}:`, err)
+        }
+      }
+    }
+  }
+
+  setLoadingTask("display", "Checking display setup for live projection.", 20)
+  await useAutoDetectSecondaryDisplay()
+  setLoadingTask("display", "Display setup is ready.", 100)
+
+  setLoadingTask("ready", "Opening your workspace.", 100)
 
   setTimeout(() => {
     loadingResources.value = false
@@ -486,27 +650,41 @@ const overrideAppSettings = async () => {
 }
 
 const retrieveSchedules = async () => {
-  if (isAppOnline.value) {
-    downloadProgress.value = "0"
-    downloadResource.value = "schedules and slides"
-    const { data } = await useAPIFetch(
-      `/church/${authStore.user?.churchId}/schedules`
+  const churchId = authStore.user?.churchId || authStore.church?._id
+  if (!isAppOnline.value) {
+    setLoadingTask(
+      "schedules",
+      "Offline: using schedules saved on this device.",
+      100
     )
-
-    const schedules = data.value ? (data.value as unknown as Schedule[]) : []
-    const mergedSchedules = useMergeObjectArray(
-      [...schedules],
-      appStore.currentState.schedules
-    )
-
-    mergedSchedules?.sort((scheduleA, scheduleB) => {
-      const dateA = new Date(scheduleA?.updatedAt)
-      const dateB = new Date(scheduleB?.updatedAt)
-      return dateB?.getTime() - dateA?.getTime()
-    })
-    appStore.setSchedules(mergedSchedules)
-    downloadProgress.value = "100"
+    return
   }
+
+  if (!churchId) {
+    setLoadingTask(
+      "schedules",
+      "No church ID found. Keeping local schedules.",
+      100
+    )
+    return
+  }
+
+  downloadProgress.value = "0"
+  const { data } = await useAPIFetch(`/church/${churchId}/schedules`)
+
+  const schedules = data.value ? (data.value as unknown as Schedule[]) : []
+  const mergedSchedules = useMergeObjectArray(
+    [...schedules],
+    appStore.currentState.schedules
+  )
+
+  mergedSchedules?.sort((scheduleA, scheduleB) => {
+    const dateA = new Date(scheduleA?.updatedAt)
+    const dateB = new Date(scheduleB?.updatedAt)
+    return dateB?.getTime() - dateA?.getTime()
+  })
+  appStore.setSchedules(mergedSchedules)
+  setLoadingTask("schedules", "Schedules and slides are ready.", 100)
 }
 
 const retrieveAllMediaFilesFromDB = async () => {
@@ -948,27 +1126,16 @@ async function openWindows() {
 }
 // WINDOW MANAGEMENT CODE ENDS HERE
 
-onMounted(() => {
-  downloadEssentialResources()
+onMounted(async () => {
+  downloadEssentialResources().catch((err) => {
+    console.error("Failed to finish loading resources:", err)
+    loadingResources.value = false
+  })
   fetchActiveAdvert()
   if (location.hostname !== "localhost") {
     useGtag()
   }
-
-  // Fetch user settings after essential resources are loaded
-  if (isAppOnline.value && authStore.user?._id) {
-    fetchUserSettings()
-  }
 })
-
-if (isAppOnline.value) {
-  fetchUser()
-  fetchChurch()
-  fetchAppInfo()
-  fetchHymns()
-  refreshLibrary()
-  fetchPlans()
-}
 </script>
 
 <style scoped></style>

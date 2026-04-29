@@ -1,76 +1,179 @@
 import { useAppStore } from '~/store/app'
 import type { BibleVerse, Scripture } from '~/types'
 
-const useScripture = async (label: string = '1:1:1', version: string = ''): Promise<Scripture | null> => {
-  const db = useIndexedDB()
+// ── Module-level index cache ────────────────────────────────────────────────
+// Built once per Bible version per session. Avoids re-scanning 31k+ verses on
+// every lookup. Keyed by version ID.
+interface VersionIndex {
+  /** "book:chapter:verse" → position in the data array */
+  verseMap: Map<string, number>
+  /** Set of book numbers that exist (for fast "book not found" check) */
+  bookSet: Set<number>
+  /** Set of "book:chapter" strings (for fast "chapter not found" check) */
+  chapterSet: Set<string>
+  data: BibleVerse[]
+}
+const versionIndexCache = new Map<string, VersionIndex>()
 
-  // set default version
-  const appStore = useAppStore()
-  version = version || appStore.currentState.settings.defaultBibleVersion || 'KJV'
+function buildIndex(version: string, data: BibleVerse[]): VersionIndex {
+  const verseMap = new Map<string, number>()
+  const bookSet = new Set<number>()
+  const chapterSet = new Set<string>()
 
-  const toast = useToast()
-
-  const shortLabelSplitted = label.split(':')
-  const book = Number(shortLabelSplitted?.[0] || "1")
-  const chapter = Number(shortLabelSplitted?.[1] || "1")
-  const verse = shortLabelSplitted?.[2]?.includes('-') ? shortLabelSplitted?.[2] : Number(shortLabelSplitted?.[2] || 1)
-  const verses: number[] = []
-
-  // If verse contains hyphen
-  if (verse.toString().includes('-')) {
-    const verseSplitted = verse.toString().split('-')
-    const verseStart = Number(verseSplitted?.[0] || "1")
-    const verseEnd = Number(verseSplitted?.[1] || "1")
-
-    for (let i = verseStart; i <= verseEnd; i++) {
-      verses.push(i)
-    }
-  } else {
-    verses.push(Number(verse))
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i]
+    if (!v) continue
+    const b = Number(v.book)
+    const c = Number(v.chapter)
+    const vs = Number(v.verse)
+    verseMap.set(`${b}:${c}:${vs}`, i)
+    bookSet.add(b)
+    chapterSet.add(`${b}:${c}`)
   }
 
-  let scripture = ''
+  const index: VersionIndex = { verseMap, bookSet, chapterSet, data }
+  versionIndexCache.set(version, index)
+  return index
+}
+
+async function getVersionIndex(version: string, db: any): Promise<VersionIndex | null> {
+  // Return cached index if already built
+  if (versionIndexCache.has(version)) return versionIndexCache.get(version)!
+
+  const bibleEntry = await db.bibleAndHymns.get(version)
+  if (!bibleEntry) return null
+
+  const data = bibleEntry.data as unknown as BibleVerse[]
+  if (!data?.length) return null
+
+  return buildIndex(version, data)
+}
+
+// ── Main composable ─────────────────────────────────────────────────────────
+
+const useScripture = async (label: string = '1:1:1', version: string = ''): Promise<Scripture | null> => {
+  const db = useIndexedDB()
+  const appStore = useAppStore()
+  const toast = useToast()
+
+  version = version || appStore.currentState.settings.defaultBibleVersion || 'KJV'
+
+  const shortLabelSplitted = label.split(':')
+  const book = Number(shortLabelSplitted?.[0] || '1')
+  const chapter = Number(shortLabelSplitted?.[1] || '1')
+  const verseRaw = shortLabelSplitted?.[2]?.includes('-')
+    ? shortLabelSplitted?.[2]
+    : Number(shortLabelSplitted?.[2] || 1)
+  const verses: number[] = []
+
+  // If verse contains hyphen (e.g. "3-5" → verses 3, 4, 5)
+  if (verseRaw.toString().includes('-')) {
+    const [startStr, endStr] = verseRaw.toString().split('-')
+    const verseStart = Number(startStr || '1')
+    const verseEnd = Number(endStr || '1')
+    for (let i = verseStart; i <= verseEnd; i++) verses.push(i)
+  } else {
+    verses.push(Number(verseRaw))
+  }
 
   try {
-    async function fetchScripture(version: string, db: any, book: number, chapter: number, verses: number[]): Promise<string | undefined> {
-      const bibleData = (await db.bibleAndHymns.get(version))?.data as unknown as BibleVerse[];
+    // ── 1. Load (or retrieve cached) index ───────────────────────────────
+    const index = await getVersionIndex(version, db)
 
-
-      // Since verses are sequential, we can optimize by finding start index
-      const startIndex = bibleData?.findIndex((scripture: any) =>
-        Number(scripture.book) === (book) &&
-        Number(scripture.chapter) === chapter &&
-        Number(scripture.verse) === verses[0]
-      );
-
-      if (startIndex === -1) return undefined;
-
-      // Get all verses in sequence and join them
-      return bibleData
-        ?.slice(startIndex, startIndex + verses.length)
-        .map(scripture => scripture.scripture)
-        .join(' ');
+    if (!index) {
+      // Distinguish: entry missing entirely vs entry has empty data
+      const bibleEntry = await db.bibleAndHymns.get(version)
+      if (!bibleEntry) {
+        toast.add({
+          title: `${version} is not downloaded yet.`,
+          description: 'Go to Settings → Bible Versions to download it.',
+          icon: 'i-bx-download',
+          color: 'amber',
+        })
+      } else {
+        toast.add({
+          title: `${version} data is empty`,
+          description: 'The downloaded Bible file appears to be corrupt. Try re-downloading it in Settings.',
+          icon: 'i-bx-error',
+          color: 'red',
+        })
+      }
+      return null
     }
 
-    // Fetch scripture and set most recent version as default
-    scripture = await fetchScripture(version, db, book, chapter, verses) as string;
+    const { verseMap, bookSet, chapterSet, data } = index
+
+    // ── 2. O(1) lookups using the index ──────────────────────────────────
+    const startIndex = verseMap.get(`${book}:${chapter}:${verses[0]}`)
+
+    if (startIndex === undefined) {
+      const bookName = bibleBooks?.[book - 1]
+
+      if (!bookSet.has(book)) {
+        toast.add({
+          title: 'Book not found',
+          description: bookName
+            ? `"${bookName}" was not found in ${version}.`
+            : `Book index ${book} does not exist in ${version}.`,
+          icon: 'i-bx-bible',
+          color: 'red',
+        })
+        return null
+      }
+
+      if (!chapterSet.has(`${book}:${chapter}`)) {
+        toast.add({
+          title: 'Chapter not found',
+          description: `${bookName || `Book ${book}`} chapter ${chapter} does not exist in ${version}.`,
+          icon: 'i-bx-bible',
+          color: 'red',
+        })
+        return null
+      }
+
+      toast.add({
+        title: 'Verse not found',
+        description: `${bookName || `Book ${book}`} ${chapter}:${verseRaw} does not exist in ${version}.`,
+        icon: 'i-bx-bible',
+        color: 'red',
+      })
+      return null
+    }
+
+    // ── 3. Slice and join ────────────────────────────────────────────────
+    const scripture = data
+      .slice(startIndex, startIndex + verses.length)
+      .map((v) => v.scripture)
+      .join(' ')
+
+    if (!scripture?.trim()) {
+      toast.add({
+        title: 'Empty verse',
+        description: `The verse text for ${bibleBooks?.[book - 1]} ${chapter}:${verseRaw} is empty in ${version}.`,
+        icon: 'i-bx-error',
+        color: 'amber',
+      })
+      return null
+    }
+
     if (!appStore.currentState.settings.defaultBibleVersion) {
-      appStore.setDefaultBibleVersion(version);
-    }
-
-    if (!scripture) {
-      throw new Error('Scripture not found')
+      appStore.setDefaultBibleVersion(version)
     }
 
     return {
-      label: `${bibleBooks?.[Number(book) - 1]} ${chapter}:${verse}`,
+      label: `${bibleBooks?.[book - 1]} ${chapter}:${verseRaw}`,
       content: scripture,
       version,
-      labelShortFormat: label
+      labelShortFormat: label,
     }
   } catch (err) {
-    console.log(err)
-    toast.add({ title: 'Scripture not found', icon: 'i-bx-error', color: 'red' })
+    console.error('[useScripture] Unexpected error:', err)
+    toast.add({
+      title: 'Failed to load scripture',
+      description: 'An unexpected error occurred. Please try again.',
+      icon: 'i-bx-error',
+      color: 'red',
+    })
   }
 
   return null
