@@ -1,3 +1,4 @@
+import { useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import type { BibleVersion } from "~/types"
 
@@ -43,6 +44,12 @@ export const useBibleVersionManager = () => {
    * Download a Bible version by ID, store it in IndexedDB, and refresh the list.
    */
   const downloadBibleVersion = async (bibleVersionId: string) => {
+    const online = useOnline()
+    if (!online.value) {
+      console.warn(`Skipping download of ${bibleVersionId}: offline`)
+      return
+    }
+
     const tempBibleVersionRecord = (version: string, data: any) => ({
       id: version,
       data,

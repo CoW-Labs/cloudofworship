@@ -1,7 +1,8 @@
 // minimalist-church-presentation-software/public/sw.js
 // Custom auto-updating service worker for Cloud of Worship
+// For APP to be updated, the service worker must be activated 
 
-const VERSION_ENDPOINT = "https://api.cloudofworship.com/api/v1/app-config/version"
+const VERSION_ENDPOINT = "https://api.cloudofworship.com/api/v1/health"
 const APP_VERSION_KEY = "appVersion"
 const DB_NAME = "cow-sw-meta"
 const DB_STORE = "meta"
@@ -106,7 +107,7 @@ self.addEventListener("fetch", (event) => {
   // Only handle same-origin requests, and skip the version endpoint itself
   if (
     url.origin === self.location.origin &&
-    !url.pathname.endsWith("/api/v1/app-config/version")
+    !url.pathname.endsWith("/api/v1/health")
   ) {
     event.respondWith(
       (async () => {
