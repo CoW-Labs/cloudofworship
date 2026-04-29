@@ -356,7 +356,7 @@ emitter.on("new-presentation", () => {
 const handleInputKeydown = (e: KeyboardEvent) => {
   // Get the current actions list based on search state
   const currentActions =
-    searchInput.value.length >= 2
+    searchInput.value?.length >= 2
       ? searchedActions.value
       : actions.value?.filter((a: QuickAction) => !a?.searchableOnly)
 
