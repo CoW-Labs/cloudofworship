@@ -38,7 +38,7 @@ jobs:
             echo "No previous merged release tag found; backfilling from repository root."
           fi
 
-          if git rev-parse --verify --quiet "refs/tags/${last_tag}" >/dev/null; then
+          if [[ -n "${last_tag}" ]]; then
             mapfile -t commits < <(git rev-list --reverse "${last_tag}..HEAD")
           else
             mapfile -t commits < <(git rev-list --reverse HEAD)
@@ -124,6 +124,7 @@ ${commit_body}"
               -d "$payload")
 
             if [[ "$status_code" != "201" && "$status_code" != "422" ]]; then
+              echo "Release API response:"
               cat /tmp/release-response.json
               echo "Failed to create release for ${next_tag} (HTTP ${status_code})"
               exit 1
