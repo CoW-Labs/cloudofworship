@@ -15,6 +15,8 @@ export interface ScriptureResult {
   shortLabel: string
   /** Human-readable label e.g. "John 3:16" */
   displayLabel: string
+  /** Monotonically increasing insertion order — used for newest-first display */
+  insertionOrder: number
 }
 
 /**
@@ -25,6 +27,7 @@ export default function useScriptureSearch() {
   const results = ref<ScriptureResult[]>([])
   const isSearching = ref(false)
   const lastQuery = ref('')
+  let insertionCounter = 0
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const DEBOUNCE_MS = 1200 // slightly longer window so the segment fully settles
@@ -71,6 +74,7 @@ export default function useScriptureSearch() {
         // Merge new results, avoiding duplicates by _id
         for (const item of enriched) {
           if (!results.value.some((r) => r._id === item._id)) {
+            item.insertionOrder = ++insertionCounter
             results.value.push(item)
           }
         }
@@ -121,6 +125,7 @@ export default function useScriptureSearch() {
         score: 0,
         shortLabel: ref.shortLabel,
         displayLabel: `${bookName} ${chapter}:${verse}`,
+        insertionOrder: ++insertionCounter,
       })
     }
   }
@@ -128,11 +133,13 @@ export default function useScriptureSearch() {
   const clearResults = () => {
     results.value = []
     lastQuery.value = ''
+    insertionCounter = 0
   }
 
   return {
     results: computed(() => results.value),
     isSearching: computed(() => isSearching.value),
+    lastQuery: computed(() => lastQuery.value),
     search,
     debouncedSearch,
     addFromBibleReferences,
