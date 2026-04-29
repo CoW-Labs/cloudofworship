@@ -103,12 +103,6 @@ export default function useSchedules() {
       return mergedSchedules
     } catch (error: any) {
       console.error('Error fetching schedules:', error)
-      toast.add({
-        icon: 'i-bx-error',
-        title: 'Failed to fetch schedules',
-        description: error.message,
-        color: 'red',
-      })
       return []
     } finally {
       loading.value = false
