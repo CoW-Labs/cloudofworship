@@ -280,15 +280,13 @@
             />
             <span
               class="text-xs font-semibold text-primary-600 dark:text-primary-400 group-hover:underline"
-            >
-              {{ result.displayLabel }}
-            </span>
+              v-html="highlightText(result.displayLabel, scriptureHighlightQuery)"
+            />
           </div>
           <p
             class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2"
-          >
-            {{ result.scripture }}
-          </p>
+            v-html="highlightText(result.scripture, scriptureHighlightQuery)"
+          />
         </button>
 
         <button
@@ -362,6 +360,7 @@
 import type { BibleReference } from "~/types/transcript"
 import type { ScriptureResult } from "~/composables/useScriptureSearch"
 import { appWideActions } from "~/utils/constants"
+import { highlightText } from "~/utils/highlightText"
 
 defineProps<{ visible: boolean }>()
 defineEmits<{ close: [] }>()
@@ -415,8 +414,17 @@ const {
 
 const scriptureVisibleCount = ref(20)
 const visibleScriptureResults = computed(() =>
-  [...scriptureResults.value].slice(0, scriptureVisibleCount.value)
+  [...scriptureResults.value]
+    .sort((a, b) => b.insertionOrder - a.insertionOrder)
+    .slice(0, scriptureVisibleCount.value)
 )
+
+// Highlight query: last 8 words from the most recent transcript segment
+const scriptureHighlightQuery = computed(() => {
+  const lastSegment = segments.value.at(-1)
+  if (!lastSegment?.text) return ''
+  return lastSegment.text.trim().split(/\s+/).slice(-8).join(' ')
+})
 
 // Track which segment ids have already been parsed so we only process new ones
 const parsedSegmentIds = new Set<string>()
