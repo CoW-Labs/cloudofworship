@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: release-pipeline
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -64,10 +68,11 @@ jobs:
             local patch="$3"
             local subject="$4"
             local body="$5"
-            local combined_message
-            combined_message="${subject}"$'\n'"${body}"
+            local combined_message="${subject}"$'\n'"${body}"
 
-            if [[ "$subject" =~ ^[a-zA-Z]+(\(.+\))?!: ]] || [[ "$subject" == BREAKING* ]] || [[ "$combined_message" == *"BREAKING CHANGE"* ]]; then
+            if [[ "$subject" =~ ^[a-zA-Z]+(\(.+\))?!: ]] || \
+               [[ "$subject" == BREAKING* ]] || \
+               [[ "$combined_message" == *"BREAKING CHANGE"* ]]; then
               major=$((major + 1))
               minor=0
               patch=0
@@ -81,32 +86,36 @@ jobs:
             echo "v${major}.${minor}.${patch}-beta"
           }
 
-          read -r current_major current_minor current_patch <<< "$(parse_version "${last_tag:-v0.0.0-beta}")"
+          read -r current_major current_minor current_patch <<< \
+            "$(parse_version "${last_tag:-v0.0.0-beta}")"
 
           for commit_sha in "${commits[@]}"; do
             commit_subject=$(git log -1 --pretty=%s "$commit_sha")
             commit_body=$(git log -1 --pretty=%b "$commit_sha")
 
-            next_tag=$(bump_version "$current_major" "$current_minor" "$current_patch" "$commit_subject" "$commit_body")
+            next_tag=$(bump_version \
+              "$current_major" "$current_minor" "$current_patch" \
+              "$commit_subject" "$commit_body")
 
-            while git rev-parse --verify --quiet "refs/tags/${next_tag}" >/dev/null; do
-              read -r current_major current_minor current_patch <<< "$(parse_version "$next_tag")"
-              current_patch=$((current_patch + 1))
-              next_tag="v${current_major}.${current_minor}.${current_patch}-beta"
+            while git rev-parse --verify --quiet "refs/tags/${next_tag}" 2>/dev/null; do
+              echo "Tag ${next_tag} already exists, incrementing patch to avoid collision..."
+              read -r col_major col_minor col_patch <<< "$(parse_version "$next_tag")"
+              col_patch=$((col_patch + 1))
+              next_tag="v${col_major}.${col_minor}.${col_patch}-beta"
             done
 
             echo "Creating ${next_tag} for ${commit_sha} (${commit_subject})"
 
-            git tag -a "$next_tag" "$commit_sha" -m "Release ${next_tag}"
-            git push origin "$next_tag"
+            if ! git rev-parse --verify --quiet "refs/tags/${next_tag}" 2>/dev/null; then
+              git tag -a "$next_tag" "$commit_sha" -m "Release ${next_tag}"
+              git push origin "$next_tag"
+            else
+              echo "Tag ${next_tag} already pushed, skipping tag creation."
+            fi
 
-            release_notes="- ${commit_subject}
-
-Commit: ${commit_sha}"
+            release_notes="- ${commit_subject}"$'\n\n'"Commit: ${commit_sha}"
             if [[ -n "${commit_body}" ]]; then
-              release_notes="${release_notes}
-
-${commit_body}"
+              release_notes="${release_notes}"$'\n\n'"${commit_body}"
             fi
 
             payload=$(jq -n \
@@ -130,8 +139,9 @@ ${commit_body}"
               exit 1
             fi
             if [[ "$status_code" == "422" ]]; then
-              echo "Release already exists or was skipped by API validation for ${next_tag}"
+              echo "Release already exists for ${next_tag}, skipping."
             fi
 
-            read -r current_major current_minor current_patch <<< "$(parse_version "$next_tag")"
+            read -r current_major current_minor current_patch <<< \
+              "$(parse_version "$next_tag")"
           done
