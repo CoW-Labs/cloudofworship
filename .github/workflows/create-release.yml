@@ -61,13 +61,14 @@ jobs:
             local major="$1"
             local minor="$2"
             local patch="$3"
-            local message="$4"
+            local subject="$4"
+            local body="$5"
 
-            if [[ "$message" == BREAKING* ]] || [[ "$message" == *"BREAKING CHANGE"* ]]; then
+            if [[ "$subject" == BREAKING* ]] || [[ "$subject"$'\n'"$body" == *"BREAKING CHANGE"* ]]; then
               major=$((major + 1))
               minor=0
               patch=0
-            elif [[ "$message" == feat:* ]]; then
+            elif [[ "$subject" =~ ^feat(\(.+\))?: ]]; then
               minor=$((minor + 1))
               patch=0
             else
@@ -83,7 +84,7 @@ jobs:
             commit_subject=$(git log -1 --pretty=%s "$commit_sha")
             commit_body=$(git log -1 --pretty=%b "$commit_sha")
 
-            next_tag=$(bump_version "$current_major" "$current_minor" "$current_patch" "$commit_subject")
+            next_tag=$(bump_version "$current_major" "$current_minor" "$current_patch" "$commit_subject" "$commit_body")
 
             while git rev-parse --verify --quiet "refs/tags/${next_tag}" >/dev/null; do
               read -r current_major current_minor current_patch <<< "$(parse_version "$next_tag")"
@@ -119,7 +120,7 @@ ${commit_body}"
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" \
               -d "$payload")
 
-            if [[ "$status_code" != "201" ]]; then
+            if [[ "$status_code" != "201" && "$status_code" != "422" ]]; then
               cat /tmp/release-response.json
               echo "Failed to create release for ${next_tag}"
               exit 1
