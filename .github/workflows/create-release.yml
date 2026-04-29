@@ -32,11 +32,11 @@ jobs:
           git fetch --tags --force
 
           last_tag=$(git tag --merged HEAD --list 'v*' --sort=-version:refname | head -n 1 || true)
-          if [[ -z "${last_tag}" ]]; then
-            last_tag="v0.0.0-beta"
+          if [[ -n "${last_tag}" ]]; then
+            echo "Latest merged release tag: ${last_tag}"
+          else
+            echo "No previous merged release tag found; backfilling from repository root."
           fi
-
-          echo "Latest merged release tag: ${last_tag}"
 
           if git rev-parse --verify --quiet "refs/tags/${last_tag}" >/dev/null; then
             mapfile -t commits < <(git rev-list --reverse "${last_tag}..HEAD")
@@ -80,7 +80,7 @@ jobs:
             echo "v${major}.${minor}.${patch}-beta"
           }
 
-          read -r current_major current_minor current_patch <<< "$(parse_version "$last_tag")"
+          read -r current_major current_minor current_patch <<< "$(parse_version "${last_tag:-v0.0.0-beta}")"
 
           for commit_sha in "${commits[@]}"; do
             commit_subject=$(git log -1 --pretty=%s "$commit_sha")
@@ -124,7 +124,7 @@ ${commit_body}"
 
             if [[ "$status_code" != "201" && "$status_code" != "422" ]]; then
               cat /tmp/release-response.json
-              echo "Failed to create release for ${next_tag}"
+              echo "Failed to create release for ${next_tag} (HTTP ${status_code})"
               exit 1
             fi
             if [[ "$status_code" == "422" ]]; then
