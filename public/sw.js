@@ -6,6 +6,7 @@ const APP_VERSION_KEY = "appVersion"
 const DB_NAME = "cow-sw-meta"
 const DB_STORE = "meta"
 const DEFAULT_APP_VERSION = "v0"
+const NAVIGATION_FALLBACK_URLS = ["/", "/login"]
 
 // IndexedDB helpers
 function openDB() {
@@ -37,6 +38,25 @@ async function setVersion(version) {
     tx.oncomplete = () => resolve()
     tx.onerror = () => resolve()
   })
+}
+
+async function getCacheName() {
+  const appVersion = (await getVersion()) || DEFAULT_APP_VERSION
+  return `app-cache-${appVersion}`
+}
+
+async function matchCachedResponse(cache, req) {
+  return (
+    (await cache.match(req)) ||
+    (await cache.match(req, { ignoreSearch: true }))
+  )
+}
+
+async function matchNavigationFallback(cache) {
+  for (const url of NAVIGATION_FALLBACK_URLS) {
+    const cachedResp = await cache.match(url)
+    if (cachedResp) return cachedResp
+  }
 }
 
 // Helper to get appVersion from API
@@ -81,6 +101,8 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request
   const url = new URL(req.url)
+  if (req.method !== "GET") return
+
   // Only handle same-origin requests, and skip the version endpoint itself
   if (
     url.origin === self.location.origin &&
@@ -88,12 +110,10 @@ self.addEventListener("fetch", (event) => {
   ) {
     event.respondWith(
       (async () => {
-        const appVersion = (await getVersion()) || DEFAULT_APP_VERSION
-        const cacheKey = `app-cache-${appVersion}`
+        const cacheKey = await getCacheName()
         try {
           const networkResp = await fetch(req)
-          // Only cache GET requests
-          if (req.method === "GET" && networkResp.ok) {
+          if (networkResp.ok) {
             const cache = await caches.open(cacheKey)
             cache.put(req, networkResp.clone())
           }
@@ -101,8 +121,14 @@ self.addEventListener("fetch", (event) => {
         } catch (e) {
           // Network failed, try cache
           const cache = await caches.open(cacheKey)
-          const cachedResp = await cache.match(req)
+          const cachedResp = await matchCachedResponse(cache, req)
           if (cachedResp) return cachedResp
+
+          if (req.mode === "navigate") {
+            const fallbackResp = await matchNavigationFallback(cache)
+            if (fallbackResp) return fallbackResp
+          }
+
           throw e
         }
       })()

@@ -212,13 +212,8 @@ const fetchChurch = async () => {
       fetchChurchSongs()
     }
     if (error.value) {
-      useToast().add({
-        icon: "i-mdi-alert-circle-outline",
-        title: "Reach out to support, your church information is corrupted.",
-        color: "red",
-      })
-      authStore.signOut()
-      throw new Error(error.value?.message)
+      navigateTo("/login")
+      console.warn("Unable to refresh church information:", error.value)
     }
   } else {
     if (!authStore.user?._id) {

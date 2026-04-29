@@ -29,7 +29,7 @@ export const useAuthToken = () => {
     if (isTauri) {
       return authStore.token
     }
-    return tokenCookie.value
+    return tokenCookie.value || authStore.token
   }
 
   /**
@@ -37,22 +37,26 @@ export const useAuthToken = () => {
    * Stores in Pinia if Tauri, otherwise in cookie
    */
   const setToken = (token: string | null | undefined) => {
+    authStore.setToken(token || null)
+
     if (isTauri) {
-      authStore.setToken(token || null)
-    } else {
-      tokenCookie.value = token
+      return
     }
+
+    tokenCookie.value = token
   }
 
   /**
    * Clear the token
    */
   const clearToken = () => {
+    authStore.setToken(null)
+
     if (isTauri) {
-      authStore.setToken(null)
-    } else {
-      tokenCookie.value = undefined
+      return
     }
+
+    tokenCookie.value = undefined
   }
 
   return {

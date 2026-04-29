@@ -60,8 +60,7 @@ export default function useScriptureSearch() {
       )
       if (data.value) {
         const payload = data.value as { results: any[] }
-        // Best match comes last so it appears at the bottom of the list (most prominent)
-        const enriched = (payload.results || []).reverse().map(enrichResult)
+        const enriched = (payload.results || []).map(enrichResult)
 
         // Merge new results, avoiding duplicates by _id
         for (const item of enriched) {
@@ -69,6 +68,9 @@ export default function useScriptureSearch() {
             results.value.push(item)
           }
         }
+
+        // Sort results by relevance (score)
+        results.value.sort((a, b) => b.score - a.score)
       }
     } catch (err) {
       console.error('Scripture search failed:', err)

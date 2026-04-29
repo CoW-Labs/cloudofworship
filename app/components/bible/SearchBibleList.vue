@@ -388,7 +388,6 @@ watch(isSearching, (val) => {
 watch(onlineSearchResults, (results) => {
   if (shouldUseOnlineSearch.value) {
     const tempResults = results as unknown as BibleVerse[]
-    tempResults.reverse()
     verses.value = tempResults
   }
 })
