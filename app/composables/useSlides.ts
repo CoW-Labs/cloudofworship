@@ -113,12 +113,12 @@ export default function useSlides() {
       return data.value as Slide[]
     } catch (error: any) {
       console.error('Error getting saved slides:', error)
-      toast.add({
-        icon: 'i-bx-error',
-        title: 'Failed to fetch saved slides',
-        description: error.message,
-        color: 'red',
-      })
+      // toast.add({
+      //   icon: 'i-bx-error',
+      //   title: 'Failed to fetch saved slides',
+      //   description: error.message,
+      //   color: 'red',
+      // })
       return []
     } finally {
       loading.value = false
