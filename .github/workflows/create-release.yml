@@ -11,7 +11,6 @@ jobs:
       contents: write
     outputs:
       next_version: ${{ steps.versioning.outputs.next_version }}
-      release_notes: ${{ steps.release_notes.outputs.release_notes }}
       skip_release: ${{ steps.versioning.outputs.skip_release }}
 
     runs-on: ubuntu-latest
@@ -48,16 +47,11 @@ jobs:
             filtered_commits+="$line"$'\n'
           done <<< "$commits"
 
-          escaped_commits=$(printf "%s" "$filtered_commits" | jq -Rsa .)
-
-          echo "release_notes=$escaped_commits" >> $GITHUB_ENV
-          echo "release_notes=$escaped_commits" >> $GITHUB_OUTPUT
+          printf "%s" "$filtered_commits" > release_notes.txt
 
       - name: Generate Next Version Tag
         id: versioning
         run: |
-          release_notes=${{ env.release_notes }}
-
           hasMajor=0
           hasMinor=0
           hasPatch=0
@@ -83,7 +77,7 @@ jobs:
             elif [[ $line == "- fix:"* ]]; then
               hasPatch=1
             fi
-          done <<< "$(echo -e "$release_notes")"
+          done < release_notes.txt
 
           last_tag=${{ env.last_tag }}
 
@@ -187,5 +181,5 @@ jobs:
         run: |
           gh release create ${{ env.next_version }} \
             --title "Release ${{ env.next_version }}" \
-            --notes "${{ env.release_notes }}" \
+            --notes-file release_notes.txt \
             --target ${{ github.event.pull_request.head.ref }}
