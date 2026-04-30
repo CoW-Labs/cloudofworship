@@ -15,8 +15,12 @@ export interface ScriptureResult {
   shortLabel: string
   /** Human-readable label e.g. "John 3:16" */
   displayLabel: string
-  /** Monotonically increasing insertion order — used for newest-first display */
-  insertionOrder: number
+  /**
+   * Which search batch this result belongs to. Increments on every `search()`
+   * call so the most recent batch always sorts above older ones. Within a batch,
+   * results are ordered by `score`.
+   */
+  batchId: number
 }
 
 /**
@@ -27,7 +31,8 @@ export default function useScriptureSearch() {
   const results = ref<ScriptureResult[]>([])
   const isSearching = ref(false)
   const lastQuery = ref('')
-  let insertionCounter = 0
+  let batchCounter = 0
+  let latestSearchId = 0
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const DEBOUNCE_MS = 1200 // slightly longer window so the segment fully settles
@@ -50,7 +55,10 @@ export default function useScriptureSearch() {
    */
   const search = async (query: string, version = 'nkjv') => {
     const trimmed = query.trim()
+    const searchId = ++latestSearchId
+
     if (!trimmed || trimmed.length < 10) {
+      results.value = []
       isSearching.value = false
       return
     }
@@ -63,29 +71,36 @@ export default function useScriptureSearch() {
     lastQuery.value = trimmed
 
     isSearching.value = true
+    const currentBatch = ++batchCounter
     try {
       const { data } = await useAPIFetch(
         `/scripture/search?q=${encodeURIComponent(trimmed)}&limit=20`
       )
+      if (searchId !== latestSearchId) return
+
       if (data.value) {
         const payload = data.value as { results: any[] }
         const enriched = (payload.results || []).map(enrichResult)
 
-        // Merge new results, avoiding duplicates by _id
+        // Merge new results — if a result already exists, move it into the
+        // current batch and refresh its score so it sorts correctly within it.
         for (const item of enriched) {
-          if (!results.value.some((r) => r._id === item._id)) {
-            item.insertionOrder = ++insertionCounter
+          const existing = results.value.find((r) => r._id === item._id)
+          if (existing) {
+            existing.batchId = currentBatch
+            existing.score = item.score
+          } else {
+            item.batchId = currentBatch
             results.value.push(item)
           }
         }
-
-        // Sort results by relevance (score)
-        results.value.sort((a, b) => b.score - a.score)
       }
     } catch (err) {
       console.error('Scripture search failed:', err)
     } finally {
-      isSearching.value = false
+      if (searchId === latestSearchId) {
+        isSearching.value = false
+      }
     }
   }
 
@@ -115,17 +130,19 @@ export default function useScriptureSearch() {
       if (results.value.some((r) => r.shortLabel === ref.shortLabel)) continue
 
       results.value.push({
-        _id: ref.shortLabel, // stable unique id
+        _id: ref.shortLabel,
         book: bookIndexStr ?? '',
         chapter: chapter ?? '',
         verse: verse ?? '',
-        scripture: ref.text, // the original matched text from the transcript
+        scripture: ref.text,
         version: 'kjv',
         lang: 'en',
         score: 0,
         shortLabel: ref.shortLabel,
         displayLabel: `${bookName} ${chapter}:${verse}`,
-        insertionOrder: ++insertionCounter,
+        // Use the next batch slot so a freshly-spoken reference floats to the
+        // top. Pre-increment so it sits above any AI results in the current batch.
+        batchId: ++batchCounter,
       })
     }
   }
@@ -133,7 +150,8 @@ export default function useScriptureSearch() {
   const clearResults = () => {
     results.value = []
     lastQuery.value = ''
-    insertionCounter = 0
+    batchCounter = 0
+    latestSearchId++
   }
 
   return {

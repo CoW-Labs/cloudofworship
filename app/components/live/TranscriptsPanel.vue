@@ -417,7 +417,7 @@ const {
 const scriptureVisibleCount = ref(20)
 const visibleScriptureResults = computed(() =>
   [...scriptureResults.value]
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.batchId - a.batchId || b.score - a.score)
     .slice(0, scriptureVisibleCount.value)
 )
 
