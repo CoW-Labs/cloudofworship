@@ -24,48 +24,55 @@
     @delete-selected-slides="deleteMultipleSlides(bulkSelectedSlides)"
   >
     <div
+      ref="slidesScroll"
       class="slides-ctn overflow-y-scroll mb-4 rounded-md transition h-[50%]"
       :class="[
         slides?.length === 0 ? 'bg-primary-100 dark:bg-primary-900' : '',
       ]"
+      @scroll.passive="onSlidesGridScroll"
     >
       <div
         v-if="slides?.length > 0"
-        ref="slidesGrid"
-        class="grid slides-grid gap-3"
+        class="virtual-slides-grid"
       >
-        <SlideCard
-          v-for="(slide, index) in slides"
-          :key="slide.id"
-          :slide="slide"
-          :live="false"
-          :selectable="bulkSelectSlides"
-          :id="slide?.id?.replace(/\d+/g, '')"
-          :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
-          :editing-by="getSlideEditor(slide.id)"
-          grid-type
-          :selected="activeSlide?.id === slide?.id"
-          @click="
-            bulkSelectSlides
-              ? null
-              : makeSlideActive(slide, {
-                  goLive: false,
-                  newlyCreated: false,
-                })
-          "
-          @duplicate="
-            (slide) => {
-              const newSlide = duplicateSlide(slide)
-              slides.push(newSlide)
-              makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
-              uploadOfflineSlides()
-            }
-          "
-          @delete="deleteSlide"
-          @save-slide="saveSlide(slide)"
-          @save-as-template="openSaveTemplateModal(slide)"
-          @bulk-selected="addToSelectedSlides(slide?.id, $event)"
-        />
+        <div :style="{ height: `${virtualTopSpacer}px` }" />
+        <div ref="slidesGrid" class="grid slides-grid gap-3">
+          <SlideCard
+            v-for="{ slide, index } in virtualSlides"
+            :key="slide.id"
+            v-memo="[
+              slide.id,
+              slide.updatedAt,
+              slide.name,
+              activeSlide?.id === slide?.id,
+              bulkSelectSlides,
+              bulkSelectedSlides.includes(slide?.id),
+              getSlideEditor(slide.id)?.userId,
+            ]"
+            :slide="slide"
+            :live="false"
+            :selectable="bulkSelectSlides"
+            :id="slide?.id?.replace(/\d+/g, '')"
+            :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
+            :editing-by="getSlideEditor(slide.id)"
+            grid-type
+            :selected="activeSlide?.id === slide?.id"
+            @click="
+              bulkSelectSlides
+                ? null
+                : makeSlideActive(slide, {
+                    goLive: false,
+                    newlyCreated: false,
+                  })
+            "
+            @duplicate="duplicatePreviewSlide"
+            @delete="deleteSlide"
+            @save-slide="saveSlide(slide)"
+            @save-as-template="openSaveTemplateModal(slide)"
+            @bulk-selected="addToSelectedSlides(slide?.id, $event)"
+          />
+        </div>
+        <div :style="{ height: `${virtualBottomSpacer}px` }" />
       </div>
       <EmptyState
         v-else
@@ -198,12 +205,14 @@ const broadcastSlideCreated = (slide: any) => {
 }
 
 /**
- * Get the name of the user currently editing a slide (if any)
+ * Get the user currently editing a slide (if any)
  */
-const getSlideEditor = (slideId: string): string | undefined => {
+const getSlideEditor = (
+  slideId: string
+): { userId: string; userName: string } | undefined => {
   const editInfo = appStore.currentState.slidesBeingEdited?.[slideId]
   if (editInfo && editInfo.userId !== authStore.user?._id) {
-    return editInfo.userName
+    return editInfo
   }
   return undefined
 }
@@ -220,10 +229,19 @@ const windowHeight = ref<number>(0)
 const activeSlide = ref<Slide>()
 const { currentState } = storeToRefs(appStore)
 const slidesGrid = ref<HTMLDivElement | null>(null)
+const slidesScroll = ref<HTMLDivElement | null>(null)
 const bulkActionLabel = ref<string>("Select Slides")
 const bulkActionIcon = ref<string>("")
 const bulkSelectSlides = ref<boolean>(false)
 const bulkSelectedSlides = ref<string[]>([])
+const slideGridColumns = ref(1)
+const slideVirtualStartRow = ref(0)
+const slideViewportHeight = ref(0)
+const slideCardRowHeight = 132
+const slideGridGap = 12
+const slideMinCardWidth = 170
+const slideOverscanRows = 3
+let slidesResizeObserver: ResizeObserver | null = null
 
 // Save as Template Modal
 const showSaveTemplateModal = ref(false)
@@ -245,13 +263,126 @@ const makeSlideActive = (
   }
 }
 
+const duplicatePreviewSlide = (slide: Slide) => {
+  const newSlide = duplicateSlide(slide)
+  if (!newSlide) return
+
+  slides.value?.push(newSlide)
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  uploadOfflineSlides()
+}
+
 onMounted(() => {
   windowHeight.value = document.documentElement.offsetHeight
   addEventListener("resize", () => {
     windowHeight.value = document.documentElement.offsetHeight
+    updateSlideGridMetrics()
+  })
+  nextTick(() => {
+    updateSlideGridMetrics()
+    if (slidesScroll.value) {
+      slidesResizeObserver = new ResizeObserver(updateSlideGridMetrics)
+      slidesResizeObserver.observe(slidesScroll.value)
+    }
   })
   uploadOfflineSlides()
 })
+
+onBeforeUnmount(() => {
+  slidesResizeObserver?.disconnect()
+  slidesResizeObserver = null
+})
+
+const updateSlideGridMetrics = () => {
+  const scrollEl = slidesScroll.value
+  if (!scrollEl) return
+
+  slideViewportHeight.value = scrollEl.clientHeight
+  slideGridColumns.value = Math.max(
+    1,
+    Math.floor(
+      (scrollEl.clientWidth + slideGridGap) /
+        (slideMinCardWidth + slideGridGap)
+    )
+  )
+  slideVirtualStartRow.value = Math.floor(
+    scrollEl.scrollTop / slideCardRowHeight
+  )
+}
+
+const onSlidesGridScroll = () => {
+  const scrollEl = slidesScroll.value
+  if (!scrollEl) return
+  slideVirtualStartRow.value = Math.floor(
+    scrollEl.scrollTop / slideCardRowHeight
+  )
+}
+
+const totalSlideRows = computed(() => {
+  return Math.ceil((slides.value?.length || 0) / slideGridColumns.value)
+})
+
+const virtualStartRow = computed(() => {
+  return Math.max(0, slideVirtualStartRow.value - slideOverscanRows)
+})
+
+const virtualVisibleRows = computed(() => {
+  return (
+    Math.ceil(slideViewportHeight.value / slideCardRowHeight) +
+    slideOverscanRows * 2
+  )
+})
+
+const virtualEndRow = computed(() => {
+  return Math.min(
+    totalSlideRows.value,
+    virtualStartRow.value + virtualVisibleRows.value
+  )
+})
+
+const virtualSlides = computed(() => {
+  const startIndex = virtualStartRow.value * slideGridColumns.value
+  const endIndex = Math.min(
+    slides.value?.length || 0,
+    virtualEndRow.value * slideGridColumns.value
+  )
+
+  return (slides.value || [])
+    .slice(startIndex, endIndex)
+    .map((slide, offset) => ({
+      slide,
+      index: startIndex + offset,
+    }))
+})
+
+const virtualTopSpacer = computed(
+  () => virtualStartRow.value * slideCardRowHeight
+)
+const virtualBottomSpacer = computed(() => {
+  return Math.max(
+    0,
+    (totalSlideRows.value - virtualEndRow.value) * slideCardRowHeight
+  )
+})
+
+const scrollToSlide = (slideId?: string) => {
+  const scrollEl = slidesScroll.value
+  if (!scrollEl || !slideId) return
+
+  const slideIndex = slides.value.findIndex((slide) => slide.id === slideId)
+  if (slideIndex < 0) return
+
+  const row = Math.floor(slideIndex / slideGridColumns.value)
+  const top = row * slideCardRowHeight
+
+  if (
+    top < scrollEl.scrollTop ||
+    top + slideCardRowHeight > scrollEl.scrollTop + scrollEl.clientHeight
+  ) {
+    scrollEl.scrollTop = top
+    onSlidesGridScroll()
+  }
+}
 
 // LISTEN TO EVENTS
 const emitter = useNuxtApp().$emitter as Emitter<any>
@@ -262,13 +393,16 @@ emitter.on("new-slide", () => {
   uploadOfflineSlides()
 })
 
-emitter.on("new-text", (slide: Slide[]) => {
-  let newSlide
+emitter.on("new-text", (slide: Slide[] | Slide) => {
+  let newSlide: Slide | null
   if (slide) {
-    newSlide = duplicateSlide(slide?.[0] || slide)
+    const sourceSlide = Array.isArray(slide) ? slide[0] : slide
+    newSlide = sourceSlide ? duplicateSlide(sourceSlide) : null
   } else {
     newSlide = createTextSlide()
   }
+  if (!newSlide) return
+
   slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   // Broadcast slide creation immediately for real-time sync
@@ -391,7 +525,9 @@ emitter.on("new-media", async (data: ExtendedFileT[]) => {
   if (data && data?.length > 0) {
     let newSlides: Slide[]
 
-    if (data?.[0]?.fromTemplate) {
+    if (
+      (data?.[0] as ExtendedFileT & { fromTemplate?: boolean })?.fromTemplate
+    ) {
       newSlides = data as unknown as Slide[]
       newSlides.forEach((slide) => {
         delete slide._id
@@ -683,6 +819,7 @@ watch(
   }),
   () => {
     nextTick(() => {
+      scrollToSlide(activeSlide.value?.id)
       const slideId = activeSlide.value?.id
       const selectorId = slideId?.replace(/\d+/g, "")
       // Guard against an empty or invalid CSS selector (e.g. slide ID is all digits)

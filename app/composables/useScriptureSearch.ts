@@ -32,6 +32,7 @@ export default function useScriptureSearch() {
   const isSearching = ref(false)
   const lastQuery = ref('')
   let batchCounter = 0
+  let latestSearchId = 0
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const DEBOUNCE_MS = 1200 // slightly longer window so the segment fully settles
@@ -54,7 +55,10 @@ export default function useScriptureSearch() {
    */
   const search = async (query: string, version = 'nkjv') => {
     const trimmed = query.trim()
+    const searchId = ++latestSearchId
+
     if (!trimmed || trimmed.length < 10) {
+      results.value = []
       isSearching.value = false
       return
     }
@@ -72,6 +76,8 @@ export default function useScriptureSearch() {
       const { data } = await useAPIFetch(
         `/scripture/search?q=${encodeURIComponent(trimmed)}&limit=20`
       )
+      if (searchId !== latestSearchId) return
+
       if (data.value) {
         const payload = data.value as { results: any[] }
         const enriched = (payload.results || []).map(enrichResult)
@@ -92,7 +98,9 @@ export default function useScriptureSearch() {
     } catch (err) {
       console.error('Scripture search failed:', err)
     } finally {
-      isSearching.value = false
+      if (searchId === latestSearchId) {
+        isSearching.value = false
+      }
     }
   }
 
@@ -143,6 +151,7 @@ export default function useScriptureSearch() {
     results.value = []
     lastQuery.value = ''
     batchCounter = 0
+    latestSearchId++
   }
 
   return {
