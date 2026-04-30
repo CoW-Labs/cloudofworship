@@ -19,14 +19,11 @@
       ])
     "
   >
-    <div
-      class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
-    >
-      <LiveContentWithBackground
-        :slide="slide"
-        :slide-styles="currentState?.settings?.slideStyles"
-      />
-    </div>
+    <DeferredSlidePreview
+      preview-class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
+      :slide="slide"
+      :slide-styles="currentState?.settings?.slideStyles"
+    />
     <div class="texts flex-col justify-between">
       <h4
         class="font-medium mt-2 break-all"

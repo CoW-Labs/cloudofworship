@@ -51,21 +51,26 @@
           <button
             class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-primary-950 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900 transition-all cursor-pointer relative"
             :id="slide?.id"
+            v-memo="[
+              slide?.id,
+              slide?.updatedAt,
+              slide?.name,
+              liveSlide?.id === slide?.id,
+              ctrlOrMetaActive,
+            ]"
             :class="{
               'bg-red-100 dark:bg-red-900': liveSlide?.id === slide?.id,
             }"
             @click="setLiveSlide(slide?.id || '0')"
             @dblclick="useGlobalEmit(appWideActions.newActiveSlide, slide)"
           >
-            <div
-              class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
-            >
-              <LiveContentWithBackground
-                :slide="slide"
-                :slide-label="slide?.name"
-                :slide-styles="currentState.settings.slideStyles"
-              />
-            </div>
+            <DeferredSlidePreview
+              preview-class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
+              :slide="slide"
+              :slide-label="slide?.name"
+              :slide-styles="currentState.settings.slideStyles"
+              :eager="liveSlide?.id === slide?.id"
+            />
             <div class="texts flex-col justify-between">
               <h4
                 class="font-medium mt-2 overflow-hidden truncate w-40 2xl:w-56"

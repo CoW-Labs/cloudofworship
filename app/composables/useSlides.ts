@@ -491,6 +491,8 @@ export default function useSlides() {
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/${slide._id}/save`,
         {
           method: 'PUT',
+          // Send the full slide so the backend can recreate it if it was deleted
+          body: slide,
           key: `save-slide-${slide._id}`,
         }
       )
