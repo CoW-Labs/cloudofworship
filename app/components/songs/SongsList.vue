@@ -87,13 +87,22 @@ const searchedSongs = ref<Song[]>([])
 const focusedActionIndex = ref(0)
 const quickActions = ref<HTMLDivElement | null>(null)
 const authStore = useAuthStore()
+let latestSongSearchId = 0
 
 const getSongs = async (query: string = "") => {
+  const searchId = ++latestSongSearchId
+  songs.value = []
+
   try {
     const results = await searchSongs(query, 20)
-    songs.value = results
+    if (searchId === latestSongSearchId) {
+      songs.value = results
+      searchedSongs.value = results
+    }
   } catch (err) {
-    toast.add({ title: "You are offline.", color: "red", icon: "i-bx-error" })
+    if (searchId === latestSongSearchId) {
+      toast.add({ title: "You are offline.", color: "red", icon: "i-bx-error" })
+    }
   }
 }
 
@@ -129,5 +138,5 @@ getSongs(props.query || "")
 
 const onSearchInput = useDebounceFn(async () => {
   getSongs(searchInput.value)
-}, 1000)
+}, 400)
 </script>

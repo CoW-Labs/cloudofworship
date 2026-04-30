@@ -13,13 +13,13 @@
       :class="['transition-all', { 'opacity-70 ': selectable }]"
       @click="$emit('click')"
     >
-      <div class="slide-preview text-white overflow-hidden md-preview">
-        <LiveContentWithBackground
-          :slide="slide"
-          :slide-label="slide?.name"
-          :slide-styles="currentState.settings.slideStyles"
-        />
-      </div>
+      <DeferredSlidePreview
+        preview-class="slide-preview text-white overflow-hidden md-preview"
+        :slide="slide"
+        :slide-label="slide?.name"
+        :slide-styles="currentState.settings.slideStyles"
+        :eager="selected"
+      />
       <div
         class="overlay-gradient absolute inset-0"
         :class="{ 'border-4 border-primary': selected }"
@@ -144,15 +144,12 @@
     :id="slide?.id"
     @click="appStore.setLiveSlide(slide?.id || '0')"
   >
-    <div
-      class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
-    >
-      <LiveContentWithBackground
-        :slide="slide"
-        :slide-label="slide?.name"
-        :slide-styles="currentState.settings.slideStyles"
-      />
-    </div>
+    <DeferredSlidePreview
+      preview-class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
+      :slide="slide"
+      :slide-label="slide?.name"
+      :slide-styles="currentState.settings.slideStyles"
+    />
     <div class="texts flex-col justify-between">
       <h4 class="font-medium mt-2">{{ slide?.name }}</h4>
       <SlideChip :slide-type="slide?.type" class="mt-1" />
@@ -206,6 +203,8 @@ const emit = defineEmits([
   "save-slide",
   "save-as-template",
   "duplicate",
+  "delete",
+  "bulk-selected",
   "click",
 ])
 
