@@ -28,7 +28,7 @@
           size: 'text-xs',
         },
       }"
-      @open="$emit('open')"
+      @open="onOpen"
       @close="$emit('close')"
       @change="
         $event === '+ More Versions'
@@ -70,7 +70,17 @@ const bibleVersion = ref<string>(
 )
 const emit = defineEmits(["change", "open", "close"])
 
-const { bibleVersionSelectOptions } = useBibleVersionManager()
+const { bibleVersionSelectOptions, populateBibleVersionOptions } =
+  useBibleVersionManager()
+
+const onOpen = async () => {
+  await populateBibleVersionOptions()
+  emit("open")
+}
+
+onMounted(() => {
+  populateBibleVersionOptions()
+})
 
 watch(
   () => props.bibleVersionInherited,

@@ -21,6 +21,7 @@
         action="new-song-search"
         :query="searchInput"
         action-text="Search in songs"
+        class="max-h-[140px]"
       />
     </Transition>
 

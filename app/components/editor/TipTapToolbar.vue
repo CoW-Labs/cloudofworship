@@ -3,10 +3,10 @@
     v-if="editor"
     class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] p-1 right-0 left-0 top-[45px]"
     :class="containerOverflow"
+    @mousedown.capture="onToolbarMouseDown"
   >
     <UButton
-      @click="editor.chain().focus().toggleBold().run()"
-      :disabled="!editor.can().chain().focus().toggleBold().run()"
+      @click="runCommand((chain) => chain.toggleBold())"
       :class="{
         'bg-primary text-white dark:text-primary-900': editor.isActive('bold'),
       }"
@@ -14,8 +14,7 @@
       variant="ghost"
     />
     <UButton
-      @click="editor.chain().focus().toggleItalic().run()"
-      :disabled="!editor.can().chain().focus().toggleItalic().run()"
+      @click="runCommand((chain) => chain.toggleItalic())"
       :class="{
         'bg-primary text-white dark:text-primary-900':
           editor.isActive('italic'),
@@ -24,8 +23,7 @@
       variant="ghost"
     />
     <UButton
-      @click="editor.chain().focus().toggleStrike().run()"
-      :disabled="!editor.can().chain().focus().toggleStrike().run()"
+      @click="runCommand((chain) => chain.toggleStrike())"
       :class="{
         'bg-primary text-white dark:text-primary-900':
           editor.isActive('strike'),
@@ -73,7 +71,7 @@
       variant="ghost"
     />
     <UButton
-      @click="editor.chain().focus().toggleBulletList().run()"
+      @click="runCommand((chain) => chain.toggleBulletList())"
       :class="{
         'bg-primary text-white dark:text-primary-900':
           editor.isActive('bulletList'),
@@ -82,7 +80,7 @@
       variant="ghost"
     />
     <UButton
-      @click="editor.chain().focus().toggleOrderedList().run()"
+      @click="runCommand((chain) => chain.toggleOrderedList())"
       :class="{
         'bg-primary text-white dark:text-primary-900':
           editor.isActive('orderedList'),
@@ -94,7 +92,7 @@
       class="button-group bg-primary-100 dark:bg-primary-900 rounded-md mx-1 p-1 flex items-center gap-1"
     >
       <UButton
-        @click="editor.chain().focus().setTextAlign('left').run()"
+        @click="runCommand((chain) => chain.setTextAlign('left'))"
         class="dark:text-primary-400 dark:hover:text-primary-500"
         :class="{
           'bg-primary text-white dark:text-primary-900': editor.isActive({
@@ -105,7 +103,7 @@
         variant="ghost"
       />
       <UButton
-        @click="editor.chain().focus().setTextAlign('center').run()"
+        @click="runCommand((chain) => chain.setTextAlign('center'))"
         class="dark:text-primary-400 dark:hover:text-primary-500"
         :class="{
           'bg-primary text-white dark:text-primary-900': editor.isActive({
@@ -116,7 +114,7 @@
         variant="ghost"
       />
       <UButton
-        @click="editor.chain().focus().setTextAlign('right').run()"
+        @click="runCommand((chain) => chain.setTextAlign('right'))"
         class="dark:text-primary-400 dark:hover:text-primary-500"
         :class="{
           'bg-primary text-white dark:text-primary-900': editor.isActive({
@@ -129,7 +127,9 @@
     </div>
     <TipTapFontSelect
       :editor="editor"
-      @change="editor.chain().focus().setFontFamily($event).run()"
+      size="md"
+      :disabled="false"
+      @change="runCommand((chain) => chain.setFontFamily($event))"
       @open="containerOverflow = ''"
       @close="containerOverflow = 'overflow-x-auto'"
     />
@@ -153,7 +153,7 @@
       </label>
     </UTooltip>
     <UButton
-      @click="editor.chain().focus().toggleBlockquote().run()"
+      @click="runCommand((chain) => chain.toggleBlockquote())"
       :class="{
         'bg-primary text-white dark:text-primary-900':
           editor.isActive('blockquote'),
@@ -162,7 +162,7 @@
       variant="ghost"
     />
     <UButton
-      @click="editor.chain().focus().toggleCodeBlock().run()"
+      @click="runCommand((chain) => chain.toggleCodeBlock())"
       :class="{
         'bg-primary text-white dark:text-primary-900':
           editor.isActive('codeBlock'),
@@ -174,16 +174,58 @@
 </template>
 
 <script setup lang="ts">
-const props = defineProps({
-  editor: Object,
-})
+import type { Editor } from "@tiptap/core"
+
+const props = defineProps<{
+  editor?: Editor
+}>()
+
 const containerOverflow = ref("overflow-x-auto")
-const isEmpty = (obj: Object) => Object.keys(obj).length === 0
+const savedSelection = ref<{ from: number; to: number } | null>(null)
 
 // Computed property for current text color
 const currentColor = computed(() => {
   return props.editor?.getAttributes("textStyle").color || "#ffffff"
 })
+
+const saveSelection = () => {
+  const editor = props.editor
+  if (!editor || editor.isDestroyed) return
+
+  const { from, to } = editor.state.selection
+  savedSelection.value = { from, to }
+}
+
+const onToolbarMouseDown = (event: MouseEvent) => {
+  saveSelection()
+
+  const target = event.target as HTMLElement | null
+  if (target?.closest('input, label, [role="listbox"], [role="option"]')) {
+    return
+  }
+
+  // Keep the browser from moving focus to toolbar controls before TipTap runs
+  // the command. Otherwise the editor falls back to its last caret position.
+  event.preventDefault()
+}
+
+const runCommand = (apply: (chain: any) => any) => {
+  const editor = props.editor
+  if (!editor || editor.isDestroyed) return
+
+  let chain = editor.chain().focus()
+  const selection = savedSelection.value
+
+  if (selection) {
+    const docSize = editor.state.doc.content.size
+    const from = Math.min(Math.max(selection.from, 0), docSize)
+    const to = Math.min(Math.max(selection.to, from), docSize)
+    chain = chain.setTextSelection({ from, to })
+  }
+
+  apply(chain).run()
+  saveSelection()
+}
 
 // Handle color change with proper focus management
 const onColorChange = (event: Event) => {
@@ -191,20 +233,16 @@ const onColorChange = (event: Event) => {
   const color = target.value
 
   // Set color and maintain focus
-  props.editor?.chain().focus().setColor(color).run()
+  runCommand((chain) => chain.setColor(color))
 }
 
 const toggleHeading = (level: number) => {
-  if (!props.editor) return
-
   // Use toggleHeading which is the correct TipTap command
-  props.editor.chain().focus().toggleHeading({ level }).run()
+  runCommand((chain) => chain.toggleHeading({ level }))
 }
 
 const setParagraph = () => {
-  if (!props.editor) return
-
-  props.editor.chain().focus().setParagraph().run()
+  runCommand((chain) => chain.setParagraph())
 }
 </script>
 

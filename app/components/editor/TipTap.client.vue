@@ -4,8 +4,6 @@
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
-      'text-lines-background-live-content':
-        slide?.slideStyle?.textLinesBackground,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
@@ -27,8 +25,6 @@
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
-      'text-lines-background-live-content':
-        slide?.slideStyle?.textLinesBackground,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
@@ -42,7 +38,12 @@
     }"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
   >
-    <TiptapEditorContent :editor="editorTwo" />
+    <TiptapEditorContent
+      v-if="slide?.type === slideTypes.song || slide?.type === slideTypes.hymn"
+      :editor="uneditableEditorTwo"
+      :class="useURLFriendlyString(slide?.slideStyle?.font || '')"
+    />
+    <TiptapEditorContent v-else :editor="editorTwo" />
   </div>
   <div
     v-else-if="slide?.layout === slideLayoutTypes.two_column"
@@ -50,8 +51,6 @@
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
-      'text-lines-background-live-content':
-        slide?.slideStyle?.textLinesBackground,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
@@ -72,8 +71,6 @@
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
-      'text-lines-background-live-content':
-        slide?.slideStyle?.textLinesBackground,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
@@ -98,8 +95,6 @@
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
-      'text-lines-background-live-content':
-        slide?.slideStyle?.textLinesBackground,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
@@ -230,6 +225,24 @@ watch(
         e.commands.setContent(newVal?.contents[2])
       )
     }
+  }
+)
+
+watch(
+  () => props.slide?.slideStyle?.font,
+  (newFont) => {
+    if (!newFont) return
+    const allEditors = [
+      editorOne.value,
+      editorTwo.value,
+      editorThree.value,
+      uneditableEditorOne.value,
+      uneditableEditorTwo.value,
+      uneditableEditorThree.value,
+    ]
+    allEditors.forEach((editor) => {
+      safeEditorCommand(editor, (e) => e.commands.setFontFamily(newFont))
+    })
   }
 )
 
