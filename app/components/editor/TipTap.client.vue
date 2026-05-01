@@ -38,7 +38,12 @@
     }"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
   >
-    <TiptapEditorContent :editor="editorTwo" />
+    <TiptapEditorContent
+      v-if="slide?.type === slideTypes.song || slide?.type === slideTypes.hymn"
+      :editor="uneditableEditorTwo"
+      :class="useURLFriendlyString(slide?.slideStyle?.font || '')"
+    />
+    <TiptapEditorContent v-else :editor="editorTwo" />
   </div>
   <div
     v-else-if="slide?.layout === slideLayoutTypes.two_column"
@@ -220,6 +225,24 @@ watch(
         e.commands.setContent(newVal?.contents[2])
       )
     }
+  }
+)
+
+watch(
+  () => props.slide?.slideStyle?.font,
+  (newFont) => {
+    if (!newFont) return
+    const allEditors = [
+      editorOne.value,
+      editorTwo.value,
+      editorThree.value,
+      uneditableEditorOne.value,
+      uneditableEditorTwo.value,
+      uneditableEditorThree.value,
+    ]
+    allEditors.forEach((editor) => {
+      safeEditorCommand(editor, (e) => e.commands.setFontFamily(newFont))
+    })
   }
 )
 

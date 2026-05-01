@@ -122,6 +122,9 @@ export default function useSlideNavigation() {
             fontSize: Number(fontSize),
           }
           tempSlide.contents = useSlideContent(tempSlide, hymn, chorus)
+          tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+            ? slideLayoutTypes.bible
+            : slideLayoutTypes.full_text
 
           usePosthogCapture("GOTO_CHORUS_TOOLBAR_USED")
           return tempSlide
@@ -143,6 +146,9 @@ export default function useSlideNavigation() {
           fontSize: Number(fontSize),
         }
         tempSlide.contents = useSlideContent(tempSlide, hymn, nextVerse)
+        tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+          ? slideLayoutTypes.bible
+          : slideLayoutTypes.full_text
 
         usePosthogCapture("GOTO_HYMN_TOOLBAR_USED")
         return tempSlide
@@ -178,6 +184,9 @@ export default function useSlideNavigation() {
         }
         tempSlide.data = song
         tempSlide.contents = useSlideContent(tempSlide, song, nextVerse)
+        tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+          ? slideLayoutTypes.bible
+          : slideLayoutTypes.full_text
 
         usePosthogCapture("GOTO_SONG_TOOLBAR_USED")
         return tempSlide
