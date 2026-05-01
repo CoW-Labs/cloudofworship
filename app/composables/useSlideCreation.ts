@@ -148,6 +148,9 @@ export default function useSlideCreation() {
       font: appStore.currentState.settings.defaultFont,
     }
     tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
+    tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+      ? slideLayoutTypes.bible
+      : slideLayoutTypes.full_text
     tempSlide.name = useSlideName(tempSlide)
     usePosthogCapture("NEW_HYMN_SLIDE_CREATED")
     return tempSlide
@@ -177,6 +180,9 @@ export default function useSlideCreation() {
     }
     tempSlide.data = song
     tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
+    tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+      ? slideLayoutTypes.bible
+      : slideLayoutTypes.full_text
     tempSlide.name = useSlideName(tempSlide)
     usePosthogCapture("NEW_SONG_SLIDE_CREATED")
     return tempSlide

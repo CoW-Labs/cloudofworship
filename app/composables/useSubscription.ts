@@ -1,4 +1,5 @@
 import { useAuthStore } from '~/store/auth'
+import { useFeatureFlags } from '~/composables/useFeatureFlags'
 
 export type SubscriptionPlan = 'free' | 'teams'
 
@@ -37,6 +38,15 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
 
 export default function useSubscription() {
   const authStore = useAuthStore()
+  const { checkFlag } = useFeatureFlags()
+
+  // If the 'transcripts-free' flag is on, treat new-transcribe as a free feature
+  const effectiveTierMap = computed((): Record<string, 'free' | 'teams'> => {
+    if (checkFlag('transcripts-free')) {
+      return { ...ACTION_TIER_MAP, 'new-transcribe': 'free' }
+    }
+    return ACTION_TIER_MAP
+  })
 
   /**
    * Get the current subscription plan
@@ -69,14 +79,14 @@ export default function useSubscription() {
    * Check if a feature/action requires Teams subscription
    */
   const requiresTeams = (actionName: string): boolean => {
-    return ACTION_TIER_MAP[actionName] === 'teams'
+    return effectiveTierMap.value[actionName] === 'teams'
   }
 
   /**
    * Check if user has access to a specific feature/action
    */
   const hasAccessToFeature = (actionName: string): boolean => {
-    const tier = ACTION_TIER_MAP[actionName]
+    const tier = effectiveTierMap.value[actionName]
 
     // If no tier is specified, assume it's available
     if (!tier) return true

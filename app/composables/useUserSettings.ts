@@ -99,6 +99,14 @@ export const useUserSettings = () => {
 
         // Update app store with fetched settings
         appStore.setAppSettings(mergedSettings)
+
+        // Downloaded Bible availability is device-local IndexedDB state, so
+        // backend/persisted settings can be stale after a reload. Refresh the
+        // flags after hydrating settings so BibleVersionSelect sees local files
+        // without requiring the user to visit Bible Version Settings first.
+        const { populateBibleVersionOptions } = useBibleVersionManager()
+        await populateBibleVersionOptions(mergedSettings.bibleVersions)
+
         return mergedSettings
       }
 

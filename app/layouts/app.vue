@@ -549,7 +549,7 @@ const downloadEssentialResources = async () => {
   }
 
   const { populateBibleVersionOptions } = useBibleVersionManager()
-  populateBibleVersionOptions(
+  await populateBibleVersionOptions(
     appInfo.value?.bibleVersions?.length
       ? appInfo.value.bibleVersions
       : undefined

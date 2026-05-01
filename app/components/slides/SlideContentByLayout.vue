@@ -27,12 +27,18 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.full_text"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw;`"
+    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw; font-size: ${
+      (slide?.slideStyle?.fontSize!!) *
+      ((slide?.slideStyle?.fontSizePercent || currentState.settings.slideStyles.fontSizePercent || 100) / 100)
+    }vw`"
   >
     <div
       v-if="contentVisible"
       class="content"
-      :class="[currentState.settings.animations ? 'come-up-1' : '']"
+      :class="[
+        useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
+        currentState.settings.animations ? 'come-up-1' : '',
+      ]"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
   </div>
