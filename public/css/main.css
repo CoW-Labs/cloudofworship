@@ -503,6 +503,10 @@ body {
 .uppercase-live-content > div:nth-child(1) > .tiptap > p {
   text-transform: uppercase;
 }
+.uppercase-live-content .bible-content .scripture-content,
+.uppercase-live-content .bible-label .scripture-label {
+  text-transform: uppercase !important;
+}
 .double-line-spacing > .slide-layout-ctn > div:nth-child(1),
 .double-line-spacing > .slide-layout-ctn .bible-content > .scripture-content,
 .double-line-spacing > div:nth-child(1) > .tiptap {
