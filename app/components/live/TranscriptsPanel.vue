@@ -51,7 +51,7 @@
               size="xs"
               :loading="isConnecting"
               :disabled="
-                isTeamsPlan &&
+                useDeepgramEngine &&
                 remainingSeconds !== null &&
                 remainingSeconds <= 0 &&
                 !isTranscribing
@@ -59,6 +59,13 @@
               @click.stop="toggleTranscription"
             />
           </UTooltip>
+
+          <!-- Scripture search in-progress indicator -->
+          <UIcon
+            v-if="isScriptureSearching"
+            name="i-bx-loader-alt"
+            class="text-xs text-primary-400 animate-spin"
+          />
 
           <Transition
             enter-active-class="transition-all duration-200 ease-out"
@@ -69,7 +76,9 @@
             leave-to-class="opacity-0 -translate-x-2"
           >
             <span
-              v-if="isTranscribing && isTeamsPlan && remainingSeconds !== null"
+              v-if="
+                isTranscribing && useDeepgramEngine && remainingSeconds !== null
+              "
               class="text-xs px-0.5 py-0.5 rounded select-none"
               :class="remainingSeconds <= 300 ? 'text-red-500' : 'text-white  '"
             >
@@ -177,7 +186,9 @@
         />
         <div
           v-if="
-            isTeamsPlan && remainingSeconds !== null && remainingSeconds <= 0
+            useDeepgramEngine &&
+            remainingSeconds !== null &&
+            remainingSeconds <= 0
           "
           class="mb-3"
         >
@@ -190,7 +201,7 @@
           />
         </div>
         <div
-          v-else-if="!isTeamsPlan && !isSpeechRecognitionSupported"
+          v-else-if="!useDeepgramEngine && !isSpeechRecognitionSupported"
           class="mb-3"
         >
           <UAlert
@@ -210,7 +221,7 @@
         </p>
         <p class="text-xs mt-1 opacity-70">
           {{
-            isTeamsPlan
+            useDeepgramEngine
               ? "AI-powered · Bible references highlighted automatically"
               : "Bible references will be highlighted automatically"
           }}
@@ -390,6 +401,7 @@ const {
   remainingMinutes,
   remainingSeconds,
   isTeamsPlan,
+  useDeepgramEngine,
   micLevel,
 } = useSermonTranscription()
 
@@ -409,6 +421,7 @@ watch(isTranscribing, (val) => {
 // ── Scripture search ───────────────────────────────────────────────────────
 const {
   results: scriptureResults,
+  isSearching: isScriptureSearching,
   debouncedSearch,
   addFromBibleReferences,
   clearResults: clearScriptureResults,

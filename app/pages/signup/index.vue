@@ -192,6 +192,37 @@
           <IconWrapper name="i-bx-info-circle" size="3" />
         </div> -->
       </UFormGroup>
+      <UFormGroup size="lg">
+        <USelectMenu
+          placeholder="How did you find Cloud of Worship? (optional)"
+          variant="solid"
+          class="bg-gray-100 rounded-md"
+          v-model="howYouFoundUs"
+          :options="[
+            'Google Search',
+            'Social Media (Facebook, Instagram, etc.)',
+            'Word of Mouth / Friend',
+            'YouTube',
+            'Church Community / WhatsApp Group',
+            'App Store',
+            'Other',
+          ]"
+          :ui="{
+            variant: {
+              solid: 'focus:ring-0 dark:bg-primary-200',
+            },
+          }"
+        >
+          <template #label>
+            <span v-if="howYouFoundUs?.length" class="truncate text-black">{{
+              howYouFoundUs
+            }}</span>
+            <span v-else class="text-gray-600"
+              >How did you find us? (optional)</span
+            >
+          </template>
+        </USelectMenu>
+      </UFormGroup>
       <UButton
         block
         size="lg"
@@ -257,6 +288,7 @@ const otherChurch = ref("")
 const churchIdentity = ref("")
 const churchAddress = ref("")
 const churchPastor = ref("")
+const howYouFoundUs = ref("")
 const { user } = storeToRefs(authStore)
 
 const passwordValid = computed(() => {
@@ -406,6 +438,7 @@ const signup = async () => {
         address: churchAddress.value,
         pastor: churchPastor.value,
         userId: authStore.user?._id,
+        howYouFoundUs: howYouFoundUs.value || undefined,
       },
     })
     if (error.value) {
