@@ -3,6 +3,8 @@
     :class="{
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
+      'text-lines-background-live-content':
+        slide?.slideStyle?.textLinesBackground,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
       'left-live-content': slide?.slideStyle?.alignment === 'left',
       'right-live-content': slide?.slideStyle?.alignment === 'right',
