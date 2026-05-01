@@ -154,6 +154,23 @@
           />
         </UFormGroup>
         <UFormGroup
+          label="Text Line Background"
+          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
+          <UToggle
+            size="lg"
+            :model-value="
+              appStore.currentState.settings.slideStyles.textLinesBackground
+            "
+            @change="
+              appStore.setSlideStyles({
+                ...appStore.currentState.settings.slideStyles,
+                textLinesBackground: $event,
+              })
+            "
+          />
+        </UFormGroup>
+        <UFormGroup
           label="Set default background fill type"
           class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
         >

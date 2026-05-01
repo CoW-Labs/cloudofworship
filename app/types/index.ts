@@ -227,6 +227,7 @@ export interface SlideStyle {
   lineSpacing?: string
   textOutlined?: boolean
   textBold?: boolean
+  textLinesBackground?: boolean
   bibleVersion?: string
   theme?: string // Theme ID for slide styling (e.g., for Bible slides)
 }

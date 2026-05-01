@@ -11,7 +11,7 @@
         useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
         currentState.settings.animations ? 'come-up-1' : '',
       ]"
-      v-html="slide?.contents?.[0]"
+      v-html="getSlideContentHtml(slide?.contents?.[0])"
     ></div>
     <div
       v-if="contentVisible"
@@ -20,7 +20,7 @@
         useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
         currentState.settings.animations ? 'come-up-2' : '',
       ]"
-      v-html="slide?.contents?.[1]"
+      v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
   </div>
 
@@ -33,7 +33,7 @@
       v-if="contentVisible"
       class="content"
       :class="[currentState.settings.animations ? 'come-up-1' : '']"
-      v-html="slide?.contents?.[1]"
+      v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
   </div>
 
@@ -46,13 +46,13 @@
       v-if="contentVisible"
       class="content"
       :class="[currentState.settings.animations ? 'come-up-1' : '']"
-      v-html="slide?.contents?.[0]"
+      v-html="getSlideContentHtml(slide?.contents?.[0])"
     ></div>
     <div
       v-if="contentVisible"
       class="content"
       :class="[currentState.settings.animations ? 'come-up-2' : '']"
-      v-html="slide?.contents?.[1]"
+      v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
   </div>
 
@@ -82,7 +82,7 @@
           currentState.settings.animations ? 'come-up-1' : '',
           bibleThemeClasses.label,
         ]"
-        v-html="slide?.contents?.[1]"
+        v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
       <div
         v-if="contentVisible"
@@ -92,7 +92,7 @@
           currentState.settings.animations ? 'come-up-2' : '',
           bibleThemeClasses.content,
         ]"
-        v-html="slide?.contents?.[0]"
+        v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
     </template>
 
@@ -105,7 +105,7 @@
           currentState.settings.animations ? 'come-up-1' : '',
           bibleThemeClasses.label,
         ]"
-        v-html="slide?.contents?.[1]"
+        v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
       <div
         v-if="contentVisible"
@@ -115,7 +115,7 @@
           currentState.settings.animations ? 'come-up-2' : '',
           bibleThemeClasses.content,
         ]"
-        v-html="slide?.contents?.[0]"
+        v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
     </template>
 
@@ -128,7 +128,7 @@
           currentState.settings.animations ? 'come-up-2' : '',
           bibleThemeClasses.label,
         ]"
-        v-html="slide?.contents?.[1]"
+        v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
       <div
         v-if="contentVisible"
@@ -138,7 +138,7 @@
           currentState.settings.animations ? 'come-up-1' : '',
           bibleThemeClasses.content,
         ]"
-        v-html="slide?.contents?.[0]"
+        v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
     </template>
 
@@ -152,7 +152,7 @@
           currentState.settings.animations ? 'come-up-1' : '',
           bibleThemeClasses.content,
         ]"
-        v-html="slide?.contents?.[0]"
+        v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
       <div
         v-if="contentVisible"
@@ -161,7 +161,7 @@
           currentState.settings.animations ? 'come-up-2' : '',
           bibleThemeClasses.label,
         ]"
-        v-html="slide?.contents?.[1]"
+        v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
     </template>
 
@@ -175,7 +175,7 @@
           currentState.settings.animations ? 'come-up-1' : '',
           bibleThemeClasses.content,
         ]"
-        v-html="slide?.contents?.[0]"
+        v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
       <div
         v-if="contentVisible"
@@ -184,7 +184,7 @@
           currentState.settings.animations ? 'come-up-2' : '',
           bibleThemeClasses.label,
         ]"
-        v-html="slide?.contents?.[1]"
+        v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
     </template>
   </div>
@@ -197,11 +197,14 @@
       ((slide?.slideStyle?.fontSizePercent || currentState.settings.slideStyles.fontSizePercent || 100) / 100)
     }vw`"
   >
-    <div class="content jost" v-html="slide?.contents?.[1]"></div>
+    <div
+      class="content jost"
+      v-html="getSlideContentHtml(slide?.contents?.[1])"
+    ></div>
     <div
       class="content"
       :class="[useURLFriendlyString(slide?.slideStyle?.font || 'Inter')]"
-      v-html="slide?.contents?.[2]"
+      v-html="getSlideContentHtml(slide?.contents?.[2])"
     ></div>
   </div>
 </template>
@@ -219,6 +222,40 @@ const props = defineProps<{
 
 const { currentState } = storeToRefs(useAppStore())
 const { getSlideTheme } = useTheme()
+
+const lineBackgroundSelector =
+  "p:not(.scripture-label):not(.song-label):not(.countdown-label):not(.copyright-content), h1, h2, h3, h4"
+
+const getSlideContentHtml = (content = "") => {
+  if (!props.slide?.slideStyle?.textLinesBackground || !content) {
+    return content
+  }
+
+  if (typeof document === "undefined") {
+    return content
+  }
+
+  const container = document.createElement("div")
+  container.innerHTML = content
+  container.querySelectorAll(lineBackgroundSelector).forEach((element) => {
+    const hasHighlight = Array.from(element.children).some((child) =>
+      child.classList.contains("text-lines-background-highlight")
+    )
+
+    if (hasHighlight) {
+      return
+    }
+
+    const highlight = document.createElement("span")
+    highlight.className = "text-lines-background-highlight"
+    while (element.firstChild) {
+      highlight.appendChild(element.firstChild)
+    }
+    element.appendChild(highlight)
+  })
+
+  return container.innerHTML
+}
 
 // Get the current theme for Bible slides
 const bibleTheme = computed<BibleTheme>(() => {
