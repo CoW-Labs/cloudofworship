@@ -107,7 +107,8 @@ export const useAppStore = defineStore("app", {
             lineSpacing: "normal",
             fontSizePercent: 100,
             textOutlined: false,
-            textBold: false
+            textBold: false,
+            textLinesBackground: false
           },
           bibleVersions: [], // Check app.vue for bible versions array in a list
           alertLimit: 5,
@@ -513,7 +514,10 @@ export const useAppStore = defineStore("app", {
           alignment: "center",
           windowPadding: { left: 24, right: 24, top: 24, bottom: 24 },
           lettercase: "",
-          fontSizePercent: 100
+          fontSizePercent: 100,
+          textOutlined: false,
+          textBold: false,
+          textLinesBackground: false
         } as SlideStyle,
         bibleVersions: bibleVersionObjects, // Check app.vue for bible versions array in a list
         songAndHymnLabelsVisibility: false,

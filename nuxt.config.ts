@@ -232,6 +232,7 @@ export default defineNuxtConfig({
         'tabler:layout-grid',
         'tabler:line-height',
         'tabler:list-numbers',
+        'tabler:highlight',
         'tabler:pause',
         'tabler:play',
         'tabler:player-skip-forward',

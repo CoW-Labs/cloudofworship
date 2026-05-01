@@ -480,10 +480,32 @@ body {
 .bold-live-content > div:nth-child(1) > .tiptap > p {
   font-weight: 850;
 }
+.text-lines-background-highlight,
+.text-lines-background-live-content > div > .tiptap p,
+.text-lines-background-live-content > div > .tiptap h1,
+.text-lines-background-live-content > div > .tiptap h2,
+.text-lines-background-live-content > div > .tiptap h3,
+.text-lines-background-live-content > div > .tiptap h4 {
+  display: inline;
+  background: #000000;
+  padding: 0.06em 0.22em;
+  line-height: 150%;
+  box-decoration-break: clone;
+  border-radius: 6px;
+  -webkit-box-decoration-break: clone;
+  -webkit-border-radius: 6px;
+  -moz-border-radius: 6px;
+  -ms-border-radius: 6px;
+  -o-border-radius: 6px;
+}
 .uppercase-live-content > .slide-layout-ctn > div:nth-child(1),
 .uppercase-live-content > div:nth-child(1) > .tiptap,
 .uppercase-live-content > div:nth-child(1) > .tiptap > p {
   text-transform: uppercase;
+}
+.uppercase-live-content .bible-content .scripture-content,
+.uppercase-live-content .bible-label .scripture-label {
+  text-transform: uppercase !important;
 }
 .double-line-spacing > .slide-layout-ctn > div:nth-child(1),
 .double-line-spacing > .slide-layout-ctn .bible-content > .scripture-content,
