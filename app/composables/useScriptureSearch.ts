@@ -53,7 +53,7 @@ export default function useScriptureSearch() {
   /**
    * Search scriptures on the backend. Can be called directly for immediate queries.
    */
-  const search = async (query: string, version = 'nkjv') => {
+  const search = async (query: string) => {
     const trimmed = query.trim()
     const searchId = ++latestSearchId
 
@@ -107,10 +107,10 @@ export default function useScriptureSearch() {
   /**
    * Debounced search — call this whenever a final transcript segment arrives.
    */
-  const debouncedSearch = (query: string, version = 'nkjv') => {
+  const debouncedSearch = (query: string) => {
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
-      search(query, version)
+      search(query)
     }, DEBOUNCE_MS)
   }
 
