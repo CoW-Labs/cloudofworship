@@ -58,6 +58,8 @@ export default function useSlideCreation() {
         lineSpacing: appStore.currentState.settings.slideStyles.lineSpacing,
         textOutlined: appStore.currentState.settings.slideStyles.textOutlined,
         textBold: appStore.currentState.settings.slideStyles.textBold,
+        textLinesBackground:
+          appStore.currentState.settings.slideStyles.textLinesBackground,
         backgroundFillType: appStore.currentState.settings.slideStyles.backgroundFillType,
       },
     }

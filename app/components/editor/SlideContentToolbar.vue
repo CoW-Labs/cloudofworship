@@ -366,6 +366,35 @@
       </UButton>
     </UTooltip>
 
+    <!-- SLIDE CONTENT LINE BACKGROUND CONTROLS -->
+    <UTooltip
+      text="Line background"
+      :popper="{ placement: 'top' }"
+      v-if="
+        !(
+          slide?.type === slideTypes.media ||
+          slide?.type === slideTypes.presentation
+        )
+      "
+    >
+      <UButton
+        @click="
+          $emit('update-style', {
+            ...slide.slideStyle,
+            textLinesBackground: !slide?.slideStyle?.textLinesBackground,
+          })
+        "
+        class="dark:text-primary-400 dark:hover:text-primary-500 disabled:text-primary-300 h-[36px] mt-[3px] grid place-items-center"
+        :class="{
+          'bg-primary text-white dark:text-primary-700':
+            slide?.slideStyle?.textLinesBackground,
+        }"
+        variant="ghost"
+      >
+        <IconWrapper name="i-tabler-highlight" size="5" />
+      </UButton>
+    </UTooltip>
+
     <!-- COUNTDOWN SLIDE CONTROLS -->
     <div
       v-if="slide?.type === slideTypes.countdown"
