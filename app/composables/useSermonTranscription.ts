@@ -87,6 +87,18 @@ export default function useSermonTranscription() {
 
   // Teams plan check — delegate to Deepgram for teams users
   const { isTeamsPlan } = useSubscription()
+  // Also route free users to Deepgram when the 'transcripts-free' flag is on,
+  // OR while the backend free-access grace period is still active (before May 5 2026).
+  // This mirrors the backend's own date gate so the two stay in sync.
+  const { checkFlag } = useFeatureFlags()
+  const useDeepgramEngine = computed(() => {
+    if (isTeamsPlan.value) return true
+    if (checkFlag('transcripts-free')) return true
+    // TODO: Remove after 2026-05-05
+    if (new Date() < new Date('2026-05-05T23:59:59Z')) return true
+    return false
+  })
+
   // Lazily create the Deepgram composable so FREE users don't trigger
   // its initialisation (which fires an API request for usage stats).
   let deepgramInstance: ReturnType<typeof useDeepgramTranscription> | null = null
@@ -237,9 +249,9 @@ export default function useSermonTranscription() {
       return
     }
 
-    // Delegate to Deepgram for Teams users
-    if (isTeamsPlan.value) {
-      usePosthogCapture('TRANSCRIPTION_STARTED', { provider: 'deepgram', plan: 'teams' })
+    // Delegate to Deepgram for Teams users (or free users with the transcripts-free flag)
+    if (useDeepgramEngine.value) {
+      usePosthogCapture('TRANSCRIPTION_STARTED', { provider: 'deepgram', plan: isTeamsPlan.value ? 'teams' : 'free' })
       return deepgram.startTranscription()
     }
 
@@ -432,11 +444,11 @@ export default function useSermonTranscription() {
    * Stop transcription session
    */
   const stopTranscription = () => {
-    // Delegate to Deepgram for Teams users
-    if (isTeamsPlan.value) {
+    // Delegate to Deepgram for Teams users (or free users with the transcripts-free flag)
+    if (useDeepgramEngine.value) {
       usePosthogCapture('TRANSCRIPTION_STOPPED', {
         provider: 'deepgram',
-        plan: 'teams',
+        plan: isTeamsPlan.value ? 'teams' : 'free',
         segmentCount: deepgram.segments.value.length,
       })
       return deepgram.stopTranscription()
@@ -481,8 +493,8 @@ export default function useSermonTranscription() {
    * Clear transcript segments
    */
   const clearTranscript = () => {
-    if (isTeamsPlan.value) {
-      usePosthogCapture('TRANSCRIPTION_CLEARED', { provider: 'deepgram', plan: 'teams' })
+    if (useDeepgramEngine.value) {
+      usePosthogCapture('TRANSCRIPTION_CLEARED', { provider: 'deepgram', plan: isTeamsPlan.value ? 'teams' : 'free' })
       return deepgram.clearTranscript()
     }
     usePosthogCapture('TRANSCRIPTION_CLEARED', {
@@ -499,7 +511,7 @@ export default function useSermonTranscription() {
    * Get all Bible references from the transcript
    */
   const allBibleReferences = computed(() => {
-    if (isTeamsPlan.value) return deepgram.allBibleReferences.value
+    if (useDeepgramEngine.value) return deepgram.allBibleReferences.value
     const refs: BibleReference[] = []
     for (const segment of state.value.segments) {
       refs.push(...segment.bibleReferences)
@@ -513,17 +525,17 @@ export default function useSermonTranscription() {
   })
 
   return {
-    // State — delegate to Deepgram state when on Teams plan
-    isTranscribing: computed(() => isTeamsPlan.value ? deepgram.isTranscribing.value : state.value.isTranscribing),
-    isConnecting: computed(() => isTeamsPlan.value ? deepgram.isConnecting.value : state.value.isConnecting),
-    error: computed(() => isTeamsPlan.value ? deepgram.error.value : state.value.error),
-    segments: computed(() => isTeamsPlan.value ? deepgram.segments.value : state.value.segments),
-    currentTranscript: computed(() => isTeamsPlan.value ? deepgram.currentTranscript.value : state.value.currentTranscript),
+    // State — delegate to Deepgram state when on Teams plan or transcripts-free flag
+    isTranscribing: computed(() => useDeepgramEngine.value ? deepgram.isTranscribing.value : state.value.isTranscribing),
+    isConnecting: computed(() => useDeepgramEngine.value ? deepgram.isConnecting.value : state.value.isConnecting),
+    error: computed(() => useDeepgramEngine.value ? deepgram.error.value : state.value.error),
+    segments: computed(() => useDeepgramEngine.value ? deepgram.segments.value : state.value.segments),
+    currentTranscript: computed(() => useDeepgramEngine.value ? deepgram.currentTranscript.value : state.value.currentTranscript),
     allBibleReferences,
     isSpeechRecognitionSupported: isSpeechRecognitionSupported(),
 
     // Mic loudness level (0–100), live during transcription
-    micLevel: computed(() => isTeamsPlan.value ? deepgram.micLevel.value : micLevel.value),
+    micLevel: computed(() => useDeepgramEngine.value ? deepgram.micLevel.value : micLevel.value),
 
     // Deepgram usage stats (null for free users)
     remainingMinutes: deepgram.remainingMinutes,
