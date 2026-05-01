@@ -868,6 +868,9 @@ const onUpdateSongLyrics = (song: Song) => {
   }
   tempSlide.data = song
   tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
+  tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+    ? slideLayoutTypes.bible
+    : slideLayoutTypes.full_text
   emit("slide-update", tempSlide)
   // console.log(verse.value)
   useToast().add({
@@ -898,6 +901,9 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
     }
     tempSlide.data = tempSong
     tempSlide.contents = useSlideContent(tempSlide, tempSong, currentSongVerse)
+    tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+      ? slideLayoutTypes.bible
+      : slideLayoutTypes.full_text
     emit("slide-update", tempSlide)
     // console.log(verse.value)
     useToast().add({

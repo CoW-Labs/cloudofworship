@@ -42,32 +42,41 @@ const useSlideContent = (
       data = data as Hymn
       if (appStore.currentState.settings.footnotes) {
         return [
-          `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`,
+          appStore.currentState.settings.songAndHymnLabelsVisibility
+            ? `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`
+            : "",
           appStore.currentState.settings.songAndHymnLabelsVisibility
             ? `<p class="song-label"><b>${
                 data?.title
               }</b> • HYMN</p><p class="copyright-content">${data?.source
                 ?.replace("undefined -", "")
                 .trim()}</p>`
-            : "",
+            : `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`,
         ]
       }
       return [
-        `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`,
+        appStore.currentState.settings.songAndHymnLabelsVisibility
+          ? `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`
+          : "",
         appStore.currentState.settings.songAndHymnLabelsVisibility
           ? `<p class="song-label"><b>${data?.title}</b> • HYMN</p>`
-          : "",
+          : `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`,
       ]
     case slideTypes.song:
       data = data as Song
       return [
-        `<p class="song-content">${nextVerse?.replaceAll(
-          "\n",
-          '<br class="mt-3">'
-        )}</>`,
+        appStore.currentState.settings.songAndHymnLabelsVisibility
+          ? `<p class="song-content">${nextVerse?.replaceAll(
+              "\n",
+              '<br class="mt-3">'
+            )}</>`
+          : "",
         appStore.currentState.settings.songAndHymnLabelsVisibility
           ? `<p class="song-label"><b>${data?.title}</b> • ${data?.artist}</p>`
-          : "",
+          : `<p class="song-content">${nextVerse?.replaceAll(
+              "\n",
+              '<br class="mt-3">'
+            )}</>`,
       ]
     case slideTypes.countdown:
       data = data as Countdown
