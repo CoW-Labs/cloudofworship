@@ -87,13 +87,12 @@ export default function useSermonTranscription() {
 
   // Teams plan check — delegate to Deepgram for teams users
   const { isTeamsPlan } = useSubscription()
-  // Also route free users to Deepgram when the 'transcripts-free' flag is on,
-  // OR while the backend free-access grace period is still active (before May 5 2026).
-  // This mirrors the backend's own date gate so the two stay in sync.
-  const { checkFlag } = useFeatureFlags()
+  // Use the reactive isEnabled ref so the computed re-evaluates once PostHog loads the flag.
+  // checkFlag() is non-reactive (plain function) and would always read false on first render.
+  const { isEnabled: isTranscriptsFreeEnabled } = useFeatureFlags('transcripts-free')
   const useDeepgramEngine = computed(() => {
     if (isTeamsPlan.value) return true
-    if (checkFlag('transcripts-free')) return true
+    if (isTranscriptsFreeEnabled.value) return true
     // TODO: Remove after 2026-05-05
     if (new Date() < new Date('2026-05-05T23:59:59Z')) return true
     return false
@@ -542,6 +541,7 @@ export default function useSermonTranscription() {
     remainingSeconds: deepgram.remainingSeconds,
     usedMinutes: deepgram.usedMinutes,
     isTeamsPlan,
+    useDeepgramEngine,
 
     // Actions
     startTranscription,
