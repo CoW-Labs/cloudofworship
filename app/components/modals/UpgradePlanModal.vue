@@ -25,7 +25,7 @@
           </button>
 
           <!-- Free Trial Badge -->
-          <div v-if="isTrialEligible" class="mb-5">
+          <div v-if="isTrialEligible && !hideFreeTrial" class="mb-5">
             <span
               class="inline-flex items-center gap-1.5 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs font-semibold px-3 py-1.5 rounded-full"
               style="font-family: 'Bricolage Grotesque'"
@@ -210,13 +210,13 @@
             </div>
 
             <p
-              v-if="isTrialEligible"
+              v-if="isTrialEligible && !hideFreeTrial"
               class="text-xs text-primary-600 dark:text-primary-400 font-medium mb-4"
             >
               14 Days Free, then pay annually
             </p>
             <p v-else class="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              Billed annually
+              Billed once in 365 days
             </p>
 
             <UButton
@@ -233,19 +233,26 @@
               class="font-semibold rounded-xl"
             >
               {{
-                isTrialEligible
+                isTrialEligible && !hideFreeTrial
                   ? "Start Your 14-Day Free Trial"
-                  : "Get Annual Plan"
+                  : "Get full access"
               }}
             </UButton>
             <!-- Hidden reference to `features` to avoid unused-computed lint errors -->
             <span v-if="false">{{ features }}</span>
 
             <p
-              v-if="isTrialEligible"
+              v-if="isTrialEligible && !hideFreeTrial"
               class="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-2.5 leading-relaxed"
             >
               We don't charge you until the 14-day trial period elapses.
+            </p>
+
+            <p
+              v-else
+              class="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-2.5 leading-relaxed"
+            >
+              We continually improve CoW, every week, for your church.
             </p>
           </div>
 
@@ -517,6 +524,11 @@ const isTrialEligible = computed(() => {
   // NGN currency is auto-detected for NG, GH, KE — so if detectedCurrency is USD, user is in an eligible country
   return church?.trialEligible && detectedCurrency.value === "USD"
 })
+
+// Feature flag to hide free trial promotion
+const { isEnabled: hideFreeTrial } = useFeatureFlags(
+  "hide-free-trial-promotion"
+)
 
 // Helper for testing: Allow manual currency switch
 const switchCurrency = (currency: "NGN" | "USD") => {
