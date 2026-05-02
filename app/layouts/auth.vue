@@ -11,11 +11,13 @@
 
           <div class="space-y-4 blur-in-1 opacity-0">
             <h1 class="text-6xl font-light leading-tight">
-              <div class="font-semibold">Join 2,200+ churches</div>
+              <div class="font-semibold">Join thousands of churches</div>
               delivering great on-screen experiences to their congregations.
             </h1>
             <p class="text-xl font-light">
-              Run your weekly services with Cloud of Worship. <br/> Project songs, hymns, and scriptures with no installation and no internet required.
+              Run your weekly services with Cloud of Worship. <br />
+              Project songs, hymns, and scriptures with no installation and no
+              internet required.
             </p>
           </div>
         </div>
