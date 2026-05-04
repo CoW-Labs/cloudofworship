@@ -90,7 +90,7 @@ export const quickActionsArr: QuickAction[] = [
     meta: "",
     unreleased: false,
     type: slideTypes.bible,
-    tier: "teams",
+    tier: "free",
   },
   {
     icon: "i-bx-church",
