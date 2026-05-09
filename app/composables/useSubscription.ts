@@ -28,6 +28,7 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-hymn': 'free',
   'new-media': 'free',
   'new-bible': 'free',
+  'new-song-setlist': 'free',
   'add-song': 'free',
   'new-library': 'free',
   'open-settings': 'free',

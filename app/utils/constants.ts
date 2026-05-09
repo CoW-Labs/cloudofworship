@@ -2,6 +2,7 @@ import type { BibleVersion, QuickAction } from "~/types"
 
 export const slideTypes = {
   song: 'song',
+  songSetlist: 'song-setlist',
   hymn: 'hymn',
   bible: 'bible',
   text: 'text',
@@ -23,6 +24,7 @@ export const appWideActions = {
   updateOrCreateBible: 'update-or-create-bible',
   newHymn: 'new-hymn',
   newSong: 'new-song',
+  newSongSetlist: 'new-song-setlist',
   newSlide: 'new-slide',
   newMedia: 'new-media',
   newYouTubeVideo: 'new-youtube-video',
@@ -31,6 +33,7 @@ export const appWideActions = {
   newTemplates: 'new-templates',
   newAlert: 'new-alert',
   addSong: 'add-song',
+  addSongSlideToSetlist: 'add-song-slide-to-setlist',
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
   newSearchBible: 'new-search-bible',
@@ -129,6 +132,15 @@ export const quickActionsArr: QuickAction[] = [
     meta: "",
     type: slideTypes.song,
     tier: "teams",
+  },
+  {
+    icon: "i-lucide-list-music",
+    name: "Song Setlist",
+    desc: "Group multiple songs in one styled slide",
+    action: appWideActions.newSongSetlist,
+    meta: "song setlist worship lyrics",
+    type: slideTypes.songSetlist,
+    tier: "free",
   },
   {
     icon: "i-bx-text",
