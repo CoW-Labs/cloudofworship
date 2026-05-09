@@ -31,6 +31,8 @@ export default function useSlideNavigation() {
         return await gotoHymnVerse(slide, title)
       case slideTypes.song:
         return await gotoSongVerse(slide, title)
+      case slideTypes.songSetlist:
+        return await gotoSongSetlistVerse(slide, title)
       default:
         return null
     }
@@ -196,10 +198,39 @@ export default function useSlideNavigation() {
     return null
   }
 
+  const gotoSongSetlistVerse = async (
+    slide: Slide,
+    title: string
+  ): Promise<Slide | null> => {
+    const { getSetlistData, navigateSongSetlist, refreshSongSetlistSlide } =
+      useSongSetlist()
+
+    if (title === "__next-setlist") {
+      return await navigateSongSetlist(slide, "next")
+    }
+    if (title === "__previous-setlist") {
+      return await navigateSongSetlist(slide, "previous")
+    }
+
+    const data = getSetlistData(slide)
+    if (!data.songs.length) return null
+
+    const requestedVerseIndex = Number(title?.split(" ")?.[1]) - 1
+    if (!Number.isFinite(requestedVerseIndex) || requestedVerseIndex < 0) {
+      return null
+    }
+
+    return await refreshSongSetlistSlide(slide, {
+      activeSongIndex: data.activeSongIndex,
+      verseIndex: requestedVerseIndex,
+    })
+  }
+
   return {
     gotoVerse,
     gotoScripture,
     gotoHymnVerse,
     gotoSongVerse,
+    gotoSongSetlistVerse,
   }
 }

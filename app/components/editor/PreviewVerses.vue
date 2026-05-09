@@ -1,8 +1,50 @@
 <template>
   <div
     ref="versesPreview"
-    class="verse-preview behavior-smooth absolute bg-primary-100 dark:bg-primary-800 right-0 left-0 top-12 z-20 py-2 overflow-auto shadow-lg rounded-b-md"
+    class="verse-preview behavior-smooth absolute bg-primary-100 dark:bg-primary-800 right-0 left-0 top-12 z-20 overflow-auto shadow-lg rounded-b-md"
   >
+    <div
+      v-if="slide?.type === slideTypes.songSetlist"
+      class="sticky top-0 z-10 flex gap-2 overflow-x-auto bg-primary-200 dark:bg-primary-900 px-4 py-3 border-b border-primary-200 dark:border-primary-950"
+    >
+      <div
+        v-for="(item, index) in setlistData.songs"
+        :key="item.id"
+        role="button"
+        tabindex="0"
+        class="group relative min-w-[150px] max-w-[210px] rounded-md border border-transparent px-3 py-2 pr-9 text-left transition-all cursor-pointer outline-none text-black dark:text-white"
+        :class="
+          index === setlistData.activeSongIndex
+            ? 'bg-primary-300 dark:bg-primary-600 shadow-sm ring-2 ring-primary-300 dark:ring-primary-500/50'
+            : 'bg-primary-100 dark:bg-primary-700 hover:bg-primary-300 dark:hover:bg-primary-600 focus:bg-primary-300 dark:focus:bg-primary-600'
+        "
+        @click="$emit('goto-song', index)"
+        @keydown.enter.prevent="$emit('goto-song', index)"
+        @keydown.space.prevent="$emit('goto-song', index)"
+      >
+        <p class="truncate text-sm font-bold leading-tight">
+          {{ item.song?.title || `Song ${index + 1}` }}
+        </p>
+        <p
+          class="truncate text-xs leading-tight text-black/70 dark:text-white/70"
+        >
+          {{ item.song?.artist || "Unknown artist" }}
+        </p>
+        <div
+          class="absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+        >
+          <UButton
+            icon="i-tabler-trash"
+            size="xs"
+            variant="ghost"
+            color="gray"
+            class="h-8 w-8 p-0 grid place-items-center hover:bg-primary-300 dark:hover:bg-primary-500"
+            @click.stop="$emit('remove-song', index)"
+          />
+        </div>
+      </div>
+    </div>
+
     <!-- Bible verses -->
     <template v-if="slide?.type === slideTypes.bible">
       <UButton
@@ -72,15 +114,16 @@
         v-show="verseTemp?.trim()"
         v-for="(verseTemp, index) in relatedData?.verses"
         :key="`verse-${index}`"
-        :id="convertStringToSlug(`Verse ${index + 1}`)"
+        :id="convertStringToSlug(`Verse ${Number(index) + 1}`)"
         class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-200 dark:hover:bg-primary-600 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
         :class="{
-          'bg-primary-300 dark:bg-primary-900': `Verse ${index + 1}` === verse,
+          'bg-primary-300 dark:bg-primary-900':
+            `Verse ${Number(index) + 1}` === verse,
         }"
-        @click="$emit('goto-verse', `Verse ${index + 1}`)"
+        @click="$emit('goto-verse', `Verse ${Number(index) + 1}`)"
       >
         <div class="flex-initial min-w-[8ch] text-xs font-semibold">
-          {{ `Verse ${index + 1}` }}
+          {{ `Verse ${Number(index) + 1}` }}
         </div>
         <div class="flex-initial w-[100%] text-xs">
           {{ verseTemp }}
@@ -91,7 +134,13 @@
 </template>
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
-import type { Scripture, Slide, BibleVerse, Song } from "~/types"
+import type {
+  Scripture,
+  Slide,
+  BibleVerse,
+  Song,
+  SongSetlistData,
+} from "~/types"
 
 const props = defineProps<{
   slide: Slide
@@ -102,6 +151,13 @@ const allChapterVerses = ref<BibleVerse[]>()
 const relatedData = ref<any>({})
 const bibleChapter = computed(() => props.verse?.split(":")?.[0])
 const versesPreview = ref<HTMLDivElement | null>(null)
+const setlistData = computed<SongSetlistData>(() => {
+  const data = props.slide?.data as SongSetlistData | undefined
+  return {
+    songs: Array.isArray(data?.songs) ? data.songs : [],
+    activeSongIndex: data?.activeSongIndex || 0,
+  }
+})
 
 // Build hymn verses list with chorus after Verse 1
 const hymnVersesWithChorus = computed(() => {
@@ -145,6 +201,14 @@ const getSongOrHymnObj = async () => {
       )
       relatedData.value = song
       break
+    case slideTypes.songSetlist: {
+      const setlistData = props.slide?.data as SongSetlistData | undefined
+      const activeItem = setlistData?.songs?.[setlistData?.activeSongIndex || 0]
+      relatedData.value = activeItem
+        ? await useSong(activeItem.song || activeItem.songId)
+        : {}
+      break
+    }
   }
 }
 
