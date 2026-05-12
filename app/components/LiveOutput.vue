@@ -45,6 +45,7 @@
         item-key="id"
         :animation="200"
         ghost-class="opacity-50"
+        @end="draggingSlide = null"
       >
         <!-- SLIDE CARD (DUPLICATED FROM THE SLIDECARD.VUE, TO MAKE DRAGGABLE WORK AS IT COULD NOT WORK IN COMPONENT) -->
         <template #item="{ element: slide, index }">
@@ -63,6 +64,12 @@
             }"
             @click="setLiveSlide(slide?.id || '0')"
             @dblclick="useGlobalEmit(appWideActions.newActiveSlide, slide)"
+            @dragstart="draggingSlide = slide"
+            @dragover.prevent="
+              slide?.type === slideTypes.songSetlist &&
+              draggingSlide?.type === slideTypes.song
+            "
+            @drop.stop.prevent="handleDropOnSetlist(slide)"
           >
             <DeferredSlidePreview
               preview-class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
@@ -155,6 +162,7 @@ const authStore = useAuthStore()
 const toast = useToast()
 const ctrlOrMetaActive = ref(false)
 const showTranscripts = ref(false)
+const draggingSlide = ref<Slide | null>(null)
 const { currentState } = storeToRefs(appStore)
 const windowRefs = inject("windowRefs") as any[]
 
@@ -299,6 +307,23 @@ const setLiveSlide = (slideId: string) => {
   // useDebounceFn(useBroadcastPost, 0)(JSON.stringify(slide))
   useBroadcastPost(JSON.stringify(slide))
   appStore.setLiveSlide(slideId)
+}
+
+const handleDropOnSetlist = (targetSlide: Slide) => {
+  if (
+    targetSlide?.type !== slideTypes.songSetlist ||
+    draggingSlide.value?.type !== slideTypes.song ||
+    draggingSlide.value.id === targetSlide.id
+  ) {
+    draggingSlide.value = null
+    return
+  }
+
+  useGlobalEmit(appWideActions.addSongSlideToSetlist, {
+    setlistSlide: targetSlide,
+    songSlide: draggingSlide.value,
+  })
+  draggingSlide.value = null
 }
 </script>
 

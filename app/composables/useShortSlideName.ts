@@ -18,6 +18,7 @@ const useShortSlideName = (slide: Slide, options?: { longer: boolean }) => {
         return `${slide?.name?.slice(0, 12)}...`
       }
     case slideTypes.song:
+    case slideTypes.songSetlist:
       if (slide?.name?.length <= 15) {
         return slide.name
       } else {

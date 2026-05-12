@@ -171,6 +171,7 @@ const {
   createBibleSlide,
   createHymnSlide,
   createSongSlide,
+  createSongSetlistSlide,
   createMediaSlide,
   createMultipleMediaSlides,
   createCountdownSlide,
@@ -178,6 +179,7 @@ const {
   duplicateSlide,
 } = useSlideCreation()
 const { gotoVerse } = useSlideNavigation()
+const { appendSongToSetlist } = useSongSetlist()
 
 // Online status for conditional API/WS calls
 const online = useOnline()
@@ -501,18 +503,74 @@ emitter.on("new-hymn", async (data: string) => {
   }
 })
 
+emitter.on(appWideActions.newSongSetlist, async (song?: Song) => {
+  const resolvedSong = song ? await useSong(song) : undefined
+  const newSlide = await createSongSetlistSlide(resolvedSong || undefined)
+  slides.value?.push(newSlide)
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  broadcastSlideCreated(newSlide)
+  uploadOfflineSlides()
+})
+
+const getRelevantSongSetlist = () => {
+  if (activeSlide.value?.type === slideTypes.songSetlist) {
+    return activeSlide.value
+  }
+  return slides.value?.find((slide) => slide.type === slideTypes.songSetlist)
+}
+
+const addSongAsSeparateSlide = (song: Song) => {
+  const newSlide = createSongSlide(song)
+  slides.value?.push(newSlide)
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  saveSlide(newSlide)
+  broadcastSlideCreated(newSlide)
+  uploadOfflineSlides()
+}
+
+const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
+  const updatedSlide = await appendSongToSetlist(setlistSlide, song)
+  if (!updatedSlide) return
+
+  const slideIndex = slides.value.findIndex((s) => s.id === updatedSlide.id)
+  if (slideIndex >= 0) {
+    slides.value.splice(slideIndex, 1, updatedSlide)
+  }
+  makeSlideActive(updatedSlide, { goLive: false, newlyCreated: false })
+  updateLiveOutput(updatedSlide)
+  updateSlideOnline(updatedSlide)
+  toast.add({
+    icon: "i-lucide-list-music",
+    title: `${song.title} added to setlist`,
+  })
+}
+
 emitter.on("new-song", async (data: Song) => {
   if (data) {
     const song = await useSong(data)
     if (song) {
-      const newSlide = createSongSlide(song)
-      slides.value?.push(newSlide)
-      makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
-      // Save song to Library if it is added to schedule
-      saveSlide(newSlide)
-      // Broadcast slide creation immediately for real-time sync
-      broadcastSlideCreated(newSlide)
-      uploadOfflineSlides()
+      const setlistSlide = getRelevantSongSetlist()
+
+      if (setlistSlide) {
+        toast.add({
+          icon: "i-lucide-list-music",
+          title: "Add song to setlist?",
+          description: `${song.title} can be added to ${setlistSlide.name} or inserted as its own slide.`,
+          timeout: 0,
+          actions: [
+            {
+              label: "Add to setlist",
+              click: () => addSongToSetlist(setlistSlide, song),
+            },
+            {
+              label: "Separate slide",
+              click: () => addSongAsSeparateSlide(song),
+            },
+          ],
+        })
+      } else {
+        addSongAsSeparateSlide(song)
+      }
     }
   }
 })
@@ -596,6 +654,44 @@ emitter.on("restart-countdown", (data: Slide) => {
 emitter.on("delete-slide", (data: Slide) => {
   deleteSlide(data?.id)
 })
+
+emitter.on(
+  appWideActions.addSongSlideToSetlist,
+  async (data: { setlistSlide: Slide; songSlide: Slide }) => {
+    const setlistSlide = slides.value.find(
+      (slide) => slide.id === data.setlistSlide?.id
+    )
+    const songSlide = slides.value.find((slide) => slide.id === data.songSlide?.id)
+
+    if (
+      !setlistSlide ||
+      !songSlide ||
+      setlistSlide.type !== slideTypes.songSetlist ||
+      songSlide.type !== slideTypes.song
+    ) {
+      return
+    }
+
+    const song = await useSong((songSlide.data as Song) || songSlide.songId!!)
+    if (!song) return
+
+    const updatedSlide = await appendSongToSetlist(setlistSlide, song)
+    if (!updatedSlide) return
+
+    const slideIndex = slides.value.findIndex((s) => s.id === updatedSlide.id)
+    if (slideIndex >= 0) {
+      slides.value.splice(slideIndex, 1, updatedSlide)
+    }
+    makeSlideActive(updatedSlide, { goLive: false, newlyCreated: false })
+    updateLiveOutput(updatedSlide)
+    updateSlideOnline(updatedSlide)
+    await deleteSlide(songSlide.id, false)
+    toast.add({
+      icon: "i-lucide-list-music",
+      title: `${song.title} moved into setlist`,
+    })
+  }
+)
 
 emitter.on("refresh-slides", () => {
   retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!).catch(

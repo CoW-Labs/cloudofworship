@@ -3,18 +3,18 @@
     <UModal
       v-model="visible"
       :ui="{
-        base: 'min-w-[700px]',
+        base: 'min-w-[700px] rounded-[24px] overflow-hidden',
       }"
       prevent-close
     >
       <button
-        class="bg-primary-500 absolute p-1 text-white rounded-full top-2 right-2"
+        class="bg-primary-500 absolute p-1 text-white rounded-full top-2 right-2 z-10"
         @click="visible = false"
       >
         <IconWrapper name="i-bx-x" class="p-2 text-white" />
       </button>
       <a :href="activeAdvert?.url" target="_blank" @click="onAdvertClicked">
-        <img class="rounded-3xl" :src="activeAdvert?.image"
+        <img class="scale-105" :src="activeAdvert?.image"
       /></a>
     </UModal>
   </div>

@@ -188,6 +188,44 @@ export default function useSlideCreation() {
     return tempSlide
   }
 
+  const createSongSetlistSlide = async (song?: Song): Promise<Slide> => {
+    const tempSlide = { ...preSlideCreation() }
+    tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+      ? slideLayoutTypes.bible
+      : slideLayoutTypes.full_text
+    tempSlide.type = slideTypes.songSetlist
+    tempSlide.background =
+      appStore.currentState.settings.defaultBackground.default?.background ||
+      appStore.currentState.settings.defaultBackground.hymn?.background
+    tempSlide.backgroundVideoKey =
+      appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey ||
+      appStore.currentState.settings.defaultBackground.hymn?.backgroundVideoKey
+    tempSlide.backgroundType =
+      appStore.currentState.settings.defaultBackground.default?.backgroundType ||
+      appStore.currentState.settings.defaultBackground.hymn?.backgroundType
+    tempSlide.title = "Song Setlist"
+    tempSlide.data = {
+      songs: [],
+      activeSongIndex: 0,
+    }
+    tempSlide.contents = ["", "<p class=\"song-content\">Add songs to this setlist</p>"]
+    tempSlide.name = useSlideName(tempSlide)
+
+    if (song) {
+      const { appendSongToSetlist } = useSongSetlist()
+      const slideWithSong = await appendSongToSetlist(tempSlide, song, {
+        makeActive: true,
+      })
+      if (slideWithSong) {
+        usePosthogCapture("NEW_SONG_SETLIST_SLIDE_CREATED")
+        return slideWithSong
+      }
+    }
+
+    usePosthogCapture("NEW_SONG_SETLIST_SLIDE_CREATED")
+    return tempSlide
+  }
+
   /**
    * Build a single media slide object from a file.
    * Returns immediately with a local Blob URL — no uploads happen here.
@@ -347,10 +385,10 @@ export default function useSlideCreation() {
             const sanitizedSlide = { ...slide }
             if (sanitizedSlide.data && typeof sanitizedSlide.data === "object") {
               const sanitizedData = {
-                ...(sanitizedSlide.data as Record<string, unknown>)
+                ...(sanitizedSlide.data as unknown as Record<string, unknown>)
               }
               delete sanitizedData.blob
-              sanitizedSlide.data = sanitizedData as typeof sanitizedSlide.data
+              sanitizedSlide.data = sanitizedData as unknown as typeof sanitizedSlide.data
             }
             return sanitizedSlide
           })
@@ -563,6 +601,7 @@ export default function useSlideCreation() {
     createBibleSlide,
     createHymnSlide,
     createSongSlide,
+    createSongSetlistSlide,
     createMediaSlide,
     createMultipleMediaSlides,
     createCountdownSlide,

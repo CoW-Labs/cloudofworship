@@ -63,6 +63,7 @@ const useSlideContent = (
           : `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`,
       ]
     case slideTypes.song:
+    case slideTypes.songSetlist:
       data = data as Song
       return [
         appStore.currentState.settings.songAndHymnLabelsVisibility

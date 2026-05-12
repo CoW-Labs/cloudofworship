@@ -237,7 +237,10 @@
 
     <!-- SLIDE CONTENT LINE CONTROLS -->
     <SlideMaxLinesSelect
-      v-if="slide?.type === slideTypes?.song"
+      v-if="
+        slide?.type === slideTypes?.song ||
+        slide?.type === slideTypes?.songSetlist
+      "
       :selected-line="slide?.slideStyle?.linesPerSlide"
       class="min-w-[120px] top-[-4px]"
       @open="containerOverflow = ''"
@@ -506,7 +509,7 @@
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
-import type { ExtendedFileT, Slide } from "~/types"
+import type { ExtendedFileT, ExternalVideo, Slide } from "~/types"
 import { appWideActions } from "~/utils/constants"
 
 const MAX_FONT_SIZE = 150
