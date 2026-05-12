@@ -4,7 +4,13 @@
     :class="[getBGBySlideType(slideType)]"
   >
     <IconWrapper :name="getIconBySlideType(slideType)" size="4" />
-    {{ slideType === slideTypes.presentation ? "PPT/PDF" : slideType }}
+    {{
+      slideType === slideTypes.presentation
+        ? "PPT/PDF"
+        : slideType === slideTypes.songSetlist
+          ? "setlist"
+          : slideType
+    }}
     {{ slideSubType ? ` (${slideSubType})` : "" }}
   </p>
 </template>
@@ -19,6 +25,8 @@ const getIconBySlideType = (slideType?: string) => {
   switch (slideType) {
     case slideTypes.song:
       return "i-bx-music"
+    case slideTypes.songSetlist:
+      return "i-lucide-list-music"
     case slideTypes.hymn:
       return "i-bx-church"
     // case slideTypes.sermon:
@@ -45,6 +53,11 @@ const getBGBySlideType = (slideType?: string) => {
         return "bg-green-700 text-green-100"
       }
       return "bg-green-100 border border-green-500 text-green-700"
+    case slideTypes.songSetlist:
+      if (props.darkMode) {
+        return "bg-emerald-700 text-emerald-100"
+      }
+      return "bg-emerald-100 border border-emerald-500 text-emerald-700"
     case slideTypes.hymn:
       if (props.darkMode) {
         return "bg-pink-700 text-pink-100"

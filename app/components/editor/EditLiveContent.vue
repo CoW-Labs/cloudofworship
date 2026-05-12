@@ -69,9 +69,11 @@
             <!-- VERSE SWITCH -->
             <div
               v-if="
-                slide?.type === slideTypes?.bible ||
+                (slide?.type === slideTypes?.bible ||
                 slide?.type === slideTypes?.hymn ||
-                slide?.type === slideTypes?.song
+                slide?.type === slideTypes?.song ||
+                slide?.type === slideTypes?.songSetlist) &&
+                !isEmptySongSetlist
               "
               class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-1 mr-0 relative"
             >
@@ -106,7 +108,7 @@
                   ($event.target as HTMLInputElement).blur()
                 "
                 @keydown="
-                  (e) => {
+                  (e: KeyboardEvent) => {
                     if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
                       e.preventDefault()
                       $emit('take-live')
@@ -132,14 +134,18 @@
             />
             <PreviewVerses
               v-if="
-                slide?.type === slideTypes.hymn ||
+                (slide?.type === slideTypes.hymn ||
                 slide?.type === slideTypes.song ||
-                slide?.type === slideTypes.bible
+                slide?.type === slideTypes.songSetlist ||
+                slide?.type === slideTypes.bible) &&
+                !isEmptySongSetlist
               "
               class="preview-verses"
               :slide="slide"
               :verse="verse"
               @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
+              @goto-song="goToSetlistSong"
+              @remove-song="removeSetlistSong"
             />
 
             <!-- PAGE SWITCH — presentation slides -->
@@ -322,7 +328,7 @@
         :editor="focusedEditor"
       />
       <SlideContentToolbar
-        v-else-if="slide"
+        v-else-if="slide && !isEmptySongSetlist"
         :slide="slide"
         @update-style="onUpdateSlideStyle($event, false)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
@@ -353,9 +359,17 @@
       action-text=""
     />
     <template v-else-if="slide">
+      <EmptyState
+        v-if="isEmptySongSetlist"
+        icon="i-lucide-list-music"
+        sub="Add songs to this setlist from the song list"
+        action=""
+        action-text=""
+        class="h-[100%] bg-primary-900 rounded-b-md"
+      />
       <!-- IMAGE NOT AVAILABLE ON THIS DEVICE NOTICE -->
       <div
-        v-if="imageNotAvailable"
+        v-else-if="imageNotAvailable"
         class="h-[100%] flex flex-col items-center justify-center gap-4 p-6 text-center bg-primary-900 rounded-b-md"
       >
         <IconWrapper name="i-bx-image-alt" size="12" class="text-primary-400" />
@@ -425,7 +439,13 @@
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
-import type { ExtendedFileT, Slide, SlideStyle, Song } from "~/types"
+import type {
+  ExtendedFileT,
+  Slide,
+  SlideStyle,
+  Song,
+  SongSetlistData,
+} from "~/types"
 
 const props = defineProps<{
   slide?: Slide
@@ -463,14 +483,28 @@ const containerOverflow = ref<string>("overflow-x-auto")
 const selectedBibleVersion = ref<string>(
   appStore.currentState.settings.defaultBibleVersion
 )
+const {
+  getSetlistData,
+  refreshSongSetlistSlide,
+  removeSongFromSetlist,
+} = useSongSetlist()
 
 const animatedSlides = computed(() => {
   if (props.slide) {
-    selectedBibleVersion.value = props.slide.slideStyle?.bibleVersion
+    selectedBibleVersion.value =
+      props.slide.slideStyle?.bibleVersion ||
+      appStore.currentState.settings.defaultBibleVersion
     return [props.slide]
   }
   return null
 })
+
+const setlistData = computed<SongSetlistData>(() => getSetlistData(props.slide))
+const isEmptySongSetlist = computed(
+  () =>
+    props.slide?.type === slideTypes.songSetlist &&
+    setlistData.value.songs.length === 0
+)
 
 /**
  * Detect if the current media slide has an image that cannot be retrieved from IndexedDB.
@@ -585,6 +619,9 @@ const nextVerse = computed(() => {
     // From verse, go to chorus
     return "Chorus"
   }
+  if (props.slide?.type === slideTypes.songSetlist) {
+    return "__next-setlist"
+  }
   return `Verse ${Number(verse.value?.split(" ")?.[1]) + 1}`
 })
 
@@ -630,6 +667,9 @@ const previousVerse = computed(() => {
     }
     // Go to chorus, but we need to set hymnVerseIndex to previous verse
     return `Chorus:${currentVerseNum - 2}`
+  }
+  if (props.slide?.type === slideTypes.songSetlist) {
+    return "__previous-setlist"
   }
   return `Verse ${Number(verse.value?.split(" ")?.[1]) - 1}`
 })
@@ -764,6 +804,22 @@ const handlePreviousVerse = async () => {
   }
 }
 
+const goToSetlistSong = async (songIndex: number) => {
+  if (!props.slide) return
+  const item = setlistData.value.songs[songIndex]
+  const updatedSlide = await refreshSongSetlistSlide(props.slide, {
+    activeSongIndex: songIndex,
+    verseIndex: item?.verseIndex || 0,
+  })
+  emit("slide-update", updatedSlide)
+}
+
+const removeSetlistSong = async (songIndex: number) => {
+  if (!props.slide) return
+  const updatedSlide = await removeSongFromSetlist(props.slide, songIndex)
+  if (updatedSlide) emit("slide-update", updatedSlide)
+}
+
 // const onSelectLayout = (data: string) => {
 //   layoutPopoverOpen.value = false
 //   const tempSlide: Slide = {
@@ -880,6 +936,29 @@ const onUpdateSongLyrics = (song: Song) => {
 }
 
 const onUpdateSongLines = async (linesPerSlide: number) => {
+  if (props.slide?.type === slideTypes.songSetlist) {
+    appStore.setSlideStyles({
+      ...appStore.currentState.settings.slideStyles,
+      linesPerSlide,
+    })
+    const slideStyle = {
+      ...props.slide.slideStyle,
+      linesPerSlide,
+    }
+    const updatedSlide = await refreshSongSetlistSlide(props.slide, {
+      activeSongIndex: setlistData.value.activeSongIndex,
+      verseIndex:
+        setlistData.value.songs[setlistData.value.activeSongIndex]?.verseIndex ||
+        0,
+    })
+    emit("slide-update", { ...updatedSlide, slideStyle })
+    useToast().add({
+      icon: "i-tabler-list-numbers",
+      title: "Lines per slide updated",
+    })
+    return
+  }
+
   // console.log("updating song lines", linesPerSlide)
   const song = (props.slide?.data as Song) || props.slide?.songId
   const tempSong: Song | null = await useSong(song, linesPerSlide)
@@ -914,6 +993,7 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
 }
 
 const onUpdateBibleVersion = (version: string) => {
+  if (!props.slide) return
   onUpdateSlideStyle({ ...props.slide.slideStyle, bibleVersion: version })
   emit("update-bible-version", version)
 }
@@ -948,11 +1028,12 @@ const predictVerseInput = (
         element?.focus()
       }, 100)
     } else if (searchedBibleBookOptions.value?.[0]) {
-      verse.value = `${searchedBibleBookOptions.value?.[0]} 1:1`
+      const bookOption = searchedBibleBookOptions.value[0]
+      verse.value = `${bookOption} 1:1`
       setTimeout(() => {
         element?.setSelectionRange(
-          searchedBibleBookOptions.value?.[0].length + 1,
-          searchedBibleBookOptions.value?.[0].length + 2
+          bookOption.length + 1,
+          bookOption.length + 2
         )
         element?.focus()
       }, 100)
