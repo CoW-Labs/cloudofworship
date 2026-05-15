@@ -8,7 +8,6 @@ export type SubscriptionPlan = 'free' | 'teams'
  */
 const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   // Teams tier features
-  'new-slide': 'teams',
   'new-templates': 'teams',
   'new-alert': 'teams',
   'remove-alert': 'teams',
@@ -22,9 +21,10 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-song': 'teams',
   'livestream-url': 'teams',
   'new-transcribe': 'teams',
-  'new-search-bible': 'teams',
 
   // Free tier features
+  'new-slide': 'free',
+  'new-search-bible': 'free',
   'new-hymn': 'free',
   'new-media': 'free',
   'new-bible': 'free',
