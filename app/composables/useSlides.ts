@@ -2,6 +2,11 @@ import { useDebounceFn, useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
+import {
+  getAPIErrorMessage,
+  isForbiddenError,
+  isNotFoundError,
+} from "~/utils/apiErrors"
 
 export default function useSlides() {
   const appStore = useAppStore()
@@ -11,6 +16,24 @@ export default function useSlides() {
   const getChurchId = () => authStore.church?._id || authStore.user?.churchId
   const slides = ref<Array<Slide>>(appStore.currentState.activeSlides || [])
   const loading = ref<boolean>(false)
+  const removeStaleSlide = (slideId?: string) => {
+    if (!slideId) return
+
+    const nextSlides = appStore.currentState.activeSlides.filter(
+      (activeSlide) => activeSlide?._id !== slideId && activeSlide?.id !== slideId
+    )
+    if (nextSlides.length !== appStore.currentState.activeSlides.length) {
+      appStore.setActiveSlides(nextSlides)
+    }
+  }
+
+  const showForbiddenToast = () => {
+    toast.add({
+      icon: 'i-bx-lock-alt',
+      title: "You don't have permission to edit this schedule.",
+      color: 'red',
+    })
+  }
 
   const updateLiveOutput = (updatedSlide: Slide, options?: { forceGoLive: boolean }) => {
     appStore.replaceScheduleActiveSlides(slides.value || [])
@@ -219,7 +242,11 @@ export default function useSlides() {
       )
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to create slides')
+        if (isForbiddenError(error.value)) {
+          showForbiddenToast()
+          return emptyResult
+        }
+        throw new Error(getAPIErrorMessage(error.value, 'Failed to create slides'))
       }
 
       appStore.setLastSynced(new Date().toISOString())
@@ -284,7 +311,15 @@ export default function useSlides() {
       )
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to update slide')
+        if (isNotFoundError(error.value)) {
+          removeStaleSlide(slide._id || slide.id)
+          return null
+        }
+        if (isForbiddenError(error.value)) {
+          showForbiddenToast()
+          return null
+        }
+        throw new Error(getAPIErrorMessage(error.value, 'Failed to update slide'))
       }
 
       appStore.setLastSynced(new Date().toISOString())
@@ -332,7 +367,11 @@ export default function useSlides() {
       )
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to update slides')
+        if (isForbiddenError(error.value)) {
+          showForbiddenToast()
+          return []
+        }
+        throw new Error(getAPIErrorMessage(error.value, 'Failed to update slides'))
       }
 
       appStore.setLastSynced(new Date().toISOString())
@@ -385,7 +424,15 @@ export default function useSlides() {
       )
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to delete slide')
+        if (isNotFoundError(error.value)) {
+          removeStaleSlide(slide._id || slide.id)
+          return true
+        }
+        if (isForbiddenError(error.value)) {
+          showForbiddenToast()
+          return false
+        }
+        throw new Error(getAPIErrorMessage(error.value, 'Failed to delete slide'))
       }
 
       appStore.setLastSynced(new Date().toISOString())
@@ -439,7 +486,11 @@ export default function useSlides() {
       )
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to delete slides')
+        if (isForbiddenError(error.value)) {
+          showForbiddenToast()
+          return false
+        }
+        throw new Error(getAPIErrorMessage(error.value, 'Failed to delete slides'))
       }
 
       appStore.setLastSynced(new Date().toISOString())

@@ -4,6 +4,7 @@ import type { LibraryItem, Slide, Song } from '~/types'
 import { liveQuery } from 'dexie'
 import { useObservable } from '@vueuse/rxjs'
 import fuzzysort from 'fuzzysort'
+import { safeDBGet } from './useIndexedDB'
 
 export default function useLibrary() {
   const authStore = useAuthStore()
@@ -336,7 +337,7 @@ export default function useLibrary() {
   const getLibraryItem = async (itemId: string): Promise<LibraryItem | undefined> => {
     try {
       const db = useIndexedDB()
-      return await db.library.get(itemId)
+      return await safeDBGet(db.library, itemId)
     } catch (error) {
       console.error('Error getting library item:', error)
       return undefined

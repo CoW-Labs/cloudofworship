@@ -1,8 +1,9 @@
 import type { Hymn } from '~/types'
+import { safeDBGet } from './useIndexedDB'
 
 const useHymn = async (number: string): Promise<Hymn | null> => {
   const db = useIndexedDB()
-  let hymns: any = await db.bibleAndHymns.get('hymns')
+  let hymns: any = await safeDBGet(db.bibleAndHymns, 'hymns')
   hymns = hymns?.data as unknown as Hymn[]
   const toast = useToast()
 
@@ -16,4 +17,3 @@ const useHymn = async (number: string): Promise<Hymn | null> => {
 }
 
 export default useHymn
-
