@@ -20,10 +20,11 @@ import posthog from "posthog-js"
 function ensureUniqueIds(arr: Slide[]): Slide[] {
   const seenIds = new Set()
   return arr.filter((obj) => {
-    if (seenIds.has(obj.id)) {
+    const id = obj?.id || obj?._id
+    if (!id || seenIds.has(id)) {
       return false
     } else {
-      seenIds.add(obj.id)
+      seenIds.add(id)
       return true
     }
   })
@@ -202,23 +203,27 @@ export const useAppStore = defineStore("app", {
       tempSlides.push(...slides)
       this.currentState.activeSlides = ensureUniqueIds(tempSlides)
       this.currentState.liveOutputSlidesId = Array.from(
-        new Set(this.currentState.activeSlides.map((slide) => slide.id))
+        new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
       this.futureStates = []
     },
     removeActiveSlide(slide: Slide) {
       // console.log('removing active slides', this.currentState.activeSlides?.length)
+      const slideIndex = this.currentState.activeSlides.findIndex(
+        (s) => s?.id === slide?.id || s?._id === slide?._id
+      )
+      if (slideIndex < 0) {
+        return
+      }
+
       onAppStateChange(this.pastStates, this.currentState, "activeSlides", [
         ...this.currentState.activeSlides,
       ])
       // onAppStateChange(this.pastStates, this.currentState)
-      this.currentState.activeSlides.splice(
-        this.currentState.activeSlides.findIndex((s) => s.id === slide.id),
-        1
-      )
+      this.currentState.activeSlides.splice(slideIndex, 1)
       // console.log("removing active slide", this.currentState.activeSlides)
       this.currentState.liveOutputSlidesId = Array.from(
-        new Set(this.currentState.activeSlides.map((slide) => slide.id))
+        new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
       this.futureStates = []
     },
@@ -233,7 +238,7 @@ export const useAppStore = defineStore("app", {
       this.currentState.activeSlides = ensureUniqueIds(tempSlides)
       // console.log("replacing schedule active slides - p2", this.currentState.activeSlides)
       this.currentState.liveOutputSlidesId = Array.from(
-        new Set(this.currentState.activeSlides.map((slide) => slide.id))
+        new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
       this.futureStates = []
     },
@@ -243,7 +248,7 @@ export const useAppStore = defineStore("app", {
       // console.log("setActiveSlides", slides)
       this.currentState.activeSlides = ensureUniqueIds(slides)
       this.currentState.liveOutputSlidesId = Array.from(
-        new Set(this.currentState.activeSlides.map((slide) => slide.id))
+        new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
       this.futureStates = []
     },

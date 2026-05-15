@@ -1,6 +1,7 @@
 import { useAuthStore } from '~/store/auth'
 import { useAppStore } from '~/store/app'
 import type { Song } from '~/types'
+import { safeDBGet } from './useIndexedDB'
 // import songsObj from '../public/songs.json'
 import useURLFriendlyString from './useURLFriendlyString'
 
@@ -34,7 +35,7 @@ const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<S
     if (typeof song === 'string' && song?.includes('-')) {
       // If [song] param comes as an ID, retrieve song obj from local backend first, if it's not ObjectID string
       const db = useIndexedDB()
-      const data = await db.library.get(song)
+      const data = await safeDBGet(db.library, song)
       song = (data?.content as Song)
     } else if (typeof song === 'string') {
       // If [song] param comes as an ID, retrieve song obj from remote backend first
@@ -101,4 +102,3 @@ const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<S
 }
 
 export default useSong
-

@@ -2,6 +2,10 @@
  * Tauri utilities for common desktop operations
  * These are helper functions that work safely in both web and desktop environments
  */
+import {
+  exitFullscreenSafely,
+  requestFullscreenSafely,
+} from "~/utils/browserSafety"
 
 /**
  * Check if the app is running in fullscreen mode
@@ -30,9 +34,9 @@ export const useIsFullscreen = () => {
     if (!isTauri) {
       // Web API fallback
       if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen()
+        await requestFullscreenSafely(document.documentElement)
       } else {
-        await document.exitFullscreen()
+        await exitFullscreenSafely()
       }
       await checkFullscreen()
       return

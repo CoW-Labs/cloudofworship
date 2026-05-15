@@ -64,6 +64,20 @@ export const useSocket = (options: WebSocketOptions) => {
   // Offline message queue
   const messageQueue: any[] = []
 
+  const sendRaw = (payload: unknown) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return false
+    }
+
+    try {
+      socket.send(JSON.stringify(payload))
+      return true
+    } catch (error) {
+      console.error('Failed to send WebSocket message:', error)
+      return false
+    }
+  }
+
   const getWebSocketUrl = () => {
     const protocol = process.env.NODE_ENV === 'development' ? 'ws' : 'wss'
     const baseUrl = runtimeConfig.public.BASE_URL?.split('://')?.[1]
@@ -105,13 +119,8 @@ export const useSocket = (options: WebSocketOptions) => {
     if (heartbeatTimer) clearInterval(heartbeatTimer)
 
     heartbeatTimer = setInterval(() => {
-      if (socket?.readyState === WebSocket.OPEN) {
-        try {
-          socket.send(JSON.stringify({ action: 'ping', data: 'reconnect' }))
-        } catch (error) {
-          console.error('Failed to send heartbeat:', error)
-          reconnect()
-        }
+      if (socket?.readyState === WebSocket.OPEN && !sendRaw({ action: 'ping', data: 'reconnect' })) {
+        reconnect()
       }
     }, heartbeatInterval)
   }
@@ -122,10 +131,7 @@ export const useSocket = (options: WebSocketOptions) => {
   const flushMessageQueue = () => {
     while (messageQueue.length > 0 && socket?.readyState === WebSocket.OPEN) {
       const message = messageQueue.shift()
-      try {
-        socket.send(JSON.stringify(message))
-      } catch (error) {
-        console.error('Failed to send queued message:', error)
+      if (!sendRaw(message)) {
         messageQueue.unshift(message) // Put it back
         break
       }
@@ -299,22 +305,15 @@ export const useSocket = (options: WebSocketOptions) => {
       return false
     }
 
-    if (socket?.readyState === WebSocket.OPEN) {
-      try {
-        socket.send(JSON.stringify(data))
-        return true
-      } catch (error) {
-        console.error('Failed to send message:', error)
-        // Queue message for later if send fails
-        messageQueue.push(data)
-        return false
-      }
-    } else {
-      console.warn('WebSocket is not connected. Queueing message for later.')
-      // Queue message for when connection is restored
-      messageQueue.push(data)
-      return false
+    if (sendRaw(data)) {
+      return true
     }
+
+    console.warn('WebSocket is not connected. Queueing message for later.')
+    if (!isIntentionallyClosed) {
+      messageQueue.push(data)
+    }
+    return false
   }
 
   /**
