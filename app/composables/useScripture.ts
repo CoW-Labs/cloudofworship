@@ -1,5 +1,6 @@
 import { useAppStore } from '~/store/app'
 import type { BibleVerse, Scripture } from '~/types'
+import { safeDBGet } from './useIndexedDB'
 
 // ── Module-level index cache ────────────────────────────────────────────────
 // Built once per Bible version per session. Avoids re-scanning 31k+ verses on
@@ -40,7 +41,7 @@ async function getVersionIndex(version: string, db: any): Promise<VersionIndex |
   // Return cached index if already built
   if (versionIndexCache.has(version)) return versionIndexCache.get(version)!
 
-  const bibleEntry = await db.bibleAndHymns.get(version)
+  const bibleEntry = await safeDBGet<{ data: BibleVerse[] }>(db.bibleAndHymns, version)
   if (!bibleEntry) return null
 
   const data = bibleEntry.data as unknown as BibleVerse[]
@@ -82,7 +83,7 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
 
     if (!index) {
       // Distinguish: entry missing entirely vs entry has empty data
-      const bibleEntry = await db.bibleAndHymns.get(version)
+      const bibleEntry = await safeDBGet(db.bibleAndHymns, version)
       if (!bibleEntry) {
         toast.add({
           title: `${version} is not downloaded yet.`,
@@ -180,4 +181,3 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
 }
 
 export default useScripture
-

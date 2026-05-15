@@ -436,6 +436,7 @@
 </template>
 
 <script setup lang="ts">
+import { safeDBGet } from "~/composables/useIndexedDB"
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
@@ -534,7 +535,7 @@ watch(
     // For blob: or data: URLs, check if the media data exists in IndexedDB
     try {
       const db = useIndexedDB()
-      const mediaObj = await db.media.get(newSlideId)
+      const mediaObj = await safeDBGet(db.media, newSlideId)
       if (!mediaObj?.data) {
         // No local media data found — image is not available on this device
         // Guard against stale watcher: only set if slide hasn't changed

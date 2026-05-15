@@ -1,5 +1,6 @@
 import { useAppStore } from '~/store/app'
 import type { BibleVerse, Scripture } from '~/types'
+import { safeDBGet } from './useIndexedDB'
 
 const useScriptureChapter = async (label: string = '1:1', version: string = ''): Promise<Scripture | null> => {
   const db = useIndexedDB()
@@ -22,7 +23,7 @@ const useScriptureChapter = async (label: string = '1:1', version: string = ''):
     }
 
     async function fetchVerses(version: string, db: any, book: number, chapter: number): Promise<any[]> {
-      const bibleData = (await db.bibleAndHymns.get(version))?.data as unknown as BibleVerse[];
+      const bibleData = (await safeDBGet<{ data: BibleVerse[] }>(db.bibleAndHymns, version))?.data as unknown as BibleVerse[];
       return bibleData?.filter((scripture: any) => Number(scripture.book) === book && Number(scripture.chapter) === chapter);
     }
 
@@ -45,4 +46,3 @@ const useScriptureChapter = async (label: string = '1:1', version: string = ''):
 }
 
 export default useScriptureChapter
-

@@ -102,6 +102,7 @@ import type {
 } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { appWideActions } from "~/utils/constants"
+import { safeDBGet } from "~/composables/useIndexedDB"
 
 useHead({
   title: "Cloud of Worship",
@@ -709,7 +710,7 @@ const retrieveAllMediaFilesFromDB = async () => {
             const mediaObj = await db.media.where({ id: slide.id }).toArray()
             if (mediaObj[0]) {
               // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
-              const arrayBuffer = mediaObj[0]?.data!!
+              const arrayBuffer = mediaObj[0]?.data as ArrayBuffer
               const blob = new Blob([arrayBuffer], {
                 type: mediaObj[0]?.content?.type,
               })
@@ -730,7 +731,7 @@ const retrieveAllMediaFilesFromDB = async () => {
             const restored: typeof slide.presentationObjects = []
             for (const obj of slide.presentationObjects) {
               const key = `${slide.id}-page-${obj.page}`
-              const mediaObj = await db.media.get(key)
+              const mediaObj = await safeDBGet(db.media, key)
               if (mediaObj?.data) {
                 const blob = new Blob([mediaObj.data as ArrayBuffer], {
                   type: "image/png",
@@ -748,11 +749,12 @@ const retrieveAllMediaFilesFromDB = async () => {
               restored[slide.presentationPageIndex ?? 0]?.imageUrl ||
               slide.background
           } else if (slide?.backgroundVideoKey) {
-            const cachedBackgroundVideo = await db.cached.get(
+            const cachedBackgroundVideo = await safeDBGet(
+              db.cached,
               slide?.backgroundVideoKey
             )
             if (cachedBackgroundVideo) {
-              const arrayBuffer = cachedBackgroundVideo?.data!!
+              const arrayBuffer = cachedBackgroundVideo?.data as ArrayBuffer
               const blob = new Blob([arrayBuffer], {
                 type: cachedBackgroundVideo?.content?.type,
               })
@@ -778,8 +780,7 @@ const retrieveAllMediaFilesFromDB = async () => {
       // Process saved slides in background
       savedSlides?.forEach((slide) => {
         if ((slide.content as Slide)?.background?.startsWith("blob:")) {
-          db.media
-            .get(slide.id)
+          safeDBGet(db.media, slide.id)
             .then((resp) => {
               if (!resp) return
               const media = resp

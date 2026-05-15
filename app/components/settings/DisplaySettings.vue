@@ -334,7 +334,10 @@ const moveCurrentScreenToNativeDisplay = async () => {
       screen: nativeDisplay,
     })
   } catch (error) {
-    console.error("Failed to move to native display:", error)
+    const name = (error as DOMException | undefined)?.name
+    if (name !== "NotAllowedError" && name !== "SecurityError") {
+      console.error("Failed to move to native display:", error)
+    }
   }
 }
 </script>

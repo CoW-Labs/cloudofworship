@@ -57,6 +57,10 @@ import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 import type { Slide } from "~/types"
 import { useAuthStore } from "~/store/auth"
+import {
+  exitFullscreenSafely,
+  requestFullscreenSafely,
+} from "~/utils/browserSafety"
 
 // Use dedicated live layout
 definePageMeta({
@@ -146,13 +150,9 @@ onMounted(() => {
   // Shortcut to go full screen
   useCreateShortcut("f", () => {
     if (document.fullscreenElement) {
-      document.exitFullscreen().catch((err) => {
-        console.warn("Error exiting fullscreen:", err)
-      })
+      exitFullscreenSafely()
     } else {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.warn("Fullscreen request denied:", err.message)
-      })
+      requestFullscreenSafely(document.documentElement)
     }
   })
 
@@ -175,10 +175,11 @@ onMounted(() => {
     }
 
     // If no active slide, show the first slide
-    if (activeSlides.length > 0) {
-      mostUpdatedLiveSlide.value = activeSlides[0]
+    const firstSlide = activeSlides[0]
+    if (firstSlide) {
+      mostUpdatedLiveSlide.value = firstSlide
       // Update the live slide ID in the store so it's reflected everywhere
-      appStore.setLiveSlide(activeSlides[0].id)
+      appStore.setLiveSlide(firstSlide.id)
     }
   }
 
