@@ -303,6 +303,13 @@ import { useDebounceFn } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import type { ExtendedFileT, Slide, SlideStyle, ExternalVideo } from "~/types"
+import {
+  exitFullscreenSafely,
+  requestFullscreenSafely,
+  safePauseMedia,
+  safePlayMedia,
+  safePostMessage,
+} from "~/utils/browserSafety"
 import { hasSlideChanged, getSlideComparisonKey } from "~/utils/slideComparison"
 
 const appMounted = ref<boolean>(false)
@@ -386,11 +393,7 @@ watch(
 
         // Only play video/audio when in fullScreen mode
         if (props.fullScreen) {
-          video.value?.play().catch((err) => {
-            if (err.name !== "AbortError") {
-              console.warn("Video play failed on slide change:", err.name)
-            }
-          })
+          safePlayMedia(video.value)
         }
 
         // Trigger smooth content fade animation on slide change
@@ -462,7 +465,8 @@ watch(
           // For YouTube/Vimeo, send postMessage to control playback
           const videoData = props.slide.data as ExternalVideo
           if (videoData.type === "youtube") {
-            iframe.value.contentWindow?.postMessage(
+            safePostMessage(
+              iframe.value.contentWindow,
               JSON.stringify({
                 event: "command",
                 func: "seekTo",
@@ -471,7 +475,8 @@ watch(
               "*"
             )
           } else if (videoData.type === "vimeo") {
-            iframe.value.contentWindow?.postMessage(
+            safePostMessage(
+              iframe.value.contentWindow,
               JSON.stringify({
                 method: "setCurrentTime",
                 value: newSeekPosition,
@@ -513,7 +518,8 @@ watch(
           if (isExternalVideo && iframe.value) {
             const videoData = props.slide.data as ExternalVideo
             if (videoData.type === "youtube") {
-              iframe.value.contentWindow?.postMessage(
+              safePostMessage(
+                iframe.value.contentWindow,
                 JSON.stringify({
                   event: "command",
                   func: "playVideo",
@@ -522,22 +528,15 @@ watch(
                 "*"
               )
             } else if (videoData.type === "vimeo") {
-              iframe.value.contentWindow?.postMessage(
+              safePostMessage(
+                iframe.value.contentWindow,
                 JSON.stringify({ method: "play" }),
                 "*"
               )
             }
           } else {
-            video.value?.play().catch((err) => {
-              if (err.name !== "AbortError") {
-                console.warn("Video play failed:", err.name)
-              }
-            })
-            audio.value?.play().catch((err) => {
-              if (err.name !== "AbortError") {
-                console.warn("Audio play failed:", err.name)
-              }
-            })
+            safePlayMedia(video.value)
+            safePlayMedia(audio.value)
           }
         } else if (
           !isPlaying &&
@@ -547,7 +546,8 @@ watch(
           if (isExternalVideo && iframe.value) {
             const videoData = props.slide.data as ExternalVideo
             if (videoData.type === "youtube") {
-              iframe.value.contentWindow?.postMessage(
+              safePostMessage(
+                iframe.value.contentWindow,
                 JSON.stringify({
                   event: "command",
                   func: "pauseVideo",
@@ -556,14 +556,15 @@ watch(
                 "*"
               )
             } else if (videoData.type === "vimeo") {
-              iframe.value.contentWindow?.postMessage(
+              safePostMessage(
+                iframe.value.contentWindow,
                 JSON.stringify({ method: "pause" }),
                 "*"
               )
             }
           } else {
-            video.value?.pause()
-            audio.value?.pause()
+            safePauseMedia(video.value)
+            safePauseMedia(audio.value)
           }
         }
       }
@@ -591,12 +592,14 @@ watch(
           const videoData = props.slide.data as ExternalVideo
           if (videoData.type === "youtube") {
             const muteFunc = isMuted ? "mute" : "unMute"
-            iframe.value.contentWindow?.postMessage(
+            safePostMessage(
+              iframe.value.contentWindow,
               JSON.stringify({ event: "command", func: muteFunc, args: [] }),
               "*"
             )
           } else if (videoData.type === "vimeo") {
-            iframe.value.contentWindow?.postMessage(
+            safePostMessage(
+              iframe.value.contentWindow,
               JSON.stringify({
                 method: "setVolume",
                 value: isMuted ? 0 : 1,
@@ -616,12 +619,7 @@ onMounted(() => {
   appMounted.value = true
   // Only play video when in fullScreen mode
   if (props.fullScreen) {
-    video.value?.play().catch((err) => {
-      if (err.name !== "AbortError" && err.name !== "NotAllowedError") {
-        console.warn("Video autoplay failed on mount:", err.name)
-      }
-      // NotAllowedError is expected without user interaction — silently ignore
-    })
+    safePlayMedia(video.value)
   }
 
   // Initialize current background
@@ -655,7 +653,7 @@ const preloadBackgroundImage = async (slide: Slide): Promise<boolean> => {
     const img = new Image()
     img.onload = () => resolve(true)
     img.onerror = () => resolve(false)
-    img.src = slide.background
+    img.src = slide.background!
 
     // Timeout after 3 seconds to prevent indefinite waiting
     setTimeout(() => resolve(true), 3000)
@@ -732,21 +730,11 @@ const activateFullScreen = () => {
   const route = useRoute()
   if (props.fullScreen && route.name === "live") {
     if (document.fullscreenElement) {
-      document.exitFullscreen().catch((err) => {
-        console.warn("Error exiting fullscreen:", err)
-      })
+      exitFullscreenSafely()
     } else {
-      document.documentElement
-        .requestFullscreen()
-        .then(() => {
-          emit("activate-fullscreen")
-        })
-        .catch((err) => {
-          // NotAllowedError means no transient user activation — shouldn't happen on dblclick,
-          // but guard anyway and emit so the parent knows
-          console.warn("Fullscreen request denied:", err.message)
-          emit("activate-fullscreen")
-        })
+      requestFullscreenSafely(document.documentElement).finally(() => {
+        emit("activate-fullscreen")
+      })
     }
   }
 }

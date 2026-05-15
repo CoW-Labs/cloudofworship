@@ -134,6 +134,7 @@
 import type { SelectVariant } from "@nuxt/ui/dist/runtime/types"
 import { useAppStore } from "~/store/app"
 import type { Alert } from "~/types"
+import { safeScrollBy } from "~/utils/browserSafety"
 const props = defineProps<{
   alert?: Alert
 }>()
@@ -199,7 +200,7 @@ const addAlert = async () => {
     usePosthogCapture("NEW_ALERT_SENT")
     emit("go-home")
     setTimeout(() => {
-      alertsRef.value?.scrollBy(0, 10000)
+      safeScrollBy(alertsRef.value, 0, 10000)
     }, 300)
   }
 }

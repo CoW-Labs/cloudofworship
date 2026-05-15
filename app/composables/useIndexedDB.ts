@@ -32,6 +32,17 @@ class WorshipCloudDatabase extends Dexie {
 // Singleton instance to avoid creating multiple connections
 let dbInstance: WorshipCloudDatabase | null = null
 
+const clearOldCaches = async () => {
+  if (typeof caches === 'undefined') return
+
+  try {
+    const keys = await caches.keys()
+    await Promise.all(keys.map((key) => caches.delete(key)))
+  } catch (error) {
+    console.warn('Failed to clear browser caches after storage error:', error)
+  }
+}
+
 /**
  * Returns the singleton IndexedDB instance.
  * If the database was closed (e.g. browser GC or private-mode restrictions),
@@ -76,9 +87,32 @@ export const safeDBOperation = async <T>(
       console.warn('DB ConstraintError (duplicate key), skipping:', err)
       return undefined
     }
+    if (err?.name === 'QuotaExceededError') {
+      await clearOldCaches()
+      dbInstance = null
+      try {
+        const db = useIndexedDB()
+        return await operation(db)
+      } catch (retryErr: any) {
+        console.error('DB operation failed after storage cleanup:', retryErr)
+        return undefined
+      }
+    }
     console.error('DB operation failed:', err)
     return undefined
   }
+}
+
+export const safeDBGet = async <T>(
+  table: Table<T, any>,
+  key: string | number | undefined | null
+): Promise<T | undefined> => {
+  if (key === undefined || key === null || key === "") {
+    return undefined
+  }
+
+  const tableName = table.name
+  return safeDBOperation((db) => db.table<T, any>(tableName).get(key)) as Promise<T | undefined>
 }
 
 export default useIndexedDB
