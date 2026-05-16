@@ -1,5 +1,6 @@
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
+import { splitVerseByLines } from "~/composables/useHymn"
 import type {
   Slide,
   Scripture,
@@ -140,12 +141,18 @@ export default function useSlideCreation() {
     tempSlide.title = "Verse 1"
     tempSlide.hymnVerseIndex = 0
     tempSlide.name = useSlideName(tempSlide)
-    const currentHymnVerse = hymn.verses?.[0]?.trim() ?? ""
+    const rawHymnVerse = hymn.verses?.[0]?.trim() ?? ""
+    const linesPerSlide = appStore.currentState.settings.slideStyles.linesPerSlide
+    const hymnChunks = splitVerseByLines(rawHymnVerse, linesPerSlide)
+    const currentHymnVerse = hymnChunks[0]
+    tempSlide.hymnSubVerseIndex = 0
+    tempSlide.hymnSubVerseTotal = hymnChunks.length
     const fontSize = useScreenFontSize(currentHymnVerse)
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
       fontSize: Number(fontSize),
       font: appStore.currentState.settings.defaultFont,
+      ...(linesPerSlide !== undefined && { linesPerSlide }),
     }
     tempSlide.contents = useSlideContent(tempSlide, hymn, currentHymnVerse)
     tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
