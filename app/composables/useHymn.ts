@@ -17,3 +17,17 @@ const useHymn = async (number: string): Promise<Hymn | null> => {
 }
 
 export default useHymn
+
+export const splitVerseByLines = (text: string, linesPerSlide?: number | string): string[] => {
+  if (!text) return ['']
+  const n = Number(linesPerSlide)
+  const lines = text.split('\n').filter(l => l.trim() !== '')
+  if (!n || n < 1 || n >= lines.length) {
+    return [text]
+  }
+  const chunks: string[] = []
+  for (let i = 0; i < lines.length; i += n) {
+    chunks.push(lines.slice(i, i + n).join('\n'))
+  }
+  return chunks
+}

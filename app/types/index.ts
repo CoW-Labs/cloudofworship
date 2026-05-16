@@ -69,6 +69,8 @@ export interface Slide {
   songId?: string // only for hymns/songs, could be [hymn.number] or [song.id]
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
   hymnVerseIndex?: number // 0-based index of current hymn verse, used for chorus navigation
+  hymnSubVerseIndex?: number // 0-based chunk index inside the current verse/chorus
+  hymnSubVerseTotal?: number // total chunks in the current verse/chorus
   data?: Song | Scripture | Hymn | Countdown | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
   slideStyle?: SlideStyle
   saved?: boolean

@@ -1,5 +1,6 @@
 import { useAppStore } from "~/store/app"
 import type { Slide, Hymn, Song, Scripture } from "~/types"
+import { splitVerseByLines } from "~/composables/useHymn"
 
 /**
  * Composable for navigating between verses in Bible, Hymn, and Song slides
@@ -97,7 +98,16 @@ export default function useSlideNavigation() {
   }
 
   /**
-   * Navigate to a specific hymn verse or chorus
+   * Navigate to a specific hymn verse or chorus.
+   *
+   * Accepted title formats:
+   *   "Verse N"          → verse N, chunk 0
+   *   "Verse N:CHUNK"    → verse N, specific 0-based chunk index
+   *   "Verse N:LAST"     → verse N, last chunk
+   *   "Chorus"           → chorus, chunk 0, keep current hymnVerseIndex
+   *   "Chorus:N"         → chorus, chunk 0, set hymnVerseIndex = N
+   *   "Chorus:N:CHUNK"   → chorus, chunk CHUNK, set hymnVerseIndex = N
+   *   "Chorus:N:LAST"    → chorus, last chunk, set hymnVerseIndex = N
    */
   const gotoHymnVerse = async (
     slide: Slide,
@@ -105,59 +115,76 @@ export default function useSlideNavigation() {
   ): Promise<Slide | null> => {
     const tempSlide = { ...slide }
     const hymn = await useHymn(tempSlide.songId as string)
+    if (!hymn) return null
 
-    if (hymn) {
-      // Handle chorus navigation (supports "Chorus" or "Chorus:N" format)
-      if (title.startsWith("Chorus")) {
-        const chorus = hymn?.chorus as string
-        if (chorus) {
-          tempSlide.title = "Chorus"
-          // Check if hymnVerseIndex is specified (for backward navigation)
-          const parts = title.split(":")
-          if (parts.length > 1) {
-            tempSlide.hymnVerseIndex = Number(parts[1])
-          }
-          // Otherwise hymnVerseIndex stays the same - it tracks the last verse shown
-          let fontSize = useScreenFontSize(chorus)
-          tempSlide.slideStyle = {
-            ...tempSlide.slideStyle,
-            fontSize: Number(fontSize),
-          }
-          tempSlide.contents = useSlideContent(tempSlide, hymn, chorus)
-          tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
-            ? slideLayoutTypes.bible
-            : slideLayoutTypes.full_text
+    const linesPerSlide = slide.slideStyle?.linesPerSlide
+    const getChunks = (text: string) => splitVerseByLines(text, linesPerSlide)
 
-          usePosthogCapture("GOTO_CHORUS_TOOLBAR_USED")
-          return tempSlide
-        }
-        return null
-      }
-
-      // Handle verse navigation
-      const verseIndex = Number(title?.split(" ")?.[1]) - 1
-      const nextVerse = hymn?.verses?.[verseIndex]?.trim()
-
-      if (nextVerse) {
-        tempSlide.title = title
-        tempSlide.hymnVerseIndex = verseIndex
-        // Calculate font-size of content
-        let fontSize = useScreenFontSize(nextVerse)
-        tempSlide.slideStyle = {
-          ...tempSlide.slideStyle,
-          fontSize: Number(fontSize),
-        }
-        tempSlide.contents = useSlideContent(tempSlide, hymn, nextVerse)
-        tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
-          ? slideLayoutTypes.bible
-          : slideLayoutTypes.full_text
-
-        usePosthogCapture("GOTO_HYMN_TOOLBAR_USED")
-        return tempSlide
-      }
+    const resolveChunkIdx = (chunkParam: string | undefined, chunks: string[]): number => {
+      if (!chunkParam || chunkParam === '') return 0
+      if (chunkParam === 'LAST') return chunks.length - 1
+      return Math.min(Math.max(Number(chunkParam) || 0, 0), chunks.length - 1)
     }
 
-    return null
+    if (title.startsWith("Chorus")) {
+      const chorus = hymn?.chorus as string
+      if (!chorus) return null
+
+      // "Chorus", "Chorus:N", "Chorus:N:CHUNK", "Chorus:N:LAST"
+      const parts = title.split(":")
+      tempSlide.title = "Chorus"
+      if (parts[1] !== undefined && parts[1] !== '') {
+        tempSlide.hymnVerseIndex = Number(parts[1])
+      }
+      // else hymnVerseIndex stays — it tracks the last verse shown
+
+      const chunks = getChunks(chorus)
+      const chunkIdx = resolveChunkIdx(parts[2], chunks)
+      const displayVerse = chunks[chunkIdx]
+
+      tempSlide.slideStyle = {
+        ...tempSlide.slideStyle,
+        fontSize: Number(useScreenFontSize(displayVerse)),
+      }
+      tempSlide.hymnSubVerseIndex = chunkIdx
+      tempSlide.hymnSubVerseTotal = chunks.length
+      tempSlide.contents = useSlideContent(tempSlide, hymn, displayVerse)
+      tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+        ? slideLayoutTypes.bible
+        : slideLayoutTypes.full_text
+
+      usePosthogCapture("GOTO_CHORUS_TOOLBAR_USED")
+      return tempSlide
+    }
+
+    // "Verse N", "Verse N:CHUNK", "Verse N:LAST"
+    const colonIdx = title.indexOf(":")
+    const verseSection = colonIdx === -1 ? title : title.slice(0, colonIdx)
+    const chunkParam = colonIdx === -1 ? undefined : title.slice(colonIdx + 1)
+
+    const verseIndex = Number(verseSection?.split(" ")?.[1]) - 1
+    const rawVerse = hymn?.verses?.[verseIndex]?.trim()
+    if (!rawVerse) return null
+
+    const chunks = getChunks(rawVerse)
+    const chunkIdx = resolveChunkIdx(chunkParam, chunks)
+    const displayVerse = chunks[chunkIdx]
+
+    tempSlide.title = verseSection
+    tempSlide.hymnVerseIndex = verseIndex
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: Number(useScreenFontSize(displayVerse)),
+    }
+    tempSlide.hymnSubVerseIndex = chunkIdx
+    tempSlide.hymnSubVerseTotal = chunks.length
+    tempSlide.contents = useSlideContent(tempSlide, hymn, displayVerse)
+    tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+      ? slideLayoutTypes.bible
+      : slideLayoutTypes.full_text
+
+    usePosthogCapture("GOTO_HYMN_TOOLBAR_USED")
+    return tempSlide
   }
 
   /**
