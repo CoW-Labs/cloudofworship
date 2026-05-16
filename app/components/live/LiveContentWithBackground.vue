@@ -1,7 +1,7 @@
 <template>
   <div
     class="live-output w-[100%] rounded-md absolute inset-0 overflow-hidden border dark:border-primary-900 bg-cover bg-no-repeat transition-all backdrop-blur-0 bg-black"
-    :style="useSlideBackground(slide)"
+    :style="backgroundStyle"
   >
     <!-- PRESENTATION SLIDE: render the current page as a fullscreen image -->
     <div
@@ -76,11 +76,13 @@ const currentPresentationPageUrl = computed(() => {
   return props.slide?.presentationObjects?.[idx]?.imageUrl ?? null
 })
 
+const backgroundStyle = computed(() => useSlideBackground(props.slide))
+
 watch(
   () => props.slide,
   (newVal, oldVal) => {
     if (appMounted) {
-      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+      if (oldVal?.id !== newVal?.id || oldVal?.updatedAt !== newVal?.updatedAt) {
         foregroundContentVisible.value = false
         setTimeout(() => {
           foregroundContentVisible.value = true
