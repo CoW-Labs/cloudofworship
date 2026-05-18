@@ -31,10 +31,7 @@
       ]"
       @scroll.passive="onSlidesGridScroll"
     >
-      <div
-        v-if="slides?.length > 0"
-        class="virtual-slides-grid"
-      >
+      <div v-if="slides?.length > 0" class="virtual-slides-grid">
         <div :style="{ height: `${virtualTopSpacer}px` }" />
         <div ref="slidesGrid" class="grid slides-grid gap-3">
           <SlideCard
@@ -108,7 +105,10 @@
 import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
-import { tabSessionId, useRealtimeSlides } from "~/composables/useRealtimeSlides"
+import {
+  tabSessionId,
+  useRealtimeSlides,
+} from "~/composables/useRealtimeSlides"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
@@ -303,8 +303,7 @@ const updateSlideGridMetrics = () => {
   slideGridColumns.value = Math.max(
     1,
     Math.floor(
-      (scrollEl.clientWidth + slideGridGap) /
-        (slideMinCardWidth + slideGridGap)
+      (scrollEl.clientWidth + slideGridGap) / (slideMinCardWidth + slideGridGap)
     )
   )
   slideVirtualStartRow.value = Math.floor(
@@ -661,7 +660,9 @@ emitter.on(
     const setlistSlide = slides.value.find(
       (slide) => slide.id === data.setlistSlide?.id
     )
-    const songSlide = slides.value.find((slide) => slide.id === data.songSlide?.id)
+    const songSlide = slides.value.find(
+      (slide) => slide.id === data.songSlide?.id
+    )
 
     if (
       !setlistSlide ||
@@ -1013,13 +1014,17 @@ const updateSlideOnline = useThrottleFn(
       })
 
       // UPDATE OVER HTTP for persistence
-      const { data, error } = await useAPIFetch(
-        `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
-        {
-          method: "PUT",
-          body: tempSlide,
-        }
-      )
+      try {
+        const { data, error } = await useAPIFetch(
+          `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
+          {
+            method: "PUT",
+            body: tempSlide,
+          }
+        )
+      } catch (err) {
+        console.error("Failed to update slide online:", err)
+      }
       if (!error.value) {
         appStore.setLastSynced(new Date().toISOString())
         return data.value
