@@ -142,11 +142,6 @@ export default function useLibrary() {
       return mergedSlides
     } catch (error) {
       console.error('Error fetching saved slides:', error)
-      toast.add({
-        icon: 'i-bx-error',
-        title: 'Failed to fetch saved slides',
-        color: 'red',
-      })
       return []
     } finally {
       loading.value = false
