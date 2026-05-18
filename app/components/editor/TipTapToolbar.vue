@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="editor"
+    v-if="isEditorReady"
     class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] p-1 right-0 left-0 top-[45px]"
     :class="containerOverflow"
     @mousedown.capture="onToolbarMouseDown"
@@ -183,14 +183,26 @@ const props = defineProps<{
 const containerOverflow = ref("overflow-x-auto")
 const savedSelection = ref<{ from: number; to: number } | null>(null)
 
+const isEditorReady = computed(() => {
+  const editor = props.editor
+  if (!editor || editor.isDestroyed) return false
+
+  try {
+    return Boolean(editor.view?.dom)
+  } catch {
+    return false
+  }
+})
+
 // Computed property for current text color
 const currentColor = computed(() => {
+  if (!isEditorReady.value) return "#ffffff"
   return props.editor?.getAttributes("textStyle").color || "#ffffff"
 })
 
 const saveSelection = () => {
   const editor = props.editor
-  if (!editor || editor.isDestroyed) return
+  if (!editor || !isEditorReady.value) return
 
   const { from, to } = editor.state.selection
   savedSelection.value = { from, to }
@@ -211,20 +223,24 @@ const onToolbarMouseDown = (event: MouseEvent) => {
 
 const runCommand = (apply: (chain: any) => any) => {
   const editor = props.editor
-  if (!editor || editor.isDestroyed) return
+  if (!editor || !isEditorReady.value) return
 
-  let chain = editor.chain().focus()
-  const selection = savedSelection.value
+  try {
+    let chain = editor.chain().focus()
+    const selection = savedSelection.value
 
-  if (selection) {
-    const docSize = editor.state.doc.content.size
-    const from = Math.min(Math.max(selection.from, 0), docSize)
-    const to = Math.min(Math.max(selection.to, from), docSize)
-    chain = chain.setTextSelection({ from, to })
+    if (selection) {
+      const docSize = editor.state.doc.content.size
+      const from = Math.min(Math.max(selection.from, 0), docSize)
+      const to = Math.min(Math.max(selection.to, from), docSize)
+      chain = chain.setTextSelection({ from, to })
+    }
+
+    apply(chain).run()
+    saveSelection()
+  } catch (error) {
+    console.warn("[TipTap] Toolbar command skipped:", error)
   }
-
-  apply(chain).run()
-  saveSelection()
 }
 
 // Handle color change with proper focus management

@@ -163,24 +163,41 @@ const getCommonExtensions = (placeholder: string, includeHeading = true) => {
   return extensions
 }
 
+const isEditorViewReady = (editor: any) => {
+  if (!editor || editor.isDestroyed) return false
+
+  try {
+    return Boolean(editor.view?.dom)
+  } catch {
+    return false
+  }
+}
+
 // Helper to safely call a command on an editor, guarding against destroyed / unmounted state
 const safeEditorCommand = (editor: any, fn: (e: any) => void) => {
-  if (editor && !editor.isDestroyed) {
-    try {
-      fn(editor)
-    } catch (err) {
-      // The editor view may not yet be available (e.g. rapid slide switching before mount)
-      console.warn(
-        "[TipTap] Editor command failed, editor may not be mounted yet:",
-        err
-      )
-    }
+  if (!isEditorViewReady(editor)) return
+
+  try {
+    fn(editor)
+  } catch (err) {
+    console.warn("[TipTap] Editor command failed:", err)
   }
+}
+
+const queueEditorCommand = (editor: any, fn: (e: any) => void) => {
+  if (isEditorViewReady(editor)) {
+    safeEditorCommand(editor, fn)
+    return
+  }
+
+  nextTick(() => {
+    requestAnimationFrame(() => safeEditorCommand(editor, fn))
+  })
 }
 
 // Function to apply default white color to editor
 const applyDefaultWhiteColor = (editor: any) => {
-  safeEditorCommand(editor, (e) => e.chain().setColor("#ffffff").run())
+  queueEditorCommand(editor, (e) => e.chain().setColor("#ffffff").run())
 }
 
 watch(
@@ -321,17 +338,20 @@ const editorOne = ref(
 
       // Apply default font if set
       if (appStore.currentState?.settings?.defaultFont) {
-        editor.commands.setFontFamily(
-          appStore.currentState.settings.defaultFont
+        queueEditorCommand(editor, (e) =>
+          e.commands.setFontFamily(appStore.currentState.settings.defaultFont)
         )
       }
 
       // Auto-apply heading if empty
       if (!editor.getText().trim()) {
-        editor.chain().focus().toggleHeading({ level: 1 }).run()
+        queueEditorCommand(editor, (e) =>
+          e.chain().focus().toggleHeading({ level: 1 }).run()
+        )
       }
     },
     onBlur: ({ editor }) => {
+      if (editor.isDestroyed) return
       emit("update", 0, editor.getHTML())
     },
     onFocus: ({ editor }) => {
@@ -359,12 +379,13 @@ const editorTwo = ref(
 
       // Apply default font if set
       if (appStore.currentState?.settings?.defaultFont) {
-        editor.commands.setFontFamily(
-          appStore.currentState.settings.defaultFont
+        queueEditorCommand(editor, (e) =>
+          e.commands.setFontFamily(appStore.currentState.settings.defaultFont)
         )
       }
     },
     onBlur: ({ editor }) => {
+      if (editor.isDestroyed) return
       emit("update", 1, editor.getHTML())
     },
     onFocus: ({ editor }) => {
@@ -390,12 +411,13 @@ const editorThree = ref(
 
       // Apply default font if set
       if (appStore.currentState?.settings?.defaultFont) {
-        editor.commands.setFontFamily(
-          appStore.currentState.settings.defaultFont
+        queueEditorCommand(editor, (e) =>
+          e.commands.setFontFamily(appStore.currentState.settings.defaultFont)
         )
       }
     },
     onBlur: ({ editor }) => {
+      if (editor.isDestroyed) return
       emit("update", 2, editor.getHTML())
     },
     onFocus: ({ editor }) => {

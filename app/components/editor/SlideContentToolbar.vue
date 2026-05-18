@@ -239,7 +239,8 @@
     <SlideMaxLinesSelect
       v-if="
         slide?.type === slideTypes?.song ||
-        slide?.type === slideTypes?.songSetlist
+        slide?.type === slideTypes?.songSetlist ||
+        slide?.type === slideTypes?.hymn
       "
       :selected-line="slide?.slideStyle?.linesPerSlide"
       class="min-w-[120px] top-[-4px]"

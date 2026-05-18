@@ -954,7 +954,7 @@ watch(
       }
     }
   },
-  { deep: true, immediate: true }
+  { immediate: true }
 )
 
 // Set slides to slides based on scheduler

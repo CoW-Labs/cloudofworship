@@ -70,9 +70,9 @@
             <div
               v-if="
                 (slide?.type === slideTypes?.bible ||
-                slide?.type === slideTypes?.hymn ||
-                slide?.type === slideTypes?.song ||
-                slide?.type === slideTypes?.songSetlist) &&
+                  slide?.type === slideTypes?.hymn ||
+                  slide?.type === slideTypes?.song ||
+                  slide?.type === slideTypes?.songSetlist) &&
                 !isEmptySongSetlist
               "
               class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-1 mr-0 relative"
@@ -104,8 +104,8 @@
                 @keydown.tab.prevent="predictVerseInput($event.target)"
                 @keydown.arrow-right.prevent="predictVerseInput($event.target)"
                 @keydown.enter="
-                  $emit('goto-verse', verse, selectedBibleVersion);
-                  ($event.target as HTMLInputElement).blur()
+                  $emit('goto-verse', verse, selectedBibleVersion)
+                  ;($event.target as HTMLInputElement).blur()
                 "
                 @keydown="
                   (e: KeyboardEvent) => {
@@ -135,9 +135,9 @@
             <PreviewVerses
               v-if="
                 (slide?.type === slideTypes.hymn ||
-                slide?.type === slideTypes.song ||
-                slide?.type === slideTypes.songSetlist ||
-                slide?.type === slideTypes.bible) &&
+                  slide?.type === slideTypes.song ||
+                  slide?.type === slideTypes.songSetlist ||
+                  slide?.type === slideTypes.bible) &&
                 !isEmptySongSetlist
               "
               class="preview-verses"
@@ -437,6 +437,7 @@
 
 <script setup lang="ts">
 import { safeDBGet } from "~/composables/useIndexedDB"
+import { splitVerseByLines } from "~/composables/useHymn"
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
@@ -484,11 +485,8 @@ const containerOverflow = ref<string>("overflow-x-auto")
 const selectedBibleVersion = ref<string>(
   appStore.currentState.settings.defaultBibleVersion
 )
-const {
-  getSetlistData,
-  refreshSongSetlistSlide,
-  removeSongFromSetlist,
-} = useSongSetlist()
+const { getSetlistData, refreshSongSetlistSlide, removeSongFromSetlist } =
+  useSongSetlist()
 
 const animatedSlides = computed(() => {
   if (props.slide) {
@@ -565,9 +563,10 @@ const fetchChapterVerseCount = async () => {
     : 0
 }
 
-// Helper to resolve ":LAST" marker to actual last verse number
+// Helper to resolve ":LAST" marker to actual last verse number (Bible only)
 const resolveLastVerse = async (verseLabel: string): Promise<string> => {
-  if (!verseLabel.includes(":LAST")) return verseLabel
+  if (props.slide?.type !== slideTypes.bible || !verseLabel.includes(":LAST"))
+    return verseLabel
 
   const chapterLabel = verseLabel.replace(":LAST", "")
   const chapter = await useScriptureChapter(chapterLabel)
@@ -610,15 +609,26 @@ const nextVerse = computed(() => {
 
     return `${bookName}:${currentVerse + 1}`
   }
-  // For hymns with chorus: verse -> chorus -> verse -> chorus -> ...
-  if (props.slide?.type === slideTypes.hymn && props.slide?.hasChorus) {
-    if (verse.value === "Chorus") {
-      // From chorus, go to next verse
-      const nextVerseIndex = (props.slide?.hymnVerseIndex ?? 0) + 1
-      return `Verse ${nextVerseIndex + 1}`
+  if (props.slide?.type === slideTypes.hymn) {
+    const subIdx = props.slide?.hymnSubVerseIndex ?? 0
+    const subTotal = props.slide?.hymnSubVerseTotal ?? 1
+    const hymnVerseIdx = props.slide?.hymnVerseIndex ?? 0
+
+    if (subTotal > 1 && subIdx < subTotal - 1) {
+      // More chunks remain in the current verse/chorus — step forward within it
+      if (verse.value === "Chorus")
+        return `Chorus:${hymnVerseIdx}:${subIdx + 1}`
+      const currentVerseNum = Number(verse.value?.split(" ")?.[1])
+      return `Verse ${currentVerseNum}:${subIdx + 1}`
     }
-    // From verse, go to chorus
-    return "Chorus"
+
+    // At the last chunk — advance to the next semantic section
+    if (props.slide?.hasChorus) {
+      if (verse.value === "Chorus") return `Verse ${hymnVerseIdx + 2}`
+      return "Chorus"
+    }
+    // No chorus — next verse, chunk 0
+    return `Verse ${Number(verse.value?.split(" ")?.[1]) + 1}`
   }
   if (props.slide?.type === slideTypes.songSetlist) {
     return "__next-setlist"
@@ -653,21 +663,34 @@ const previousVerse = computed(() => {
 
     return `${bookName}:${currentVerse - 1}`
   }
-  // For hymns with chorus: ... -> chorus -> verse -> chorus -> verse
-  if (props.slide?.type === slideTypes.hymn && props.slide?.hasChorus) {
-    if (verse.value === "Chorus") {
-      // From chorus, go back to the current verse
-      const currentVerseIndex = props.slide?.hymnVerseIndex ?? 0
-      return `Verse ${currentVerseIndex + 1}`
+  if (props.slide?.type === slideTypes.hymn) {
+    const subIdx = props.slide?.hymnSubVerseIndex ?? 0
+    const subTotal = props.slide?.hymnSubVerseTotal ?? 1
+    const hymnVerseIdx = props.slide?.hymnVerseIndex ?? 0
+
+    if (subTotal > 1 && subIdx > 0) {
+      // More chunks remain going backward — step back within current verse/chorus
+      if (verse.value === "Chorus")
+        return `Chorus:${hymnVerseIdx}:${subIdx - 1}`
+      const currentVerseNum = Number(verse.value?.split(" ")?.[1])
+      return `Verse ${currentVerseNum}:${subIdx - 1}`
     }
-    // From verse, go to chorus (after previous verse)
+
+    // At the first chunk — go back to the last chunk of the previous semantic section
+    if (props.slide?.hasChorus) {
+      if (verse.value === "Chorus") {
+        // Back to last chunk of the verse that preceded this chorus
+        return `Verse ${hymnVerseIdx + 1}:LAST`
+      }
+      const currentVerseNum = Number(verse.value?.split(" ")?.[1])
+      if (currentVerseNum <= 1) return "Verse 1"
+      // Back to last chunk of the chorus after the previous verse
+      return `Chorus:${currentVerseNum - 2}:LAST`
+    }
+    // No chorus — previous verse, last chunk
     const currentVerseNum = Number(verse.value?.split(" ")?.[1])
-    if (currentVerseNum <= 1) {
-      // On Verse 1, can't go back further
-      return "Verse 1"
-    }
-    // Go to chorus, but we need to set hymnVerseIndex to previous verse
-    return `Chorus:${currentVerseNum - 2}`
+    if (currentVerseNum <= 1) return "Verse 1"
+    return `Verse ${currentVerseNum - 1}:LAST`
   }
   if (props.slide?.type === slideTypes.songSetlist) {
     return "__previous-setlist"
@@ -937,6 +960,58 @@ const onUpdateSongLyrics = (song: Song) => {
 }
 
 const onUpdateSongLines = async (linesPerSlide: number) => {
+  if (props.slide?.type === slideTypes.hymn) {
+    if (!props.slide) return
+    appStore.setSlideStyles({
+      ...appStore.currentState.settings.slideStyles,
+      linesPerSlide,
+    })
+    const hymn = await useHymn(props.slide.songId as string)
+    if (!hymn) {
+      useToast().add({
+        title: "Hymn not found",
+        icon: "i-bx-error",
+        color: "red",
+      })
+      return
+    }
+    const currentTitle = verse.value || props.slide.title || "Verse 1"
+    let rawText: string
+    if (currentTitle.startsWith("Chorus")) {
+      rawText = hymn.chorus as string
+    } else {
+      const verseIndex = Number(currentTitle?.split(" ")?.[1]) - 1
+      rawText = hymn.verses?.[verseIndex]?.trim() ?? ""
+    }
+    const chunks = splitVerseByLines(rawText, linesPerSlide)
+    const clampedIdx = Math.min(
+      props.slide.hymnSubVerseIndex ?? 0,
+      chunks.length - 1
+    )
+    const displayVerse = chunks[clampedIdx]
+    const tempSlide: Slide = {
+      ...props.slide,
+      slideStyle: {
+        ...props.slide.slideStyle,
+        linesPerSlide,
+        fontSize: Number(useScreenFontSize(displayVerse)),
+      },
+      hymnSubVerseIndex: clampedIdx,
+      hymnSubVerseTotal: chunks.length,
+    }
+    tempSlide.contents = useSlideContent(tempSlide, hymn, displayVerse)
+    tempSlide.layout = appStore.currentState.settings
+      .songAndHymnLabelsVisibility
+      ? slideLayoutTypes.bible
+      : slideLayoutTypes.full_text
+    emit("slide-update", tempSlide)
+    useToast().add({
+      icon: "i-tabler-list-numbers",
+      title: "Lines per slide updated",
+    })
+    return
+  }
+
   if (props.slide?.type === slideTypes.songSetlist) {
     appStore.setSlideStyles({
       ...appStore.currentState.settings.slideStyles,
@@ -949,14 +1024,10 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
     const updatedSlide = await refreshSongSetlistSlide(props.slide, {
       activeSongIndex: setlistData.value.activeSongIndex,
       verseIndex:
-        setlistData.value.songs[setlistData.value.activeSongIndex]?.verseIndex ||
-        0,
+        setlistData.value.songs[setlistData.value.activeSongIndex]
+          ?.verseIndex || 0,
     })
     emit("slide-update", { ...updatedSlide, slideStyle })
-    useToast().add({
-      icon: "i-tabler-list-numbers",
-      title: "Lines per slide updated",
-    })
     return
   }
 
@@ -981,15 +1052,11 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
     }
     tempSlide.data = tempSong
     tempSlide.contents = useSlideContent(tempSlide, tempSong, currentSongVerse)
-    tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+    tempSlide.layout = appStore.currentState.settings
+      .songAndHymnLabelsVisibility
       ? slideLayoutTypes.bible
       : slideLayoutTypes.full_text
     emit("slide-update", tempSlide)
-    // console.log(verse.value)
-    useToast().add({
-      icon: "i-tabler-list-numbers",
-      title: "Lines per slide updated",
-    })
   }
 }
 
@@ -1032,10 +1099,7 @@ const predictVerseInput = (
       const bookOption = searchedBibleBookOptions.value[0]
       verse.value = `${bookOption} 1:1`
       setTimeout(() => {
-        element?.setSelectionRange(
-          bookOption.length + 1,
-          bookOption.length + 2
-        )
+        element?.setSelectionRange(bookOption.length + 1, bookOption.length + 2)
         element?.focus()
       }, 100)
     } else {
