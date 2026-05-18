@@ -49,12 +49,14 @@ const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<S
     // console.log('song', song)
 
     // If [song] param, comes as an object, begin division process immediately
-    // Divide songs into verses
+    // Extract chorus first, then divide remaining lyrics into verses
+    const { chorus, cleanedLyrics } = extractSongChorus(song.lyrics || '')
+    if (chorus) song.chorus = chorus
+
     const verses = []
     let tempVerse = ''
     let lineCount = 0
-    // const lyricLines = song.lyrics?.replaceAll('\n\n', '\n')?.replaceAll('\n \n', '\n')?.split('\n')
-    const lyricLines = song.lyrics?.replaceAll('\n \n', '\n\n')?.split('\n')
+    const lyricLines = cleanedLyrics?.replaceAll('\n \n', '\n\n')?.split('\n')
 
     for (let i = 0; i < lyricLines.length; i++) {
       let line = lyricLines[i]

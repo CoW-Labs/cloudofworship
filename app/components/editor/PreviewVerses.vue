@@ -74,8 +74,8 @@
       </UButton>
     </template>
 
-    <!-- Hymn verses with chorus after Verse 1 -->
-    <template v-else-if="slide?.type === slideTypes.hymn">
+    <!-- Hymn/Song verses with chorus after Verse 1 -->
+    <template v-else-if="slide?.type === slideTypes.hymn || (slide?.type === slideTypes.song && slide?.hasChorus)">
       <UButton
         block
         variant="ghost"

@@ -181,7 +181,9 @@ export interface Song {
   album?: string
   cover?: string
   author?: string
+  chorus?: string
   verses?: Array<string>
+  language?: string
   isPublic?: boolean
   createdBy?: string
   churchId?: string

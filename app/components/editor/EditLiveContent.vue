@@ -609,7 +609,10 @@ const nextVerse = computed(() => {
 
     return `${bookName}:${currentVerse + 1}`
   }
-  if (props.slide?.type === slideTypes.hymn) {
+  if (
+    props.slide?.type === slideTypes.hymn ||
+    props.slide?.type === slideTypes.song
+  ) {
     const subIdx = props.slide?.hymnSubVerseIndex ?? 0
     const subTotal = props.slide?.hymnSubVerseTotal ?? 1
     const hymnVerseIdx = props.slide?.hymnVerseIndex ?? 0
@@ -960,7 +963,10 @@ const onUpdateSongLyrics = (song: Song) => {
 }
 
 const onUpdateSongLines = async (linesPerSlide: number) => {
-  if (props.slide?.type === slideTypes.hymn) {
+  if (
+    props.slide?.type === slideTypes.hymn ||
+    props.slide?.type === slideTypes.song
+  ) {
     if (!props.slide) return
     appStore.setSlideStyles({
       ...appStore.currentState.settings.slideStyles,

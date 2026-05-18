@@ -177,6 +177,8 @@ export default function useSlideCreation() {
       appStore.currentState.settings.defaultBackground.default?.backgroundType ||
       appStore.currentState.settings.defaultBackground.hymn?.backgroundType
     tempSlide.songId = song._id || song.id
+    tempSlide.hasChorus = !!song.chorus
+    tempSlide.hymnVerseIndex = 0
     tempSlide.title = "Verse 1"
     const currentSongVerse = song.verses?.[0]?.trim() ?? ""
     const fontSize = useScreenFontSize(currentSongVerse as string)

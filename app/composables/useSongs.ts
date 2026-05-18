@@ -1,6 +1,49 @@
 import { useAuthStore } from '~/store/auth'
 import type { Song } from '~/types'
 
+// Matches section headers like: Chorus, [Chorus], (Chorus), Chorus:, CHORUS -, Refrain:, Bridge:
+const CHORUS_HEADER_RE = /^[\[\(]?\s*(chorus|refrain|bridge)\s*[\]\)]?\s*[:\-]?\s*$/i
+// Strips verse label lines like: Verse 1, [Verse 2], Verse 3:
+const VERSE_HEADER_RE = /^[\[\(]?\s*verse\s*\d*\s*[\]\)]?\s*[:\-]?\s*$/i
+
+/**
+ * Extracts the chorus from raw lyrics and returns it separately alongside
+ * the lyrics with all chorus blocks and section headers removed, ready for
+ * standard verse parsing. The first chorus occurrence is stored; repeated
+ * occurrences (common in copy-pasted lyrics) are silently dropped.
+ */
+export const extractSongChorus = (lyrics: string): { chorus: string | undefined; cleanedLyrics: string } => {
+  const lines = lyrics.split('\n')
+  let chorus: string | undefined
+  const cleanedLines: string[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const trimmed = lines[i].trim()
+
+    if (CHORUS_HEADER_RE.test(trimmed)) {
+      i++
+      const chorusLines: string[] = []
+      while (i < lines.length && lines[i].trim() !== '') {
+        chorusLines.push(lines[i])
+        i++
+      }
+      if (!chorus && chorusLines.length) {
+        chorus = chorusLines.join('\n').trim()
+      }
+      // All chorus blocks are excluded from cleaned lyrics
+    } else if (VERSE_HEADER_RE.test(trimmed)) {
+      // Drop bare "Verse N:" header lines — content follows on subsequent lines
+      i++
+    } else {
+      cleanedLines.push(lines[i])
+      i++
+    }
+  }
+
+  return { chorus, cleanedLyrics: cleanedLines.join('\n') }
+}
+
 export default function useSongs() {
   const authStore = useAuthStore()
   const toast = useToast()
@@ -274,11 +317,12 @@ export default function useSongs() {
    * Parse song lyrics into verses
    */
   const parseSongLyrics = (lyrics: string, linesPerVerse: number = 4): string[] => {
+    const { cleanedLyrics } = extractSongChorus(lyrics)
     const verses = []
     let tempVerse = ''
     let lineCount = 0
 
-    const lyricLines = lyrics?.replaceAll('\n \n', '\n\n')?.split('\n')
+    const lyricLines = cleanedLyrics?.replaceAll('\n \n', '\n\n')?.split('\n')
 
     for (let i = 0; i < lyricLines.length; i++) {
       let line = lyricLines[i]

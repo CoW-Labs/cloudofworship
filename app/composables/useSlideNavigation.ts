@@ -200,12 +200,34 @@ export default function useSlideNavigation() {
     )
 
     if (song) {
+      // Handle chorus navigation (mirrors gotoHymnVerse logic, reads from song.chorus)
+      if (title.startsWith('Chorus')) {
+        const chorus = song.chorus
+        if (chorus) {
+          tempSlide.title = 'Chorus'
+          const parts = title.split(':')
+          if (parts.length > 1) {
+            tempSlide.hymnVerseIndex = Number(parts[1])
+          }
+          const fontSize = useScreenFontSize(chorus)
+          tempSlide.slideStyle = { ...tempSlide.slideStyle, fontSize: Number(fontSize) }
+          tempSlide.data = song
+          tempSlide.contents = useSlideContent(tempSlide, song, chorus)
+          tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+            ? slideLayoutTypes.bible
+            : slideLayoutTypes.full_text
+          usePosthogCapture('GOTO_CHORUS_TOOLBAR_USED')
+          return tempSlide
+        }
+        return null
+      }
+
       const verseIndex = Number(title?.split(" ")?.[1]) - 1
       const nextVerse = song?.verses?.[verseIndex]?.trim()
 
       if (nextVerse) {
         tempSlide.title = title
-        // Calculate font-size of content
+        tempSlide.hymnVerseIndex = verseIndex
         let fontSize = useScreenFontSize(nextVerse)
         tempSlide.slideStyle = {
           ...tempSlide.slideStyle,
