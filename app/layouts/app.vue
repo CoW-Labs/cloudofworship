@@ -57,7 +57,7 @@
             </span>
           </div>
 
-          <UProgress size="2xl" :value="overallLoadingProgress" :max="100" />
+          <UProgress size="2xl" :value="overallLoadingProgress || undefined" :max="100" />
 
           <div
             class="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-400"
@@ -396,9 +396,7 @@ emitter.on("close-offline-toast", () => {
 
 emitter.on("selected-schedule", (schedule: Schedule) => {
   appStore.setSlidesLoading(true)
-  setTimeout(() => {
-    retrieveAllMediaFilesFromDB()
-  }, 2000)
+  retrieveAllMediaFilesFromDB()
 })
 
 emitter.on("go-live", async () => {
@@ -499,101 +497,95 @@ const fetchActiveAdvert = async () => {
 
 const downloadEssentialResources = async () => {
   const db = useIndexedDB()
-
   loadingResources.value = true
-  setLoadingTask("startup", "Refreshing account, church, and app settings.", 5)
+
+  // ── Phase 1: Critical path ────────────────────────────────────────────────
+  // Only what the workspace needs to render. Everything else runs in the
+  // background after the loading screen is dismissed.
+  setLoadingTask("startup", "Refreshing account, church, and schedules.", 5)
 
   if (online.value) {
+    // retrieveSchedules only needs authStore.churchId, which Pinia already
+    // has from the persisted session, so it's safe to run in parallel.
     await Promise.allSettled([
       fetchUser(),
       fetchChurch(),
-      fetchAppInfo(),
-      refreshLibrary(),
-      fetchPlans(),
+      retrieveSchedules(),
     ])
   } else {
-    setLoadingTask(
-      "startup",
-      "Offline: using saved account and app settings.",
-      100
-    )
+    setLoadingTask("startup", "Offline: using saved account and app settings.", 100)
+    await retrieveSchedules()
   }
-
-  if (online.value) {
-    await saveAllBackgroundVideos()
-  } else {
-    setLoadingTask("videos", "Offline: using cached background videos.", 100)
-  }
-
-  setLoadingTask("schedules", "Loading schedules and slides.", 0)
-  await retrieveSchedules()
-
-  setLoadingTask("bible", "Checking KJV Bible availability.", 10)
-  let tempBible = await db.bibleAndHymns.get("KJV")
-  if (!tempBible && online.value) {
-    setLoadingTask("bible", "Downloading KJV Bible for offline use.", 0)
-
-    try {
-      let kjvBible = await useDetailedFetch(
-        `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/kjv.json`,
-        downloadProgress
-      )
-      kjvBible = await kjvBible.json()
-      await db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
-    } catch (err) {
-      console.warn("Failed to download KJV Bible (offline?):", err)
-    }
-  } else if (tempBible) {
-    setLoadingTask("bible", "KJV Bible is already available offline.", 100)
-  } else {
-    setLoadingTask("bible", "Offline: KJV Bible is not cached yet.", 100)
-  }
-
-  const { populateBibleVersionOptions } = useBibleVersionManager()
-  await populateBibleVersionOptions(
-    appInfo.value?.bibleVersions?.length
-      ? appInfo.value.bibleVersions
-      : undefined
-  )
-
-  await fetchHymns()
-
-  if (online.value && authStore.user?._id) {
-    setLoadingTask("bible", "Checking your preferred Bible version.", 90)
-    const userSettings = await fetchUserSettings()
-    const preferredVersion =
-      userSettings?.defaultBibleVersion ||
-      appStore.currentState.settings.defaultBibleVersion
-    if (preferredVersion && preferredVersion !== "KJV") {
-      const { isBibleVersionDownloaded, downloadBibleVersion } =
-        useBibleVersionManager()
-      const alreadyDownloaded = await isBibleVersionDownloaded(preferredVersion)
-      if (!alreadyDownloaded) {
-        setLoadingTask("bible", `Downloading ${preferredVersion} Bible.`, 0)
-        try {
-          await downloadBibleVersion(preferredVersion)
-        } catch (err) {
-          console.error(`Failed to auto-download ${preferredVersion}:`, err)
-        }
-      }
-    }
-  }
-
-  setLoadingTask("display", "Checking display setup for live projection.", 20)
-  await useAutoDetectSecondaryDisplay()
-  setLoadingTask("display", "Display setup is ready.", 100)
 
   setLoadingTask("ready", "Opening your workspace.", 100)
+  loadingResources.value = false
 
-  setTimeout(() => {
-    loadingResources.value = false
-    useGlobalEmit(
-      appWideActions.selectedSchedule,
-      appStore.currentState.activeSchedule?._id
-    )
-    overrideAppSettings()
-    appStore.refreshAppActionsStack()
-  }, 100)
+  await nextTick()
+  useGlobalEmit(
+    appWideActions.selectedSchedule,
+    appStore.currentState.activeSchedule?._id
+  )
+  overrideAppSettings()
+  appStore.refreshAppActionsStack()
+
+  // ── Phase 2: Background ───────────────────────────────────────────────────
+  // These run after the workspace is visible. Errors are isolated and non-fatal.
+  if (online.value) {
+    Promise.allSettled([
+      // App info then populate Bible version options (chained dependency)
+      fetchAppInfo().then(async () => {
+        const { populateBibleVersionOptions } = useBibleVersionManager()
+        await populateBibleVersionOptions(
+          appInfo.value?.bibleVersions?.length
+            ? appInfo.value.bibleVersions
+            : undefined
+        )
+      }),
+      refreshLibrary(),
+      fetchPlans(),
+      saveAllBackgroundVideos(),
+      // KJV Bible — only downloads once per device
+      (async () => {
+        const tempBible = await db.bibleAndHymns.get("KJV")
+        if (!tempBible) {
+          try {
+            let kjvBible = await useDetailedFetch(
+              `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/kjv.json`,
+              downloadProgress
+            )
+            kjvBible = await kjvBible.json()
+            await db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
+          } catch (err) {
+            console.warn("Failed to download KJV Bible:", err)
+          }
+        }
+      })(),
+      fetchHymns(),
+      // User settings + preferred non-KJV Bible version
+      (async () => {
+        if (!authStore.user?._id) return
+        const userSettings = await fetchUserSettings()
+        const preferredVersion =
+          userSettings?.defaultBibleVersion ||
+          appStore.currentState.settings.defaultBibleVersion
+        if (preferredVersion && preferredVersion !== "KJV") {
+          const { isBibleVersionDownloaded, downloadBibleVersion } =
+            useBibleVersionManager()
+          const alreadyDownloaded = await isBibleVersionDownloaded(preferredVersion)
+          if (!alreadyDownloaded) {
+            try {
+              await downloadBibleVersion(preferredVersion)
+            } catch (err) {
+              console.error(`Failed to auto-download ${preferredVersion}:`, err)
+            }
+          }
+        }
+      })(),
+    ])
+
+    // Secondary display detection — fire and forget, go-live flows self-detect
+    useAutoDetectSecondaryDisplay()
+  }
 }
 
 const overrideAppSettings = async () => {
