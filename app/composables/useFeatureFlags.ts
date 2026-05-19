@@ -23,6 +23,10 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
    */
   const checkFlag = (key: FeatureFlagKey): boolean => {
     if (!posthog) {
+      // PostHog is not initialized on localhost — allow all flagged features
+      if (window.location.hostname === "localhost") {
+        return true
+      }
       console.warn("PostHog is not initialized")
       return false
     }
@@ -38,6 +42,10 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
    */
   const getFlagValue = (key: FeatureFlagKey): boolean | string | undefined => {
     if (!posthog) {
+      // PostHog is not initialized on localhost — treat all flags as enabled
+      if (window.location.hostname === "localhost") {
+        return true
+      }
       console.warn("PostHog is not initialized")
       return undefined
     }

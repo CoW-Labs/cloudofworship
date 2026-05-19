@@ -96,6 +96,7 @@ export const useAppStore = defineStore("app", {
           footnotes: false,
           songAndHymnLabelsVisibility: false,
           liveWindowFullscreen: true, // Default to fullscreen mode
+          closeLiveWindowWithOperator: false, // Default: live window stays open when operator tab closes
           // motionlessSlides: true,
           transitionInterval: 0.7,
           slideStyles: {
@@ -389,6 +390,12 @@ export const useAppStore = defineStore("app", {
         liveWindowFullscreen: fullscreen,
       }
       usePosthogCapture("LIVE_WINDOW_FULLSCREEN_SETTINGS_CHANGED")
+    },
+    setCloseLiveWindowWithOperator(value: boolean) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        closeLiveWindowWithOperator: value,
+      }
     },
     setLinesPerSlide(lines: number) {
       this.currentState.settings = {
