@@ -543,6 +543,13 @@ export default function useSermonTranscription() {
     isTeamsPlan,
     useDeepgramEngine,
 
+    // Scripture results streamed from the server (Deepgram path only).
+    // Falls back to an empty array for the Web Speech (free) path; the panel
+    // continues to use its own `useScriptureSearch` HTTP fetch there.
+    deepgramScriptureResults: computed(() =>
+      useDeepgramEngine.value ? deepgram.scriptureResults.value : [],
+    ),
+
     // Actions
     startTranscription,
     stopTranscription,

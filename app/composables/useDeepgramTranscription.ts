@@ -2,7 +2,8 @@ import { ref, computed, onUnmounted } from 'vue'
 import { useAppStore } from '~/store/app'
 import { useAuthStore } from '~/store/auth'
 import type { TranscriptSegment, BibleReference } from '~/types/transcript'
-import { appWideActions } from '~/utils/constants'
+import type { ScriptureResult } from '~/composables/useScriptureSearch'
+import { appWideActions, bibleBooks } from '~/utils/constants'
 
 interface TranscriptionState {
   isTranscribing: boolean
@@ -12,12 +13,25 @@ interface TranscriptionState {
   currentTranscript: string
   remainingSeconds: number | null
   usedSeconds: number
+  // Scripture results pushed by the server over the same WS connection,
+  // so the panel can render them without a separate HTTP search.
+  scriptureResults: ScriptureResult[]
 }
 
 /**
  * Composable for Deepgram-powered real-time transcription (Teams plan only).
- * Streams microphone audio to the backend WebSocket proxy which relays to Deepgram.
- * Enforces a 60-minute-per-week limit server-side.
+ *
+ * Streams microphone audio to the backend WebSocket proxy which relays to
+ * Deepgram, then pushes back four kinds of messages over the same connection:
+ *   - transcript  (interim + final)
+ *   - references  (Bible refs parsed server-side, on each final segment)
+ *   - scriptures  (semantic scripture matches, pushed on each final segment)
+ *   - limit_reached / error
+ *
+ * Performance/reliability features:
+ *   - AudioWorklet capture (off the main thread, 32 ms chunks)
+ *   - KeepAlive frames during silence to prevent Deepgram timeouts
+ *   - Voice commands fire on interim results with a fire-once latch
  */
 export default function useDeepgramTranscription() {
   const appStore = useAppStore()
@@ -33,98 +47,161 @@ export default function useDeepgramTranscription() {
     currentTranscript: '',
     remainingSeconds: null,
     usedSeconds: 0,
+    scriptureResults: [],
   })
 
-  // Microphone loudness level, 0–100, updated every audio frame
   const micLevel = ref(0)
 
   let ws: WebSocket | null = null
   let audioContext: AudioContext | null = null
   let mediaStream: MediaStream | null = null
-  let processorNode: ScriptProcessorNode | null = null
-  let sessionStartTime: number | null = null
+  // Allow either an AudioWorkletNode (preferred) or a ScriptProcessorNode (fallback)
+  let workletNode: AudioWorkletNode | ScriptProcessorNode | null = null
+  let sourceNode: MediaStreamAudioSourceNode | null = null
   let sessionElapsedTimer: ReturnType<typeof setInterval> | null = null
   let usageSyncTimer: ReturnType<typeof setInterval> | null = null
+  let keepAliveTimer: ReturnType<typeof setInterval> | null = null
+  let lastAudioSentAt = 0
+
+  // Voice-command latch — prevents firing the same command repeatedly while
+  // the interim transcript still contains the trigger phrase.
+  let lastFiredCommand: 'next-verse' | 'previous-verse' | null = null
+  let lastCommandFiredAt = 0
+  const COMMAND_COOLDOWN_MS = 1500
+
+  // Auto-live cooldown — prevents rapid-fire slide switches when the preacher
+  // mentions several references in quick succession.
+  let lastAutoLiveAt = 0
+  const AUTO_LIVE_COOLDOWN_MS = 4000
 
   /**
-   * Detect voice commands in the transcript
+   * Detect voice commands in the transcript.
    */
   const detectVoiceCommand = (text: string): 'next-verse' | 'previous-verse' | null => {
-    const lowerText = text.toLowerCase().trim()
+    const lower = text.toLowerCase().trim()
     if (
-      lowerText.includes('next verse') ||
-      lowerText.includes('next first') ||
-      lowerText === 'next' ||
-      lowerText.includes('go to next verse') ||
-      lowerText.includes('go next verse')
-    ) {
-      return 'next-verse'
-    }
+      lower.includes('next verse') ||
+      lower.includes('next first') ||
+      lower === 'next' ||
+      lower.includes('go to next verse') ||
+      lower.includes('go next verse')
+    ) return 'next-verse'
+
     if (
-      lowerText.includes('previous verse') ||
-      lowerText.includes('last verse') ||
-      lowerText.includes('go back') ||
-      lowerText.includes('go to previous verse') ||
-      lowerText.includes('go to last verse') ||
-      lowerText.includes('go previous verse')
-    ) {
-      return 'previous-verse'
-    }
+      lower.includes('previous verse') ||
+      lower.includes('last verse') ||
+      lower.includes('go back') ||
+      lower.includes('go to previous verse') ||
+      lower.includes('go to last verse') ||
+      lower.includes('go previous verse')
+    ) return 'previous-verse'
+
     return null
   }
 
-  const executeVoiceCommand = (command: 'next-verse' | 'previous-verse') => {
-    if (command === 'next-verse') {
-      useGlobalEmit(appWideActions.nextVerse)
-    } else if (command === 'previous-verse') {
-      useGlobalEmit(appWideActions.previousVerse)
+  /**
+   * Fire the matching command, with a debounce so the same interim text
+   * doesn't trigger repeatedly. Reset the latch when text changes substantially.
+   */
+  const maybeFireVoiceCommand = (text: string) => {
+    const command = detectVoiceCommand(text)
+    if (!command) {
+      lastFiredCommand = null
+      return
     }
+    const now = Date.now()
+    if (command === lastFiredCommand && now - lastCommandFiredAt < COMMAND_COOLDOWN_MS) return
+    lastFiredCommand = command
+    lastCommandFiredAt = now
+    if (command === 'next-verse') useGlobalEmit(appWideActions.nextVerse)
+    else useGlobalEmit(appWideActions.previousVerse)
   }
 
-  const createSegmentFromText = (text: string) => {
+  const createSegmentFromText = (text: string, refsFromServer?: BibleReference[]) => {
     if (!text.trim()) return
-    const cleanedText = text.trim()
-    const voiceCommand = detectVoiceCommand(cleanedText)
-    if (voiceCommand) executeVoiceCommand(voiceCommand)
+    const cleaned = text.trim()
 
-    const references = useBibleReferenceParser(cleanedText)
-    const segment: TranscriptSegment = {
+    // Server-parsed references are authoritative when present.
+    // Fall back to the client parser only if the server didn't send any —
+    // useful during dev/local where the backend may be older.
+    const references = refsFromServer && refsFromServer.length > 0
+      ? refsFromServer
+      : useBibleReferenceParser(cleaned)
+
+    state.value.segments.push({
       id: useObjectID(),
-      text: cleanedText,
+      text: cleaned,
       timestamp: Date.now(),
       bibleReferences: references,
-    }
-    state.value.segments.push(segment)
+    })
     state.value.currentTranscript = ''
   }
 
+  // How many past WS pushes to keep visible. Results from older pushes are
+  // evicted so the panel stays focused on what's being said right now.
+  const MAX_SCRIPTURE_BATCHES = 2
+  const RESULTS_PER_BATCH = 5
+  let batchCounter = 0
+
   /**
-   * Build the WebSocket URL pointing to our backend proxy.
-   * Converts http(s) base URL → ws(s).
+   * Replace the visible scripture results with the latest push.
+   * Keeps up to MAX_SCRIPTURE_BATCHES worth of results so there is some
+   * continuity, but evicts anything older to avoid bloat.
+   * Within a batch results are ordered by the backend's relevance score.
    */
+  const mergeScriptureResults = (raw: any[]) => {
+    if (!raw?.length) return
+    const currentBatch = ++batchCounter
+
+    const incoming: ScriptureResult[] = raw.slice(0, RESULTS_PER_BATCH).map((r) => {
+      const bookIndex = Number(r.book)
+      const bookName = bibleBooks[bookIndex - 1] || `Book ${bookIndex}`
+      return {
+        ...r,
+        shortLabel: `${r.book}:${r.chapter}:${r.verse}`,
+        displayLabel: `${bookName} ${r.chapter}:${r.verse}`,
+        batchId: currentBatch,
+      }
+    })
+
+    // Evict batches that are too old, then prepend the new batch.
+    const cutoff = currentBatch - MAX_SCRIPTURE_BATCHES
+    const retained = state.value.scriptureResults.filter(
+      (x) => x.batchId > cutoff && !incoming.some((n) => n.shortLabel === x.shortLabel),
+    )
+    state.value.scriptureResults = [...incoming, ...retained]
+  }
+
+  /**
+   * Apply references parsed by the server into the most-recent matching segment
+   * and automatically go live with the first reference detected.
+   *
+   * A cooldown prevents rapid-fire slide switches when multiple references are
+   * mentioned in quick succession.
+   */
+  const applyServerReferences = (references: BibleReference[]) => {
+    if (!references?.length) return
+
+    const lastSegment = state.value.segments[state.value.segments.length - 1]
+    if (lastSegment) {
+      lastSegment.bibleReferences = references
+    }
+
+    // Auto go-live with the first reference if cooldown has elapsed.
+    const now = Date.now()
+    if (now - lastAutoLiveAt >= AUTO_LIVE_COOLDOWN_MS) {
+      lastAutoLiveAt = now
+      useGlobalEmit(appWideActions.updateOrCreateBible, references[0].shortLabel)
+    }
+  }
+
   const buildWsUrl = (churchId: string): string => {
     const baseUrl = (config.public.BASE_URL as string) || ''
-    // e.g. https://api.cloudofworship.com/api/v1 → wss://api.cloudofworship.com/api/v1
     const wsBase = baseUrl.replace(/^http/, 'ws')
     const token = useAuthToken().getToken()
     return `${wsBase}/church/${churchId}/transcription/stream?token=${token}`
   }
 
-  /**
-   * Convert Float32 PCM samples to Int16 for Deepgram (linear16 encoding).
-   */
-  const float32ToInt16 = (float32Array: Float32Array): ArrayBuffer => {
-    const int16Array = new Int16Array(float32Array.length)
-    for (let i = 0; i < float32Array.length; i++) {
-      const s = Math.max(-1, Math.min(1, float32Array[i] ?? 0))
-      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff
-    }
-    return int16Array.buffer
-  }
-
-  /**
-   * Fetch the current weekly usage from the API.
-   */
   const fetchUsage = async () => {
     const churchId = authStore.user?.churchId
     if (!churchId) return
@@ -140,9 +217,6 @@ export default function useDeepgramTranscription() {
     }
   }
 
-  /**
-   * Start Deepgram transcription session.
-   */
   const startTranscription = async () => {
     if (state.value.isTranscribing) {
       toast.add({ title: 'Already transcribing', icon: 'i-bx-info-circle' })
@@ -177,26 +251,24 @@ export default function useDeepgramTranscription() {
       return
     }
 
-    // Connect to backend WebSocket proxy
     try {
       const wsUrl = buildWsUrl(churchId)
       ws = new WebSocket(wsUrl)
       ws.binaryType = 'arraybuffer'
-
-      ws.onopen = () => {
-        // Audio capture starts once the server sends "ready"
-      }
 
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data)
 
           if (msg.type === 'ready') {
-            // Server is connected to Deepgram – start capturing audio
             state.value.remainingSeconds = msg.remainingSeconds
             state.value.isTranscribing = true
             state.value.isConnecting = false
-            sessionStartTime = Date.now()
+
+            // Pre-warm the scripture IndexedDB index so the first auto-live
+            // reference hits a hot cache instead of paying the 150–500 ms
+            // cold-build cost.
+            useScripture('43:3:16').catch(() => {})
 
             sessionElapsedTimer = setInterval(() => {
               if (state.value.remainingSeconds !== null && state.value.remainingSeconds > 0) {
@@ -205,10 +277,16 @@ export default function useDeepgramTranscription() {
               }
             }, 1000)
 
-            // Re-sync remaining time from the server every 60 s to prevent drift
-            usageSyncTimer = setInterval(() => {
-              fetchUsage()
-            }, 60_000)
+            usageSyncTimer = setInterval(fetchUsage, 60_000)
+
+            // KeepAlive — every 5s of true silence, send a frame so Deepgram
+            // doesn't time out the upstream socket.
+            keepAliveTimer = setInterval(() => {
+              if (ws?.readyState !== WebSocket.OPEN) return
+              if (Date.now() - lastAudioSentAt > 5_000) {
+                ws.send(JSON.stringify({ type: 'KeepAlive' }))
+              }
+            }, 5_000)
 
             startAudioCapture()
           } else if (msg.type === 'transcript') {
@@ -216,7 +294,13 @@ export default function useDeepgramTranscription() {
               createSegmentFromText(msg.transcript)
             } else {
               state.value.currentTranscript = msg.transcript
+              // Fire voice commands on interim for snappy response
+              maybeFireVoiceCommand(msg.transcript)
             }
+          } else if (msg.type === 'references') {
+            applyServerReferences(msg.references)
+          } else if (msg.type === 'scriptures') {
+            mergeScriptureResults(msg.results)
           } else if (msg.type === 'limit_reached') {
             toast.add({
               title: 'Weekly limit reached',
@@ -273,41 +357,76 @@ export default function useDeepgramTranscription() {
   }
 
   /**
-   * Start capturing microphone audio and streaming it over the WebSocket.
+   * Start AudioWorklet-based capture. The processor runs on a dedicated audio
+   * thread and posts ~32 ms Int16 PCM chunks to the main thread, which forwards
+   * them over the WebSocket.
    */
-  const startAudioCapture = () => {
+  const startAudioCapture = async () => {
     if (!mediaStream || !ws) return
 
     audioContext = new AudioContext({ sampleRate: 16000 })
-    const source = audioContext.createMediaStreamSource(mediaStream)
-    // ScriptProcessorNode is deprecated but still broadly supported and avoids
-    // AudioWorklet complexity. Buffer size 4096 gives good latency vs. overhead balance.
-    processorNode = audioContext.createScriptProcessor(4096, 1, 1)
 
-    processorNode.onaudioprocess = (e) => {
-      const pcmData = e.inputBuffer.getChannelData(0)
+    try {
+      await audioContext.audioWorklet.addModule('/audio-worklets/transcription-pcm-processor.js')
+    } catch (err) {
+      console.error('Failed to load AudioWorklet, falling back to ScriptProcessorNode:', err)
+      startAudioCaptureFallback()
+      return
+    }
 
-      // Compute RMS loudness and map to 0–100
-      let sum = 0
-      for (let i = 0; i < pcmData.length; i++) {
-        sum += (pcmData[i] ?? 0) * (pcmData[i] ?? 0)
-      }
-      const rms = Math.sqrt(sum / pcmData.length)
-      // RMS of speech typically peaks around 0.3; clamp and scale to 0–100
+    sourceNode = audioContext.createMediaStreamSource(mediaStream)
+    workletNode = new AudioWorkletNode(audioContext, 'transcription-pcm-processor')
+
+    workletNode.port.onmessage = (e) => {
+      const { audio, rms } = e.data as { audio: ArrayBuffer; rms: number }
+      // RMS of speech peaks around 0.3 — clamp and scale to 0–100
       micLevel.value = Math.min(100, Math.round((rms / 0.3) * 100))
 
       if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(float32ToInt16(pcmData))
+        ws.send(audio)
+        lastAudioSentAt = Date.now()
       }
     }
 
-    source.connect(processorNode)
-    processorNode.connect(audioContext.destination)
+    sourceNode.connect(workletNode)
+    // We don't connect to destination — we don't want to play the mic back
   }
 
   /**
-   * Stop the current transcription session.
+   * Legacy ScriptProcessorNode capture — kept for older browsers that lack
+   * AudioWorklet (rare; Chrome/Edge/Firefox/Safari have all shipped it for years).
    */
+  const startAudioCaptureFallback = () => {
+    if (!mediaStream || !ws || !audioContext) return
+
+    const source = audioContext.createMediaStreamSource(mediaStream)
+    const processor = audioContext.createScriptProcessor(2048, 1, 1)
+
+    processor.onaudioprocess = (e) => {
+      const pcmData = e.inputBuffer.getChannelData(0)
+      let sum = 0
+      for (let i = 0; i < pcmData.length; i++) sum += (pcmData[i] ?? 0) ** 2
+      const rms = Math.sqrt(sum / pcmData.length)
+      micLevel.value = Math.min(100, Math.round((rms / 0.3) * 100))
+
+      const int16 = new Int16Array(pcmData.length)
+      for (let i = 0; i < pcmData.length; i++) {
+        const s = Math.max(-1, Math.min(1, pcmData[i] ?? 0))
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff
+      }
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(int16.buffer)
+        lastAudioSentAt = Date.now()
+      }
+    }
+
+    source.connect(processor)
+    processor.connect(audioContext.destination)
+    // Store on the same slots used by the teardown path
+    workletNode = processor
+    sourceNode = source
+  }
+
   const stopTranscription = () => {
     if (!state.value.isTranscribing && !state.value.isConnecting) return
 
@@ -319,62 +438,51 @@ export default function useDeepgramTranscription() {
     state.value.isTranscribing = false
     state.value.isConnecting = false
 
-    // Refresh usage from server after stopping
     fetchUsage()
   }
 
-  /**
-   * Release all resources.
-   */
   const cleanup = () => {
-    if (sessionElapsedTimer) {
-      clearInterval(sessionElapsedTimer)
-      sessionElapsedTimer = null
-    }
+    if (sessionElapsedTimer) { clearInterval(sessionElapsedTimer); sessionElapsedTimer = null }
+    if (usageSyncTimer)      { clearInterval(usageSyncTimer);      usageSyncTimer = null }
+    if (keepAliveTimer)      { clearInterval(keepAliveTimer);      keepAliveTimer = null }
 
-    if (usageSyncTimer) {
-      clearInterval(usageSyncTimer)
-      usageSyncTimer = null
+    if (workletNode) {
+      try { workletNode.disconnect() } catch {}
+      workletNode = null
     }
-
-    if (processorNode) {
-      processorNode.disconnect()
-      processorNode = null
+    if (sourceNode) {
+      try { sourceNode.disconnect() } catch {}
+      sourceNode = null
     }
-
     if (audioContext) {
-      audioContext.close().catch(() => { })
+      audioContext.close().catch(() => {})
       audioContext = null
     }
-
     if (mediaStream) {
       mediaStream.getTracks().forEach((t) => t.stop())
       mediaStream = null
     }
-
     if (ws) {
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close()
       }
       ws = null
     }
-
     micLevel.value = 0
-
-    sessionStartTime = null
+    lastFiredCommand = null
   }
 
   const clearTranscript = () => {
     state.value.segments = []
     state.value.currentTranscript = ''
+    state.value.scriptureResults = []
+    batchCounter = 0
     toast.add({ title: 'Transcript cleared', icon: 'i-bx-trash' })
   }
 
   const allBibleReferences = computed(() => {
     const refs: BibleReference[] = []
-    for (const segment of state.value.segments) {
-      refs.push(...segment.bibleReferences)
-    }
+    for (const segment of state.value.segments) refs.push(...segment.bibleReferences)
     return refs
   })
 
@@ -382,10 +490,9 @@ export default function useDeepgramTranscription() {
     if (state.value.remainingSeconds === null) return null
     return Math.floor(state.value.remainingSeconds / 60)
   })
-
   const usedMinutes = computed(() => Math.floor(state.value.usedSeconds / 60))
 
-  // Fetch usage on composable initialisation
+  // Fetch usage lazily — only when the panel is opened, not on import
   fetchUsage()
 
   onUnmounted(() => {
@@ -404,6 +511,10 @@ export default function useDeepgramTranscription() {
     usedMinutes,
     allBibleReferences,
     micLevel: computed(() => micLevel.value),
+    // Scripture results streamed from the server over the same WS connection.
+    // The transcripts panel reads this for the "Scriptures" tab when on the
+    // Deepgram path (Teams plan / transcripts-free flag).
+    scriptureResults: computed(() => state.value.scriptureResults),
 
     startTranscription,
     stopTranscription,
