@@ -1014,22 +1014,23 @@ const updateSlideOnline = useThrottleFn(
       })
 
       // UPDATE OVER HTTP for persistence
+      let data: any, error: any
       try {
-        const { data, error } = await useAPIFetch(
+        ;({ data, error } = await useAPIFetch(
           `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
           {
             method: "PUT",
             body: tempSlide,
           }
-        )
+        ))
       } catch (err) {
         console.error("Failed to update slide online:", err)
       }
-      if (!error.value) {
+      if (!error?.value) {
         appStore.setLastSynced(new Date().toISOString())
         return data.value
       } else {
-        throw new Error(error.value?.message)
+        throw new Error(error?.value?.message)
       }
     }
   },
