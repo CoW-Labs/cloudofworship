@@ -3,7 +3,7 @@ import { bibleBooks } from '~/utils/constants'
 import type { BibleReference } from '~/types/transcript'
 
 export interface ScriptureResult {
-  _id: string
+  _id?: string
   book: string      // 1-based string e.g. "43"
   chapter: string
   verse: string
@@ -82,10 +82,9 @@ export default function useScriptureSearch() {
         const payload = data.value as { results: any[] }
         const enriched = (payload.results || []).map(enrichResult)
 
-        // Merge new results — if a result already exists, move it into the
-        // current batch and refresh its score so it sorts correctly within it.
+        // Merge new results — dedup by shortLabel (book:chapter:verse).
         for (const item of enriched) {
-          const existing = results.value.find((r) => r._id === item._id)
+          const existing = results.value.find((r) => r.shortLabel === item.shortLabel)
           if (existing) {
             existing.batchId = currentBatch
             existing.score = item.score

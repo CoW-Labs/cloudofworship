@@ -36,13 +36,15 @@ export default function useSlides() {
   }
 
   const updateLiveOutput = (updatedSlide: Slide, options?: { forceGoLive: boolean }) => {
-    appStore.replaceScheduleActiveSlides(slides.value || [])
-
-    // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
+    // Post to the live window first — before any Pinia/localStorage work —
+    // so the projector sees the new slide as early as possible.
     if (updatedSlide.id === appStore.currentState.liveSlideId || options?.forceGoLive) {
       appStore.setLiveSlide(updatedSlide.id)
       useBroadcastPost(JSON.stringify(updatedSlide))
     }
+
+    // Persist schedule state after broadcasting (non-critical path).
+    appStore.replaceScheduleActiveSlides(slides.value || [])
   }
 
   /**

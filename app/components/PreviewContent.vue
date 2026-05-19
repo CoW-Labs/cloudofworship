@@ -430,48 +430,44 @@ emitter.on("new-bible", async (data: string) => {
 })
 
 emitter.on("update-or-create-bible", async (data: string) => {
-  if (data) {
-    // Find any existing Bible slide (prefer the live one)
-    const existingBibleSlide =
-      slides.value?.find(
-        (s: Slide) =>
-          s.type === slideTypes.bible &&
-          s.id === currentState.value?.liveSlideId
-      ) || slides.value?.find((s: Slide) => s.type === slideTypes.bible)
+  if (!data) return
 
-    const scripture = await useScripture(data)
-    if (scripture) {
-      if (existingBibleSlide) {
-        // Update the existing Bible slide
-        const updatedSlide = await gotoVerse(
-          existingBibleSlide,
-          scripture.label,
-          scripture.version || "KJV"
-        )
-        if (updatedSlide) {
-          const slideIndex = slides.value.findIndex(
-            (s: Slide) => s.id === updatedSlide.id
-          )
-          slides.value.splice(slideIndex, 1, updatedSlide)
-          makeSlideActive(updatedSlide, { goLive: true, newlyCreated: false })
-          updateLiveOutput(updatedSlide)
-          updateSlideOnline(updatedSlide)
-        }
-      } else {
-        // No existing Bible slide - create a new one
-        const newSlide = createBibleSlide(scripture)
-        slides.value?.push(newSlide)
-        makeSlideActive(newSlide, {
-          goLive: true,
-          newlyCreated: true,
-        })
-        // Broadcast slide creation immediately for real-time sync
-        broadcastSlideCreated(newSlide)
-        uploadOfflineSlides()
-      }
-      appStore.setRecentBibleSearches(data)
+  // Find any existing Bible slide (prefer the live one)
+  const existingBibleSlide =
+    slides.value?.find(
+      (s: Slide) =>
+        s.type === slideTypes.bible &&
+        s.id === currentState.value?.liveSlideId
+    ) || slides.value?.find((s: Slide) => s.type === slideTypes.bible)
+
+  // Resolve the shortLabel to a scripture object — needed for both paths
+  // to get the human-readable label (e.g. "Genesis 28:19") that gotoVerse expects.
+  const scripture = await useScripture(data)
+  if (!scripture) return
+
+  if (existingBibleSlide) {
+    const updatedSlide = await gotoVerse(
+      existingBibleSlide,
+      scripture.label,
+      scripture.version || "KJV"
+    )
+    if (updatedSlide) {
+      const slideIndex = slides.value.findIndex(
+        (s: Slide) => s.id === updatedSlide.id
+      )
+      slides.value.splice(slideIndex, 1, updatedSlide)
+      makeSlideActive(updatedSlide, { goLive: true, newlyCreated: false })
+      updateLiveOutput(updatedSlide)
+      updateSlideOnline(updatedSlide)
     }
+  } else {
+    const newSlide = createBibleSlide(scripture)
+    slides.value?.push(newSlide)
+    makeSlideActive(newSlide, { goLive: true, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
   }
+  appStore.setRecentBibleSearches(data)
 })
 
 emitter.on("new-bible-whole-search", async (data: string) => {
