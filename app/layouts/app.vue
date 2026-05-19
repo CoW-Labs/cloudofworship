@@ -1098,9 +1098,12 @@ async function openWindows() {
       }
     }
 
-    // Also close our popup windows if the main app window is closed
+    // Close popup windows when the operator tab closes, but only when the user
+    // has opted into this behaviour (default is to leave the live window open)
     window.addEventListener("beforeunload", () => {
-      closeAllWindows()
+      if (appStore.currentState.settings.closeLiveWindowWithOperator) {
+        closeAllWindows()
+      }
     })
 
     screenDetails.addEventListener("screenschange", () => {

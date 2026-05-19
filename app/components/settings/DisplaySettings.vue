@@ -43,7 +43,7 @@
         </UButton>
       </div>
     </div>
-    <div v-if="isTauri" class="live-window-settings flex flex-col gap-2">
+    <div class="live-window-settings flex flex-col gap-2">
       <div class="sub-header">
         <h3 class="font-medium">Live Window Settings</h3>
         <p class="text-xs opacity-50 mb-2 mt-1">
@@ -51,6 +51,7 @@
         </p>
       </div>
       <div
+        v-if="isTauri"
         class="bg-gray-100 dark:bg-gray-800 p-4 px-6 rounded-md flex justify-between items-center"
       >
         <div class="info">
@@ -70,6 +71,34 @@
                 title: value
                   ? 'Live window will open in fullscreen'
                   : 'Live window will open as resizable window',
+                icon: 'i-bx-check-circle',
+              })
+            }
+          "
+        />
+      </div>
+      <div
+        v-if="!isTauri"
+        class="bg-gray-100 dark:bg-gray-800 p-4 px-6 rounded-md flex justify-between items-center"
+      >
+        <div class="info pr-4">
+          <div class="text-sm font-semibold">
+            Close live window when this tab is closed
+          </div>
+          <div class="text-xs opacity-70 mt-1">
+            When enabled, the live output window closes automatically if you
+            close the control center tab.
+          </div>
+        </div>
+        <UToggle
+          :model-value="currentState.settings.closeLiveWindowWithOperator"
+          @update:model-value="
+            (value: boolean) => {
+              appStore.setCloseLiveWindowWithOperator(value)
+              useToast().add({
+                title: value
+                  ? 'Live window will close with this tab'
+                  : 'Live window will stay open when this tab is closed',
                 icon: 'i-bx-check-circle',
               })
             }

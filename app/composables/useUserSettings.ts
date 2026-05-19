@@ -87,6 +87,7 @@ export const useUserSettings = () => {
           footnotes: userSettings.footnotes,
           songAndHymnLabelsVisibility: userSettings.songAndHymnLabelsVisibility,
           liveWindowFullscreen: userSettings.liveWindowFullscreen,
+          closeLiveWindowWithOperator: userSettings.closeLiveWindowWithOperator,
           transitionInterval: userSettings.transitionInterval,
           alertLimit: userSettings.alertLimit,
         }
@@ -142,6 +143,7 @@ export const useUserSettings = () => {
         footnotes: settingsToSave.footnotes,
         songAndHymnLabelsVisibility: settingsToSave.songAndHymnLabelsVisibility,
         liveWindowFullscreen: settingsToSave.liveWindowFullscreen,
+        closeLiveWindowWithOperator: settingsToSave.closeLiveWindowWithOperator,
         transitionInterval: settingsToSave.transitionInterval,
         alertLimit: settingsToSave.alertLimit,
       }
