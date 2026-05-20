@@ -403,6 +403,7 @@ const {
   isTeamsPlan,
   useDeepgramEngine,
   micLevel,
+  deepgramScriptureResults,
 } = useSermonTranscription()
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
@@ -419,16 +420,26 @@ watch(isTranscribing, (val) => {
 })
 
 // ── Scripture search ───────────────────────────────────────────────────────
+// On the Deepgram path the server pushes scripture results over the same WS
+// connection — no HTTP search needed. The Web Speech (free) path still uses
+// the HTTP fallback because there's no server connection to push from.
 const {
-  results: scriptureResults,
+  results: httpScriptureResults,
   isSearching: isScriptureSearching,
   debouncedSearch,
   addFromBibleReferences,
-  clearResults: clearScriptureResults,
+  clearResults: clearHttpScriptureResults,
 } = useScriptureSearch()
+
+const scriptureResults = computed(() =>
+  useDeepgramEngine.value ? deepgramScriptureResults.value : httpScriptureResults.value
+)
 
 const scriptureVisibleCount = ref(20)
 const visibleScriptureResults = computed(() =>
+  // On the Deepgram path the list is already ordered: newest batch first,
+  // backend score order within each batch. On the Web Speech path we sort
+  // by batchId then score for the same effect.
   [...scriptureResults.value]
     .sort((a, b) => b.batchId - a.batchId || b.score - a.score)
     .slice(0, scriptureVisibleCount.value)
@@ -447,16 +458,18 @@ const parsedSegmentIds = new Set<string>()
 watch(
   () => segments.value.length,
   () => {
+    // Deepgram path: server already pushed references and scriptures via WS,
+    // nothing to do here.
+    if (useDeepgramEngine.value) return
+
+    // Free / Web Speech path: locally parse and HTTP-search.
     for (const segment of segments.value) {
       if (parsedSegmentIds.has(segment.id)) continue
       parsedSegmentIds.add(segment.id)
-
-      // Use the already-parsed bible references from the segment
       if (segment.bibleReferences.length > 0)
         addFromBibleReferences(segment.bibleReferences)
     }
 
-    // Also fire the debounced backend search with the last 3 segments
     const combinedText = segments.value
       .slice(-3)
       .map((s) => s.text)
@@ -486,8 +499,11 @@ const toggleTranscription = () =>
   isTranscribing.value ? stopTranscription() : startTranscription()
 
 const handleClear = () => {
+  // `clearTranscript()` from useSermonTranscription clears both segments AND
+  // the Deepgram-path scripture results (handled inside the composable).
   clearTranscript()
-  clearScriptureResults()
+  // Also reset the HTTP-path scripture results used by the free / Web Speech path.
+  clearHttpScriptureResults()
   parsedSegmentIds.clear()
   scriptureVisibleCount.value = 20
 }

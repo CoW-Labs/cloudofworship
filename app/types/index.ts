@@ -292,6 +292,7 @@ export interface AppSettings {
   footnotes?: boolean
   songAndHymnLabelsVisibility: boolean
   liveWindowFullscreen?: boolean // Whether live window opens in fullscreen mode
+  closeLiveWindowWithOperator?: boolean // Whether live window closes when operator tab closes (browser only)
 
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number
