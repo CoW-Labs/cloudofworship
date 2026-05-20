@@ -36,13 +36,15 @@ export default function useSlides() {
   }
 
   const updateLiveOutput = (updatedSlide: Slide, options?: { forceGoLive: boolean }) => {
-    appStore.replaceScheduleActiveSlides(slides.value || [])
-
-    // If the current slide in the live output/slide schedule is being edited, then update LiveOutput immediately
+    // Post to the live window first — before any Pinia/localStorage work —
+    // so the projector sees the new slide as early as possible.
     if (updatedSlide.id === appStore.currentState.liveSlideId || options?.forceGoLive) {
       appStore.setLiveSlide(updatedSlide.id)
       useBroadcastPost(JSON.stringify(updatedSlide))
     }
+
+    // Persist schedule state after broadcasting (non-critical path).
+    appStore.replaceScheduleActiveSlides(slides.value || [])
   }
 
   /**
@@ -136,12 +138,6 @@ export default function useSlides() {
       return data.value as Slide[]
     } catch (error: any) {
       console.error('Error getting saved slides:', error)
-      // toast.add({
-      //   icon: 'i-bx-error',
-      //   title: 'Failed to fetch saved slides',
-      //   description: error.message,
-      //   color: 'red',
-      // })
       return []
     } finally {
       loading.value = false

@@ -78,7 +78,19 @@
         class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
         ref="actionsContainer"
       >
+        <!-- Skeleton loader while IndexedDB is hydrating -->
+        <template v-if="loading">
+          <div
+            v-for="i in 20"
+            :key="i"
+            class="flex gap-3 p-2 py-2 dark:border-primary-950"
+          >
+            <USkeleton class="h-16 w-full rounded" />
+          </div>
+        </template>
+
         <ActionCard
+          v-else
           v-for="(action, index) in visibleActions"
           :key="action?.name"
           :action="action"
@@ -211,6 +223,7 @@ const searchInputEl = ref<{ input: HTMLInputElement }>()
 const searchInput = ref<string>("")
 const focusedActionIndex = ref<number>(0)
 const actions = ref<QuickAction[]>([])
+const loading = ref(true)
 const quickActions = ref<HTMLDivElement | null>(null)
 const actionsContainer = ref<HTMLDivElement | null>(null)
 const appStore = useAppStore()
@@ -254,6 +267,7 @@ const getAllHymns = async () => {
       }
     })
   )
+  loading.value = false
 }
 
 getAllHymns()
