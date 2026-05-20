@@ -72,7 +72,7 @@ export default function useDeepgramTranscription() {
   // Auto-live cooldown — prevents rapid-fire slide switches when the preacher
   // mentions several references in quick succession.
   let lastAutoLiveAt = 0
-  const AUTO_LIVE_COOLDOWN_MS = 4000
+  const AUTO_LIVE_COOLDOWN_MS = 1500
 
   /**
    * Detect voice commands in the transcript.
@@ -268,7 +268,7 @@ export default function useDeepgramTranscription() {
             // Pre-warm the scripture IndexedDB index so the first auto-live
             // reference hits a hot cache instead of paying the 150–500 ms
             // cold-build cost.
-            useScripture('43:3:16').catch(() => {})
+            useScripture('43:3:16').catch(() => { })
 
             sessionElapsedTimer = setInterval(() => {
               if (state.value.remainingSeconds !== null && state.value.remainingSeconds > 0) {
@@ -443,19 +443,19 @@ export default function useDeepgramTranscription() {
 
   const cleanup = () => {
     if (sessionElapsedTimer) { clearInterval(sessionElapsedTimer); sessionElapsedTimer = null }
-    if (usageSyncTimer)      { clearInterval(usageSyncTimer);      usageSyncTimer = null }
-    if (keepAliveTimer)      { clearInterval(keepAliveTimer);      keepAliveTimer = null }
+    if (usageSyncTimer) { clearInterval(usageSyncTimer); usageSyncTimer = null }
+    if (keepAliveTimer) { clearInterval(keepAliveTimer); keepAliveTimer = null }
 
     if (workletNode) {
-      try { workletNode.disconnect() } catch {}
+      try { workletNode.disconnect() } catch { }
       workletNode = null
     }
     if (sourceNode) {
-      try { sourceNode.disconnect() } catch {}
+      try { sourceNode.disconnect() } catch { }
       sourceNode = null
     }
     if (audioContext) {
-      audioContext.close().catch(() => {})
+      audioContext.close().catch(() => { })
       audioContext = null
     }
     if (mediaStream) {
