@@ -272,16 +272,16 @@ export const quickActionsArr: QuickAction[] = [
     // unreleased: true,
     // type: slideTypes.text
   },
-  // {
-  //   icon: "i-material-symbols-speech-to-text",
-  //   name: "Transcribe Sermon",
-  //   desc: "Transcribe sermon and auto-suggest Bible slides",
-  //   action: appWideActions.newTranscribe,
-  //   meta: "transcribe sermon speech text bible audio microphone",
-  //   tier: 'teams',
-  //   // unreleased: true,
-  //   featureFlag: 'transcripts-feature',
-  // },
+  {
+    icon: "i-material-symbols-speech-to-text",
+    name: "Transcribe Sermon",
+    desc: "Transcribe sermon and auto-suggest Bible slides",
+    action: appWideActions.newTranscribe,
+    meta: "transcribe sermon speech text bible audio microphone",
+    tier: 'teams',
+    // unreleased: true,
+    featureFlag: 'transcripts-feature',
+  },
   {
     icon: "i-ph-file-ppt",
     name: "Import Slides",
