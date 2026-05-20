@@ -182,7 +182,8 @@ const hymnVersesWithChorus = computed(() => {
 })
 
 const getAllChapterVerses = async () => {
-  const chapter = await useScriptureChapter(props.verse)
+  const slideVersion = (props.slide?.data as Scripture | undefined)?.version || ''
+  const chapter = await useScriptureChapter(props.verse, slideVersion)
   // console.log("chapter", chapter?.content)
   allChapterVerses.value = chapter?.content as BibleVerse[]
 }
@@ -303,6 +304,19 @@ watch(bibleChapter, () => {
   getAllChapterVerses()
   // console.log(bibleChapter.value)
 })
+
+// Re-fetch chapter verses when the user switches Bible translation.
+// The version is stored on the slide's data object (set by gotoScripture),
+// NOT in the store's defaultBibleVersion (which is only set when no version exists yet).
+const appStore = useAppStore()
+watch(
+  () => (props.slide?.data as Scripture | undefined)?.version,
+  (newVersion, oldVersion) => {
+    if (newVersion && newVersion !== oldVersion && props.slide?.type === slideTypes.bible) {
+      getAllChapterVerses()
+    }
+  }
+)
 
 watch(
   () => props.slide,
