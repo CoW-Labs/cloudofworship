@@ -16,7 +16,6 @@ import { bibleVersionObjects } from "~/utils/constants"
 import { useThrottleFn } from "@vueuse/core"
 import posthog from "posthog-js"
 
-// console.log(usePinia())
 function ensureUniqueIds(arr: Slide[]): Slide[] {
   const seenIds = new Set()
   return arr.filter((obj) => {
