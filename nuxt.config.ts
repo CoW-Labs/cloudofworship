@@ -97,6 +97,9 @@ export default defineNuxtConfig({
     clearScreen: false,
     // Enable environment variables
     envPrefix: ['VITE_', 'TAURI_'],
+    build: {
+      sourcemap: true,
+    },
   },
 
   runtimeConfig: {
