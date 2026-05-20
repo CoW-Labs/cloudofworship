@@ -201,7 +201,7 @@ export const quickActionsArr: QuickAction[] = [
     tier: "teams",
     // unreleased: true,
   },
-  {tran
+  {
     icon: "i-mdi-youtube",
     name: "Add YouTube Video",
     desc: "Embed YouTube videos in your schedule",
