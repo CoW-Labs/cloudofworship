@@ -167,7 +167,7 @@ const isEditorViewReady = (editor: any) => {
   if (!editor || editor.isDestroyed) return false
 
   try {
-    return Boolean(editor.view?.dom)
+    return Boolean(editor.view?.dom?.isConnected)
   } catch {
     return false
   }

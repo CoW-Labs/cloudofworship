@@ -65,18 +65,27 @@ const useIndexedDB = () => {
  * @example
  * await safeDBOperation(() => db.media.delete(slideId))
  */
+const isRecoverableDBError = (err: any): boolean => {
+  const name = err?.name ?? ''
+  const innerName = err?.inner?.name ?? ''
+  // DatabaseClosedError: browser closed the connection (tab backgrounded, GC, private mode)
+  // UnknownError with "Internal error": browser-level IDB failure (storage pressure, Firefox/iOS quirk)
+  if (name === 'DatabaseClosedError') return true
+  if (name === 'UnknownError' || innerName === 'UnknownError') return true
+  return false
+}
+
 export const safeDBOperation = async <T>(
   operation: (db: WorshipCloudDatabase) => Promise<T>
 ): Promise<T | undefined> => {
   try {
     return await operation(useIndexedDB())
   } catch (err: any) {
-    if (err?.name === 'DatabaseClosedError') {
+    if (isRecoverableDBError(err)) {
       // Reset the singleton so the next call to useIndexedDB() opens a fresh connection
       dbInstance = null
       try {
-        const db = useIndexedDB()
-        return await operation(db)
+        return await operation(useIndexedDB())
       } catch (retryErr: any) {
         console.error('DB operation failed after re-open:', retryErr)
         return undefined
@@ -91,8 +100,7 @@ export const safeDBOperation = async <T>(
       await clearOldCaches()
       dbInstance = null
       try {
-        const db = useIndexedDB()
-        return await operation(db)
+        return await operation(useIndexedDB())
       } catch (retryErr: any) {
         console.error('DB operation failed after storage cleanup:', retryErr)
         return undefined
