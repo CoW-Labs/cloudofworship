@@ -1,4 +1,5 @@
-const useURLFriendlyString = (inputString: string): string => {
+const useURLFriendlyString = (inputString: string | undefined | null): string => {
+  if (!inputString) return ''
   let urlFriendlyString = inputString.replace(/[^\w\s-]/g, '')
 
   // Replace spaces with hyphens

@@ -1119,32 +1119,35 @@ const onUpdateSlide = (slide: Slide) => {
     stopCountdown()
   }
 
-  makeSlideActive(slide)
-  const slideIndex = slides.value?.findIndex(
-    (slideInner: Slide) => slide.id === slideInner.id
-  )
-  slides.value?.splice(slideIndex || 0, 1, slide)
+  // Stamp a client-side updatedAt so v-memo detects the change and re-renders the card
+  const updatedSlide: Slide = { ...slide, updatedAt: new Date().toISOString() }
 
-  updateSlideOnline(slide)
-  updateLiveOutput(slide)
+  makeSlideActive(updatedSlide)
+  const slideIndex = slides.value?.findIndex(
+    (slideInner: Slide) => updatedSlide.id === slideInner.id
+  )
+  slides.value?.splice(slideIndex || 0, 1, updatedSlide)
+
+  updateSlideOnline(updatedSlide)
+  updateLiveOutput(updatedSlide)
 
   // When updating of countdown slide is done, resume timer
-  if (slide.type === slideTypes.countdown) {
-    startCountdown(slide)
+  if (updatedSlide.type === slideTypes.countdown) {
+    startCountdown(updatedSlide)
   }
 }
 
 // This function updates specific slide that is not active
 const onUpdateInactiveSlide = (slide: Slide) => {
-  const slideIndex = slides.value?.findIndex(
-    (slideInner: Slide) => slide.id === slideInner.id
-  )
-  slides.value?.splice(slideIndex || 0, 1, slide)
+  const updatedSlide: Slide = { ...slide, updatedAt: new Date().toISOString() }
 
-  // Every 3 seconds
-  // const debouncedTextSlideUpdate = useDebounceFn(updateSlideOnline, 3000)
-  updateSlideOnline(slide)
-  updateLiveOutput(slide)
+  const slideIndex = slides.value?.findIndex(
+    (slideInner: Slide) => updatedSlide.id === slideInner.id
+  )
+  slides.value?.splice(slideIndex || 0, 1, updatedSlide)
+
+  updateSlideOnline(updatedSlide)
+  updateLiveOutput(updatedSlide)
 }
 
 // Countdown management functions
