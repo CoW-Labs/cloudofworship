@@ -1,6 +1,7 @@
 import { useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import type { BibleVersion } from "~/types"
+import { safeDBOperation } from "~/composables/useIndexedDB"
 
 /**
  * Composable for managing Bible versions.
@@ -19,7 +20,8 @@ export const useBibleVersionManager = () => {
    * Check whether a given Bible version ID has been downloaded to IndexedDB.
    */
   const isBibleVersionDownloaded = async (bibleVersionId: string): Promise<boolean> => {
-    return (await db.bibleAndHymns.where("id").equals(bibleVersionId).count()) > 0
+    const count = await safeDBOperation((d) => d.bibleAndHymns.where("id").equals(bibleVersionId).count())
+    return (count ?? 0) > 0
   }
 
   /**
@@ -64,7 +66,7 @@ export const useBibleVersionManager = () => {
         downloadProgress
       )
       bibleResponse = await bibleResponse.json()
-      await db.bibleAndHymns.add(tempBibleVersionRecord(bibleVersionId, bibleResponse))
+      await safeDBOperation((d) => d.bibleAndHymns.put(tempBibleVersionRecord(bibleVersionId, bibleResponse)))
     } finally {
       bibleVersionLoading.value = false
       await populateBibleVersionOptions()

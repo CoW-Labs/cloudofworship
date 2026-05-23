@@ -1,6 +1,7 @@
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { splitVerseByLines } from "~/composables/useHymn"
+import { safeDBOperation } from "~/composables/useIndexedDB"
 import type {
   Slide,
   Scripture,
@@ -264,15 +265,13 @@ export default function useSlideCreation() {
       tempSlide.data = externalVideo
       tempSlide.name = file.name || `${file.type} Video`
 
-      useIndexedDB()
-        .media.add({
-          id: tempSlide.id,
-          content: { type: file.type },
-          data: externalVideo,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-        .catch((err) => console.error("Failed to add external video slide:", err))
+      safeDBOperation((db) => db.media.put({
+        id: tempSlide.id,
+        content: { type: file.type },
+        data: externalVideo,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }))
     } else {
       // ── Regular file (image / video / audio) ─────────────────────────────
       tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
@@ -289,15 +288,13 @@ export default function useSlideCreation() {
         fileReader.readAsArrayBuffer(file.blob)
         fileReader.addEventListener("loadend", async () => {
           const arrayBuffer = fileReader.result as ArrayBuffer
-          await useIndexedDB()
-            .media.add({
-              id: tempSlide.id,
-              content: { size: file.blob?.size, type: file.blob?.type },
-              data: arrayBuffer,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            })
-            .catch((err) => console.error("Failed to persist media blob:", err))
+          await safeDBOperation((db) => db.media.put({
+            id: tempSlide.id,
+            content: { size: file.blob?.size, type: file.blob?.type },
+            data: arrayBuffer,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }))
           // Remove blob from the in-memory file object after it is stored
           delete file.blob
         })
@@ -481,17 +478,13 @@ export default function useSlideCreation() {
             const blob = new Blob([arrayBuffer], { type: "image/png" })
 
             // 2a — Persist to IndexedDB (works for all plans / offline)
-            await db.media
-              .add({
-                id: `${tempSlide.id}-page-${obj.page}`,
-                content: { type: "image/png", slideId: tempSlide.id },
-                data: arrayBuffer,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              })
-              .catch((err) =>
-                console.error(`Failed to persist presentation page ${obj.page}:`, err)
-              )
+            await safeDBOperation((d) => d.media.put({
+              id: `${tempSlide.id}-page-${obj.page}`,
+              content: { type: "image/png", slideId: tempSlide.id },
+              data: arrayBuffer,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }))
 
             // 2b — Upload to cloud on Teams plan
             if (isTeamsPlan.value && navigator.onLine) {

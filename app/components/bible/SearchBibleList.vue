@@ -239,9 +239,9 @@ onMounted(() => {
 })
 
 const getDefaultBible = async () => {
-  const bible = await db.bibleAndHymns.get(
-    appStore.currentState.settings.defaultBibleVersion
-  )
+  const version = appStore.currentState.settings.defaultBibleVersion
+  if (!version) return
+  const bible = await db.bibleAndHymns.get(version)
   defaultBible.value = bible?.data as unknown as BibleVerse[]
   getVerses()
 }

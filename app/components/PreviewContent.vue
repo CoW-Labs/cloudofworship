@@ -121,6 +121,7 @@ import type {
   ExtendedFileT,
 } from "~/types"
 import { appWideActions } from "~/utils/constants"
+import { isNotFoundError } from "~/utils/apiErrors"
 
 // Setup real-time slide sync
 const { handleWebSocketMessage } = useRealtimeSlides()
@@ -1026,6 +1027,10 @@ const updateSlideOnline = useThrottleFn(
         appStore.setLastSynced(new Date().toISOString())
         return data.value
       } else {
+        if (isNotFoundError(error.value)) {
+          appStore.removeActiveSlide(slide)
+          return null
+        }
         throw new Error(error?.value?.message)
       }
     }
