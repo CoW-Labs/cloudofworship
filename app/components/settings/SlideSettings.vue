@@ -31,7 +31,7 @@
             <template #label>
               <IconWrapper name="i-bx-font-family" size="4"> </IconWrapper>
               <span
-                v-if="font?.length"
+                v-if="appStore.currentState.settings.defaultFont?.length"
                 class="truncate"
                 :class="
                   useURLFriendlyString(
@@ -565,7 +565,6 @@ const appStore = useAppStore()
 
 const MAX_FONT_SIZE = 150
 const MIN_FONT_SIZE = 50
-const font = ref(appStore.currentState.settings.defaultFont)
 const lines = ref<number>(
   appStore.currentState.settings.slideStyles.linesPerSlide || 4
 )
@@ -651,5 +650,4 @@ const libraryTabs = [
   { label: "Still Background", icon: "i-bx-image" },
   { label: "Motion Background", icon: "i-bx-film" },
 ]
-
 </script>
