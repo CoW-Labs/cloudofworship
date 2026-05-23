@@ -209,7 +209,7 @@ const saveAndSelectImages = async (files: File[]) => {
 
     await getAllLocallySavedImages()
     if (bgImageToBeSelected.value) {
-      emit("select", bgImageToBeSelected.value)
+      emit("select", { image: bgImageToBeSelected.value })
     }
   } finally {
     imageCompressionLoading.value = false
