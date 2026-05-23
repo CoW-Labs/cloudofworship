@@ -114,7 +114,7 @@ self.addEventListener("fetch", (event) => {
         const cacheKey = await getCacheName()
         try {
           const networkResp = await fetch(req)
-          if (networkResp.ok) {
+          if (networkResp.ok && networkResp.status === 200) {
             const cache = await caches.open(cacheKey)
             cache.put(req, networkResp.clone())
           }

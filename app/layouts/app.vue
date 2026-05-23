@@ -102,7 +102,7 @@ import type {
 } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { appWideActions } from "~/utils/constants"
-import { safeDBGet } from "~/composables/useIndexedDB"
+import { safeDBGet, safeDBOperation } from "~/composables/useIndexedDB"
 
 useHead({
   title: "Cloud of Worship",
@@ -362,9 +362,7 @@ const fetchHymns = async () => {
         }
       )
       hymns = await hymns.json()
-      await db.bibleAndHymns
-        .add(tempBibleVersion("hymns", hymns))
-        .catch((err) => console.error("Failed to add hymns:", err))
+      await safeDBOperation((d) => d.bibleAndHymns.put(tempBibleVersion("hymns", hymns)))
     } else {
       setLoadingTask("hymns", "Hymns are already available offline.", 100)
     }
@@ -554,7 +552,7 @@ const downloadEssentialResources = async () => {
               downloadProgress
             )
             kjvBible = await kjvBible.json()
-            await db.bibleAndHymns.add(tempBibleVersion("KJV", kjvBible))
+            await safeDBOperation((d) => d.bibleAndHymns.put(tempBibleVersion("KJV", kjvBible)))
           } catch (err) {
             console.warn("Failed to download KJV Bible:", err)
           }

@@ -11,9 +11,8 @@
         Alert Schedule (Maximum of
         {{ appStore.currentState.settings.alertLimit }})
       </div>
-      <div class="alerts max-h-[200px] overflow-y-auto">
+      <div ref="alertsRef" class="alerts max-h-[200px] overflow-y-auto">
         <div
-          ref="alertsRef"
           class="alert-card-ctn flex items-center px-2"
           v-for="alert in currentState.alerts"
           :key="alert.id"
