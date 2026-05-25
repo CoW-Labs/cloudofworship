@@ -355,6 +355,8 @@ const getEmbedUrl = (data: ExternalVideo): string => {
     let videoId = ""
     if (data.url.includes("youtu.be")) {
       videoId = data.url.split("youtu.be/")[1]?.split("?")[0] || ""
+    } else if (data.url.includes("/shorts/")) {
+      videoId = data.url.split("/shorts/")[1]?.split("?")[0] || ""
     } else {
       videoId = data.url.split("v=")[1]?.split("&")[0] || ""
     }

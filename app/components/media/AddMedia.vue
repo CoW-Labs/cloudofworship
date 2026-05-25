@@ -271,6 +271,8 @@ const extractVideoId = (url: string, type: string): string => {
   if (type === "youtube") {
     if (url.includes("youtu.be")) {
       return url.split("youtu.be/")[1]?.split("?")[0] || ""
+    } else if (url.includes("/shorts/")) {
+      return url.split("/shorts/")[1]?.split("?")[0] || ""
     } else {
       return url.split("v=")[1]?.split("&")[0] || ""
     }
