@@ -312,15 +312,6 @@ watch(
   { deep: true }
 )
 
-onBeforeUnmount(() => {
-  editorOne.value?.destroy()
-  editorTwo.value?.destroy()
-  editorThree.value?.destroy()
-  uneditableEditorOne.value?.destroy()
-  uneditableEditorTwo.value?.destroy()
-  uneditableEditorThree.value?.destroy()
-})
-
 const editorOne = ref(
   useEditor({
     content: props.slide.contents[0] || "",

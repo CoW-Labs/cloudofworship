@@ -11,14 +11,14 @@ export const useAuthToken = () => {
   const runtimeConfig = useRuntimeConfig()
   const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 
-  const thirtyDaysAhead = new Date()
-  thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
+  const oneHundredEightyDaysAhead = new Date()
+  oneHundredEightyDaysAhead.setDate(oneHundredEightyDaysAhead.getDate() + 180)
 
   // Cookie instance (only used in browser)
   const tokenCookie = useCookie("token", {
     secure: !isDevEnvironment,
     sameSite: true,
-    expires: thirtyDaysAhead,
+    expires: oneHundredEightyDaysAhead,
   })
 
   /**
