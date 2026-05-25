@@ -18,7 +18,8 @@ export default defineNuxtPlugin(nuxtApp => {
         if (
           exception === "Permissions check failed" ||
           exception === "Script error." ||
-          exception?.includes("play() request was interrupted")
+          exception?.includes("play() request was interrupted") ||
+          exception?.includes("No internet connection")
         ) {
           return null
         }

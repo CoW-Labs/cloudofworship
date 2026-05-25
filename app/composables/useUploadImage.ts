@@ -12,10 +12,17 @@ type UploadImageResponseT = {
   }
 }
 
-const useUploadImage = async (image: Blob) : Promise<UploadImageResponseT> => {
-  // console.log("uploading image", image?.name)
+const useUploadImage = async (image: Blob): Promise<UploadImageResponseT> => {
   const authStore = useAuthStore()
   const churchId = authStore.user?.churchId
+  if (!churchId) {
+    useToast().add({
+      title: "Hymn not found",
+      icon: "i-bx-error",
+      color: "red",
+    })
+    authStore.signOut()
+  }
   const formdata = new FormData()
   formdata.append("file", image)
 
