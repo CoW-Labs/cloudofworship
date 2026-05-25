@@ -35,6 +35,9 @@ export const useAPIFetch: useFetchType = async (path, options = {}) => {
     ...(config.public.NODE_ENV === 'development' ? { "x-dev-token": config.public.DEV_TOKEN } : {})
   };
 
+  // Unique key per call so Nuxt never returns a stale cached response.
+  options.key = `${String(path)}-${Date.now()}`;
+
   const executeWithDelay = async () => {
     const delay = getDelayPromise();
     if (delay) {

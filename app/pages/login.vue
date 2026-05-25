@@ -149,71 +149,73 @@ const login = async (event) => {
   event.preventDefault()
   loading.value = true
 
-  usePosthogCapture("LOGIN_ATTEMPTED", {
-    method: "email_password",
-    email: email.value,
-  })
-
-  const { data, error } = await useAPIFetch<LoginResponseT>("/auth/login", {
-    method: "POST",
-    body: {
-      email: email.value,
-      password: password.value,
-      appVersion: appVersion,
-    },
-  })
-
-  // If error occurred
-  if (error.value) {
-    usePosthogCapture("LOGIN_FAILED", {
+  try {
+    usePosthogCapture("LOGIN_ATTEMPTED", {
       method: "email_password",
       email: email.value,
-      error: error.value?.data?.message,
     })
 
-    toast.add({
-      title: error.value?.data?.message,
-      color: "red",
-      icon: "i-bx-error",
+    const { data, error } = await useAPIFetch<LoginResponseT>("/auth/login", {
+      method: "POST",
+      body: {
+        email: email.value,
+        password: password.value,
+        appVersion: appVersion,
+      },
     })
-  } else {
-    if (
-      !data.value?.data?.user?.emailVerified &&
-      new Date().getTime() > new Date(inaccessibleDate).getTime()
-    ) {
-      // If account is no longer accessible and user is not verified
+
+    // If error occurred
+    if (error.value) {
       usePosthogCapture("LOGIN_FAILED", {
         method: "email_password",
         email: email.value,
-        error: "Email not verified",
+        error: error.value?.data?.message,
       })
 
       toast.add({
-        title: "Account is no longer accessible. Verify your email to proceed",
+        title: error.value?.data?.message,
         color: "red",
         icon: "i-bx-error",
       })
-      navigateTo("/verify")
     } else {
-      token.value = data.value?.token
-      authStore.setUser(data.value?.data?.user!!)
+      if (
+        !data.value?.data?.user?.emailVerified &&
+        new Date().getTime() > new Date(inaccessibleDate).getTime()
+      ) {
+        // If account is no longer accessible and user is not verified
+        usePosthogCapture("LOGIN_FAILED", {
+          method: "email_password",
+          email: email.value,
+          error: "Email not verified",
+        })
 
-      usePosthogCapture("LOGIN_SUCCESSFUL", {
-        method: "email_password",
-        userId: data.value?.data?.user?._id,
-        email: email.value,
-        emailVerified: data.value?.data?.user?.emailVerified,
-      })
-
-      if (data.value?.data?.user?.emailVerified) {
-        navigateTo("/")
+        toast.add({
+          title: "Account is no longer accessible. Verify your email to proceed",
+          color: "red",
+          icon: "i-bx-error",
+        })
+        navigateTo("/verify")
       } else {
-        goToVerify()
+        token.value = data.value?.token
+        authStore.setUser(data.value?.data?.user!!)
+
+        usePosthogCapture("LOGIN_SUCCESSFUL", {
+          method: "email_password",
+          userId: data.value?.data?.user?._id,
+          email: email.value,
+          emailVerified: data.value?.data?.user?.emailVerified,
+        })
+
+        if (data.value?.data?.user?.emailVerified) {
+          navigateTo("/")
+        } else {
+          goToVerify()
+        }
       }
-      navigateTo("/")
     }
+  } finally {
+    loading.value = false
   }
-  loading.value = false
 }
 
 const goToVerify = () => {
