@@ -291,11 +291,11 @@ export default function useDeepgramTranscription() {
             startAudioCapture()
           } else if (msg.type === 'transcript') {
             if (msg.isFinal || msg.speechFinal) {
-              createSegmentFromText(msg.transcript)
+              createSegmentFromText(msg.transcript ?? '')
             } else {
-              state.value.currentTranscript = msg.transcript
+              state.value.currentTranscript = msg.transcript ?? ''
               // Fire voice commands on interim for snappy response
-              maybeFireVoiceCommand(msg.transcript)
+              maybeFireVoiceCommand(msg.transcript ?? '')
             }
           } else if (msg.type === 'references') {
             applyServerReferences(msg.references)
@@ -374,6 +374,9 @@ export default function useDeepgramTranscription() {
       return
     }
 
+    // Guard: cleanup() may have nulled these while addModule was awaiting
+    if (!audioContext || !mediaStream) return
+
     sourceNode = audioContext.createMediaStreamSource(mediaStream)
     workletNode = new AudioWorkletNode(audioContext, 'transcription-pcm-processor')
 
@@ -430,7 +433,7 @@ export default function useDeepgramTranscription() {
   const stopTranscription = () => {
     if (!state.value.isTranscribing && !state.value.isConnecting) return
 
-    if (state.value.currentTranscript.trim()) {
+    if ((state.value.currentTranscript ?? '').trim()) {
       createSegmentFromText(state.value.currentTranscript)
     }
 
