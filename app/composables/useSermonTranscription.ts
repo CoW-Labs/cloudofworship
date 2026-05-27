@@ -462,7 +462,7 @@ export default function useSermonTranscription() {
     })
 
     // Finalize any remaining transcript
-    if (state.value.currentTranscript.trim()) {
+    if ((state.value.currentTranscript ?? '').trim()) {
       createSegmentFromText(state.value.currentTranscript)
     }
 

@@ -50,7 +50,7 @@ const useSlideContent = (
                 data?.title
               }</b> • HYMN</p><p class="copyright-content">${data?.source
                 ?.replace("undefined -", "")
-                .trim()}</p>`
+                ?.trim() ?? ""}</p>`
             : `<p class="song-content">${nextVerse?.replaceAll("\n", "<br>")}</>`,
         ]
       }
@@ -84,7 +84,7 @@ const useSlideContent = (
       return [
         "",
         `<p class="countdown-label" style="line-height: 0;">${data?.content}</p>`,
-        `<p class="countdown-content opacity-75 leading-[1]">${data?.timeLeft?.replace(
+        `<p class="countdown-content opacity-75 leading-[1]">${String(data?.timeLeft ?? '').replace(
           "00:",
           ""
         )}</>`,
