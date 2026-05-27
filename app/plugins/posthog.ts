@@ -13,6 +13,7 @@ export default defineNuxtPlugin(nuxtApp => {
     posthog.init("phc_sZj5IKRKRCd6Mv8GrthWQOlWu4ihmCFry3oQAIKrW9T", {
       api_host: "https://intel.cloudofworship.com",
       person_profiles: "identified_only",
+      enable_recording_console_log: true,
       before_send: (event) => {
         const exception = (event as any)?.properties?.$exception_message
         if (
