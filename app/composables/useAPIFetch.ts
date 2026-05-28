@@ -49,6 +49,11 @@ export const useAPIFetch: useFetchType = async (path, options = {}) => {
     await executeWithDelay();
   };
 
+  options.onRequestError = ({ error }) => {
+    appStore.setSlidesLoading(false);
+    console.error(`[${options.method || 'GET'}] "${path}": <no response> ${error?.message}`);
+  };
+
   options.onResponseError = ({ response }) => {
     appStore.setSlidesLoading(false);
     if (response.status === 401 && !(path as string).includes("/auth")) {
