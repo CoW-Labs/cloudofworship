@@ -292,12 +292,6 @@ const getTauriDisplays = async () => {
     // })
   } catch (error) {
     console.error("Failed to get Tauri displays:", error)
-    useToast().add({
-      title: "Failed to detect displays",
-      description: "Please try again",
-      icon: "i-bx-error-circle",
-      color: "red",
-    })
   }
 }
 
@@ -318,12 +312,6 @@ const getBrowserDisplays = async () => {
     // })
   } catch (error) {
     console.error("Failed to get browser displays:", error)
-    useToast().add({
-      title: "Failed to detect displays",
-      description: "Please try again",
-      icon: "i-bx-error-circle",
-      color: "red",
-    })
   }
 }
 
