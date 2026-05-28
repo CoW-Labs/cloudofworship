@@ -42,7 +42,7 @@ if (nuxtApp.$emitter) {
 }
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("v0.50.6-beta")
+const appVersion = ref<string>("v0.50.7-beta")
 
 const warmOfflineRoutes = async () => {
   await Promise.allSettled([
