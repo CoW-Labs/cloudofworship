@@ -132,12 +132,12 @@ onMounted(() => {
 
 const getAllHymns = async () => {
   const hymns = await db.bibleAndHymns.get("hymns")
-  allHymns.value = hymns?.data as unknown as Hymn[]
+  allHymns.value = (hymns?.data as unknown as Hymn[]) || []
   getHymns()
 }
 
 const getHymns = (query: string = "") => {
-  if (query?.length >= 2) {
+  if (query?.length >= 2 && allHymns.value?.length) {
     loading.value = true
     let results: any | Fuzzysort.Result[] = fuzzysort.go(
       query,
