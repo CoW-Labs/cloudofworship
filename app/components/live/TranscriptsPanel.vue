@@ -454,6 +454,20 @@ const scriptureHighlightQuery = computed(() => {
 
 // Track which segment ids have already been parsed so we only process new ones
 const parsedSegmentIds = new Set<string>()
+let lastLocalAutoLiveAt = 0
+let lastLocalAutoLiveReference: string | null = null
+const LOCAL_AUTO_LIVE_COOLDOWN_MS = 1500
+
+const maybeAutoOpenLocalReference = (reference: BibleReference) => {
+  if (reference.shortLabel === lastLocalAutoLiveReference) return
+
+  const now = Date.now()
+  if (now - lastLocalAutoLiveAt < LOCAL_AUTO_LIVE_COOLDOWN_MS) return
+
+  lastLocalAutoLiveAt = now
+  lastLocalAutoLiveReference = reference.shortLabel
+  useGlobalEmit(appWideActions.updateOrCreateBible, reference.shortLabel)
+}
 
 watch(
   () => segments.value.length,
@@ -466,8 +480,13 @@ watch(
     for (const segment of segments.value) {
       if (parsedSegmentIds.has(segment.id)) continue
       parsedSegmentIds.add(segment.id)
-      if (segment.bibleReferences.length > 0)
+      if (segment.bibleReferences.length > 0) {
         addFromBibleReferences(segment.bibleReferences)
+        const firstReference = segment.bibleReferences[0]
+        if (firstReference && isTranscribing.value) {
+          maybeAutoOpenLocalReference(firstReference)
+        }
+      }
     }
 
     const combinedText = segments.value
@@ -505,6 +524,8 @@ const handleClear = () => {
   // Also reset the HTTP-path scripture results used by the free / Web Speech path.
   clearHttpScriptureResults()
   parsedSegmentIds.clear()
+  lastLocalAutoLiveAt = 0
+  lastLocalAutoLiveReference = null
   scriptureVisibleCount.value = 20
 }
 

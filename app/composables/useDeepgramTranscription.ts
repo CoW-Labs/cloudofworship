@@ -1,6 +1,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useAppStore } from '~/store/app'
 import { useAuthStore } from '~/store/auth'
+import { prewarmScriptureVersion } from '~/composables/useScripture'
 import type { TranscriptSegment, BibleReference } from '~/types/transcript'
 import type { ScriptureResult } from '~/composables/useScriptureSearch'
 import { appWideActions, bibleBooks } from '~/utils/constants'
@@ -16,6 +17,14 @@ interface TranscriptionState {
   // Scripture results pushed by the server over the same WS connection,
   // so the panel can render them without a separate HTTP search.
   scriptureResults: ScriptureResult[]
+}
+
+interface ReferenceMessageMeta {
+  isFinal?: boolean
+  speechFinal?: boolean
+  provisional?: boolean
+  receivedAt?: number
+  sentAt?: number
 }
 
 /**
@@ -72,6 +81,7 @@ export default function useDeepgramTranscription() {
   // Auto-live cooldown — prevents rapid-fire slide switches when the preacher
   // mentions several references in quick succession.
   let lastAutoLiveAt = 0
+  let lastAutoLiveReference: string | null = null
   const AUTO_LIVE_COOLDOWN_MS = 1500
 
   /**
@@ -179,7 +189,7 @@ export default function useDeepgramTranscription() {
    * A cooldown prevents rapid-fire slide switches when multiple references are
    * mentioned in quick succession.
    */
-  const applyServerReferences = (references: BibleReference[]) => {
+  const applyServerReferences = (references: BibleReference[], meta: ReferenceMessageMeta = {}) => {
     if (!references?.length) return
 
     const lastSegment = state.value.segments[state.value.segments.length - 1]
@@ -187,11 +197,22 @@ export default function useDeepgramTranscription() {
       lastSegment.bibleReferences = references
     }
 
-    // Auto go-live with the first reference if cooldown has elapsed.
+    // Auto go-live with the first reference if cooldown has elapsed. Repeated
+    // interim pushes for the same reference are ignored locally, while a later
+    // final result that corrects the provisional reference is allowed through.
+    const firstReference = references[0]
+    if (!firstReference) return
+
+    const nextReference = firstReference.shortLabel
+    const isDuplicateReference = nextReference === lastAutoLiveReference
+    if (isDuplicateReference) return
+
     const now = Date.now()
-    if (now - lastAutoLiveAt >= AUTO_LIVE_COOLDOWN_MS) {
+    const isFinalCorrection = !meta.provisional && !!lastAutoLiveReference
+    if (isFinalCorrection || now - lastAutoLiveAt >= AUTO_LIVE_COOLDOWN_MS) {
       lastAutoLiveAt = now
-      useGlobalEmit(appWideActions.updateOrCreateBible, references[0].shortLabel)
+      lastAutoLiveReference = nextReference
+      useGlobalEmit(appWideActions.updateOrCreateBible, nextReference)
     }
   }
 
@@ -265,10 +286,10 @@ export default function useDeepgramTranscription() {
             state.value.isTranscribing = true
             state.value.isConnecting = false
 
-            // Pre-warm the scripture IndexedDB index so the first auto-live
-            // reference hits a hot cache instead of paying the 150–500 ms
-            // cold-build cost.
-            useScripture('43:3:16').catch(() => { })
+            // Pre-warm the selected scripture version so the first auto-live
+            // reference hits a hot cache instead of paying the IndexedDB/index
+            // build cost on the critical path.
+            prewarmScriptureVersion().catch(() => { })
 
             sessionElapsedTimer = setInterval(() => {
               if (state.value.remainingSeconds !== null && state.value.remainingSeconds > 0) {
@@ -298,7 +319,13 @@ export default function useDeepgramTranscription() {
               maybeFireVoiceCommand(msg.transcript ?? '')
             }
           } else if (msg.type === 'references') {
-            applyServerReferences(msg.references)
+            applyServerReferences(msg.references, {
+              isFinal: msg.isFinal,
+              speechFinal: msg.speechFinal,
+              provisional: msg.provisional,
+              receivedAt: msg.receivedAt,
+              sentAt: msg.sentAt,
+            })
           } else if (msg.type === 'scriptures') {
             mergeScriptureResults(msg.results)
           } else if (msg.type === 'limit_reached') {
@@ -473,6 +500,8 @@ export default function useDeepgramTranscription() {
     }
     micLevel.value = 0
     lastFiredCommand = null
+    lastAutoLiveAt = 0
+    lastAutoLiveReference = null
   }
 
   const clearTranscript = () => {

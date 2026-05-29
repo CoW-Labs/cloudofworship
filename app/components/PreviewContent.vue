@@ -266,6 +266,22 @@ const makeSlideActive = (
   }
 }
 
+const updateBibleSlideFromScripture = (
+  slide: Slide,
+  scripture: Scripture
+): Slide => {
+  const updatedSlide = { ...slide }
+  updatedSlide.title = scripture.label
+  updatedSlide.data = scripture
+  updatedSlide.slideStyle = {
+    ...updatedSlide.slideStyle,
+    fontSize: Number(useScreenFontSize(scripture.content as string)),
+  }
+  updatedSlide.contents = useSlideContent(updatedSlide, scripture)
+  updatedSlide.name = useSlideName(updatedSlide)
+  return updatedSlide
+}
+
 const duplicatePreviewSlide = (slide: Slide) => {
   const newSlide = duplicateSlide(slide)
   if (!newSlide) return
@@ -447,20 +463,17 @@ emitter.on("update-or-create-bible", async (data: string) => {
   if (!scripture) return
 
   if (existingBibleSlide) {
-    const updatedSlide = await gotoVerse(
+    const updatedSlide = updateBibleSlideFromScripture(
       existingBibleSlide,
-      scripture.label,
-      scripture.version || "KJV"
+      scripture
     )
-    if (updatedSlide) {
-      const slideIndex = slides.value.findIndex(
-        (s: Slide) => s.id === updatedSlide.id
-      )
-      slides.value.splice(slideIndex, 1, updatedSlide)
-      makeSlideActive(updatedSlide, { goLive: true, newlyCreated: false })
-      updateLiveOutput(updatedSlide)
-      updateSlideOnline(updatedSlide)
-    }
+    const slideIndex = slides.value.findIndex(
+      (s: Slide) => s.id === updatedSlide.id
+    )
+    if (slideIndex < 0) return
+    slides.value.splice(slideIndex, 1, updatedSlide)
+    makeSlideActive(updatedSlide, { goLive: true, newlyCreated: false })
+    updateSlideOnline(updatedSlide)
   } else {
     const newSlide = createBibleSlide(scripture)
     slides.value?.push(newSlide)
