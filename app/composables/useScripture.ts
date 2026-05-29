@@ -15,6 +15,7 @@ interface VersionIndex {
   data: BibleVerse[]
 }
 const versionIndexCache = new Map<string, VersionIndex>()
+const versionIndexPromiseCache = new Map<string, Promise<VersionIndex | null>>()
 
 function buildIndex(version: string, data: BibleVerse[]): VersionIndex {
   const verseMap = new Map<string, number>()
@@ -41,16 +42,36 @@ async function getVersionIndex(version: string, db: any): Promise<VersionIndex |
   // Return cached index if already built
   if (versionIndexCache.has(version)) return versionIndexCache.get(version)!
 
-  const bibleEntry = await safeDBGet<{ data: BibleVerse[] }>(db.bibleAndHymns, version)
-  if (!bibleEntry) return null
+  if (versionIndexPromiseCache.has(version)) {
+    return await versionIndexPromiseCache.get(version)!
+  }
 
-  const data = bibleEntry.data as unknown as BibleVerse[]
-  if (!data?.length) return null
+  const indexPromise = (async () => {
+    const bibleEntry = await safeDBGet<{ data: BibleVerse[] }>(db.bibleAndHymns, version)
+    if (!bibleEntry) return null
 
-  return buildIndex(version, data)
+    const data = bibleEntry.data as unknown as BibleVerse[]
+    if (!data?.length) return null
+
+    return buildIndex(version, data)
+  })()
+
+  versionIndexPromiseCache.set(version, indexPromise)
+  try {
+    return await indexPromise
+  } finally {
+    versionIndexPromiseCache.delete(version)
+  }
 }
 
 // ── Main composable ─────────────────────────────────────────────────────────
+
+export const prewarmScriptureVersion = async (version: string = ''): Promise<void> => {
+  const db = useIndexedDB()
+  const appStore = useAppStore()
+  const resolvedVersion = version || appStore.currentState.settings.defaultBibleVersion || 'KJV'
+  await getVersionIndex(resolvedVersion, db)
+}
 
 const useScripture = async (label: string = '1:1:1', version: string = ''): Promise<Scripture | null> => {
   const db = useIndexedDB()

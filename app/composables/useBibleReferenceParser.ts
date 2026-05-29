@@ -66,20 +66,25 @@ bibleBooks.forEach((book, index) => {
   } else if (book === 'Proverbs') {
     bookNameVariations['prov'] = bookIndex
     bookNameVariations['pro'] = bookIndex
+    bookNameVariations['proverb'] = bookIndex
   } else if (book === 'Ecclesiastes') {
     bookNameVariations['eccl'] = bookIndex
     bookNameVariations['ecc'] = bookIndex
   } else if (book === 'Song of Solomon') {
     bookNameVariations['song'] = bookIndex
     bookNameVariations['songs'] = bookIndex
+    bookNameVariations['solomon'] = bookIndex
     bookNameVariations['sos'] = bookIndex
     bookNameVariations['song of songs'] = bookIndex
+    bookNameVariations['songs of solomon'] = bookIndex
+    bookNameVariations['canticles'] = bookIndex
   } else if (book === 'Isaiah') {
     bookNameVariations['isa'] = bookIndex
   } else if (book === 'Jeremiah') {
     bookNameVariations['jer'] = bookIndex
   } else if (book === 'Lamentations') {
     bookNameVariations['lam'] = bookIndex
+    bookNameVariations['lamentation'] = bookIndex
   } else if (book === 'Ezekiel') {
     bookNameVariations['ezek'] = bookIndex
     bookNameVariations['eze'] = bookIndex
@@ -117,6 +122,7 @@ bibleBooks.forEach((book, index) => {
   } else if (book === 'Acts of the Apostles') {
     bookNameVariations['acts'] = bookIndex
     bookNameVariations['act'] = bookIndex
+    bookNameVariations['acts of apostles'] = bookIndex
   } else if (book === 'Romans') {
     bookNameVariations['rom'] = bookIndex
   } else if (book === '1 Corinthians') {
@@ -184,6 +190,8 @@ bibleBooks.forEach((book, index) => {
     bookNameVariations['3rd john'] = bookIndex
   } else if (book === 'Revelation') {
     bookNameVariations['rev'] = bookIndex
+    bookNameVariations['revelations'] = bookIndex
+    bookNameVariations['revelation of john'] = bookIndex
   }
 })
 
@@ -313,9 +321,9 @@ function buildProcessedToRawIndexMap(rawText: string, processedText: string): nu
   for (let r = rawLength - 1; r >= 0; r--) {
     for (let p = processedLength - 1; p >= 0; p--) {
       if (rawText[r] === processedText[p]) {
-        lcs[r][p] = lcs[r + 1][p + 1] + 1
+        lcs[r]![p] = lcs[r + 1]![p + 1]! + 1
       } else {
-        lcs[r][p] = Math.max(lcs[r + 1][p], lcs[r][p + 1])
+        lcs[r]![p] = Math.max(lcs[r + 1]![p]!, lcs[r]![p + 1]!)
       }
     }
   }
@@ -330,7 +338,7 @@ function buildProcessedToRawIndexMap(rawText: string, processedText: string): nu
       r++
       p++
       map[p] = r
-    } else if (lcs[r + 1][p] >= lcs[r][p + 1]) {
+    } else if (lcs[r + 1]![p]! >= lcs[r]![p + 1]!) {
       r++
     } else {
       p++
@@ -381,26 +389,26 @@ const useBibleReferenceParser = (rawText: string): BibleReference[] => {
   // For patterns without an explicit chapter (single-chapter books), chapterGroup is 0 (= use 1).
   const patterns: [RegExp, number, number, number][] = [
     // Standard format: "John 3:16" or "1 John 3:16-18" or "Second Corinthians 3:16"
-    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s+(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?/gi, 3, 4, 5],
+    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?/gi, 3, 4, 5],
 
     // Verbose format: "John chapter 3 verse 16" or "Second Corinthians chapter 5 verse 17"
-    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s+chapter\s+(\d+)\s+verse[s]?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
+    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+chapter\s+(\d+)\s+verse[s]?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
 
     // Mixed format: "John 3 verse 16" or "John 3 verse 16 to 18"
-    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s+(\d+)\s+verse[s]?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
+    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(\d+)\s+verse[s]?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
 
     // Spoken format with filler words: "1 Timothy 6 from verse 3 to 12"
     // Tolerates up to 4 filler/connector words between chapter and verse keyword
-    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s+(\d+)(?:\s+(?!verses?\b|from\b)\w+){0,4}\s+(?:from\s+)?verses?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
+    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(\d+)(?:\s+(?!verses?\b|from\b)\w+){0,4}\s+(?:from\s+)?verses?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
 
     // Spoken chapter+verse without colon or "verse" keyword: "1 Corinthians 15 57"
     // (produced by pre-processing "first Corinthians fifteen fifty seven")
     // Must be two consecutive numbers after the book name.
-    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s+(\d+)\s+(\d+)(?:\s*-\s*(\d+))?/gi, 3, 4, 5],
+    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(\d+)\s+(\d+)(?:\s*-\s*(\d+))?/gi, 3, 4, 5],
 
     // Single-chapter book format: "3 John verse 4" or "Jude verse 3 to 5"
     // No chapter number — verse is treated as chapter 1 verse N
-    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+of\s+[a-z]+)?)\s+(?:from\s+)?verses?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 0, 3, 4],
+    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(?:from\s+)?verses?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 0, 3, 4],
   ]
 
   for (const [pattern, chapterGroup, verseStartGroup, verseEndGroup] of patterns) {
