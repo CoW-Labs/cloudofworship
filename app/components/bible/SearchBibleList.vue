@@ -278,10 +278,10 @@ const getVerses = (query: string = "") => {
     const queryWords = Array.isArray(query)
       ? query
       : query
-          .toLowerCase()
-          .trim()
-          .split(/\s+/)
-          .filter((w) => w.length > 0)
+          ?.toLowerCase()
+          ?.trim()
+          ?.split(/\s+/)
+          ?.filter((w) => w.length > 0)
 
     // If single word or phrase, use fuzzy search
     let results: any[] = []

@@ -62,7 +62,7 @@ export default function useSlideNavigation() {
         bibleBooks.find((book) =>
           book.toLowerCase().startsWith(bibleBook.toLowerCase())
         ) || ""
-      title = `${bibleBook} ${title.substring(title?.lastIndexOf(" ")).trim()}`
+      title = `${bibleBook} ${title.substring(title?.lastIndexOf(" "))?.trim()}`
     }
 
     const tempSlide = { ...slide }

@@ -22,7 +22,7 @@ export const highlightText = (text: string, query: string): string => {
     `<mark class="bg-primary-200 dark:bg-primary-700 text-inherit rounded px-0.5">${m}</mark>`
 
   const escapedText = escapeHtml(text)
-  const trimmed = query.trim()
+  const trimmed = query?.trim()
 
   // ── Full-phrase match ──────────────────────────────────────────────────
   // When the query contains spaces and the entire phrase exists in the text,

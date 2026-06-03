@@ -60,10 +60,10 @@ const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<S
       let line = lyricLines[i]
 
       // Clean up line
-      line = line.replaceAll("â", "'").replaceAll('solo: ', '')?.replaceAll(' ??? ', '')?.replaceAll(' ?? ', '')?.replaceAll('[force-verse-break]', '')
+      line = line?.replaceAll("â", "'").replaceAll('solo: ', '')?.replaceAll(' ??? ', '')?.replaceAll(' ?? ', '')?.replaceAll('[force-verse-break]', '')
 
       // if line is empty, pick new line and start new verse
-      if (line.trim() === '') {
+      if (line?.trim() === '') {
         verses.push(tempVerse?.replace('\n\n', ''))
         lineCount = 0
         tempVerse = ''

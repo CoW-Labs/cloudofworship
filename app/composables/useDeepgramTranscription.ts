@@ -88,7 +88,7 @@ export default function useDeepgramTranscription() {
    * Detect voice commands in the transcript.
    */
   const detectVoiceCommand = (text: string): 'next-verse' | 'previous-verse' | null => {
-    const lower = text.toLowerCase().trim()
+    const lower = text.toLowerCase()?.trim()
     if (
       lower.includes('next verse') ||
       lower.includes('next first') ||
@@ -128,8 +128,8 @@ export default function useDeepgramTranscription() {
   }
 
   const createSegmentFromText = (text: string, refsFromServer?: BibleReference[]) => {
-    if (!text.trim()) return
-    const cleaned = text.trim()
+    if (!text?.trim()) return
+    const cleaned = text?.trim()
 
     // Server-parsed references are authoritative when present.
     // Fall back to the client parser only if the server didn't send any —
@@ -460,7 +460,7 @@ export default function useDeepgramTranscription() {
   const stopTranscription = () => {
     if (!state.value.isTranscribing && !state.value.isConnecting) return
 
-    if ((state.value.currentTranscript ?? '').trim()) {
+    if ((state.value.currentTranscript ?? '')?.trim()) {
       createSegmentFromText(state.value.currentTranscript)
     }
 
