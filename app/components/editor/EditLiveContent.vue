@@ -716,6 +716,7 @@ watch(
     if (newSlide?.id !== oldSlide?.id) {
       // Different slide — always reset verse
       verse.value = newSlide?.title || ""
+      slideContents.value = [...(newSlide?.contents || [])]
     } else if (newSlide?.title !== oldSlide?.title && !verseInputFocused) {
       // Same slide, title updated (e.g. after a successful gotoVerse) — update
       verse.value = newSlide?.title || ""
