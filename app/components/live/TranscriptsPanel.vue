@@ -432,7 +432,9 @@ const {
 } = useScriptureSearch()
 
 const scriptureResults = computed(() =>
-  useDeepgramEngine.value ? deepgramScriptureResults.value : httpScriptureResults.value
+  useDeepgramEngine.value
+    ? deepgramScriptureResults.value
+    : httpScriptureResults.value
 )
 
 const scriptureVisibleCount = ref(20)
@@ -449,7 +451,7 @@ const visibleScriptureResults = computed(() =>
 const scriptureHighlightQuery = computed(() => {
   const lastSegment = segments.value.at(-1)
   if (!lastSegment?.text) return ""
-  return lastSegment.text.trim().split(/\s+/).slice(-8).join(" ")
+  return lastSegment.text?.trim().split(/\s+/).slice(-8).join(" ")
 })
 
 // Track which segment ids have already been parsed so we only process new ones
@@ -493,7 +495,7 @@ watch(
       .slice(-3)
       .map((s) => s.text)
       .join(" ")
-    if (combinedText.trim()) debouncedSearch(combinedText)
+    if (combinedText?.trim()) debouncedSearch(combinedText)
   },
   { immediate: true }
 )

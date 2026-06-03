@@ -716,6 +716,7 @@ watch(
     if (newSlide?.id !== oldSlide?.id) {
       // Different slide — always reset verse
       verse.value = newSlide?.title || ""
+      slideContents.value = [...(newSlide?.contents || [])]
     } else if (newSlide?.title !== oldSlide?.title && !verseInputFocused) {
       // Same slide, title updated (e.g. after a successful gotoVerse) — update
       verse.value = newSlide?.title || ""
@@ -1071,7 +1072,6 @@ const predictVerseInput = (
   specificBook?: string
 ) => {
   if (verse.value?.trim()) {
-    console.log(specificBook)
     const bibleVerseInput = document.getElementById(
       "bible-verse-input"
     ) as HTMLInputElement
@@ -1085,7 +1085,6 @@ const predictVerseInput = (
         bibleVerseInput?.focus()
       }, 1000)
     } else if (verse.value.endsWith(" ")) {
-      // verse.value = `${verse.value?.trim()} 1:`
       // DO nothing
     } else if (verse.value?.includes(":")) {
       setTimeout(() => {

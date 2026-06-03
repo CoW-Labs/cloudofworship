@@ -54,7 +54,7 @@ export default function useScriptureSearch() {
    * Search scriptures on the backend. Can be called directly for immediate queries.
    */
   const search = async (query: string) => {
-    const trimmed = query.trim()
+    const trimmed = query?.trim()
     const searchId = ++latestSearchId
 
     if (!trimmed || trimmed.length < 10) {

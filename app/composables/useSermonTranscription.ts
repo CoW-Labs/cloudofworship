@@ -175,7 +175,7 @@ export default function useSermonTranscription() {
     }
     analyserNode?.disconnect()
     analyserNode = null
-    analyserContext?.close().catch(() => {})
+    analyserContext?.close().catch(() => { })
     analyserContext = null
     analyserStream?.getTracks().forEach((t) => t.stop())
     analyserStream = null
@@ -194,7 +194,7 @@ export default function useSermonTranscription() {
    * Returns the command type if found, null otherwise
    */
   const detectVoiceCommand = (text: string): 'next-verse' | 'previous-verse' | null => {
-    const lowerText = text.toLowerCase().trim()
+    const lowerText = text.toLowerCase()?.trim()
 
     // Check for "next verse" command
     if (
@@ -311,12 +311,12 @@ export default function useSermonTranscription() {
         // Process all results from the current session
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i]
-          const transcript = result[0].transcript
+          const transcript = result?.[0]?.transcript
 
-          if (result.isFinal) {
+          if (result?.isFinal) {
             // Final result - add to buffer and create segment
             finalTranscriptBuffer += transcript + ' '
-            createSegmentFromText(transcript)
+            createSegmentFromText(transcript ?? '')
           } else {
             // Interim result - show live
             interimTranscript += transcript

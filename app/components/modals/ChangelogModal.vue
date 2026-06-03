@@ -31,7 +31,7 @@
           <ul class="list-disc px-4 leading-7">
             <li
               class="stuff"
-              v-for="item in changelog.trim().split('\n')"
+              v-for="item in changelog?.trim().split('\n')"
               :key="item"
             >
               {{ item?.replace("-", "")?.trim() }}

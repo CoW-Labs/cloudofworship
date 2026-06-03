@@ -94,7 +94,7 @@ export default function useUser() {
           method: 'POST',
           body: {
             churchId,
-            recipients: emails.map((email) => ({ email: email.trim() })),
+            recipients: emails.map((email) => ({ email: email?.trim() })),
           },
           key: 'send-email-invitations',
         }
