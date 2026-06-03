@@ -173,6 +173,8 @@ const isEditorViewReady = (editor: any) => {
   }
 }
 
+const isEditorUsable = (editor: any) => Boolean(editor && !editor.isDestroyed)
+
 // Helper to safely call a command on an editor, guarding against destroyed / unmounted state
 const safeEditorCommand = (editor: any, fn: (e: any) => void) => {
   if (!isEditorViewReady(editor)) return
@@ -195,6 +197,25 @@ const queueEditorCommand = (editor: any, fn: (e: any) => void) => {
   })
 }
 
+const syncEditorContent = (editor: any, content = "") => {
+  if (!isEditorUsable(editor)) return
+
+  try {
+    editor.commands.setContent(content)
+  } catch (err) {
+    console.warn("[TipTap] Editor content sync failed:", err)
+  }
+}
+
+const syncAllEditorContents = (contents: Array<string | undefined> = []) => {
+  syncEditorContent(editorOne.value, contents[0] || "")
+  syncEditorContent(editorTwo.value, contents[1] || "")
+  syncEditorContent(editorThree.value, contents[2] || "")
+  syncEditorContent(uneditableEditorOne.value, contents[0] || "")
+  syncEditorContent(uneditableEditorTwo.value, contents[1] || "")
+  syncEditorContent(uneditableEditorThree.value, contents[2] || "")
+}
+
 // Function to apply default white color to editor
 const applyDefaultWhiteColor = (editor: any) => {
   queueEditorCommand(editor, (e) => e.chain().setColor("#ffffff").run())
@@ -203,44 +224,12 @@ const applyDefaultWhiteColor = (editor: any) => {
 watch(
   () => props.slide,
   (newVal, oldVal) => {
+    if (!newVal) return
+
     if (newVal?.id !== oldVal?.id && newVal.type === slideTypes.text) {
-      safeEditorCommand(editorOne.value, (e) =>
-        e.commands.setContent(newVal?.contents[0])
-      )
-      safeEditorCommand(editorTwo.value, (e) =>
-        e.commands.setContent(newVal?.contents[1])
-      )
-      safeEditorCommand(editorThree.value, (e) =>
-        e.commands.setContent(newVal?.contents[2])
-      )
-      safeEditorCommand(uneditableEditorOne.value, (e) =>
-        e.commands.setContent(newVal?.contents[0])
-      )
-      safeEditorCommand(uneditableEditorTwo.value, (e) =>
-        e.commands.setContent(newVal?.contents[1])
-      )
-      safeEditorCommand(uneditableEditorThree.value, (e) =>
-        e.commands.setContent(newVal?.contents[2])
-      )
+      syncAllEditorContents(newVal?.contents)
     } else if (newVal.type !== slideTypes.text) {
-      safeEditorCommand(editorOne.value, (e) =>
-        e.commands.setContent(newVal?.contents[0])
-      )
-      safeEditorCommand(editorTwo.value, (e) =>
-        e.commands.setContent(newVal?.contents[1])
-      )
-      safeEditorCommand(editorThree.value, (e) =>
-        e.commands.setContent(newVal?.contents[2])
-      )
-      safeEditorCommand(uneditableEditorOne.value, (e) =>
-        e.commands.setContent(newVal?.contents[0])
-      )
-      safeEditorCommand(uneditableEditorTwo.value, (e) =>
-        e.commands.setContent(newVal?.contents[1])
-      )
-      safeEditorCommand(uneditableEditorThree.value, (e) =>
-        e.commands.setContent(newVal?.contents[2])
-      )
+      syncAllEditorContents(newVal?.contents)
     }
   }
 )
@@ -276,36 +265,24 @@ watch(
       // Update editors only if content changed and editor is not currently focused
       // This prevents conflicts when user is actively typing
       if (content0Changed && !editorOne.value?.isFocused) {
-        safeEditorCommand(editorOne.value, (e) =>
-          e.commands.setContent(newVal[0] || "")
-        )
+        syncEditorContent(editorOne.value, newVal[0] || "")
       }
       if (content1Changed && !editorTwo.value?.isFocused) {
-        safeEditorCommand(editorTwo.value, (e) =>
-          e.commands.setContent(newVal[1] || "")
-        )
+        syncEditorContent(editorTwo.value, newVal[1] || "")
       }
       if (content2Changed && !editorThree.value?.isFocused) {
-        safeEditorCommand(editorThree.value, (e) =>
-          e.commands.setContent(newVal[2] || "")
-        )
+        syncEditorContent(editorThree.value, newVal[2] || "")
       }
 
       // Always update uneditable editors for preview
       if (content0Changed) {
-        safeEditorCommand(uneditableEditorOne.value, (e) =>
-          e.commands.setContent(newVal[0] || "")
-        )
+        syncEditorContent(uneditableEditorOne.value, newVal[0] || "")
       }
       if (content1Changed) {
-        safeEditorCommand(uneditableEditorTwo.value, (e) =>
-          e.commands.setContent(newVal[1] || "")
-        )
+        syncEditorContent(uneditableEditorTwo.value, newVal[1] || "")
       }
       if (content2Changed) {
-        safeEditorCommand(uneditableEditorThree.value, (e) =>
-          e.commands.setContent(newVal[2] || "")
-        )
+        syncEditorContent(uneditableEditorThree.value, newVal[2] || "")
       }
     }
   },
