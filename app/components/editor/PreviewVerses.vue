@@ -50,7 +50,7 @@
       <UButton
         block
         variant="ghost"
-        v-show="verseTemp?.scripture.trim()"
+        v-show="verseTemp?.scripture?.trim()"
         v-for="(verseTemp, index) in allChapterVerses"
         :key="`verse-${index}`"
         :id="convertStringToSlug(`${bibleChapter + '-' + verseTemp?.verse}`)"
@@ -182,7 +182,8 @@ const hymnVersesWithChorus = computed(() => {
 })
 
 const getAllChapterVerses = async () => {
-  const slideVersion = (props.slide?.data as Scripture | undefined)?.version || ''
+  const slideVersion =
+    (props.slide?.data as Scripture | undefined)?.version || ""
   const chapter = await useScriptureChapter(props.verse, slideVersion)
   // console.log("chapter", chapter?.content)
   allChapterVerses.value = chapter?.content as BibleVerse[]
@@ -312,7 +313,11 @@ const appStore = useAppStore()
 watch(
   () => (props.slide?.data as Scripture | undefined)?.version,
   (newVersion, oldVersion) => {
-    if (newVersion && newVersion !== oldVersion && props.slide?.type === slideTypes.bible) {
+    if (
+      newVersion &&
+      newVersion !== oldVersion &&
+      props.slide?.type === slideTypes.bible
+    ) {
       getAllChapterVerses()
     }
   }

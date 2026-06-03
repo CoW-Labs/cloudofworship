@@ -155,7 +155,7 @@ const sendEmailInvite = async () => {
         churchId: authStore.user?.churchId,
         recipients: emailInput.value
           .split(",")
-          ?.map((email) => ({ email: email.trim() })),
+          ?.map((email) => ({ email: email?.trim() })),
       },
     }
   )

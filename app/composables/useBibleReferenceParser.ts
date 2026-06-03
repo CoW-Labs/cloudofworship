@@ -482,7 +482,7 @@ const useBibleReferenceParser = (rawText: string): BibleReference[] => {
  */
 function findBookIndex(bookName: string): number | null {
   // Normalize the input
-  const normalized = bookName.toLowerCase().trim()
+  const normalized = bookName.toLowerCase()?.trim()
 
   // Direct match
   if (bookNameVariations[normalized]) {

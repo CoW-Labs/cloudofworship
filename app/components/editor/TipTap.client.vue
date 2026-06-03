@@ -312,7 +312,7 @@ const editorOne = ref(
       }
 
       // Auto-apply heading if empty
-      if (!editor.getText().trim()) {
+      if (!editor.getText()?.trim()) {
         queueEditorCommand(editor, (e) =>
           e.chain().focus().toggleHeading({ level: 1 }).run()
         )
