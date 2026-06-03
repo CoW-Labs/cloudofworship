@@ -96,7 +96,7 @@ const songExcerptOpen = ref(false)
 const lyricsContent = computed(() => {
   return (
     (props.song as Song)?.lyrics?.trim() ||
-    (props.song?.verses as string[])?.join("\n").trim() ||
+    (props.song?.verses as string[])?.join("\n")?.trim() ||
     ""
   )
 })

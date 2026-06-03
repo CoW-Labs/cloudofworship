@@ -36,7 +36,7 @@ const useShortSlideName = (slide: Slide, options?: { longer: boolean }) => {
       } else if ((slide.data as ExternalVideo)?.type === 'vimeo' || (slide.data as ExternalVideo)?.type === 'youtube') {
         return `${slide?.name?.slice(0, options?.longer ? 20 : 10)}...`
       } else {
-        return `${slide?.name?.slice(0, 6).trim()}..${slide.name?.substring(slide.name.lastIndexOf('.'))}`
+        return `${slide?.name?.slice(0, 6)?.trim()}..${slide.name?.substring(slide.name.lastIndexOf('.'))}`
       }
     default:
       return slide.name

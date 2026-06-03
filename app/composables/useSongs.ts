@@ -285,14 +285,14 @@ export default function useSongs() {
 
       // Clean up line
       line = line
-        .replaceAll("â", "'")
+        ?.replaceAll("â", "'")
         .replaceAll('solo: ', '')
         .replaceAll(' ??? ', '')
         .replaceAll(' ?? ', '')
         .replaceAll('[force-verse-break]', '')
 
       // If line is empty, start new verse
-      if (line.trim() === '') {
+      if (line?.trim() === '') {
         if (tempVerse) {
           verses.push(tempVerse.replace('\n\n', ''))
         }
