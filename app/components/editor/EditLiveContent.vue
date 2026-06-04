@@ -761,6 +761,20 @@ const handlePreviousPage = () => {
   handleGotoPage(idx + 1)
 }
 
+const handleVoiceNextVerse = async () => {
+  if (nextVerse.value) {
+    const resolvedVerse = await resolveLastVerse(nextVerse.value)
+    emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+  }
+}
+
+const handleVoicePreviousVerse = async () => {
+  if (previousVerse.value) {
+    const resolvedVerse = await resolveLastVerse(previousVerse.value)
+    emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+  }
+}
+
 onMounted(() => {
   useCreateShortcut("ArrowRight", async () => {
     if (props.slide?.type === slideTypes.presentation) {
@@ -784,28 +798,13 @@ onMounted(() => {
   })
 
   // Listen for voice command events (next verse / previous verse)
-  emitter.on(appWideActions.nextVerse, () => {
-    if (nextVerse.value) {
-      emit("goto-verse", nextVerse.value, selectedBibleVersion.value)
-    }
-  })
-  emitter.on(appWideActions.previousVerse, () => {
-    if (previousVerse.value) {
-      emit("goto-verse", previousVerse.value, selectedBibleVersion.value)
-    }
-  })
+  emitter.on(appWideActions.nextVerse, handleVoiceNextVerse)
+  emitter.on(appWideActions.previousVerse, handleVoicePreviousVerse)
+})
 
-  // Listen for voice command events (next verse / previous verse)
-  emitter.on(appWideActions.nextVerse, () => {
-    if (nextVerse.value) {
-      emit("goto-verse", nextVerse.value, selectedBibleVersion.value)
-    }
-  })
-  emitter.on(appWideActions.previousVerse, () => {
-    if (previousVerse.value) {
-      emit("goto-verse", previousVerse.value, selectedBibleVersion.value)
-    }
-  })
+onUnmounted(() => {
+  emitter.off(appWideActions.nextVerse, handleVoiceNextVerse)
+  emitter.off(appWideActions.previousVerse, handleVoicePreviousVerse)
 })
 
 emitter.on("pause-inactive-slide-video", () => {
@@ -989,7 +988,7 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
       props.slide.hymnSubVerseIndex ?? 0,
       chunks.length - 1
     )
-    const displayVerse = chunks[clampedIdx]
+    const displayVerse = chunks[clampedIdx] ?? ""
     const tempSlide: Slide = {
       ...props.slide,
       slideStyle: {
