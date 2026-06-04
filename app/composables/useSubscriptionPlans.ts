@@ -24,11 +24,13 @@ export interface SubscriptionPlansResponse {
  * Composable for fetching subscription plans from the API
  */
 export const useSubscriptionPlans = () => {
-  const plans = ref<SubscriptionPlan[]>([])
+  // Shared across every caller (the upgrade modal and usePayment use separate
+  // instances) so plans fetched once are reused — no refetch before checkout opens.
+  const plans = useState<SubscriptionPlan[]>('subscription-plans', () => [])
+  const selectedCurrency = useState<'NGN' | 'USD'>('subscription-selected-currency', () => 'USD') // Default to USD
+  const detectedCurrency = useState<'NGN' | 'USD' | null>('subscription-detected-currency', () => null)
   const loading = ref(false)
   const error = ref<string | null>(null)
-  const selectedCurrency = ref<'NGN' | 'USD'>('USD') // Default to USD
-  const detectedCurrency = ref<'NGN' | 'USD' | null>(null)
   const isDetectingCurrency = ref(false)
 
   // Allow local testing by setting currency in localStorage
