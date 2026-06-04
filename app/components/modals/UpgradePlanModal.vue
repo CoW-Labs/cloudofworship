@@ -497,7 +497,7 @@ const {
   plansLoading,
   fetchPlans: fetchPaymentPlans,
   initiatePayment,
-  loadPaystackScript,
+  preloadPaystack,
 } = usePayment()
 
 // Use subscription plans composable
@@ -647,8 +647,8 @@ onMounted(async () => {
     }
   )
 
-  // Preload Paystack script
-  loadPaystackScript().catch(console.error)
+  // Warm the Paystack SDK so the first checkout click opens instantly
+  preloadPaystack().catch(console.error)
 })
 
 onBeforeUnmount(() => {

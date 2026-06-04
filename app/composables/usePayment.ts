@@ -3,6 +3,16 @@ import { DodoPayments } from 'dodopayments-checkout'
 
 export type PaymentPlan = 'yearly' | 'monthly'
 
+// Lazily load the Paystack SDK once and share the promise across all callers,
+// so the checkout opens instantly on click and isn't bundled into the initial app load.
+let paystackSdk: Promise<any> | null = null
+const loadPaystack = (): Promise<any> => {
+  if (!paystackSdk) {
+    paystackSdk = import('@paystack/inline-js').then((m) => m.default)
+  }
+  return paystackSdk
+}
+
 export interface PaymentConfig {
   plan: PaymentPlan
   currency?: 'NGN' | 'USD'
@@ -192,26 +202,10 @@ export const usePayment = () => {
   // ─── Paystack ────────────────────────────────────────────────────────────────
 
   /**
-   * Load Paystack inline script
+   * Warm the Paystack SDK ahead of time (e.g. when the upgrade modal mounts),
+   * so the first checkout click opens with no load delay.
    */
-  const loadPaystackScript = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (import.meta.client) {
-        if ((window as any).PaystackPop) {
-          resolve()
-          return
-        }
-        const script = document.createElement('script')
-        script.src = 'https://js.paystack.co/v1/inline.js'
-        script.async = true
-        script.onload = () => resolve()
-        script.onerror = () => reject(new Error('Failed to load Paystack script'))
-        document.head.appendChild(script)
-      } else {
-        reject(new Error('Not running on client'))
-      }
-    })
-  }
+  const preloadPaystack = (): Promise<any> => loadPaystack()
 
   /**
    * Get plan details by plan type (used by Paystack / NGN flow)
@@ -248,10 +242,15 @@ export const usePayment = () => {
       return
     }
 
-    try {
-      await loadPaystackScript()
+    // Spinner shows from the first click — covers SDK load + plan fetch + iframe render.
+    loading.value = true
 
-      const planDetails = await getPlanDetails(plan, currency)
+    try {
+      // SDK load and plan lookup are independent — run them together.
+      const [PaystackPop, planDetails] = await Promise.all([
+        loadPaystack(),
+        getPlanDetails(plan, currency),
+      ])
       if (!planDetails) throw new Error('Selected plan is not available')
 
       const reference = `cow_${Date.now()}_${authStore.user._id}`
@@ -260,69 +259,92 @@ export const usePayment = () => {
         plan, planCode: planDetails.code, amount: planDetails.amount,
         currency: planDetails.currency, discount: planDetails.discount || 'none', provider: 'paystack',
       })
-      const { trackPaymentInitiated } = useSendEvent()
+      const { trackPaymentInitiated, trackPaymentCancelled } = useSendEvent()
       trackPaymentInitiated(planDetails.code, planDetails.amount, planDetails.currency)
 
-      loading.value = true
+      const nameParts = authStore.user.fullname?.trim().split(/\s+/).filter(Boolean) ?? []
+      const firstName = nameParts[0] || authStore.user.email?.split('@')?.[0] || 'User'
+      const lastName = nameParts.slice(1).join(' ') || 'User'
 
-      if (typeof window !== 'undefined' && (window as any).PaystackPop) {
-        const nameParts = authStore.user.fullname?.trim().split(/\s+/).filter(Boolean) ?? []
-        const firstName = nameParts[0] || authStore.user.email?.split('@')?.[0] || 'User'
-        const lastName = nameParts.slice(1).join(' ') || 'User'
+      // Watchdog: if the checkout iframe never signals it loaded, recover instead of
+      // leaving the user staring at a blank full-screen overlay indefinitely.
+      let settled = false
+      const watchdog = setTimeout(() => {
+        if (settled) return
+        settled = true
+        loading.value = false
+        const msg = 'Checkout is taking too long to load. Please check your connection and try again.'
+        useToast().add({ icon: 'i-heroicons-clock', title: 'Checkout Timed Out', description: msg, color: 'amber' })
+        onError?.(msg)
+      }, 15000)
 
-        const handler = (window as any).PaystackPop.setup({
-          key: PAYSTACK_PUBLIC_KEY,
-          email: authStore.user.email,
-          firstName,
-          lastName,
-          amount: planDetails.amount * 100,
-          currency: planDetails.currency,
-          plan: planDetails.code,
-          ref: reference,
-          onClose: function () {
-            loading.value = false
-            usePosthogCapture('PAYMENT_CANCELLED', { plan, amount: planDetails.amount, currency: planDetails.currency })
-            const { trackPaymentCancelled } = useSendEvent()
-            trackPaymentCancelled(planDetails.code, 'User closed payment modal')
-            useToast().add({ icon: 'i-heroicons-information-circle', title: 'Payment Cancelled', description: 'You can upgrade anytime', color: 'gray' })
-            onCancel?.()
-          },
-          callback: function (response: any) {
-            loading.value = false
-            usePosthogCapture('PAYMENT_SUCCESSFUL', {
-              plan, amount: planDetails.amount, currency: planDetails.currency,
-              reference: response.reference, status: response.status, provider: 'paystack',
-            })
-            successPlanName.value = planDetails.name
-            showSuccessModal.value = true
-            onSuccess?.(response.reference)
+      const popup = new PaystackPop()
+      popup.newTransaction({
+        key: PAYSTACK_PUBLIC_KEY,
+        email: authStore.user.email,
+        firstName,
+        lastName,
+        amount: planDetails.amount * 100,
+        currency: planDetails.currency,
+        plan: planDetails.code,
+        reference,
+        // Iframe finished rendering — drop our spinner; Paystack's UI is now visible.
+        onLoad: () => {
+          settled = true
+          clearTimeout(watchdog)
+          loading.value = false
+        },
+        onCancel: () => {
+          settled = true
+          clearTimeout(watchdog)
+          loading.value = false
+          usePosthogCapture('PAYMENT_CANCELLED', { plan, amount: planDetails.amount, currency: planDetails.currency })
+          trackPaymentCancelled(planDetails.code, 'User closed payment modal')
+          useToast().add({ icon: 'i-heroicons-information-circle', title: 'Payment Cancelled', description: 'You can upgrade anytime', color: 'gray' })
+          onCancel?.()
+        },
+        onError: (error: any) => {
+          settled = true
+          clearTimeout(watchdog)
+          loading.value = false
+          const errMsg = error?.message || 'An error occurred during checkout. Please try again.'
+          useToast().add({ icon: 'i-heroicons-exclamation-triangle', title: 'Payment Error', description: errMsg, color: 'orange' })
+          onError?.(errMsg)
+        },
+        onSuccess: (transaction: any) => {
+          settled = true
+          clearTimeout(watchdog)
+          loading.value = false
+          const txRef = transaction?.reference || reference
+          usePosthogCapture('PAYMENT_SUCCESSFUL', {
+            plan, amount: planDetails.amount, currency: planDetails.currency,
+            reference: txRef, status: transaction?.status, provider: 'paystack',
+          })
+          successPlanName.value = planDetails.name
+          showSuccessModal.value = true
+          onSuccess?.(txRef)
 
-            // Confirm with backend in the background — activates immediately without waiting for the webhook
-            useAPIFetch<{ message: string; data: { status: string } }>('/billing/confirm', {
-              method: 'POST',
-              body: { provider: 'paystack', checkoutReference: response.reference },
-              key: `paystack-confirm-${response.reference}`,
-            }).then(({ data: confirmData }) => {
-              if (confirmData.value?.data?.status === 'active') {
-                if (authStore.church) {
-                  authStore.setChurch({ ...authStore.church, subscriptionPlan: 'teams' })
-                }
-                authStore.clearSubscriptionDetails()
+          // Confirm with backend in the background — activates immediately without waiting for the webhook
+          useAPIFetch<{ message: string; data: { status: string } }>('/billing/confirm', {
+            method: 'POST',
+            body: { provider: 'paystack', checkoutReference: txRef },
+            key: `paystack-confirm-${txRef}`,
+          }).then(({ data: confirmData }) => {
+            if (confirmData.value?.data?.status === 'active') {
+              if (authStore.church) {
+                authStore.setChurch({ ...authStore.church, subscriptionPlan: 'teams' })
               }
-            }).catch(err => {
-              console.error('Failed to confirm Paystack subscription:', err)
-              // Webhook will still activate — not a blocker
-            })
-          },
-        })
-
-        handler.openIframe()
-      } else {
-        throw new Error('Paystack is not available')
-      }
+              authStore.clearSubscriptionDetails()
+            }
+          }).catch(err => {
+            console.error('Failed to confirm Paystack subscription:', err)
+            // Webhook will still activate — not a blocker
+          })
+        },
+      })
     } catch (error: any) {
       loading.value = false
-      const errorMessage = error.message || 'Payment system is loading. Please try again in a moment.'
+      const errorMessage = error.message || 'Payment system is unavailable. Please try again.'
       useToast().add({ icon: 'i-heroicons-exclamation-triangle', title: 'Payment Error', description: errorMessage, color: 'orange' })
       onError?.(errorMessage)
     }
@@ -347,6 +369,6 @@ export const usePayment = () => {
     fetchPlans: subscriptionPlans.fetchPlans,
     getPlanDetails,
     initiatePayment,
-    loadPaystackScript,
+    preloadPaystack,
   }
 }
