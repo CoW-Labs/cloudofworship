@@ -312,6 +312,9 @@ export default function useDeepgramTranscription() {
             startAudioCapture()
           } else if (msg.type === 'transcript') {
             if (msg.isFinal || msg.speechFinal) {
+              // Some short commands arrive as final-only results, so run the
+              // same latched detector here as well as on interim text.
+              maybeFireVoiceCommand(msg.transcript ?? '')
               createSegmentFromText(msg.transcript ?? '')
             } else {
               state.value.currentTranscript = msg.transcript ?? ''
