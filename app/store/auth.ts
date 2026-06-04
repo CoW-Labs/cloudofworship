@@ -48,7 +48,16 @@ export const useAuthStore = defineStore('auth', {
   },
   actions: {
     setUser(user: User) {
+      const isDifferentUser = this.user?._id !== user._id
+      const isDifferentChurch = this.church?._id && this.church._id !== user.churchId
+
       this.user = user
+
+      if (isDifferentUser || isDifferentChurch) {
+        this.church = null
+        this.subscriptionDetails = null
+        this.subscriptionDetailsLastFetched = null
+      }
     },
     setChurch(church: Church) {
       this.church = church
