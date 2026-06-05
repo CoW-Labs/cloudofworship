@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from "vue"
+import { ref } from "vue"
 
 const props = defineProps({
   size: {
@@ -47,7 +47,11 @@ const props = defineProps({
   },
   maxFileSize: {
     type: Number,
-    default: 3, // Currently only for images
+    default: 3, // Images only (MB)
+  },
+  maxVideoFileSize: {
+    type: Number,
+    default: 250, // Videos only (MB); Infinity = no limit
   },
   icon: {
     type: String,
@@ -57,7 +61,6 @@ const props = defineProps({
 const toast = useToast()
 const fileInput = ref(null)
 const isDragOver = ref(false)
-const files = reactive<File[]>([])
 const emit = defineEmits(["change"])
 
 const onDragOver = () => {
@@ -101,22 +104,39 @@ const handleFiles = (selectedFiles: FileList | File[]) => {
       })
     }
   }
+  // Emit only the newly-selected files; the parent owns the canonical list.
+  // Holding state here caused removed files to reappear on the next drop, and
+  // re-processing of already-handled files in single-shot consumers.
+  const validFiles: File[] = []
   for (let i = 0; i < selectedFiles.length; i++) {
     if (isFileSizeExceeded(selectedFiles[i])) {
-      files.push(selectedFiles[i])
+      validFiles.push(selectedFiles[i])
     }
   }
-  emit("change", files)
+  if (validFiles.length > 0) {
+    emit("change", validFiles)
+  }
 }
 
-// Currently only for images
+// Returns true when the file is within limits, false (with a toast) when it exceeds them
 const isFileSizeExceeded = (file: File) => {
   if (
-    file.size > props.maxFileSize * 1024 * 1024 &&
-    file.type.startsWith("image")
+    file.type.startsWith("image") &&
+    file.size > props.maxFileSize * 1024 * 1024
   ) {
     toast.add({
-      title: `File size exceeds ${props.maxFileSize}MB`,
+      title: `Image size exceeds ${props.maxFileSize}MB`,
+      icon: "i-bx-info-circle",
+      color: "red",
+    })
+    return false
+  }
+  if (
+    file.type.startsWith("video") &&
+    file.size > props.maxVideoFileSize * 1024 * 1024
+  ) {
+    toast.add({
+      title: `Video size exceeds ${props.maxVideoFileSize}MB`,
       icon: "i-bx-info-circle",
       color: "red",
     })
