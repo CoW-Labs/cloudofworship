@@ -762,6 +762,7 @@ const handlePreviousPage = () => {
 }
 
 const handleVoiceNextVerse = async () => {
+  if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
   if (nextVerse.value) {
     const resolvedVerse = await resolveLastVerse(nextVerse.value)
     emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
@@ -769,10 +770,63 @@ const handleVoiceNextVerse = async () => {
 }
 
 const handleVoicePreviousVerse = async () => {
+  if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
   if (previousVerse.value) {
     const resolvedVerse = await resolveLastVerse(previousVerse.value)
     emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
   }
+}
+
+const handleVoiceGotoVerseNumber = (verseNumber: number) => {
+  if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
+  const supportedSlideTypes = [
+    slideTypes.bible,
+    slideTypes.hymn,
+    slideTypes.song,
+    slideTypes.songSetlist,
+  ]
+  if (!props.slide || !supportedSlideTypes.includes(props.slide.type)) return
+  if (!Number.isInteger(verseNumber) || verseNumber < 1) return
+
+  if (props.slide.type === slideTypes.bible) {
+    if (chapterVerseCount.value > 0 && verseNumber > chapterVerseCount.value)
+      return
+
+    const chapterSeparatorIndex = verse.value.lastIndexOf(":")
+    if (chapterSeparatorIndex === -1) return
+
+    const chapterLabel = verse.value.slice(0, chapterSeparatorIndex)
+    emit(
+      "goto-verse",
+      `${chapterLabel}:${verseNumber}`,
+      selectedBibleVersion.value
+    )
+    return
+  }
+
+  emit("goto-verse", `Verse ${verseNumber}`, selectedBibleVersion.value)
+}
+
+const handleVoiceBibleVersionChange = (version: string) => {
+  if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
+  if (
+    !(appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ?? true)
+  ) return
+  if (props.slide?.type !== slideTypes.bible) return
+
+  const availableVersion = appStore.currentState.settings.bibleVersions?.find(
+    (bibleVersion) =>
+      bibleVersion?.id === version &&
+      (bibleVersion?.isDownloaded ||
+        bibleVersion?.id === appStore.currentState.settings.defaultBibleVersion)
+  )
+  if (
+    !availableVersion &&
+    version !== appStore.currentState.settings.defaultBibleVersion
+  ) return
+  if (selectedBibleVersion.value === version) return
+
+  onUpdateBibleVersion(version)
 }
 
 onMounted(() => {
@@ -797,14 +851,18 @@ onMounted(() => {
     }
   })
 
-  // Listen for voice command events (next verse / previous verse)
+  // Listen for voice command events
   emitter.on(appWideActions.nextVerse, handleVoiceNextVerse)
   emitter.on(appWideActions.previousVerse, handleVoicePreviousVerse)
+  emitter.on(appWideActions.gotoVerseNumber, handleVoiceGotoVerseNumber)
+  emitter.on(appWideActions.changeBibleVersion, handleVoiceBibleVersionChange)
 })
 
 onUnmounted(() => {
   emitter.off(appWideActions.nextVerse, handleVoiceNextVerse)
   emitter.off(appWideActions.previousVerse, handleVoicePreviousVerse)
+  emitter.off(appWideActions.gotoVerseNumber, handleVoiceGotoVerseNumber)
+  emitter.off(appWideActions.changeBibleVersion, handleVoiceBibleVersionChange)
 })
 
 emitter.on("pause-inactive-slide-video", () => {

@@ -3,6 +3,11 @@ export default defineNuxtConfig({
   compatibilityDate: "2025-01-01",
   devtools: { enabled: false },
 
+  // Explicitly enable the pages system so Nuxt's dev-mode detection doesn't
+  // raise a false-positive "NuxtPage not used" warning when <NuxtPage /> is
+  // slotted inside <NuxtLayout> (a known static-analysis limitation in Nuxt 4).
+  pages: true,
+
   imports: {
     autoImport: true,
   },

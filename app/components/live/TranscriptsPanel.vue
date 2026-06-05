@@ -374,9 +374,11 @@ import type { BibleReference } from "~/types/transcript"
 import type { ScriptureResult } from "~/composables/useScriptureSearch"
 import { appWideActions } from "~/utils/constants"
 import { highlightText } from "~/utils/highlightText"
+import { useAppStore } from "~/store/app"
 
 defineProps<{ visible: boolean }>()
 defineEmits<{ close: [] }>()
+const appStore = useAppStore()
 
 // ── Feature intro ──────────────────────────────────────────────────────────
 const featureIntroModal = ref<{
@@ -403,7 +405,6 @@ const {
   isTeamsPlan,
   useDeepgramEngine,
   micLevel,
-  deepgramScriptureResults,
 } = useSermonTranscription()
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
@@ -420,31 +421,22 @@ watch(isTranscribing, (val) => {
 })
 
 // ── Scripture search ───────────────────────────────────────────────────────
-// On the Deepgram path the server pushes scripture results over the same WS
-// connection — no HTTP search needed. The Web Speech (free) path still uses
-// the HTTP fallback because there's no server connection to push from.
+// Search the exact transcript segments rendered in the panel for both engines.
+// (The Deepgram backend still pushes its own scripture matches, but the client
+// ignores them — the panel keeps segment boundaries authoritative by querying
+// with each displayed segment instead.)
 const {
   results: httpScriptureResults,
   isSearching: isScriptureSearching,
-  debouncedSearch,
-  addFromBibleReferences,
+  search: searchScriptures,
   clearResults: clearHttpScriptureResults,
 } = useScriptureSearch()
 
-const scriptureResults = computed(() =>
-  useDeepgramEngine.value
-    ? deepgramScriptureResults.value
-    : httpScriptureResults.value
-)
+const scriptureResults = computed(() => httpScriptureResults.value)
 
 const scriptureVisibleCount = ref(20)
 const visibleScriptureResults = computed(() =>
-  // On the Deepgram path the list is already ordered: newest batch first,
-  // backend score order within each batch. On the Web Speech path we sort
-  // by batchId then score for the same effect.
-  [...scriptureResults.value]
-    .sort((a, b) => b.batchId - a.batchId || b.score - a.score)
-    .slice(0, scriptureVisibleCount.value)
+  scriptureResults.value.slice(0, scriptureVisibleCount.value)
 )
 
 // Highlight query: last 8 words from the most recent transcript segment
@@ -461,6 +453,7 @@ let lastLocalAutoLiveReference: string | null = null
 const LOCAL_AUTO_LIVE_COOLDOWN_MS = 1500
 
 const maybeAutoOpenLocalReference = (reference: BibleReference) => {
+  if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
   if (reference.shortLabel === lastLocalAutoLiveReference) return
 
   const now = Date.now()
@@ -474,28 +467,25 @@ const maybeAutoOpenLocalReference = (reference: BibleReference) => {
 watch(
   () => segments.value.length,
   () => {
-    // Deepgram path: server already pushed references and scriptures via WS,
-    // nothing to do here.
-    if (useDeepgramEngine.value) return
-
-    // Free / Web Speech path: locally parse and HTTP-search.
     for (const segment of segments.value) {
       if (parsedSegmentIds.has(segment.id)) continue
       parsedSegmentIds.add(segment.id)
+
       if (segment.bibleReferences.length > 0) {
-        addFromBibleReferences(segment.bibleReferences)
         const firstReference = segment.bibleReferences[0]
-        if (firstReference && isTranscribing.value) {
+        if (firstReference && isTranscribing.value && !useDeepgramEngine.value) {
           maybeAutoOpenLocalReference(firstReference)
         }
       }
-    }
 
-    const combinedText = segments.value
-      .slice(-3)
-      .map((s) => s.text)
-      .join(" ")
-    if (combinedText?.trim()) debouncedSearch(combinedText)
+      // Replace the visible scriptures with this segment's matches. The parsed
+      // references are passed in so they merge into the same atomic update
+      // (shown ahead of fuzzy matches) instead of being clobbered by the async
+      // response.
+      if (segment.text?.trim() || segment.bibleReferences.length > 0) {
+        searchScriptures(segment.text ?? "", segment.bibleReferences)
+      }
+    }
   },
   { immediate: true }
 )

@@ -43,7 +43,7 @@
         (slide?.data as ExternalVideo)?.type !== 'vimeo'
       "
       :source="slide?.background"
-      :repeat="slide?.slideStyle?.repeatMedia"
+      :repeat="slide?.slideStyle?.repeatMedia ?? false"
       :visible="slide?.backgroundType === backgroundTypes.video"
     />
 

@@ -44,6 +44,18 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   // Track slide locks
   const slideLocks = ref<Record<string, SlideEditLock>>({})
 
+  const slideMatchesId = (slide: Slide | undefined, ...ids: Array<string | null | undefined>) => {
+    if (!slide) return false
+    return ids.some((id) => Boolean(id) && (slide.id === id || slide._id === id))
+  }
+
+  const clearLiveSlideIfDeleted = (slide: Slide) => {
+    if (slideMatchesId(slide, appStore.currentState.liveSlideId)) {
+      appStore.setLiveSlide("")
+      useBroadcastPost(JSON.stringify(null))
+    }
+  }
+
   // Lock refresh interval (every 15 seconds)
   let lockRefreshInterval: NodeJS.Timeout | null = null
   const currentLockedSlideId = ref<string | null>(null)
@@ -118,7 +130,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         if (data && (data.id || data._id || data.slideId)) {
           const slideId = data.slideId || data.id || data._id
           const slideIndex = appStore.currentState.activeSlides.findIndex(
-            (s) => s.id === slideId || s._id === data._id
+            (s) => slideMatchesId(s, slideId, data._id)
           )
 
           if (slideIndex !== -1) {
@@ -148,13 +160,15 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         // Don't process updates from the same tab
         if (data.tabId === tabSessionId) return
 
-        if (data.slideId) {
+        if (data.slideId || data.id || data._id) {
+          const slideId = data.slideId || data.id || data._id
           const slideToRemove = appStore.currentState.activeSlides.find(
-            (s) => s.id === data.slideId
+            (s) => slideMatchesId(s, slideId, data._id)
           )
           if (slideToRemove) {
+            clearLiveSlideIfDeleted(slideToRemove)
             appStore.removeActiveSlide(slideToRemove)
-            options.onSlideDeleted?.(data.slideId, data.deletedByName)
+            options.onSlideDeleted?.(slideId, data.deletedByName)
           }
         }
         break
@@ -206,9 +220,10 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         if (data.slideIds && Array.isArray(data.slideIds)) {
           data.slideIds.forEach((slideId: string) => {
             const slideToRemove = appStore.currentState.activeSlides.find(
-              (s) => s.id === slideId
+              (s) => slideMatchesId(s, slideId)
             )
             if (slideToRemove) {
+              clearLiveSlideIfDeleted(slideToRemove)
               appStore.removeActiveSlide(slideToRemove)
             }
           })

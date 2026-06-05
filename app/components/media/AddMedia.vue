@@ -25,7 +25,11 @@
         </div>
       </div>
 
-      <FileDropzone :maxFileSize="maxFileSize" @change="files = $event" />
+      <FileDropzone
+        :maxFileSize="maxFileSize"
+        :maxVideoFileSize="maxVideoFileSize"
+        @change="onDropzoneChange"
+      />
       <label v-if="isTauri" class="flex flex-col center text-center">
         <div
           class="text-center w-full mx-auto px-2 py-2 mt-1 bg-primary-500 rounded-md flex items-center text-primary-500 cursor-pointer gap-1 border border-primary-500 bg-transparent"
@@ -38,7 +42,7 @@
           class="invisible"
           accept="video/*,image/*,audio/*"
           multiple
-          @change="files = $event.target?.files"
+          @change="onDropzoneChange(($event.target as HTMLInputElement)?.files || [])"
         />
       </label>
     </div>
@@ -87,7 +91,6 @@
       <UButton
         class="mb-2 w-[100%] flex justify-between"
         trailing-icon="i-bx-chevron-right"
-        :loading="imageCompressionLoading"
         @click="addMediaEmitter"
         size="lg"
         >Create {{ fileObjs?.length }} Slide{{
@@ -105,7 +108,7 @@
         >
           <div
             v-for="(fileObj, index) in fileObjs"
-            :key="fileObj.name"
+            :key="fileObj.url"
             v-show="fileObj"
             class="file-preview relative border-2 border-primary-100 dark:border-primary-800 rounded-md flex min-h-[100px] cursor-pointer group hover:border-primary-500 transition-all"
             @click="removeFile(index)"
@@ -124,7 +127,7 @@
                   :src="fileObj.thumbnail"
                   :alt="fileObj.name"
                   class="w-full h-full object-cover"
-                  @error="(e) => (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'%3E%3Crect fill=\'%23333\' width=\'100\' height=\'100\'/%3E%3C/svg%3E'"
+                  @error="onThumbnailError"
                 />
                 <div
                   v-else
@@ -232,13 +235,14 @@ const props = defineProps<{
   initialTab?: number
 }>()
 
-const imageCompressionLoading = ref(false)
 const { isTauri } = useTauri()
 const authStore = useAuthStore()
 const { isTeamsPlan, isFreePlan } = useSubscription()
 
 // Free plan: 3MB soft-limit for images; Teams plan: larger (10MB) allowed
 const maxFileSize = computed(() => (isFreePlan.value ? 3 : 10))
+// Videos: 250MB cap for non-teams plans; Teams plan has no limit
+const maxVideoFileSize = computed(() => (isTeamsPlan.value ? Infinity : 250))
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const files = ref()
 const emit = defineEmits(["close"])
@@ -246,6 +250,31 @@ const externalVideoUrl = ref("")
 const externalVideos = ref<ExternalVideo[]>([])
 const toast = useToast()
 const activeTab = ref(props.initialTab || 0)
+const urlCache = new Map<File, string>()
+
+watch(
+  () => files.value,
+  (newFiles) => {
+    const currentFiles = new Set<File>(Array.from(newFiles || []))
+    urlCache.forEach((url, file) => {
+      if (!currentFiles.has(file)) {
+        URL.revokeObjectURL(url)
+        urlCache.delete(file)
+      }
+    })
+    currentFiles.forEach((file) => {
+      if (!urlCache.has(file)) {
+        urlCache.set(file, URL.createObjectURL(file))
+      }
+    })
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  urlCache.forEach((url) => URL.revokeObjectURL(url))
+  urlCache.clear()
+})
 
 const mediaTabs = [
   {
@@ -387,6 +416,19 @@ const removeExternalVideo = (index: number) => {
   externalVideos.value.splice(index, 1)
 }
 
+const PLACEHOLDER_THUMBNAIL =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23333' width='100' height='100'/%3E%3C/svg%3E"
+
+// YouTube maxresdefault is missing for many videos; fall back to hqdefault, then a placeholder
+const onThumbnailError = (e: Event) => {
+  const img = e.target as HTMLImageElement
+  if (img.src.includes("maxresdefault")) {
+    img.src = img.src.replace("maxresdefault", "hqdefault")
+  } else {
+    img.src = PLACEHOLDER_THUMBNAIL
+  }
+}
+
 const fileObjs = computed(() => {
   const tempArr: any[] = []
 
@@ -398,7 +440,7 @@ const fileObjs = computed(() => {
         name: file?.name,
         size: file?.size,
         type: file?.type?.split("/")?.[0],
-        url: URL.createObjectURL(file),
+        url: urlCache.get(file) || URL.createObjectURL(file),
       })
     }
   })
@@ -421,40 +463,69 @@ const isAnyFileExternal = computed(() => {
   return fileObjs.value?.find((file) => file.isExternal)
 })
 
-const addMediaEmitter = async () => {
-  imageCompressionLoading.value = true
-  // console.log("uncompressedFiles", fileObjs.value)
-  const compressedFiles = await Promise.all(
-    fileObjs.value.map(async (fileObj) => {
-      // Handle external videos
-      if (fileObj.isExternal) {
-        return {
-          name: fileObj.name,
-          type: fileObj.type,
-          url: fileObj.url,
-          thumbnail: fileObj.thumbnail,
-          isExternal: true,
-        } as ExtendedFileT & { isExternal: boolean }
-      }
-
-      // Handle regular files
-      let compressedFile = fileObj.blob
-      if (fileObj.type.includes("image")) {
-        compressedFile = await useCompressedImage(fileObj.blob)
-      }
-      URL.revokeObjectURL(fileObj.url)
+const addMediaEmitter = () => {
+  // Emit immediately with the original blobs so slides reach the schedule
+  // instantly. Image compression now runs in the background just before upload
+  // (see createMultipleMediaSlides), so the user no longer waits on the worker.
+  const mediaFiles = fileObjs.value.map((fileObj) => {
+    // Handle external videos
+    if (fileObj.isExternal) {
       return {
-        ...fileObj,
-        blob: compressedFile,
-        url: URL.createObjectURL(compressedFile),
-      } as ExtendedFileT
-    })
-  )
-  imageCompressionLoading.value = false
-  useGlobalEmit(appWideActions.newMedia, compressedFiles)
+        name: fileObj.name,
+        type: fileObj.type,
+        url: fileObj.url,
+        thumbnail: fileObj.thumbnail,
+        isExternal: true,
+      } as ExtendedFileT & { isExternal: boolean }
+    }
+
+    // Fresh object URL from the original blob — the cached preview URL is
+    // revoked when `files` clears below, so the slide needs its own.
+    return {
+      ...fileObj,
+      url: URL.createObjectURL(fileObj.blob),
+    } as ExtendedFileT
+  })
+  useGlobalEmit(appWideActions.newMedia, mediaFiles)
   files.value = []
   externalVideos.value = []
   emit("close")
+}
+
+const onDropzoneChange = (incomingFiles: FileList | File[]) => {
+  // Single validation gate for BOTH the dropzone and the Tauri file input.
+  // FileDropzone pre-filters, but the Tauri input feeds raw files straight here,
+  // so size limits must be enforced before files.value is updated.
+  const validFiles: File[] = []
+  Array.from(incomingFiles || []).forEach((file) => {
+    if (
+      file.type.startsWith("image") &&
+      file.size > maxFileSize.value * 1024 * 1024
+    ) {
+      toast.add({
+        title: `Image size exceeds ${maxFileSize.value}MB`,
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+      return
+    }
+    if (
+      file.type.startsWith("video") &&
+      file.size > maxVideoFileSize.value * 1024 * 1024
+    ) {
+      toast.add({
+        title: `Video size exceeds ${maxVideoFileSize.value}MB`,
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+      return
+    }
+    validFiles.push(file)
+  })
+  if (validFiles.length === 0) return
+  // Accumulate so multiple drops/selections build up the preview set without
+  // losing previously added (or removed) files.
+  files.value = [...Array.from(files.value || []), ...validFiles]
 }
 
 const removeFile = (index: number) => {
@@ -468,7 +539,7 @@ const removeFile = (index: number) => {
     }
   } else {
     const filesArray = Array.from(files.value || [])
-    filesArray.splice(index - externalVideos.value.length, 1)
+    filesArray.splice(index, 1)
     files.value = filesArray
   }
 }

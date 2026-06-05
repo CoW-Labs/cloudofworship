@@ -26,7 +26,6 @@
             icon="i-bx-search"
             placeholder="Search actions, scripture, hymns..."
             v-model="searchInput"
-            color="black"
             class="w-[100%]"
             ref="searchInputEl"
             @keydown="handleInputKeydown"
