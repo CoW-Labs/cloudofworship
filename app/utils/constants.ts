@@ -51,6 +51,8 @@ export const appWideActions = {
   mediaSeek: 'media-seek',
   appLoading: 'app-loading',
   gotoVerse: 'goto-verse',
+  gotoVerseNumber: 'goto-verse-number',
+  changeBibleVersion: 'change-bible-version',
   nextVerse: 'next-verse',
   previousVerse: 'previous-verse',
   deleteScheduleSlides: 'delete-schedule-slides',
@@ -103,6 +105,16 @@ export const quickActionsArr: QuickAction[] = [
     meta: "",
     type: slideTypes.hymn,
     tier: "free",
+  },
+  {
+    icon: "i-material-symbols-speech-to-text",
+    name: "Transcribe Sermon",
+    desc: "Transcribe sermon and auto-suggest Bible slides",
+    action: appWideActions.newTranscribe,
+    meta: "transcribe sermon speech text bible audio microphone",
+    tier: 'teams',
+    // unreleased: true,
+    featureFlag: 'transcripts-feature',
   },
   {
     icon: "i-lucide-music-2",
@@ -271,16 +283,6 @@ export const quickActionsArr: QuickAction[] = [
     tier: "free",
     // unreleased: true,
     // type: slideTypes.text
-  },
-  {
-    icon: "i-material-symbols-speech-to-text",
-    name: "Transcribe Sermon",
-    desc: "Transcribe sermon and auto-suggest Bible slides",
-    action: appWideActions.newTranscribe,
-    meta: "transcribe sermon speech text bible audio microphone",
-    tier: 'teams',
-    // unreleased: true,
-    featureFlag: 'transcripts-feature',
   },
   {
     icon: "i-ph-file-ppt",
