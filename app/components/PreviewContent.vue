@@ -1053,7 +1053,40 @@ const updateSlideOnline = useThrottleFn(
 )
 
 const deleteSlide = async (slideId: string, addToast: boolean = true) => {
-  const tempSlide = slides.value.find((s) => s.id === slideId) as Slide
+  if (!slideId) return
+
+  const slideMatchesId = (slide: Slide) =>
+    slide.id === slideId || slide._id === slideId
+  const tempSlide = slides.value.find(slideMatchesId) as Slide | undefined
+
+  if (!tempSlide) {
+    const activeStoreSlide = appStore.currentState.activeSlides.find(slideMatchesId)
+    const wasLive =
+      appStore.currentState.liveSlideId === slideId ||
+      (activeStoreSlide
+        ? appStore.currentState.liveSlideId === activeStoreSlide.id ||
+          appStore.currentState.liveSlideId === activeStoreSlide._id
+        : false)
+
+    if (wasLive) {
+      appStore.setLiveSlide("")
+      useBroadcastPost(JSON.stringify(null))
+    }
+
+    if (activeStoreSlide || wasLive) {
+      broadcastSlideUpdate("delete-slide", {
+        slideId: activeStoreSlide?.id || slideId,
+        _id: activeStoreSlide?._id,
+      })
+    }
+
+    appStore.setActiveSlides(
+      appStore.currentState.activeSlides.filter((slide) => !slideMatchesId(slide))
+    )
+    return
+  }
+
+  const clientSlideId = tempSlide.id || slideId
 
   // Clear countdown animation if slide is a countdown slide before deleting
   if (tempSlide?.type === slideTypes.countdown) {
@@ -1066,17 +1099,25 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   }
 
   // Clear live projection if the deleted slide is currently live
-  if (appStore.currentState.liveSlideId === slideId) {
+  if (
+    appStore.currentState.liveSlideId === clientSlideId ||
+    appStore.currentState.liveSlideId === tempSlide._id
+  ) {
     appStore.setLiveSlide("")
     useBroadcastPost(JSON.stringify(null))
   }
 
-  const slideIndex = slides.value.findIndex((s) => s.id === slideId)
-  slides.value.splice(slideIndex, 1)
+  const slideIndex = slides.value.findIndex(slideMatchesId)
+  if (slideIndex >= 0) {
+    slides.value.splice(slideIndex, 1)
+  }
   appStore.removeActiveSlide(tempSlide)
 
   // Broadcast deletion via WebSocket for realtime collaboration
-  broadcastSlideUpdate("delete-slide", { slideId })
+  broadcastSlideUpdate("delete-slide", {
+    slideId: clientSlideId,
+    _id: tempSlide._id,
+  })
 
   // Delete slide online if it has an _id
   if (tempSlide?._id) {
@@ -1085,7 +1126,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
   // Delete Probable Media files linked in DB (as long as they are not saved in Library)
   const db = useIndexedDB()
-  const itemSaved = await getLibraryItem(slideId)
+  const itemSaved = await getLibraryItem(clientSlideId)
   if (!itemSaved) {
     if (tempSlide?.type === slideTypes.presentation) {
       // Presentation slides write one IndexedDB record per page, keyed as
@@ -1093,14 +1134,14 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
       // them, so we delete every record whose key starts with the slide ID.
       await db.media
         .where("id")
-        .startsWith(`${slideId}-page-`)
+        .startsWith(`${clientSlideId}-page-`)
         .delete()
         .catch((err) =>
           console.error("Failed to delete presentation media pages:", err)
         )
     } else {
       await db.media
-        .delete(slideId)
+        .delete(clientSlideId)
         .catch((err) => console.error("Failed to delete media:", err))
     }
   }
