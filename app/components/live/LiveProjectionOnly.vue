@@ -252,7 +252,7 @@
           <UButton
             variant="ghost"
             size="xs"
-            color="slate"
+            color="gray"
             icon="i-bx-expand-alt"
             class="hover:bg-primary-500"
             @click="isLargePreviewOpen = true"
@@ -385,7 +385,7 @@ watch(
       }
 
       // Only proceed if this is the active live slide
-      if (!appMounted || props.slide.id !== currentState.value?.liveSlideId) {
+      if (!appMounted.value || props.slide.id !== currentState.value?.liveSlideId) {
         return
       }
 
@@ -418,7 +418,7 @@ const handleSlideContentChange = useDebounceFn(() => {
   // Guard: slide may be undefined when the debounced callback fires
   if (
     !props.slide ||
-    !appMounted ||
+    !appMounted.value ||
     props.slide.id !== currentState.value?.liveSlideId
   ) {
     return
@@ -457,43 +457,46 @@ watch(
     }
 
     try {
-      if (appMounted && props.slide.id === currentState.value?.liveSlideId) {
-        // Handle seeking - only in fullScreen mode
-        const isExternalVideo =
-          (props.slide.data as any)?.type === "youtube" ||
-          (props.slide.data as any)?.type === "vimeo"
+      const slide = props.slide
+      if (!appMounted.value || !slide?.id || slide.id !== currentState.value?.liveSlideId) {
+        return
+      }
 
-        if (isExternalVideo && iframe.value) {
-          // For YouTube/Vimeo, send postMessage to control playback
-          const videoData = props.slide.data as ExternalVideo
-          if (videoData.type === "youtube") {
-            safePostMessage(
-              iframe.value.contentWindow,
-              JSON.stringify({
-                event: "command",
-                func: "seekTo",
-                args: [newSeekPosition, true],
-              }),
-              "*"
-            )
-          } else if (videoData.type === "vimeo") {
-            safePostMessage(
-              iframe.value.contentWindow,
-              JSON.stringify({
-                method: "setCurrentTime",
-                value: newSeekPosition,
-              }),
-              "*"
-            )
-          }
-        } else {
-          // For regular video/audio files
-          if (video.value) {
-            video.value.currentTime = newSeekPosition
-          }
-          if (audio.value) {
-            audio.value.currentTime = newSeekPosition
-          }
+      // Handle seeking - only in fullScreen mode
+      const isExternalVideo =
+        (slide.data as any)?.type === "youtube" ||
+        (slide.data as any)?.type === "vimeo"
+
+      if (isExternalVideo && iframe.value) {
+        // For YouTube/Vimeo, send postMessage to control playback
+        const videoData = slide.data as ExternalVideo
+        if (videoData.type === "youtube") {
+          safePostMessage(
+            iframe.value.contentWindow,
+            JSON.stringify({
+              event: "command",
+              func: "seekTo",
+              args: [newSeekPosition, true],
+            }),
+            "*"
+          )
+        } else if (videoData.type === "vimeo") {
+          safePostMessage(
+            iframe.value.contentWindow,
+            JSON.stringify({
+              method: "setCurrentTime",
+              value: newSeekPosition,
+            }),
+            "*"
+          )
+        }
+      } else {
+        // For regular video/audio files
+        if (video.value) {
+          video.value.currentTime = newSeekPosition
+        }
+        if (audio.value) {
+          audio.value.currentTime = newSeekPosition
         }
       }
     } catch (err) {
@@ -511,63 +514,66 @@ watch(
     }
 
     try {
-      if (appMounted && props.slide.id === currentState.value?.liveSlideId) {
-        const isExternalVideo =
-          (props.slide.data as any)?.type === "youtube" ||
-          (props.slide.data as any)?.type === "vimeo"
+      const slide = props.slide
+      if (!appMounted.value || !slide?.id || slide.id !== currentState.value?.liveSlideId) {
+        return
+      }
 
-        if (isPlaying) {
-          if (isExternalVideo && iframe.value) {
-            const videoData = props.slide.data as ExternalVideo
-            if (videoData.type === "youtube") {
-              safePostMessage(
-                iframe.value.contentWindow,
-                JSON.stringify({
-                  event: "command",
-                  func: "playVideo",
-                  args: [],
-                }),
-                "*"
-              )
-            } else if (videoData.type === "vimeo") {
-              safePostMessage(
-                iframe.value.contentWindow,
-                JSON.stringify({ method: "play" }),
-                "*"
-              )
-            }
-          } else {
-            safePlayMedia(video.value)
-            safePlayMedia(audio.value)
+      const isExternalVideo =
+        (slide.data as any)?.type === "youtube" ||
+        (slide.data as any)?.type === "vimeo"
+
+      if (isPlaying) {
+        if (isExternalVideo && iframe.value) {
+          const videoData = slide.data as ExternalVideo
+          if (videoData.type === "youtube") {
+            safePostMessage(
+              iframe.value.contentWindow,
+              JSON.stringify({
+                event: "command",
+                func: "playVideo",
+                args: [],
+              }),
+              "*"
+            )
+          } else if (videoData.type === "vimeo") {
+            safePostMessage(
+              iframe.value.contentWindow,
+              JSON.stringify({ method: "play" }),
+              "*"
+            )
           }
-        } else if (
-          !isPlaying &&
-          isPlaying !== undefined &&
-          props.slide.type === slideTypes.media
-        ) {
-          if (isExternalVideo && iframe.value) {
-            const videoData = props.slide.data as ExternalVideo
-            if (videoData.type === "youtube") {
-              safePostMessage(
-                iframe.value.contentWindow,
-                JSON.stringify({
-                  event: "command",
-                  func: "pauseVideo",
-                  args: [],
-                }),
-                "*"
-              )
-            } else if (videoData.type === "vimeo") {
-              safePostMessage(
-                iframe.value.contentWindow,
-                JSON.stringify({ method: "pause" }),
-                "*"
-              )
-            }
-          } else {
-            safePauseMedia(video.value)
-            safePauseMedia(audio.value)
+        } else {
+          safePlayMedia(video.value)
+          safePlayMedia(audio.value)
+        }
+      } else if (
+        !isPlaying &&
+        isPlaying !== undefined &&
+        slide.type === slideTypes.media
+      ) {
+        if (isExternalVideo && iframe.value) {
+          const videoData = slide.data as ExternalVideo
+          if (videoData.type === "youtube") {
+            safePostMessage(
+              iframe.value.contentWindow,
+              JSON.stringify({
+                event: "command",
+                func: "pauseVideo",
+                args: [],
+              }),
+              "*"
+            )
+          } else if (videoData.type === "vimeo") {
+            safePostMessage(
+              iframe.value.contentWindow,
+              JSON.stringify({ method: "pause" }),
+              "*"
+            )
           }
+        } else {
+          safePauseMedia(video.value)
+          safePauseMedia(audio.value)
         }
       }
     } catch (err) {
@@ -585,30 +591,33 @@ watch(
     }
 
     try {
-      if (appMounted && props.slide.id === currentState.value?.liveSlideId) {
-        const isExternalVideo =
-          (props.slide.data as any)?.type === "youtube" ||
-          (props.slide.data as any)?.type === "vimeo"
+      const slide = props.slide
+      if (!appMounted.value || !slide?.id || slide.id !== currentState.value?.liveSlideId) {
+        return
+      }
 
-        if (isExternalVideo && iframe.value) {
-          const videoData = props.slide.data as ExternalVideo
-          if (videoData.type === "youtube") {
-            const muteFunc = isMuted ? "mute" : "unMute"
-            safePostMessage(
-              iframe.value.contentWindow,
-              JSON.stringify({ event: "command", func: muteFunc, args: [] }),
-              "*"
-            )
-          } else if (videoData.type === "vimeo") {
-            safePostMessage(
-              iframe.value.contentWindow,
-              JSON.stringify({
-                method: "setVolume",
-                value: isMuted ? 0 : 1,
-              }),
-              "*"
-            )
-          }
+      const isExternalVideo =
+        (slide.data as any)?.type === "youtube" ||
+        (slide.data as any)?.type === "vimeo"
+
+      if (isExternalVideo && iframe.value) {
+        const videoData = slide.data as ExternalVideo
+        if (videoData.type === "youtube") {
+          const muteFunc = isMuted ? "mute" : "unMute"
+          safePostMessage(
+            iframe.value.contentWindow,
+            JSON.stringify({ event: "command", func: muteFunc, args: [] }),
+            "*"
+          )
+        } else if (videoData.type === "vimeo") {
+          safePostMessage(
+            iframe.value.contentWindow,
+            JSON.stringify({
+              method: "setVolume",
+              value: isMuted ? 0 : 1,
+            }),
+            "*"
+          )
         }
       }
     } catch (err) {
