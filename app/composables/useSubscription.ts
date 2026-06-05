@@ -50,15 +50,14 @@ export default function useSubscription() {
   })
 
   /**
-   * Get the current subscription plan
-   * Checks the user's subscription first, then falls back to church subscription.
+   * Get the current subscription plan.
+   * church.subscriptionPlan is the ONLY authoritative source of the *current*
+   * plan. user.subscription.plan is stale and must NOT be used as a fallback —
+   * trusting it would grant Teams features / cloud upload to users who are no
+   * longer on Teams. When church is not loaded we cannot know the plan, so we
+   * fail safe to 'free'.
    */
   const getCurrentPlan = (): SubscriptionPlan => {
-    const userPlan = authStore.user?.subscription?.plan
-    if (userPlan) {
-      return userPlan
-    }
-
     const church = authStore.church
 
     if (church && church._id === authStore.user?.churchId) {

@@ -293,6 +293,8 @@ export interface AppSettings {
   songAndHymnLabelsVisibility: boolean
   liveWindowFullscreen?: boolean // Whether live window opens in fullscreen mode
   closeLiveWindowWithOperator?: boolean // Whether live window closes when operator tab closes (browser only)
+  transcriptionAutoActions?: boolean
+  transcriptionVoiceBibleVersionCommands?: boolean
 
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number

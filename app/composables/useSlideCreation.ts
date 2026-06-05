@@ -145,7 +145,7 @@ export default function useSlideCreation() {
     const rawHymnVerse = hymn.verses?.[0]?.trim() ?? ""
     const linesPerSlide = appStore.currentState.settings.slideStyles.linesPerSlide
     const hymnChunks = splitVerseByLines(rawHymnVerse, linesPerSlide)
-    const currentHymnVerse = hymnChunks[0]
+    const currentHymnVerse = hymnChunks[0] ?? ""
     tempSlide.hymnSubVerseIndex = 0
     tempSlide.hymnSubVerseTotal = hymnChunks.length
     const fontSize = useScreenFontSize(currentHymnVerse)
@@ -316,12 +316,15 @@ export default function useSlideCreation() {
    * │                  URLs → returned immediately so the     │
    * │                  current user sees them right away.     │
    * ├─────────────────────────────────────────────────────────┤
-   * │  Step 2 (async,  a. Upload image blobs to the cloud     │
-   * │  background)        (Teams plan only).                  │
-   * │                  b. Patch slides with hosted URLs.      │
-   * │                  c. POST all slides to the backend      │
+   * │  Step 2 (async,  a. Compress image blobs (>500KB).      │
+   * │  background)     b. Refresh IndexedDB with compressed   │
+   * │                     copy (both plans).                  │
+   * │                  c. Upload compressed blobs to cloud    │
+   * │                     (Teams plan only).                  │
+   * │                  d. Patch slides with hosted URLs.      │
+   * │                  e. POST all slides to the backend      │
    * │                     via batchCreateSlides.              │
-   * │                  d. Emit batch-create-slides via        │
+   * │                  f. Emit batch-create-slides via        │
    * │                     WebSocket so other clients sync.    │
    * └─────────────────────────────────────────────────────────┘
    *
@@ -349,14 +352,57 @@ export default function useSlideCreation() {
         try {
           const { isTeamsPlan } = useSubscription()
 
-          // 2a — Upload image blobs to the cloud (Teams plan, images only).
+          // 2a — Compress image blobs in the background (both plans).
           // capturedBlobs holds references taken before createMediaSlide's async
           // FileReader could delete file.blob — so they are always available here.
+          // useCompressedImage returns the original untouched for files <=500KB,
+          // so small images skip the worker. This runs after the slides are
+          // already on screen, so the user never waits on it.
+          const compressedBlobs = await Promise.all(
+            capturedBlobs.map(async (blob) => {
+              if (!blob?.type?.includes("image")) return blob
+              try {
+                return await useCompressedImage(blob)
+              } catch (err) {
+                console.error("Background image compression failed", err)
+                return blob
+              }
+            })
+          )
+
+          // 2b — Refresh IndexedDB with the compressed copy so offline storage
+          // stays lean (esp. for free users, whose images are never uploaded).
+          // createMediaSlide persisted the original synchronously; this overwrites
+          // it. If this write rarely loses a race, IndexedDB just keeps the
+          // original — a benign fallback, never a broken render.
+          await Promise.all(
+            compressedBlobs.map(async (blob, index) => {
+              const original = capturedBlobs[index]
+              if (!blob || !original || blob === original) return
+              if (blob.size >= original.size) return
+              const slide = newSlides[index]
+              if (!slide) return
+              try {
+                const arrayBuffer = await blob.arrayBuffer()
+                await safeDBOperation((db) => db.media.put({
+                  id: slide.id,
+                  content: { size: blob.size, type: blob.type },
+                  data: arrayBuffer,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                }))
+              } catch (err) {
+                console.error("Re-persisting compressed image failed", err)
+              }
+            })
+          )
+
+          // 2c — Upload compressed image blobs to the cloud (Teams plan, images only).
           // Promise.all ensures batchCreateSlides never fires until every image
           // upload has finished.
           if (isTeamsPlan.value) {
             const uploadPromises = files.map(async (file: ExtendedFileT, index: number) => {
-              const blob = capturedBlobs[index]
+              const blob = compressedBlobs[index]
               // Only upload image files; skip videos, audio, and external files
               if (!blob?.type?.includes("image")) return null
               try {
@@ -371,7 +417,7 @@ export default function useSlideCreation() {
             // Wait for ALL uploads to complete before proceeding to the batch call
             const results = await Promise.all(uploadPromises)
 
-            // 2b — Patch local slide objects with hosted URLs
+            // 2d — Patch local slide objects with hosted URLs
             results.forEach((res) => {
               if (!res?.uploaded) return
               const slide = newSlides[res.index]
@@ -384,7 +430,7 @@ export default function useSlideCreation() {
             })
           }
 
-          // 2c — POST all new slides to the backend with their final URLs
+          // 2e — POST all new slides to the backend with their final URLs
           const sanitizedSlides = newSlides.map((slide) => {
             const sanitizedSlide = { ...slide }
             if (sanitizedSlide.data && typeof sanitizedSlide.data === "object") {
@@ -406,7 +452,7 @@ export default function useSlideCreation() {
             if (local && serverSlide._id) local._id = serverSlide._id
           })
 
-          // 2d — Broadcast to other clients only after server confirms creation
+          // 2f — Broadcast to other clients only after server confirms creation
           const nuxtApp = useNuxtApp()
           const socket = nuxtApp.$socketio as any
           if (socket?.connected && inserted.length > 0) {

@@ -3,8 +3,12 @@ import { useAppStore } from '~/store/app'
 import { useAuthStore } from '~/store/auth'
 import { prewarmScriptureVersion } from '~/composables/useScripture'
 import type { TranscriptSegment, BibleReference } from '~/types/transcript'
-import type { ScriptureResult } from '~/composables/useScriptureSearch'
-import { appWideActions, bibleBooks } from '~/utils/constants'
+import { appWideActions } from '~/utils/constants'
+import {
+  detectBibleVersionVoiceCommand,
+  detectVerseGotoCommand,
+  detectVerseVoiceCommand,
+} from '~/utils/voiceCommands'
 
 interface TranscriptionState {
   isTranscribing: boolean
@@ -14,9 +18,6 @@ interface TranscriptionState {
   currentTranscript: string
   remainingSeconds: number | null
   usedSeconds: number
-  // Scripture results pushed by the server over the same WS connection,
-  // so the panel can render them without a separate HTTP search.
-  scriptureResults: ScriptureResult[]
 }
 
 interface ReferenceMessageMeta {
@@ -34,7 +35,8 @@ interface ReferenceMessageMeta {
  * Deepgram, then pushes back four kinds of messages over the same connection:
  *   - transcript  (interim + final)
  *   - references  (Bible refs parsed server-side, on each final segment)
- *   - scriptures  (semantic scripture matches, pushed on each final segment)
+ *   - scriptures  (semantic matches; ignored client-side — TranscriptsPanel
+ *                  runs its own HTTP scripture search keyed to displayed segments)
  *   - limit_reached / error
  *
  * Performance/reliability features:
@@ -56,7 +58,6 @@ export default function useDeepgramTranscription() {
     currentTranscript: '',
     remainingSeconds: null,
     usedSeconds: 0,
-    scriptureResults: [],
   })
 
   const micLevel = ref(0)
@@ -74,7 +75,7 @@ export default function useDeepgramTranscription() {
 
   // Voice-command latch — prevents firing the same command repeatedly while
   // the interim transcript still contains the trigger phrase.
-  let lastFiredCommand: 'next-verse' | 'previous-verse' | null = null
+  let lastFiredCommand: string | null = null
   let lastCommandFiredAt = 0
   const COMMAND_COOLDOWN_MS = 1500
 
@@ -84,29 +85,25 @@ export default function useDeepgramTranscription() {
   let lastAutoLiveReference: string | null = null
   const AUTO_LIVE_COOLDOWN_MS = 1500
 
-  /**
-   * Detect voice commands in the transcript.
-   */
-  const detectVoiceCommand = (text: string): 'next-verse' | 'previous-verse' | null => {
-    const lower = text.toLowerCase()?.trim()
-    if (
-      lower.includes('next verse') ||
-      lower.includes('next first') ||
-      lower === 'next' ||
-      lower.includes('go to next verse') ||
-      lower.includes('go next verse')
-    ) return 'next-verse'
+  const getAvailableBibleVersionsForVoice = () => {
+    const settings = appStore.currentState.settings
+    const availableVersions =
+      settings.bibleVersions?.filter((version) =>
+        version?.isDownloaded || version?.id === settings.defaultBibleVersion
+      ) || []
 
     if (
-      lower.includes('previous verse') ||
-      lower.includes('last verse') ||
-      lower.includes('go back') ||
-      lower.includes('go to previous verse') ||
-      lower.includes('go to last verse') ||
-      lower.includes('go previous verse')
-    ) return 'previous-verse'
+      settings.defaultBibleVersion &&
+      !availableVersions.some((version) => version?.id === settings.defaultBibleVersion)
+    ) {
+      availableVersions.push({
+        id: settings.defaultBibleVersion,
+        name: settings.defaultBibleVersion,
+        isDownloaded: true,
+      })
+    }
 
-    return null
+    return availableVersions
   }
 
   /**
@@ -114,15 +111,46 @@ export default function useDeepgramTranscription() {
    * doesn't trigger repeatedly. Reset the latch when text changes substantially.
    */
   const maybeFireVoiceCommand = (text: string) => {
-    const command = detectVoiceCommand(text)
-    if (!command) {
+    if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
+
+    const gotoVerseNumber = detectVerseGotoCommand(text)
+    const versionCommand =
+      !gotoVerseNumber &&
+      (appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ?? true)
+        ? detectBibleVersionVoiceCommand(text, getAvailableBibleVersionsForVoice())
+        : null
+    const command = gotoVerseNumber || versionCommand
+      ? null
+      : detectVerseVoiceCommand(text)
+    const commandKey = gotoVerseNumber
+      ? `goto-verse-number:${gotoVerseNumber}`
+      : versionCommand
+        ? `change-bible-version:${versionCommand}`
+      : command
+
+    if (!commandKey) {
       lastFiredCommand = null
       return
     }
+
     const now = Date.now()
-    if (command === lastFiredCommand && now - lastCommandFiredAt < COMMAND_COOLDOWN_MS) return
-    lastFiredCommand = command
+    if (
+      commandKey === lastFiredCommand &&
+      now - lastCommandFiredAt < COMMAND_COOLDOWN_MS
+    ) return
+    lastFiredCommand = commandKey
     lastCommandFiredAt = now
+
+    if (gotoVerseNumber) {
+      useGlobalEmit(appWideActions.gotoVerseNumber, gotoVerseNumber)
+      return
+    }
+
+    if (versionCommand) {
+      useGlobalEmit(appWideActions.changeBibleVersion, versionCommand)
+      return
+    }
+
     if (command === 'next-verse') useGlobalEmit(appWideActions.nextVerse)
     else useGlobalEmit(appWideActions.previousVerse)
   }
@@ -145,41 +173,6 @@ export default function useDeepgramTranscription() {
       bibleReferences: references,
     })
     state.value.currentTranscript = ''
-  }
-
-  // How many past WS pushes to keep visible. Results from older pushes are
-  // evicted so the panel stays focused on what's being said right now.
-  const MAX_SCRIPTURE_BATCHES = 2
-  const RESULTS_PER_BATCH = 5
-  let batchCounter = 0
-
-  /**
-   * Replace the visible scripture results with the latest push.
-   * Keeps up to MAX_SCRIPTURE_BATCHES worth of results so there is some
-   * continuity, but evicts anything older to avoid bloat.
-   * Within a batch results are ordered by the backend's relevance score.
-   */
-  const mergeScriptureResults = (raw: any[]) => {
-    if (!raw?.length) return
-    const currentBatch = ++batchCounter
-
-    const incoming: ScriptureResult[] = raw.slice(0, RESULTS_PER_BATCH).map((r) => {
-      const bookIndex = Number(r.book)
-      const bookName = bibleBooks[bookIndex - 1] || `Book ${bookIndex}`
-      return {
-        ...r,
-        shortLabel: `${r.book}:${r.chapter}:${r.verse}`,
-        displayLabel: `${bookName} ${r.chapter}:${r.verse}`,
-        batchId: currentBatch,
-      }
-    })
-
-    // Evict batches that are too old, then prepend the new batch.
-    const cutoff = currentBatch - MAX_SCRIPTURE_BATCHES
-    const retained = state.value.scriptureResults.filter(
-      (x) => x.batchId > cutoff && !incoming.some((n) => n.shortLabel === x.shortLabel),
-    )
-    state.value.scriptureResults = [...incoming, ...retained]
   }
 
   /**
@@ -206,6 +199,7 @@ export default function useDeepgramTranscription() {
     const nextReference = firstReference.shortLabel
     const isDuplicateReference = nextReference === lastAutoLiveReference
     if (isDuplicateReference) return
+    if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
 
     const now = Date.now()
     const isFinalCorrection = !meta.provisional && !!lastAutoLiveReference
@@ -329,8 +323,6 @@ export default function useDeepgramTranscription() {
               receivedAt: msg.receivedAt,
               sentAt: msg.sentAt,
             })
-          } else if (msg.type === 'scriptures') {
-            mergeScriptureResults(msg.results)
           } else if (msg.type === 'limit_reached') {
             toast.add({
               title: 'Weekly limit reached',
@@ -510,8 +502,6 @@ export default function useDeepgramTranscription() {
   const clearTranscript = () => {
     state.value.segments = []
     state.value.currentTranscript = ''
-    state.value.scriptureResults = []
-    batchCounter = 0
     toast.add({ title: 'Transcript cleared', icon: 'i-bx-trash' })
   }
 
@@ -546,10 +536,6 @@ export default function useDeepgramTranscription() {
     usedMinutes,
     allBibleReferences,
     micLevel: computed(() => micLevel.value),
-    // Scripture results streamed from the server over the same WS connection.
-    // The transcripts panel reads this for the "Scriptures" tab when on the
-    // Deepgram path (Teams plan / transcripts-free flag).
-    scriptureResults: computed(() => state.value.scriptureResults),
 
     startTranscription,
     stopTranscription,

@@ -1,8 +1,10 @@
 import imageCompression from 'browser-image-compression';
 
 const useCompressedImage = async (image: Blob) => {
-  // console.log('originalFile instanceof Blob', image instanceof Blob); // true
-  // console.log(`originalFile size ${image.size / 1024 / 1024} MB`);
+  const TARGET_SIZE_BYTES = 0.5 * 1024 * 1024
+  if (image.size <= TARGET_SIZE_BYTES) {
+    return image
+  }
   const options = {
     maxSizeMB: 0.5,
     maxWidthOrHeight: 1920,
@@ -10,9 +12,6 @@ const useCompressedImage = async (image: Blob) => {
   }
   try {
     const compressedFile = await imageCompression((image as File), options);
-    // console.log('compressedFile instanceof Blob', compressedFile instanceof Blob); // true
-    // console.log(`compressedFile size ${compressedFile.size / 1024 / 1024} MB`);
-    // console.log('compressedFile type', URL.createObjectURL(compressedFile));
     return compressedFile;
 
   } catch (error) {
