@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-ctn h-[100%]">
+  <div class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] pb-[15%]">
     <!-- Tabs -->
     <UTabs v-model="activeTab" :items="storageSettingsTabs" class="mb-4">
       <template #default="{ item }">
@@ -63,7 +63,7 @@
                 Background Videos and Images
               </div>
             </td>
-            <td>{{ formatMegabytes(cachedTableSize) }}</td>
+            <td class="text-right">{{ formatMegabytes(cachedTableSize) }}</td>
           </tr>
           <tr class="border-b border-gray-200 dark:border-gray-800 h-[50px]">
             <td>
@@ -74,7 +74,7 @@
                 Library Items
               </div>
             </td>
-            <td>{{ formatMegabytes(libraryTableSize) }}</td>
+            <td class="text-right">{{ formatMegabytes(libraryTableSize) }}</td>
           </tr>
           <tr class="border-b border-gray-200 dark:border-gray-800 h-[50px]">
             <td>
@@ -85,21 +85,103 @@
                 Bible versions and hymns
               </div>
             </td>
-            <td>{{ formatMegabytes(bibleAndHymnsTableSize) }}</td>
+            <td class="text-right">
+              {{ formatMegabytes(bibleAndHymnsTableSize) }}
+            </td>
           </tr>
-          <tr class="border-gray-200 dark:border-gray-800 h-[50px]">
+          <tr
+            class="border-gray-200 dark:border-gray-800 h-[50px] cursor-pointer select-none"
+            @click="mediaExpanded = !mediaExpanded"
+          >
             <td>
               <div class="flex items-center gap-2">
                 <div
                   class="colored-circle rounded-full w-3 h-3 bg-blue-500"
                 ></div>
                 Media Slides (Images, Videos, Audio)
+                <span
+                  v-if="mediaGroups.length"
+                  class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500"
+                >
+                  {{ mediaGroups.length }}
+                  {{ mediaGroups.length === 1 ? "file" : "files" }}
+                </span>
               </div>
             </td>
-            <td>{{ formatMegabytes(mediaTableSize) }}</td>
+            <td class="text-right">
+              <div class="flex justify-end gap-2">
+                {{ formatMegabytes(mediaTableSize) }}
+                <Icon
+                  name="i-lucide-chevron-down"
+                  class="w-4 h-4 transition-transform"
+                  :class="mediaExpanded ? 'rotate-180' : ''"
+                />
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
+
+      <!-- Expandable per-file media list -->
+      <div v-if="mediaExpanded" class="media-files mt-0 pl-4">
+        <!-- <div class="flex items-center justify-between py-2">
+          <span class="text-xs text-gray-500">
+            {{ mediaGroups.length }}
+            {{ mediaGroups.length === 1 ? "file" : "files" }} ·
+            {{ formatMegabytes(mediaTableSize) }} total
+          </span>
+          <button
+            v-if="mediaGroups.length"
+            class="text-xs font-medium text-red-500 hover:text-red-600"
+            @click="
+              removeAllMediaPrompt
+                ? removeAllMedia()
+                : (removeAllMediaPrompt = true)
+            "
+          >
+            {{ removeAllMediaPrompt ? "Confirm remove all" : "Remove all" }}
+          </button>
+        </div> -->
+
+        <div
+          v-if="!mediaGroups.length"
+          class="py-6 text-center text-sm text-gray-500"
+        >
+          No media files stored on this device.
+        </div>
+
+        <div
+          v-for="group in mediaGroups"
+          :key="group.baseId"
+          class="flex items-center gap-3 py-2 border-t border-gray-50"
+        >
+          <div
+            class="relative w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0"
+            :class="kindMeta[group.kind].class"
+          >
+            <Icon :name="kindMeta[group.kind].icon" class="w-5 h-5" />
+            <span
+              class="absolute bottom-0 inset-x-0 text-[7px] leading-3 font-bold text-center bg-black/30 rounded-b-lg"
+            >
+              {{ kindMeta[group.kind].label }}
+            </span>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium truncate">{{ group.name }}</p>
+            <p class="text-xs text-gray-500">{{ group.subtitle }}</p>
+          </div>
+          <span class="text-sm text-gray-500 whitespace-nowrap">
+            {{ formatMegabytes(group.sizeMB) }}
+          </span>
+          <UButton
+            color="gray"
+            variant="ghost"
+            size="xs"
+            icon="i-lucide-trash-2"
+            @click="deleteMediaGroup(group)"
+          />
+        </div>
+      </div>
 
       <div class="danger-zone mt-4 bg-red-100 dark:bg-red-900 rounded-md p-4">
         <h3 class="font-medium">Danger Zone</h3>
@@ -209,19 +291,79 @@
 </template>
 
 <script setup lang="ts">
-import type { Media } from "~/types"
+import type { Media, Slide } from "~/types"
 import { useAuthStore } from "~/store/auth"
+import { useAppStore } from "~/store/app"
 
 const authStore = useAuthStore()
+const appStore = useAppStore()
+const emitter = useNuxtApp().$emitter as any
+const toast = useToast()
 const db = useIndexedDB()
 const loading = ref<boolean>(true)
 const cachedTableSize = ref<number>(0)
 const libraryTableSize = ref<number>(0)
 const bibleAndHymnsTableSize = ref<number>(0)
-const mediaTableSize = ref<number>(0)
 const deletePrompt = ref<boolean>(false)
 const deletePromptText = ref<string>("")
 const activeTab = ref<number>(0)
+
+// ── Per-file media visibility ──────────────────────────────────────────────
+type MediaKind = "video" | "image" | "audio" | "presentation" | "other"
+
+interface MediaGroup {
+  baseId: string
+  ids: string[]
+  size: number // bytes
+  sizeMB: number
+  kind: MediaKind
+  name: string
+  subtitle: string
+  slideExists: boolean
+}
+
+const kindMeta: Record<
+  MediaKind,
+  { icon: string; label: string; class: string }
+> = {
+  video: { icon: "i-lucide-play", label: "VIDEO", class: "bg-blue-500" },
+  image: { icon: "i-lucide-image", label: "IMAGE", class: "bg-teal-500" },
+  audio: {
+    icon: "i-lucide-audio-lines",
+    label: "AUDIO",
+    class: "bg-emerald-500",
+  },
+  presentation: {
+    icon: "i-lucide-presentation",
+    label: "SLIDES",
+    class: "bg-purple-500",
+  },
+  other: { icon: "i-lucide-file", label: "FILE", class: "bg-gray-500" },
+}
+
+const mediaGroups = ref<MediaGroup[]>([])
+const mediaExpanded = ref<boolean>(false)
+const removeAllMediaPrompt = ref<boolean>(false)
+
+const mediaTableSize = computed(() =>
+  mediaGroups.value.reduce((total, group) => total + group.sizeMB, 0)
+)
+
+const getMediaKind = (mime: string, pageCount: number): MediaKind => {
+  if (pageCount > 1) return "presentation"
+  if (mime.startsWith("video") || ["youtube", "vimeo"].includes(mime))
+    return "video"
+  if (mime.startsWith("image")) return "image"
+  if (mime.startsWith("audio")) return "audio"
+  return "other"
+}
+
+const getTypeLabel = (mime: string, name: string): string => {
+  const ext = name?.split(".").pop()
+  if (ext && ext !== name && ext.length <= 4) return ext.toUpperCase()
+  const subtype = mime?.split("/")?.[1]
+  return subtype ? subtype.toUpperCase() : "FILE"
+}
 
 const maxCloudStorage = 100 // 100 MB max storage per user
 const cloudStorageUsed = computed(() => {
@@ -265,13 +407,97 @@ const getStoreSize = async (store: any) => {
   return storeSize
 }
 
-const calculateMediaTableSize = async () => {
-  let totalSize = 0
-  // console.log("mediaTableSize", await db.media.count())
-  await db.media.each((item: Media) => {
-    totalSize += (item?.data as ArrayBuffer)?.byteLength || 0
-  })
-  mediaTableSize.value = totalSize / 1024 / 1024
+const loadMediaFiles = async () => {
+  const slideMap = new Map<string, Slide>(
+    appStore.currentState.activeSlides
+      ?.filter((slide) => slide?.id)
+      .map((slide) => [slide.id, slide])
+  )
+  const groups = new Map<
+    string,
+    { ids: string[]; size: number; mime: string }
+  >()
+
+  await safeDBOperation((database) =>
+    database.media.each((item: Media) => {
+      const id = item.id
+      const baseId = id.includes("-page-") ? id.split("-page-")[0] : id
+      const size =
+        (item?.data as ArrayBuffer)?.byteLength || item?.content?.size || 0
+
+      let group = groups.get(baseId)
+      if (!group) {
+        group = { ids: [], size: 0, mime: item?.content?.type || "" }
+        groups.set(baseId, group)
+      }
+      group.ids.push(id)
+      group.size += size
+    })
+  )
+
+  mediaGroups.value = Array.from(groups.entries())
+    .map(([baseId, group]) => {
+      const slide = slideMap.get(baseId)
+      const kind = getMediaKind(group.mime, group.ids.length)
+      const name =
+        slide?.name ||
+        (slide?.data as any)?.name ||
+        `Media ${baseId.slice(0, 6)}`
+      const sizeMB = group.size / 1024 / 1024
+      const subtitle =
+        kind === "presentation"
+          ? `Presentation · ${group.ids.length} pages`
+          : getTypeLabel(group.mime, name) + (slide ? "" : " · unused")
+
+      return {
+        baseId,
+        ids: group.ids,
+        size: group.size,
+        sizeMB,
+        kind,
+        name,
+        subtitle,
+        slideExists: !!slide,
+      }
+    })
+    .sort((a, b) => b.size - a.size)
+}
+
+const deleteMediaGroup = async (group: MediaGroup) => {
+  mediaGroups.value = mediaGroups.value.filter(
+    (item) => item.baseId !== group.baseId
+  )
+
+  if (group.slideExists) {
+    // Reuse full slide-deletion flow (API + socket broadcast + DB cleanup,
+    // respecting any copy saved in the Library).
+    emitter.emit("delete-slide", { id: group.baseId })
+  } else {
+    // Orphaned media record with no owning slide — free it directly.
+    for (const id of group.ids) {
+      await safeDBOperation((database) => database.media.delete(id))
+    }
+  }
+
+  toast.add({ title: `${group.name} removed`, icon: "i-tabler-trash" })
+}
+
+const removeAllMedia = async () => {
+  const groups = [...mediaGroups.value]
+  mediaGroups.value = []
+  removeAllMediaPrompt.value = false
+
+  for (const group of groups) {
+    if (group.slideExists) {
+      emitter.emit("delete-slide", { id: group.baseId })
+    } else {
+      for (const id of group.ids) {
+        await safeDBOperation((database) => database.media.delete(id))
+      }
+    }
+  }
+
+  toast.add({ title: "All media files removed", icon: "i-tabler-trash" })
 }
 
 const calculateBackgroundVideosAndImagesTableSize = async () => {
@@ -301,15 +527,9 @@ const deleteAllData = async () => {
   loading.value = false
 }
 
-// calculateMediaTableSize()
-// calculateBackgroundVideosAndImagesTableSize()
-// calculateLibraryTableSize()
-// calculateBibleAndHymnsTableSize()
-// loading.value = false
-
 onMounted(async () => {
   loading.value = true
-  await calculateMediaTableSize()
+  await loadMediaFiles()
   await calculateBackgroundVideosAndImagesTableSize()
   await calculateLibraryTableSize()
   await calculateBibleAndHymnsTableSize()
