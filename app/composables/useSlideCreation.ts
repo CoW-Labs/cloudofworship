@@ -145,7 +145,7 @@ export default function useSlideCreation() {
     const rawHymnVerse = hymn.verses?.[0]?.trim() ?? ""
     const linesPerSlide = appStore.currentState.settings.slideStyles.linesPerSlide
     const hymnChunks = splitVerseByLines(rawHymnVerse, linesPerSlide)
-    const currentHymnVerse = hymnChunks[0]
+    const currentHymnVerse = hymnChunks[0] ?? ""
     tempSlide.hymnSubVerseIndex = 0
     tempSlide.hymnSubVerseTotal = hymnChunks.length
     const fontSize = useScreenFontSize(currentHymnVerse)
