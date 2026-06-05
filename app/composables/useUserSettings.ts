@@ -88,6 +88,9 @@ export const useUserSettings = () => {
           songAndHymnLabelsVisibility: userSettings.songAndHymnLabelsVisibility,
           liveWindowFullscreen: userSettings.liveWindowFullscreen,
           closeLiveWindowWithOperator: userSettings.closeLiveWindowWithOperator,
+          transcriptionAutoActions: userSettings.transcriptionAutoActions ?? true,
+          transcriptionVoiceBibleVersionCommands:
+            userSettings.transcriptionVoiceBibleVersionCommands ?? true,
           transitionInterval: userSettings.transitionInterval,
           alertLimit: userSettings.alertLimit,
         }
@@ -144,6 +147,9 @@ export const useUserSettings = () => {
         songAndHymnLabelsVisibility: settingsToSave.songAndHymnLabelsVisibility,
         liveWindowFullscreen: settingsToSave.liveWindowFullscreen,
         closeLiveWindowWithOperator: settingsToSave.closeLiveWindowWithOperator,
+        transcriptionAutoActions: settingsToSave.transcriptionAutoActions ?? true,
+        transcriptionVoiceBibleVersionCommands:
+          settingsToSave.transcriptionVoiceBibleVersionCommands ?? true,
         transitionInterval: settingsToSave.transitionInterval,
         alertLimit: settingsToSave.alertLimit,
       }
