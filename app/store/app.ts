@@ -96,6 +96,8 @@ export const useAppStore = defineStore("app", {
           songAndHymnLabelsVisibility: false,
           liveWindowFullscreen: true, // Default to fullscreen mode
           closeLiveWindowWithOperator: false, // Default: live window stays open when operator tab closes
+          transcriptionAutoActions: true,
+          transcriptionVoiceBibleVersionCommands: true,
           // motionlessSlides: true,
           transitionInterval: 0.7,
           slideStyles: {
@@ -185,11 +187,13 @@ export const useAppStore = defineStore("app", {
       ])
       // console.log('appending active slide', [...this.currentState.activeSlides])
       if (!this.currentState.activeSlides.find((s) => s?.id === slide?.id)) {
-        if (position && position >= 0) {
-          this.currentState.activeSlides.splice(position, 0, slide)
+        const nextSlides = [...this.currentState.activeSlides]
+        if (position !== undefined && position >= 0) {
+          nextSlides.splice(position, 0, slide)
         } else {
-          this.currentState.activeSlides.push(slide)
+          nextSlides.push(slide)
         }
+        this.currentState.activeSlides = ensureUniqueIds(nextSlides)
         this.currentState.liveOutputSlidesId = Array.from(
           new Set(this.currentState.activeSlides.map((slide) => slide?.id))
         )
@@ -265,7 +269,12 @@ export const useAppStore = defineStore("app", {
       this.currentState.emitter = emitter
     },
     setAppSettings(settings: AppSettings) {
-      this.currentState.settings = settings
+      this.currentState.settings = {
+        ...settings,
+        transcriptionAutoActions: settings.transcriptionAutoActions ?? true,
+        transcriptionVoiceBibleVersionCommands:
+          settings.transcriptionVoiceBibleVersionCommands ?? true,
+      }
     },
     setSlideStyles(styles: SlideStyle) {
       this.currentState.settings = {
@@ -307,11 +316,15 @@ export const useAppStore = defineStore("app", {
     },
     setDefaultSlideBackgrounds() {
       if (this.currentState.backgroundVideos.length >= 4) {
+        const bibleBackgroundVideo = this.currentState.backgroundVideos[2]
+        const textBackgroundVideo = this.currentState.backgroundVideos[3]
+        if (!bibleBackgroundVideo || !textBackgroundVideo) return
+
         this.currentState.settings.defaultBackground.hymn.background =
           this.currentState.settings.defaultBackground.bible.background =
-          this.currentState.backgroundVideos[2].url
+          bibleBackgroundVideo.url
         this.currentState.settings.defaultBackground.text.background =
-          this.currentState.backgroundVideos[3].url
+          textBackgroundVideo.url
       }
     },
     setRecentBibleSearches(searchQuery: string) {
@@ -532,6 +545,8 @@ export const useAppStore = defineStore("app", {
         } as SlideStyle,
         bibleVersions: bibleVersionObjects, // Check app.vue for bible versions array in a list
         songAndHymnLabelsVisibility: false,
+        transcriptionAutoActions: true,
+        transcriptionVoiceBibleVersionCommands: true,
       })
       this.setBackgroundVideos([])
       this.setDefaultSlideBackgrounds()

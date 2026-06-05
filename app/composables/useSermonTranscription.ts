@@ -2,6 +2,12 @@ import { ref, computed, onUnmounted } from 'vue'
 import { useAppStore } from '~/store/app'
 import type { TranscriptSegment, BibleReference } from '~/types/transcript'
 import { appWideActions } from '~/utils/constants'
+import {
+  detectBibleVersionVoiceCommand,
+  detectVerseGotoCommand,
+  detectVerseVoiceCommand,
+  type VerseVoiceCommand,
+} from '~/utils/voiceCommands'
 
 interface TranscriptionState {
   isTranscribing: boolean
@@ -190,42 +196,9 @@ export default function useSermonTranscription() {
   }
 
   /**
-   * Detect voice commands in the transcript
-   * Returns the command type if found, null otherwise
-   */
-  const detectVoiceCommand = (text: string): 'next-verse' | 'previous-verse' | null => {
-    const lowerText = text.toLowerCase()?.trim()
-
-    // Check for "next verse" command
-    if (
-      lowerText.includes('next verse') ||
-      lowerText.includes('next first') || // Speech recognition might mishear
-      lowerText === 'next' ||
-      lowerText.includes('go to next verse') ||
-      lowerText.includes('go next verse')
-    ) {
-      return 'next-verse'
-    }
-
-    // Check for "previous verse" command
-    if (
-      lowerText.includes('previous verse') ||
-      lowerText.includes('last verse') ||
-      lowerText.includes('go back') ||
-      lowerText.includes('go to previous verse') ||
-      lowerText.includes('go to last verse') ||
-      lowerText.includes('go previous verse')
-    ) {
-      return 'previous-verse'
-    }
-
-    return null
-  }
-
-  /**
    * Execute a voice command
    */
-  const executeVoiceCommand = (command: 'next-verse' | 'previous-verse') => {
+  const executeVoiceCommand = (command: VerseVoiceCommand) => {
     if (command === 'next-verse') {
       // Emit the next verse event
       useGlobalEmit(appWideActions.nextVerse)
@@ -235,6 +208,37 @@ export default function useSermonTranscription() {
       useGlobalEmit(appWideActions.previousVerse)
       console.log('Voice command: previous verse')
     }
+  }
+
+  const executeGotoVerseNumberCommand = (verseNumber: number) => {
+    useGlobalEmit(appWideActions.gotoVerseNumber, verseNumber)
+    console.log(`Voice command: go to verse ${verseNumber}`)
+  }
+
+  const executeBibleVersionCommand = (version: string) => {
+    useGlobalEmit(appWideActions.changeBibleVersion, version)
+    console.log(`Voice command: change Bible version to ${version}`)
+  }
+
+  const getAvailableBibleVersionsForVoice = () => {
+    const settings = appStore.currentState.settings
+    const availableVersions =
+      settings.bibleVersions?.filter((version) =>
+        version?.isDownloaded || version?.id === settings.defaultBibleVersion
+      ) || []
+
+    if (
+      settings.defaultBibleVersion &&
+      !availableVersions.some((version) => version?.id === settings.defaultBibleVersion)
+    ) {
+      availableVersions.push({
+        id: settings.defaultBibleVersion,
+        name: settings.defaultBibleVersion,
+        isDownloaded: true,
+      })
+    }
+
+    return availableVersions
   }
 
   /**
@@ -420,10 +424,30 @@ export default function useSermonTranscription() {
     const cleanedText = text.trim()
 
     // Check for voice commands first
-    const voiceCommand = detectVoiceCommand(cleanedText)
-    if (voiceCommand) {
-      executeVoiceCommand(voiceCommand)
-      // Still add to transcript so user can see what was said
+    if (appStore.currentState.settings.transcriptionAutoActions ?? true) {
+      const gotoVerseNumber = detectVerseGotoCommand(cleanedText)
+      const versionCommand =
+        !gotoVerseNumber &&
+        (appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ?? true)
+          ? detectBibleVersionVoiceCommand(
+              cleanedText,
+              getAvailableBibleVersionsForVoice()
+            )
+          : null
+      const voiceCommand = gotoVerseNumber || versionCommand
+        ? null
+        : detectVerseVoiceCommand(cleanedText)
+
+      if (gotoVerseNumber) {
+        executeGotoVerseNumberCommand(gotoVerseNumber)
+        // Still add to transcript so user can see what was said
+      } else if (versionCommand) {
+        executeBibleVersionCommand(versionCommand)
+        // Still add to transcript so user can see what was said
+      } else if (voiceCommand) {
+        executeVoiceCommand(voiceCommand)
+        // Still add to transcript so user can see what was said
+      }
     }
 
     const references = useBibleReferenceParser(cleanedText)
@@ -542,13 +566,6 @@ export default function useSermonTranscription() {
     usedMinutes: deepgram.usedMinutes,
     isTeamsPlan,
     useDeepgramEngine,
-
-    // Scripture results streamed from the server (Deepgram path only).
-    // Falls back to an empty array for the Web Speech (free) path; the panel
-    // continues to use its own `useScriptureSearch` HTTP fetch there.
-    deepgramScriptureResults: computed(() =>
-      useDeepgramEngine.value ? deepgram.scriptureResults.value : [],
-    ),
 
     // Actions
     startTranscription,
