@@ -1,4 +1,3 @@
-import { useFetch } from "#app";
 import type { AsyncDataRequestStatus } from "#app";
 import type { Ref } from "vue";
 import { useOnline } from "@vueuse/core";
@@ -19,7 +18,7 @@ type APIFetchResult<ResT = any, ErrorT = any> = {
   status: Ref<AsyncDataRequestStatus>;
 };
 
-// wrap useFetch with configuration needed to talk to our API
+// wrap $fetch with auth headers, offline queuing, and error handling needed to talk to our API
 export const useAPIFetch = async <ResT = any, ErrorT = any>(
   path: any,
   options: any = {}
@@ -51,12 +50,6 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
     Authorization: `Bearer ${tokenValue}`,
     ...(config.public.NODE_ENV === 'development' ? { "x-dev-token": config.public.DEV_TOKEN } : {})
   };
-
-  // Unique key per GET call so Nuxt never returns a stale cached response.
-  // Mutations are handled with $fetch below, outside Nuxt async-data caching.
-  if (!isMutation) {
-    options.key = `${String(path)}-${Date.now()}`;
-  }
 
   const { getDelayPromise } = useRequestCounter();
 
@@ -228,5 +221,60 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
     };
   }
 
-  return useFetch<ResT, ErrorT>(path, options) as unknown as APIFetchResult<ResT, ErrorT>;
+  // Use $fetch directly instead of useFetch to avoid Nuxt's "useFetch called after mount"
+  // warning. This composable is frequently called inside lifecycle hooks and async event
+  // handlers where useFetch is not allowed. Since we generate unique keys (Date.now) the
+  // Nuxt dedup/cache layer was already a no-op, so the behaviour is identical.
+  const fetchData = ref<ResT | null>(null) as Ref<ResT | null | undefined>;
+  const fetchError = ref<ErrorT | null>(null) as Ref<ErrorT | null | undefined>;
+  const fetchPending = ref(false);
+  const fetchStatus = ref<AsyncDataRequestStatus>("idle");
+
+  const fetchOptions = { ...options };
+  delete fetchOptions.key;
+  delete fetchOptions.dedupe;
+  delete fetchOptions.watch;
+
+  const clear = () => {
+    fetchData.value = null;
+    fetchError.value = null;
+    fetchPending.value = false;
+    fetchStatus.value = "idle";
+  };
+
+  const executeGet = async () => {
+    fetchPending.value = true;
+    fetchError.value = null;
+    fetchStatus.value = "pending";
+
+    try {
+      fetchData.value = await $fetch<ResT>(path as string, fetchOptions);
+      fetchStatus.value = "success";
+    } catch (err: any) {
+      fetchError.value = err as ErrorT;
+      fetchStatus.value = "error";
+      const response = err?.response || err;
+      const responseStatus = response?.status || response?.statusCode;
+
+      if (responseStatus) {
+        handleResponseError(response);
+      } else {
+        handleRequestError(err);
+      }
+    } finally {
+      fetchPending.value = false;
+    }
+  };
+
+  await executeGet();
+
+  return {
+    data: fetchData,
+    error: fetchError,
+    pending: fetchPending,
+    refresh: executeGet,
+    execute: executeGet,
+    clear,
+    status: fetchStatus,
+  };
 };
