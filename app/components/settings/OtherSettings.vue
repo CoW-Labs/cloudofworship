@@ -14,16 +14,11 @@
         >
           <span class="text-sm whitespace-nowrap">5</span>
           <URange
-            :model-value="currentState.settings.transitionInterval"
+            :model-value="currentState.settings.alertLimit ?? 5"
             :min="5"
             :max="30"
             :step="1"
-            @change="
-              appStore.setAppSettings({
-                ...appStore.currentState.settings,
-                alertLimit: $event,
-              })
-            "
+            @change="updateSetting('alertLimit', Number($event))"
           />
           <span class="text-sm whitespace-nowrap"> 30</span>
         </div>
