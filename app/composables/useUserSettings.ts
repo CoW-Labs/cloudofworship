@@ -20,7 +20,14 @@ export const useUserSettings = () => {
    */
   const saveSettingsLocally = (settings: AppSettings) => {
     lastLocalSaveTimestamp = Date.now()
-    appStore.setAppSettings(settings)
+
+    // When this is called from a watcher that is already responding to the
+    // current store settings, writing the same settings back into Pinia creates
+    // a new object reference and retriggers the watcher indefinitely. Only write
+    // to the store when the caller is providing a distinct settings object.
+    if (settings !== appStore.currentState.settings) {
+      appStore.setAppSettings(settings)
+    }
   }
 
   /**
