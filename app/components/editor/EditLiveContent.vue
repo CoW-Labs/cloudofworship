@@ -25,7 +25,7 @@
               <!-- Editing by indicator -->
               <UTooltip
                 v-if="editingBy"
-                :text="`${editingBy.userName} is editing this slide`"
+                :text="`${editingBy.userName} is on this slide`"
                 :popper="{ placement: 'bottom' }"
               >
                 <div
