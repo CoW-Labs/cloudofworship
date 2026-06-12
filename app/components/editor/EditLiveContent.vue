@@ -25,7 +25,7 @@
               <!-- Editing by indicator -->
               <UTooltip
                 v-if="editingBy"
-                :text="`${editingBy.userName} is editing this slide`"
+                :text="`${editingBy.userName} is on this slide`"
                 :popper="{ placement: 'bottom' }"
               >
                 <div
@@ -225,6 +225,27 @@
                   slide?.layout !== slideLayoutTypes.bible,
               }"
             >
+              <UPopover
+                v-if="slide?.type === slideTypes.bible"
+                v-model:open="gotoScriptureOpen"
+              >
+                <UTooltip text="Go to scripture" :popper="{ arrow: true }">
+                  <UButton
+                    variant="ghost"
+                    class="px-1.5"
+                    icon="i-bx-book-open"
+                    :disabled="!slide"
+                  />
+                </UTooltip>
+                <template #panel>
+                  <GotoScripture
+                    :verse="verse"
+                    :version="selectedBibleVersion"
+                    @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
+                    @close="gotoScriptureOpen = false"
+                  />
+                </template>
+              </UPopover>
               <UPopover v-model:open="bgEditBgPopoverOpen">
                 <UTooltip text="Style background" :popper="{ arrow: true }">
                   <UButton
@@ -478,6 +499,7 @@ const bgImagePopoverOpen = ref<boolean>(false)
 const bgVideoPopoverOpen = ref<boolean>(false)
 const bgColorPopoverOpen = ref<boolean>(false)
 const themePopoverOpen = ref<boolean>(false)
+const gotoScriptureOpen = ref<boolean>(false)
 const slideContents = ref<Array<string>>([])
 const verse = ref<string>(props.slide?.title || "")
 const searchedBibleBookOptions = ref<string[]>([])
@@ -717,6 +739,8 @@ watch(
       // Different slide — always reset verse
       verse.value = newSlide?.title || ""
       slideContents.value = [...(newSlide?.contents || [])]
+      // Close the scripture picker — it was tied to the previous slide
+      gotoScriptureOpen.value = false
     } else if (newSlide?.title !== oldSlide?.title && !verseInputFocused) {
       // Same slide, title updated (e.g. after a successful gotoVerse) — update
       verse.value = newSlide?.title || ""

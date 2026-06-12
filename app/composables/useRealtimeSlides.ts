@@ -29,6 +29,13 @@ const tabSessionId = `tab-${Date.now()}-${Math.random().toString(36).substring(2
 // Export the tab session ID for use in other modules
 export { tabSessionId }
 
+// Set true for one tick while we apply a live-slide selection received from a
+// peer, so the `liveSlideId` watcher in pages/index.vue does NOT re-broadcast
+// it back out. Without this guard, every client that receives a live-slide
+// would echo it to the room — harmless (it converges on value equality) but it
+// turns one selection into O(peers) extra socket frames. See index.vue.
+export const suppressLiveSlideBroadcast = ref(false)
+
 export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const appStore = useAppStore()
   const authStore = useAuthStore()
@@ -39,7 +46,9 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const onlineCount = computed(() => onlineUsers.value.length)
 
   // Track which slides are being edited by others (using Record for localStorage compatibility)
-  const slidesBeingEdited = ref<Record<string, { userId: string; userName: string }>>({})
+  const slidesBeingEdited = ref<
+    Record<string, { userId: string; userName: string; avatar?: string; theme?: string }>
+  >({})
 
   // Track slide locks
   const slideLocks = ref<Record<string, SlideEditLock>>({})
@@ -144,7 +153,14 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             const existingSlide = appStore.currentState.activeSlides[slideIndex]
             const mergedSlide = { ...existingSlide, ...updatedSlide }
 
-            appStore.currentState.activeSlides.splice(slideIndex, 1, mergedSlide)
+            // Reassign the array reference (not an in-place splice) so shallow
+            // watchers re-fire. PreviewContent keeps a filtered copy of the
+            // slides synced via `watch(() => activeSlides)`, which only triggers
+            // on reference change — an in-place splice would update LiveOutput
+            // (a computed) but leave the preview grid and editor stale.
+            const nextSlides = [...appStore.currentState.activeSlides]
+            nextSlides.splice(slideIndex, 1, mergedSlide)
+            appStore.setActiveSlides(nextSlides)
             options.onSlideUpdated?.(mergedSlide, data.updatedByName)
 
             // If slide is live, update the live output
@@ -198,16 +214,24 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         if (data.tabId === tabSessionId) return
 
         if (data.slides && Array.isArray(data.slides)) {
+          // Build a new array reference so shallow watchers (PreviewContent
+          // keeps a filtered copy synced via `watch(() => activeSlides)`)
+          // re-fire. In-place splices update LiveOutput (a computed) but leave
+          // the preview grid and editor stale.
+          const nextSlides = [...appStore.currentState.activeSlides]
+          let changed = false
           data.slides.forEach((updatedSlide: Slide) => {
-            const slideIndex = appStore.currentState.activeSlides.findIndex(
+            const slideIndex = nextSlides.findIndex(
               (s) => s.id === updatedSlide.id || s._id === updatedSlide._id
             )
             if (slideIndex !== -1) {
-              const existingSlide = appStore.currentState.activeSlides[slideIndex]
+              const existingSlide = nextSlides[slideIndex]
               const mergedSlide = { ...existingSlide, ...updatedSlide }
-              appStore.currentState.activeSlides.splice(slideIndex, 1, mergedSlide)
+              nextSlides.splice(slideIndex, 1, mergedSlide)
+              changed = true
             }
           })
+          if (changed) appStore.setActiveSlides(nextSlides)
           options.onBatchSlidesUpdated?.(data.slides, data.updatedByName)
         }
         break
@@ -258,10 +282,18 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         slidesBeingEdited.value[data.slideId] = {
           userId: data.userId,
           userName: data.userName,
+          avatar: data.avatar,
+          theme: data.theme,
         }
 
-        // Also update store for component reactivity
-        appStore.setSlideBeingEdited(data.slideId, data.userId, data.userName)
+        // Also update store for component reactivity (carries avatar/theme so
+        // the slide card can render the user's avatar, not just an initial).
+        appStore.setSlideBeingEdited(data.slideId, {
+          userId: data.userId,
+          userName: data.userName,
+          avatar: data.avatar,
+          theme: data.theme,
+        })
 
         options.onSlideEditing?.(data.slideId, data.userName)
 
@@ -331,9 +363,26 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         }
         break
 
-      case 'live-slide':
-        // Handle live slide updates (existing functionality)
+      case 'live-slide': {
+        // A peer took a slide live — mirror their selection locally and drive
+        // this operator's projection window. Cheap and infrequent: one id
+        // compare, one store write, one find, one broadcast per change.
+        const liveId = data?.id || data?._id || data?.slideId
+        if (!liveId || appStore.currentState.liveSlideId === liveId) break
+
+        // Suppress the index.vue watcher so we don't bounce this selection
+        // straight back out to the room.
+        suppressLiveSlideBroadcast.value = true
+        appStore.setLiveSlide(liveId)
+
+        // Project the fully-hydrated local copy (it carries client-only `data`
+        // that the server payload may not), falling back to the wire payload.
+        const localSlide = appStore.currentState.activeSlides.find(
+          (s) => s.id === liveId || s._id === liveId
+        )
+        useBroadcastPost(JSON.stringify(localSlide || data))
         break
+      }
     }
   }
 

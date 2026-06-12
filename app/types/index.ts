@@ -336,5 +336,8 @@ export interface AppState {
   defaultCameraId: string
   // Realtime collaboration
   onlineUsers: Array<OnlineUser>
-  slidesBeingEdited: Record<string, { userId: string; userName: string }>
+  slidesBeingEdited: Record<
+    string,
+    { userId: string; userName: string; avatar?: string; theme?: string }
+  >
 }

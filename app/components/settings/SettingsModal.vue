@@ -59,7 +59,9 @@
             <!-- DISPLAY SETTINGS -->
             <DisplaySettings v-else-if="activeTab === 'Display Settings'" />
             <!-- CAMERA & MIC SETTINGS -->
-            <CameraAndMicSettings v-else-if="activeTab === 'Camera & Mic Settings'" />
+            <CameraAndMicSettings
+              v-else-if="activeTab === 'Microphone Settings'"
+            />
             <!-- SLIDE SETTINGS -->
             <SlideSettings
               v-else-if="activeTab === 'Slide Settings'"
@@ -94,13 +96,14 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
-const { fetchUserSettings, saveSettingsLocally, debouncedSaveSettings } = useUserSettings()
+const { fetchUserSettings, saveSettingsLocally, debouncedSaveSettings } =
+  useUserSettings()
 const settingsModalOpen = ref(props.isOpen)
 const tabs = [
   { name: "Account/Profile Settings", active: false },
   { name: "Subscription Settings", active: false },
   { name: "Display Settings", active: false },
-  { name: "Camera & Mic Settings", active: false },
+  { name: "Microphone Settings", active: false },
   { name: "Slide Settings", active: false },
   { name: "Slide Background Settings", active: false },
   { name: "Bible Version Settings", active: false },
