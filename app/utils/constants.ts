@@ -418,10 +418,10 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-ph-camera",
-    name: "Camera & Mic Settings",
+    name: "Microphone Settings",
     desc: "Set up camera and microphone for transcription",
     action: appWideActions.openSettings,
-    actionArg: "Camera & Mic Settings",
+    actionArg: "Microphone Settings",
     meta: "camera microphone audio video input device transcription",
     searchableOnly: true,
     tier: "free",
