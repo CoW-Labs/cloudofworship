@@ -132,7 +132,10 @@ export const useAppStore = defineStore("app", {
         defaultMicrophoneId: "",
         defaultCameraId: "",
         onlineUsers: [] as OnlineUser[],
-        slidesBeingEdited: {} as Record<string, { userId: string; userName: string }>,
+        slidesBeingEdited: {} as Record<
+          string,
+          { userId: string; userName: string; avatar?: string; theme?: string }
+        >,
         // activeLiveWindows: [] as any[]
       },
       // Undo/Redo stacks
@@ -224,8 +227,13 @@ export const useAppStore = defineStore("app", {
         ...this.currentState.activeSlides,
       ])
       // onAppStateChange(this.pastStates, this.currentState)
-      this.currentState.activeSlides.splice(slideIndex, 1)
-      // console.log("removing active slide", this.currentState.activeSlides)
+      // Reassign the array reference (not an in-place splice) so shallow
+      // watchers re-fire. PreviewContent keeps a filtered copy synced via
+      // `watch(() => activeSlides)`, which only triggers on reference change.
+      // !! - IMPACTS PERFORMANCE SLIGHTLY
+      const nextSlides = [...this.currentState.activeSlides]
+      nextSlides.splice(slideIndex, 1)
+      this.currentState.activeSlides = nextSlides
       this.currentState.liveOutputSlidesId = Array.from(
         new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
@@ -602,8 +610,11 @@ export const useAppStore = defineStore("app", {
         (u) => u.userId !== userId
       )
     },
-    setSlideBeingEdited(slideId: string, userId: string, userName: string) {
-      this.currentState.slidesBeingEdited[slideId] = { userId, userName }
+    setSlideBeingEdited(
+      slideId: string,
+      user: { userId: string; userName: string; avatar?: string; theme?: string }
+    ) {
+      this.currentState.slidesBeingEdited[slideId] = { ...user }
     },
     clearSlideBeingEdited(slideId: string) {
       delete this.currentState.slidesBeingEdited[slideId]

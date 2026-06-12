@@ -136,6 +136,13 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
           description: 'Go to Settings → Bible Versions to download it.',
           icon: 'i-bx-download',
           color: 'amber',
+          actions: [
+            {
+              label: 'Download Bible version',
+              click: () =>
+                useGlobalEmit(appWideActions.openSettings, 'Bible Version Settings'),
+            },
+          ],
         })
       } else {
         toast.add({
