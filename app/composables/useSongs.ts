@@ -54,6 +54,35 @@ export default function useSongs() {
   }
 
   /**
+   * Proactive duplicate check: returns existing songs that look like duplicates
+   * of the given title (similarity-filtered server-side, so it's empty for a
+   * genuinely new song). Stays quiet on error — it's a non-blocking hint.
+   */
+  const findSimilarSongs = async (
+    title: string,
+    artist = '',
+    lyrics = ''
+  ): Promise<Song[]> => {
+    const query = title?.trim()
+    if (!query || query.length < 2) return []
+    try {
+      // POST so the full lyrics (the strongest signal, too long for a URL) ride
+      // in the body. Returns only genuine near-duplicates, empty for a new song.
+      const { data, error } = await useAPIFetch(
+        `/church/${churchId}/songs/duplicates`,
+        {
+          method: 'POST',
+          body: { title: query, artist: artist?.trim(), lyrics: lyrics?.trim(), churchId },
+        }
+      )
+      if (error.value) return []
+      return ((data.value as any)?.data?.data || []) as Song[]
+    } catch {
+      return []
+    }
+  }
+
+  /**
    * Get all songs for the church
    */
   const getAllSongs = async (): Promise<Song[]> => {
@@ -332,6 +361,7 @@ export default function useSongs() {
     loading,
     songs,
     searchSongs,
+    findSimilarSongs,
     getAllSongs,
     getSongsCount,
     getSongById,
