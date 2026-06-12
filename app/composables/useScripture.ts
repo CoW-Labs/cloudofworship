@@ -12,6 +12,8 @@ interface VersionIndex {
   bookSet: Set<number>
   /** Set of "book:chapter" strings (for fast "chapter not found" check) */
   chapterSet: Set<string>
+  /** "book:chapter" → highest verse number (for the scripture picker) */
+  chapterVerseCounts: Map<string, number>
   data: BibleVerse[]
 }
 const versionIndexCache = new Map<string, VersionIndex>()
@@ -21,6 +23,7 @@ function buildIndex(version: string, data: BibleVerse[]): VersionIndex {
   const verseMap = new Map<string, number>()
   const bookSet = new Set<number>()
   const chapterSet = new Set<string>()
+  const chapterVerseCounts = new Map<string, number>()
 
   for (let i = 0; i < data.length; i++) {
     const v = data[i]
@@ -30,10 +33,14 @@ function buildIndex(version: string, data: BibleVerse[]): VersionIndex {
     const vs = Number(v.verse)
     verseMap.set(`${b}:${c}:${vs}`, i)
     bookSet.add(b)
-    chapterSet.add(`${b}:${c}`)
+    const chapterKey = `${b}:${c}`
+    chapterSet.add(chapterKey)
+    if (vs > (chapterVerseCounts.get(chapterKey) ?? 0)) {
+      chapterVerseCounts.set(chapterKey, vs)
+    }
   }
 
-  const index: VersionIndex = { verseMap, bookSet, chapterSet, data }
+  const index: VersionIndex = { verseMap, bookSet, chapterSet, chapterVerseCounts, data }
   versionIndexCache.set(version, index)
   return index
 }
@@ -71,6 +78,24 @@ export const prewarmScriptureVersion = async (version: string = ''): Promise<voi
   const appStore = useAppStore()
   const resolvedVersion = version || appStore.currentState.settings.defaultBibleVersion || 'KJV'
   await getVersionIndex(resolvedVersion, db)
+}
+
+/**
+ * Number of verses in a given book/chapter for a Bible version.
+ * Reads from the cached version index (built once per session), so repeated
+ * calls while browsing the scripture picker incur no IndexedDB reads.
+ * Returns 0 when the version isn't downloaded or the chapter doesn't exist.
+ */
+export const getChapterVerseCount = async (
+  book: number,
+  chapter: number,
+  version: string = ''
+): Promise<number> => {
+  const db = useIndexedDB()
+  const appStore = useAppStore()
+  const resolvedVersion = version || appStore.currentState.settings.defaultBibleVersion || 'KJV'
+  const index = await getVersionIndex(resolvedVersion, db)
+  return index?.chapterVerseCounts.get(`${book}:${chapter}`) ?? 0
 }
 
 const useScripture = async (label: string = '1:1:1', version: string = ''): Promise<Scripture | null> => {
