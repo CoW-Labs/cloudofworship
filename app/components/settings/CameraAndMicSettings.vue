@@ -123,8 +123,7 @@
     <UDivider />
 
     <!-- ─── CAMERA SECTION ────────────────────────────────────── -->
-    <div class="camera-section flex flex-col gap-2">
-      <!-- Active camera card -->
+    <!-- <div class="camera-section flex flex-col gap-2">
       <div class="sub-header">
         <h3 class="font-medium">Active Camera</h3>
         <p class="text-xs opacity-50 mb-2 mt-1">
@@ -165,7 +164,6 @@
         </div>
       </div>
 
-      <!-- Available cameras list -->
       <div class="flex items-center justify-between mt-2">
         <h3 class="font-medium">Available Cameras</h3>
         <UButton
@@ -238,7 +236,7 @@
           @change="($event: any) => handleCamSelect($event, cam)"
         />
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 
@@ -278,7 +276,10 @@ const getMicrophoneList = async () => {
       appStore.setDefaultMicrophone("")
     }
   } catch (err: any) {
-    if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+    if (
+      err?.name === "NotAllowedError" ||
+      err?.name === "PermissionDeniedError"
+    ) {
       micPermissionDenied.value = true
     } else {
       useToast().add({
@@ -300,7 +301,10 @@ const handleMicSelect = (checked: boolean, mic: MediaDeviceInfo) => {
     })
   } else {
     appStore.setDefaultMicrophone("")
-    useToast().add({ title: "Default microphone cleared", icon: "i-bx-microphone-off" })
+    useToast().add({
+      title: "Default microphone cleared",
+      icon: "i-bx-microphone-off",
+    })
   }
 }
 
@@ -334,7 +338,10 @@ const getCameraList = async () => {
       appStore.setDefaultCamera("")
     }
   } catch (err: any) {
-    if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+    if (
+      err?.name === "NotAllowedError" ||
+      err?.name === "PermissionDeniedError"
+    ) {
       camPermissionDenied.value = true
     } else {
       useToast().add({
@@ -363,11 +370,11 @@ const handleCamSelect = (checked: boolean, cam: MediaDeviceInfo) => {
 // ── Lifecycle ───────────────────────────────────────────────────
 const onDeviceChange = () => {
   getMicrophoneList()
-  getCameraList()
+  // getCameraList()
 }
 
 onMounted(async () => {
-  await Promise.all([getMicrophoneList(), getCameraList()])
+  await Promise.all([getMicrophoneList()])
   navigator.mediaDevices.addEventListener("devicechange", onDeviceChange)
 })
 
