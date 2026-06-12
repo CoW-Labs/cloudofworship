@@ -34,6 +34,27 @@ export interface SlideEditLock {
   lockedByName: string
 }
 
+// The single socket instance currently in use for the operator window.
+// `nuxtApp.provide('socketio', ...)` is write-once (Nuxt defines `$socketio`
+// as a non-writable getter), so a plain socket reference handed to consumers
+// goes stale the moment the socket is recreated — which happens on every manual
+// reconnect and every schedule switch. We instead provide a stable proxy that
+// always forwards to whatever socket is live right now, so `nuxtApp.$socketio`
+// never points at a dead socket.
+let activeSocket: Socket | null = null
+
+const liveSocketProxy = new Proxy({} as Socket, {
+  get(_target, prop) {
+    if (!activeSocket) return undefined
+    const value = (activeSocket as any)[prop]
+    return typeof value === "function" ? value.bind(activeSocket) : value
+  },
+  set(_target, prop, value) {
+    if (activeSocket) (activeSocket as any)[prop] = value
+    return true
+  },
+})
+
 export const useSocketIO = (options: SocketIOOptions) => {
   const {
     scheduleId,
@@ -226,9 +247,10 @@ export const useSocketIO = (options: SocketIOOptions) => {
         rememberUpgrade: true,
       })
 
-      // Provide socket to Nuxt app
+      // Point the shared proxy at the freshly-created socket and expose it once.
+      activeSocket = socket
       if (!nuxtApp.$socketio) {
-        nuxtApp.provide('socketio', socket)
+        nuxtApp.provide('socketio', liveSocketProxy)
       }
 
       // Connection events
@@ -438,6 +460,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
     if (socket) {
       socket.removeAllListeners()
       socket.disconnect()
+      if (activeSocket === socket) activeSocket = null
       socket = null
     }
   }

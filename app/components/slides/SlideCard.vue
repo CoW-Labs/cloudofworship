@@ -36,7 +36,7 @@
       <!-- Editing indicator - avatar circle -->
       <div v-if="editingBy" class="absolute bottom-2 left-2 group/editing">
         <UTooltip
-          :text="`${editingBy.userName} is editing`"
+          :text="`${editingBy.userName} is on this slide`"
           :popper="{ placement: 'top' }"
         >
           <div

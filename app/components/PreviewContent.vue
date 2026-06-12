@@ -82,6 +82,7 @@
     </div>
     <EditLiveContent
       :slide="activeSlide"
+      :editing-by="activeSlide?.id ? getSlideEditor(activeSlide.id) : undefined"
       @slide-update="onUpdateSlide"
       @inactive-slide-update="onUpdateInactiveSlide"
       @goto-verse="gotoAction"
@@ -105,10 +106,7 @@
 import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
-import {
-  tabSessionId,
-  useRealtimeSlides,
-} from "~/composables/useRealtimeSlides"
+import { tabSessionId } from "~/composables/useRealtimeSlides"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
@@ -123,33 +121,11 @@ import type {
 import { appWideActions } from "~/utils/constants"
 import { isNotFoundError } from "~/utils/apiErrors"
 
-// Setup real-time slide sync
-const { handleWebSocketMessage } = useRealtimeSlides()
-
-let previewSocket: any = null
-const previewSocketAnyHandler = (event: string, data: any) => {
-  // Normalize for both Socket.IO and WebSocket style
-  if (data && typeof data === "object" && data.action && data.data) {
-    handleWebSocketMessage(data)
-  } else if (event && data) {
-    handleWebSocketMessage({ action: event, data })
-  }
-}
-
-onMounted(() => {
-  // Listen for all incoming socket messages and sync slides
-  const nuxtApp = useNuxtApp()
-  previewSocket = nuxtApp.$socketio as any
-  if (previewSocket) {
-    previewSocket.onAny(previewSocketAnyHandler)
-  }
-})
-
-onUnmounted(() => {
-  if (previewSocket) {
-    previewSocket.offAny(previewSocketAnyHandler)
-  }
-})
+// Incoming realtime slide events are handled once, centrally, in pages/index.vue
+// (via useRealtimeSlides wired to the live socket). That handler mutates the
+// shared Pinia store, which this component reads reactively — so there is no
+// separate socket subscription here. A local onAny() listener used to live here
+// but it double-processed every message and went stale after reconnects.
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -212,12 +188,75 @@ const broadcastSlideCreated = (slide: any) => {
  */
 const getSlideEditor = (
   slideId: string
-): { userId: string; userName: string } | undefined => {
+):
+  | { userId: string; userName: string; avatar?: string; theme?: string }
+  | undefined => {
   const editInfo = appStore.currentState.slidesBeingEdited?.[slideId]
   if (editInfo && editInfo.userId !== authStore.user?._id) {
     return editInfo
   }
   return undefined
+}
+
+// --- Collaborative on-slide presence ("X is on this slide") ---
+// Announced when a user lands on a slide (and re-affirmed on edit), so peers
+// see an avatar on a slide someone is already working on. We announce ONCE per
+// slide (not per keystroke): the cheap `editingSlideId.value === slideId` guard
+// makes repeat calls a single string compare with no socket traffic. While on
+// the slide we refresh every 20s — comfortably under the 35s auto-expiry on the
+// receive side — so one session is ~1 frame + a heartbeat, not a flood. Peers
+// populate `slidesBeingEdited` from the `slide-editing` event (carrying avatar
+// + theme; see useRealtimeSlides).
+// NOTE: this relies on the server relaying `slide-editing` to room peers.
+const editingSlideId = ref<string | null>(null)
+let presenceRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+const emitEditingPresence = (slideId: string) => {
+  if (!online.value) return
+  const socket = useNuxtApp().$socketio as any
+  if (!socket?.connected) return
+  socket.emit("slide-editing", {
+    slideId,
+    userId: authStore.user?._id,
+    userName: authStore.user?.fullname,
+    avatar: authStore.user?.avatar,
+    // Normalize to a single leading '#' so peers can use it directly as a CSS color.
+    theme: authStore.user?.theme
+      ? `#${String(authStore.user.theme).replace(/^#+/, "")}`
+      : undefined,
+    tabId: tabSessionId,
+  })
+}
+
+const announceEditing = (slideId?: string) => {
+  if (!slideId || editingSlideId.value === slideId) return
+  stopEditing()
+  editingSlideId.value = slideId
+  emitEditingPresence(slideId)
+  presenceRefreshTimer = setInterval(() => {
+    if (editingSlideId.value) emitEditingPresence(editingSlideId.value)
+  }, 20000)
+}
+
+const stopEditing = () => {
+  if (presenceRefreshTimer) {
+    clearInterval(presenceRefreshTimer)
+    presenceRefreshTimer = null
+  }
+  if (editingSlideId.value) {
+    // Best-effort instant clear on peers; if it isn't relayed, their copy
+    // self-expires after 35s.
+    if (online.value) {
+      const socket = useNuxtApp().$socketio as any
+      if (socket?.connected) {
+        socket.emit("unlock-slide", {
+          slideId: editingSlideId.value,
+          tabId: tabSessionId,
+        })
+      }
+    }
+    editingSlideId.value = null
+  }
 }
 
 // Countdown state - kept in component for tight coupling with slide updates
@@ -310,7 +349,20 @@ onMounted(() => {
 onBeforeUnmount(() => {
   slidesResizeObserver?.disconnect()
   slidesResizeObserver = null
+  stopEditing()
 })
+
+// Move presence with the user's active slide: release the slide they left and
+// announce the one they're now on, so peers see an avatar on the slide someone
+// is sitting on (not just when actively typing).
+watch(
+  () => activeSlide.value?.id,
+  (newId, oldId) => {
+    if (newId === oldId) return
+    stopEditing()
+    if (newId) announceEditing(newId)
+  }
+)
 
 const updateSlideGridMetrics = () => {
   const scrollEl = slidesScroll.value
@@ -992,10 +1044,39 @@ watch(
   { immediate: true }
 )
 
-const updateSlideOnline = useThrottleFn(
+// Media (video) slides are never re-synced — their heavy video payload is
+// handled by its own upload flow and must not be re-broadcast/re-persisted.
+const isMediaVideoSlide = (slide: Slide) =>
+  slide.type === slideTypes.media &&
+  slide.backgroundType === backgroundTypes.video
+
+// Realtime broadcast cadence (~250ms): fast enough to feel live as a
+// collaborator types, but still coalesced so a burst of keystrokes is a few
+// socket frames, not dozens. This is the main performance lever on low-end
+// machines — every broadcast makes each peer swap the activeSlides array
+// reference AND triggers a pinia-shared-state localStorage write, so do NOT
+// push this toward per-keystroke.
+const broadcastSlideEdit = useThrottleFn(
+  (slide: Slide) => {
+    if (!online.value || isMediaVideoSlide(slide)) return
+    // Broadcast regardless of whether the slide has a server `_id` yet —
+    // collaborators hold it by client `id` from the create broadcast, so
+    // id-keyed updates apply even before batch upload assigns an `_id`.
+    broadcastSlideUpdate("update-slide", {
+      ...slide,
+      slideId: slide.id,
+    })
+  },
+  250,
+  true
+)
+
+// HTTP persistence cadence (2s): decoupled from the broadcast above so live
+// typing stays responsive without multiplying database writes.
+const persistSlideOnline = useThrottleFn(
   async (slide: Slide) => {
-    // Don't make API calls when offline
-    if (!online.value) return
+    // Don't make API calls when offline; persistence needs a server `_id`.
+    if (!online.value || !slide?._id || isMediaVideoSlide(slide)) return
 
     const tempSlide: Slide | any = { ...slide }
     delete tempSlide._id
@@ -1009,48 +1090,40 @@ const updateSlideOnline = useThrottleFn(
       tempSlide.backgroundVideoKey = null
     }
 
-    // If slide is a media (video) slide, do not update it
-    if (
-      slide?._id &&
-      !(
-        slide.type === slideTypes.media &&
-        slide.backgroundType === backgroundTypes.video
-      )
-    ) {
-      // Broadcast update via WebSocket for realtime collaboration
-      broadcastSlideUpdate("update-slide", {
-        ...slide,
-        slideId: slide.id,
-      })
-
-      // UPDATE OVER HTTP for persistence
-      let data: any, error: any
-      try {
-        ;({ data, error } = await useAPIFetch(
-          `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
-          {
-            method: "PUT",
-            body: tempSlide,
-          }
-        ))
-      } catch (err) {
-        console.error("Failed to update slide online:", err)
-      }
-      if (!error?.value) {
-        appStore.setLastSynced(new Date().toISOString())
-        return data.value
-      } else {
-        if (isNotFoundError(error.value)) {
-          appStore.removeActiveSlide(slide)
-          return null
+    let data: any, error: any
+    try {
+      ;({ data, error } = await useAPIFetch(
+        `/church/${churchId}/schedules/${appStore.currentState.activeSchedule?._id}/slides/${slide?._id}`,
+        {
+          method: "PUT",
+          body: tempSlide,
         }
-        throw new Error(error?.value?.message)
+      ))
+    } catch (err) {
+      console.error("Failed to update slide online:", err)
+    }
+    if (!error?.value) {
+      appStore.setLastSynced(new Date().toISOString())
+      return data?.value
+    } else {
+      if (isNotFoundError(error.value)) {
+        appStore.removeActiveSlide(slide)
+        return null
       }
+      throw new Error(error?.value?.message)
     }
   },
   2000,
   true
 )
+
+// Public entry point for "an edit happened": announce presence (once per
+// slide), broadcast fast, persist slow.
+const updateSlideOnline = (slide: Slide) => {
+  announceEditing(slide?.id)
+  broadcastSlideEdit(slide)
+  persistSlideOnline(slide)
+}
 
 const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   if (!slideId) return

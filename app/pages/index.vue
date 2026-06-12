@@ -37,6 +37,7 @@ import { useDebounceFn, useOnline } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import type { Slide } from "~/types"
 import type { Socket } from "socket.io-client"
+import { suppressLiveSlideBroadcast } from "~/composables/useRealtimeSlides"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -102,14 +103,14 @@ const {
   updateOnlineUsers,
   cleanup: cleanupRealtimeSlides,
 } = useRealtimeSlides({
-  onSlideCreated: (slide, createdByName) => {
-    toast.add({
-      title: `${createdByName} added a new slide`,
-      icon: "i-tabler-plus",
-      color: "blue",
-      timeout: 3000,
-    })
-  },
+  // onSlideCreated: (slide, createdByName) => {
+  //   toast.add({
+  //     title: `${createdByName} added a new slide`,
+  //     icon: "i-tabler-plus",
+  //     color: "blue",
+  //     timeout: 3000,
+  //   })
+  // },
   onSlideUpdated: (slide, updatedByName) => {
     // Silent update - no toast for every update to avoid noise
   },
@@ -233,6 +234,11 @@ const sendLiveSlideToSocket = (slide: Slide) => {
 watch(
   () => appStore.currentState.liveSlideId,
   (liveSlideId) => {
+    // Don't re-broadcast a selection we just applied from a peer.
+    if (suppressLiveSlideBroadcast.value) {
+      suppressLiveSlideBroadcast.value = false
+      return
+    }
     const liveSlide = appStore.currentState.activeSlides.find(
       (slide) => slide.id === liveSlideId
     )

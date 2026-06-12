@@ -219,13 +219,22 @@ const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 const { user, church } = storeToRefs(authStore)
 const { currentState } = storeToRefs(appStore)
 
-// Online users (excluding current user)
-const onlineUsersExcludingSelf = computed(
-  () =>
-    currentState.value.onlineUsers?.filter(
-      (u) => u.userId !== user.value?._id
-    ) || []
-)
+// Online users in the SAME schedule, excluding the current user.
+// Users collaborating on a different schedule must not appear here. We only
+// drop a user when they carry a scheduleId that differs from the active one,
+// so a missing/blank scheduleId from the server falls back to showing them.
+const onlineUsersExcludingSelf = computed(() => {
+  const activeScheduleId = currentState.value.activeSchedule?._id
+  return (
+    currentState.value.onlineUsers?.filter((u) => {
+      if (u.userId === user.value?._id) return false
+      if (u.scheduleId && activeScheduleId) {
+        return u.scheduleId === activeScheduleId
+      }
+      return true
+    }) || []
+  )
+})
 
 // Show max 5 avatars in the navbar
 const displayOnlineUsers = computed(() =>
