@@ -67,7 +67,7 @@
             @dragstart="draggingSlide = slide"
             @dragover.prevent="
               slide?.type === slideTypes.songSetlist &&
-              draggingSlide?.type === slideTypes.song
+                draggingSlide?.type === slideTypes.song
             "
             @drop.stop.prevent="handleDropOnSetlist(slide)"
           >
@@ -137,7 +137,6 @@
       />
 
       <LiveProjectionOnly
-        v-if="liveSlide"
         slide-label
         :slide="liveSlide"
         :full-screen="false"
