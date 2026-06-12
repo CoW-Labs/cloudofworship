@@ -11,7 +11,7 @@
       <!-- Proactive duplicate check: existing matches surfaced as the user types -->
       <div
         v-if="!song && similarSongs.length"
-        class="rounded-md border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/40 p-3"
+        class="rounded-md bg-primary-50 dark:bg-primary-900/40 p-3"
       >
         <div
           class="text-sm font-semibold flex items-center gap-2 text-primary-600 dark:text-primary-300"
@@ -19,9 +19,6 @@
           <IconWrapper name="i-bx-search-alt" size="4" />
           Is your song already here?
         </div>
-        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Tap one to use it instead of adding a duplicate.
-        </p>
         <div class="mt-2 flex flex-col gap-1">
           <div
             v-for="match in similarSongs"
@@ -36,11 +33,6 @@
                 class="flex items-center gap-2 min-w-0 flex-1 text-left"
                 @click="togglePreview(match.id)"
               >
-                <IconWrapper
-                  name="i-bx-music"
-                  class="text-primary shrink-0"
-                  rounded-bg
-                />
                 <div class="min-w-0">
                   <p class="font-medium truncate">{{ match.title }}</p>
                   <p class="text-xs text-gray-500 truncate">
@@ -66,12 +58,18 @@
                 Use this
               </UButton>
             </div>
-            <p
-              v-if="expandedId === match.id"
-              class="px-3 pb-2 text-xs text-gray-500 dark:text-gray-400 whitespace-pre-line max-h-32 overflow-y-auto"
-            >
-              {{ match.lyrics || "No lyrics preview available." }}
-            </p>
+            <Transition name="duplicate-preview">
+              <div
+                v-if="expandedId === match.id"
+                class="duplicate-lyrics-frame relative px-0 pb-2"
+              >
+                <p
+                  class="duplicate-lyrics-preview text-xs whitespace-pre-line max-h-32 overflow-y-auto rounded-md px-2 py-2"
+                >
+                  {{ match.lyrics || "No lyrics preview available." }}
+                </p>
+              </div>
+            </Transition>
           </div>
         </div>
 
@@ -284,7 +282,11 @@ const uploadSongToAPI = async (
     if (data?.possibleDuplicates?.length) {
       return { ok: false, duplicates: data.possibleDuplicates, canForce: true }
     }
-    return { ok: false, duplicates: data?.song ? [data.song] : [], canForce: false }
+    return {
+      ok: false,
+      duplicates: data?.song ? [data.song] : [],
+      canForce: false,
+    }
   }
 
   toast.add({
@@ -295,3 +297,46 @@ const uploadSongToAPI = async (
   return { ok: false }
 }
 </script>
+
+<style scoped>
+.duplicate-preview-enter-active,
+.duplicate-preview-leave-active {
+  max-height: 10rem;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 0.2s ease, opacity 0.16s ease;
+}
+
+.duplicate-preview-enter-from,
+.duplicate-preview-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.duplicate-lyrics-frame::before,
+.duplicate-lyrics-frame::after {
+  content: "";
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 1rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.duplicate-lyrics-frame::before {
+  top: 0;
+  border-radius: 0.375rem 0.375rem 0 0;
+  box-shadow: inset 0 10px 10px -12px rgb(15 23 42 / 0.1);
+}
+
+.duplicate-lyrics-frame::after {
+  bottom: 0.5rem;
+  border-radius: 0 0 0.375rem 0.375rem;
+  box-shadow: inset 0 -14px 12px -14px rgb(15 23 42 / 0.15);
+}
+
+.duplicate-lyrics-preview {
+  scrollbar-gutter: stable;
+}
+</style>
