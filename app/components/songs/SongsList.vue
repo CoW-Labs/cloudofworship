@@ -80,8 +80,8 @@ const props = defineProps<{
 
 const searchInput = ref<string>(props.query || "")
 const toast = useToast()
-const { searchSongs, loading: songsLoading } = useSongs()
-const loading = songsLoading
+const { searchSongs } = useSongs()
+const loading = ref<boolean>(false)
 const songs = ref<Song[]>([])
 const searchedSongs = ref<Song[]>([])
 const focusedActionIndex = ref(0)
@@ -91,7 +91,9 @@ let latestSongSearchId = 0
 
 const getSongs = async (query: string = "") => {
   const searchId = ++latestSongSearchId
+  loading.value = true
   songs.value = []
+  focusedActionIndex.value = 0
 
   try {
     const results = await searchSongs(query, 20)
@@ -102,6 +104,10 @@ const getSongs = async (query: string = "") => {
   } catch (err) {
     if (searchId === latestSongSearchId) {
       toast.add({ title: "You are offline.", color: "red", icon: "i-bx-error" })
+    }
+  } finally {
+    if (searchId === latestSongSearchId) {
+      loading.value = false
     }
   }
 }
