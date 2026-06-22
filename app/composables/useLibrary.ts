@@ -12,6 +12,19 @@ export default function useLibrary() {
   const toast = useToast()
   const getChurchId = () => authStore.church?._id || authStore.user?.churchId
 
+  const toCacheableSlide = (slide: Slide): Slide | null => {
+    try {
+      return structuredClone(toRaw(slide))
+    } catch {
+      try {
+        return JSON.parse(JSON.stringify(toRaw(slide))) as Slide
+      } catch (error) {
+        console.error('Unable to prepare slide for library cache:', error)
+        return null
+      }
+    }
+  }
+
   // Reactive loading state
   const loading = ref<boolean>(true)
 
@@ -167,13 +180,23 @@ export default function useLibrary() {
         await db.library.bulkDelete(existingSlideIds)
       }
 
-      const librarySlides: LibraryItem[] = slides.map((slide) => ({
-        id: slide._id || slide.id,
-        type: libraryTypes.slide,
-        content: slide,
-        createdAt: slide.createdAt || new Date().toISOString(),
-        updatedAt: slide.updatedAt || new Date().toISOString(),
-      }))
+      const librarySlides: LibraryItem[] = slides
+        .map((slide) => {
+          const cacheableSlide = toCacheableSlide(slide)
+          if (!cacheableSlide) return null
+
+          const slideId = cacheableSlide._id || cacheableSlide.id
+          if (!slideId) return null
+
+          return {
+            id: slideId,
+            type: libraryTypes.slide,
+            content: cacheableSlide,
+            createdAt: cacheableSlide.createdAt || new Date().toISOString(),
+            updatedAt: cacheableSlide.updatedAt || new Date().toISOString(),
+          }
+        })
+        .filter((item): item is LibraryItem => Boolean(item))
 
       await db.library.bulkPut(librarySlides)
     } catch (error) {
