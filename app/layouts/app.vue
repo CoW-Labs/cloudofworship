@@ -247,7 +247,9 @@ const fetchUser = async () => {
   if (data.value) {
     const user = data.value as unknown as User
     authStore.setUser(user)
+    return user
   }
+  return null
 }
 
 const fetchChurchSongs = async () => {
@@ -503,10 +505,21 @@ const downloadEssentialResources = async () => {
   setLoadingTask("startup", "Refreshing account, church, and schedules.", 5)
 
   if (online.value) {
-    // retrieveSchedules only needs authStore.churchId, which Pinia already
-    // has from the persisted session, so it's safe to run in parallel.
+    const user = await fetchUser()
+
+    if (!user && !authStore.user?._id) {
+      loadingResources.value = false
+      navigateTo("/login")
+      return
+    }
+
+    if (authStore.user?.emailVerified === false) {
+      loadingResources.value = false
+      navigateTo("/verify")
+      return
+    }
+
     await Promise.allSettled([
-      fetchUser(),
       fetchChurch(),
       retrieveSchedules(),
     ])

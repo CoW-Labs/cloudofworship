@@ -1,20 +1,24 @@
 <template>
   <div class="login-main section">
     <div class="header flex flex-col items-center text-center mb-10">
-      <Logo class="w-24 h-24" />
-      <p class="max-w-[200px] mx-auto come-up-1">
+      <Logo class="w-32 h-32 mb-12" />
+      <p class="max-w-[280px] mx-auto come-up-1">
         Join
-        <span class="text-primary font-semibold">{{ church?.type }}</span> on
+        <span class="text-primary font-semibold"
+          >{{ church?.name }}, {{ church?.type }}</span
+        >
+        on
         <br />
         <span class="font-semibold">Cloud of Worship</span>
       </p>
 
       <div class="people-info mt-4 text-center">
-        <UAvatarGroup class="mb-2" max="3">
+        <UAvatarGroup class="mb-2" :max="3">
           <UAvatar
             v-for="(user, index) in church?.users?.slice(0, 4)"
+            :key="user?._id || index"
             :src="user?.avatar"
-            :text="user?.fullname?.split(' ')?.[0]?.[0]"
+            :text="user?.fullname?.split(' ')?.[0]?.[0] || ''"
             size="lg"
             :ui="{ text: `text-[${user?.theme}] font-semibold` }"
             :class="`border-[${user?.theme}] bg-[${user?.theme}20]`"
@@ -34,84 +38,48 @@
     <!-- FORM 1 -->
     <form
       v-show="step === 1"
-      class="flex flex-col gap-3 max-w-[325px] mx-auto come-up-2"
-      @submit="signup()"
+      class="flex flex-col gap-3.5 mx-auto come-up-2"
+      @submit.prevent="signup"
     >
-      <UFormGroup size="lg">
-        <UInput placeholder="Your full name" v-model="fullName" />
-      </UFormGroup>
-      <UFormGroup size="lg">
-        <UInput placeholder="Your email" v-model="email" />
-      </UFormGroup>
-      <UFormGroup size="lg">
-        <div class="flex relative">
-          <UInput
-            placeholder="Choose a password"
-            :type="passwordType"
-            class="w-[100%]"
-            v-model="password"
-            @update:model-value="passwordInputHover = true"
-            @blur="passwordInputHover = false"
-          />
-
-          <UButton
-            class="absolute right-0 top-0 bottom-0 dark:hover:bg-primary-300"
-            color="gray"
-            variant="ghost"
-            size="sm"
-            @click="
-              passwordType === 'password'
-                ? (passwordType = 'text')
-                : (passwordType = 'password')
-            "
-          >
-            <IconWrapper
-              size="5"
-              :name="
-                passwordType === 'password'
-                  ? 'i-tabler-eye'
-                  : 'i-tabler-eye-off'
-              "
-              dark-text
-            />
-          </UButton>
-        </div>
+      <CowInput label="Full name" v-model="fullName" />
+      <CowInput label="Email address" type="email" v-model="email" />
+      <div>
+        <CowInput
+          label="Choose a password"
+          type="password"
+          v-model="password"
+          @update:model-value="passwordInputHover = true"
+          @blur="passwordInputHover = false"
+        />
         <div
           v-if="passwordInputHover"
-          class="help text-gray-400 text-xs mt-2 flex gap-2 come-up-1"
+          class="help text-gray-500 dark:text-gray-400 text-xs mt-2 flex gap-2 come-up-1"
         >
           <IconWrapper name="i-bx-info-circle" size="3" />
-          Password must be at least 8 characters, including upper and lowercase
-          characters, and a number.
+          Password must be at least 8 characters and include a letter and a
+          number.
         </div>
-      </UFormGroup>
-      <UButton
+      </div>
+
+      <CowButton
         block
-        size="lg"
-        class="mt-12"
-        :disabled="!(useValidEmail(email) && passwordValid)"
+        type="submit"
+        class="mt-3"
+        :disabled="!(fullName.trim() && useValidEmail(email) && passwordValid)"
         :loading="loading"
-        @click="signup"
       >
         Create your account
-      </UButton>
-      <UButton
+      </CowButton>
+      <CowButton
+        variant="secondary"
         block
-        size="lg"
-        class="mt-0"
-        color="white"
+        type="button"
         :loading="loading"
         @click="handleGoogleSignUp"
       >
-        <GoogleIcon />
+        <GoogleIcon class="w-5 h-5" />
         Sign up with Google
-      </UButton>
-      <!-- <p class="text-sm flex items-center justify-center gap-0">
-        I already have an account.
-        <UButton size="sm" class="p-1" variant="link" to="/login"
-          >Sign in</UButton
-        >
-      </p> -->
+      </CowButton>
     </form>
   </div>
 </template>
@@ -124,8 +92,6 @@ definePageMeta({
   layout: "auth",
 })
 
-const runtimeConfig = useRuntimeConfig()
-const isDevEnvironment = runtimeConfig.public.BASE_URL?.includes("localhost")
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
 const { isTauri } = useTauri()
 const { checkRedirectResult } = useTauriGoogleAuth()
@@ -133,6 +99,7 @@ const { checkRedirectResult } = useTauriGoogleAuth()
 const { token } = useAuthToken()
 const authStore = useAuthStore()
 const route = useRoute()
+const toast = useToast()
 
 // Initialize UTM tracking
 const { initUTMTracking, getUTMParams } = useUTMParams()
@@ -146,20 +113,25 @@ const passwordInputHover = ref(false)
 const loading = ref(false)
 const church = ref<Church>()
 
+const getChurchId = () => {
+  const churchId = route.params.church_id
+  return Array.isArray(churchId) ? churchId[0] : churchId
+}
+
 const passwordValid = computed(() => {
-  const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+]{8,}$/
+  const regex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
   return regex.test(password.value)
 })
 
 const getChurch = async () => {
   // console.log(authStore.user)
-  const churchId = route.params.church_id
+  const churchId = getChurchId()
   if (churchId) {
     const promise = await useAPIFetch(`/church/${churchId}?teammates=true`)
     church.value = promise.data.value as Church
   } else {
     navigateTo("/signup")
-    useToast().add({
+    toast.add({
       icon: "i-bx-church",
       title: "Add your church in less than 1 minute to continue.",
     })
@@ -171,6 +143,8 @@ onMounted(async () => {
   // Initialize UTM tracking on page load
   initUTMTracking(route)
 
+  await getChurch()
+
   // Check for Google auth redirect result first (Tauri only)
   if (isTauri) {
     loading.value = true
@@ -179,7 +153,11 @@ onMounted(async () => {
     if (result?.user) {
       // Process the Google auth result
       const { user } = result
-      const churchIdParam = route.params.church_id.toString()
+      const churchIdParam = getChurchId()
+      if (!churchIdParam) {
+        loading.value = false
+        return
+      }
 
       // Get the ID token from Firebase user
       const idToken = await user.getIdToken()
@@ -200,7 +178,7 @@ onMounted(async () => {
       )
 
       if (error.value) {
-        useToast().add({
+        toast.add({
           title: error.value?.data?.error?.includes("E11000")
             ? "Email linked to an account. Sign in instead."
             : error.value?.data?.message,
@@ -208,46 +186,32 @@ onMounted(async () => {
           icon: "i-bx-error",
         })
       } else {
-        token.value = data.value?.token
-        authStore.setUser({
-          ...data?.value?.data.newUser!!,
-          churchId: churchIdParam,
-        })
-        if (church.value) {
-          authStore.setChurch(church.value)
+        const newUser = data.value?.data.newUser
+        if (newUser) {
+          token.value = data.value?.token || null
+          authStore.setUser({ ...newUser, churchId: churchIdParam })
+          if (church.value) {
+            authStore.setChurch(church.value)
+          }
+          if (newUser.emailVerified) {
+            navigateTo("/?newUser=1")
+          } else {
+            navigateTo("/verify?newUser=1")
+          }
         }
       }
     }
     loading.value = false
   }
-
-  // Show promotional toast
-  setTimeout(() => {
-    useToast().add({
-      title: "Still not convinced?",
-      color: "red",
-      description:
-        "Watch this video to see why we think Cloud of Worship is your church's literal power point.",
-      timeout: 0,
-      actions: [
-        {
-          icon: "i-bx-play",
-          label: "Watch video",
-          click: () =>
-            window.open(
-              "https://www.youtube.com/watch?v=e3tbMg_CrpE",
-              "_blank"
-            ),
-        },
-      ],
-    })
-  }, 1500)
 })
 
-getChurch()
-
 const signup = async () => {
-  const churchId = route.params.church_id.toString()
+  const churchId = getChurchId()
+  if (!churchId) {
+    navigateTo("/signup")
+    return
+  }
+
   loading.value = true
 
   // Get UTM parameters
@@ -267,7 +231,7 @@ const signup = async () => {
     }
   )
   if (error.value) {
-    useToast().add({
+    toast.add({
       title: error.value?.data?.error?.includes("E11000")
         ? "Email linked to an account"
         : error.value?.data?.message,
@@ -275,18 +239,30 @@ const signup = async () => {
       icon: "i-bx-error",
     })
   } else {
-    token.value = data.value?.token
-    authStore.setUser({ ...data?.value?.data.newUser!!, churchId })
-    if (church.value) {
-      authStore.setChurch(church.value)
+    const newUser = data.value?.data.newUser
+    if (newUser) {
+      token.value = data.value?.token || null
+      authStore.setUser({ ...newUser, churchId })
+      if (church.value) {
+        authStore.setChurch(church.value)
+      }
+      if (newUser.emailVerified) {
+        navigateTo("/?newUser=1")
+      } else {
+        navigateTo("/verify?newUser=1")
+      }
     }
-    navigateTo("/?newUser=1")
   }
   loading.value = false
 }
 
 const handleGoogleSignUp = async () => {
-  const churchId = route.params.church_id.toString()
+  const churchId = getChurchId()
+  if (!churchId) {
+    navigateTo("/signup")
+    return
+  }
+
   loading.value = true
 
   try {
@@ -315,7 +291,7 @@ const handleGoogleSignUp = async () => {
       }
     )
     if (error.value) {
-      useToast().add({
+      toast.add({
         title: error.value?.data?.error?.includes("E11000")
           ? "Email linked to an account. Sign in instead."
           : error.value?.data?.message,
@@ -323,14 +299,22 @@ const handleGoogleSignUp = async () => {
         icon: "i-bx-error",
       })
     } else {
-      token.value = data.value?.token
-      authStore.setUser({ ...data?.value?.data.newUser!!, churchId })
+      const newUser = data.value?.data.newUser
+      if (!newUser) return
+
+      token.value = data.value?.token || null
+      authStore.setUser({ ...newUser, churchId })
       if (church.value) {
         authStore.setChurch(church.value)
       }
+      if (newUser.emailVerified) {
+        navigateTo("/?newUser=1")
+      } else {
+        navigateTo("/verify?newUser=1")
+      }
     }
   } catch (error: any) {
-    useToast().add({
+    toast.add({
       title: "Google sign up failed",
       description: error?.message || "An error occurred",
       color: "red",
