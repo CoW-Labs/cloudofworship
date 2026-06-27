@@ -1,46 +1,26 @@
 <template>
-  <div class="min-h-[100vh] w-[100%] flex overflow-hidden">
-    <div class="hidden lg:grid lg:w-3/5 place-items-center text-white">
-      <div
-        class="h-[92.5%] w-[95%] rounded-2xl lg:flex bg-gradient-to-br from-[#FF6F65] via-primary-800 to-primary-900 p-16 flex-col justify-between text-white"
-      >
-        <div>
-          <div class="flex items-center gap-3 mb-16">
-            <CoWLogo class="w-80 blur-in-0 opacity-0" />
-          </div>
-
-          <div class="space-y-4 blur-in-1 opacity-0">
-            <h1 class="text-6xl font-light leading-tight">
-              <div class="font-semibold">Join thousands of churches</div>
-              delivering great on-screen experiences to their congregations.
-            </h1>
-            <p class="text-xl font-light">
-              Run your weekly services with Cloud of Worship. <br />
-              Project songs, hymns, and scriptures with no installation and no
-              internet required.
-            </p>
-          </div>
-        </div>
-
-        <div class="text-xs opacity-0 blur-in-2">
-          <p class="opacity-80">
-            &copy; {{ new Date().getFullYear() }} Cloud of Worship (CoW Labs).
-            All rights reserved.
-          </p>
-        </div>
-      </div>
+  <div class="auth-layout" :class="`auth-layout--${variant}`">
+    <!-- Left collage (split variant only) -->
+    <div class="auth-layout__collage" :aria-hidden="variant !== 'split'">
+      <Transition name="auth-visual" mode="out-in">
+        <MultiplayerDemoContainer
+          v-if="showMultiplayerDemo"
+          key="multiplayer-demo"
+          v-bind="signupVisualState"
+        />
+        <AuthCollageContainer v-else key="auth-collage" />
+      </Transition>
     </div>
 
-    <!-- Right Side - Auth Form -->
-    <!-- <div
-      class="w-full lg:w-2/5 bg-[radial-gradient(circle,#cd99ff,white,white)] dark:bg-[radial-gradient(circle,#31005f,rgb(17,24,39),rgb(17,24,39))] grid place-items-center lg:p-8"
-    > -->
-    <div class="w-full lg:w-2/5 grid place-items-center lg:p-8">
-      <div
-        class="auth-box bg-white dark:bg-gray-900 rounded-2xl p-[3rem] py-[5%] max-w-[450px] w-[100%] relative"
-      >
+    <!-- Form column -->
+    <div class="auth-layout__main">
+      <div class="auth-layout__slot">
         <slot />
       </div>
+      <p class="auth-layout__footer">
+        &copy; {{ new Date().getFullYear() }} Cloud of Worship (CoW Labs). All
+        rights reserved.
+      </p>
     </div>
   </div>
 </template>
@@ -52,6 +32,15 @@ useHead({
   title: "Cloud of Worship",
 })
 
+const route = useRoute()
+const signupVisualState = useSignupVisualState()
+const variant = computed(
+  () => (route.meta.authVariant as "split" | "centered") || "split"
+)
+const showMultiplayerDemo = computed(
+  () => route.path.startsWith("/signup") && signupVisualState.value.step >= 3
+)
+
 const { handleGoogleSignIn: tauriGoogleSignIn } = useTauriGoogleAuth()
 
 const handleGoogleSignIn = async (): Promise<UserCredential> => {
@@ -62,48 +51,96 @@ provide("handleGoogleSignIn", handleGoogleSignIn)
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap");
-
-h1 {
-  font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial;
+.auth-layout {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: #ffffff;
+  color: #0f172a;
 }
 
-.bg-radial-gradient {
-  background: radial-gradient(circle, #31005f, white, white);
-}
-.dark-bg-radial-gradient {
-  background: radial-gradient(circle, #cd99ff, black, black);
-}
-.outlined-text {
-  -webkit-text-stroke: 1px #a855f760;
-}
-.outlined-text-dark {
-  -webkit-text-stroke: 1px #a855f7;
+.auth-layout__collage {
+  display: none;
+  padding: 0.75rem;
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.985);
+  transition: width 0.72s cubic-bezier(0.16, 1, 0.3, 1),
+    padding 0.72s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.42s ease,
+    transform 0.72s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes blurIn {
-  0% {
-    filter: blur(10px);
-    transform: translateY(20px);
-    opacity: 0;
+@media (min-width: 1024px) {
+  .auth-layout__collage {
+    display: block;
+    width: 0;
+    padding: 0;
   }
-  100% {
-    filter: blur(0px);
-    transform: translate(0px);
+
+  .auth-layout--split .auth-layout__collage {
+    width: 55%;
+    padding: 0.75rem;
     opacity: 1;
+    transform: scale(1);
   }
 }
 
-.blur-in-0 {
-  animation: blurIn 0.5s ease-out 0s forwards;
+.auth-visual-enter-active,
+.auth-visual-leave-active {
+  transition: opacity 0.58s ease, transform 0.72s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.58s ease;
 }
 
-.blur-in-1 {
-  animation: blurIn 0.5s ease-out 0.2s forwards;
+.auth-visual-enter-from {
+  opacity: 0;
+  transform: translateY(24px) scale(0.975);
+  filter: blur(10px);
 }
 
-.blur-in-2 {
-  animation: blurIn 0.5s ease-out 0.4s forwards;
+.auth-visual-leave-to {
+  opacity: 0;
+  transform: translateY(-16px) scale(1.012);
+  filter: blur(8px);
+}
+
+.auth-layout__main {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  transition: flex-basis 0.72s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.auth-layout__slot {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: 3rem 1.5rem;
+}
+
+.auth-layout__slot > :deep(*) {
+  width: 100%;
+  max-width: 420px;
+}
+
+.auth-layout__footer {
+  padding-bottom: 1.75rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+</style>
+
+<style>
+html.dark .auth-layout {
+  background-color: #0b1120;
+  color: #f8fafc;
+}
+
+html.dark .auth-layout__footer {
+  color: #64748b;
 }
 </style>
