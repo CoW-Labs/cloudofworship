@@ -99,12 +99,12 @@ const onBlur = () => {
   border-radius: 1rem;
   background-color: #ffffff;
   padding: 1.05rem 1rem 0.85rem;
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1.5px rgba(15, 23, 42, 0.1);
   transition: box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
 .cow-input__field.cow-input__field--floated {
-  box-shadow: inset 0 0 0 1.5px rgba(15, 23, 42, 0.14);
+  box-shadow: inset 0 0 0 1.5px rgba(15, 23, 42, 0.22);
 }
 
 .cow-input__control {
