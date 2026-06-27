@@ -195,14 +195,12 @@
 </template>
 
 <script setup lang="ts">
-import { useAppStore } from "~/store/app"
+import { appWideActions } from "~/utils/constants"
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
 const emit = defineEmits<{ close: [] }>()
 
-const appStore = useAppStore()
-const { createPresentationSlide } = useSlideCreation()
 const { checkFlag } = useFeatureFlags()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -293,12 +291,11 @@ const handleImport = async () => {
     const presentationObjects = await usePowerpointToImage(selectedFile.value)
 
     statusMessage.value = `Rendered ${presentationObjects.length} page(s). Creating slide…`
-    const newSlide = createPresentationSlide(
-      selectedFile.value.name,
-      presentationObjects
-    )
-
-    appStore.appendActiveSlide(newSlide)
+    useGlobalEmit(appWideActions.newPresentation, {
+      fileName: selectedFile.value.name,
+      presentationObjects,
+      fromImport: true,
+    })
 
     emit("close")
   } catch (err: any) {

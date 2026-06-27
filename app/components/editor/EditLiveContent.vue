@@ -264,13 +264,19 @@
                   <UButton
                     variant="ghost"
                     class="px-1.5"
-                    icon="i-bx-image-add"
-                    :disabled="!slide"
+                    :icon="
+                      backgroundImageLoading
+                        ? 'i-bx-loader-alt'
+                        : 'i-bx-image-add'
+                    "
+                    :loading="backgroundImageLoading"
+                    :disabled="!slide || backgroundImageLoading"
                   />
                 </UTooltip>
                 <template #panel>
                   <BgImageSelection
                     :value="slide?.background"
+                    @loading-change="backgroundImageLoading = $event"
                     @select="
                       onSelectBackground(backgroundTypes.image, $event.image)
                     "
@@ -285,13 +291,17 @@
                   <UButton
                     variant="ghost"
                     class="px-1.5"
-                    icon="i-bx-film"
-                    :disabled="!slide"
+                    :icon="
+                      backgroundVideoLoading ? 'i-bx-loader-alt' : 'i-bx-film'
+                    "
+                    :loading="backgroundVideoLoading"
+                    :disabled="!slide || backgroundVideoLoading"
                   />
                 </UTooltip>
                 <template #panel>
                   <BgVideoSelection
                     :value="slide?.background"
+                    @loading-change="backgroundVideoLoading = $event"
                     @select="onSelectBackground(backgroundTypes.video, $event)"
                   />
                 </template>
@@ -498,6 +508,8 @@ const bgEditBgPopoverOpen = ref<boolean>(false)
 const bgImagePopoverOpen = ref<boolean>(false)
 const bgVideoPopoverOpen = ref<boolean>(false)
 const bgColorPopoverOpen = ref<boolean>(false)
+const backgroundImageLoading = ref<boolean>(false)
+const backgroundVideoLoading = ref<boolean>(false)
 const themePopoverOpen = ref<boolean>(false)
 const gotoScriptureOpen = ref<boolean>(false)
 const slideContents = ref<Array<string>>([])
@@ -937,7 +949,7 @@ const removeSetlistSong = async (songIndex: number) => {
 
 const onSelectBackground = (
   backgroundType: string,
-  data: { video: string; key: string } // type of { imageUrl: string; file: any } for image, or { videoUrl: string; key: string } for video
+  data: string | { video: string; key?: string }
 ) => {
   bgImagePopoverOpen.value = false
   bgVideoPopoverOpen.value = false
@@ -945,8 +957,8 @@ const onSelectBackground = (
 
   const tempSlide = {
     ...props.slide,
-    background: data.video || data,
-    backgroundVideoKey: data.key || undefined,
+    background: typeof data === "string" ? data : data.video,
+    backgroundVideoKey: typeof data === "string" ? undefined : data.key,
     backgroundType,
   } as Slide
   emit("slide-update", tempSlide)
