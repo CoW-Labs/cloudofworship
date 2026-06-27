@@ -25,7 +25,7 @@
   >
     <div
       ref="slidesScroll"
-      class="slides-ctn overflow-y-scroll mb-4 rounded-md transition h-[50%]"
+      class="slides-ctn overflow-y-scroll mb-4 rounded-md transition h-[50%] touch-pan-y"
       :class="[
         slides?.length === 0 ? 'bg-primary-100 dark:bg-primary-900' : '',
       ]"
