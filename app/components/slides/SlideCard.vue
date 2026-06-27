@@ -250,4 +250,13 @@ const handleSaveAsTemplateClick = () => {
 .slide-card.selectable .actions {
   display: none;
 }
+
+/* On touch devices, always show actions since hover doesn't exist */
+@media (hover: none) {
+  .slide-card .actions {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 </style>
