@@ -68,7 +68,8 @@ export const appWideActions = {
   uploadOfflineSlides: 'upload-offline-slides',
   batchUpdateSlides: 'batch-update-slides',
   openShortcutsModal: 'open-shortcuts',
-  newPresentation: 'new-presentation',
+  // newPresentation: 'new-presentation',
+  newPresentationFromPdf: 'new-presentation-from-pdf',
   promoteActiveSlide: 'promote-active-slide-live',
   selectSlides: 'select-slides',
   showUpgradeModal: 'show-upgrade-modal',
@@ -286,10 +287,17 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-ph-file-ppt",
-    name: "Import Slides",
-    desc: "Import from PowerPoint or PDF",
+    name: "Import Slides from PowerPoint",
+    desc: "Import slides from a PowerPoint file",
     action: appWideActions.newPresentation,
-    meta: "power point Google slides pdf presentation canva",
+    meta: "power point pptx ppt Google slides presentation canva import",
+  },
+  {
+    icon: "i-ph-file-pdf",
+    name: "Import Slides from PDF",
+    desc: "Import slides from a PDF file",
+    action: appWideActions.newPresentationFromPdf,
+    meta: "pdf import slides presentation",
   },
   // --- Live Control ---
   {
