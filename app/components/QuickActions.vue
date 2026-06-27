@@ -201,6 +201,13 @@
     <AddPresentation
       v-else-if="page === 'presentation'"
       class="come-up-1"
+      file-type="ppt"
+      @close="page = ''"
+    />
+    <AddPresentation
+      v-else-if="page === 'presentation-pdf'"
+      class="come-up-1"
+      file-type="pdf"
       @close="page = ''"
     />
     <!-- </Transition> -->
@@ -374,6 +381,10 @@ emitter.on("new-countdown", () => {
 
 emitter.on("new-presentation", () => {
   page.value = "presentation"
+})
+
+emitter.on("new-presentation-from-pdf", () => {
+  page.value = "presentation-pdf"
 })
 
 const handleInputKeydown = (e: KeyboardEvent) => {
