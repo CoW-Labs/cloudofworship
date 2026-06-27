@@ -85,7 +85,7 @@ const menuUi = {
 
 const menuPanelUi = {
   rounded: "rounded-xl",
-  ring: "ring-1 ring-gray-200 dark:ring-gray-700/70",
+  ring: "ring-1 ring-gray-100 dark:ring-gray-700/70",
   shadow: "shadow-lg",
   background: "bg-white dark:bg-[#131a27]",
   option: {

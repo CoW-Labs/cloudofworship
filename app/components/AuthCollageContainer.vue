@@ -163,7 +163,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey))
   height: 100%;
   border-radius: 1rem;
   overflow: hidden;
-  background: linear-gradient(135deg, #ff6f65, #6b21a8 55%, #4c1d95);
+  background: linear-gradient(135deg, #cbd5e1, #94a3b8 55%, #64748b);
   perspective: 1200px;
 }
 
@@ -177,7 +177,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey))
   display: flex;
   gap: 10px;
   padding: 10px;
-  background: #0f172a;
+  background: #e2e8f0;
   transform: translate(-54%, -50%)
     matrix(0.866025, -0.5, 0.866025, 0.5, 0, 0) scale(1.95);
   transform-origin: center;
