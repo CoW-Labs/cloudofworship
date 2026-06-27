@@ -28,23 +28,10 @@
       <FileDropzone
         :maxFileSize="maxFileSize"
         :maxVideoFileSize="maxVideoFileSize"
+        accept="video/*,image/*,audio/*"
+        description="image, video or audio files."
         @change="onDropzoneChange"
       />
-      <label v-if="isTauri" class="flex flex-col center text-center">
-        <div
-          class="text-center w-full mx-auto px-2 py-2 mt-1 bg-primary-500 rounded-md flex items-center text-primary-500 cursor-pointer gap-1 border border-primary-500 bg-transparent"
-        >
-          <IconWrapper name="i-bx-folder-open" size="5" />
-          Choose files
-        </div>
-        <input
-          type="file"
-          class="invisible"
-          accept="video/*,image/*,audio/*"
-          multiple
-          @change="onDropzoneChange(($event.target as HTMLInputElement)?.files || [])"
-        />
-      </label>
     </div>
 
     <!-- YOUTUBE/VIMEO TAB -->
@@ -235,7 +222,6 @@ const props = defineProps<{
   initialTab?: number
 }>()
 
-const { isTauri } = useTauri()
 const authStore = useAuthStore()
 const { isTeamsPlan, isFreePlan } = useSubscription()
 

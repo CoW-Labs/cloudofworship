@@ -117,6 +117,7 @@ import type {
   Countdown,
   Schedule,
   ExtendedFileT,
+  PresentationObject,
 } from "~/types"
 import { appWideActions } from "~/utils/constants"
 import { isNotFoundError } from "~/utils/apiErrors"
@@ -151,6 +152,7 @@ const {
   createSongSetlistSlide,
   createMediaSlide,
   createMultipleMediaSlides,
+  createPresentationSlide,
   createCountdownSlide,
   saveSlideToLib,
   duplicateSlide,
@@ -668,6 +670,22 @@ emitter.on("new-media", async (data: ExtendedFileT[]) => {
     // uploadOfflineSlides() here would race against that flow and send
     // batchCreateSlides with blob: URLs before the images have been uploaded.
   }
+})
+
+emitter.on("new-presentation", async (data: {
+  fileName?: string
+  presentationObjects?: PresentationObject[]
+  fromImport?: boolean
+}) => {
+  if (!data?.presentationObjects?.length || !data.fileName) return
+
+  const newSlide = createPresentationSlide(
+    data.fileName,
+    data.presentationObjects
+  )
+
+  slides.value?.push(newSlide)
+  appStore.appendActiveSlide(newSlide)
 })
 
 emitter.on("new-active-slide", (data: Slide) => {

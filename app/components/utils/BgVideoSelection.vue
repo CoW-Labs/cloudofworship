@@ -44,6 +44,7 @@
         v-if="!settingsPage"
         size="sm"
         icon="i-bx-film"
+        accept="video/*"
         :maxFileSize="maxFileSize"
         @change="saveAndSelectVideos($event)"
         :loading="videoUploadLoading"
@@ -56,7 +57,11 @@
           class="absolute inset-0 opacity-0 cursor-pointer"
           accept="video/*"
           multiple
-          @change="saveAndSelectVideos(Array.from($event.target?.files || []))"
+          @change="
+            saveAndSelectVideos(
+              Array.from(($event.target as HTMLInputElement)?.files || [])
+            )
+          "
         />
         <UButton
           class="z-1 mt-2"
@@ -94,16 +99,28 @@ defineProps<{
   settingsPage?: boolean
 }>()
 
-const emit = defineEmits(["select"])
+const emit = defineEmits(["select", "loading-change"])
 const videoUploadLoading = ref(false)
 const currentVideoIndex = ref(0)
 const totalVideos = ref(0)
 const deletingVideoId = ref<string | null>(null)
 
 const bgVideoToBeSelected = ref<string | null>(null)
-const backgroundVideos = ref<BackgroundVideo[]>(
-  appStore.currentState.backgroundVideos
-)
+const localVideoObjectUrls = new Set<string>()
+const defaultBackgroundVideos = [...appStore.currentState.backgroundVideos]
+const backgroundVideos = ref<BackgroundVideo[]>([...defaultBackgroundVideos])
+
+const revokeLocalVideoObjectUrls = () => {
+  const usedBackgrounds = new Set(
+    appStore.currentState.activeSlides.map((s) => s.background).filter(Boolean)
+  )
+  localVideoObjectUrls.forEach((url) => {
+    if (!usedBackgrounds.has(url)) {
+      URL.revokeObjectURL(url)
+    }
+  })
+  localVideoObjectUrls.clear()
+}
 
 const getAllLocallySavedVideos = async () => {
   const db = useIndexedDB()
@@ -117,7 +134,9 @@ const getAllLocallySavedVideos = async () => {
     ".mkv",
     ".ogg",
     ".flv",
-  ]
+  ] as const
+
+  revokeLocalVideoObjectUrls()
 
   // Create Object URLs from locally saved videos - process in batches
   const locallySavedVideos: BackgroundVideo[] = []
@@ -127,21 +146,15 @@ const getAllLocallySavedVideos = async () => {
   for (let i = 0; i < videos.length; i += chunkSize) {
     const chunk = videos.slice(i, i + chunkSize)
     chunk.forEach((video) => {
+      if (!videoTypes.some((extension) => video.id.includes(extension))) {
+        return
+      }
+
       const blobURL = URL.createObjectURL(video.data as unknown as Blob)
-      if (
-        video.id?.includes(videoTypes[0]) ||
-        video.id?.includes(videoTypes[1]) ||
-        video.id?.includes(videoTypes[2]) ||
-        video.id?.includes(videoTypes[3]) ||
-        video.id?.includes(videoTypes[4]) ||
-        video.id?.includes(videoTypes[5])
-      ) {
-        locallySavedVideos.push({ id: video.id, url: blobURL })
-        if (video.id === bgVideoToBeSelected.value) {
-          bgVideoToBeSelected.value = blobURL
-        }
-      } else {
-        return // Ignore non-video files
+      localVideoObjectUrls.add(blobURL)
+      locallySavedVideos.push({ id: video.id, url: blobURL })
+      if (video.id === bgVideoToBeSelected.value) {
+        bgVideoToBeSelected.value = blobURL
       }
     })
 
@@ -151,12 +164,12 @@ const getAllLocallySavedVideos = async () => {
     }
   }
 
-  locallySavedVideos.forEach((video) => {
-    if (backgroundVideos.value.find((bgVideo) => bgVideo.id === video.id)) {
-      return
-    }
-    backgroundVideos.value.push(video)
+  const videosById = new Map<string, BackgroundVideo>()
+  ;[...defaultBackgroundVideos, ...locallySavedVideos].forEach((video) => {
+    if (!video?.id || videosById.has(video.id)) return
+    videosById.set(video.id, video)
   })
+  backgroundVideos.value = Array.from(videosById.values())
 }
 
 const saveAndSelectVideos = async (files: File[]) => {
@@ -165,11 +178,12 @@ const saveAndSelectVideos = async (files: File[]) => {
   const db = useIndexedDB()
 
   videoUploadLoading.value = true
+  emit("loading-change", true)
   totalVideos.value = files.length
+  let selectedVideoKey: string | null = null
 
   try {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+    for (const [i, file] of files.entries()) {
       currentVideoIndex.value = i + 1
 
       const randomId = useID(6)
@@ -188,6 +202,7 @@ const saveAndSelectVideos = async (files: File[]) => {
       // Select the last added video
       if (i === files.length - 1) {
         bgVideoToBeSelected.value = tempMedia.id
+        selectedVideoKey = tempMedia.id
       }
     }
 
@@ -195,11 +210,12 @@ const saveAndSelectVideos = async (files: File[]) => {
     if (bgVideoToBeSelected.value) {
       emit("select", {
         video: bgVideoToBeSelected.value,
-        key: bgVideoToBeSelected.value,
+        key: selectedVideoKey || bgVideoToBeSelected.value,
       })
     }
   } finally {
     videoUploadLoading.value = false
+    emit("loading-change", false)
     currentVideoIndex.value = 0
     totalVideos.value = 0
   }
@@ -231,4 +247,8 @@ const handleDeleteVideo = async (video: BackgroundVideo) => {
 }
 
 getAllLocallySavedVideos()
+
+onBeforeUnmount(() => {
+  revokeLocalVideoObjectUrls()
+})
 </script>
