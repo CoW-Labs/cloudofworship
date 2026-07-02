@@ -5,11 +5,12 @@
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold">Save as Template</h3>
           <UButton
-            icon="i-bx-x"
             color="gray"
             variant="ghost"
             @click="isOpen = false"
-          />
+          >
+            <template #leading><CloseIcon class="w-5 h-5" /></template>
+          </UButton>
         </div>
       </template>
 

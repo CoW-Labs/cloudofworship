@@ -1,7 +1,7 @@
 <template>
   <div
     v-show="slide?.type !== slideTypes.presentation"
-    class="my-2 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] py-1 right-0 left-0 top-[45px]"
+    class="flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] py-1 right-0 left-0 top-[42px]"
     :class="containerOverflow"
   >
     <UTooltip

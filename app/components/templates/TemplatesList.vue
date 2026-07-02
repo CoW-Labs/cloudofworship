@@ -1,5 +1,8 @@
 <template>
-  <div class="templates-main min-h-[80vh] h-[100%]" ref="templatesContainer">
+  <div
+    class="templates-main min-h-[80vh] h-[100%] flex flex-col"
+    ref="templatesContainer"
+  >
     <!-- CATEGORY TABS -->
     <!-- <UTabs :items="categoryTabs" @change="activeCategory = $event">
       <template #default="{ item }">
@@ -13,7 +16,7 @@
     <!-- Superadmin Info Banner -->
     <div
       v-if="authStore.user?.role === 'superadmin'"
-      class="mt-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3"
+      class="mb-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3"
     >
       <div class="flex items-start gap-2">
         <IconWrapper
@@ -27,87 +30,97 @@
       </div>
     </div>
 
-    <!-- SEARCH AND CLOSE -->
-    <div class="flex gap-2 come-up-1 mt-2">
-      <UInput
-        icon="i-bx-search"
-        :placeholder="`Search ${categoryTabs[activeCategory].label} templates`"
-        v-model="searchInput"
-        class="w-[100%]"
-        @input="onSearchInput"
-        @input.capture="loading = true"
-      />
-      <UButton icon="i-bx-x" color="primary" @click="$emit('close')"></UButton>
-    </div>
-
-    <!-- LOADING STATE -->
     <div
-      v-if="loading"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-350px)]"
+      class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1.5 flex flex-col flex-1 min-h-0"
     >
-      <USkeleton
-        v-for="i in 10"
-        :key="i"
-        class="w-[100%] h-[100px] mt-2"
-      ></USkeleton>
-    </div>
-
-    <!-- TEMPLATES DISPLAY -->
-    <template v-else>
-      <template v-if="searchInput.length < 2">
-        <div
-          class="actions-ctn mt-2 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
+      <!-- SEARCH AND CLOSE -->
+      <div class="flex gap-2 come-up-1">
+        <UInput
+          :placeholder="`Search ${categoryTabs[activeCategory].label} templates`"
+          v-model="searchInput"
+          class="w-[100%] cow-search-input"
+          @input="onSearchInput"
+          @input.capture="loading = true"
         >
-          <EmptyState
-            v-if="displayedTemplates?.length === 0"
-            icon="i-tabler-layout-grid"
-            sub="No templates available yet."
-            desc="Templates help you quickly create beautiful slides"
-          />
-          <RecycleScroller
-            v-else
-            class="h-[calc(100vh-300px)]"
-            :items="displayedTemplates"
-            :item-size="110"
-            key-field="_id"
-            v-slot="{ item: template }"
-          >
-            <TemplateCard
-              :key="template._id"
-              :template="template"
-              @use-template="useTemplate($event)"
-            />
-          </RecycleScroller>
-        </div>
-      </template>
+          <template #leading>
+            <SearchIcon class="w-4 h-4 text-gray-400 dark:text-[#9aa3b2]" />
+          </template>
+        </UInput>
+        <CowButton
+          variant="secondary"
+          size="2xs"
+          class="!px-2.5 !py-0 max-h-[40px] rounded-lg"
+          @click="$emit('close')"
+        >
+          <CloseIcon class="w-4 h-4" />
+        </CowButton>
+      </div>
 
-      <!-- SEARCH RESULTS -->
+      <!-- LOADING STATE -->
+      <div
+        v-if="loading"
+        class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-350px)]"
+      >
+        <CowSkeleton variant="block" :count="10" :height="100" />
+      </div>
+
+      <!-- TEMPLATES DISPLAY -->
       <template v-else>
-        <div
-          class="actions-ctn mt-2 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
-        >
-          <EmptyState
-            v-if="searchResults?.length === 0"
-            icon="i-tabler-search"
-            sub="No templates found matching your query"
-          />
-          <RecycleScroller
-            v-else
-            class="h-[calc(100vh-300px)]"
-            :items="searchResults"
-            :item-size="110"
-            key-field="_id"
-            v-slot="{ item: template }"
+        <template v-if="searchInput.length < 2">
+          <div
+            class="actions-ctn -mx-1.5 mt-1.5 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
           >
-            <TemplateCard
-              :key="template._id"
-              :template="template"
-              @use-template="useTemplate($event)"
+            <EmptyState
+              v-if="displayedTemplates?.length === 0"
+              icon="i-tabler-layout-grid"
+              sub="No templates available yet."
+              desc="Templates help you quickly create beautiful slides"
             />
-          </RecycleScroller>
-        </div>
+            <RecycleScroller
+              v-else
+              class="h-[calc(100vh-300px)]"
+              :items="displayedTemplates"
+              :item-size="110"
+              key-field="_id"
+              v-slot="{ item: template }"
+            >
+              <TemplateCard
+                :key="template._id"
+                :template="template"
+                @use-template="useTemplate($event)"
+              />
+            </RecycleScroller>
+          </div>
+        </template>
+
+        <!-- SEARCH RESULTS -->
+        <template v-else>
+          <div
+            class="actions-ctn -mx-1.5 mt-1.5 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
+          >
+            <EmptyState
+              v-if="searchResults?.length === 0"
+              icon="i-tabler-search"
+              sub="No templates found matching your query"
+            />
+            <RecycleScroller
+              v-else
+              class="h-[calc(100vh-300px)]"
+              :items="searchResults"
+              :item-size="110"
+              key-field="_id"
+              v-slot="{ item: template }"
+            >
+              <TemplateCard
+                :key="template._id"
+                :template="template"
+                @use-template="useTemplate($event)"
+              />
+            </RecycleScroller>
+          </div>
+        </template>
       </template>
-    </template>
+    </div>
   </div>
 </template>
 

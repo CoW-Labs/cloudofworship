@@ -2,7 +2,7 @@
   <div
     v-if="slide?.layout === slideLayoutTypes.heading_sub"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw;`"
+    :style="`padding: ${padding.top}cqw ${padding.right}cqw ${padding.bottom}cqw ${padding.left}cqw;`"
   >
     <div
       v-if="contentVisible"
@@ -27,10 +27,10 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.full_text"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw; font-size: ${
+    :style="`padding: ${padding.top}cqw ${padding.right}cqw ${padding.bottom}cqw ${padding.left}cqw; font-size: ${
       (slide?.slideStyle?.fontSize!!) *
       ((slide?.slideStyle?.fontSizePercent || currentState.settings.slideStyles.fontSizePercent || 100) / 100)
-    }vw`"
+    }cqw`"
   >
     <div
       v-if="contentVisible"
@@ -46,7 +46,7 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.two_column"
     class="slide-layout-ctn flex gap-4 h-[100%] justify-around items-center"
-    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw;`"
+    :style="`padding: ${padding.top}cqw ${padding.right}cqw ${padding.bottom}cqw ${padding.left}cqw;`"
   >
     <div
       v-if="contentVisible"
@@ -70,14 +70,14 @@
       bibleThemeClasses.container,
       bibleTheme.layout.labelPosition === 'left' ||
       bibleTheme.layout.labelPosition === 'right'
-        ? 'flex-row items-center gap-[2vw]'
+        ? 'flex-row items-center gap-[2cqw]'
         : 'flex-col gap-2',
       bibleTheme.layout.labelPosition === 'right' ? 'flex-row-reverse' : '',
     ]"
-    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw; font-size: ${
+    :style="`padding: ${padding.top}cqw ${padding.right}cqw ${padding.bottom}cqw ${padding.left}cqw; font-size: ${
       (slide?.slideStyle?.fontSize!!) *
       ((slide?.slideStyle?.fontSizePercent || currentState.settings.slideStyles.fontSizePercent || 100) / 100)
-    }vw`"
+    }cqw`"
   >
     <!-- For 'top' label position, render label first -->
     <template v-if="bibleTheme.layout.labelPosition === 'top'">
@@ -198,10 +198,10 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.countdown"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding.top}vw ${padding.right}vw ${padding.bottom}vw ${padding.left}vw; font-size: ${
+    :style="`padding: ${padding.top}cqw ${padding.right}cqw ${padding.bottom}cqw ${padding.left}cqw; font-size: ${
       (slide?.slideStyle?.fontSize!!) *
       ((slide?.slideStyle?.fontSizePercent || currentState.settings.slideStyles.fontSizePercent || 100) / 100)
-    }vw`"
+    }cqw`"
   >
     <div
       class="content jost"
@@ -290,7 +290,7 @@ const bibleThemeClasses = computed(() => {
     theme.layout.labelPosition !== "overlay"
   ) {
     classes.label +=
-      " bg-black/40 px-[2vw] py-[0.5vw] rounded-[0.5vw] inline-block"
+      " bg-black/40 px-[2cqw] py-[0.5cqw] rounded-[0.5cqw] inline-block"
   }
 
   return classes

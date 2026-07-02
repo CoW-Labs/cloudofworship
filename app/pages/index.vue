@@ -1,18 +1,24 @@
 <template #default="{ defaultProps }">
-  <div class="flex mt-4 px-4">
-    <div :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }">
+  <div class="flex mt-4 px-4 h-[calc(100vh-80px)]">
+    <div
+      :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }"
+      class="h-full"
+    >
       <QuickActions />
     </div>
     <div
-      class="w-[5px] flex-shrink-0 mx-[2px] cursor-ew-resize rounded hover:bg-primary-300/50 dark:hover:bg-primary-700/50 transition-colors"
+      class="w-2 flex-shrink-0 mx-1 cursor-ew-resize rounded opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
       @mousedown.prevent="startResize('left', $event)"
     />
-    <PreviewContent class="min-w-0" />
+    <PreviewContent class="flex-1 min-w-0 h-full" />
     <div
-      class="w-[5px] flex-shrink-0 mx-[2px] cursor-ew-resize rounded hover:bg-primary-300/50 dark:hover:bg-primary-700/50 transition-colors"
+      class="w-2 flex-shrink-0 mx-1 cursor-ew-resize rounded opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
       @mousedown.prevent="startResize('right', $event)"
     />
-    <div :style="{ width: liveOutputWidth + 'px', flexShrink: 0 }">
+    <div
+      :style="{ width: liveOutputWidth + 'px', flexShrink: 0 }"
+      class="h-full"
+    >
       <LiveOutput />
     </div>
   </div>
@@ -48,12 +54,12 @@ const MAX_RETRIES = 10
 let retryCount = 0
 
 // Resizable panel widths
-const QA_MIN_WIDTH = 200
-const QA_MAX_WIDTH = 500
-const QA_DEFAULT_WIDTH = 330
-const LO_MIN_WIDTH = 250
+const QA_MIN_WIDTH = 300
+const QA_MAX_WIDTH = 550
+const QA_DEFAULT_WIDTH = 340
+const LO_MIN_WIDTH = 400
 const LO_MAX_WIDTH = 600
-const LO_DEFAULT_WIDTH = 400
+const LO_DEFAULT_WIDTH = 450
 
 const quickActionsWidth = ref(QA_DEFAULT_WIDTH)
 const liveOutputWidth = ref(LO_DEFAULT_WIDTH)

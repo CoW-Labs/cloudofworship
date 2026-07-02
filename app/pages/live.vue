@@ -75,6 +75,7 @@ const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
 const FPS = 10
 const mostUpdatedLiveSlide = ref<Slide | null>(null)
+const lastBroadcastTs = ref(0)
 
 useHead({
   title: "Live Projection - Cloud of Worship",
@@ -189,7 +190,15 @@ onMounted(() => {
   // Store cleanup function to properly dispose of BroadcastChannel
   const cleanupBroadcast = useBroadcastMessage((data: string) => {
     try {
-      const parsed = JSON.parse(data)
+      const envelope = JSON.parse(data)
+
+      // Drop messages that arrive out of order (e.g. a background countdown
+      // tick from a tab that hasn't yet caught up to a newer live-slide
+      // change) instead of always applying whatever lands last.
+      if (envelope.ts < lastBroadcastTs.value) return
+      lastBroadcastTs.value = envelope.ts
+
+      const parsed = JSON.parse(envelope.payload)
 
       // null broadcast means the live slide was deleted — blank the projection
       if (parsed === null) {

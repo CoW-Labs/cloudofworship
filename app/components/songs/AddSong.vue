@@ -1,12 +1,8 @@
 <template>
   <div class="add-song-main my-4">
     <form class="flex flex-col gap-3">
-      <UFormGroup label="Title" size="lg">
-        <UInput placeholder="Hallelujah Eh" v-model="title" />
-      </UFormGroup>
-      <UFormGroup label="Artist" size="lg">
-        <UInput placeholder="Nathaniel Bassey" v-model="artist" />
-      </UFormGroup>
+      <CowInput v-model="title" label="Title" />
+      <CowInput v-model="artist" label="Artist" />
 
       <!-- Proactive duplicate check: existing matches surfaced as the user types -->
       <div
@@ -49,14 +45,13 @@
                   class="text-gray-400 ml-1 shrink-0"
                 />
               </button>
-              <UButton
+              <CowButton
                 size="2xs"
-                color="primary"
-                variant="soft"
+                variant="primary"
                 @click="useExistingSong(match)"
               >
                 Use this
-              </UButton>
+              </CowButton>
             </div>
             <Transition name="duplicate-preview">
               <div
@@ -74,18 +69,17 @@
         </div>
 
         <!-- Shown only after a near-dup blocked the submit (warn-don't-block) -->
-        <UButton
+        <CowButton
           v-if="canForce"
+          variant="secondary"
           block
           size="sm"
-          variant="outline"
-          color="gray"
           class="mt-2"
           :loading="loading"
           @click="addAnyway"
         >
           None of these — add anyway
-        </UButton>
+        </CowButton>
       </div>
 
       <div
@@ -104,26 +98,15 @@
           adding a worship lineup.
         </p>
       </div>
-      <UFormGroup label="Lyrics" size="lg">
-        <UTextarea
-          autoresize
-          placeholder="Hallelujah Eh! It's the sound of Victory"
-          variant="none"
-          :rows="12"
-          color="gray"
-          v-model="lyrics"
-        />
-      </UFormGroup>
-      <UFormGroup size="lg">
-        <div class="flex gap-2 items-center">
-          <span>Share this song with other users?</span>
-          <UToggle size="lg" v-model="isSongPublic" />
-        </div>
-      </UFormGroup>
+      <CowTextarea v-model="lyrics" label="Lyrics" :rows="12" autoresize />
+      <CowToggle
+        v-model="isSongPublic"
+        label="Share this song with other users?"
+      />
 
-      <UButton
+      <CowButton
+        variant="primary"
         block
-        :icon="song ? 'i-bx-edit' : 'i-bx-plus'"
         size="lg"
         class="mt-4"
         :disabled="!(artist && title && lyrics)"
@@ -131,7 +114,7 @@
         @click="addSong()"
       >
         {{ song ? "Edit Song" : "Add Song" }}
-      </UButton>
+      </CowButton>
     </form>
   </div>
 </template>

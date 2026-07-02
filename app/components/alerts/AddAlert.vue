@@ -47,18 +47,18 @@
         </div>
       </div>
       <div class="button-ctn px-4">
-        <UButton
+        <CowButton
+          variant="secondary"
           block
-          variant="outline"
           class="mt-4"
           @click="appStore.setActiveAlert(null)"
         >
           Remove Alert
-        </UButton>
+        </CowButton>
       </div>
     </div>
     <h2 class="font-semibold text-md">Add Alert</h2>
-    <form class="flex flex-col gap-3 mt-2">
+    <form class="flex flex-col gap-5 mt-3">
       <UFormGroup size="lg">
         <BgColorSelection
           :count="6"
@@ -68,38 +68,17 @@
         />
       </UFormGroup>
 
-      <UFormGroup size="lg">
-        <USelectMenu
-          :variant="'solid' as SelectVariant"
-          color="black"
-          placeholder="Alert position"
-          class="text-gray-400"
-          v-model="position"
-          :ui="{
-            variant: {
-              solid: 'focus:ring-0 bg-gray-100',
-            },
-          }"
-          :options="['Top', 'Bottom']"
-        >
-          <template #label>
-            <span v-if="position?.length" class="truncate text-black">{{
-              position
-            }}</span>
-            <span v-else>Alert position</span>
-          </template>
-        </USelectMenu>
-      </UFormGroup>
-      <UFormGroup size="lg">
-        <UTextarea
-          autoresize
-          placeholder="Your alert content goes here"
-          variant="none"
-          :rows="6"
-          color="gray"
-          v-model="content"
-        />
-      </UFormGroup>
+      <CowDropdown
+        label="Alert position"
+        v-model="position"
+        :options="['Top', 'Bottom']"
+      />
+      <CowTextarea
+        v-model="content"
+        label="Your alert content"
+        :rows="6"
+        autoresize
+      />
 
       <UFormGroup size="lg" label="Speed">
         <div class="flex items-center gap-3 px-2">
@@ -115,9 +94,9 @@
         </div>
       </UFormGroup>
 
-      <UButton
+      <CowButton
+        variant="primary"
         block
-        trailing-icon="i-bx-send"
         size="lg"
         class="mt-4"
         :disabled="!(content && position && bgColor)"
@@ -125,12 +104,11 @@
         @click="addAlert"
       >
         Send alert to LIVE
-      </UButton>
+      </CowButton>
     </form>
   </div>
 </template>
 <script setup lang="ts">
-import type { SelectVariant } from "@nuxt/ui/dist/runtime/types"
 import { useAppStore } from "~/store/app"
 import type { Alert } from "~/types"
 import { safeScrollBy } from "~/utils/browserSafety"
