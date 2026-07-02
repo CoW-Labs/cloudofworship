@@ -1,78 +1,97 @@
 <template>
-  <div class="song-main min-h-[80vh] h-[100%]" ref="quickActions">
-    <div class="flex gap-2">
-      <UInput
-        icon="i-bx-search"
-        placeholder="Search song title, lyrics, artist"
-        v-model="searchInput"
-        class="w-[100%]"
-        @input="onSearchInput"
-        @keyup.enter="getSongs($event.target.value)"
-      />
-      <UButton icon="i-bx-x" color="primary" @click="$emit('close')"></UButton>
-    </div>
-
+  <div class="song-main min-h-[80vh] h-[100%] flex flex-col" ref="quickActions">
     <div
-      v-if="loading"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+      class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1.5 flex flex-col flex-1 min-h-0"
     >
-      <USkeleton
-        v-for="i in 15"
-        :key="i"
-        class="w-[100%] h-[80px] mt-2"
-      ></USkeleton>
+      <div class="flex gap-2">
+        <UInput
+          placeholder="Search song title, lyrics, artist"
+          v-model="searchInput"
+          class="w-[100%] cow-search-input"
+          @input="onSearchInput"
+          @keyup.enter="getSongs($event.target.value)"
+        >
+          <template #leading>
+            <SearchIcon class="w-4 h-4 text-gray-400 dark:text-[#9aa3b2]" />
+          </template>
+        </UInput>
+        <CowButton
+          variant="secondary"
+          size="2xs"
+          class="!px-2.5 !py-0 max-h-[40px] rounded-lg"
+          @click="$emit('close')"
+        >
+          <CloseIcon class="w-4 h-4" />
+        </CowButton>
+      </div>
+
+      <div
+        v-if="loading"
+        class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
+      >
+        <CowSkeleton variant="row" :count="15" />
+      </div>
+      <template v-else>
+        <!-- BASIC SONGS -->
+        <div
+          v-if="searchInput.length < 2"
+          class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
+        >
+          <ActionCard
+            v-for="(song, index) in songs"
+            :key="song.id"
+            :ref="(el) => setItemRef(el, index)"
+            :action="turnToSongAction(song)"
+            :icon-override="SongsIcon"
+            compact
+            show-subtext
+            :active="hasInteracted && index === focusedActionIndex"
+            :class="{
+              'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
+            }"
+            @click="focusedActionIndex = index"
+            @mouseenter="onRowMouseEnter(index)"
+          />
+        </div>
+
+        <!-- SEARCHING SONGS -->
+        <div
+          v-else
+          class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
+        >
+          <ActionCard
+            v-for="(song, index) in songs"
+            :key="song.id"
+            :ref="(el) => setItemRef(el, index)"
+            :action="turnToSongAction(song)"
+            :icon-override="SongsIcon"
+            compact
+            show-subtext
+            :active="hasInteracted && index === focusedActionIndex"
+            :class="{
+              'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
+            }"
+            @click="focusedActionIndex = index"
+            @mouseenter="onRowMouseEnter(index)"
+          />
+        </div>
+
+        <EmptyState
+          v-if="!loading && songs?.length === 0"
+          icon="i-tabler-cloud-search"
+          sub="We couldn't find that song"
+          desc="Try searching for a portion of the lyrics, or the song title and artist together."
+          is-wider
+        />
+      </template>
     </div>
-    <template v-else>
-      <!-- BASIC SONGS -->
-      <div
-        v-if="searchInput.length < 2"
-        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
-      >
-        <SongCard
-          v-for="(song, index) in songs"
-          :key="song.id"
-          :song="song"
-          type="song"
-          :class="{
-            'bg-primary-50 dark:bg-primary-800 rounded-md':
-              index === focusedActionIndex,
-          }"
-          @click="focusedActionIndex = index"
-        />
-      </div>
-
-      <!-- SEARCHING SONGS -->
-      <div
-        v-else
-        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
-      >
-        <SongCard
-          v-for="(song, index) in songs"
-          :key="song.id"
-          :song="song"
-          type="song"
-          :class="{
-            'bg-primary-50 dark:bg-primary-800 rounded-md':
-              index === focusedActionIndex,
-          }"
-          @click="focusedActionIndex = index"
-        />
-      </div>
-
-      <EmptyState
-        v-if="!loading && songs?.length === 0"
-        icon="i-tabler-cloud-search"
-        sub="We couldn't find that song"
-        desc="Try searching for a portion of the lyrics, or the song title and artist together."
-        is-wider
-      />
-    </template>
   </div>
 </template>
 <script setup lang="ts">
-import type { Song } from "~/types"
+import type { QuickAction, Song } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
 import { useAuthStore } from "~/store/auth"
+import SongsIcon from "~/components/svgs/SongsIcon.vue"
 
 const props = defineProps<{
   query: string
@@ -83,23 +102,47 @@ const toast = useToast()
 const { searchSongs } = useSongs()
 const loading = ref<boolean>(false)
 const songs = ref<Song[]>([])
-const searchedSongs = ref<Song[]>([])
 const focusedActionIndex = ref(0)
+const hasInteracted = ref(false)
+const onRowMouseEnter = (index: number) => {
+  focusedActionIndex.value = index
+  hasInteracted.value = true
+}
 const quickActions = ref<HTMLDivElement | null>(null)
 const authStore = useAuthStore()
+const itemRefs = ref<(HTMLElement | null)[]>([])
 let latestSongSearchId = 0
+
+const setItemRef = (el: any, index: number) => {
+  itemRefs.value[index] = el?.$el || el || null
+}
+
+const turnToSongAction = (song: Song): QuickAction => {
+  const subtext =
+    song?.artist ||
+    (song?.author === "me" ? "compiled by me" : song?.author) ||
+    ""
+  return {
+    icon: "i-bx-music",
+    name: song?.title || "",
+    desc: subtext,
+    action: "new-song",
+    songData: song,
+    type: slideTypes.song,
+  }
+}
 
 const getSongs = async (query: string = "") => {
   const searchId = ++latestSongSearchId
   loading.value = true
   songs.value = []
   focusedActionIndex.value = 0
+  hasInteracted.value = false
 
   try {
     const results = await searchSongs(query, 20)
     if (searchId === latestSongSearchId) {
       songs.value = results
-      searchedSongs.value = results
     }
   } catch (err) {
     if (searchId === latestSongSearchId) {
@@ -120,24 +163,36 @@ onMounted(() => {
     }
     switch (e.key) {
       case "ArrowDown":
-        focusedActionIndex.value < searchedSongs.value.length - 1
+        hasInteracted.value = true
+        focusedActionIndex.value < songs.value.length - 1
           ? (focusedActionIndex.value += 1)
           : null
         break
       case "ArrowUp":
+        hasInteracted.value = true
         focusedActionIndex.value > 0 ? (focusedActionIndex.value -= 1) : null
         break
-      case "Enter":
-        const action = searchedSongs.value?.[focusedActionIndex.value]
-        // useGlobalEmit(
-        //   action.action,
-        //   `${action.bibleBookIndex}:${bibleChapterAndVerse.value}`
-        // )
+      case "Enter": {
+        const song = songs.value?.[focusedActionIndex.value]
+        if (!song) return
+        useGlobalEmit("new-song", song)
         break
+      }
       default:
         return
     }
   })
+})
+
+watch(songs, () => {
+  itemRefs.value = []
+  focusedActionIndex.value = 0
+  hasInteracted.value = false
+})
+
+watch(focusedActionIndex, async () => {
+  await nextTick()
+  itemRefs.value[focusedActionIndex.value]?.scrollIntoView({ block: "nearest" })
 })
 
 getSongs(props.query || "")

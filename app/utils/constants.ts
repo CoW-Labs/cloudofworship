@@ -71,6 +71,8 @@ export const appWideActions = {
   newPresentation: 'new-presentation',
   promoteActiveSlide: 'promote-active-slide-live',
   selectSlides: 'select-slides',
+  selectAllSlides: 'select-all-slides',
+  cancelSelectSlides: 'cancel-select-slides',
   showUpgradeModal: 'show-upgrade-modal',
   signOut: 'sign-out',
 }
@@ -111,7 +113,7 @@ export const quickActionsArr: QuickAction[] = [
     name: "Transcribe Sermon",
     desc: "Transcribe sermon and auto-suggest Bible slides",
     action: appWideActions.newTranscribe,
-    meta: "transcribe sermon speech text bible audio microphone",
+    meta: "transcribe sermon speech text bible audio microphone speech to text, audio to text transcripts",
     tier: 'teams',
     // unreleased: true,
     featureFlag: 'transcripts-feature',

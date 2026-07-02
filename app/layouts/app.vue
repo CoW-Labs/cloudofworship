@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="!loadingResources"
-    class="app-ctn max-h-[100vh] overflow-hidden text"
+    class="app-ctn min-h-[100vh] max-h-[100vh] overflow-hidden bg-gray-100 text dark:bg-[#111722]"
   >
     <Navbar :app-version="appVersion" :online="isAppOnline" />
     <SubscriptionExpiryBanner />
@@ -34,7 +34,7 @@
   </div>
   <div
     v-else
-    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center bg-white px-6 text-gray-900 dark:bg-gray-950 dark:text-white"
+    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center bg-white px-6 text-gray-900 dark:bg-[#111722] dark:text-white"
   >
     <div class="wrapper w-full max-w-md text-center">
       <section class="min-w-0">

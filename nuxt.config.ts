@@ -1,6 +1,25 @@
+import { execSync } from 'child_process'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2025-01-01",
+
+  sourcemap: {
+    client: true,
+  },
+
+  hooks: {
+    'nitro:build:public-assets': () => {
+      console.log('Running PostHog sourcemap injection and upload...')
+      try {
+        execSync("posthog-cli sourcemap inject --directory '.output'", { stdio: 'inherit' })
+        execSync("posthog-cli sourcemap upload --directory '.output' --delete-after", { stdio: 'inherit' })
+        console.log('PostHog sourcemap injection completed successfully')
+      } catch (error) {
+        console.error('PostHog sourcemap injection failed:', error)
+      }
+    },
+  },
   devtools: { enabled: false },
 
   // Explicitly enable the pages system so Nuxt's dev-mode detection doesn't
@@ -102,9 +121,7 @@ export default defineNuxtConfig({
     clearScreen: false,
     // Enable environment variables
     envPrefix: ['VITE_', 'TAURI_'],
-    build: {
-      sourcemap: true,
-    },
+    build: {},
   },
 
   runtimeConfig: {

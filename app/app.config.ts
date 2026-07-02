@@ -31,6 +31,19 @@ export default defineAppConfig({
         loadingIcon: 'i-bx-loader-alt'
       }
     },
+    tabs: {
+      list: {
+        rounded: 'rounded-2xl',
+        height: 'h-12',
+        marker: {
+          rounded: 'rounded-2xl'
+        },
+        tab: {
+          rounded: 'rounded-2xl',
+          height: 'h-10'
+        }
+      }
+    },
     textarea: {
       color: {
         gray: {

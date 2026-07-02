@@ -86,7 +86,7 @@ export const bibleThemes: BibleTheme[] = [
     cssClasses: {
       container: 'bible-theme-label-large',
       content: '',
-      label: 'text-[2vw]',
+      label: 'text-[2cqw]',
     },
   },
   {
@@ -103,7 +103,7 @@ export const bibleThemes: BibleTheme[] = [
     cssClasses: {
       container: 'bible-theme-label-bg',
       content: '',
-      label: 'text-[2vw] bg-white/10 pt-[1.5vw] mt-[3.5vw] leading-[0px]',
+      label: 'text-[2cqw] bg-white/10 pt-[1.5cqw] mt-[3.5cqw] leading-[0px]',
     },
   },
   {
@@ -119,8 +119,8 @@ export const bibleThemes: BibleTheme[] = [
     },
     cssClasses: {
       container: 'bible-theme-overlay',
-      content: 'pb-[7.5vw]',
-      label: 'bg-gradient-to-t from-black/80 to-transparent pb-[3vw] px-[2vw] absolute bottom-0 left-0 right-0',
+      content: 'pb-[7.5cqw]',
+      label: 'bg-gradient-to-t from-black/80 to-transparent pb-[3cqw] px-[2cqw] absolute bottom-0 left-0 right-0',
     },
   },
   // {
@@ -137,7 +137,7 @@ export const bibleThemes: BibleTheme[] = [
   //   cssClasses: {
   //     container: 'bible-theme-side',
   //     content: 'text-left flex-1',
-  //     label: 'bg-white/10 px-[1.5vw] py-[1vw] rounded-[0.5vw] writing-mode-vertical',
+  //     label: 'bg-white/10 px-[1.5cqw] py-[1cqw] rounded-[0.5cqw] writing-mode-vertical',
   //   },
   // },
 ]

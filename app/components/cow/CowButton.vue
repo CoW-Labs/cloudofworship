@@ -12,7 +12,13 @@
     :class="`cow-button--${variant}`"
     v-bind="$attrs"
   >
+    <template v-if="$slots.leading" #leading>
+      <slot name="leading" />
+    </template>
     <slot />
+    <template v-if="$slots.trailing" #trailing>
+      <slot name="trailing" />
+    </template>
   </UButton>
 </template>
 
@@ -21,7 +27,7 @@ defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(
   defineProps<{
-    variant?: "primary" | "secondary"
+    variant?: "primary" | "secondary" | "dark" | "danger"
     block?: boolean
     loading?: boolean
     disabled?: boolean
@@ -80,8 +86,8 @@ const buttonUi = {
 .cow-button--secondary {
   color: #0f172a !important;
   background-color: #ffffff !important;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12), 0 4px 0 0 #e2e8f0,
-    0 10px 16px -10px rgba(15, 23, 42, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12), 0 4px 0 0 #cbd5e1,
+    0 10px 16px -10px rgba(15, 23, 42, 0.35);
 }
 
 .cow-button--secondary:hover {
@@ -90,7 +96,39 @@ const buttonUi = {
 
 .cow-button--secondary:active:not(:disabled) {
   transform: translateY(3px);
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12), 0 1px 0 0 #e2e8f0;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12), 0 1px 0 0 #cbd5e1;
+}
+
+.cow-button--dark {
+  color: #fff !important;
+  background-color: #111827 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 0 0 #030712,
+    0 10px 16px -10px rgba(3, 7, 18, 0.45);
+}
+
+.cow-button--dark:hover {
+  background-color: #1f2937 !important;
+}
+
+.cow-button--dark:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 0 #030712;
+}
+
+.cow-button--danger {
+  color: #fff !important;
+  background-color: #991b1b !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 0 0 #450a0a,
+    0 10px 16px -10px rgba(69, 10, 10, 0.6);
+}
+
+.cow-button--danger:hover {
+  background-color: #7f1d1d !important;
+}
+
+.cow-button--danger:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 0 #450a0a;
 }
 
 .cow-button:disabled {

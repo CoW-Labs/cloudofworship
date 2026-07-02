@@ -1,7 +1,7 @@
 <template>
   <div class="add-song-main mb-4">
     <h2 class="font-semibold text-md">Add Countdown</h2>
-    <form class="flex flex-col gap-3 mt-2">
+    <form class="flex flex-col gap-5 mt-3">
       <!-- <UFormGroup size="xl">
         <div class="flex items-center gap-2">
           <UInput type="number" class="text-xs" />
@@ -9,29 +9,14 @@
         </div>
       </UFormGroup> -->
 
-      <UFormGroup size="lg">
-        <USelectMenu
-          :variant="'solid' as SelectVariant"
-          color="black"
-          placeholder="Alert position"
-          class="text-gray-400"
-          value-attribute="value"
-          v-model="time"
-          :ui="{
-            variant: {
-              solid: 'focus:ring-0 bg-gray-100',
-            },
-          }"
-          :options="timeOptions"
-        >
-          <template #label>
-            <span v-if="time?.length" class="truncate text-black">{{
-              timeOptions.find((option: any) => option.value === time)?.label
-            }}</span>
-            <span v-else>Countdown duration</span>
-          </template>
-        </USelectMenu>
-      </UFormGroup>
+      <CowDropdown
+        label="Countdown duration"
+        :model-value="timeOptions.find((o: any) => o.value === time)?.label"
+        @update:model-value="
+          time = timeOptions.find((o: any) => o.label === $event)?.value
+        "
+        :options="timeOptions.map((o: any) => o.label)"
+      />
 
       <UFormGroup size="lg" label="A little more specific with your time?">
         <div
@@ -64,19 +49,15 @@
         </div>
       </UFormGroup>
 
-      <UFormGroup size="lg">
-        <UTextarea
-          placeholder="Optional text above your countdown e.g 'Time before service starts:'"
-          variant="none"
-          :rows="6"
-          color="gray"
-          v-model="content"
-        />
-      </UFormGroup>
+      <CowTextarea
+        v-model="content"
+        label="Optional text above your countdown"
+        :rows="6"
+      />
 
-      <UButton
+      <CowButton
+        variant="primary"
         block
-        icon="i-bx-add"
         size="lg"
         class="mt-4"
         :disabled="!time"
@@ -84,7 +65,7 @@
         @click="createCountdown"
       >
         Create countdown slide
-      </UButton>
+      </CowButton>
     </form>
   </div>
 </template>
@@ -94,7 +75,6 @@ import { appWideActions } from "~/utils/constants"
 import type { Countdown } from "~/types"
 import type { Emitter } from "mitt"
 import { min } from "rxjs"
-import type { SelectVariant } from "@nuxt/ui/dist/runtime/types"
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
 

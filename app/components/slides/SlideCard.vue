@@ -2,7 +2,7 @@
   <!-- GRID TYPE CARD -->
   <div
     v-if="gridType"
-    class="slide-card gap-3 h-[120px] rounded-md bg-primary hover:bg-primary-700 transition-all cursor-pointer relative overflow-hidden"
+    class="slide-card gap-3 h-[120px] rounded-lg bg-primary hover:bg-primary-700 transition-all cursor-pointer relative overflow-hidden"
     :id="slide?.id?.replace(/\d+/g, '')"
     :class="[
       selected ? 'border-black' : 'border-transparent',
@@ -140,7 +140,7 @@
   </div>
   <button
     v-else
-    class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-primary-950 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900 transition-all cursor-pointer relative"
+    class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-[#171d2b] rounded-lg hover:bg-primary-50 dark:hover:bg-[#2b3242] transition-all cursor-pointer relative"
     :id="slide?.id"
     @click="appStore.setLiveSlide(slide?.id || '0')"
   >

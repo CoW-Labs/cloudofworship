@@ -11,7 +11,7 @@
         class="bg-primary-500 absolute p-1 text-white rounded-full top-2 right-2 z-10"
         @click="visible = false"
       >
-        <IconWrapper name="i-bx-x" class="p-2 text-white" />
+        <CloseIcon class="p-2 text-white" />
       </button>
       <a :href="activeAdvert?.url" target="_blank" @click="onAdvertClicked">
         <img class="scale-105" :src="activeAdvert?.image"

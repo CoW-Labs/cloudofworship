@@ -1,7 +1,7 @@
 <template>
   <Transition>
     <div
-      class="navbar-ctn relative h-[50px] w-[100%] border-b border-gray-100 dark:border-primary-950 flex justify-between items-center px-4 dark:border-primary-900"
+      class="navbar-ctn relative h-[50px] w-[100%] flex justify-between items-center px-4"
       v-if="route.name !== 'live'"
     >
       <UProgress
@@ -12,12 +12,6 @@
       <div class="logo flex items-center gap-2 w-[310px]">
         <Logo class="w-[38px]" />
         <h1 class="text-md font-semibold">Cloud of Worship</h1>
-        <UButton
-          class="version-chip flex text-xs font-semibold bg-primary-200 p-2 py-1 rounded-full border border-transparent hover:bg-primary-300 hover:border-primary-900 transition-all text-primary-900"
-          @click="useGlobalEmit(appWideActions.showChangelog)"
-        >
-          {{ appVersion }}
-        </UButton>
       </div>
       <div class="projects-ctn">
         <!-- <IconWrapper name="i-bx-spinner-dots" v-if="slidesAndScheduleLoading" /> -->
@@ -132,7 +126,51 @@
           </UButton>
         </UTooltip>
 
-        <!-- ACCOUNT PROFILE BUTTON -->
+        <!-- INVITE PEOPLE BUTTON -->
+        <UTooltip text="Invite church media team">
+          <CowButton
+            variant="primary"
+            size="sm"
+            class="!px-4 gap-1.5"
+            @click="handleInviteClick"
+          >
+            <UserIcon class="w-4 h-4" />
+            Invite
+          </CowButton>
+        </UTooltip>
+
+        <!-- DARK / LIGHT MODE TOGGLE (sliding switch) -->
+        <ClientOnly>
+          <button
+            type="button"
+            class="theme-toggle relative flex items-center w-[60px] h-8 rounded-full bg-gray-100 dark:bg-[#171d2b] transition-colors"
+            role="switch"
+            :aria-checked="isDark"
+            aria-label="Toggle dark mode"
+            @click="setDark(!isDark)"
+          >
+            <span
+              class="theme-toggle__thumb absolute top-[3px] left-[3px] w-[26px] h-[26px] rounded-full grid place-items-center transition-transform duration-300 ease-out"
+              :class="isDark ? 'translate-x-[28px] bg-white' : 'translate-x-0 bg-gray-900'"
+            >
+              <LightModeIcon v-if="!isDark" class="w-3.5 h-3.5 text-white" />
+              <DarkModeIcon v-else class="w-3.5 h-3.5 text-gray-900" />
+            </span>
+            <LightModeIcon
+              class="absolute left-[8px] w-3.5 h-3.5 transition-opacity duration-200"
+              :class="isDark ? 'opacity-40 text-gray-400' : 'opacity-0'"
+            />
+            <DarkModeIcon
+              class="absolute right-[8px] w-3.5 h-3.5 transition-opacity duration-200"
+              :class="isDark ? 'opacity-0' : 'opacity-40 text-gray-400'"
+            />
+          </button>
+          <template #fallback>
+            <div class="w-[60px] h-8" />
+          </template>
+        </ClientOnly>
+
+        <!-- ACCOUNT PROFILE + MENU -->
         <UPopover
           mode="click"
           :ui="{
@@ -140,11 +178,7 @@
             background: 'bg-white dark-bg-gray-900 border-0',
           }"
         >
-          <UButton
-            variant="ghost"
-            trailing-icon="i-bx-chevron-down"
-            class="p-1"
-          >
+          <button class="flex items-center gap-1.5 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#171d2b] transition-colors">
             <UAvatar
               :src="user?.avatar"
               :text="user?.fullname?.split(' ')?.[0]?.[0]"
@@ -154,7 +188,8 @@
               }"
               :class="`border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
             />
-          </UButton>
+            <UIcon name="i-bx-menu" class="w-5 h-5 text-gray-500 dark:text-gray-300" />
+          </button>
           <template #panel>
             <ProfileMiniModal
               :user="user"
@@ -163,34 +198,6 @@
             />
           </template>
         </UPopover>
-
-        <!-- INVITE PEOPLE BUTTON -->
-        <UTooltip text="Invite church media team">
-          <UButton
-            variant="outline"
-            class="h-8"
-            icon="i-bx-user-plus"
-            @click="handleInviteClick"
-          >
-            Invite
-          </UButton>
-        </UTooltip>
-
-        <!-- DARK / LIGHT MODE TOGGLE -->
-        <ClientOnly>
-          <UButton
-            :icon="isDark ? 'i-tabler-moon-filled' : 'i-tabler-sun-filled'"
-            color="primary"
-            variant="ghost"
-            aria-label="Theme"
-            class="h-10"
-            @click="isDark = !isDark"
-            >{{ isDark ? "Light" : "Dark" }}</UButton
-          >
-          <template #fallback>
-            <div class="w-8 h-8" />
-          </template>
-        </ClientOnly>
       </div>
     </div>
   </Transition>
@@ -200,7 +207,6 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import { appWideActions } from "~/utils/constants"
 
 const route = useRoute()
 const settingsModalOpen = ref(false)
@@ -277,6 +283,11 @@ const isDark = computed({
     colorMode.preference = colorMode.value === "dark" ? "light" : "dark"
   },
 })
+
+// Explicit theme setter for the segmented toggle (each half targets one mode)
+const setDark = (dark: boolean) => {
+  colorMode.preference = dark ? "dark" : "light"
+}
 
 onMounted(() => {
   if (!currentState.value?.activeSchedule) {
@@ -358,6 +369,31 @@ emitter?.on("sign-out", () => {
     opacity: 0;
     transform: scale(0.8) translateY(-10px);
   }
+}
+
+/* Dark/light toggle — CowButton-style solid ledge that compresses on press.
+   Ledge depth (5px) and press travel (4px) match CowButton's primary/sm
+   variant (the Invite button) so the two feel like the same height. */
+.theme-toggle {
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12), 0 5px 0 0 #cbd5e1,
+    0 10px 16px -10px rgba(15, 23, 42, 0.35);
+  transition: transform 0.08s ease, box-shadow 0.08s ease,
+    background-color 0.2s ease;
+  will-change: transform;
+}
+
+.theme-toggle:active {
+  transform: translateY(4px);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12), 0 1px 0 0 #cbd5e1;
+}
+
+html.dark .theme-toggle {
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2), 0 5px 0 0 #0d1320,
+    0 10px 16px -10px rgba(0, 0, 0, 0.6);
+}
+
+html.dark .theme-toggle:active {
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2), 0 1px 0 0 #0d1320;
 }
 
 /* Avatar zoom-in animation for the avatar list */

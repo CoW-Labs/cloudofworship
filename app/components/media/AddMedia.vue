@@ -68,34 +68,29 @@
 
       <!-- YouTube/Vimeo URL Input -->
       <div class="flex flex-col gap-2">
-        <UInput
-          v-model="externalVideoUrl"
-          placeholder="Paste YouTube or Vimeo URL here..."
-          class="flex-1"
-          size="lg"
-          icon="i-bx-link"
-        />
-        <UButton
+        <CowInput v-model="externalVideoUrl" label="YouTube or Vimeo URL" />
+        <CowButton
+          variant="primary"
           @click="addExternalVideo"
           :disabled="!externalVideoUrl"
-          icon="i-bx-plus"
           size="lg"
           class="justify-center mt-1"
         >
           Add external video
-        </UButton>
+        </CowButton>
       </div>
     </div>
     <!-- PREVIEW AND CREATE BUTTON -->
     <div v-if="fileObjs?.length > 0" class="preview-ctn flex flex-col mt-8">
-      <UButton
-        class="mb-2 w-[100%] flex justify-between"
-        trailing-icon="i-bx-chevron-right"
+      <CowButton
+        variant="primary"
+        class="mb-2"
+        block
         @click="addMediaEmitter"
         size="lg"
         >Create {{ fileObjs?.length }} Slide{{
           fileObjs?.length > 1 ? "s" : ""
-        }}</UButton
+        }}</CowButton
       >
       <Transition name="fade-sm">
         <div

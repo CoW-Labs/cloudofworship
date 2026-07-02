@@ -1,105 +1,130 @@
 <template>
-  <AppSection
-    heading="Preview and Edit Content"
-    :secondary-buttons="[
-      {
-        label: bulkActionLabel,
-        action: 'select-slides',
-        icon: bulkActionIcon,
-        color: 'primary',
-        confirmAction: false,
-        visible: true,
-      },
-      {
-        label: 'Delete Slides',
-        action: 'delete-selected-slides',
-        icon: 'i-tabler-trash',
-        color: 'red',
-        confirmAction: true,
-        visible: bulkSelectedSlides.length > 0,
-      },
-    ]"
-    slot-ctn-styles="flex flex-col justify-between h-[calc(100vh-182px)]"
-    class="flex-[2]"
-    @delete-selected-slides="deleteMultipleSlides(bulkSelectedSlides)"
-  >
-    <div
-      ref="slidesScroll"
-      class="slides-ctn overflow-y-scroll mb-4 rounded-md transition h-[50%]"
-      :class="[
-        slides?.length === 0 ? 'bg-primary-100 dark:bg-primary-900' : '',
+  <div ref="previewColumn" class="preview-column flex flex-col h-full min-w-0">
+    <AppSection
+      heading="Preview and Edit Content"
+      :secondary-buttons="[
+        {
+          label: 'Select Slides',
+          action: appWideActions.selectSlides,
+          icon: '',
+          color: 'primary',
+          confirmAction: false,
+          visible: !bulkSelectSlides,
+        },
+        {
+          label: 'Select All',
+          action: appWideActions.selectAllSlides,
+          icon: 'i-bx-checkbox',
+          color: 'primary',
+          confirmAction: false,
+          visible: bulkSelectSlides,
+        },
+        {
+          label: 'Cancel',
+          action: appWideActions.cancelSelectSlides,
+          icon: 'i-mdi-close',
+          color: 'gray',
+          confirmAction: false,
+          visible: bulkSelectSlides,
+        },
+        {
+          label: 'Delete Slides',
+          action: 'delete-selected-slides',
+          color: 'red',
+          confirmAction: true,
+          visible: bulkSelectedSlides.length > 0,
+        },
       ]"
-      @scroll.passive="onSlidesGridScroll"
+      :style="{ height: previewHeight + 'px', flexShrink: 0 }"
+      class="min-h-0"
+      @delete-selected-slides="deleteMultipleSlides(bulkSelectedSlides)"
     >
-      <div v-if="slides?.length > 0" class="virtual-slides-grid">
-        <div :style="{ height: `${virtualTopSpacer}px` }" />
-        <div ref="slidesGrid" class="grid slides-grid gap-3">
-          <SlideCard
-            v-for="{ slide, index } in virtualSlides"
-            :key="slide.id"
-            v-memo="[
-              slide.id,
-              slide.updatedAt,
-              slide.name,
-              activeSlide?.id === slide?.id,
-              bulkSelectSlides,
-              bulkSelectedSlides.includes(slide?.id),
-              getSlideEditor(slide.id)?.userId,
-            ]"
-            :slide="slide"
-            :live="false"
-            :selectable="bulkSelectSlides"
-            :id="slide?.id?.replace(/\d+/g, '')"
-            :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
-            :editing-by="getSlideEditor(slide.id)"
-            grid-type
-            :selected="activeSlide?.id === slide?.id"
-            @click="
-              bulkSelectSlides
-                ? null
-                : makeSlideActive(slide, {
-                    goLive: false,
-                    newlyCreated: false,
-                  })
-            "
-            @duplicate="duplicatePreviewSlide"
-            @delete="deleteSlide"
-            @save-slide="saveSlide(slide)"
-            @save-as-template="openSaveTemplateModal(slide)"
-            @bulk-selected="addToSelectedSlides(slide?.id, $event)"
-          />
+      <div
+        ref="slidesScroll"
+        class="slides-ctn overflow-y-scroll rounded-lg transition flex-1 min-h-0 bg-gray-100 dark:bg-[#222938]"
+        :class="[slides?.length === 0 ? '' : 'p-2']"
+        @scroll.passive="onSlidesGridScroll"
+      >
+        <div v-if="slides?.length > 0" class="virtual-slides-grid">
+          <div :style="{ height: `${virtualTopSpacer}px` }" />
+          <div ref="slidesGrid" class="grid slides-grid gap-3">
+            <SlideCard
+              v-for="{ slide, index } in virtualSlides"
+              :key="slide.id"
+              v-memo="[
+                slide.id,
+                slide.updatedAt,
+                slide.name,
+                activeSlide?.id === slide?.id,
+                bulkSelectSlides,
+                bulkSelectedSlides.includes(slide?.id),
+                getSlideEditor(slide.id)?.userId,
+              ]"
+              :slide="slide"
+              :live="false"
+              :selectable="bulkSelectSlides"
+              :id="slide?.id?.replace(/\d+/g, '')"
+              :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
+              :editing-by="getSlideEditor(slide.id)"
+              grid-type
+              :selected="activeSlide?.id === slide?.id"
+              @click="
+                bulkSelectSlides
+                  ? null
+                  : makeSlideActive(slide, {
+                      goLive: false,
+                      newlyCreated: false,
+                    })
+              "
+              @duplicate="duplicatePreviewSlide"
+              @delete="deleteSlide"
+              @save-slide="saveSlide(slide)"
+              @save-as-template="openSaveTemplateModal(slide)"
+              @bulk-selected="addToSelectedSlides(slide?.id, $event)"
+            />
+          </div>
+          <div :style="{ height: `${virtualBottomSpacer}px` }" />
         </div>
-        <div :style="{ height: `${virtualBottomSpacer}px` }" />
+        <EmptyState
+          v-else
+          icon="i-tabler-device-desktop-plus"
+          svg-icon="NoSlidesIcon"
+          sub="No slides yet"
+          action="new-slide"
+          action-text="Create new slide"
+        />
       </div>
-      <EmptyState
-        v-else
-        icon="i-tabler-device-desktop-plus"
-        class="dark:text-white"
-        sub="No slides yet"
-        action="new-slide"
-        action-text="Create new slide"
-      />
-    </div>
-    <EditLiveContent
-      :slide="activeSlide"
-      :editing-by="activeSlide?.id ? getSlideEditor(activeSlide.id) : undefined"
-      @slide-update="onUpdateSlide"
-      @inactive-slide-update="onUpdateInactiveSlide"
-      @goto-verse="gotoAction"
-      @update-bible-version="gotoAction(activeSlide?.title!!, $event)"
-      @take-live="
-        makeSlideActive(activeSlide!!, {
-          goLive: true,
-          newlyCreated: false,
-        })
-      "
+    </AppSection>
+
+    <div
+      class="v-resize-handle h-3 shrink-0 rounded cursor-ns-resize opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
+      @mousedown.prevent="startVResize($event)"
     />
+
+    <AppSection class="flex-1 min-h-0" slot-ctn-styles="!p-0">
+      <EditLiveContent
+        :slide="activeSlide"
+        :editing-by="
+          activeSlide?.id ? getSlideEditor(activeSlide.id) : undefined
+        "
+        @slide-update="onUpdateSlide"
+        @inactive-slide-update="onUpdateInactiveSlide"
+        @goto-verse="gotoAction"
+        @update-bible-version="gotoAction(activeSlide?.title!!, $event)"
+        @take-live="
+          makeSlideActive(activeSlide!!, {
+            goLive: true,
+            newlyCreated: false,
+          })
+        "
+      />
+    </AppSection>
 
     <SaveAsTemplateModal
       v-model="showSaveTemplateModal"
       :slide="slideToSaveAsTemplate"
     />
-  </AppSection>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -266,14 +291,43 @@ const countdownStartTime = ref<number>(0)
 const countdownDuration = ref<number>(0)
 const countdownRAF = ref<number>(0)
 
+// Vertical resize between "Preview and Edit Content" and "Edit Content" sections
+const PREVIEW_MIN_HEIGHT = 240
+const PREVIEW_MAX_HEIGHT = 900
+const PREVIEW_DEFAULT_HEIGHT = 480
+const previewHeight = ref(PREVIEW_DEFAULT_HEIGHT)
+const previewColumn = ref<HTMLDivElement | null>(null)
+let vResizeStartY = 0
+let vResizeStartHeight = 0
+
+const startVResize = (event: MouseEvent) => {
+  vResizeStartY = event.clientY
+  vResizeStartHeight = previewHeight.value
+  document.addEventListener("mousemove", onVResizeMove)
+  document.addEventListener("mouseup", onVResizeEnd)
+  document.body.style.cursor = "ns-resize"
+  document.body.style.userSelect = "none"
+}
+const onVResizeMove = (event: MouseEvent) => {
+  const delta = event.clientY - vResizeStartY
+  previewHeight.value = Math.min(
+    PREVIEW_MAX_HEIGHT,
+    Math.max(PREVIEW_MIN_HEIGHT, vResizeStartHeight + delta)
+  )
+}
+const onVResizeEnd = () => {
+  document.removeEventListener("mousemove", onVResizeMove)
+  document.removeEventListener("mouseup", onVResizeEnd)
+  document.body.style.cursor = ""
+  document.body.style.userSelect = ""
+}
+
 // Component state
 const windowHeight = ref<number>(0)
 const activeSlide = ref<Slide>()
 const { currentState } = storeToRefs(appStore)
 const slidesGrid = ref<HTMLDivElement | null>(null)
 const slidesScroll = ref<HTMLDivElement | null>(null)
-const bulkActionLabel = ref<string>("Select Slides")
-const bulkActionIcon = ref<string>("")
 const bulkSelectSlides = ref<boolean>(false)
 const bulkSelectedSlides = ref<string[]>([])
 const slideGridColumns = ref(1)
@@ -350,6 +404,8 @@ onBeforeUnmount(() => {
   slidesResizeObserver?.disconnect()
   slidesResizeObserver = null
   stopEditing()
+  document.removeEventListener("mousemove", onVResizeMove)
+  document.removeEventListener("mouseup", onVResizeEnd)
 })
 
 // Move presence with the user's active slide: release the slide they left and
@@ -505,8 +561,7 @@ emitter.on("update-or-create-bible", async (data: string) => {
   const existingBibleSlide =
     slides.value?.find(
       (s: Slide) =>
-        s.type === slideTypes.bible &&
-        s.id === currentState.value?.liveSlideId
+        s.type === slideTypes.bible && s.id === currentState.value?.liveSlideId
     ) || slides.value?.find((s: Slide) => s.type === slideTypes.bible)
 
   // Resolve the shortLabel to a scripture object — needed for both paths
@@ -771,26 +826,17 @@ emitter.on("batch-update-slides", (slides: Slide[]) => {
   batchUpdateSlides(slides)
 })
 
-emitter.on("select-slides", () => {
-  if (bulkActionLabel.value === "Select Slides") {
-    bulkSelectSlides.value = !bulkSelectSlides.value
-    bulkActionLabel.value = "Select All"
-    bulkActionIcon.value = "i-bx-checkbox"
-    toast.add({
-      title: "Click button twice to cancel",
-      icon: "i-bx-info-circle",
-      color: "green",
-    })
-  } else if (bulkActionLabel.value === "Select All") {
-    addAllSlidesToSelectedSlides()
-    bulkActionLabel.value = "Cancel"
-    bulkActionIcon.value = "i-mdi-close"
-  } else if (bulkActionLabel.value === "Cancel") {
-    removeAllSelectedSlides()
-    bulkActionLabel.value = "Select Slides"
-    bulkActionIcon.value = ""
-    bulkSelectSlides.value = !bulkSelectSlides.value
-  }
+emitter.on(appWideActions.selectSlides, () => {
+  bulkSelectSlides.value = true
+})
+
+emitter.on(appWideActions.selectAllSlides, () => {
+  addAllSlidesToSelectedSlides()
+})
+
+emitter.on(appWideActions.cancelSelectSlides, () => {
+  removeAllSelectedSlides()
+  bulkSelectSlides.value = false
 })
 
 emitter.on("promote-active-slide-live", () => {
@@ -1133,7 +1179,8 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   const tempSlide = slides.value.find(slideMatchesId) as Slide | undefined
 
   if (!tempSlide) {
-    const activeStoreSlide = appStore.currentState.activeSlides.find(slideMatchesId)
+    const activeStoreSlide =
+      appStore.currentState.activeSlides.find(slideMatchesId)
     const wasLive =
       appStore.currentState.liveSlideId === slideId ||
       (activeStoreSlide
@@ -1154,7 +1201,9 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     }
 
     appStore.setActiveSlides(
-      appStore.currentState.activeSlides.filter((slide) => !slideMatchesId(slide))
+      appStore.currentState.activeSlides.filter(
+        (slide) => !slideMatchesId(slide)
+      )
     )
     return
   }
@@ -1234,8 +1283,6 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
   })
   toast.add({ title: "Multiple slides deleted", icon: "i-tabler-trash" })
   bulkSelectedSlides.value = []
-  bulkActionLabel.value = "Select Slides"
-  bulkActionIcon.value = ""
   bulkSelectSlides.value = false
 }
 

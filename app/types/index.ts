@@ -136,9 +136,12 @@ export interface QuickAction {
   bibleBookIndex?: string
   bibleChapterAndVerse?: string
   hymnIndex?: string
+  songData?: Song
+  countdownData?: Countdown
   searchableOnly?: boolean
   meta?: string
   tier?: 'free' | 'teams' // Subscription tier required for this action
+  recentSearch?: boolean // Marks a recently opened item (e.g. recent Bible search), shows RecentClockIcon
 }
 
 export interface Scripture {
@@ -187,6 +190,7 @@ export interface Song {
   churchId?: string
   createdAt?: string
   updatedAt?: string
+  fromSaved?: boolean // client-side only, set when the song came from the personal library
 }
 
 export interface ExternalVideo {

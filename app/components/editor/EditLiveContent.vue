@@ -1,52 +1,49 @@
 <template>
   <div
-    class="main relative min-h-[300px] h-[45vh]"
+    class="main relative h-full min-h-0"
     :class="containerOverflow === 'overflow-x-auto' ? '' : 'overflow-hidden'"
   >
     <div>
       <div
-        class="toolbar w-[100%] p-2 px-4 min-h-[56px] bg-primary-100 dark:bg-primary-800 rounded-t-md flex items-center justify-between"
+        v-if="slide"
+        class="toolbar w-[100%] px-3 py-1 min-h-[44px] bg-primary-100 dark:bg-[#222938] rounded-t-md flex items-center justify-between"
       >
         <template v-if="slide">
-          <TransitionGroup name="list">
-            <div
-              v-for="slide in animatedSlides"
-              :key="slide?.id"
-              class="slide-name flex items-center gap-2 top-1 text-primary-900 dark:text-primary-100"
-            >
-              <h4 class="font-medium text-nowrap">
-                {{ useShortSlideName(slide, { longer: true }) }}
-              </h4>
-              <SlideChip
-                :slide-type="slide?.type"
-                :slide-sub-type="(slide?.data as ExtendedFileT)?.type"
-                dark-mode
-              />
-              <!-- Editing by indicator -->
-              <UTooltip
-                v-if="editingBy"
-                :text="`${editingBy.userName} is on this slide`"
-                :popper="{ placement: 'bottom' }"
-              >
-                <div
-                  class="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow animate-pulse ml-2"
-                  :style="{ backgroundColor: editingBy.theme || '#f59e0b' }"
-                >
-                  <img
-                    v-if="editingBy.avatar"
-                    :src="editingBy.avatar"
-                    :alt="editingBy.userName"
-                    class="w-full h-full rounded-full object-cover"
-                  />
-                  <span v-else>{{
-                    editingBy.userName?.charAt(0)?.toUpperCase() || "?"
-                  }}</span>
-                </div>
-              </UTooltip>
-            </div>
-          </TransitionGroup>
           <div
-            class="actions flex items-center ml-6"
+            class="slide-name flex items-center gap-2 top-1 text-primary-900 dark:text-primary-100"
+          >
+            <h4 class="font-medium text-nowrap">
+              {{ useShortSlideName(slide, { longer: true }) }}
+            </h4>
+            <SlideChip
+              :slide-type="slide?.type"
+              :slide-sub-type="(slide?.data as ExtendedFileT)?.type"
+              dark-mode
+            />
+            <!-- Editing by indicator -->
+            <UTooltip
+              v-if="editingBy"
+              :text="`${editingBy.userName} is on this slide`"
+              :popper="{ placement: 'bottom' }"
+            >
+              <div
+                class="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow animate-pulse ml-2"
+                :style="{ backgroundColor: editingBy.theme || '#f59e0b' }"
+              >
+                <img
+                  v-if="editingBy.avatar"
+                  :src="editingBy.avatar"
+                  :alt="editingBy.userName"
+                  class="w-full h-full rounded-full object-cover"
+                />
+                <span v-else>{{
+                  editingBy.userName?.charAt(0)?.toUpperCase() || "?"
+                }}</span>
+              </div>
+            </UTooltip>
+          </div>
+          <div
+            class="actions flex items-center ml-4"
             :class="containerOverflow"
           >
             <!-- <FontSelect
@@ -75,7 +72,7 @@
                   slide?.type === slideTypes?.songSetlist) &&
                 !isEmptySongSetlist
               "
-              class="verse-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-1 mr-0 relative"
+              class="verse-switch button-group bg-primary-200 dark:bg-[#171d2b] rounded-l-md mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
             >
               <UTooltip text="Previous verse" :popper="{ arrow: true }">
                 <UButton
@@ -151,7 +148,7 @@
             <!-- PAGE SWITCH — presentation slides -->
             <div
               v-if="slide?.type === slideTypes.presentation"
-              class="page-switch button-group bg-primary-200 dark:bg-primary-900 rounded-l-md mx-1 flex items-center gap-1 h-[36px] px-1 pr-1 mr-0 relative"
+              class="page-switch button-group bg-primary-200 dark:bg-[#171d2b] rounded-l-md mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
             >
               <UTooltip text="Previous page" :popper="{ arrow: true }">
                 <UButton
@@ -189,7 +186,7 @@
             />
             <BibleVersionSelect
               v-if="slide?.type === slideTypes?.bible"
-              class="bg-primary-200 dark:bg-primary-900 rounded-r-md mr-1 flex items-center gap-1 h-[36px] relative min-w-[80px]"
+              class="bg-primary-200 dark:bg-[#171d2b] rounded-r-md mr-1 flex items-center gap-1 h-[32px] relative min-w-[80px]"
               :bibleVersionInherited="selectedBibleVersion"
               @open="containerOverflow = ''"
               @close="containerOverflow = 'overflow-x-auto'"
@@ -221,7 +218,7 @@
               "
               class="button-group flex rounded-md mx-1 p-1"
               :class="{
-                'bg-primary-200 dark:bg-primary-900':
+                'bg-primary-200 dark:bg-[#171d2b]':
                   slide?.layout !== slideLayoutTypes.bible,
               }"
             >
@@ -241,7 +238,9 @@
                   <GotoScripture
                     :verse="verse"
                     :version="selectedBibleVersion"
-                    @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
+                    @goto-verse="
+                      $emit('goto-verse', $event, selectedBibleVersion)
+                    "
                     @close="gotoScriptureOpen = false"
                   />
                 </template>
@@ -375,6 +374,7 @@
     <EmptyState
       v-if="!slide"
       icon="i-bx-slideshow"
+      svg-icon="NoSlidesIcon"
       sub="Select slide above to start editing"
       action=""
       action-text=""
@@ -386,12 +386,12 @@
         sub="Add songs to this setlist from the song list"
         action=""
         action-text=""
-        class="h-[100%] bg-primary-900 rounded-b-md"
+        class="h-[100%] bg-[#222938] rounded-b-md"
       />
       <!-- IMAGE NOT AVAILABLE ON THIS DEVICE NOTICE -->
       <div
         v-else-if="imageNotAvailable"
-        class="h-[100%] flex flex-col items-center justify-center gap-4 p-6 text-center bg-primary-900 rounded-b-md"
+        class="h-[100%] flex flex-col items-center justify-center gap-4 p-6 text-center bg-[#222938] rounded-b-md"
       >
         <IconWrapper name="i-bx-image-alt" size="12" class="text-primary-400" />
         <div>
@@ -413,7 +413,7 @@
       </div>
       <div
         v-else
-        class="h-[100%] relative text-white bg-primary-900 bg-no-repeat transition-all rounded-b-md overflow-hidden"
+        class="h-[100%] relative text-white bg-[#222938] bg-no-repeat transition-all rounded-b-md overflow-hidden"
         :class="{
           'bg-center bg-cover':
             slide?.slideStyle?.backgroundFillType ===
@@ -510,15 +510,17 @@ const selectedBibleVersion = ref<string>(
 const { getSetlistData, refreshSongSetlistSlide, removeSongFromSetlist } =
   useSongSetlist()
 
-const animatedSlides = computed(() => {
-  if (props.slide) {
-    selectedBibleVersion.value =
-      props.slide.slideStyle?.bibleVersion ||
-      appStore.currentState.settings.defaultBibleVersion
-    return [props.slide]
-  }
-  return null
-})
+watch(
+  () => props.slide,
+  (newSlide) => {
+    if (newSlide) {
+      selectedBibleVersion.value =
+        newSlide.slideStyle?.bibleVersion ||
+        appStore.currentState.settings.defaultBibleVersion
+    }
+  },
+  { immediate: true }
+)
 
 const setlistData = computed<SongSetlistData>(() => getSetlistData(props.slide))
 const isEmptySongSetlist = computed(
@@ -834,8 +836,12 @@ const handleVoiceGotoVerseNumber = (verseNumber: number) => {
 const handleVoiceBibleVersionChange = (version: string) => {
   if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
   if (
-    !(appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ?? true)
-  ) return
+    !(
+      appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ??
+      true
+    )
+  )
+    return
   if (props.slide?.type !== slideTypes.bible) return
 
   const availableVersion = appStore.currentState.settings.bibleVersions?.find(
@@ -847,7 +853,8 @@ const handleVoiceBibleVersionChange = (version: string) => {
   if (
     !availableVersion &&
     version !== appStore.currentState.settings.defaultBibleVersion
-  ) return
+  )
+    return
   if (selectedBibleVersion.value === version) return
 
   onUpdateBibleVersion(version)

@@ -201,7 +201,7 @@
             class="signup-invite-chip__remove"
             @click="removeInvite(i)"
           >
-            <IconWrapper name="i-bx-x" size="3.5" />
+            <CloseIcon class="w-3.5 h-3.5" />
           </button>
         </span>
       </div>

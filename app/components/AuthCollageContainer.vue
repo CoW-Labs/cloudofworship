@@ -39,7 +39,7 @@
             aria-label="Close"
             @click="close"
           >
-            <IconWrapper name="i-bx-x" size="6" />
+            <CloseIcon class="w-6 h-6" />
           </button>
         </div>
       </div>

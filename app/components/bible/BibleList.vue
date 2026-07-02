@@ -1,61 +1,90 @@
 <template>
-  <div class="bible-main min-h-[80vh] h-[100%]" ref="quickActions" tabindex="1">
-    <div class="flex gap-2">
-      <UInput
-        icon="i-bx-search"
-        placeholder="Search scriptures"
-        v-model="searchInput"
-        class="w-[100%]"
-        @input="onSearchInput"
-      />
-      <UButton icon="i-bx-x" color="primary" @click="$emit('close')"></UButton>
-    </div>
-
-    <!-- SEARCHING BIBLE VERSES -->
+  <div
+    class="bible-main min-h-[80vh] h-[100%] flex flex-col"
+    ref="quickActions"
+    tabindex="1"
+  >
     <div
-      v-if="searchInput.length >= 2"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+      class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1.5 flex flex-col flex-1 min-h-0"
     >
-      <ActionCard
-        v-for="(action, index) in searchedActions"
-        :key="action?.name"
-        :action="{ ...action, bibleChapterAndVerse }"
-        :class="{
-          'bg-primary-50 dark:bg-primary-800 rounded-md':
-            index === focusedActionIndex,
-        }"
-        @click="focusedActionIndex = index"
+      <div class="flex gap-2">
+        <UInput
+          placeholder="Search scriptures"
+          v-model="searchInput"
+          class="w-[100%] cow-search-input"
+          @input="onSearchInput"
+        >
+          <template #leading>
+            <SearchIcon class="w-4 h-4 text-gray-400 dark:text-[#9aa3b2]" />
+          </template>
+        </UInput>
+        <CowButton
+          variant="secondary"
+          size="2xs"
+          class="!px-2.5 !py-0 max-h-[40px] rounded-lg"
+          @click="$emit('close')"
+        >
+          <CloseIcon class="w-4 h-4" />
+        </CowButton>
+      </div>
+
+      <!-- SEARCHING BIBLE VERSES -->
+      <div
+        v-if="searchInput.length >= 2"
+        class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
       >
-        <template #desc>
-          <span v-html="highlightText(action.desc ?? '', searchInput)" />
-        </template>
-      </ActionCard>
-    </div>
+        <ActionCard
+          v-for="(action, index) in searchedActions"
+          :key="action?.name"
+          :ref="(el) => setItemRef(el, index)"
+          :action="{ ...action, bibleChapterAndVerse }"
+          compact
+          :active="hasInteracted && index === focusedActionIndex"
+          :class="{
+            'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
+          }"
+          @click="focusedActionIndex = index"
+          @mouseenter="onRowMouseEnter(index)"
+        >
+          <template #desc>
+            <span v-html="highlightText(action.desc ?? '', searchInput)" />
+          </template>
+        </ActionCard>
+      </div>
 
-    <!-- RECENTLY OPENED SCRIPTURES -->
-    <div
-      v-if="
-        currentState.recentBibleSearches.length > 0 && searchInput.length < 2
-      "
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
-    >
-      <BibleQueryCard
-        v-for="bibleQuery in [...currentState.recentBibleSearches].reverse()"
-        :key="bibleQuery"
-        :bible-query="bibleQuery"
-        type="song"
+      <!-- RECENTLY OPENED SCRIPTURES -->
+      <div
+        v-if="
+          currentState.recentBibleSearches.length > 0 && searchInput.length < 2
+        "
+        class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
+      >
+        <ActionCard
+          v-for="(action, index) in recentBibleActions"
+          :key="action.actionArg"
+          :ref="(el) => setItemRef(el, index)"
+          :action="action"
+          compact
+          :active="hasInteracted && index === focusedActionIndex"
+          :class="{
+            'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
+          }"
+          @click="focusedActionIndex = index"
+          @mouseenter="onRowMouseEnter(index)"
+        />
+      </div>
+
+      <EmptyState
+        v-if="
+          currentState.recentBibleSearches?.length === 0 &&
+          searchInput.length < 2
+        "
+        icon="i-tabler-cloud-search"
+        sub="You haven't opened any scriptures yet"
+        action-text="Open Genesis 1"
+        action="bible-search-demo"
       />
     </div>
-
-    <EmptyState
-      v-if="
-        currentState.recentBibleSearches?.length === 0 && searchInput.length < 2
-      "
-      icon="i-tabler-cloud-search"
-      sub="You haven't opened any scriptures yet"
-      action-text="Open Genesis 1"
-      action="bible-search-demo"
-    />
   </div>
 </template>
 <script setup lang="ts">
@@ -73,8 +102,18 @@ const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const searchInput = ref<string>(props.query || "")
 const focusedActionIndex = ref(0)
+const hasInteracted = ref(false)
+const onRowMouseEnter = (index: number) => {
+  focusedActionIndex.value = index
+  hasInteracted.value = true
+}
 const quickActions = ref<HTMLDivElement | null>(null)
 const actions = ref<QuickAction[]>([])
+const itemRefs = ref<(HTMLElement | null)[]>([])
+
+const setItemRef = (el: any, index: number) => {
+  itemRefs.value[index] = el?.$el || el || null
+}
 
 watch(
   () => props.query,
@@ -87,6 +126,20 @@ watch(searchInput, () => {
   if (searchInput.value.startsWith("/") && searchInput.value.length > 1) {
     searchInput.value = searchInput.value.replaceAll("/", "")
   }
+})
+
+watch(
+  () => searchInput.value.length >= 2,
+  () => {
+    itemRefs.value = []
+    focusedActionIndex.value = 0
+    hasInteracted.value = false
+  }
+)
+
+watch(focusedActionIndex, async () => {
+  await nextTick()
+  itemRefs.value[focusedActionIndex.value]?.scrollIntoView({ block: "nearest" })
 })
 
 // Initialize actions
@@ -138,6 +191,7 @@ const searchedActions = computed<QuickAction[]>(() => {
   }
 
   focusedActionIndex.value = 0
+  hasInteracted.value = false
   const colonIndex = searchInputBeforeTwoDigitNumbers?.indexOf(":")
   const searchInputBeforeColon =
     colonIndex === -1
@@ -179,6 +233,35 @@ const searchedActions = computed<QuickAction[]>(() => {
   return results?.slice(0, 10)
 })
 
+const recentBibleActions = computed<QuickAction[]>(() => {
+  return [...currentState.value.recentBibleSearches]
+    .reverse()
+    .map((bibleQuery) => {
+      const colonIndex = bibleQuery.indexOf(":")
+      return {
+        icon: "i-bx-history",
+        name: useScriptureLabel(bibleQuery, { toLongForm: true }),
+        desc: "Recently opened",
+        action: appWideActions.newBible,
+        actionArg: bibleQuery,
+        type: slideTypes.bible,
+        bibleBookIndex: bibleQuery.substring(0, colonIndex),
+        bibleChapterAndVerse: bibleQuery.substring(colonIndex + 1),
+        recentSearch: true,
+      }
+    })
+})
+
+const visibleNavActions = computed<QuickAction[]>(() => {
+  if (searchInput.value.length >= 2) {
+    return searchedActions.value.map((action) => ({
+      ...action,
+      bibleChapterAndVerse: bibleChapterAndVerse.value,
+    }))
+  }
+  return recentBibleActions.value
+})
+
 const onSearchInput = useDebounceFn(async () => {
   // getSongs(searchInput.value)
 }, 1000)
@@ -191,24 +274,27 @@ onMounted(() => {
     }
     switch (e.key) {
       case "ArrowDown":
-        focusedActionIndex.value < searchedActions.value.length - 1
+        hasInteracted.value = true
+        focusedActionIndex.value < visibleNavActions.value.length - 1
           ? (focusedActionIndex.value += 1)
           : null
         break
       case "ArrowUp":
+        hasInteracted.value = true
         focusedActionIndex.value > 0 ? (focusedActionIndex.value -= 1) : null
         break
       case "Enter":
-        const action = searchedActions.value?.[
+        const action = visibleNavActions.value?.[
           focusedActionIndex.value
         ] as unknown as QuickAction
+        if (!action) return
         useGlobalEmit(
           action?.action,
           action?.type === slideTypes.bible
-            ? `${action?.bibleBookIndex}:${bibleChapterAndVerse.value}`
+            ? `${action?.bibleBookIndex}:${action?.bibleChapterAndVerse}`
             : action?.type === slideTypes.hymn
             ? action?.hymnIndex
-            : ""
+            : action?.actionArg || ""
         )
         break
       default:

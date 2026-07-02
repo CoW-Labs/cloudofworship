@@ -9,7 +9,7 @@
     }s`"
   >
     <div
-      class="live-output w-[100%] min-h-[220px] rounded-md relative overflow-hidden border bg-black dark:border-none"
+      class="live-output w-[100%] min-h-[220px] rounded-2xl relative overflow-hidden border bg-black dark:border-none"
       v-if="contentVisible"
       @dblclick="activateFullScreen()"
     >
@@ -222,7 +222,7 @@
         :content-visible="foregroundContentVisible"
         :slide="slide"
         class="relative z-10"
-        :class="fullScreen ? 'h-screen' : 'min-h-[220px] rounded-md'"
+        :class="fullScreen ? 'h-screen' : 'min-h-[220px] rounded-2xl'"
         :padding="
           fullScreen
             ? {
@@ -385,7 +385,10 @@ watch(
       }
 
       // Only proceed if this is the active live slide
-      if (!appMounted.value || props.slide.id !== currentState.value?.liveSlideId) {
+      if (
+        !appMounted.value ||
+        props.slide.id !== currentState.value?.liveSlideId
+      ) {
         return
       }
 
@@ -458,7 +461,11 @@ watch(
 
     try {
       const slide = props.slide
-      if (!appMounted.value || !slide?.id || slide.id !== currentState.value?.liveSlideId) {
+      if (
+        !appMounted.value ||
+        !slide?.id ||
+        slide.id !== currentState.value?.liveSlideId
+      ) {
         return
       }
 
@@ -515,7 +522,11 @@ watch(
 
     try {
       const slide = props.slide
-      if (!appMounted.value || !slide?.id || slide.id !== currentState.value?.liveSlideId) {
+      if (
+        !appMounted.value ||
+        !slide?.id ||
+        slide.id !== currentState.value?.liveSlideId
+      ) {
         return
       }
 
@@ -592,7 +603,11 @@ watch(
 
     try {
       const slide = props.slide
-      if (!appMounted.value || !slide?.id || slide.id !== currentState.value?.liveSlideId) {
+      if (
+        !appMounted.value ||
+        !slide?.id ||
+        slide.id !== currentState.value?.liveSlideId
+      ) {
         return
       }
 

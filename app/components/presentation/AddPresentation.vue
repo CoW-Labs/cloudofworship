@@ -95,15 +95,15 @@
           <span class="text-gray-400 text-xs shrink-0">{{
             fileSizeLabel
           }}</span>
-          <UButton
-            icon="i-bx-x"
+          <CowButton
+            variant="secondary"
             size="2xs"
-            color="gray"
-            variant="ghost"
             class="shrink-0"
             :disabled="isConverting"
             @click.prevent="clearFile"
-          />
+          >
+            <template #leading><CloseIcon class="w-4 h-4" /></template>
+          </CowButton>
         </div>
       </Transition>
 
@@ -151,9 +151,9 @@
       </div>
 
       <!-- CTA -->
-      <UButton
+      <CowButton
+        variant="primary"
         block
-        trailing-icon="i-bx-chevron-right"
         size="lg"
         class="mt-2"
         :disabled="!selectedFile || isConverting"
@@ -161,7 +161,7 @@
         @click="handleImport"
       >
         Import presentation slide
-      </UButton>
+      </CowButton>
     </div>
 
     <!-- Feature Introduction Modal -->
