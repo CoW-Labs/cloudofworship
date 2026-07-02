@@ -6,7 +6,7 @@ const useSlideBackground = (slide: Slide) => {
     case backgroundTypes.solid:
       return `background-color: ${slide?.background};`
     case backgroundTypes.gradient:
-      return `background-color: ${slide?.background};`
+      return `background-image: ${slide?.background};`
     case backgroundTypes.image:
       return `background-image: url(${slide?.background});`
   }
