@@ -258,59 +258,68 @@
                   <BgStyle />
                 </template>
               </UPopover>
-              <UPopover v-model:open="bgImagePopoverOpen">
-                <UTooltip text="Add background image" :popper="{ arrow: true }">
+              <UPopover v-model:open="bgSelectPopoverOpen">
+                <UTooltip text="Add background" :popper="{ arrow: true }">
                   <UButton
                     variant="ghost"
                     class="px-1.5"
-                    icon="i-bx-image-add"
+                    icon="i-bx-images"
                     :disabled="!slide"
                   />
                 </UTooltip>
                 <template #panel>
-                  <BgImageSelection
-                    :value="slide?.background"
-                    @select="
-                      onSelectBackground(backgroundTypes.image, $event.image)
-                    "
-                  />
-                </template>
-              </UPopover>
-              <UPopover
-                v-if="!(slide?.data as ExtendedFileT)?.type?.includes('audio')"
-                v-model:open="bgVideoPopoverOpen"
-              >
-                <UTooltip text="Add background video" :popper="{ arrow: true }">
-                  <UButton
-                    variant="ghost"
-                    class="px-1.5"
-                    icon="i-bx-film"
-                    :disabled="!slide"
-                  />
-                </UTooltip>
-                <template #panel>
-                  <BgVideoSelection
-                    :value="slide?.background"
-                    @select="onSelectBackground(backgroundTypes.video, $event)"
-                  />
-                </template>
-              </UPopover>
-              <UPopover v-model:open="bgColorPopoverOpen">
-                <UTooltip text="Add background color" :popper="{ arrow: true }">
-                  <UButton
-                    variant="ghost"
-                    class="px-1.5"
-                    icon="i-mdi-square-rounded"
-                    :disabled="!slide"
-                  />
-                </UTooltip>
-                <template #panel>
-                  <BgColorSelection
-                    :value="slide?.background"
-                    @select="
-                      onSelectBackground(backgroundTypes.solid, $event.color)
-                    "
-                  />
+                  <div class="p-2 w-[350px]">
+                    <UTabs
+                      :items="backgroundTabs"
+                      v-model:model-value="activeBackgroundTab"
+                      :ui="{ wrapper: 'space-y-2' }"
+                    />
+                    <div class="tab-content">
+                      <BgImageSelection
+                        v-if="activeBackgroundTabKey === backgroundTypes.image"
+                        :value="slide?.background"
+                        @select="
+                          onSelectBackground(
+                            backgroundTypes.image,
+                            $event.image
+                          )
+                        "
+                      />
+                      <BgVideoSelection
+                        v-else-if="
+                          activeBackgroundTabKey === backgroundTypes.video
+                        "
+                        :value="slide?.background"
+                        @select="
+                          onSelectBackground(backgroundTypes.video, $event)
+                        "
+                      />
+                      <BgColorSelection
+                        v-else-if="
+                          activeBackgroundTabKey === backgroundTypes.solid
+                        "
+                        :value="slide?.background"
+                        @select="
+                          onSelectBackground(
+                            backgroundTypes.solid,
+                            $event.color
+                          )
+                        "
+                      />
+                      <BgGradientSelection
+                        v-else-if="
+                          activeBackgroundTabKey === backgroundTypes.gradient
+                        "
+                        :value="slide?.background"
+                        @select="
+                          onSelectBackground(
+                            backgroundTypes.gradient,
+                            $event.gradient
+                          )
+                        "
+                      />
+                    </div>
+                  </div>
                 </template>
               </UPopover>
               <UPopover
@@ -495,9 +504,37 @@ const appStore = useAppStore()
 const focusedEditor = ref<Editor | undefined>()
 const layoutPopoverOpen = ref<boolean>(false)
 const bgEditBgPopoverOpen = ref<boolean>(false)
-const bgImagePopoverOpen = ref<boolean>(false)
-const bgVideoPopoverOpen = ref<boolean>(false)
-const bgColorPopoverOpen = ref<boolean>(false)
+const bgSelectPopoverOpen = ref<boolean>(false)
+const activeBackgroundTab = ref<number>(0)
+
+// Background type tabs shown inside the single "Add background" popover.
+// The Video tab is hidden for audio media slides (a video bg makes no sense there).
+const backgroundTabs = computed(() => {
+  const isAudio = (props.slide?.data as ExtendedFileT)?.type?.includes("audio")
+  return [
+    { key: backgroundTypes.image, label: "Image" },
+    ...(isAudio ? [] : [{ key: backgroundTypes.video, label: "Video" }]),
+    { key: backgroundTypes.solid, label: "Color" },
+    {
+      key: backgroundTypes.gradient,
+      label: "Gradient",
+    },
+  ]
+})
+
+const activeBackgroundTabKey = computed(
+  () => backgroundTabs.value[activeBackgroundTab.value]?.key
+)
+
+// When the popover opens, jump to the tab matching the slide's current background.
+watch(bgSelectPopoverOpen, (open) => {
+  if (!open) return
+  const idx = backgroundTabs.value.findIndex(
+    (tab) => tab.key === props.slide?.backgroundType
+  )
+  activeBackgroundTab.value = idx === -1 ? 0 : idx
+})
+
 const themePopoverOpen = ref<boolean>(false)
 const gotoScriptureOpen = ref<boolean>(false)
 const slideContents = ref<Array<string>>([])
@@ -946,9 +983,7 @@ const onSelectBackground = (
   backgroundType: string,
   data: { video: string; key: string } // type of { imageUrl: string; file: any } for image, or { videoUrl: string; key: string } for video
 ) => {
-  bgImagePopoverOpen.value = false
-  bgVideoPopoverOpen.value = false
-  bgColorPopoverOpen.value = false
+  bgSelectPopoverOpen.value = false
 
   const tempSlide = {
     ...props.slide,

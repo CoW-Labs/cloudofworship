@@ -1,19 +1,22 @@
 <template>
   <div class="bg-image-selection-ctn p-2">
     <div
-      :class="{ 'gap-4 grid-cols-3 max-h-full': settingsPage }"
-      class="bg-image-selection grid gap-2 grid-cols-3 max-h-[190px] overflow-y-auto overflow-x-hidden"
+      class="bg-image-selection grid gap-2 max-h-[190px] overflow-y-auto overflow-x-hidden"
+      :class="settingsPage ? 'gap-4 grid-cols-3 max-h-full' : 'grid-cols-3'"
     >
       <UButton
         v-for="image in backgroundImages"
         :key="image"
         @click="$emit('select', { image })"
         class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
-        :class="[settingsPage ? 'w-[180px] h-[100px]' : 'w-[90px] h-[50px]']"
+        :class="[settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]']"
       >
         <div
-          class="bg-image min-w-[180px] h-[100px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
-          :class="{ 'opacity-30': image === value }"
+          class="bg-image w-full h-full transition rounded-md opacity-100 hover:opacity-30 bg-cover"
+          :class="[
+            settingsPage ? 'min-w-[180px] h-[100px]' : '',
+            { 'opacity-30': image === value },
+          ]"
           :style="`background-image: url(${image})`"
         ></div>
         <IconWrapper
@@ -42,7 +45,7 @@
       size="sm"
       :maxFileSize="maxFileSize"
       @change="saveAndSelectImages($event)"
-      class="max-w-[300px]"
+      class="max-w-[320px]"
       :class="{ 'max-w-full': settingsPage }"
       :loading="imageCompressionLoading"
     />

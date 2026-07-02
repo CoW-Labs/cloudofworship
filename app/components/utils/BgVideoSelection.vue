@@ -9,7 +9,7 @@
         :key="video?.id"
         @click="$emit('select', { video: video?.url, key: video?.id })"
         class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
-        :class="[settingsPage ? 'w-[180px] h-[100px]' : 'w-[90px] h-[50px]']"
+        :class="[settingsPage ? 'w-[195px] h-[100px]' : 'w-full h-[60px]']"
       >
         <video
           class="bg-image w-[100%] h-[100%] transition rounded-md opacity-100 hover:opacity-30 object-cover"

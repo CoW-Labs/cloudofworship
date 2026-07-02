@@ -4,7 +4,7 @@
     :class="{
       'grid-cols-6': count === 6,
       'grid-cols-12': count === 12,
-      'grid-cols-4': !count,
+      'grid-cols-7': !count,
     }"
   >
     <UButton

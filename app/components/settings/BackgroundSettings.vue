@@ -61,6 +61,21 @@
                   )
                 "
               />
+              <BgGradientSelection
+                v-else-if="activeSlideBackgroundTab === 3"
+                :count="12"
+                :value="
+                  appStore.currentState.settings.defaultBackground.default
+                    ?.background
+                "
+                @select="
+                  appStore.setDefaultSlideBackground(
+                    backgroundTypes.gradient,
+                    $event.gradient,
+                    null
+                  )
+                "
+              />
             </div>
           </Transition>
         </UFormGroup>
@@ -78,6 +93,7 @@ const slideBackgroundTabs = [
   { label: "Video", icon: "i-bx-video" },
   { label: "Image", icon: "i-bx-image" },
   { label: "Color", icon: "i-bx-paint" },
+  { label: "Gradient", icon: "i-mdi-gradient-horizontal" },
 ]
 const activeSlideBackgroundTab = ref<number>(0)
 
@@ -93,6 +109,9 @@ switch (
     break
   case backgroundTypes.solid:
     activeSlideBackgroundTab.value = 2
+    break
+  case backgroundTypes.gradient:
+    activeSlideBackgroundTab.value = 3
     break
 }
 </script>
