@@ -1,5 +1,6 @@
 <template>
-  <div class="add-song-main my-4">
+  <div class="add-song-main my-4 mt-0">
+    <h2 class="font-semibold text-md mb-4">Add a song</h2>
     <form class="flex flex-col gap-3">
       <CowInput v-model="title" label="Title" />
       <CowInput v-model="artist" label="Artist" />
