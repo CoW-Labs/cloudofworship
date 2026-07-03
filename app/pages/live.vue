@@ -35,17 +35,14 @@
     <!-- Using motionless slides to test bug with Bible Slides not moving to next slide in live view -->
     <!-- <Transition class="fade"> -->
     <LiveProjectionOnly
-      v-show="mostUpdatedLiveSlide?.id === currentState.liveSlideId"
+      v-show="mostUpdatedLiveSlide"
       :content-visible="true"
       :id="currentState.liveSlideId"
       :full-screen="true"
       :slide="mostUpdatedLiveSlide!!"
       :slide-label="false"
       :slide-styles="currentState.settings.slideStyles"
-      :audio-muted="
-          mostUpdatedLiveSlide?.id !== currentState.liveSlideId ||
-          mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!
-        "
+      :audio-muted="mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!"
     />
     <!-- </Transition> -->
 
@@ -203,10 +200,22 @@ onMounted(() => {
       // null broadcast means the live slide was deleted — blank the projection
       if (parsed === null) {
         mostUpdatedLiveSlide.value = null
+        // Keep the shared store in agreement so a reloading operator window
+        // doesn't adopt a stale liveSlideId from this tab via pinia-shared-state.
+        if (appStore.currentState.liveSlideId) appStore.setLiveSlide("")
         return
       }
 
       const updatedSlide = parsed as Slide
+
+      // Mirror the projected slide id into the shared store. The broadcast
+      // channel drives the projection, but the operator window derives its
+      // live-slide preview from currentState.liveSlideId — and on reload it
+      // re-adopts state from this /live tab. Without this, that value goes
+      // stale here and the operator shows "No Live Slide" after a reload.
+      if (updatedSlide?.id && appStore.currentState.liveSlideId !== updatedSlide.id) {
+        appStore.setLiveSlide(updatedSlide.id)
+      }
 
       // Track slide presentation
       usePosthogCapture("SLIDE_PRESENTED_LIVE", {

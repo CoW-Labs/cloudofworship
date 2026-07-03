@@ -156,6 +156,7 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const toast = useToast()
 const churchId = authStore.user?.churchId
+const lastSelectedScheduleId = ref(appStore.currentState.activeSchedule?._id ?? null)
 
 // Composables
 const {
@@ -848,9 +849,18 @@ emitter.on("promote-active-slide-live", () => {
   }
 })
 
-emitter.on("selected-schedule", (data: Schedule) => {
+emitter.on("selected-schedule", (data: Schedule | string | null) => {
   // Clear Edit Content pane
   // activeSlide.value = undefined
+
+  const incomingId = typeof data === "string" ? data : data?._id ?? null
+  const isReselectingSameSchedule =
+    incomingId != null && incomingId === lastSelectedScheduleId.value
+  lastSelectedScheduleId.value = incomingId
+
+  // App boot re-emits this for the already-active schedule (e.g. on reload) —
+  // only clear the live slide when the schedule actually changes.
+  if (isReselectingSameSchedule) return
 
   // Clear live projection
   appStore.setLiveSlide("")

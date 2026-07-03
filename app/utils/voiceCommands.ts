@@ -105,6 +105,9 @@ const gotoVerseNumberPatterns: RegExp[] = [
   new RegExp(
     `\\b(?:let us|let s|lets)\\s+(?:go|move|turn|jump)\\s+(?:to\\s+)?(?:the\\s+)?(?:bible\\s+)?verse\\s+(?:number\\s+)?(${verseNumberPattern})\\b`,
   ),
+  new RegExp(
+    `\\bverses?\\s+(?:number\\s+)?(${verseNumberPattern})\\b`,
+  ),
 ]
 
 const bibleVersionCommandPatterns: RegExp[] = [

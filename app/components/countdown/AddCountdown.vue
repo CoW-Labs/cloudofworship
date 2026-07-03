@@ -1,6 +1,5 @@
 <template>
   <div class="add-song-main mb-4">
-    <h2 class="font-semibold text-md">Add Countdown</h2>
     <form class="flex flex-col gap-5 mt-3">
       <!-- <UFormGroup size="xl">
         <div class="flex items-center gap-2">
