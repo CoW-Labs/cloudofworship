@@ -246,6 +246,13 @@
     <AddPresentation
       v-else-if="page === 'presentation'"
       class="fade-in-right h-full min-h-0 overflow-auto"
+      file-type="ppt"
+      @close="page = ''"
+    />
+    <AddPresentation
+      v-else-if="page === 'presentation-pdf'"
+      class="fade-in-right h-full min-h-0 overflow-auto"
+      file-type="pdf"
       @close="page = ''"
     />
     <!-- </Transition> -->
@@ -757,7 +764,8 @@ emitter.on("new-hymn", (data) => {
 
 emitter.on("new-media", (data) => {
   const fromSaved = data?.[0]?.fromSaved
-  if (!fromSaved) {
+  const fromDrop = data?.[0]?.fromDrop
+  if (!fromSaved && !fromDrop) {
     page.value = "media"
   }
 })
@@ -811,6 +819,10 @@ emitter.on("new-countdown", (data) => {
 
 emitter.on("new-presentation", () => {
   page.value = "presentation"
+})
+
+emitter.on("new-presentation-from-pdf", () => {
+  page.value = "presentation-pdf"
 })
 
 const handleInputKeydown = (e: KeyboardEvent) => {

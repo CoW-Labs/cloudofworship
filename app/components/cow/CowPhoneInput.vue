@@ -57,7 +57,7 @@
 
     <div v-if="error" class="cow-phone__error come-up-1">
       <span class="cow-phone__error-text">
-        <IconWrapper name="i-bx-info-circle" size="4" />
+        <InfoIcon class="w-4 h-4" />
         {{ error }}
       </span>
     </div>

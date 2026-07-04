@@ -1,20 +1,39 @@
 <template>
   <div
-    class="cow-inset-panel min-h-60 h-full w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-gray-200 dark:border-[#3a4456] bg-gray-50 dark:bg-[#222938] text-gray-500"
+    class="cow-inset-panel min-h-60 h-full w-full flex-1 min-h-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed transition-colors"
+    :class="
+      tinted
+        ? 'border-primary-400 dark:border-primary-500/70 bg-primary-500/30 text-primary-500'
+        : 'border-gray-200 dark:border-[#3a4456] bg-gray-50 dark:bg-[#222938] text-gray-500'
+    "
   >
     <div
-      class="w-[118px] h-[74px] grid place-items-center rounded-xl border border-dashed border-gray-400/80 dark:border-[#586277]"
+      class="w-[118px] h-[74px] grid place-items-center rounded-xl border border-dashed"
+      :class="
+        tinted
+          ? 'border-primary-400 dark:border-primary-400/70'
+          : 'border-gray-400/80 dark:border-[#586277]'
+      "
     >
       <NoSlidesIcon
         v-if="svgIcon === 'NoSlidesIcon'"
-        class="w-7 h-7 text-gray-500 dark:text-[#8f98aa]"
+        class="w-7 h-7"
+        :class="tinted ? 'text-primary-500 dark:text-primary-300' : 'text-gray-500 dark:text-[#8f98aa]'"
       />
-      <IconWrapper v-else :name="icon" size="7" />
+      <IconWrapper
+        v-else
+        :name="icon"
+        size="7"
+        :class="tinted ? 'text-primary-500 dark:text-primary-300' : ''"
+      />
     </div>
     <div>
       <h2
-        class="text-sm font-medium max-w-[220px] text-center mx-auto text-gray-400 dark:text-[#9aa3b2]"
-        :class="{ 'max-w-[200px]': isWider }"
+        class="text-sm font-medium max-w-[220px] text-center mx-auto"
+        :class="[
+          isWider ? 'max-w-[200px]' : '',
+          tinted ? 'text-primary-600 dark:text-primary-300' : 'text-gray-400 dark:text-[#9aa3b2]',
+        ]"
       >
         {{ sub }}
       </h2>
@@ -52,6 +71,8 @@ defineProps<{
   // Optional custom SVG icon. Currently supports "NoSlidesIcon" — when set it
   // replaces the iconify icon with the new line-style monitor icon.
   svgIcon?: string
+  // Purple-tinted variant used for drag-and-drop overlays
+  tinted?: boolean
 }>()
 </script>
 

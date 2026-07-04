@@ -20,10 +20,8 @@
           class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-4"
         >
           <div class="flex items-start gap-3">
-            <IconWrapper
-              name="i-bx-info-circle"
-              size="5"
-              class="text-amber-600 dark:text-amber-400 mt-0.5"
+            <InfoIcon
+              class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5"
             />
             <div>
               <h4 class="font-semibold text-amber-900 dark:text-amber-100">
@@ -76,7 +74,7 @@
           <div
             class="text-sm text-primary-500 font-semibold flex items-center gap-2"
           >
-            <IconWrapper name="i-bx-info-circle" size="4"></IconWrapper>
+            <InfoIcon class="w-4 h-4" />
             Note
           </div>
           <p class="mt-2 text-sm">

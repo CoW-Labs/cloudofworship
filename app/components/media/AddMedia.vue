@@ -9,11 +9,7 @@
       <div
         class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
       >
-        <IconWrapper
-          name="i-bx-info-circle"
-          size="4"
-          class="text-primary-500"
-        />
+        <InfoIcon class="w-4 h-4 text-primary-500" />
         <div class="flex-1">
           <h4 class="text-md font-semibold">
             Add image, video or audio slides
@@ -28,23 +24,10 @@
       <FileDropzone
         :maxFileSize="maxFileSize"
         :maxVideoFileSize="maxVideoFileSize"
+        accept="video/*,image/*,audio/*"
+        description="image, video or audio files."
         @change="onDropzoneChange"
       />
-      <label v-if="isTauri" class="flex flex-col center text-center">
-        <div
-          class="text-center w-full mx-auto px-2 py-2 mt-1 bg-primary-500 rounded-md flex items-center text-primary-500 cursor-pointer gap-1 border border-primary-500 bg-transparent"
-        >
-          <IconWrapper name="i-bx-folder-open" size="5" />
-          Choose files
-        </div>
-        <input
-          type="file"
-          class="invisible"
-          accept="video/*,image/*,audio/*"
-          multiple
-          @change="onDropzoneChange(($event.target as HTMLInputElement)?.files || [])"
-        />
-      </label>
     </div>
 
     <!-- YOUTUBE/VIMEO TAB -->
@@ -52,11 +35,7 @@
       <div
         class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
       >
-        <IconWrapper
-          name="i-bx-info-circle"
-          size="4"
-          class="text-primary-500"
-        />
+        <InfoIcon class="w-4 h-4 text-primary-500" />
         <div class="flex-1">
           <h4 class="text-md font-semibold">Add YouTube or Vimeo videos</h4>
           <p class="text-sm">
@@ -212,7 +191,7 @@
             <div
               class="bg-primary-800 opacity-0 absolute inset-0 flex items-center justify-center rounded-md group-hover:opacity-90 transition-all"
             >
-              <IconWrapper name="i-bx-trash" size="8" class="text-white" />
+              <DeleteIcon class="w-8 h-8 text-white" />
             </div>
           </div>
         </div>
@@ -230,7 +209,6 @@ const props = defineProps<{
   initialTab?: number
 }>()
 
-const { isTauri } = useTauri()
 const authStore = useAuthStore()
 const { isTeamsPlan, isFreePlan } = useSubscription()
 

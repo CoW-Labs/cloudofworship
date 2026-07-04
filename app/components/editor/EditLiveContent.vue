@@ -2,7 +2,18 @@
   <div
     class="main relative h-full min-h-0"
     :class="containerOverflow === 'overflow-x-auto' ? '' : 'overflow-hidden'"
+    @dragenter="onBgDragEnter"
+    @dragover="onBgDragOver"
+    @dragleave="onBgDragLeave"
+    @drop="onBgDrop"
   >
+    <EmptyState
+      v-if="isDraggingBackgroundFile && slide"
+      tinted
+      icon="i-bx-cloud-upload"
+      sub="Drop to set as slide background"
+      class="absolute inset-0 z-20 pointer-events-none"
+    />
     <div>
       <div
         v-if="slide"
@@ -263,8 +274,15 @@
                   <UButton
                     variant="ghost"
                     class="px-1.5"
-                    icon="i-bx-images"
-                    :disabled="!slide"
+                    :icon="
+                      backgroundImageLoading || backgroundVideoLoading
+                        ? 'i-bx-loader-alt'
+                        : 'i-bx-images'
+                    "
+                    :loading="backgroundImageLoading || backgroundVideoLoading"
+                    :disabled="
+                      !slide || backgroundImageLoading || backgroundVideoLoading
+                    "
                   />
                 </UTooltip>
                 <template #panel>
@@ -278,6 +296,7 @@
                       <BgImageSelection
                         v-if="activeBackgroundTabKey === backgroundTypes.image"
                         :value="slide?.background"
+                        @loading-change="backgroundImageLoading = $event"
                         @select="
                           onSelectBackground(
                             backgroundTypes.image,
@@ -290,6 +309,7 @@
                           activeBackgroundTabKey === backgroundTypes.video
                         "
                         :value="slide?.background"
+                        @loading-change="backgroundVideoLoading = $event"
                         @select="
                           onSelectBackground(backgroundTypes.video, $event)
                         "
@@ -466,6 +486,7 @@
 </template>
 
 <script setup lang="ts">
+import { useOnline } from "@vueuse/core"
 import { safeDBGet } from "~/composables/useIndexedDB"
 import { splitVerseByLines } from "~/composables/useHymn"
 import type { Editor } from "@tiptap/core"
@@ -473,6 +494,7 @@ import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import type {
   ExtendedFileT,
+  Media,
   Slide,
   SlideStyle,
   Song,
@@ -506,6 +528,8 @@ const layoutPopoverOpen = ref<boolean>(false)
 const bgEditBgPopoverOpen = ref<boolean>(false)
 const bgSelectPopoverOpen = ref<boolean>(false)
 const activeBackgroundTab = ref<number>(0)
+const backgroundImageLoading = ref<boolean>(false)
+const backgroundVideoLoading = ref<boolean>(false)
 
 // Background type tabs shown inside the single "Add background" popover.
 // The Video tab is hidden for audio media slides (a video bg makes no sense there).
@@ -981,17 +1005,161 @@ const removeSetlistSong = async (songIndex: number) => {
 
 const onSelectBackground = (
   backgroundType: string,
-  data: { video: string; key: string } // type of { imageUrl: string; file: any } for image, or { videoUrl: string; key: string } for video
+  data: string | { video: string; key?: string }
 ) => {
   bgSelectPopoverOpen.value = false
 
   const tempSlide = {
     ...props.slide,
-    background: data.video || data,
-    backgroundVideoKey: data.key || undefined,
+    background: typeof data === "string" ? data : data.video,
+    backgroundVideoKey: typeof data === "string" ? undefined : data.key,
     backgroundType,
   } as Slide
   emit("slide-update", tempSlide)
+}
+
+// Drag-and-drop a file onto the slide preview — treated as adding a background
+// image/video, mirroring what BgImageSelection/BgVideoSelection do for uploads.
+const { isFreePlan, isTeamsPlan } = useSubscription()
+const maxDroppedBgImageSize = computed(() => (isFreePlan.value ? 3 : 10))
+const maxDroppedBgVideoSize = computed(() => (isTeamsPlan.value ? Infinity : 250))
+const isDraggingBackgroundFile = ref(false)
+let bgDragCounter = 0
+
+const isFileDrag = (event: DragEvent) =>
+  Array.from(event.dataTransfer?.types || []).includes("Files")
+
+const onBgDragEnter = (event: DragEvent) => {
+  if (!props.slide || !isFileDrag(event)) return
+  bgDragCounter++
+  isDraggingBackgroundFile.value = true
+}
+
+const onBgDragOver = (event: DragEvent) => {
+  if (!props.slide || !isFileDrag(event)) return
+  event.preventDefault()
+}
+
+const onBgDragLeave = (event: DragEvent) => {
+  if (!props.slide || !isFileDrag(event)) return
+  bgDragCounter = Math.max(0, bgDragCounter - 1)
+  if (bgDragCounter === 0) isDraggingBackgroundFile.value = false
+}
+
+const addDroppedBackgroundImage = async (file: File) => {
+  const online = useOnline()
+  const db = useIndexedDB()
+  try {
+    const compressedBlob = await useCompressedImage(file)
+    const compressedFile =
+      compressedBlob instanceof File
+        ? compressedBlob
+        : new File([compressedBlob], file.name, {
+            type: compressedBlob.type || file.type,
+            lastModified: file.lastModified,
+          })
+
+    let uploadedFile = null
+    if (online.value) {
+      uploadedFile = await useUploadImage(compressedFile)
+    }
+
+    const imageUrl = uploadedFile
+      ? uploadedFile.file.url
+      : URL.createObjectURL(compressedFile)
+    const tempMedia: Media = {
+      id: `/custom-image-bg-${useID(6)}.${file.type?.split("/")?.[1]}`,
+      data: uploadedFile ? uploadedFile.file.url : compressedFile,
+      content: "image",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    await db.cached
+      .add(tempMedia)
+      .catch((err) =>
+        console.error("Failed to save dropped background image:", err)
+      )
+
+    onSelectBackground(backgroundTypes.image, imageUrl)
+  } catch (error) {
+    console.error("Failed to add dropped background image:", error)
+    useToast().add({
+      title: "Failed to add background image",
+      icon: "i-bx-error",
+      color: "red",
+    })
+  }
+}
+
+const addDroppedBackgroundVideo = async (file: File) => {
+  const db = useIndexedDB()
+  try {
+    const id = `/custom-video-bg-${useID(6)}.${file.type?.split("/")?.[1]}`
+    const tempMedia: Media = {
+      id,
+      data: file,
+      content: "video",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    await db.cached
+      .add(tempMedia)
+      .catch((err) =>
+        console.error("Failed to save dropped background video:", err)
+      )
+
+    onSelectBackground(backgroundTypes.video, {
+      video: URL.createObjectURL(file),
+      key: id,
+    })
+  } catch (error) {
+    console.error("Failed to add dropped background video:", error)
+    useToast().add({
+      title: "Failed to add background video",
+      icon: "i-bx-error",
+      color: "red",
+    })
+  }
+}
+
+const onBgDrop = (event: DragEvent) => {
+  if (!isFileDrag(event)) return
+  event.preventDefault()
+  bgDragCounter = 0
+  isDraggingBackgroundFile.value = false
+  if (!props.slide) return
+
+  const file = event.dataTransfer?.files?.[0]
+  if (!file) return
+
+  if (file.type.startsWith("image")) {
+    if (file.size > maxDroppedBgImageSize.value * 1024 * 1024) {
+      useToast().add({
+        title: `Image size exceeds ${maxDroppedBgImageSize.value}MB`,
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+      return
+    }
+    addDroppedBackgroundImage(file)
+  } else if (file.type.startsWith("video")) {
+    if (file.size > maxDroppedBgVideoSize.value * 1024 * 1024) {
+      useToast().add({
+        title: `Video size exceeds ${maxDroppedBgVideoSize.value}MB`,
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+      return
+    }
+    addDroppedBackgroundVideo(file)
+  } else {
+    useToast().add({
+      title: "Unsupported file type",
+      description: "Drop an image or video to set as background",
+      icon: "i-bx-error",
+      color: "red",
+    })
+  }
 }
 
 const onSelectTheme = (themeId: string) => {

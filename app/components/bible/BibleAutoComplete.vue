@@ -22,7 +22,7 @@
         v-if="!verse"
         class="rounded-lg p-3 bg-primary-100 dark:bg-primary-900 flex items-center gap-2 mt-2"
       >
-        <IconWrapper name="i-bx-info-circle" size="6" color="red" />
+        <InfoIcon class="w-6 h-6" />
         <div class="info flex items-center">
           Start typing to search for books.
         </div>

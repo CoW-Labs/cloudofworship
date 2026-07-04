@@ -41,10 +41,21 @@
     >
       <div
         ref="slidesScroll"
-        class="slides-ctn overflow-y-scroll rounded-lg transition flex-1 min-h-0 bg-gray-100 dark:bg-[#222938]"
+        class="slides-ctn relative overflow-y-scroll rounded-lg transition flex-1 min-h-0 bg-gray-100 dark:bg-[#222938] touch-pan-y"
         :class="[slides?.length === 0 ? '' : 'p-2']"
         @scroll.passive="onSlidesGridScroll"
+        @dragenter="onMediaDragEnter"
+        @dragover="onMediaDragOver"
+        @dragleave="onMediaDragLeave"
+        @drop="onMediaDrop"
       >
+        <EmptyState
+          v-if="isDraggingMediaFile"
+          tinted
+          icon="i-bx-cloud-upload"
+          sub="Drop to add as media slide"
+          class="absolute inset-0 z-20 pointer-events-none"
+        />
         <div v-if="slides?.length > 0" class="virtual-slides-grid">
           <div :style="{ height: `${virtualTopSpacer}px` }" />
           <div ref="slidesGrid" class="grid slides-grid gap-3">
@@ -142,6 +153,7 @@ import type {
   Countdown,
   Schedule,
   ExtendedFileT,
+  PresentationObject,
 } from "~/types"
 import { appWideActions } from "~/utils/constants"
 import { isNotFoundError } from "~/utils/apiErrors"
@@ -177,6 +189,7 @@ const {
   createSongSetlistSlide,
   createMediaSlide,
   createMultipleMediaSlides,
+  createPresentationSlide,
   createCountdownSlide,
   saveSlideToLib,
   duplicateSlide,
@@ -186,6 +199,86 @@ const { appendSongToSetlist } = useSongSetlist()
 
 // Online status for conditional API/WS calls
 const online = useOnline()
+
+// Drag-and-drop media files onto the slide grid — mirrors the AddMedia.vue flow
+const { isFreePlan, isTeamsPlan } = useSubscription()
+const maxDroppedImageSize = computed(() => (isFreePlan.value ? 3 : 10))
+const maxDroppedVideoSize = computed(() => (isTeamsPlan.value ? Infinity : 250))
+const isDraggingMediaFile = ref(false)
+let mediaDragCounter = 0
+
+const isFileDrag = (event: DragEvent) =>
+  Array.from(event.dataTransfer?.types || []).includes("Files")
+
+const onMediaDragEnter = (event: DragEvent) => {
+  if (!isFileDrag(event)) return
+  mediaDragCounter++
+  isDraggingMediaFile.value = true
+}
+
+const onMediaDragOver = (event: DragEvent) => {
+  if (!isFileDrag(event)) return
+  event.preventDefault()
+}
+
+const onMediaDragLeave = (event: DragEvent) => {
+  if (!isFileDrag(event)) return
+  mediaDragCounter = Math.max(0, mediaDragCounter - 1)
+  if (mediaDragCounter === 0) isDraggingMediaFile.value = false
+}
+
+const onMediaDrop = (event: DragEvent) => {
+  if (!isFileDrag(event)) return
+  event.preventDefault()
+  mediaDragCounter = 0
+  isDraggingMediaFile.value = false
+
+  const droppedFiles = Array.from(event.dataTransfer?.files || [])
+  if (droppedFiles.length === 0) return
+
+  const validFiles: File[] = []
+  droppedFiles.forEach((file) => {
+    if (
+      file.type.startsWith("image") &&
+      file.size > maxDroppedImageSize.value * 1024 * 1024
+    ) {
+      toast.add({
+        title: `Image size exceeds ${maxDroppedImageSize.value}MB`,
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+      return
+    }
+    if (
+      file.type.startsWith("video") &&
+      file.size > maxDroppedVideoSize.value * 1024 * 1024
+    ) {
+      toast.add({
+        title: `Video size exceeds ${maxDroppedVideoSize.value}MB`,
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+      return
+    }
+    if (!/^(image|video|audio)/.test(file.type)) return
+    validFiles.push(file)
+  })
+  if (validFiles.length === 0) return
+
+  // Same shape AddMedia.vue's addMediaEmitter builds for regular files.
+  // fromDrop tells QuickActions.vue not to switch its panel to the Add Media
+  // page — the slides are already created, no need to navigate there too.
+  const mediaFiles = validFiles.map((file) => ({
+    blob: file,
+    name: file.name,
+    size: file.size,
+    type: file.type?.split("/")?.[0],
+    url: URL.createObjectURL(file),
+    fromDrop: true,
+  })) as unknown as ExtendedFileT[]
+
+  useGlobalEmit(appWideActions.newMedia, mediaFiles)
+}
 
 /**
  * Send slide update via Socket.IO for realtime collaboration
@@ -724,6 +817,22 @@ emitter.on("new-media", async (data: ExtendedFileT[]) => {
     // uploadOfflineSlides() here would race against that flow and send
     // batchCreateSlides with blob: URLs before the images have been uploaded.
   }
+})
+
+emitter.on("new-presentation", async (data: {
+  fileName?: string
+  presentationObjects?: PresentationObject[]
+  fromImport?: boolean
+}) => {
+  if (!data?.presentationObjects?.length || !data.fileName) return
+
+  const newSlide = createPresentationSlide(
+    data.fileName,
+    data.presentationObjects
+  )
+
+  slides.value?.push(newSlide)
+  appStore.appendActiveSlide(newSlide)
 })
 
 emitter.on("new-active-slide", (data: Slide) => {
