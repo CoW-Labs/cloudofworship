@@ -43,6 +43,7 @@
     <FileDropzone
       v-if="!settingsPage"
       size="sm"
+      accept="image/*"
       :maxFileSize="maxFileSize"
       @change="saveAndSelectImages($event)"
       class="max-w-[320px]"
@@ -90,7 +91,7 @@ defineProps<{
   settingsPage?: boolean
 }>()
 
-const emit = defineEmits(["select"])
+const emit = defineEmits(["select", "loading-change"])
 const authStore = useAuthStore()
 const { isFreePlan } = useSubscription()
 
@@ -103,7 +104,9 @@ const totalImages = ref(0)
 const deletingImageId = ref<string | null>(null)
 
 const bgImageToBeSelected = ref<string | null>(null)
-const backgroundImages = ref<string[]>([
+const localImageObjectUrls = new Set<string>()
+const transientPreviewUrls = new Set<string>()
+const defaultBackgroundImages = [
   "https://images.unsplash.com/photo-1553901753-215db344677a?q=80&w=1740",
   "https://images.unsplash.com/photo-1506056820413-f8fa4de15de6?q=80&w=1740",
   "https://images.unsplash.com/photo-1515162305285-0293e4767cc2?q=80&w=1740",
@@ -133,11 +136,24 @@ const backgroundImages = ref<string[]>([
   "https://images.unsplash.com/photo-1616548321600-aaab929899b5?q=80&w=1740",
   "https://images.unsplash.com/photo-1711560728293-14b647bd3a12?q=80&w=1740",
   // ---
-])
+]
+const backgroundImages = ref<string[]>([...defaultBackgroundImages])
+
+const revokeLocalImageObjectUrls = () => {
+  localImageObjectUrls.forEach((url) => URL.revokeObjectURL(url))
+  localImageObjectUrls.clear()
+}
+
+const revokeTransientPreviewUrls = () => {
+  transientPreviewUrls.forEach((url) => URL.revokeObjectURL(url))
+  transientPreviewUrls.clear()
+}
 
 const getAllLocallySavedImages = async () => {
   const db = useIndexedDB()
   const images = await db.cached.where({ content: "image" }).toArray()
+
+  revokeLocalImageObjectUrls()
 
   // Create Object URLs from locally saved images - process in batches
   const imageURLs: string[] = []
@@ -152,6 +168,10 @@ const getAllLocallySavedImages = async () => {
           ? image.data
           : URL.createObjectURL(image.data as unknown as Blob)
 
+      if (typeof image.data !== "string") {
+        localImageObjectUrls.add(blobURL)
+      }
+
       imageURLs.push(blobURL)
 
       if (image.id === bgImageToBeSelected.value) {
@@ -165,7 +185,9 @@ const getAllLocallySavedImages = async () => {
     }
   }
 
-  backgroundImages.value = backgroundImages.value.concat(imageURLs)
+  backgroundImages.value = Array.from(
+    new Set([...defaultBackgroundImages, ...imageURLs])
+  )
 }
 
 const saveAndSelectImages = async (files: File[]) => {
@@ -175,50 +197,84 @@ const saveAndSelectImages = async (files: File[]) => {
   const db = useIndexedDB()
 
   imageCompressionLoading.value = true
+  emit("loading-change", true)
   totalImages.value = files.length
 
-  try {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      currentImageIndex.value = i + 1
+  const previewUrls = files.map((file) => {
+    const previewUrl = URL.createObjectURL(file)
+    transientPreviewUrls.add(previewUrl)
+    return previewUrl
+  })
 
-      const compressedFile = await useCompressedImage(file)
-      let uploadedFile = null
-      const randomId = useID(6)
+  backgroundImages.value = Array.from(
+    new Set([...defaultBackgroundImages, ...previewUrls, ...backgroundImages.value])
+  )
 
-      // Save to S3
-      if (online.value) {
-        uploadedFile = await useUploadImage(compressedFile)
-      }
-
-      // Save to IndexedDB
-      const tempMedia: Media = {
-        id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
-        data: uploadedFile ? uploadedFile?.file?.url : compressedFile,
-        content: "image",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-
-      await db.cached
-        .add(tempMedia)
-        .catch((err) => console.error("Failed to save custom image:", err))
-
-      // Select the last added image
-      if (i === files.length - 1) {
-        bgImageToBeSelected.value = tempMedia.id
-      }
-    }
-
-    await getAllLocallySavedImages()
-    if (bgImageToBeSelected.value) {
-      emit("select", { image: bgImageToBeSelected.value })
-    }
-  } finally {
-    imageCompressionLoading.value = false
-    currentImageIndex.value = 0
-    totalImages.value = 0
+  const immediatePreviewUrl = previewUrls[previewUrls.length - 1]
+  if (immediatePreviewUrl) {
+    emit("select", { image: immediatePreviewUrl })
   }
+
+  // Keep the UI responsive by persisting and uploading in the background.
+  // The final selection is re-emitted once IndexedDB has the stable asset URL.
+  ;(async () => {
+    let savedSuccessfully = false
+    try {
+      for (const [i, file] of files.entries()) {
+        currentImageIndex.value = i + 1
+
+        const compressedBlob = await useCompressedImage(file)
+        const compressedFile =
+          compressedBlob instanceof File
+            ? compressedBlob
+            : new File([compressedBlob], file.name, {
+                type: compressedBlob.type || file.type,
+                lastModified: file.lastModified,
+              })
+        let uploadedFile = null
+        const randomId = useID(6)
+
+        // Save to S3 when available, but never block the initial preview.
+        if (online.value) {
+          uploadedFile = await useUploadImage(compressedFile)
+        }
+
+        // Save to IndexedDB so the background survives reloads.
+        const tempMedia: Media = {
+          id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
+          data: uploadedFile ? uploadedFile?.file?.url : compressedFile,
+          content: "image",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+
+        await db.cached
+          .add(tempMedia)
+          .catch((err) => console.error("Failed to save custom image:", err))
+
+        // Select the last added image once the stable asset is available.
+        if (i === files.length - 1) {
+          bgImageToBeSelected.value = tempMedia.id
+        }
+      }
+
+      await getAllLocallySavedImages()
+      if (bgImageToBeSelected.value) {
+        emit("select", { image: bgImageToBeSelected.value })
+      }
+      savedSuccessfully = true
+    } catch (error) {
+      console.error("Failed to save custom image:", error)
+    } finally {
+      imageCompressionLoading.value = false
+      emit("loading-change", false)
+      currentImageIndex.value = 0
+      totalImages.value = 0
+      if (savedSuccessfully) {
+        revokeTransientPreviewUrls()
+      }
+    }
+  })()
 }
 
 // Check if image is a custom uploaded image
@@ -229,7 +285,7 @@ const isCustomImage = (imageUrl: string) => {
 // Delete custom background image
 const handleDeleteImage = async (imageUrl: string) => {
   try {
-    deletingImageId.value = imageURLs
+    deletingImageId.value = imageUrl
 
     // Refresh images after deletion
     await getAllLocallySavedImages()
@@ -247,4 +303,9 @@ const handleDeleteImage = async (imageUrl: string) => {
 }
 
 getAllLocallySavedImages()
+
+onBeforeUnmount(() => {
+  revokeLocalImageObjectUrls()
+  revokeTransientPreviewUrls()
+})
 </script>

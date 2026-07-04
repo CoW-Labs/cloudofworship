@@ -29,7 +29,7 @@
 
     <div v-if="error" class="cow-textarea__error come-up-1">
       <span class="cow-textarea__error-text">
-        <IconWrapper name="i-bx-info-circle" size="4" />
+        <InfoIcon class="w-4 h-4" />
         {{ error }}
       </span>
       <slot name="hint" />

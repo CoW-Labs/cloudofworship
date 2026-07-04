@@ -84,7 +84,9 @@
           :style="previewPositionStyle"
         >
           <AppSection heading="Preview" slot-ctn-styles="!p-0">
-            <p class="px-2 py-2 max-h-[210px] overflow-y-auto whitespace-pre-line">
+            <p
+              class="px-2 py-2 max-h-[210px] overflow-y-auto whitespace-pre-line"
+            >
               {{
                 previewContent ||
                 (previewError ? "Preview unavailable" : "Loading...")
@@ -118,6 +120,7 @@ import LibraryIcon from "~/components/svgs/LibraryIcon.vue"
 import SongsIcon from "~/components/svgs/SongsIcon.vue"
 import MediaIcon from "~/components/svgs/MediaIcon.vue"
 import PptIcon from "~/components/svgs/PptIcon.vue"
+import PdfIcon from "~/components/svgs/PDFIcon.vue"
 import BannersAndAlertsIcon from "~/components/svgs/BannersAndAlertsIcon.vue"
 import CountdownIcon from "~/components/svgs/CountdownIcon.vue"
 import SchedulesIcon from "~/components/svgs/SchedulesIcon.vue"
@@ -160,6 +163,7 @@ const actionIconComponentMap: Record<string, Component> = {
   "new-alert": BannersAndAlertsIcon,
   "new-countdown": CountdownIcon,
   "new-presentation": PptIcon,
+  "new-presentation-from-pdf": PdfIcon,
   "open-schedule-modal": SchedulesIcon,
   "open-settings": SettingsIcon,
 }

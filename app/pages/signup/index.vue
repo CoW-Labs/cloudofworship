@@ -74,7 +74,7 @@
           v-if="passwordInputHover"
           class="help text-gray-500 dark:text-gray-400 text-xs mt-2 flex gap-2 come-up-1"
         >
-          <IconWrapper name="i-bx-info-circle" size="3" />
+          <InfoIcon class="w-3 h-3" />
           Password must be at least 8 characters and include a letter and a
           number.
         </div>

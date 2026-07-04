@@ -74,6 +74,9 @@
           item-key="id"
           :animation="200"
           ghost-class="opacity-50"
+          :delay="150"
+          :delay-on-touch-only="true"
+          :touch-start-threshold="5"
           @end="draggingSlide = null"
         >
           <!-- SLIDE CARD (DUPLICATED FROM THE SLIDECARD.VUE, TO MAKE DRAGGABLE WORK AS IT COULD NOT WORK IN COMPONENT) -->
@@ -432,5 +435,14 @@ const handleDropOnSetlist = (targetSlide: Slide) => {
   visibility: visible;
   opacity: 1;
   transform: translateX(0);
+}
+
+/* On touch devices, always show actions since hover doesn't exist */
+@media (hover: none) {
+  .slide-card .actions {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 </style>

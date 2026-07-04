@@ -1,15 +1,22 @@
 <template>
-  <div
+  <label
     class="dropzone text-center py-8 p-6 min-h-[200px] flex flex-col justify-center items-center rounded-lg border-dashed border-2 border-primary-200 cursor-pointer"
     @dragover.prevent="onDragOver"
     @dragleave.prevent="onDragLeave"
     @drop.prevent="onDrop"
     :class="{
-      'border-primary-500': isDragOver,
+      'border-primary-500 bg-primary-50 dark:bg-primary-900': isDragOver,
+      'hover:border-primary-400 transition-colors': !isDragOver,
       'p-2 min-h-[100px]': size === 'sm',
     }"
   >
-    <input type="file" ref="fileInput" @change="onFileSelect" multiple hidden />
+    <input
+      type="file"
+      :accept="accept"
+      :multiple="multiple"
+      @change="onFileSelect"
+      hidden
+    />
 
     <IconWrapper
       :name="icon"
@@ -19,22 +26,18 @@
     ></IconWrapper>
     <div class="texts">
       <p class="mb font-medium">
-        <span class="text-md">Drag & Drop</span> or
-        <span class="text-md">Copy & Paste</span>
+        <span class="text-md">Drag &amp; Drop</span> or
+        <span class="text-md">Click to select</span>
       </p>
       <p
         v-if="size !== 'sm'"
         class="text-sm mb-6"
         :class="{ 'text-xs': size === 'sm' }"
       >
-        image, video or audio files.
+        {{ description }}
       </p>
     </div>
-
-    <!-- <UButton icon="i-bx-plus" @click.prevent="openFileDialog"
-      >Select Files</UButton
-    > -->
-  </div>
+  </label>
 </template>
 
 <script setup lang="ts">
@@ -57,9 +60,20 @@ const props = defineProps({
     type: String,
     default: "i-bx-image",
   },
+  accept: {
+    type: String,
+    default: "",
+  },
+  multiple: {
+    type: Boolean,
+    default: true,
+  },
+  description: {
+    type: String,
+    default: "image, video or audio files.",
+  },
 })
 const toast = useToast()
-const fileInput = ref(null)
 const isDragOver = ref(false)
 const emit = defineEmits(["change"])
 
@@ -78,32 +92,10 @@ const onDrop = (event: DragEvent) => {
 
 const onFileSelect = (event: Event) => {
   handleFiles((event?.target as HTMLInputElement).files || [])
+  ;(event.target as HTMLInputElement).value = ""
 }
 
-// const openFileDialog = () => {
-//   fileInput.value.click()
-// }
-
 const handleFiles = (selectedFiles: FileList | File[]) => {
-  // console.log("selectedFiles", selectedFiles)
-  if (props.size === "sm" && props.icon === "i-bx-image") {
-    if (!selectedFiles?.[0]?.type.startsWith("image")) {
-      return toast.add({
-        title: "Please select only images",
-        icon: "i-bx-info-circle",
-        color: "red",
-      })
-    }
-  }
-  if (props.size === "sm" && props.icon === "i-bx-film") {
-    if (!selectedFiles?.[0]?.type.startsWith("video")) {
-      return toast.add({
-        title: "Please select only videos",
-        icon: "i-bx-info-circle",
-        color: "red",
-      })
-    }
-  }
   // Emit only the newly-selected files; the parent owns the canonical list.
   // Holding state here caused removed files to reappear on the next drop, and
   // re-processing of already-handled files in single-shot consumers.
