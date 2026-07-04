@@ -6,13 +6,6 @@
       class="min-h-0 overflow-hidden rounded-2xl bg-black shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
     >
       <div class="relative w-full h-full flex items-center justify-center">
-        <div
-          v-if="liveSlide"
-          class="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded-full"
-        >
-          <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-          LIVE
-        </div>
         <LiveProjectionOnly
           slide-label
           :slide="liveSlide"

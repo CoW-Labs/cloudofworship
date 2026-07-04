@@ -9,7 +9,7 @@
       class="content"
       :class="[
         useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-        currentState.settings.animations ? 'come-up-1' : '',
+        currentState.settings.microAnimations !== false ? 'come-up-1' : '',
       ]"
       v-html="getSlideContentHtml(slide?.contents?.[0])"
     ></div>
@@ -18,7 +18,7 @@
       class="content"
       :class="[
         useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-        currentState.settings.animations ? 'come-up-2' : '',
+        currentState.settings.microAnimations !== false ? 'come-up-2' : '',
       ]"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
@@ -37,7 +37,7 @@
       class="content"
       :class="[
         useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-        currentState.settings.animations ? 'come-up-1' : '',
+        currentState.settings.microAnimations !== false ? 'come-up-1' : '',
       ]"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
@@ -51,13 +51,13 @@
     <div
       v-if="contentVisible"
       class="content"
-      :class="[currentState.settings.animations ? 'come-up-1' : '']"
+      :class="[currentState.settings.microAnimations !== false ? 'come-up-1' : '']"
       v-html="getSlideContentHtml(slide?.contents?.[0])"
     ></div>
     <div
       v-if="contentVisible"
       class="content"
-      :class="[currentState.settings.animations ? 'come-up-2' : '']"
+      :class="[currentState.settings.microAnimations !== false ? 'come-up-2' : '']"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
   </div>
@@ -85,7 +85,7 @@
         v-if="contentVisible"
         class="content bible-label"
         :class="[
-          currentState.settings.animations ? 'come-up-1' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
           bibleThemeClasses.label,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[1])"
@@ -95,7 +95,7 @@
         class="content bible-content flex-1"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.animations ? 'come-up-2' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
           bibleThemeClasses.content,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
@@ -108,7 +108,7 @@
         v-if="contentVisible"
         class="content bible-label writing-mode-vertical rotate-180"
         :class="[
-          currentState.settings.animations ? 'come-up-1' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
           bibleThemeClasses.label,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[1])"
@@ -118,7 +118,7 @@
         class="content bible-content flex-1"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.animations ? 'come-up-2' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
           bibleThemeClasses.content,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
@@ -131,7 +131,7 @@
         v-if="contentVisible"
         class="content bible-label writing-mode-vertical"
         :class="[
-          currentState.settings.animations ? 'come-up-2' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
           bibleThemeClasses.label,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[1])"
@@ -141,7 +141,7 @@
         class="content bible-content flex-1"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.animations ? 'come-up-1' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
           bibleThemeClasses.content,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
@@ -155,7 +155,7 @@
         class="content bible-content"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.animations ? 'come-up-1' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
           bibleThemeClasses.content,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
@@ -164,7 +164,7 @@
         v-if="contentVisible"
         class="content bible-label"
         :class="[
-          currentState.settings.animations ? 'come-up-2' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
           bibleThemeClasses.label,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[1])"
@@ -178,7 +178,7 @@
         class="content bible-content"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.animations ? 'come-up-1' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
           bibleThemeClasses.content,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
@@ -187,7 +187,7 @@
         v-if="contentVisible"
         class="content bible-label"
         :class="[
-          currentState.settings.animations ? 'come-up-2' : '',
+          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
           bibleThemeClasses.label,
         ]"
         v-html="getSlideContentHtml(slide?.contents?.[1])"

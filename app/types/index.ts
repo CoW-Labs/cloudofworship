@@ -292,7 +292,8 @@ export interface AppSettings {
   }
   slideStyles: SlideStyle
   bibleVersions: Array<any> // Check app.vue for bible versions array in a list
-  animations?: boolean
+  animations?: boolean // Transitions between slides (e.g. crossfade)
+  microAnimations?: boolean // Micro/text animations within a slide (come-up etc.)
   footnotes?: boolean
   songAndHymnLabelsVisibility: boolean
   liveWindowFullscreen?: boolean // Whether live window opens in fullscreen mode

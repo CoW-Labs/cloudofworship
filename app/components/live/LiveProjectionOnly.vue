@@ -1,72 +1,28 @@
 <template>
   <div
     class="live-output-ctn w-[100%] min-h-[220px] relative"
-    :class="{ 'no-animations': !currentState.settings.animations }"
-    :style="`transition-duration: ${
+    :class="{ 'no-animations': currentState.settings.microAnimations === false }"
+    :style="`--cow-transition-duration: ${
       currentState.settings.animations
-        ? currentState.settings.transitionInterval
+        ? currentState.settings.transitionInterval ?? 0.7
         : 0
     }s`"
   >
     <div
-      class="live-output w-[100%] min-h-[220px] rounded-2xl relative overflow-hidden border bg-black dark:border-none"
+      class="live-output w-[100%] min-h-[220px] relative overflow-hidden bg-black"
+      :class="
+        isLivePageFullScreen
+          ? 'rounded-none border-0'
+          : 'rounded-2xl border dark:border-none'
+      "
       v-if="contentVisible"
       @dblclick="activateFullScreen()"
     >
-      <!-- PREVIOUS BACKGROUND (for smooth transitions) -->
-      <div
-        v-if="backgroundTransitioning && previousBackgroundStyles"
-        class="absolute inset-0 bg-no-repeat transition-opacity duration-300"
-        :class="{
-          'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
-          'h-[88vh] rounded-none border-none min-h-[100%]': fullScreenHeight,
-          'bg-cover': slide?.type !== slideTypes.media,
-          'bg-center bg-cover':
-            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
-          'bg-top bg-cover':
-            slide?.slideStyle?.backgroundFillType ===
-            backgroundFillTypes.cropTop,
-          'bg-bottom bg-cover':
-            slide?.slideStyle?.backgroundFillType ===
-            backgroundFillTypes.cropBottom,
-          'bg-center bg-contain':
-            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
-          'bg-center bg-stretch':
-            slide?.slideStyle?.backgroundFillType ===
-            backgroundFillTypes.stretch,
-          'opacity-0': backgroundLoaded,
-          'opacity-100': !backgroundLoaded,
-        }"
-        :style="previousBackgroundStyles"
-        style="z-index: 1"
-      ></div>
-
-      <!-- CURRENT BACKGROUND -->
-      <div
-        class="absolute inset-0 bg-no-repeat transition-opacity duration-300"
-        :class="{
-          'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
-          'h-[88vh] rounded-none border-none min-h-[100%]': fullScreenHeight,
-          'bg-cover': slide?.type !== slideTypes.media,
-          'bg-center bg-cover':
-            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.crop,
-          'bg-top bg-cover':
-            slide?.slideStyle?.backgroundFillType ===
-            backgroundFillTypes.cropTop,
-          'bg-bottom bg-cover':
-            slide?.slideStyle?.backgroundFillType ===
-            backgroundFillTypes.cropBottom,
-          'bg-center bg-contain':
-            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
-          'bg-center bg-stretch':
-            slide?.slideStyle?.backgroundFillType ===
-            backgroundFillTypes.stretch,
-          'opacity-100': backgroundLoaded,
-          'opacity-0': !backgroundLoaded,
-        }"
-        :style="backgroundStyles"
-        style="z-index: 2"
-      >
+      <!-- PERSISTENT MEDIA LAYER -->
+      <!-- Kept OUTSIDE the crossfade so the video/audio/iframe refs and their
+           playback survive slide changes (seek/play/pause/mute watchers depend
+           on stable refs, and re-mounting a video would replay/flash it). -->
+      <div class="absolute inset-0" style="z-index: 1">
         <!-- AUDIO BACKGROUND -->
         <audio
           v-if="fullScreen"
@@ -197,51 +153,93 @@
           crossorigin="anonymous"
         ></video>
       </div>
-      <!-- End of CURRENT BACKGROUND -->
+      <!-- End of PERSISTENT MEDIA LAYER -->
 
-      <div
-        v-if="!fullScreen || slideLabel"
-        class="overlay-gradient absolute z-10 inset-0"
-      ></div>
-
-      <div
-        v-if="!fullScreen || slideLabel"
-        class="heading p-3 absolute z-10 inset-0"
-      >
-        <h5
-          class="font-semibold text-white overflow-hidden truncate w-48 2xl:w-64"
+      <!-- SLIDE FACE (crossfades as one unit: background + label + text) -->
+      <!-- Keyed by the displayed slide id so a slide change swaps the whole
+           face via the crossfade, while same-slide edits (e.g. Bible verse
+           navigation) keep the same key and update in place with no crossfade. -->
+      <Transition :name="transitionName">
+        <div
+          :key="displayedSlide?.id"
+          class="slide-face relative h-full"
+          style="z-index: 2"
         >
-          {{ slide?.name || "No Live Slide" }}
-        </h5>
-        <LiveSlideIndicator :visible="!!slide?.name" class="mr-4 mt-4" />
-      </div>
+          <!-- BACKGROUND (image/solid/gradient, blurred for text slides) -->
+          <div
+            class="absolute inset-0 bg-no-repeat"
+            :class="{
+              'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
+              'h-[88vh] rounded-none border-none min-h-[100%]': fullScreenHeight,
+              'bg-cover': displayedSlide?.type !== slideTypes.media,
+              'bg-center bg-cover':
+                displayedSlide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.crop,
+              'bg-top bg-cover':
+                displayedSlide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.cropTop,
+              'bg-bottom bg-cover':
+                displayedSlide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.cropBottom,
+              'bg-center bg-contain':
+                displayedSlide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.fit,
+              'bg-center bg-stretch':
+                displayedSlide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.stretch,
+            }"
+            :style="backgroundStyles"
+          ></div>
 
-      <!-- MAIN FOREGROUND CONTENT -->
-      <LiveContent
-        :key="slide?._id"
-        :content-visible="foregroundContentVisible"
-        :slide="slide"
-        class="relative z-10"
-        :class="fullScreen ? 'h-screen' : 'min-h-[220px] rounded-2xl'"
-        :padding="
-          fullScreen
-            ? {
-                top: computePadding(
-                  currentState.settings.slideStyles.windowPadding?.top
-                ),
-                right: computePadding(
-                  currentState.settings.slideStyles.windowPadding?.right
-                ),
-                bottom: computePadding(
-                  currentState.settings.slideStyles.windowPadding?.bottom
-                ),
-                left: computePadding(
-                  currentState.settings.slideStyles.windowPadding?.left
-                ),
-              }
-            : { top: 0, right: 0, bottom: 0, left: 0 }
-        "
-      />
+          <div
+            v-if="!fullScreen || slideLabel"
+            class="overlay-gradient absolute z-10 inset-0"
+          ></div>
+
+          <div
+            v-if="!fullScreen || slideLabel"
+            class="heading p-3 absolute z-10 inset-0"
+          >
+            <h5
+              class="font-semibold text-white overflow-hidden truncate w-48 2xl:w-64"
+            >
+              {{ displayedSlide?.name || "No Live Slide" }}
+            </h5>
+            <LiveSlideIndicator
+              :visible="!!displayedSlide?.name"
+              class="mr-4 mt-4"
+            />
+          </div>
+
+          <!-- MAIN FOREGROUND CONTENT -->
+          <LiveContent
+            :key="displayedSlide?._id"
+            :content-visible="true"
+            :slide="displayedSlide"
+            class="relative z-10"
+            :class="fullScreen ? 'h-screen' : 'min-h-[220px] rounded-2xl'"
+            :padding="
+              fullScreen
+                ? {
+                    top: computePadding(
+                      currentState.settings.slideStyles.windowPadding?.top
+                    ),
+                    right: computePadding(
+                      currentState.settings.slideStyles.windowPadding?.right
+                    ),
+                    bottom: computePadding(
+                      currentState.settings.slideStyles.windowPadding?.bottom
+                    ),
+                    left: computePadding(
+                      currentState.settings.slideStyles.windowPadding?.left
+                    ),
+                  }
+                : { top: 0, right: 0, bottom: 0, left: 0 }
+            "
+          />
+        </div>
+      </Transition>
+      <!-- End of SLIDE FACE -->
 
       <template v-if="!fullScreen">
         <UTooltip
@@ -299,7 +297,6 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import type { ExtendedFileT, Slide, SlideStyle, ExternalVideo } from "~/types"
@@ -310,28 +307,17 @@ import {
   safePlayMedia,
   safePostMessage,
 } from "~/utils/browserSafety"
-import { hasSlideChanged, getSlideComparisonKey } from "~/utils/slideComparison"
 
 const appMounted = ref<boolean>(false)
 const video = ref<HTMLVideoElement | null>(null)
 const audio = ref<HTMLAudioElement | null>(null)
 const iframe = ref<HTMLIFrameElement | null>(null)
-const foregroundContentVisible = ref<boolean>(true)
 const isLargePreviewOpen = ref<boolean>(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
 const route = useRoute()
-const renderKey = ref(0)
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["activate-fullscreen"])
-const mostRecentSlideUpdate = ref<Slide | null>(null)
-const lastComparisonKey = ref<string>("")
-
-// Double-buffered background system for smooth transitions
-const currentBackgroundStyles = ref<string>("")
-const previousBackgroundStyles = ref<string>("")
-const backgroundLoaded = ref<boolean>(true)
-const backgroundTransitioning = ref<boolean>(false)
 
 const props = defineProps<{
   slide: Slide
@@ -342,6 +328,18 @@ const props = defineProps<{
   slideLabel?: Boolean
   fullScreenHeight?: string
 }>()
+
+// The slide currently rendered in the crossfading face. It lags props.slide by
+// the (image) preload so the incoming background doesn't flash blank mid-fade.
+// Same-slide edits share this object's reactivity and update in place.
+const displayedSlide = ref<Slide>(props.slide)
+
+// Resolve the Vue transition name from the transition type. Only `fade` is
+// implemented today; future types (slide/zoom/cut) plug in here + one CSS block.
+const transitionName = computed(() => `cow-slide-${transitionTypes.fade}`)
+const isLivePageFullScreen = computed(
+  () => props.fullScreen && route.path === "/live"
+)
 
 const getEmbedUrl = (data: ExternalVideo): string => {
   const isMuted =
@@ -374,77 +372,66 @@ const getEmbedUrl = (data: ExternalVideo): string => {
   return ""
 }
 
-// Optimized watcher - only watch slide ID for main changes
+// Preload background images so the crossfade doesn't flash a blank background.
+const preloadBackgroundImage = async (slide: Slide): Promise<boolean> => {
+  if (slide?.backgroundType !== backgroundTypes.image || !slide?.background) {
+    return true // No image to preload
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve(true)
+    img.onerror = () => resolve(false)
+    img.src = slide.background!
+
+    // Timeout after 3 seconds to prevent indefinite waiting
+    setTimeout(() => resolve(true), 3000)
+  })
+}
+
+// Drive the crossfade: when the slide switches, preload the incoming image then
+// commit it to `displayedSlide`, which changes the face key and triggers the
+// crossfade. Same-slide updates (new object, same id) commit immediately with
+// no crossfade so verse navigation stays jitter-free.
 watch(
-  () => props.slide?.id,
-  (newId, oldId) => {
-    try {
-      // Guard: slide may be undefined when the watcher fires
-      if (!props.slide) {
-        return
-      }
+  () => props.slide,
+  async (newSlide, oldSlide) => {
+    if (!newSlide) {
+      displayedSlide.value = newSlide
+      return
+    }
 
-      // Only proceed if this is the active live slide
-      if (
-        !appMounted.value ||
-        props.slide.id !== currentState.value?.liveSlideId
-      ) {
-        return
-      }
+    const idChanged = !!oldSlide && newSlide.id !== oldSlide.id
+    if (idChanged) {
+      await preloadBackgroundImage(newSlide)
+    }
 
-      // Check if slide has actually changed using efficient comparison
-      if (newId !== oldId) {
-        incrementRenderKey(props.slide)
+    displayedSlide.value = newSlide
 
-        // Only play video/audio when in fullScreen mode
-        if (props.fullScreen) {
-          safePlayMedia(video.value)
-        }
-
-        // Trigger smooth content fade animation on slide change
-        // Use requestAnimationFrame for smoother timing
-        foregroundContentVisible.value = false
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            foregroundContentVisible.value = true
-          }, 150) // Slightly longer for smoother fade
-        })
-      }
-    } catch (error) {
-      console.error("Error in slide watcher:", error)
+    // Only play video/audio when in fullScreen mode
+    if (idChanged && props.fullScreen) {
+      safePlayMedia(video.value)
     }
   }
 )
 
-// Separate watcher for slide content/style changes (debounced)
-const handleSlideContentChange = useDebounceFn(() => {
-  // Guard: slide may be undefined when the debounced callback fires
+const computeBackgroundStyles = (slide: Slide): string => {
   if (
-    !props.slide ||
-    !appMounted.value ||
-    props.slide.id !== currentState.value?.liveSlideId
+    slide?.type === slideTypes.media ||
+    slide?.type === slideTypes.presentation
   ) {
-    return
+    return useSlideBackground(slide)
   }
+  return `${useSlideBackground(slide)}; filter: blur(${
+    props.slideStyles.blur
+  }px) brightness(${props.slideStyles.brightness}%);`
+}
 
-  const newKey = getSlideComparisonKey(props.slide)
-
-  // Only update if content has actually changed
-  if (newKey !== lastComparisonKey.value) {
-    lastComparisonKey.value = newKey
-    incrementRenderKey(props.slide)
-
-    // Don't trigger fade animation for content changes within the same slide
-    // This prevents jitter when moving between verses in Bible slides
-    // The CSS animations (come-up-1, come-up-2) will handle the smooth transitions
-  }
-}, 50)
-
-watch(
-  () => [props.slide?.contents, props.slide?.slideStyle],
-  handleSlideContentChange,
-  { deep: true }
-)
+const backgroundStyles = computed(() => {
+  return displayedSlide.value
+    ? computeBackgroundStyles(displayedSlide.value)
+    : ""
+})
 
 // Separate watcher for media seeking (not debounced - needs to be immediate)
 watch(
@@ -647,104 +634,7 @@ onMounted(() => {
   if (props.fullScreen) {
     safePlayMedia(video.value)
   }
-
-  // Initialize current background
-  currentBackgroundStyles.value = computeBackgroundStyles(props.slide)
 })
-
-const computeBackgroundStyles = (slide: Slide): string => {
-  if (
-    slide?.type === slideTypes.media ||
-    slide?.type === slideTypes.presentation
-  ) {
-    return useSlideBackground(slide)
-  }
-  return `${useSlideBackground(slide)}; filter: blur(${
-    props.slideStyles.blur
-  }px) brightness(${props.slideStyles.brightness}%);`
-}
-
-const backgroundStyles = computed(() => {
-  // Return current background styles
-  return currentBackgroundStyles.value
-})
-
-// Preload background images to ensure smooth transitions
-const preloadBackgroundImage = async (slide: Slide): Promise<boolean> => {
-  if (slide?.backgroundType !== backgroundTypes.image || !slide?.background) {
-    return true // No image to preload
-  }
-
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => resolve(true)
-    img.onerror = () => resolve(false)
-    img.src = slide.background!
-
-    // Timeout after 3 seconds to prevent indefinite waiting
-    setTimeout(() => resolve(true), 3000)
-  })
-}
-
-// Watch for slide changes and handle background transitions
-watch(
-  () => props.slide?.id,
-  async (newId, oldId) => {
-    if (newId !== oldId && oldId) {
-      // Store previous background
-      previousBackgroundStyles.value = currentBackgroundStyles.value
-      backgroundLoaded.value = false
-      backgroundTransitioning.value = true
-
-      // Preload new background if it's an image
-      await preloadBackgroundImage(props.slide)
-
-      // Update to new background
-      currentBackgroundStyles.value = computeBackgroundStyles(props.slide)
-
-      // Mark as loaded and ready to transition
-      await nextTick()
-      backgroundLoaded.value = true
-
-      // Clear previous background after transition completes
-      setTimeout(() => {
-        backgroundTransitioning.value = false
-        previousBackgroundStyles.value = ""
-      }, 300) // Match animation duration
-    } else if (newId && !oldId) {
-      // Initial load
-      currentBackgroundStyles.value = computeBackgroundStyles(props.slide)
-    }
-  },
-  { immediate: false }
-)
-
-// Watch for style changes within the same slide
-watch(
-  () => [
-    props.slide?.background,
-    props.slide?.backgroundType,
-    props.slideStyles.blur,
-    props.slideStyles.brightness,
-  ],
-  () => {
-    if (props.slide?.id === mostRecentSlideUpdate.value?.id) {
-      // Same slide, just update styles immediately (no transition needed)
-      currentBackgroundStyles.value = computeBackgroundStyles(props.slide)
-    }
-  },
-  { deep: true }
-)
-
-const incrementRenderKey = (slide: Slide) => {
-  // Use efficient comparison instead of expensive JSON.stringify
-  if (!hasSlideChanged(slide, mostRecentSlideUpdate.value)) {
-    return
-  }
-
-  renderKey.value += 1
-  mostRecentSlideUpdate.value = slide
-}
 
 // Function to create padding based on the ones set at display settings
 // Calculation is necessary because minimum padding is 6vw and the padding is in VW units

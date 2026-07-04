@@ -311,6 +311,33 @@ html.dark .cow-search-input input::placeholder {
   -webkit-backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
 }
+/* SLIDE-TO-SLIDE CROSSFADE (whole slide face: background + text) */
+/* Duration is driven by --cow-transition-duration set inline on the live container. */
+/* will-change lives on the *-active classes only, so it is applied by Vue during the
+   transition and dropped afterwards — idle slides never pin a compositor layer. */
+.cow-slide-fade-enter-active,
+.cow-slide-fade-leave-active {
+  transition: opacity var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  -webkit-transition: opacity var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: opacity;
+}
+.cow-slide-fade-enter-from,
+.cow-slide-fade-leave-to {
+  opacity: 0;
+}
+.cow-slide-fade-enter-to,
+.cow-slide-fade-leave-from {
+  opacity: 1;
+}
+/* The leaving slide is pulled out of flow so the entering slide keeps driving
+   the container height while the two overlap during the crossfade. */
+.cow-slide-fade-leave-active {
+  position: absolute;
+  inset: 0;
+}
+
 .no-animations {
   .come-up-1 {
     animation: none;
