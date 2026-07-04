@@ -396,7 +396,7 @@
       </div>
       <UForm :state="{}">
         <UFormGroup
-          label="Transition between slides and micro animations"
+          label="Transitions between slides"
           class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
         >
           <UToggle
@@ -433,6 +433,21 @@
             />
             <span class="text-sm"> 5s</span>
           </div>
+        </UFormGroup>
+        <UFormGroup
+          label="Micro animations and text animations"
+          class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
+        >
+          <UToggle
+            size="lg"
+            :model-value="appStore.currentState.settings.microAnimations !== false"
+            :disabled="!hasAccessToAnimations"
+            @change="
+              hasAccessToAnimations
+                ? appStore.setMicroAnimations($event)
+                : handleUpgradeClick()
+            "
+          />
         </UFormGroup>
       </UForm>
     </div>

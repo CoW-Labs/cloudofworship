@@ -92,6 +92,7 @@ export const useAppStore = defineStore("app", {
             },
           },
           animations: true,
+          microAnimations: true,
           footnotes: false,
           songAndHymnLabelsVisibility: false,
           liveWindowFullscreen: true, // Default to fullscreen mode
@@ -433,6 +434,13 @@ export const useAppStore = defineStore("app", {
         animations: animations,
       }
       usePosthogCapture("ANIMATIONS_SETTINGS_CHANGED")
+    },
+    setMicroAnimations(microAnimations: boolean) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        microAnimations: microAnimations,
+      }
+      usePosthogCapture("MICRO_ANIMATIONS_SETTINGS_CHANGED")
     },
     setFootnotes(footnotes: boolean) {
       this.currentState.settings = {

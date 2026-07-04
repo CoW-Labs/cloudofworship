@@ -521,6 +521,15 @@ export const lineSpacingTypes = {
   double: 'double',
 }
 
+// Slide-to-slide transition types for the live projection.
+// `fade` is the only implemented type today; extend with slide/zoom/cut later.
+export const transitionTypes = {
+  fade: 'fade', // default
+  // slide: 'slide',
+  // zoom: 'zoom',
+  // cut: 'cut',
+}
+
 export const bibleBooks = [
   "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
   "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
