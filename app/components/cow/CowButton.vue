@@ -69,7 +69,7 @@ const buttonUi = {
   color: #fff !important;
   background-color: #a855f7 !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 5px 0 0 #7e22ce,
-    0 12px 18px -8px rgba(126, 34, 206, 0.9);
+    0 12px 18px -8px rgba(126, 34, 206, 0.45);
 }
 
 .cow-button--primary:hover {

@@ -2,119 +2,108 @@
   <div class="flex">
     <UModal
       v-model="visible"
-      :ui="{
-        base: 'min-w-[700px]',
-      }"
       :prevent-close="true"
+      :ui="{
+        base: 'min-w-[700px] max-w-[700px]',
+        background: 'bg-transparent dark:bg-transparent',
+        ring: '',
+        rounded: 'rounded-2xl',
+        shadow: 'shadow-none',
+        overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
+      }"
       @close="activeSchedule ? emit('close') : null"
     >
-      <UCard
-        :ui="{
-          ring: '',
-          divide: 'divide-y divide-gray-100 dark:divide-gray-800',
-        }"
+      <AppSection
+        heading="Create a schedule"
+        heading-styles="text-lg font-semibold"
       >
-        <template #header>
-          <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-md truncate">
-              Projects and Schedule
-            </h2>
-            <div class="actions flex items-center gap-2">
-              <UButton
-                icon="i-bx-search"
-                v-if="currentState.schedules.length > 0"
-                color="primary"
-                :variant="searchVisible ? 'outline' : 'ghost'"
-                @click="
-                  () => {
-                    searchVisible = !searchVisible
-                    if (!searchVisible) {
-                      searchInput = ''
-                    }
-                  }
-                "
-                >Search</UButton
-              >
+        <template #actions>
+          <button
+            class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-[#222938] transition-colors"
+            @click="closeScheduleModal"
+          >
+            <IconWrapper
+              name="i-mdi-close"
+              class="w-4 h-4 text-gray-600 dark:text-[#a7afbd]"
+            />
+          </button>
+        </template>
 
-              <UButton
-                icon="i-mdi-close"
-                variant="ghost"
-                @click="closeScheduleModal"
-              ></UButton>
+        <div
+          class="schedule-modal-body rounded-2xl bg-gray-50 dark:bg-[#1b212e] p-4"
+        >
+          <CowInput v-model="scheduleName" label="Schedule name" />
+          <div class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Leave field blank to use default title
+          </div>
+
+          <div class="starters-ctn mt-6">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm text-gray-400">Start with a template</p>
+              <span
+                class="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                >See all templates</span
+              >
+            </div>
+            <div class="grid grid-cols-4 gap-4">
+              <div class="flex flex-col gap-2.5">
+                <button
+                  class="h-[110px] rounded-xl border-2 border-dashed flex items-center justify-center transition-colors"
+                  :class="
+                    selectedStarter === 'blank'
+                      ? 'border-primary-500'
+                      : 'border-gray-200 dark:border-[#2a3244]'
+                  "
+                  @click="selectedStarter = 'blank'"
+                >
+                  <IconWrapper name="i-mdi-plus" class="w-6 h-6 text-gray-400" />
+                </button>
+                <span
+                  class="text-sm text-center text-gray-500 dark:text-gray-400"
+                >
+                  Start from blank
+                </span>
+              </div>
+              <div
+                v-for="preset in starterPresets"
+                :key="preset.key"
+                class="flex flex-col gap-2.5"
+              >
+                <button
+                  class="starter-preset h-[110px] rounded-xl bg-cover bg-center ring-2 transition-all"
+                  :class="
+                    selectedStarter === preset.key
+                      ? 'ring-primary-500'
+                      : 'ring-transparent'
+                  "
+                  :style="{ backgroundImage: `url(${preset.image})` }"
+                  @click="selectedStarter = preset.key"
+                ></button>
+                <span
+                  class="text-sm text-center text-gray-500 dark:text-gray-400 truncate"
+                >
+                  {{ preset.label }}
+                </span>
+              </div>
             </div>
           </div>
-        </template>
-        <div class="search-and-add-content">
-          <Transition name="fade-sm">
-            <div v-if="searchVisible" class="flex search-input gap-2 mb-4">
-              <UFormGroup size="lg" class="w-[100%]">
-                <UInput
-                  icon="i-bx-search"
-                  placeholder="Search for schedules"
-                  v-model="searchInput"
-                />
-              </UFormGroup>
-            </div>
-          </Transition>
-          <!-- <UButton
-            block
-            class="h-[170px] bg-primary-100 dark:bg-primary-300 border border-primary-100 dark:border-primary-500 hover:bg-primary-100 dark:hover:bg-primary-400 hover:border-primary-500 transition-all flex-col gap-4 text-primary-500"
-            @click="newScheduleVisible = !newScheduleVisible"
+
+          <div
+            v-if="recentSchedules.length > 0"
+            class="recent-schedules-ctn mt-6"
           >
-            <PlusIcon />
-            <div>New Schedule</div>
-          </UButton> -->
-
-          <Transition name="fade-sm">
-            <div v-if="newScheduleVisible" class="schedules-ctn mb-8">
-              <form
-                class="schedules flex items-end overflow-auto gap-2 bg-primary-100 dark:bg-primary-900 p-6 rounded-lg"
-                @submit.prevent="createNewSchedule()"
+            <div class="flex items-center justify-between mb-1">
+              <p class="text-sm text-gray-400">Recent Schedules</p>
+              <span
+                class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer transition-colors"
+                @click="scheduleListLimit = recentSchedules.length"
               >
-                <UFormGroup
-                  label="Create New Schedule"
-                  size="lg"
-                  class="flex-1"
-                >
-                  <UInput
-                    placeholder="Enter your schedule name"
-                    v-model="scheduleName"
-                    class="mt-3"
-                  />
-                  <div class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Leave field blank to create schedule with name "{{
-                      testScheduleName
-                    }}"
-                  </div>
-                </UFormGroup>
-                <UButton
-                  type="submit"
-                  class="h-[40px] mb-6"
-                  size="sm"
-                  icon="i-bx-save"
-                >
-                  Save Schedule
-                </UButton>
-              </form>
+                See all
+              </span>
             </div>
-          </Transition>
-
-          <div class="schedules-ctn mt-6">
-            <p class="text-sm text-gray-400">Recent schedules</p>
-
-            <div class="schedules flex-col flex mt-4 h-[40vh] overflow-auto">
-              <EmptyState
-                v-if="currentState.schedules.length === 0"
-                icon="i-bx-calendar"
-                sub="No schedules yet"
-                desc="Click the button above to create a new schedule and start using Cloud of Worship."
-                is-wider
-              />
+            <div class="max-h-[220px] overflow-auto">
               <ScheduleCard
-                v-else
-                v-for="schedule in searchedSchedules
-                  ?.filter((schedule: Schedule) => schedule?.name?.trim().length > 0)
-                  ?.slice(0, scheduleListLimit)"
+                v-for="schedule in recentSchedules.slice(0, scheduleListLimit)"
                 :key="schedule?._id"
                 :schedule="schedule"
                 @select="(schedule: Schedule) => {
@@ -128,20 +117,27 @@
                 }"
                 @delete="deleteSchedule($event)"
               />
-              <UButton
-                v-if="searchedSchedules?.length > scheduleListLimit"
-                variant="ghost"
-                trailing-icon="i-bx-chevron-down"
-                size="lg"
-                class="justify-center mt-4"
-                @click="scheduleListLimit += 5"
-              >
-                See more schedules
-              </UButton>
             </div>
           </div>
+
+          <div class="footer-actions flex justify-end gap-3 mt-8">
+            <CowButton
+              variant="secondary"
+              class="min-w-[130px]"
+              @click="closeScheduleModal"
+            >
+              Cancel
+            </CowButton>
+            <CowButton
+              variant="primary"
+              class="min-w-[130px]"
+              @click="createNewSchedule"
+            >
+              Save
+            </CowButton>
+          </div>
         </div>
-      </UCard>
+      </AppSection>
     </UModal>
   </div>
 </template>
@@ -157,7 +153,7 @@ const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
 const scheduleName = ref<string>("")
-const scheduleListLimit = ref<number>(6)
+const scheduleListLimit = ref<number>(3)
 const testScheduleName = ref<string>(
   `CoW Schedule ${new Date().toLocaleDateString("en-GB")?.replaceAll("/", "-")}`
 )
@@ -168,12 +164,31 @@ const props = defineProps<{
 }>()
 
 const visible = ref<boolean>(props.visible)
-const searchVisible = ref<boolean>(false)
-const newScheduleVisible = ref<boolean>(true)
-const searchInput = ref<string>("")
 const toast = useToast()
 const loading = ref<boolean>(false)
 const copied = ref<boolean>(false)
+
+const selectedStarter = ref<string>("blank")
+const starterPresets = [
+  {
+    key: "regular-sunday",
+    label: "Regular Sunday",
+    image:
+      "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=600",
+  },
+  {
+    key: "communion",
+    label: "Communion Service",
+    image:
+      "https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=600",
+  },
+  {
+    key: "christmas",
+    label: "Christmas Schedule",
+    image:
+      "https://images.unsplash.com/photo-1512389142860-9c449e58a543?q=80&w=600",
+  },
+]
 
 watch(
   () => props.visible,
@@ -197,16 +212,12 @@ const closeScheduleModal = () => {
   }
 }
 
-const searchedSchedules = computed(() => {
-  if (searchInput.value.length === 0) {
-    return appStore.currentState.schedules
-  }
-  const tempSchedules = [...appStore.currentState.schedules]
-  return tempSchedules?.filter((schedule) => {
-    return schedule?.name
-      ?.toLowerCase()
-      .includes(searchInput.value.toLowerCase())
-  })
+const recentSchedules = computed(() => {
+  return (
+    currentState.value.schedules?.filter(
+      (schedule) => schedule?.name?.trim().length > 0
+    ) || []
+  )
 })
 
 const createScheduleOnline = async (schedule: Schedule) => {

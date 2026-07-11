@@ -12,6 +12,16 @@
       <div class="logo flex items-center gap-2 w-[310px]">
         <Logo class="w-[38px]" />
         <h1 class="text-md font-semibold">Cloud of Worship</h1>
+        <!-- TEST-ONLY: trigger the upgrade/plan modal -->
+        <UButton
+          variant="soft"
+          color="primary"
+          size="2xs"
+          class="ml-1"
+          @click="useGlobalEmit('show-upgrade-modal')"
+        >
+          Test modal
+        </UButton>
       </div>
       <div class="projects-ctn">
         <!-- <IconWrapper name="i-bx-spinner-dots" v-if="slidesAndScheduleLoading" /> -->

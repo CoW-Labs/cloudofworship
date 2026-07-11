@@ -1,71 +1,36 @@
 <template>
   <UButton
     variant="ghost"
-    class="schedule-card flex items-center justify-between border-b border-gray-100 w-full dark:border-gray-800 py-4 last:border-0 text-black dark:text-white"
+    class="schedule-card group flex items-center justify-between border-b border-gray-100 w-full dark:border-[#202838] py-3 last:border-0 text-black dark:text-white"
     @click="$emit('select', schedule)"
   >
-    <div class="title-and-date">
-      <div class="title font-medium text-start flex items-center gap-2">
-        {{ schedule?.name }}
-        <UTooltip v-if="!schedule?.lastUpdated" text="Offline. Yet to sync">
-          <Icon name="i-tabler-cloud-off" class="w-4 h-4 text-gray-500" />
-        </UTooltip>
-      </div>
-      <div class="flex items-center gap-2 mt-1">
-        <UAvatar
-          :text="scheduleAuthor?.fullname?.split(' ')?.[0]?.[0]"
-          :src="scheduleAuthor?.avatar"
-          size="xs"
-          :ui="{
-            text: `text-[${scheduleAuthor?.theme}] dark:text-[${scheduleAuthor?.theme}] font-semibold`,
-          }"
-          :class="`dark:border border-[${scheduleAuthor?.theme}] bg-[${scheduleAuthor?.theme}20] dark:bg-[${scheduleAuthor?.theme}20]`"
-        />
-        <span class="text-xs text-gray-500"
+    <div class="flex items-center gap-3 min-w-0">
+      <UAvatar
+        :text="scheduleAuthor?.fullname?.split(' ')?.[0]?.[0]"
+        :src="scheduleAuthor?.avatar"
+        size="lg"
+        :ui="{
+          text: `text-[${scheduleAuthor?.theme}] dark:text-[${scheduleAuthor?.theme}] font-semibold`,
+        }"
+        :class="`shrink-0 dark:border border-[${scheduleAuthor?.theme}] bg-[${scheduleAuthor?.theme}20] dark:bg-[${scheduleAuthor?.theme}20]`"
+      />
+      <div class="title-and-date min-w-0 text-start">
+        <div class="title font-medium flex items-center gap-2 truncate">
+          {{ schedule?.name }}
+          <UTooltip v-if="!schedule?.lastUpdated" text="Offline. Yet to sync">
+            <Icon name="i-tabler-cloud-off" class="w-4 h-4 text-gray-500" />
+          </UTooltip>
+        </div>
+        <span class="text-xs text-gray-500 mt-0.5 block"
           >Created
           {{ format(new Date(schedule?.updatedAt as string).getTime()) }}</span
         >
       </div>
     </div>
     <div class="col-2 flex items-center gap-4">
-      <div class="editors w-[130px]">
-        <span class="text-sm">Shared project</span>
-        <!-- <UAvatarGroup class="mb-2" max="3" size="sm">
-          <UAvatar
-            alt="Favour "
-            class="border-primary-500 relative l-[20px]"
-            :ui="{
-              background: 'bg-primary-100 ring-0',
-              wrapper: 'bg-red-500',
-            }"
-          />
-          <UAvatar
-            alt="John "
-            class="border-primary-500 relative l-[20px]"
-            :ui="{
-              background: 'bg-primary-100 ring-0',
-              wrapper: 'bg-red-500',
-            }"
-          />
-          <UAvatar
-            alt="Favour"
-            class="border-primary-500 relative l-[20px]"
-            :ui="{
-              background: 'bg-primary-100 ring-0',
-              wrapper: 'bg-red-500',
-            }"
-          />
-          <UAvatar
-            alt="John "
-            class="border-primary-500 relative l-[20px]"
-            :ui="{
-              background: 'bg-primary-100 ring-0',
-              wrapper: 'bg-red-500',
-            }"
-          />
-        </UAvatarGroup> -->
-      </div>
-      <div class="more-ctn w-[50px] flex justify-end">
+      <div
+        class="more-ctn w-[50px] flex justify-end opacity-0 group-hover:opacity-100 transition-opacity"
+      >
         <UPopover
           :ui="{
             ring: 'ring-0',

@@ -80,30 +80,21 @@
         <div
           v-if="canPreview && previewOpen"
           ref="previewEl"
-          class="action-excerpt text-xs rounded-xl bg-white dark:bg-gray-800 w-[300px] max-h-[260px] shadow-lg whitespace-pre-line z-[100] fixed"
+          class="action-excerpt text-xs w-[300px] max-h-[260px] shadow-lg whitespace-pre-line z-[100] fixed"
           :style="previewPositionStyle"
         >
-          <AppSection heading="Preview" slot-ctn-styles="!p-0">
-            <p
-              class="px-2 py-2 max-h-[210px] overflow-y-auto whitespace-pre-line"
+          <AppSection heading="Preview" :sub-heading="action?.name || ''">
+            <div
+              class="rounded-xl bg-gray-100 dark:bg-[#2b3242] max-h-[190px] overflow-y-auto"
             >
-              {{
-                previewContent ||
-                (previewError ? "Preview unavailable" : "Loading...")
-              }}
-            </p>
+              <p class="px-3 py-3 whitespace-pre-line">
+                {{
+                  previewContent ||
+                  (previewError ? "Preview unavailable" : "Loading...")
+                }}
+              </p>
+            </div>
           </AppSection>
-          <component
-            :is="customIconComponent"
-            v-if="customIconComponent"
-            class="absolute -bottom-4 -right-4 w-6 h-6 text-primary-500 opacity-15"
-          />
-          <IconWrapper
-            v-else
-            :name="action?.icon"
-            size="24"
-            class="absolute -bottom-4 -right-4 text-primary-500 opacity-15"
-          />
         </div>
       </Transition>
     </Teleport>

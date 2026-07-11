@@ -21,7 +21,7 @@
           </UTooltip>
           <ArrowRightIcon class="w-3.5 h-3.5 text-primary shrink-0" />
           <span
-            class="pl-2 text-gray-600 dark:text-[#a7afbd] font-normal capitalize"
+            class="pl-2 text-gray-600 dark:text-[#a7afbd] font-normal capitalize truncate min-w-0 flex-1"
             >{{ subHeading }}</span
           >
         </template>
