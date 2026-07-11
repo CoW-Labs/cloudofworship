@@ -73,7 +73,7 @@ const columns: Column[] = Array.from({ length: COLS }, (_, c) => {
       ]!
   )
   const duration = 96 + ((c * 13) % 38)
-  const scrollDuration = duration * 2
+  const scrollDuration = duration * 2 * 1.5
 
   return {
     loop: [...strip, ...strip],

@@ -3,313 +3,259 @@
     <UModal
       v-model="visible"
       :ui="{
-        base: 'min-w-[800px] w-full max-w-[920px]',
+        width: 'w-full sm:max-w-[1240px]',
+        base: 'w-full',
         overlay: {
-          background: 'bg-gray-200/75 dark:bg-gray-800/75',
+          background: 'bg-gray-200/75 dark:bg-gray-950/80',
         },
         padding: 'p-0',
+        rounded: 'rounded-[28px]',
+        background: 'bg-white dark:bg-[#161b28]',
       }"
     >
       <div
-        class="upgrade-modal grid grid-cols-1 md:grid-cols-2 overflow-hidden rounded-lg"
+        class="upgrade-modal relative bg-white dark:bg-[#161b28] px-6 py-8 sm:px-12 sm:py-10 lg:px-[4.5rem] lg:py-12 rounded-[28px]"
       >
-        <!-- Left Side - Marketing / Features -->
-        <div
-          class="bg-gray-50 dark:bg-gray-900 p-8 pb-6 relative flex flex-col"
+        <!-- Close -->
+        <button
+          class="absolute top-5 right-5 p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors z-20"
+          @click="handleDismiss"
         >
-          <button
-            class="absolute top-4 right-4 p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors z-10 md:hidden"
-            @click="visible = false"
-          >
-            <IconWrapper name="i-heroicons-x-mark-20-solid" class="w-5 h-5" />
-          </button>
+          <IconWrapper name="i-heroicons-x-mark-20-solid" class="w-5 h-5" />
+        </button>
 
-          <!-- Free Trial Badge -->
-          <div v-if="isTrialEligible && !hideFreeTrial" class="mb-5">
-            <span
-              class="inline-flex items-center gap-1.5 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs font-semibold px-3 py-1.5 rounded-full"
-              style="font-family: 'Bricolage Grotesque'"
-            >
-              <IconWrapper
-                name="i-heroicons-sparkles-20-solid"
-                class="w-3.5 h-3.5 mb-2"
-              />
-              14-DAY FREE TRIAL
-            </span>
-          </div>
+        <!-- Heading -->
+        <h2
+          class="text-center text-2xl sm:text-[1.75rem] font-bold text-gray-900 dark:text-white mb-8 lg:mb-10"
+        >
+          How do you want to continue?
+        </h2>
 
-          <!-- Heading -->
-          <h2
-            class="text-2xl font-semibold mb-8 text-gray-900 dark:text-white leading-tight"
-          >
-            Hi {{ authStore.user?.fullname?.split(" ")?.[0] }}, you can do more
-            for
-            <span class="text-primary"
-              >{{ authStore.church?.name }}, {{ authStore.church?.type }}</span
-            >
-          </h2>
-
-          <!-- Feature Items -->
-          <div class="space-y-5 mb-8">
-            <div class="flex items-start gap-3">
-              <div
-                class="w-10 h-10 min-w-10 rounded-xl bg-primary-100 dark:bg-primary-900 flex items-center justify-center"
+        <div class="grid grid-cols-1 md:grid-cols-[4fr_3fr] gap-6 lg:gap-8">
+          <!-- LEFT — Plan chooser -->
+          <div class="flex flex-col">
+            <!-- Billing toggle + currency -->
+            <div class="flex items-center gap-3 mb-6">
+              <UTabs
+                v-model="billingTabIndex"
+                :items="billingTabs"
+                class="flex-1"
+                :ui="{
+                  list: {
+                    height: 'h-12',
+                    rounded: 'rounded-xl',
+                    background: 'bg-gray-100 dark:bg-white/5',
+                    padding: 'p-1',
+                    tab: { height: 'h-10', rounded: 'rounded-lg' },
+                    marker: {
+                      rounded: 'rounded-lg',
+                      background: 'bg-white dark:bg-white/10',
+                    },
+                  },
+                }"
               >
-                <IconWrapper
-                  name="i-heroicons-book-open-20-solid"
-                  class="w-5 h-5 text-primary-600 dark:text-primary-400"
-                />
-              </div>
-              <div>
-                <p class="font-semibold text-sm text-gray-900 dark:text-white">
-                  Access to 10,000+ songs
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  Complete library of contemporary and classic hymns,
-                  contributed by churches like yours.
-                </p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3">
-              <div
-                class="w-10 h-10 min-w-10 rounded-xl bg-primary-100 dark:bg-primary-900 flex items-center justify-center"
-              >
-                <IconWrapper
-                  name="i-heroicons-cloud-arrow-down-20-solid"
-                  class="w-5 h-5 text-primary-600 dark:text-primary-400"
-                />
-              </div>
-              <div>
-                <p class="font-semibold text-sm text-gray-900 dark:text-white">
-                  Offline Worship Mode
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  Save online lyrics and create sermon slides accessible fully
-                  offline.
-                </p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3">
-              <div
-                class="w-10 h-10 min-w-10 rounded-xl bg-primary-100 dark:bg-primary-900 flex items-center justify-center"
-              >
-                <IconWrapper
-                  name="i-heroicons-user-group-20-solid"
-                  class="w-5 h-5 text-primary-600 dark:text-primary-400"
-                />
-              </div>
-              <div>
-                <p class="font-semibold text-sm text-gray-900 dark:text-white">
-                  Work Together
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  Add your team members, pastor, choir to contribute to your
-                  schedule at no extra cost
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Testimonial -->
-          <div class="mt-auto">
-            <div
-              class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"
-            >
-              <div ref="reviewContainer" class="relative w-full min-h-[80px]">
-                <div
-                  v-for="(review, index) in shuffledReviews"
-                  :key="index"
-                  ref="reviewSlides"
-                  class="review-slide"
-                  :class="{
-                    'absolute inset-0 opacity-0 pointer-events-none':
-                      index !== currentReviewIndex,
-                  }"
-                >
-                  <p
-                    class="text-sm text-gray-700 dark:text-gray-300 italic leading-relaxed mb-3"
-                  >
-                    "{{
-                      review.text.length > 120
-                        ? review.text.substring(0, 115) + "..."
-                        : review.text
-                    }}"
-                  </p>
-                  <div class="flex items-center gap-2">
-                    <div
-                      v-if="review.avatar"
-                      class="w-8 min-w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center"
-                      :style="`background-image: url('${review.avatar}'); background-size: cover; background-position: center;`"
-                    ></div>
-                    <div
-                      v-else
-                      class="w-8 min-w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-600 dark:text-primary-400 font-semibold text-xs"
+                <template #default="{ item }">
+                  <span class="flex items-center gap-1.5">
+                    {{ item.label }}
+                    <span
+                      v-if="item.value === 'yearly'"
+                      class="text-[10px] font-semibold bg-primary-400 text-white px-2 py-1 rounded-full leading-none"
                     >
-                      {{ review.name.charAt(0) }}
-                    </div>
-                    <div>
-                      <p
-                        class="font-semibold text-xs text-gray-900 dark:text-white"
-                      >
-                        {{ review.name }}
-                      </p>
-                      <p
-                        v-if="review.tagline"
-                        class="text-[10px] text-gray-500 dark:text-gray-400"
-                      >
-                        {{ review.tagline }}
-                      </p>
-                    </div>
+                      17% Off
+                    </span>
+                  </span>
+                </template>
+              </UTabs>
+
+              <UPopover
+                mode="click"
+                :popper="{ placement: 'bottom-end' }"
+                :ui="{ ring: 'ring-1 ring-gray-200 dark:ring-white/10' }"
+              >
+                <button
+                  class="flex items-center gap-2 h-12 text-sm font-medium px-4 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
+                >
+                  {{ selectedCurrency }} ({{ currencySymbol }})
+                  <IconWrapper
+                    name="i-heroicons-chevron-down-20-solid"
+                    class="w-4 h-4 text-gray-400"
+                  />
+                </button>
+                <template #panel="{ close }">
+                  <div class="p-1 min-w-[120px]">
+                    <button
+                      v-for="code in currencyCodes"
+                      :key="code"
+                      class="w-full flex items-center justify-between gap-3 text-sm py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                      :class="
+                        selectedCurrency === code
+                          ? 'text-primary-600 dark:text-primary-400 font-semibold'
+                          : 'text-gray-700 dark:text-gray-200'
+                      "
+                      @click="selectCurrency(code), close()"
+                    >
+                      {{ code }} ({{ getCurrencySymbol(code) }})
+                      <IconWrapper
+                        v-if="selectedCurrency === code"
+                        name="i-heroicons-check-20-solid"
+                        class="w-4 h-4"
+                      />
+                    </button>
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right Side - Pricing -->
-        <div
-          class="bg-white dark:bg-gray-950 p-6 relative flex flex-col overflow-y-auto max-h-[90vh]"
-        >
-          <button
-            class="absolute top-4 right-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors z-10"
-            @click="visible = false"
-          >
-            <IconWrapper name="i-heroicons-x-mark-20-solid" class="w-5 h-5" />
-          </button>
-
-          <!-- Annual Plan Card -->
-          <div
-            class="border-2 rounded-2xl p-5 mb-4 cursor-pointer transition-all relative"
-            :class="
-              selectedPlan === 'yearly'
-                ? 'border-primary-500 bg-white dark:bg-gray-900 shadow-lg shadow-primary-100 dark:shadow-none'
-                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-            "
-            @click="selectedPlan = 'yearly'"
-          >
-            <!-- Recommended Badge -->
-            <div class="absolute -top-3 right-4">
-              <span
-                class="bg-primary-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide"
-              >
-                Recommended
-              </span>
+                </template>
+              </UPopover>
             </div>
 
-            <h3 class="font-bold text-lg mb-1">Annual Plan</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              Unrestricted access for one full year.
-            </p>
-
-            <div class="flex items-baseline gap-1 mb-1">
-              <span class="text-3xl font-bold text-gray-900 dark:text-white"
-                >{{ currencySymbol }}{{ yearlyPrice.toLocaleString() }}</span
-              >
-              <span class="text-sm text-gray-500 dark:text-gray-400">/yr</span>
-            </div>
-
-            <p
-              v-if="isTrialEligible && !hideFreeTrial"
-              class="text-xs text-primary-600 dark:text-primary-400 font-medium mb-4"
-            >
-              14 Days Free, then pay annually
-            </p>
-            <p v-else class="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              Billed once in 365 days
-            </p>
-
-            <UButton
-              color="primary"
-              size="lg"
-              block
-              @click.stop="
-                () => {
-                  selectedPlan = 'yearly'
-                  handleUpgrade()
-                }
+            <!-- Starter (Free) -->
+            <button
+              type="button"
+              class="text-left border-2 rounded-[20px] p-6 mb-4 transition-all relative bg-gray-50 dark:bg-white/[0.045]"
+              :class="
+                selectedTier === 'free'
+                  ? 'border-primary-500'
+                  : 'border-transparent hover:border-gray-200 dark:hover:border-white/10'
               "
-              :loading="loading && selectedPlan === 'yearly'"
-              class="font-semibold rounded-xl"
+              @click="selectedTier = 'free'"
             >
-              {{
-                isTrialEligible && !hideFreeTrial
-                  ? "Start Your 14-Day Free Trial"
-                  : "Get full access"
-              }}
-            </UButton>
-            <!-- Hidden reference to `features` to avoid unused-computed lint errors -->
-            <span v-if="false">{{ features }}</span>
+              <span class="absolute top-6 right-6">
+                <span
+                  class="flex items-center justify-center w-6 h-6 rounded-full border-2 transition-colors"
+                  :class="
+                    selectedTier === 'free'
+                      ? 'border-primary-500 bg-primary-500'
+                      : 'border-gray-400 dark:border-gray-500 bg-white/50 dark:bg-black/20'
+                  "
+                >
+                  <IconWrapper
+                    v-if="selectedTier === 'free'"
+                    name="i-heroicons-check-20-solid"
+                    class="w-4 h-4 text-white"
+                  />
+                </span>
+              </span>
 
-            <p
-              v-if="isTrialEligible && !hideFreeTrial"
-              class="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-2.5 leading-relaxed"
-            >
-              We don't charge you until the 14-day trial period elapses.
-            </p>
-
-            <p
-              v-else
-              class="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-2.5 leading-relaxed"
-            >
-              We continually improve CoW, every week, for your church.
-            </p>
-          </div>
-
-          <!-- Ends of Earth Initiative Card -->
-          <div
-            class="bg-primary-600 dark:bg-primary-700 rounded-2xl p-5 mb-4 text-white"
-          >
-            <div class="flex items-center gap-2 mb-2">
-              <IconWrapper
-                name="i-heroicons-globe-alt-20-solid"
-                class="w-4 h-4 text-primary-200 mb-2"
-              />
-              <span
-                class="text-[10px] font-semibold uppercase tracking-wider text-primary-200"
-                >Our Mission</span
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.12em] text-gray-400 dark:text-gray-500 mb-3"
               >
-            </div>
-            <h4 class="font-bold text-base mb-2">Ends of Earth Initiative</h4>
-            <p class="text-xs text-primary-100 leading-relaxed mb-3">
-              90% of profits go directly to efforts pushing the gospel forward
-              in churches across Africa and other regions.
-            </p>
+                Starter
+              </p>
+              <h3
+                class="text-[2.5rem] leading-none font-bold text-gray-900 dark:text-white mb-3"
+              >
+                Free
+              </h3>
+              <p class="text-[15px] text-gray-500 dark:text-gray-400">
+                For churches with a single steward
+              </p>
+            </button>
+
+            <!-- Team (Paid) -->
+            <button
+              type="button"
+              class="text-left border-2 rounded-[20px] p-6 mb-6 transition-all relative bg-gray-50 dark:bg-white/[0.045]"
+              :class="
+                selectedTier === 'team'
+                  ? 'border-primary-500'
+                  : 'border-transparent hover:border-gray-200 dark:hover:border-white/10'
+              "
+              @click="selectedTier = 'team'"
+            >
+              <span class="absolute top-6 right-6">
+                <span
+                  class="flex items-center justify-center w-6 h-6 rounded-full border-2 transition-colors"
+                  :class="
+                    selectedTier === 'team'
+                      ? 'border-primary-500 bg-primary-500'
+                      : 'border-gray-400 dark:border-gray-500 bg-white/50 dark:bg-black/20'
+                  "
+                >
+                  <IconWrapper
+                    v-if="selectedTier === 'team'"
+                    name="i-heroicons-check-20-solid"
+                    class="w-4 h-4 text-white"
+                  />
+                </span>
+              </span>
+
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.12em] text-gray-400 dark:text-gray-500 mb-3"
+              >
+                Team
+              </p>
+              <h3
+                class="text-[2.5rem] leading-none font-bold text-gray-900 dark:text-white mb-3"
+              >
+                {{ currencySymbol }}{{ teamPrice.toLocaleString() }}
+              </h3>
+              <p class="text-[15px] text-gray-500 dark:text-gray-400 max-w-[34ch]">
+                For churches that need collaboration tools for multiple stewards.
+              </p>
+            </button>
+
+            <!-- Continue -->
+            <CowButton
+              block
+              class="mt-auto"
+              :loading="loading && selectedTier === 'team'"
+              @click="handleContinue"
+            >
+              Continue
+            </CowButton>
           </div>
 
-          <!-- Monthly Plan Option -->
+          <!-- RIGHT — Mission visual -->
           <div
-            class="border rounded-2xl p-4 cursor-pointer transition-all flex items-center justify-between"
-            :class="
-              selectedPlan === 'monthly'
-                ? 'border-primary-500 bg-primary-50 dark:bg-primary-950'
-                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-            "
-            @click="selectedPlan = 'monthly'"
+            class="mission-card relative rounded-[20px] overflow-hidden min-h-[560px] md:min-h-[680px]"
           >
-            <div>
-              <h3 class="font-semibold text-sm text-gray-900 dark:text-white">
-                Monthly Plan
+            <!-- Drifting clouds -->
+            <div class="cloud-drift cloud-drift--1"></div>
+            <div class="cloud-drift cloud-drift--2"></div>
+            <div class="cloud-drift cloud-drift--3"></div>
+
+            <!-- Heart + title -->
+            <div
+              class="relative z-10 flex flex-col items-center text-center px-8 pt-14"
+            >
+              <img
+                ref="heartEl"
+                src="/images/upgrade/heart-cloud.png"
+                alt=""
+                class="heart-cloud w-32 h-32 object-contain mb-6"
+              />
+              <h3
+                ref="titleEl"
+                class="text-3xl font-bold text-white leading-tight max-w-[13ch]"
+                style="text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2)"
+              >
+                Ends of The Earth Initiative
               </h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ currencySymbol }}{{ monthlyPrice.toLocaleString() }} / month
+            </div>
+
+            <!-- Floating info cards — slanted, bleeding off opposite edges -->
+            <div
+              ref="card1El"
+              class="mission-float-card absolute -left-6 bottom-[88px] w-[62%] bg-white rounded-[18px] p-5 shadow-2xl"
+              style="transform: rotate(-6deg)"
+            >
+              <PieChartIcon class="w-11 h-11 mb-3" />
+              <p class="text-sm leading-snug text-gray-800">
+                <span class="font-bold">90% of profits</span> from Teams plan
+                sales go directly to efforts pushing the gospel forward in
+                churches across Africa and other regions.
               </p>
             </div>
-            <UButton
-              color="primary"
-              variant="ghost"
-              size="sm"
-              @click.stop="
-                () => {
-                  selectedPlan = 'monthly'
-                  handleUpgrade()
-                }
-              "
-              :loading="loading && selectedPlan === 'monthly'"
-              class="font-medium text-xs"
+
+            <div
+              ref="card2El"
+              class="mission-float-card absolute -right-6 -bottom-2 w-[60%] bg-[#f6efdc] rounded-[18px] p-5 shadow-2xl"
+              style="transform: rotate(5deg)"
             >
-              Switch to Monthly
-            </UButton>
+              <EarthIcon class="w-11 h-11 mb-3" />
+              <p class="text-sm leading-snug text-gray-800">
+                Your subscription helps equip ministries with the tools they need
+                to spread the good news.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -326,176 +272,54 @@
 
 <script setup lang="ts">
 import type { PaymentPlan } from "~/composables/usePayment"
-import { useAuthStore } from "~/store/auth"
 import { gsap } from "gsap"
-
-// Reviews extracted from user testimonials
-const reviews = [
-  {
-    text: "I would definitely recommend CoW anytime! I am able to access my slides from any device, less stress with lyrics and scriptures, and there's the fast support team too. Peak love!",
-    name: "Anonymous",
-    avatar: "",
-    tagline: "",
-  },
-  {
-    text: "Cloud of Worship has been a game-changer for our church services. The intuitive interface makes it easy for our team to manage song lyrics, scriptures, and multimedia content seamlessly. Highly recommended for any church seeking a modern, efficient, and user-friendly presentation solution.",
-    name: "Emmanuel Sebastian",
-    avatar:
-      "https://senja-io.s3.us-west-1.amazonaws.com/public/avatar/14e49738-03e7-4855-9871-77e84f868b0b_1000384827.jpg",
-    tagline: "Media Handler, MFMCF Unijos",
-  },
-  {
-    text: "Cloud of Worship is, without a doubt, one of the best presentation software tools I've used in years. The design is user-friendly and intuitive, making it enjoyable to use, even for those who aren't tech-savvy. It's absolutely a game-changer.",
-    name: "Darlington Letala",
-    avatar:
-      "https://senja-io.s3.us-west-1.amazonaws.com/public/avatar/1744529c-fde0-410e-953d-2df9954851e1_1614239889013.jpg",
-    tagline: "Church in Zimbabwe",
-  },
-  {
-    text: "Love Cloud of Worship! Great interface, amazing tool for spreading the Gospel. Can't wait to see more exciting features!",
-    name: "Adeshina Grace",
-    avatar:
-      "https://senja-io.s3.us-west-1.amazonaws.com/public/avatar/7b0fae18-1467-4281-a2f2-d2af4b5f0d80_IMG_3863.jpeg",
-    tagline: "Media, Fountain of Mercy Christian Church",
-  },
-  {
-    text: "When I suddenly realised a significant improvement in the screen display, such that worship lyrics, Bible references and slides now come up speedily without delay, I knew something different had been added. I strongly recommend it for churches in need of an easy to use, yet efficient and reliable church presentation software.",
-    name: "Engr Adebayo Awoyele",
-    avatar:
-      "https://senja-io.s3.us-west-1.amazonaws.com/public/media/86f4d51b-de77-4860-b579-d31e86b76dc2_4025598a-64f3-484c-9528-c099131a38ff_bayo.jpg",
-    tagline: "Congregant, FGC Ifako (Salvation Chapel)",
-  },
-  {
-    text: "The app's ability for different users to create accounts and share lyrics fosters community. Cloud of Worship is indispensable, and we highly recommend it for any congregation looking to enhance their worship experience.",
-    name: "Yinka Adenikinju",
-    avatar: "/images/testimonials/bro-yinka.jpg",
-    tagline: "Head of Media Ministry, Foursquare Gospel Church",
-  },
-  {
-    text: "It is my pleasure to vet Cloud of Worship to be an excellent user centered application. Its user interface is very intuitive. The fact that it can virtually do what other projecting software does is amazing to me.",
-    name: "Oluwasegun Akindele",
-    avatar:
-      "https://senja-io.s3.us-west-1.amazonaws.com/public/avatar/7ad11edd-5712-4470-89b0-9b061cf04cf0_passport.png",
-    tagline: "IT Support Specialist",
-  },
-  {
-    text: "As a media personnel, finding the right projection software has always been challenging. However, Cloud of Worship has revolutionized our work. The user interface is incredibly intuitive, allowing our team to learn and operate it with ease quickly.",
-    name: "Moshood Olawale Mustapha",
-    avatar:
-      "https://senja-io.s3.us-west-1.amazonaws.com/public/media/f8ce11c2-a830-421d-8af7-d1d09bf9b187_df19ae10-92da-41ce-8eec-387ba2364b72_moshood.jpg",
-    tagline: "Live Streaming Lead, RCF Unilag",
-  },
-]
-
-// Review slideshow state
-const currentReviewIndex = ref(0)
-const reviewContainer = ref<HTMLElement | null>(null)
-const reviewSlides = ref<HTMLElement[]>([])
-let reviewInterval: ReturnType<typeof setInterval> | null = null
 
 const visible = ref(false)
 const selectedPlan = ref<PaymentPlan>("yearly")
+const selectedTier = ref<"free" | "team">("team")
 
-// Randomized reviews - shuffled each time modal opens
-const shuffledReviews = ref([...reviews])
-
-// Fisher-Yates shuffle algorithm
-const shuffleReviews = () => {
-  const array = [...reviews]
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[array[i], array[j]] = [array[j], array[i]]
-  }
-  shuffledReviews.value = array
-}
-
-const animateToNextReview = () => {
-  if (!reviewSlides.value || reviewSlides.value.length === 0) return
-
-  const currentSlide = reviewSlides.value[currentReviewIndex.value]
-  const nextIndex =
-    (currentReviewIndex.value + 1) % shuffledReviews.value.length
-  const nextSlide = reviewSlides.value[nextIndex]
-
-  if (!currentSlide || !nextSlide) return
-
-  // Animate current slide out
-  gsap.to(currentSlide, {
-    opacity: 0,
-    y: -12,
-    duration: 0.5,
-    ease: "power2.inOut",
-    onComplete: () => {
-      currentSlide.classList.add("absolute", "inset-0", "pointer-events-none")
-      currentSlide.style.opacity = "0"
-
-      // Update index
-      currentReviewIndex.value = nextIndex
-
-      // Prepare next slide
-      nextSlide.classList.remove("absolute", "inset-0", "pointer-events-none")
-
-      // Animate next slide in
-      gsap.fromTo(
-        nextSlide,
-        { opacity: 0, y: 12 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.5,
-          ease: "power2.inOut",
-        }
-      )
-    },
-  })
-}
-
-const startReviewSlideshow = () => {
-  stopReviewSlideshow()
-  reviewInterval = setInterval(animateToNextReview, 6000)
-}
-
-const stopReviewSlideshow = () => {
-  if (reviewInterval) {
-    clearInterval(reviewInterval)
-    reviewInterval = null
-  }
-}
-
-// Watch modal visibility to start/stop slideshow
-watch(visible, (isVisible) => {
-  if (isVisible) {
-    // Shuffle reviews when modal opens
-    shuffleReviews()
-
-    // Reset to first review when modal opens
-    currentReviewIndex.value = 0
-    nextTick(() => {
-      // Reset all slides
-      reviewSlides.value?.forEach((slide, i) => {
-        if (i === 0) {
-          slide.classList.remove("absolute", "inset-0", "pointer-events-none")
-          gsap.set(slide, { opacity: 1, y: 0 })
-        } else {
-          slide.classList.add("absolute", "inset-0", "pointer-events-none")
-          gsap.set(slide, { opacity: 0, y: 0 })
-        }
-      })
-      startReviewSlideshow()
-    })
-  } else {
-    stopReviewSlideshow()
-  }
+// Billing interval as UTabs (index-based model)
+const billingTabs = [
+  { label: "Monthly", value: "monthly" as PaymentPlan },
+  { label: "Annually", value: "yearly" as PaymentPlan },
+]
+const billingTabIndex = computed({
+  get: () => (selectedPlan.value === "yearly" ? 1 : 0),
+  set: (index: number) => {
+    selectedPlan.value = billingTabs[index]?.value ?? "yearly"
+  },
 })
+
+// Right-side animation refs
+const heartEl = ref<HTMLElement | null>(null)
+const titleEl = ref<HTMLElement | null>(null)
+const card1El = ref<HTMLElement | null>(null)
+const card2El = ref<HTMLElement | null>(null)
+
+const animateMissionIn = () => {
+  const targets = [heartEl.value, titleEl.value, card1El.value, card2El.value]
+  if (targets.some((el) => !el)) return
+
+  gsap.killTweensOf(targets)
+  gsap.set(heartEl.value, { opacity: 0, y: -16, scale: 0.8 })
+  gsap.set(titleEl.value, { opacity: 0, y: 14 })
+  // Keep each card's resting slant through the entrance so GSAP's transform
+  // doesn't wipe the inline rotate.
+  gsap.set(card1El.value, { opacity: 0, y: 28, rotation: -6 })
+  gsap.set(card2El.value, { opacity: 0, y: 28, rotation: 5 })
+
+  const tl = gsap.timeline({ defaults: { ease: "power2.out" } })
+  tl.to(heartEl.value, { opacity: 1, y: 0, scale: 1, duration: 0.7 })
+    .to(titleEl.value, { opacity: 1, y: 0, duration: 0.6 }, "-=0.35")
+    .to(card1El.value, { opacity: 1, y: 0, rotation: -6, duration: 0.6 }, "-=0.25")
+    .to(card2El.value, { opacity: 1, y: 0, rotation: 5, duration: 0.6 }, "-=0.4")
+}
 
 // Use payment composable
 const {
   loading,
   showSuccessModal,
   successPlanName,
-  plansData,
-  plansLoading,
-  fetchPlans: fetchPaymentPlans,
   initiatePayment,
   preloadPaystack,
 } = usePayment()
@@ -505,113 +329,65 @@ const {
   plans,
   selectedCurrency,
   detectedCurrency,
-  isDetectingCurrency,
   detectCurrency,
   fetchPlans,
   getPlanByIntervalAndCurrency,
   getCurrencySymbol,
-  formatAmount,
   setTestCurrency,
-  getTestCurrency,
 } = useSubscriptionPlans()
 
-// Auth store for church data
-const authStore = useAuthStore()
+const currencyCodes = ["NGN", "USD"] as const
 
-// Trial eligibility: church must have trialEligible=true AND be in an NGN-currency country (NG, GH, or KE)
-const isTrialEligible = computed(() => {
-  const church = authStore.church
-  // NGN currency is auto-detected for NG, GH, KE — so if detectedCurrency is USD, user is in an eligible country
-  return church?.trialEligible && detectedCurrency.value === "USD"
-})
-
-// Feature flag to hide free trial promotion
-const { isEnabled: hideFreeTrial } = useFeatureFlags(
-  "hide-free-trial-promotion"
-)
-
-// Helper for testing: Allow manual currency switch
-const switchCurrency = (currency: "NGN" | "USD") => {
-  setTestCurrency(currency)
-  selectedCurrency.value = currency
-  detectedCurrency.value = currency
+const selectCurrency = (code: "NGN" | "USD") => {
+  setTestCurrency(code)
+  selectedCurrency.value = code
 }
 
-// Get pricing from API
+// Pricing from API
 const yearlyPrice = computed(() => {
   const plan = getPlanByIntervalAndCurrency("yearly", selectedCurrency.value)
   if (!plan) return 0
-
-  // For USD, use amountCents if available
-  if (plan.currency === "USD" && plan.amountCents) {
-    return plan.amountCents / 100 // Convert cents to dollars
-  }
-
+  if (plan.currency === "USD" && plan.amountCents) return plan.amountCents / 100
   return plan.amount
 })
 
 const monthlyPrice = computed(() => {
   const plan = getPlanByIntervalAndCurrency("monthly", selectedCurrency.value)
   if (!plan) return 0
-
-  // For USD, use amountCents if available
-  if (plan.currency === "USD" && plan.amountCents) {
-    return plan.amountCents / 100 // Convert cents to dollars
-  }
-
+  if (plan.currency === "USD" && plan.amountCents) return plan.amountCents / 100
   return plan.amount
 })
 
-const currencySymbol = computed(() => {
-  return getCurrencySymbol(selectedCurrency.value)
-})
+const teamPrice = computed(() =>
+  selectedPlan.value === "yearly" ? yearlyPrice.value : monthlyPrice.value
+)
 
-const features = computed(() => {
-  const plan = getPlanByIntervalAndCurrency(
-    selectedPlan.value,
-    selectedCurrency.value
-  )
-
-  if (plan?.features && plan.features.length > 0) {
-    return plan.features.slice(1, 6)
-  }
-
-  // Fallback features if API doesn't provide them
-  return [
-    "Access 9,000+ growing songs library",
-    "Create custom text slides",
-    "YouTube & Vimeo video support",
-    "Dynamic countdown timers",
-    "5GB cloud storage",
-  ]
-})
+const currencySymbol = computed(() => getCurrencySymbol(selectedCurrency.value))
 
 const emitter = useNuxtApp().$emitter as any
 
+// Watch modal visibility to trigger the right-side entrance animation
+watch(visible, (isVisible) => {
+  if (isVisible) {
+    nextTick(() => animateMissionIn())
+  }
+})
+
 onMounted(async () => {
-  // Detect user's currency based on location
   await detectCurrency()
-
-  // Fetch all subscription plans from API (both NGN and USD)
   await fetchPlans()
-
-  // For local testing: Override currency detection by setting in console
-  // localStorage.setItem('test_currency', 'USD') or localStorage.setItem('test_currency', 'NGN')
-  // Then refresh the page
 
   emitter.on(
     "show-upgrade-modal",
     (data?: { planCode?: string; planId?: string }) => {
       visible.value = true
 
-      // Set plan based on plan_id (preferred) or plan_code (legacy support)
       if (data?.planId) {
-        // Use plan_id to find the plan
         const plan = plans.value.find((p) => p.id === data.planId)
         if (plan) {
           selectedPlan.value = plan.interval
-          // Override auto-detected currency with plan's currency if specified
           selectedCurrency.value = plan.currency
+          selectedTier.value = "team"
 
           usePosthogCapture("UPGRADE_MODAL_OPENED", {
             planId: data.planId,
@@ -626,6 +402,7 @@ onMounted(async () => {
         if (plan) {
           selectedPlan.value = plan.interval
           selectedCurrency.value = plan.currency
+          selectedTier.value = "team"
 
           usePosthogCapture("UPGRADE_MODAL_OPENED", {
             planCode: data.planCode,
@@ -637,7 +414,6 @@ onMounted(async () => {
           })
         }
       } else {
-        // No specific plan provided, use auto-detected currency
         usePosthogCapture("UPGRADE_MODAL_OPENED", {
           source: "feature_gate",
           currency: selectedCurrency.value,
@@ -653,11 +429,28 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   emitter.off("show-upgrade-modal")
-  stopReviewSlideshow()
 })
 
+const handleContinue = () => {
+  if (selectedTier.value === "free") {
+    usePosthogCapture("UPGRADE_MODAL_CONTINUE_FREE", {
+      currency: selectedCurrency.value,
+    })
+    visible.value = false
+    return
+  }
+  handleUpgrade()
+}
+
+const handleDismiss = () => {
+  usePosthogCapture("UPGRADE_MODAL_DISMISSED", {
+    tier: selectedTier.value,
+    currency: selectedCurrency.value,
+  })
+  visible.value = false
+}
+
 const handleUpgrade = async () => {
-  // Get the selected plan details
   const planDetails = getPlanByIntervalAndCurrency(
     selectedPlan.value,
     selectedCurrency.value
@@ -673,13 +466,11 @@ const handleUpgrade = async () => {
     return
   }
 
-  // Get the actual amount to charge (using amountCents for USD)
   const amount =
     selectedCurrency.value === "USD" && planDetails.amountCents
       ? planDetails?.amountCents || 0
       : planDetails?.amountKobo || 0
 
-  // Track upgrade attempt with currency
   usePosthogCapture("UPGRADE_INITIATED", {
     plan: selectedPlan.value,
     currency: selectedCurrency.value,
@@ -691,7 +482,7 @@ const handleUpgrade = async () => {
   await initiatePayment({
     plan: selectedPlan.value,
     currency: selectedCurrency.value,
-    onSuccess: async (reference) => {
+    onSuccess: async () => {
       visible.value = false
       useChurch().fetchChurch()
     },
@@ -716,10 +507,105 @@ const handleSuccessModalClose = () => {
 
 <style scoped>
 .upgrade-modal {
-  max-height: 90vh;
+  max-height: 92vh;
+  overflow-y: auto;
 }
 
-.review-slide {
+/* Right-side sky card — bottom-anchored so the photo's clouds sit at the
+   base of the card, peeking out behind the info cards */
+.mission-card {
+  background-image: url("/images/upgrade/sky-background.jpg");
+  background-size: cover;
+  background-position: 50% 100%;
+  animation: sky-pan 40s ease-in-out infinite alternate;
+}
+
+@keyframes sky-pan {
+  from {
+    background-position: 42% 100%;
+  }
+  to {
+    background-position: 58% 100%;
+  }
+}
+
+/* Drifting cloud puffs — square boxes so the soft cloud image never crops */
+.cloud-drift {
+  position: absolute;
+  aspect-ratio: 1 / 1;
+  background-image: url("/images/upgrade/cloud-smoke.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.cloud-drift--1 {
+  top: 2%;
+  width: 300px;
+  opacity: 0.85;
+  animation: drift-right 40s linear infinite;
+}
+
+.cloud-drift--2 {
+  top: 30%;
+  width: 420px;
+  opacity: 0.6;
+  animation: drift-left 52s linear infinite;
+}
+
+.cloud-drift--3 {
+  top: 12%;
+  width: 220px;
+  opacity: 0.7;
+  animation: drift-right 32s linear infinite;
+  animation-delay: -14s;
+}
+
+@keyframes drift-right {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
+
+@keyframes drift-left {
+  from {
+    transform: translateX(280%);
+  }
+  to {
+    transform: translateX(-140%);
+  }
+}
+
+/* Gentle float on the heart cloud */
+.heart-cloud {
+  animation: heart-bob 5s ease-in-out infinite;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.15));
+}
+
+@keyframes heart-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.mission-float-card {
   will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mission-card,
+  .cloud-drift,
+  .heart-cloud {
+    animation: none;
+  }
 }
 </style>

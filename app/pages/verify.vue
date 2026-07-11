@@ -156,6 +156,7 @@ const editingEmail = ref(false)
 const codeResentTimes = ref(0)
 const resendCooldown = ref(0)
 const router = useRouter()
+const route = useRoute()
 let resendCooldownTimer: ReturnType<typeof setInterval> | null = null
 
 // Store reference to upgrade modal
@@ -334,15 +335,22 @@ const verifyEmail = async () => {
       } catch {
         // localStorage unavailable
       }
+    }
 
+    // New signups reach verify as the tail end of onboarding — surface the
+    // plan chooser once they land on home, whether or not a plan was preselected.
+    const isNewUserOnboarding = !!route.query.newUser || !!pendingPlanId.value
+
+    if (isNewUserOnboarding) {
       usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
         planId: pendingPlanId.value,
         email: email.value,
       })
 
+      const planId = pendingPlanId.value
       await router.push("/")
       setTimeout(() => {
-        useGlobalEmit("show-upgrade-modal", { planId: pendingPlanId.value })
+        useGlobalEmit("show-upgrade-modal", planId ? { planId } : undefined)
       }, 500)
     } else {
       router.push("/")

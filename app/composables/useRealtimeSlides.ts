@@ -36,10 +36,26 @@ export { tabSessionId }
 // turns one selection into O(peers) extra socket frames. See index.vue.
 export const suppressLiveSlideBroadcast = ref(false)
 
+export interface CurrentPresenter {
+  userId: string
+  userName: string
+}
+
 export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const appStore = useAppStore()
   const authStore = useAuthStore()
   const toast = useToast()
+
+  // Shared across every consumer of this composable in the current app.
+  const currentPresenter = useState<CurrentPresenter | null>(
+    "current-presenter",
+    () => null
+  )
+  const isCurrentUserPresenting = computed(
+    () =>
+      !currentPresenter.value ||
+      currentPresenter.value.userId === authStore.user?._id
+  )
 
   // Track online users
   const onlineUsers = ref<OnlineUser[]>([])
@@ -363,6 +379,31 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         }
         break
 
+      case 'presenter-changed': {
+        const previousPresenter = currentPresenter.value
+        const nextPresenter =
+          data?.userId && data?.userName
+            ? {
+                userId: data.userId,
+                userName: data.userName,
+              }
+            : null
+
+        currentPresenter.value = nextPresenter
+
+        if (
+          nextPresenter &&
+          previousPresenter?.userId !== nextPresenter.userId
+        ) {
+          toast.add({
+            title: `${nextPresenter.userName} is now presenting`,
+            icon: 'i-tabler-presentation',
+            color: 'red',
+          })
+        }
+        break
+      }
+
       case 'live-slide': {
         // A peer took a slide live — mirror their selection locally and drive
         // this operator's projection window. Cheap and infrequent: one id
@@ -434,6 +475,22 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     }
   }
 
+  const claimPresenter = () => {
+    const socket = useNuxtApp().$socketio as Socket
+    if (typeof socket?.emit !== "function") return false
+
+    socket.emit('claim-presenter', {})
+    return true
+  }
+
+  const releasePresenter = () => {
+    const socket = useNuxtApp().$socketio as Socket
+    if (typeof socket?.emit !== "function") return false
+
+    socket.emit('release-presenter', {})
+    return true
+  }
+
   /**
    * Cleanup on unmount
    */
@@ -443,6 +500,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     slidesBeingEdited.value = {}
     slideLocks.value = {}
     onlineUsers.value = []
+    currentPresenter.value = null
     appStore.clearAllSlidesBeingEdited()
     appStore.setOnlineUsers([])
   }
@@ -454,6 +512,8 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     slidesBeingEdited: readonly(slidesBeingEdited),
     slideLocks: readonly(slideLocks),
     currentLockedSlideId: readonly(currentLockedSlideId),
+    currentPresenter: readonly(currentPresenter),
+    isCurrentUserPresenting,
 
     // Methods
     handleWebSocketMessage,
@@ -463,6 +523,8 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     isSlideLockedByOther,
     getSlideLock,
     releaseCurrentLock,
+    claimPresenter,
+    releasePresenter,
     cleanup,
   }
 }

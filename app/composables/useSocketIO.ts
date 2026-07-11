@@ -393,6 +393,10 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('live-slide', { action: 'live-slide', data })
       })
 
+      socket.on('presenter-changed', (data) => {
+        onMessage?.('presenter-changed', { action: 'presenter-changed', data })
+      })
+
       // Alert and overlay events
       socket.on('add-alert', (data) => {
         onMessage?.('add-alert', { action: 'add-alert', data })
@@ -559,6 +563,20 @@ export const useSocketIO = (options: SocketIOOptions) => {
   }
 
   /**
+   * Claim presenter ownership for this schedule
+   */
+  const claimPresenter = () => {
+    return emit('claim-presenter', {})
+  }
+
+  /**
+   * Release presenter ownership for this schedule
+   */
+  const releasePresenter = () => {
+    return emit('release-presenter', {})
+  }
+
+  /**
    * Send slide reorder event
    */
   const sendSlideReorder = (slideOrder: string[], tabId: string) => {
@@ -615,6 +633,8 @@ export const useSocketIO = (options: SocketIOOptions) => {
 
     // Live slide
     sendLiveSlide,
+    claimPresenter,
+    releasePresenter,
 
     // Users
     getOnlineUsers,

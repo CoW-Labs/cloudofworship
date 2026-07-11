@@ -142,7 +142,7 @@
     v-else
     class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-[#171d2b] rounded-lg hover:bg-primary-50 dark:hover:bg-[#2b3242] transition-all cursor-pointer relative"
     :id="slide?.id"
-    @click="appStore.setLiveSlide(slide?.id || '0')"
+    @click="goLive(slide?.id || '0')"
   >
     <DeferredSlidePreview
       preview-class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
@@ -169,6 +169,12 @@
       </UTooltip>
     </div>
   </button>
+  <TakeoverPresenterModal
+    v-if="!gridType"
+    v-model:open="takeoverModalOpen"
+    :presenter-name="currentPresenter?.userName || 'Another team member'"
+    @confirm="confirmTakeover"
+  />
 </template>
 
 <script setup lang="ts">
@@ -180,6 +186,13 @@ import { useAuthStore } from "~/store/auth"
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
+const {
+  currentPresenter,
+  isCurrentUserPresenting,
+  claimPresenter,
+} = useRealtimeSlides()
+const takeoverModalOpen = ref(false)
+const pendingLiveSlideId = ref<string | null>(null)
 
 // Subscription check
 const { hasAccessToFeature } = useSubscription()
@@ -207,6 +220,28 @@ const emit = defineEmits([
   "bulk-selected",
   "click",
 ])
+
+const applyLiveSlide = (slideId: string) => {
+  claimPresenter()
+  appStore.setLiveSlide(slideId)
+}
+
+const goLive = (slideId: string) => {
+  if (isCurrentUserPresenting.value) {
+    applyLiveSlide(slideId)
+    return
+  }
+
+  pendingLiveSlideId.value = slideId
+  takeoverModalOpen.value = true
+}
+
+const confirmTakeover = () => {
+  if (!pendingLiveSlideId.value) return
+
+  applyLiveSlide(pendingLiveSlideId.value)
+  pendingLiveSlideId.value = null
+}
 
 const handleSaveConfirm = () => {
   if (!hasAccessToFeature("new-library")) {

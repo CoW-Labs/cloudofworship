@@ -741,13 +741,14 @@ const finishOnboarding = async () => {
         userId: authStore.user._id,
         churchId,
       })
-      await navigateTo("/")
-      setTimeout(() => {
-        useGlobalEmit("show-upgrade-modal", { planId })
-      }, 500)
-    } else {
-      await navigateTo("/")
     }
+
+    // Always surface the plan chooser once onboarding wraps up,
+    // before the operator settles on the home screen.
+    await navigateTo("/")
+    setTimeout(() => {
+      useGlobalEmit("show-upgrade-modal", planId ? { planId } : undefined)
+    }, 500)
   } else {
     usePosthogCapture("SIGNUP_COMPLETE_UNVERIFIED", {
       userId: authStore.user?._id,
