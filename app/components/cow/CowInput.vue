@@ -133,6 +133,11 @@ const onBlur = () => {
 .cow-input__field.cow-input__field--error,
 .cow-input__field.cow-input__field--error.cow-input__field--focused {
   box-shadow: inset 0 0 0 1.75px rgba(239, 68, 68, 0.9);
+  background-color: #fef2f2;
+}
+
+.cow-input__field--error .cow-input__label--float {
+  background-color: #fef2f2;
 }
 
 .cow-input__label {
@@ -219,6 +224,11 @@ html.dark .cow-input__field.cow-input__field--focused {
 html.dark .cow-input__field.cow-input__field--error,
 html.dark .cow-input__field.cow-input__field--error.cow-input__field--focused {
   box-shadow: inset 0 0 0 1.75px rgba(239, 68, 68, 0.9);
+  background-color: #2a1416;
+}
+
+html.dark .cow-input__field--error .cow-input__label--float {
+  background-color: #2a1416;
 }
 
 html.dark .cow-input__label {

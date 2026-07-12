@@ -221,6 +221,11 @@ const countryMenuUi = {
 .cow-phone__field.cow-phone__field--error,
 .cow-phone__field.cow-phone__field--error.cow-phone__field--focused {
   box-shadow: inset 0 0 0 1.75px rgba(239, 68, 68, 0.9);
+  background-color: #fef2f2;
+}
+
+.cow-phone__field--error .cow-phone__label--float {
+  background-color: #fef2f2;
 }
 
 .cow-phone__row {
@@ -322,6 +327,11 @@ html.dark .cow-phone__field.cow-phone__field--error,
 html.dark
   .cow-phone__field.cow-phone__field--error.cow-phone__field--focused {
   box-shadow: inset 0 0 0 1.75px rgba(239, 68, 68, 0.9);
+  background-color: #2a1416;
+}
+
+html.dark .cow-phone__field--error .cow-phone__label--float {
+  background-color: #2a1416;
 }
 
 html.dark .cow-phone__dial,

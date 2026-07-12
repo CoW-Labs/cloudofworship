@@ -184,6 +184,7 @@ const triggerConfetti = () => {
 const handleClose = () => {
   isOpen.value = false
   emit("close")
+  navigateTo("/")
   setTimeout(() => {
     useGlobalEmit("open-invite-modal")
   }, 300)

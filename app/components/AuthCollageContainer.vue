@@ -302,6 +302,14 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey))
 </style>
 
 <style>
+html.dark .auth-collage {
+  background: linear-gradient(135deg, #1e293b, #0f172a 55%, #0b1120);
+}
+
+html.dark .auth-collage__stage {
+  background: #0b1120;
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;

@@ -2,35 +2,42 @@
   <svg
     width="24"
     height="24"
-    viewBox="0 0 32 32"
+    viewBox="0 0 24 24"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      d="M22.5 25C24.433 25 26 23.433 26 21.5C26 19.567 24.433 18 22.5 18C20.567 18 19 19.567 19 21.5C19 23.433 20.567 25 22.5 25Z"
+      d="M3.75 6H20.25"
       stroke="currentColor"
-      stroke-width="2"
+      stroke-width="1.5"
       stroke-linecap="round"
       stroke-linejoin="round"
     />
     <path
-      d="M6.5 29C8.433 29 10 27.433 10 25.5C10 23.567 8.433 22 6.5 22C4.567 22 3 23.567 3 25.5C3 27.433 4.567 29 6.5 29Z"
+      d="M3.75 12H15"
       stroke="currentColor"
-      stroke-width="2"
+      stroke-width="1.5"
       stroke-linecap="round"
       stroke-linejoin="round"
     />
     <path
-      d="M26 10L10 14"
+      d="M3.75 18H10.5"
       stroke="currentColor"
-      stroke-width="2"
+      stroke-width="1.5"
       stroke-linecap="round"
       stroke-linejoin="round"
     />
     <path
-      d="M10 25.5V8L26 4V21.5"
+      d="M16.5 20.25C17.7426 20.25 18.75 19.2426 18.75 18C18.75 16.7574 17.7426 15.75 16.5 15.75C15.2574 15.75 14.25 16.7574 14.25 18C14.25 19.2426 15.2574 20.25 16.5 20.25Z"
       stroke="currentColor"
-      stroke-width="2"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M18.75 18V10.5L22.5 11.625"
+      stroke="currentColor"
+      stroke-width="1.5"
       stroke-linecap="round"
       stroke-linejoin="round"
     />

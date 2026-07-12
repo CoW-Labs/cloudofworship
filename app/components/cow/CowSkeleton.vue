@@ -12,6 +12,12 @@
     </div>
 
     <USkeleton
+      v-else-if="variant === 'grid'"
+      class="w-full h-[120px] rounded-lg cow-skeleton"
+      :ui="skeletonUi"
+    />
+
+    <USkeleton
       v-else
       class="w-[100%] mt-2 cow-skeleton"
       :ui="skeletonUi"
@@ -23,7 +29,7 @@
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    variant?: "row" | "block"
+    variant?: "row" | "block" | "grid"
     count?: number
     height?: number
   }>(),
