@@ -22,6 +22,10 @@
         rights reserved.
       </p>
     </div>
+
+    <ClientOnly>
+      <UpgradePlanModal />
+    </ClientOnly>
   </div>
 </template>
 

@@ -13,7 +13,7 @@
         <Logo class="w-[38px]" />
         <h1 class="text-md font-semibold">Cloud of Worship</h1>
         <!-- TEST-ONLY: trigger the upgrade/plan modal -->
-        <UButton
+        <!-- <UButton
           variant="soft"
           color="primary"
           size="2xs"
@@ -21,7 +21,7 @@
           @click="useGlobalEmit('show-upgrade-modal')"
         >
           Test modal
-        </UButton>
+        </UButton> -->
       </div>
       <div class="projects-ctn">
         <!-- <IconWrapper name="i-bx-spinner-dots" v-if="slidesAndScheduleLoading" /> -->
@@ -161,7 +161,11 @@
           >
             <span
               class="theme-toggle__thumb absolute top-[3px] left-[3px] w-[26px] h-[26px] rounded-full grid place-items-center transition-transform duration-300 ease-out"
-              :class="isDark ? 'translate-x-[28px] bg-white' : 'translate-x-0 bg-gray-900'"
+              :class="
+                isDark
+                  ? 'translate-x-[28px] bg-white'
+                  : 'translate-x-0 bg-gray-900'
+              "
             >
               <LightModeIcon v-if="!isDark" class="w-3.5 h-3.5 text-white" />
               <DarkModeIcon v-else class="w-3.5 h-3.5 text-gray-900" />
@@ -188,7 +192,9 @@
             background: 'bg-white dark-bg-gray-900 border-0',
           }"
         >
-          <button class="flex items-center gap-1.5 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#171d2b] transition-colors">
+          <button
+            class="flex items-center gap-1.5 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#171d2b] transition-colors"
+          >
             <UAvatar
               :src="user?.avatar"
               :text="user?.fullname?.split(' ')?.[0]?.[0]"
@@ -198,7 +204,10 @@
               }"
               :class="`border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
             />
-            <UIcon name="i-bx-menu" class="w-5 h-5 text-gray-500 dark:text-gray-300" />
+            <UIcon
+              name="i-bx-menu"
+              class="w-5 h-5 text-gray-500 dark:text-gray-300"
+            />
           </button>
           <template #panel>
             <ProfileMiniModal

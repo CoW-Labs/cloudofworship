@@ -437,6 +437,7 @@ const handleContinue = () => {
       currency: selectedCurrency.value,
     })
     visible.value = false
+    navigateTo("/")
     return
   }
   handleUpgrade()

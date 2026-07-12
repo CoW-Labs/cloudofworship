@@ -56,7 +56,10 @@
           sub="Drop to add as media slide"
           class="absolute inset-0 z-20 pointer-events-none"
         />
-        <div v-if="slides?.length > 0" class="virtual-slides-grid">
+        <div v-if="isLoadingSlides" class="grid slides-grid gap-3">
+          <CowSkeleton variant="grid" :count="10" />
+        </div>
+        <div v-else-if="slides?.length > 0" class="virtual-slides-grid">
           <div :style="{ height: `${virtualTopSpacer}px` }" />
           <div ref="slidesGrid" class="grid slides-grid gap-3">
             <SlideCard
@@ -420,6 +423,11 @@ const onVResizeEnd = () => {
 const windowHeight = ref<number>(0)
 const activeSlide = ref<Slide>()
 const { currentState } = storeToRefs(appStore)
+// Drives the slide-grid skeleton. Kept separate from appStore.slidesLoading
+// (which only tracks the network request) so the skeleton stays up through
+// the local `slides` ref sync + grid render that happens after the fetch
+// resolves, not just the fetch itself.
+const isLoadingSlides = ref(false)
 const slidesGrid = ref<HTMLDivElement | null>(null)
 const slidesScroll = ref<HTMLDivElement | null>(null)
 const bulkSelectSlides = ref<boolean>(false)
@@ -1071,67 +1079,77 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
     return
   }
 
-  // appStore.setSlidesLoading(true)
-  const { data, error } = await useAPIFetch(
-    `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
-  )
-  if (!error.value) {
-    let tempSlides = (data.value as Slide[]) || []
-    if (!Array.isArray(tempSlides)) {
-      console.warn(
-        "retrieveSlidesOnline: unexpected response shape",
-        data.value
-      )
-      return
-    }
-    tempSlides.forEach((slide) => {
-      if (
-        slide.backgroundType === backgroundTypes.video &&
-        (slide.backgroundVideoKey === "video-bg-1" ||
-          slide.backgroundVideoKey === "/video-bg-1.mp4" ||
-          slide.backgroundVideoKey === "video-bg-2" ||
-          slide.backgroundVideoKey === "/video-bg-2.mp4" ||
-          slide.backgroundVideoKey === "video-bg-3" ||
-          slide.backgroundVideoKey === "/video-bg-3.mp4" ||
-          slide.backgroundVideoKey === "video-bg-4" ||
-          slide.backgroundVideoKey === "/video-bg-4.mp4" ||
-          slide.backgroundVideoKey === "video-bg-5" ||
-          slide.backgroundVideoKey === "/video-bg-5.mp4" ||
-          slide.backgroundVideoKey === "video-bg-6" ||
-          slide.backgroundVideoKey === "/video-bg-6.mp4")
-      ) {
-        slide.background = appStore.currentState.backgroundVideos?.find(
-          (bg) => bg.id === slide.backgroundVideoKey
-        )?.url
-        // console.log(
-        //   appStore.currentState.backgroundVideos?.find(
-        //     (bg) => bg.id === slide.backgroundVideoKey
-        //   )?.url
-        // )
-      } else if (
-        slide.backgroundType === backgroundTypes.image &&
-        slide.background?.includes("blob:")
-      ) {
-        const previousBackground = appStore.currentState.activeSlides.find(
-          (s) => s.id === slide.id
-        )?.background
-        if (previousBackground) {
-          slide.background = previousBackground
-        }
-      } else {
-        // console.log("not found")
-      }
-    })
-    // Sort slides by index
-    tempSlides = [...tempSlides].sort((a, b) => a.index - b.index)
+  // Only block the grid with a skeleton when there's nothing on screen yet —
+  // background refreshes (e.g. "refresh-slides") shouldn't blank out
+  // already-rendered slides.
+  const showSkeletonWhileLoading = !slides.value?.length
+  if (showSkeletonWhileLoading) isLoadingSlides.value = true
+  appStore.setSlidesLoading(true)
 
-    appStore.setActiveSlides(
-      useMergeObjectArray(tempSlides, [...appStore.currentState.activeSlides])
+  try {
+    const { data, error } = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
     )
-    // appStore.setSlidesLoading(false)
-    appStore.setLastSynced(new Date().toISOString())
-  } else {
-    console.warn("Unable to refresh schedule slides:", error.value)
+    if (!error.value) {
+      let tempSlides = (data.value as Slide[]) || []
+      if (!Array.isArray(tempSlides)) {
+        console.warn(
+          "retrieveSlidesOnline: unexpected response shape",
+          data.value
+        )
+        return
+      }
+      tempSlides.forEach((slide) => {
+        if (
+          slide.backgroundType === backgroundTypes.video &&
+          (slide.backgroundVideoKey === "video-bg-1" ||
+            slide.backgroundVideoKey === "/video-bg-1.mp4" ||
+            slide.backgroundVideoKey === "video-bg-2" ||
+            slide.backgroundVideoKey === "/video-bg-2.mp4" ||
+            slide.backgroundVideoKey === "video-bg-3" ||
+            slide.backgroundVideoKey === "/video-bg-3.mp4" ||
+            slide.backgroundVideoKey === "video-bg-4" ||
+            slide.backgroundVideoKey === "/video-bg-4.mp4" ||
+            slide.backgroundVideoKey === "video-bg-5" ||
+            slide.backgroundVideoKey === "/video-bg-5.mp4" ||
+            slide.backgroundVideoKey === "video-bg-6" ||
+            slide.backgroundVideoKey === "/video-bg-6.mp4")
+        ) {
+          slide.background = appStore.currentState.backgroundVideos?.find(
+            (bg) => bg.id === slide.backgroundVideoKey
+          )?.url
+        } else if (
+          slide.backgroundType === backgroundTypes.image &&
+          slide.background?.includes("blob:")
+        ) {
+          const previousBackground = appStore.currentState.activeSlides.find(
+            (s) => s.id === slide.id
+          )?.background
+          if (previousBackground) {
+            slide.background = previousBackground
+          }
+        }
+      })
+      // Sort slides by index
+      tempSlides = [...tempSlides].sort((a, b) => a.index - b.index)
+
+      appStore.setActiveSlides(
+        useMergeObjectArray(tempSlides, [...appStore.currentState.activeSlides])
+      )
+      appStore.setLastSynced(new Date().toISOString())
+    } else {
+      console.warn("Unable to refresh schedule slides:", error.value)
+    }
+  } finally {
+    appStore.setSlidesLoading(false)
+    if (showSkeletonWhileLoading) {
+      // Wait for the activeSlides watcher to sync the local `slides` ref and
+      // for Vue to flush that update (including mounting the slide cards)
+      // before dropping the skeleton, so the grid never shows an empty/half
+      // -rendered frame between "fetch done" and "slides actually painted".
+      await nextTick()
+      isLoadingSlides.value = false
+    }
   }
 }
 

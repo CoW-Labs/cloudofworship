@@ -338,20 +338,25 @@ const verifyEmail = async () => {
     }
 
     // New signups reach verify as the tail end of onboarding — surface the
-    // plan chooser once they land on home, whether or not a plan was preselected.
+    // plan chooser once they're back on the signup screen, whether or not a
+    // plan was preselected.
     const isNewUserOnboarding = !!route.query.newUser || !!pendingPlanId.value
 
     if (isNewUserOnboarding) {
-      usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
-        planId: pendingPlanId.value,
-        email: email.value,
-      })
-
       const planId = pendingPlanId.value
-      await router.push("/")
-      setTimeout(() => {
-        useGlobalEmit("show-upgrade-modal", planId ? { planId } : undefined)
-      }, 500)
+      await router.push("/signup")
+
+      const isOnTeamsPlan = authStore.church?.subscriptionPlan === "teams"
+      if (!isOnTeamsPlan) {
+        usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
+          planId,
+          email: email.value,
+        })
+
+        setTimeout(() => {
+          useGlobalEmit("show-upgrade-modal", planId ? { planId } : undefined)
+        }, 500)
+      }
     } else {
       router.push("/")
     }

@@ -62,23 +62,12 @@
       </div>
 
       <CowInput label="Email address" type="email" v-model="email" />
-      <div>
-        <CowInput
-          label="Choose a password"
-          type="password"
-          v-model="password"
-          @blur="passwordInputHover = false"
-          @update:model-value="passwordInputHover = true"
-        />
-        <div
-          v-if="passwordInputHover"
-          class="help text-gray-500 dark:text-gray-400 text-xs mt-2 flex gap-2 come-up-1"
-        >
-          <InfoIcon class="w-3 h-3" />
-          Password must be at least 8 characters and include a letter and a
-          number.
-        </div>
-      </div>
+      <CowInput
+        label="Choose a password"
+        type="password"
+        v-model="password"
+        :error="passwordError"
+      />
 
       <CowButton
         block
@@ -255,17 +244,15 @@
     </form>
 
     <!-- PROGRESS -->
-    <div v-if="step > 1" class="flex justify-center items-center gap-2 mt-10">
+    <div v-if="step > 1" class="flex justify-center items-center gap-1 mt-10">
       <span
         v-for="n in 5"
         :key="n"
-        class="h-1.5 rounded-full transition-all duration-300"
+        class="h-0.5 w-[30px] rounded-full transition-all duration-300"
         :class="
-          n === step
-            ? 'w-8 bg-primary-500'
-            : n < step
-              ? 'w-4 bg-primary-500'
-              : 'w-4 bg-gray-200 dark:bg-gray-700'
+          n <= step
+            ? 'bg-gray-900 dark:bg-white'
+            : 'bg-gray-200 dark:bg-slate-600'
         "
       />
     </div>
@@ -339,7 +326,6 @@ const googleLoading = ref(false)
 // Step 1
 const email = ref("")
 const password = ref("")
-const passwordInputHover = ref(false)
 
 // Step 2
 const fullName = ref("")
@@ -360,8 +346,13 @@ const howYouFoundUs = ref("")
 const phone = ref("")
 
 const passwordValid = computed(() => {
-  const regex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
+  const regex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
   return regex.test(password.value)
+})
+
+const passwordError = computed(() => {
+  if (!password.value || passwordValid.value) return ""
+  return "Password must include a letter, a number and a symbol"
 })
 
 const step1Disabled = computed(
@@ -743,12 +734,18 @@ const finishOnboarding = async () => {
       })
     }
 
-    // Always surface the plan chooser once onboarding wraps up,
-    // before the operator settles on the home screen.
-    await navigateTo("/")
-    setTimeout(() => {
+    if (signupMethod.value === "google") {
+      // Google accounts arrive pre-verified — stay on this last step and let
+      // the user decide on a plan right here instead of bouncing to "/".
       useGlobalEmit("show-upgrade-modal", planId ? { planId } : undefined)
-    }, 500)
+    } else {
+      // Always surface the plan chooser once onboarding wraps up,
+      // before the operator settles on the home screen.
+      await navigateTo("/")
+      setTimeout(() => {
+        useGlobalEmit("show-upgrade-modal", planId ? { planId } : undefined)
+      }, 500)
+    }
   } else {
     usePosthogCapture("SIGNUP_COMPLETE_UNVERIFIED", {
       userId: authStore.user?._id,

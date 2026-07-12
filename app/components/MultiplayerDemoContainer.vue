@@ -11,6 +11,22 @@
       </header>
 
       <div class="mp-demo__stage">
+        <svg width="0" height="0" class="mp-demo__gradient-defs">
+          <defs>
+            <linearGradient
+              id="mp-demo-search-icon-gradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="100%"
+            >
+              <stop offset="0%" stop-color="#ec5fc0" />
+              <stop offset="45%" stop-color="#c79bea" />
+              <stop offset="100%" stop-color="#9d8cf6" />
+            </linearGradient>
+          </defs>
+        </svg>
+
         <div class="mp-demo__search">
           <SearchIcon class="mp-demo__search-icon" />
           <span class="mp-demo__search-text">Search</span>
@@ -175,6 +191,16 @@ const collaboratorCursors = computed(() => {
   --mp-cursor-stroke: #1e2536;
   --mp-pink: #fb80dc;
   --mp-shadow: 0 26px 80px rgba(15, 23, 42, 0.14);
+  --mp-search-glow-1: rgba(214, 69, 176, 0.65);
+  --mp-search-glow-2: rgba(143, 125, 247, 0.65);
+  --mp-search-glow-3: rgba(168, 85, 247, 0.45);
+  --mp-search-border-gradient: linear-gradient(
+    115deg,
+    #d445b0 0%,
+    #acbcdb 38%,
+    #a7b2e0 70%,
+    #8f7df7 100%
+  );
 
   position: relative;
   width: 100%;
@@ -195,7 +221,7 @@ const collaboratorCursors = computed(() => {
 
 .mp-demo__window {
   position: absolute;
-  inset: 1.25rem;
+  inset: 0px;
   overflow: hidden;
   border: 1px solid var(--mp-border);
   border-radius: 1.6rem;
@@ -300,9 +326,9 @@ const collaboratorCursors = computed(() => {
   /* Solid interior fill */
   background: var(--mp-search-bg);
   /* Surrounding gradient glow — rendered behind the solid fill */
-  box-shadow: -16px 2px 48px -10px rgba(214, 69, 176, 0.65),
-    16px 2px 48px -10px rgba(143, 125, 247, 0.65),
-    0 12px 60px -14px rgba(168, 85, 247, 0.45);
+  box-shadow: -16px 2px 48px -10px var(--mp-search-glow-1),
+    16px 2px 48px -10px var(--mp-search-glow-2),
+    0 12px 60px -14px var(--mp-search-glow-3);
   animation: demo-float-in 0.72s 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -313,13 +339,7 @@ const collaboratorCursors = computed(() => {
   content: "";
   padding: 2px;
   border-radius: inherit;
-  background: linear-gradient(
-    115deg,
-    #d445b0 0%,
-    #acbcdb 38%,
-    #a7b2e0 70%,
-    #8f7df7 100%
-  );
+  background: var(--mp-search-border-gradient);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -330,7 +350,10 @@ const collaboratorCursors = computed(() => {
   flex: 0 0 auto;
   width: 1.9rem;
   height: 1.9rem;
-  color: var(--mp-search-icon);
+}
+
+.mp-demo__search-icon :deep(path) {
+  stroke: url(#mp-demo-search-icon-gradient);
 }
 
 .mp-demo__search-text {
@@ -339,6 +362,7 @@ const collaboratorCursors = computed(() => {
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
+  font-weight: 400;
 }
 
 .mp-demo__menu {
@@ -441,7 +465,7 @@ const collaboratorCursors = computed(() => {
 
 /* Dark theme */
 html.dark .mp-demo {
-  --mp-shell-bg: #12151f;
+  --mp-shell-bg: #0b1120;
   --mp-window-bg: #1a1f2e;
   --mp-grid-dot: rgba(255, 255, 255, 0.05);
   --mp-grid-line: rgba(255, 255, 255, 0.018);
@@ -459,6 +483,16 @@ html.dark .mp-demo {
   --mp-glass-highlight: rgba(255, 255, 255, 0.25);
   --mp-cursor-stroke: #ffffff;
   --mp-shadow: 0 28px 90px rgba(0, 0, 0, 0.4);
+  --mp-search-glow-1: rgba(214, 69, 176, 0.28);
+  --mp-search-glow-2: rgba(143, 125, 247, 0.28);
+  --mp-search-glow-3: rgba(168, 85, 247, 0.2);
+  --mp-search-border-gradient: linear-gradient(
+    115deg,
+    rgba(212, 69, 176, 0.55) 0%,
+    rgba(172, 188, 219, 0.4) 38%,
+    rgba(167, 178, 224, 0.4) 70%,
+    rgba(143, 125, 247, 0.55) 100%
+  );
 }
 
 @keyframes demo-window-in {
