@@ -3,7 +3,7 @@
     <UModal
       v-model="visible"
       :ui="{
-        width: 'w-full sm:max-w-[1240px]',
+        width: 'w-full sm:max-w-[1040px]',
         base: 'w-full',
         overlay: {
           background: 'bg-gray-200/75 dark:bg-gray-950/80',
@@ -14,7 +14,7 @@
       }"
     >
       <div
-        class="upgrade-modal relative bg-white dark:bg-[#161b28] px-6 py-8 sm:px-12 sm:py-10 lg:px-[4.5rem] lg:py-12 rounded-[28px]"
+        class="upgrade-modal relative bg-white dark:bg-[#161b28] px-6 py-8 sm:px-12 sm:py-10 lg:px-[6.5rem] lg:py-12 rounded-[28px]"
       >
         <!-- Close -->
         <button
@@ -31,7 +31,9 @@
           How do you want to continue?
         </h2>
 
-        <div class="grid grid-cols-1 md:grid-cols-[4fr_3fr] gap-6 lg:gap-8">
+        <div
+          class="grid grid-cols-1 md:grid-cols-[4fr_3fr] gap-6 lg:gap-8 max-w-[850px] mx-auto"
+        >
           <!-- LEFT — Plan chooser -->
           <div class="flex flex-col">
             <!-- Billing toggle + currency -->
@@ -39,6 +41,7 @@
               <UTabs
                 v-model="billingTabIndex"
                 :items="billingTabs"
+                :content="false"
                 class="flex-1"
                 :ui="{
                   list: {
@@ -119,7 +122,7 @@
             >
               <span class="absolute top-6 right-6">
                 <span
-                  class="flex items-center justify-center w-6 h-6 rounded-full border-2 transition-colors"
+                  class="flex items-center justify-center w-8 h-8 rounded-full border-2 transition-colors"
                   :class="
                     selectedTier === 'free'
                       ? 'border-primary-500 bg-primary-500'
@@ -129,7 +132,7 @@
                   <IconWrapper
                     v-if="selectedTier === 'free'"
                     name="i-heroicons-check-20-solid"
-                    class="w-4 h-4 text-white"
+                    class="w-5 h-5 text-white shrink-0"
                   />
                 </span>
               </span>
@@ -142,7 +145,7 @@
               <h3
                 class="text-[2.5rem] leading-none font-bold text-gray-900 dark:text-white mb-3"
               >
-                Free
+                {{ currencySymbol }}0.00
               </h3>
               <p class="text-[15px] text-gray-500 dark:text-gray-400">
                 For churches with a single steward
@@ -162,7 +165,7 @@
             >
               <span class="absolute top-6 right-6">
                 <span
-                  class="flex items-center justify-center w-6 h-6 rounded-full border-2 transition-colors"
+                  class="flex items-center justify-center w-8 h-8 rounded-full border-2 transition-colors"
                   :class="
                     selectedTier === 'team'
                       ? 'border-primary-500 bg-primary-500'
@@ -172,7 +175,7 @@
                   <IconWrapper
                     v-if="selectedTier === 'team'"
                     name="i-heroicons-check-20-solid"
-                    class="w-4 h-4 text-white"
+                    class="w-5 h-5 text-white shrink-0"
                   />
                 </span>
               </span>
@@ -180,22 +183,25 @@
               <p
                 class="text-xs font-semibold uppercase tracking-[0.12em] text-gray-400 dark:text-gray-500 mb-3"
               >
-                Team
+                Teams
               </p>
               <h3
                 class="text-[2.5rem] leading-none font-bold text-gray-900 dark:text-white mb-3"
               >
-                {{ currencySymbol }}{{ teamPrice.toLocaleString() }}
+                {{ currencySymbol }}{{ displayedTeamPrice.toLocaleString() }}
               </h3>
-              <p class="text-[15px] text-gray-500 dark:text-gray-400 max-w-[34ch]">
-                For churches that need collaboration tools for multiple stewards.
+              <p
+                class="text-[15px] text-gray-500 dark:text-gray-400 max-w-[34ch]"
+              >
+                For churches that need collaboration tools for multiple
+                stewards.
               </p>
             </button>
 
             <!-- Continue -->
             <CowButton
               block
-              class="mt-auto"
+              class="mt-10"
               :loading="loading && selectedTier === 'team'"
               @click="handleContinue"
             >
@@ -205,7 +211,7 @@
 
           <!-- RIGHT — Mission visual -->
           <div
-            class="mission-card relative rounded-[20px] overflow-hidden min-h-[560px] md:min-h-[680px]"
+            class="mission-card relative rounded-[20px] overflow-hidden min-h-[560px] md:min-h-[600px]"
           >
             <!-- Drifting clouds -->
             <div class="cloud-drift cloud-drift--1"></div>
@@ -214,13 +220,13 @@
 
             <!-- Heart + title -->
             <div
-              class="relative z-10 flex flex-col items-center text-center px-8 pt-14"
+              class="relative z-10 flex flex-col items-center text-center px-8 pt-8"
             >
               <img
                 ref="heartEl"
                 src="/images/upgrade/heart-cloud.png"
                 alt=""
-                class="heart-cloud w-32 h-32 object-contain mb-6"
+                class="heart-cloud w-40 h-40 object-contain mb-2"
               />
               <h3
                 ref="titleEl"
@@ -234,7 +240,7 @@
             <!-- Floating info cards — slanted, bleeding off opposite edges -->
             <div
               ref="card1El"
-              class="mission-float-card absolute -left-6 bottom-[88px] w-[62%] bg-white rounded-[18px] p-5 shadow-2xl"
+              class="mission-float-card absolute -left-5 bottom-[110px] w-[68%] bg-white rounded-[18px] p-5 shadow-2xl"
               style="transform: rotate(-6deg)"
             >
               <PieChartIcon class="w-11 h-11 mb-3" />
@@ -252,8 +258,8 @@
             >
               <EarthIcon class="w-11 h-11 mb-3" />
               <p class="text-sm leading-snug text-gray-800">
-                Your subscription helps equip ministries with the tools they need
-                to spread the good news.
+                Your subscription helps equip ministries with the tools they
+                need to spread the good news.
               </p>
             </div>
           </div>
@@ -311,8 +317,16 @@ const animateMissionIn = () => {
   const tl = gsap.timeline({ defaults: { ease: "power2.out" } })
   tl.to(heartEl.value, { opacity: 1, y: 0, scale: 1, duration: 0.7 })
     .to(titleEl.value, { opacity: 1, y: 0, duration: 0.6 }, "-=0.35")
-    .to(card1El.value, { opacity: 1, y: 0, rotation: -6, duration: 0.6 }, "-=0.25")
-    .to(card2El.value, { opacity: 1, y: 0, rotation: 5, duration: 0.6 }, "-=0.4")
+    .to(
+      card1El.value,
+      { opacity: 1, y: 0, rotation: -6, duration: 0.6 },
+      "-=0.25"
+    )
+    .to(
+      card2El.value,
+      { opacity: 1, y: 0, rotation: 5, duration: 0.6 },
+      "-=0.4"
+    )
 }
 
 // Use payment composable
@@ -361,6 +375,30 @@ const monthlyPrice = computed(() => {
 const teamPrice = computed(() =>
   selectedPlan.value === "yearly" ? yearlyPrice.value : monthlyPrice.value
 )
+
+// Rolling/odometer-style animation for the team price when the billing
+// interval (or currency) changes while the modal is visible.
+const displayedTeamPrice = ref(teamPrice.value)
+let teamPriceTween: gsap.core.Tween | null = null
+
+watch(teamPrice, (newPrice) => {
+  if (!visible.value) {
+    teamPriceTween?.kill()
+    displayedTeamPrice.value = newPrice
+    return
+  }
+
+  teamPriceTween?.kill()
+  const proxy = { val: displayedTeamPrice.value }
+  teamPriceTween = gsap.to(proxy, {
+    val: newPrice,
+    duration: 0.6,
+    ease: "power2.out",
+    onUpdate: () => {
+      displayedTeamPrice.value = Math.round(proxy.val * 100) / 100
+    },
+  })
+})
 
 const currencySymbol = computed(() => getCurrencySymbol(selectedCurrency.value))
 
