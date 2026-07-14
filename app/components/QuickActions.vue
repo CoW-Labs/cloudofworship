@@ -228,6 +228,13 @@
       @close="page = ''"
     />
 
+    <!-- SCHEDULES SECTION-->
+    <SchedulesList
+      v-else-if="page === 'schedules-list'"
+      class="fade-in-right h-full min-h-0 overflow-auto"
+      @close="page = ''"
+    />
+
     <!-- LIBRARY SECTION-->
     <AddAlert
       v-else-if="page === 'alert'"
@@ -788,6 +795,10 @@ emitter.on("new-library", () => {
 
 emitter.on("new-templates", () => {
   page.value = "templates"
+})
+
+emitter.on(appWideActions.newSchedulesList, () => {
+  page.value = "schedules-list"
 })
 
 emitter.on("new-alert", () => {

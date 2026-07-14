@@ -58,6 +58,7 @@ export const appWideActions = {
   deleteScheduleSlides: 'delete-schedule-slides',
   selectedSchedule: 'selected-schedule',
   openScheduleModal: 'open-schedule-modal',
+  newSchedulesList: 'new-schedules-list',
   toggleDarkMode: 'toggle-dark-mode',
   joinCommunity: 'join-community',
   openInviteModal: 'open-invite-modal',
@@ -253,6 +254,15 @@ export const quickActionsArr: QuickAction[] = [
     tier: "free",
     // unreleased: true,
     // type: slideTypes.text
+  },
+  {
+    icon: "i-bx-calendar",
+    name: "Recent schedule",
+    desc: "Browse and switch between all your schedules",
+    action: appWideActions.newSchedulesList,
+    meta: "recent schedules list all switch service",
+    searchableOnly: true,
+    tier: "free",
   },
   {
     icon: "i-bx-moon",
