@@ -4,7 +4,7 @@
       v-model="visible"
       :prevent-close="true"
       :ui="{
-        base: 'min-w-[700px] max-w-[700px]',
+        base: 'min-w-[570px] max-w-[570px]',
         background: 'bg-transparent dark:bg-transparent',
         ring: '',
         rounded: 'rounded-2xl',
@@ -40,23 +40,14 @@
           <div class="starters-ctn mt-6">
             <div class="flex items-center justify-between mb-3">
               <p class="text-sm text-gray-400">Start with a template</p>
-              <span
-                class="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                >See all templates</span
-              >
             </div>
             <div class="grid grid-cols-4 gap-4">
               <div class="flex flex-col gap-2.5">
                 <button
-                  class="h-[110px] rounded-xl border-2 border-dashed flex items-center justify-center transition-colors"
-                  :class="
-                    selectedStarter === 'blank'
-                      ? 'border-primary-500'
-                      : 'border-gray-200 dark:border-[#2a3244]'
-                  "
+                  class="h-[80px] rounded-xl border-2 border-dashed border-gray-200 dark:border-[#2a3244] flex items-center justify-center transition-colors"
                   @click="selectedStarter = 'blank'"
                 >
-                  <IconWrapper name="i-mdi-plus" class="w-6 h-6 text-gray-400" />
+                  <PlusIcon />
                 </button>
                 <span
                   class="text-sm text-center text-gray-500 dark:text-gray-400"
@@ -70,7 +61,7 @@
                 class="flex flex-col gap-2.5"
               >
                 <button
-                  class="starter-preset h-[110px] rounded-xl bg-cover bg-center ring-2 transition-all"
+                  class="starter-preset h-[80px] rounded-xl bg-cover bg-center ring-2 transition-all"
                   :class="
                     selectedStarter === preset.key
                       ? 'ring-primary-500'
@@ -96,12 +87,12 @@
               <p class="text-sm text-gray-400">Recent Schedules</p>
               <span
                 class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer transition-colors"
-                @click="scheduleListLimit = recentSchedules.length"
+                @click="openAllSchedules"
               >
                 See all
               </span>
             </div>
-            <div class="max-h-[220px] overflow-auto">
+            <div class="max-h-[300px] overflow-auto">
               <ScheduleCard
                 v-for="schedule in recentSchedules.slice(0, scheduleListLimit)"
                 :key="schedule?._id"
@@ -153,7 +144,7 @@ const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
 const scheduleName = ref<string>("")
-const scheduleListLimit = ref<number>(3)
+const scheduleListLimit = ref<number>(5)
 const testScheduleName = ref<string>(
   `CoW Schedule ${new Date().toLocaleDateString("en-GB")?.replaceAll("/", "-")}`
 )
@@ -210,6 +201,11 @@ const closeScheduleModal = () => {
       icon: "i-bx-info-circle",
     })
   }
+}
+
+const openAllSchedules = () => {
+  useGlobalEmit(appWideActions.newSchedulesList)
+  emit("close")
 }
 
 const recentSchedules = computed(() => {

@@ -156,6 +156,7 @@ const actionIconComponentMap: Record<string, Component> = {
   "new-presentation": PptIcon,
   "new-presentation-from-pdf": PdfIcon,
   "open-schedule-modal": SchedulesIcon,
+  "new-schedules-list": SchedulesIcon,
   "open-settings": SettingsIcon,
 }
 
