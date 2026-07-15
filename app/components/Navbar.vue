@@ -63,67 +63,10 @@
         />
 
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
-        <div
-          v-if="onlineUsersExcludingSelf.length > 0"
-          class="online-users-ctn flex items-center relative left-6"
+        <UTooltip
+          v-if="!online && onlineUsersExcludingSelf.length === 0"
+          text="You are offline"
         >
-          <UTooltip>
-            <template #text>
-              <div class="text-sm">
-                <div
-                  v-for="user in onlineUsersExcludingSelf"
-                  :key="user.userId"
-                  class="py-0.5"
-                >
-                  {{ user.userName }}
-                </div>
-              </div>
-            </template>
-            <div class="flex items-center gap-1 mr-2">
-              <div class="flex -space-x-2">
-                <div
-                  class="relative h-8 w-8 grid place-items-center transition-all duration-200 ease-out hover:z-50 hover:translate-x-1"
-                  v-for="(user, index) in displayOnlineUsers"
-                  :key="user.userId"
-                  :style="{
-                    zIndex: displayOnlineUsers.length - index,
-                  }"
-                >
-                  <UAvatar
-                    :src="user.avatar"
-                    :alt="user.userName"
-                    :text="
-                      !user.avatar
-                        ? user.userName?.charAt(0)?.toUpperCase()
-                        : undefined
-                    "
-                    size="sm"
-                    class="ring-2 transition-all duration-200 cursor-pointer hover:scale-110"
-                    :class="{ 'grayscale opacity-50': !online }"
-                    :style="{
-                      '--tw-ring-color': user?.theme || '#6366f1',
-                      backgroundColor: user?.theme || '#6366f1',
-                      color: !user.avatar
-                        ? user?.theme || '#6366f1'
-                        : undefined,
-                    }"
-                  />
-                  <span
-                    v-if="online"
-                    class="animate-ping absolute inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75"
-                  ></span>
-                </div>
-              </div>
-              <span
-                v-if="onlineUsersExcludingSelf.length > 3"
-                class="text-xs text-gray-500 ml-1"
-              >
-                +{{ onlineUsersExcludingSelf.length - 3 }}
-              </span>
-            </div>
-          </UTooltip>
-        </div>
-        <UTooltip v-else-if="!online" text="You are offline">
           <UButton
             variant="ghost"
             class="h-10 w-48 opacity-65 transition-all"
@@ -184,16 +127,78 @@
           </template>
         </ClientOnly>
 
+        <div
+          v-if="onlineUsersExcludingSelf.length > 0"
+          class="online-users-ctn relative z-10 -mr-6 flex items-center"
+        >
+          <UTooltip>
+            <template #text>
+              <div class="text-sm">
+                <div
+                  v-for="user in onlineUsersExcludingSelf"
+                  :key="user.userId"
+                  class="py-0.5"
+                >
+                  {{ user.userName }}
+                </div>
+              </div>
+            </template>
+            <div class="flex items-center gap-1">
+              <div class="flex -space-x-2">
+                <div
+                  class="relative h-8 w-8 grid place-items-center transition-all duration-200 ease-out hover:z-50 hover:translate-x-1"
+                  v-for="(user, index) in displayOnlineUsers"
+                  :key="user.userId"
+                  :style="{
+                    zIndex: displayOnlineUsers.length - index,
+                  }"
+                >
+                  <UAvatar
+                    :src="user.avatar"
+                    :alt="user.userName"
+                    :text="
+                      !user.avatar
+                        ? user.userName?.charAt(0)?.toUpperCase()
+                        : undefined
+                    "
+                    size="sm"
+                    class="ring-2 transition-all duration-200 cursor-pointer hover:scale-110"
+                    :class="{ 'grayscale opacity-50': !online }"
+                    :style="{
+                      '--tw-ring-color': user?.theme || '#6366f1',
+                      backgroundColor: user?.theme || '#6366f1',
+                      color: !user.avatar
+                        ? user?.theme || '#6366f1'
+                        : undefined,
+                    }"
+                  />
+                  <span
+                    v-if="online"
+                    class="animate-ping absolute inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75"
+                  ></span>
+                </div>
+              </div>
+              <span
+                v-if="onlineUsersExcludingSelf.length > 3"
+                class="text-xs text-gray-500 ml-1"
+              >
+                +{{ onlineUsersExcludingSelf.length - 3 }}
+              </span>
+            </div>
+          </UTooltip>
+        </div>
+
         <!-- ACCOUNT PROFILE + MENU -->
         <UPopover
           mode="click"
+          class="relative z-30"
           :ui="{
             ring: 'ring-0',
             background: 'bg-white dark-bg-gray-900 border-0',
           }"
         >
           <button
-            class="flex items-center gap-1.5 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#171d2b] transition-colors"
+            class="relative z-30 flex items-center gap-1.5 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#171d2b] transition-colors"
           >
             <UAvatar
               :src="user?.avatar"
@@ -202,7 +207,7 @@
               :ui="{
                 text: `text-[${user?.theme}] dark:text-[${user?.theme}] font-semibold`,
               }"
-              :class="`border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
+              :class="`relative z-30 border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
             />
             <UIcon
               name="i-bx-menu"

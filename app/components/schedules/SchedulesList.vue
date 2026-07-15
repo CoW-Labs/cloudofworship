@@ -48,6 +48,7 @@
             :schedule="schedule"
             @select="selectSchedule"
             @delete="deleteSchedule($event)"
+            @duplicate="duplicateSchedule($event)"
           />
         </RecycleScroller>
       </div>
@@ -66,6 +67,7 @@ const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
 
 const searchInput = ref<string>("")
+const duplicatingScheduleId = ref<string>("")
 
 const allSchedules = computed(() => {
   return (
@@ -108,5 +110,44 @@ const deleteSchedule = (scheduleId: string) => {
   const { deleteSchedule: deleteScheduleComposable } = useSchedules()
   deleteScheduleComposable(scheduleId)
   useGlobalEmit(appWideActions.deleteScheduleSlides, scheduleId)
+}
+
+const isScheduleLimitReached = (): boolean => {
+  const { isFreePlan } = useSubscription()
+  const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
+  const scheduleCount = appStore.currentState.schedules.length
+
+  if (isFreePlan.value && scheduleCount >= 5 && isPremiumFeatureEnabled.value) {
+    useGlobalEmit("show-upgrade-modal")
+    usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+      feature: "Create Schedule",
+      location: "schedules_list",
+      currentCount: scheduleCount,
+      limit: 5,
+    })
+    useToast().add({
+      icon: "i-heroicons-exclamation-triangle",
+      title: "Schedule Limit Reached",
+      description:
+        "Free plan allows up to 5 schedules. Upgrade to create unlimited schedules.",
+      color: "orange",
+    })
+    return true
+  }
+  return false
+}
+
+const duplicateSchedule = async (schedule: Schedule) => {
+  if (duplicatingScheduleId.value) return
+  if (isScheduleLimitReached()) return
+
+  duplicatingScheduleId.value = schedule._id
+  try {
+    const { duplicateSchedule } = useScheduleTemplates()
+    await duplicateSchedule(schedule)
+    emit("close")
+  } finally {
+    duplicatingScheduleId.value = ""
+  }
 }
 </script>
