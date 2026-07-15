@@ -19,12 +19,12 @@
       >
         <template #actions>
           <button
-            class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-[#222938] transition-colors"
+            class="grid h-8 w-8 place-items-center rounded-md leading-none hover:bg-gray-100 dark:hover:bg-[#222938] transition-colors"
             @click="closeScheduleModal"
           >
-            <IconWrapper
-              name="i-mdi-close"
-              class="w-4 h-4 text-gray-600 dark:text-[#a7afbd]"
+            <UIcon
+              name="i-lucide-x"
+              class="block h-5 w-5 -translate-y-px text-gray-600 dark:text-[#a7afbd]"
             />
           </button>
         </template>
@@ -32,22 +32,23 @@
         <div
           class="schedule-modal-body rounded-2xl bg-gray-50 dark:bg-[#1b212e] p-4"
         >
-          <CowInput v-model="scheduleName" label="Schedule name" />
-          <div class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Leave field blank to use default title
-          </div>
-
-          <div class="starters-ctn mt-6">
+          <div class="starters-ctn">
             <div class="flex items-center justify-between mb-3">
               <p class="text-sm text-gray-400">Start with a template</p>
             </div>
             <div class="grid grid-cols-4 gap-4">
               <div class="flex flex-col gap-2.5">
                 <button
-                  class="h-[80px] rounded-xl border-2 border-dashed border-gray-200 dark:border-[#2a3244] flex items-center justify-center transition-colors"
-                  @click="selectedStarter = 'blank'"
+                  class="relative h-[80px] rounded-xl border-2 border-dashed border-gray-200 dark:border-[#2a3244] flex items-center justify-center transition-colors hover:border-primary-500 disabled:cursor-not-allowed"
+                  :disabled="!!creatingKey"
+                  @click="createBlankSchedule"
                 >
                   <PlusIcon />
+                  <USkeleton
+                    v-if="creatingKey === 'blank'"
+                    class="rounded-xl schedule-skeleton"
+                    :ui="skeletonUi"
+                  />
                 </button>
                 <span
                   class="text-sm text-center text-gray-500 dark:text-gray-400"
@@ -61,15 +62,17 @@
                 class="flex flex-col gap-2.5"
               >
                 <button
-                  class="starter-preset h-[80px] rounded-xl bg-cover bg-center ring-2 transition-all"
-                  :class="
-                    selectedStarter === preset.key
-                      ? 'ring-primary-500'
-                      : 'ring-transparent'
-                  "
+                  class="starter-preset relative h-[80px] rounded-xl bg-cover bg-center ring-2 ring-transparent hover:ring-primary-500 transition-all disabled:cursor-not-allowed"
                   :style="{ backgroundImage: `url(${preset.image})` }"
-                  @click="selectedStarter = preset.key"
-                ></button>
+                  :disabled="!!creatingKey"
+                  @click="createFromTemplate(preset)"
+                >
+                  <USkeleton
+                    v-if="creatingKey === preset.key"
+                    class="rounded-xl schedule-skeleton"
+                    :ui="skeletonUi"
+                  />
+                </button>
                 <span
                   class="text-sm text-center text-gray-500 dark:text-gray-400 truncate"
                 >
@@ -92,7 +95,7 @@
                 See all
               </span>
             </div>
-            <div class="max-h-[300px] overflow-auto">
+            <div class="max-h-[370px] overflow-auto">
               <ScheduleCard
                 v-for="schedule in recentSchedules.slice(0, scheduleListLimit)"
                 :key="schedule?._id"
@@ -107,26 +110,11 @@
                   $emit('close')
                 }"
                 @delete="deleteSchedule($event)"
+                @duplicate="duplicateSchedule($event)"
               />
             </div>
           </div>
 
-          <div class="footer-actions flex justify-end gap-3 mt-8">
-            <CowButton
-              variant="secondary"
-              class="min-w-[130px]"
-              @click="closeScheduleModal"
-            >
-              Cancel
-            </CowButton>
-            <CowButton
-              variant="primary"
-              class="min-w-[130px]"
-              @click="createNewSchedule"
-            >
-              Save
-            </CowButton>
-          </div>
         </div>
       </AppSection>
     </UModal>
@@ -136,18 +124,15 @@
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import type { Schedule } from "~/types"
+import type { Schedule, ScheduleTemplate } from "~/types"
 import { appWideActions } from "~/utils/constants"
+import { scheduleTemplates } from "~/utils/scheduleTemplates"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
-const scheduleName = ref<string>("")
 const scheduleListLimit = ref<number>(5)
-const testScheduleName = ref<string>(
-  `CoW Schedule ${new Date().toLocaleDateString("en-GB")?.replaceAll("/", "-")}`
-)
 
 const props = defineProps<{
   visible: boolean
@@ -156,30 +141,19 @@ const props = defineProps<{
 
 const visible = ref<boolean>(props.visible)
 const toast = useToast()
-const loading = ref<boolean>(false)
 const copied = ref<boolean>(false)
 
-const selectedStarter = ref<string>("blank")
-const starterPresets = [
-  {
-    key: "regular-sunday",
-    label: "Regular Sunday",
-    image:
-      "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=600",
-  },
-  {
-    key: "communion",
-    label: "Communion Service",
-    image:
-      "https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=600",
-  },
-  {
-    key: "christmas",
-    label: "Christmas Schedule",
-    image:
-      "https://images.unsplash.com/photo-1512389142860-9c449e58a543?q=80&w=600",
-  },
-]
+// Key of the template currently being created ('blank' or a preset key), used to
+// show a per-tile loading state and block concurrent creations.
+const creatingKey = ref<string>("")
+const starterPresets = scheduleTemplates
+
+// Full-card skeleton overlay shown on the tile being created (matches CowSkeleton).
+const skeletonUi = {
+  base: "absolute inset-0 overflow-hidden animate-pulse",
+  background: "bg-gray-300 dark:bg-gray-600/80",
+  rounded: "rounded-xl",
+}
 
 watch(
   () => props.visible,
@@ -221,11 +195,11 @@ const createScheduleOnline = async (schedule: Schedule) => {
   return createSchedule(schedule)
 }
 
-const createNewSchedule = () => {
-  // Check subscription limits for free users
-  const { hasAccessToFeature, isFreePlan } = useSubscription()
+// Returns true (and surfaces the upgrade prompt) when the free-plan schedule
+// limit has been reached, so callers should abort.
+const isScheduleLimitReached = (): boolean => {
+  const { isFreePlan } = useSubscription()
   const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
-
   const scheduleCount = appStore.currentState.schedules.length
 
   if (isFreePlan.value && scheduleCount >= 5 && isPremiumFeatureEnabled.value) {
@@ -243,37 +217,78 @@ const createNewSchedule = () => {
         "Free plan allows up to 5 schedules. Upgrade to create unlimited schedules.",
       color: "orange",
     })
-    return
+    return true
   }
+  return false
+}
 
-  const scheduleId = useObjectID()
-  const schedule: Schedule = {
-    _id: scheduleId,
-    name: scheduleName.value?.trim() || testScheduleName.value,
-    authorId: authStore?.user?._id as string,
-    editorIds: [],
-    churchId: authStore?.user?.churchId as string,
-    createdAt: new Date().toISOString(),
-  }
+// Create an empty schedule and open it immediately.
+const createBlankSchedule = async () => {
+  if (creatingKey.value) return
+  if (isScheduleLimitReached()) return
 
-  // Find all slides without a scheduleId and add the new scheduleId
-  appStore.currentState.activeSlides.forEach((slide) => {
-    if (!slide.scheduleId) {
-      slide.scheduleId = scheduleId
+  creatingKey.value = "blank"
+  try {
+    const scheduleId = useObjectID()
+    const schedule: Schedule = {
+      _id: scheduleId,
+      name: "Untitled schedule",
+      authorId: authStore?.user?._id as string,
+      editorIds: [],
+      churchId: authStore?.user?.churchId as string,
+      createdAt: new Date().toISOString(),
     }
-  })
 
-  appStore.setActiveSchedule(schedule)
-  useGlobalEmit(appWideActions.selectedSchedule, schedule)
-  scheduleName.value = ""
+    // Find all slides without a scheduleId and add the new scheduleId
+    appStore.currentState.activeSlides.forEach((slide) => {
+      if (!slide.scheduleId) {
+        slide.scheduleId = scheduleId
+      }
+    })
+
+    appStore.setActiveSchedule(schedule)
+    useGlobalEmit(appWideActions.selectedSchedule, schedule)
+
+    usePosthogCapture("SCHEDULE_CREATED", {
+      scheduleName: schedule.name,
+      hasSlides: appStore.currentState.activeSlides.length > 0,
+    })
+  } finally {
+    creatingKey.value = ""
+  }
 
   emit("close")
+}
 
-  // Track schedule creation
-  usePosthogCapture("SCHEDULE_CREATED", {
-    scheduleName: schedule.name,
-    hasSlides: appStore.currentState.activeSlides.length > 0,
-  })
+// Create a schedule from a starter template (with its themed slides) and open it.
+const createFromTemplate = async (template: ScheduleTemplate) => {
+  if (creatingKey.value) return
+  if (isScheduleLimitReached()) return
+
+  creatingKey.value = template.key
+  try {
+    const { createScheduleFromTemplate } = useScheduleTemplates()
+    await createScheduleFromTemplate(template)
+  } finally {
+    creatingKey.value = ""
+  }
+
+  emit("close")
+}
+
+const duplicateSchedule = async (schedule: Schedule) => {
+  if (creatingKey.value) return
+  if (isScheduleLimitReached()) return
+
+  creatingKey.value = `duplicate-${schedule._id}`
+  try {
+    const { duplicateSchedule } = useScheduleTemplates()
+    await duplicateSchedule(schedule)
+  } finally {
+    creatingKey.value = ""
+  }
+
+  emit("close")
 }
 
 const uploadBatchSchedules = async () => {
@@ -312,3 +327,34 @@ const deleteSchedule = (scheduleId: string) => {
 
 retrieveSchedules()
 </script>
+
+<style scoped>
+.schedule-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.6),
+    transparent
+  );
+  animation: schedule-skeleton-shimmer 1.3s ease-in-out infinite;
+}
+
+html.dark .schedule-skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.22),
+    transparent
+  );
+}
+
+@keyframes schedule-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+</style>

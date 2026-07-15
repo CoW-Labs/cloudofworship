@@ -63,10 +63,9 @@
                 color="gray"
                 icon="i-bx-copy"
                 class="justify-start"
-                disabled
                 size="sm"
                 block
-                @click="duplicateSchedule()"
+                @click.stop.prevent="duplicateSchedule"
               >
                 Duplicate
               </UButton>
@@ -87,6 +86,12 @@ const props = defineProps<{
   schedule: Schedule
 }>()
 
+const emit = defineEmits<{
+  select: [schedule: Schedule]
+  delete: [scheduleId: string]
+  duplicate: [schedule: Schedule]
+}>()
+
 const authStore = useAuthStore()
 
 const scheduleAuthor = computed(() => {
@@ -98,5 +103,7 @@ const scheduleAuthor = computed(() => {
   return null
 })
 
-const duplicateSchedule = () => {}
+const duplicateSchedule = () => {
+  emit("duplicate", props.schedule)
+}
 </script>
