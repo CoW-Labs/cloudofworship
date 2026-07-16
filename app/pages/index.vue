@@ -37,16 +37,11 @@ useHead({
   ],
 })
 import { PANEL_SIZE_LIMITS, useAppStore } from "~/store/app"
-import { useAuthStore } from "~/store/auth"
-import { ref, computed } from "vue"
+import { ref } from "vue"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import type { Emitter } from "mitt"
-import type { Slide } from "~/types"
-import type { Socket } from "socket.io-client"
-import { suppressLiveSlideBroadcast } from "~/composables/useRealtimeSlides"
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const toast = useToast()
 const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
@@ -228,35 +223,6 @@ const disconnectSocket = () => {
   cleanupRealtimeSlides()
   appStore.setOnlineUsers([])
 }
-
-const sendLiveSlideToSocket = (slide: Slide) => {
-  if (!socketInstance.value?.isConnected()) {
-    console.error(
-      "Error sending live slide to socket",
-      "Socket.IO not connected"
-    )
-  } else {
-    socketInstance.value.sendLiveSlide(slide)
-  }
-}
-
-watch(
-  () => appStore.currentState.liveSlideId,
-  (liveSlideId) => {
-    // Don't re-broadcast a selection we just applied from a peer.
-    if (suppressLiveSlideBroadcast.value) {
-      suppressLiveSlideBroadcast.value = false
-      return
-    }
-    const liveSlide = appStore.currentState.activeSlides.find(
-      (slide) => slide.id === liveSlideId
-    )
-    if (liveSlide) {
-      sendLiveSlideToSocket(liveSlide)
-    }
-  },
-  { deep: true }
-)
 
 onMounted(async () => {
   const emailChange = useRoute().query.email_change

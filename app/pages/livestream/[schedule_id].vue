@@ -249,7 +249,7 @@ const updateBlobBackgroundURls = (slides: Slide[]) => {
 }
 
 const handleWebSocketMessage = (parsedData: any) => {
-  const { data, action, message } = parsedData
+  const { data, action } = parsedData
 
   switch (action) {
     case "connected":
@@ -257,10 +257,6 @@ const handleWebSocketMessage = (parsedData: any) => {
       if (Array.isArray(data)) {
         updateBlobBackgroundURls(data)
       }
-      break
-    case "live-slide":
-      const tempSlide = updateBlobBackgroundURl({ ...data })
-      liveSlide.value = { ...tempSlide }
       break
     case "new-slide":
     case "slide-created":

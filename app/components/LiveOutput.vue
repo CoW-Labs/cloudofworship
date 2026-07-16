@@ -53,25 +53,6 @@
       ]"
       :is-live-window-active="windowRefs?.length > 0"
     >
-      <template #actions>
-        <div
-          v-if="currentPresenter"
-          class="flex items-center gap-2 text-xs whitespace-nowrap"
-        >
-          <span
-            class="rounded-full bg-red-50 px-2 py-1 font-medium text-red-700 dark:bg-red-950/40 dark:text-red-300"
-          >
-            🔴 {{ currentPresenter.userName }} presenting
-          </span>
-          <button
-            v-if="isCurrentUserPresenting"
-            class="font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-300"
-            @click.stop="releasePresenter"
-          >
-            Stop presenting
-          </button>
-        </div>
-      </template>
       <div class="main flex flex-col flex-1 min-h-0">
         <div
           v-if="liveOutputSlides?.length === 0 || !liveOutputSlides"
@@ -181,11 +162,6 @@
         </draggable>
       </div>
     </AppSection>
-    <TakeoverPresenterModal
-      v-model:open="takeoverModalOpen"
-      :presenter-name="currentPresenter?.userName || 'Another team member'"
-      @confirm="confirmTakeover"
-    />
   </div>
 </template>
 
@@ -207,14 +183,6 @@ const draggingSlide = ref<Slide | null>(null)
 const shortcutCleanups: Array<() => void> = []
 const { currentState } = storeToRefs(appStore)
 const windowRefs = inject("windowRefs") as any[]
-const {
-  currentPresenter,
-  isCurrentUserPresenting,
-  claimPresenter,
-  releasePresenter,
-} = useRealtimeSlides()
-const takeoverModalOpen = ref(false)
-const pendingLiveSlideId = ref<string | null>(null)
 
 const online = useOnline()
 
@@ -438,29 +406,15 @@ onMounted(() => {
 //   }
 // }
 
-const applyLiveSlide = (slideId: string) => {
-  claimPresenter()
-  const slide = appStore.currentState.activeSlides.find((s) => s.id === slideId)
+const setLiveSlide = (slideId: string) => {
+  const slide = appStore.currentState.activeSlides.find(
+    (s) => s.id === slideId || s._id === slideId
+  )
+  if (!slide) return
+
   // useDebounceFn(useBroadcastPost, 0)(JSON.stringify(slide))
   useBroadcastPost(JSON.stringify(slide))
   appStore.setLiveSlide(slideId)
-}
-
-const setLiveSlide = (slideId: string) => {
-  if (isCurrentUserPresenting.value) {
-    applyLiveSlide(slideId)
-    return
-  }
-
-  pendingLiveSlideId.value = slideId
-  takeoverModalOpen.value = true
-}
-
-const confirmTakeover = () => {
-  if (!pendingLiveSlideId.value) return
-
-  applyLiveSlide(pendingLiveSlideId.value)
-  pendingLiveSlideId.value = null
 }
 
 const handleDropOnSetlist = (targetSlide: Slide) => {

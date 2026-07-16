@@ -406,16 +406,6 @@ export const useSocket = (options: WebSocketOptions) => {
     })
   }
 
-  /**
-   * Send live slide update
-   */
-  const sendLiveSlide = (slide: any) => {
-    return send({
-      action: 'live-slide',
-      data: slide,
-    })
-  }
-
   const getState = () => {
     return {
       readyState: socket?.readyState,
@@ -455,7 +445,5 @@ export const useSocket = (options: WebSocketOptions) => {
     lockSlide,
     unlockSlide,
     refreshLock,
-    // Live slide
-    sendLiveSlide,
   }
 }

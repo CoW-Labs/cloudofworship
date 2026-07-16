@@ -190,7 +190,7 @@ onMounted(() => {
       const envelope = JSON.parse(data)
 
       // Drop messages that arrive out of order (e.g. a background countdown
-      // tick from a tab that hasn't yet caught up to a newer live-slide
+      // tick from a tab that hasn't yet caught up to a newer local live output
       // change) instead of always applying whatever lands last.
       if (envelope.ts < lastBroadcastTs.value) return
       lastBroadcastTs.value = envelope.ts
@@ -210,7 +210,7 @@ onMounted(() => {
 
       // Mirror the projected slide id into the shared store. The broadcast
       // channel drives the projection, but the operator window derives its
-      // live-slide preview from currentState.liveSlideId — and on reload it
+      // live output preview from currentState.liveSlideId — and on reload it
       // re-adopts state from this /live tab. Without this, that value goes
       // stale here and the operator shows "No Live Slide" after a reload.
       if (updatedSlide?.id && appStore.currentState.liveSlideId !== updatedSlide.id) {

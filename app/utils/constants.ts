@@ -62,7 +62,6 @@ export const appWideActions = {
   toggleDarkMode: 'toggle-dark-mode',
   joinCommunity: 'join-community',
   openInviteModal: 'open-invite-modal',
-  liveSlideIdTransfer: 'live-slide-id-transfer',
   liveActiveSlidesTransfer: 'live-active-slides-transfer',
   liveSettingsTransfer: 'live-settings-transfer',
   quickActionsFocus: 'quick-actions-focus',
