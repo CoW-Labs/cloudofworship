@@ -204,6 +204,7 @@ const toast = useToast()
 const ctrlOrMetaActive = ref(false)
 const showTranscripts = ref(false)
 const draggingSlide = ref<Slide | null>(null)
+const shortcutCleanups: Array<() => void> = []
 const { currentState } = storeToRefs(appStore)
 const windowRefs = inject("windowRefs") as any[]
 const {
@@ -282,6 +283,7 @@ const onTranscriptResizeEnd = () => {
 }
 
 onBeforeUnmount(() => {
+  shortcutCleanups.splice(0).forEach((cleanup) => cleanup())
   appStore.setPanelSize("livePreviewHeight", livePreviewHeight.value)
   appStore.setPanelSize(
     "transcriptPanelHeight",
@@ -368,45 +370,54 @@ const previousSlide = computed(() => {
   // const tempSlides = liveOutputSlidesId.value?.map((id) =>
   //   appStore.activeSlides.find((slide) => slide.id === id)
   // ) as Slide[]
-  const gotoSlideIndex = (liveSlideIndex as number) - 1 || 0
+  if (!liveSlideIndex || liveSlideIndex < 1) return
+  const gotoSlideIndex = liveSlideIndex - 1
   if (gotoSlideIndex < liveOutputSlides.value?.length) {
     return liveOutputSlides.value[gotoSlideIndex]
   }
 })
 
 onMounted(() => {
-  useCreateShortcut("ArrowDown", () => {
+  shortcutCleanups.push(useCreateShortcut("ArrowDown", () => {
     if (nextSlide.value) {
       setLiveSlide(nextSlide.value.id)
+      return true
     }
-  })
-  useCreateShortcut("ArrowUp", () => {
+    return false
+  }))
+  shortcutCleanups.push(useCreateShortcut("ArrowUp", () => {
     if (previousSlide.value) {
       setLiveSlide(previousSlide.value.id)
+      return true
     }
-  })
-  useCreateShortcut(
+    return false
+  }))
+  shortcutCleanups.push(useCreateShortcut(
     "0",
     () => {
-      if (liveOutputSlides.value?.at(-1)?._id) {
-        setLiveSlide(liveOutputSlides.value?.at(-1)?._id!!)
+      if (liveOutputSlides.value?.at(-1)?.id) {
+        setLiveSlide(liveOutputSlides.value?.at(-1)?.id!!)
+        return true
       }
+      return false
     },
     { ctrlOrMeta: true, shift: false }
-  )
+  ))
 
   // Create shortcuts for Slides 1-9
   const oneDigitNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]
   oneDigitNumbers.forEach((digit) => {
-    useCreateShortcut(
+    shortcutCleanups.push(useCreateShortcut(
       digit.toString(),
       () => {
-        if (liveOutputSlides.value?.at(digit - 1)?._id) {
-          setLiveSlide(liveOutputSlides.value?.at(digit - 1)?._id!!)
+        if (liveOutputSlides.value?.at(digit - 1)?.id) {
+          setLiveSlide(liveOutputSlides.value?.at(digit - 1)?.id!!)
+          return true
         }
+        return false
       },
       { ctrlOrMeta: true, shift: false }
-    )
+    ))
   })
 
   // Add listener for ctrlOrMeta

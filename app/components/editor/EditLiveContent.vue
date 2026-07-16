@@ -492,6 +492,7 @@ const containerOverflow = ref<string>("overflow-x-auto")
 const selectedBibleVersion = ref<string>(
   appStore.currentState.settings.defaultBibleVersion
 )
+const shortcutCleanups: Array<() => void> = []
 const { getSetlistData, refreshSongSetlistSlide, removeSongFromSetlist } =
   useSongSetlist()
 
@@ -844,26 +845,32 @@ const handleVoiceBibleVersionChange = (version: string) => {
 }
 
 onMounted(() => {
-  useCreateShortcut("ArrowRight", async () => {
+  shortcutCleanups.push(useCreateShortcut("ArrowRight", () => {
     if (props.slide?.type === slideTypes.presentation) {
       handleNextPage()
-      return
+      return true
     }
     if (nextVerse.value) {
-      const resolvedVerse = await resolveLastVerse(nextVerse.value)
-      emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+      resolveLastVerse(nextVerse.value).then((resolvedVerse) => {
+        emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+      })
+      return true
     }
-  })
-  useCreateShortcut("ArrowLeft", async () => {
+    return false
+  }))
+  shortcutCleanups.push(useCreateShortcut("ArrowLeft", () => {
     if (props.slide?.type === slideTypes.presentation) {
       handlePreviousPage()
-      return
+      return true
     }
     if (previousVerse.value) {
-      const resolvedVerse = await resolveLastVerse(previousVerse.value)
-      emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+      resolveLastVerse(previousVerse.value).then((resolvedVerse) => {
+        emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+      })
+      return true
     }
-  })
+    return false
+  }))
 
   // Listen for voice command events
   emitter.on(appWideActions.nextVerse, handleVoiceNextVerse)
@@ -876,6 +883,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  shortcutCleanups.splice(0).forEach((cleanup) => cleanup())
   emitter.off(appWideActions.nextVerse, handleVoiceNextVerse)
   emitter.off(appWideActions.previousVerse, handleVoicePreviousVerse)
   emitter.off(appWideActions.gotoVerseNumber, handleVoiceGotoVerseNumber)

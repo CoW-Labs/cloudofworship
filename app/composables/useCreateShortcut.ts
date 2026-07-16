@@ -1,9 +1,9 @@
 const useCreateShortcut = (
   commandKey: string,
-  action: () => void,
+  action: () => boolean | void | Promise<boolean | void>,
   options?: { ctrlOrMeta?: boolean; shift?: boolean }
 ) => {
-  window.addEventListener("keydown", (e) => {
+  const handleKeydown = (e: KeyboardEvent) => {
     const activeElement = document.activeElement
     const isCommandKeyPressed = e.key === commandKey
     const isCtrlOrMetaPressed = e.ctrlKey || e.metaKey
@@ -16,14 +16,25 @@ const useCreateShortcut = (
 
     if (options?.ctrlOrMeta) {
       if (isCommandKeyPressed && isCtrlOrMetaPressed) {
-        action()
-        e.preventDefault()
+        const handled = action() !== false
+        if (handled) {
+          e.preventDefault()
+        }
       }
     } else if (isCommandKeyPressed) {
-      action()
-      e.stopImmediatePropagation()
+      const handled = action() !== false
+      if (handled) {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+      }
     }
-  })
+  }
+
+  window.addEventListener("keydown", handleKeydown)
+
+  return () => {
+    window.removeEventListener("keydown", handleKeydown)
+  }
 }
 
 export default useCreateShortcut
