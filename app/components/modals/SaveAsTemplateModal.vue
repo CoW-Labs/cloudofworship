@@ -59,7 +59,7 @@
 
         <!-- Category -->
         <UFormGroup label="Category" size="lg" required>
-          <USelectMenu
+          <CowSelectMenu
             v-model="templateData.category"
             :options="categories"
             placeholder="Select category"

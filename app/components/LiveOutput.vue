@@ -192,7 +192,7 @@
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import draggable from "vuedraggable"
-import { useAppStore } from "~/store/app"
+import { PANEL_SIZE_LIMITS, useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
 import type { Slide } from "~/types"
@@ -218,14 +218,12 @@ const pendingLiveSlideId = ref<string | null>(null)
 const online = useOnline()
 
 // Vertical resize between the "Live preview" panel and "Slide Schedule"
-const LIVE_PREVIEW_MIN_HEIGHT = 160
-const LIVE_PREVIEW_MAX_HEIGHT = 700
-const LIVE_PREVIEW_DEFAULT_HEIGHT = 280
-const TRANSCRIPT_PANEL_MIN_HEIGHT = 190
-const TRANSCRIPT_PANEL_MAX_HEIGHT = 520
-const TRANSCRIPT_PANEL_DEFAULT_HEIGHT = 280
-const livePreviewHeight = ref(LIVE_PREVIEW_DEFAULT_HEIGHT)
-const transcriptPanelHeight = ref(TRANSCRIPT_PANEL_DEFAULT_HEIGHT)
+const LIVE_PREVIEW_MIN_HEIGHT = PANEL_SIZE_LIMITS.livePreviewHeight.min
+const LIVE_PREVIEW_MAX_HEIGHT = PANEL_SIZE_LIMITS.livePreviewHeight.max
+const TRANSCRIPT_PANEL_MIN_HEIGHT = PANEL_SIZE_LIMITS.transcriptPanelHeight.min
+const TRANSCRIPT_PANEL_MAX_HEIGHT = PANEL_SIZE_LIMITS.transcriptPanelHeight.max
+const livePreviewHeight = ref(appStore.panelSize("livePreviewHeight"))
+const transcriptPanelHeight = ref(appStore.panelSize("transcriptPanelHeight"))
 const liveColumn = ref<HTMLDivElement | null>(null)
 let vResizeStartY = 0
 let vResizeStartHeight = 0
@@ -248,6 +246,7 @@ const onVResizeMove = (event: MouseEvent) => {
   )
 }
 const onVResizeEnd = () => {
+  appStore.setPanelSize("livePreviewHeight", livePreviewHeight.value)
   document.removeEventListener("mousemove", onVResizeMove)
   document.removeEventListener("mouseup", onVResizeEnd)
   document.body.style.cursor = ""
@@ -272,6 +271,10 @@ const onTranscriptResizeMove = (event: MouseEvent) => {
 }
 
 const onTranscriptResizeEnd = () => {
+  appStore.setPanelSize(
+    "transcriptPanelHeight",
+    transcriptPanelHeight.value
+  )
   document.removeEventListener("mousemove", onTranscriptResizeMove)
   document.removeEventListener("mouseup", onTranscriptResizeEnd)
   document.body.style.cursor = ""
@@ -279,6 +282,11 @@ const onTranscriptResizeEnd = () => {
 }
 
 onBeforeUnmount(() => {
+  appStore.setPanelSize("livePreviewHeight", livePreviewHeight.value)
+  appStore.setPanelSize(
+    "transcriptPanelHeight",
+    transcriptPanelHeight.value
+  )
   document.removeEventListener("mousemove", onVResizeMove)
   document.removeEventListener("mouseup", onVResizeEnd)
   document.removeEventListener("mousemove", onTranscriptResizeMove)

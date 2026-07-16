@@ -1,5 +1,32 @@
 <template>
-  <div class="bg-image-selection-ctn p-2">
+  <div v-if="backgroundPanel" class="h-full w-full p-3">
+    <div
+      class="grid h-full grid-cols-3 gap-[8.5px] overflow-y-auto overflow-x-hidden"
+    >
+      <button
+        v-for="video in backgroundVideos"
+        :key="video?.id"
+        type="button"
+        class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-black transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[#E8D1F8]"
+        :class="video?.url === value ? 'ring-2 ring-[#E8D1F8]' : ''"
+        :aria-label="video?.url === value ? 'Selected background video' : 'Select background video'"
+        :aria-pressed="video?.url === value"
+        @click="$emit('select', { video: video?.url, key: video?.id })"
+      >
+        <video
+          class="h-full w-full object-cover"
+          :src="video?.url"
+          muted
+          autoplay
+          playsinline
+          preload="metadata"
+          crossorigin="anonymous"
+        ></video>
+      </button>
+    </div>
+  </div>
+
+  <div v-else class="bg-image-selection-ctn p-2">
     <div
       :class="{ 'gap-4 grid-cols-3 max-h-full': settingsPage }"
       class="bg-image-selection grid gap-2 grid-cols-3 max-h-[200px] overflow-y-auto overflow-x-hidden"
@@ -39,7 +66,7 @@
         /> -->
       </UButton>
     </div>
-    <div class="button-ctn pt-2">
+    <div v-if="!hideUpload" class="button-ctn pt-2">
       <FileDropzone
         v-if="!settingsPage"
         size="sm"
@@ -97,6 +124,8 @@ const db = useIndexedDB()
 defineProps<{
   value?: string
   settingsPage?: boolean
+  hideUpload?: boolean
+  backgroundPanel?: boolean
 }>()
 
 const emit = defineEmits(["select", "loading-change"])

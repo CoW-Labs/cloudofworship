@@ -66,12 +66,12 @@
         text="Duplicate Slide"
       >
         <UButton
-          icon="i-bx-copy"
           size="xs"
           variant="ghost"
-          class="px-1.5 text-white hover:bg-primary-500"
+          class="px-1.5 rounded-full !text-white hover:!bg-white/10"
           @click.stop.prevent="$emit('duplicate', slide)"
         >
+          <template #leading><CopyIcon class="w-4 h-4" /></template>
         </UButton>
       </UTooltip>
 
@@ -88,7 +88,7 @@
             ? 'Save Hymn as Song'
             : 'Save to Library'
         "
-        button-styles="px-1.5 text-white hover:bg-primary"
+        button-styles="px-1.5 rounded-full !text-white hover:!bg-white/10"
         :label="
           slide?.type === slideTypes.hymn
             ? 'You are about to save this hymn as a song for easy update, song slide benefits and future access. Continue?'
@@ -96,6 +96,7 @@
         "
         @confirm="handleSaveConfirm"
       >
+        <template #icon><SaveIcon class="w-4 h-4" /></template>
       </ConfirmDialog>
 
       <UTooltip
@@ -108,22 +109,23 @@
         text="Save as Template"
       >
         <UButton
-          icon="i-bx-bookmarks"
           size="xs"
           variant="ghost"
-          class="px-1.5 text-white hover:bg-primary-500"
+          class="px-1.5 rounded-full !text-white hover:!bg-white/10"
           @click.stop.prevent="handleSaveAsTemplateClick"
         >
+          <template #leading><TemplatesIcon class="w-4 h-4" /></template>
         </UButton>
       </UTooltip>
 
       <ConfirmDialog
         button-icon="i-tabler-trash"
         header="Delete slide"
-        button-styles="px-1.5 text-white hover:bg-primary"
+        button-styles="px-1.5 rounded-full !text-white hover:!bg-white/10"
         label="Are you sure you want to delete this slide? This action is not reversible"
         @confirm="useGlobalEmit(appWideActions.deleteSlide, slide)"
       >
+        <template #icon><DeleteIcon class="w-4 h-4" /></template>
       </ConfirmDialog>
     </div>
     <div
@@ -158,14 +160,15 @@
     <div class="actions absolute bottom-2 right-2 flex gap-1">
       <UTooltip text="Preview/Edit Slide" :popper="{ placement: 'top' }">
         <UButton
-          icon="i-bx-edit"
           size="xs"
           variant="ghost"
           class="px-1 text-primary-500 hover:bg-primary-white"
           @click.stop.prevent="
             useGlobalEmit(appWideActions.newActiveSlide, slide)
           "
-        />
+        >
+          <template #leading><EditIcon class="w-4 h-4" /></template>
+        </UButton>
       </UTooltip>
     </div>
   </button>

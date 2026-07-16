@@ -1,6 +1,6 @@
 <template>
   <div
-    class="verse-preview behavior-smooth absolute bg-primary-100 dark:bg-primary-800 right-0 left-0 top-12 z-20 py-2 overflow-auto shadow-lg rounded-b-md"
+    class="verse-preview behavior-smooth absolute bg-white dark:bg-[#222938] right-0 left-0 top-12 z-20 py-2 overflow-auto shadow-lg rounded-b-2xl"
   >
     <div class="grid grid-cols-3 2xl:grid-cols-5 gap-2 p-2">
       <button

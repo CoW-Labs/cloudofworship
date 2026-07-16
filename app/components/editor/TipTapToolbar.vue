@@ -1,37 +1,50 @@
 <template>
   <div
     v-if="isEditorReady"
-    class="my-0 flex gap-1 w-[100%] absolute z-10 bg-white dark:bg-[#121212] p-1 right-0 left-0 top-[45px]"
+    class="absolute z-10 top-[46px] left-1/2 -translate-x-1/2 max-w-[calc(100%-1rem)] flex justify-center"
     :class="containerOverflow"
     @mousedown.capture="onToolbarMouseDown"
   >
-    <UButton
-      @click="runCommand((chain) => chain.toggleBold())"
-      :class="{
-        'bg-primary text-white dark:text-primary-900': editor.isActive('bold'),
-      }"
-      icon="i-bx-bold"
-      variant="ghost"
-    />
-    <UButton
-      @click="runCommand((chain) => chain.toggleItalic())"
-      :class="{
-        'bg-primary text-white dark:text-primary-900':
-          editor.isActive('italic'),
-      }"
-      icon="i-bx-italic"
-      variant="ghost"
-    />
-    <UButton
-      @click="runCommand((chain) => chain.toggleStrike())"
-      :class="{
-        'bg-primary text-white dark:text-primary-900':
-          editor.isActive('strike'),
-      }"
-      icon="i-bx-strikethrough"
-      variant="ghost"
-    />
-    <!-- <UButton
+    <div
+      class="content-toolbar-pill flex items-center gap-1 bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
+    >
+      <UButton
+        @click="runCommand((chain) => chain.toggleBold())"
+        class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+        :class="{
+          'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
+            editor.isActive('bold'),
+        }"
+        variant="ghost"
+        color="gray"
+      >
+        <BoldIcon class="w-4 h-4" />
+      </UButton>
+      <UButton
+        @click="runCommand((chain) => chain.toggleItalic())"
+        class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+        :class="{
+          'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
+            editor.isActive('italic'),
+        }"
+        variant="ghost"
+        color="gray"
+      >
+        <ItalicIcon class="w-4 h-4" />
+      </UButton>
+      <UButton
+        @click="runCommand((chain) => chain.toggleStrike())"
+        class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+        :class="{
+          'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
+            editor.isActive('strike'),
+        }"
+        variant="ghost"
+        color="gray"
+      >
+        <StrikethroughIcon class="w-4 h-4" />
+      </UButton>
+      <!-- <UButton
       @click="editor.chain().focus().toggleCode().run()"
       :disabled="!editor.can().chain().focus().toggleCode().run()"
       :class="{
@@ -40,136 +53,151 @@
       icon="i-bx-code"
       variant="ghost"
     /> -->
-    <div
-      class="button-group bg-primary-100 dark:bg-primary-900 rounded-md mx-1 p-1 flex items-center gap-1"
-    >
-      <UButton
-        v-for="headingSize in 3"
-        :key="`heading-size-${headingSize}`"
-        @click="toggleHeading(headingSize)"
-        class="dark:text-primary-400 dark:hover:text-primary-500 gap-0 items-end"
-        :class="{
-          'bg-primary text-white dark:text-primary-900': editor.isActive(
-            'heading',
-            {
-              level: headingSize,
-            }
-          ),
-        }"
-        variant="ghost"
+      <div
+        class="button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 flex items-center gap-1"
       >
-        H<span class="text-xs">{{ headingSize }}</span>
-      </UButton>
-    </div>
-    <UButton
-      @click="setParagraph()"
-      :class="{
-        'bg-primary text-white dark:text-primary-900':
-          editor.isActive('paragraph'),
-      }"
-      icon="i-bx-paragraph"
-      variant="ghost"
-    />
-    <UButton
-      @click="runCommand((chain) => chain.toggleBulletList())"
-      :class="{
-        'bg-primary text-white dark:text-primary-900':
-          editor.isActive('bulletList'),
-      }"
-      icon="i-bx-list-ul"
-      variant="ghost"
-    />
-    <UButton
-      @click="runCommand((chain) => chain.toggleOrderedList())"
-      :class="{
-        'bg-primary text-white dark:text-primary-900':
-          editor.isActive('orderedList'),
-      }"
-      icon="i-bx-list-ol"
-      variant="ghost"
-    />
-    <div
-      class="button-group bg-primary-100 dark:bg-primary-900 rounded-md mx-1 p-1 flex items-center gap-1"
-    >
-      <UButton
-        @click="runCommand((chain) => chain.setTextAlign('left'))"
-        class="dark:text-primary-400 dark:hover:text-primary-500"
-        :class="{
-          'bg-primary text-white dark:text-primary-900': editor.isActive({
-            textAlign: 'left',
-          }),
-        }"
-        icon="i-bi-text-left"
-        variant="ghost"
-      />
-      <UButton
-        @click="runCommand((chain) => chain.setTextAlign('center'))"
-        class="dark:text-primary-400 dark:hover:text-primary-500"
-        :class="{
-          'bg-primary text-white dark:text-primary-900': editor.isActive({
-            textAlign: 'center',
-          }),
-        }"
-        icon="i-bi-text-center"
-        variant="ghost"
-      />
-      <UButton
-        @click="runCommand((chain) => chain.setTextAlign('right'))"
-        class="dark:text-primary-400 dark:hover:text-primary-500"
-        :class="{
-          'bg-primary text-white dark:text-primary-900': editor.isActive({
-            textAlign: 'right',
-          }),
-        }"
-        icon="i-bi-text-right"
-        variant="ghost"
-      />
-    </div>
-    <TipTapFontSelect
-      :editor="editor"
-      size="md"
-      :disabled="false"
-      @change="runCommand((chain) => chain.setFontFamily($event))"
-      @open="containerOverflow = ''"
-      @close="containerOverflow = 'overflow-x-auto'"
-    />
-    <UTooltip text="Change text color" :popper="{ arrow: true }">
-      <label class="cursor-pointer">
-        <input
-          type="color"
-          @input="onColorChange"
-          class="sr-only"
-          :value="currentColor"
-        />
-        <div
-          class="min-w-10 h-10 flex items-center justify-center rounded-md p-1.5 text-primary-500 dark:text-primary-400 bg-primary-100 dark:bg-primary-900 hover:bg-primary-200 dark:hover:bg-primary-950 cursor-pointer transition-colors"
+        <UButton
+          v-for="headingSize in 3"
+          :key="`heading-size-${headingSize}`"
+          @click="toggleHeading(headingSize)"
+          class="rounded-full gap-0 items-end text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
+          :class="{
+            'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+              editor.isActive('heading', { level: headingSize }),
+          }"
+          variant="ghost"
+          color="gray"
         >
-          <span class="i-bx-palette text-lg"></span>
+          H<span class="text-xs">{{ headingSize }}</span>
+        </UButton>
+      </div>
+      <UButton
+        @click="setParagraph()"
+        class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+        :class="{
+          'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
+            editor.isActive('paragraph'),
+        }"
+        icon="i-bx-paragraph"
+        variant="ghost"
+        color="gray"
+      />
+      <UButton
+        @click="runCommand((chain) => chain.toggleBulletList())"
+        class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+        :class="{
+          'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
+            editor.isActive('bulletList'),
+        }"
+        icon="i-bx-list-ul"
+        variant="ghost"
+        color="gray"
+      />
+      <UButton
+        @click="runCommand((chain) => chain.toggleOrderedList())"
+        class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+        :class="{
+          'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
+            editor.isActive('orderedList'),
+        }"
+        icon="i-bx-list-ol"
+        variant="ghost"
+        color="gray"
+      />
+      <div
+        class="button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 flex items-center gap-1"
+      >
+        <UButton
+          @click="runCommand((chain) => chain.setTextAlign('left'))"
+          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
+          :class="{
+            'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+              editor.isActive({ textAlign: 'left' }),
+          }"
+          variant="ghost"
+          color="gray"
+        >
+          <AlignLeftIcon class="w-4 h-4" />
+        </UButton>
+        <UButton
+          @click="runCommand((chain) => chain.setTextAlign('center'))"
+          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
+          :class="{
+            'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+              editor.isActive({ textAlign: 'center' }),
+          }"
+          variant="ghost"
+          color="gray"
+        >
+          <AlignCenterIcon class="w-4 h-4" />
+        </UButton>
+        <UButton
+          @click="runCommand((chain) => chain.setTextAlign('right'))"
+          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
+          :class="{
+            'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+              editor.isActive({ textAlign: 'right' }),
+          }"
+          variant="ghost"
+          color="gray"
+        >
+          <AlignRightIcon class="w-4 h-4" />
+        </UButton>
+      </div>
+      <TipTapFontSelect
+        :editor="editor"
+        size="md"
+        :disabled="false"
+        @change="
+          runCommand((chain) => chain.setFontFamily($event), {
+            restoreFocus: true,
+          })
+        "
+        @open="containerOverflow = ''"
+        @close="containerOverflow = 'overflow-x-auto'"
+      />
+      <UTooltip text="Change text color" :popper="{ arrow: true }">
+        <label class="cursor-pointer">
+          <input
+            type="color"
+            @input="onColorChange"
+            class="sr-only"
+            :value="currentColor"
+          />
           <div
-            class="absolute w-[80%] rounded-xl h-1 bottom-[3px]"
-            :style="`background: ${currentColor}`"
-          ></div>
-        </div>
-      </label>
-    </UTooltip>
-    <UButton
-      @click="runCommand((chain) => chain.toggleBlockquote())"
-      :class="{
-        'bg-primary text-white dark:text-primary-900':
-          editor.isActive('blockquote'),
-      }"
-      icon="i-bx-bxs-quote-right"
-      variant="ghost"
-    />
-    <UButton
-      @click="runCommand((chain) => chain.toggleCodeBlock())"
-      :class="{
-        'bg-primary text-white dark:text-primary-900':
-          editor.isActive('codeBlock'),
-      }"
-      icon="i-bx-code-curly"
-      variant="ghost"
-    />
+            class="min-w-10 h-10 flex items-center justify-center rounded-full p-1.5 text-gray-600 dark:text-[#a7afbd] bg-gray-100 dark:bg-[#171d2b] hover:bg-gray-200 dark:hover:bg-[#2b3242] cursor-pointer transition-colors"
+          >
+            <span class="i-bx-palette text-lg"></span>
+            <div
+              class="absolute w-[80%] rounded-xl h-1 bottom-[3px]"
+              :style="`background: ${currentColor}`"
+            ></div>
+          </div>
+        </label>
+      </UTooltip>
+      <UButton
+        @click="runCommand((chain) => chain.toggleBlockquote())"
+        class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+        :class="{
+          'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
+            editor.isActive('blockquote'),
+        }"
+        icon="i-bx-bxs-quote-right"
+        variant="ghost"
+        color="gray"
+      />
+      <UButton
+        @click="runCommand((chain) => chain.toggleCodeBlock())"
+        class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+        :class="{
+          'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
+            editor.isActive('codeBlock'),
+        }"
+        icon="i-bx-code-curly"
+        variant="ghost"
+        color="gray"
+      />
+    </div>
   </div>
 </template>
 
@@ -221,7 +249,30 @@ const onToolbarMouseDown = (event: MouseEvent) => {
   event.preventDefault()
 }
 
-const runCommand = (apply: (chain: any) => any) => {
+// Re-assert editor focus + the saved selection. Controls like the font
+// dropdown hand focus back to their own trigger one frame *after* the command
+// runs, which collapses the visible selection even though the mark was applied.
+// Running this on the next frame wins that race so the edited text stays
+// highlighted. It only re-focuses — it never blurs — so it triggers no save.
+const reassertSelection = () => {
+  const editor = props.editor
+  if (!editor || !isEditorReady.value || editor.isFocused) return
+
+  const chain = editor.chain().focus()
+  const selection = savedSelection.value
+  if (selection) {
+    const docSize = editor.state.doc.content.size
+    const from = Math.min(Math.max(selection.from, 0), docSize)
+    const to = Math.min(Math.max(selection.to, from), docSize)
+    chain.setTextSelection({ from, to })
+  }
+  chain.run()
+}
+
+const runCommand = (
+  apply: (chain: any) => any,
+  options: { restoreFocus?: boolean } = {}
+) => {
   const editor = props.editor
   if (!editor || !isEditorReady.value) return
 
@@ -238,6 +289,13 @@ const runCommand = (apply: (chain: any) => any) => {
 
     apply(chain).run()
     saveSelection()
+
+    // Opt-in for controls that surrender focus to an async popover (font
+    // dropdown). Plain buttons keep focus via the mousedown preventDefault, so
+    // they don't need — or want — the extra frame.
+    if (options.restoreFocus) {
+      nextTick(() => requestAnimationFrame(reassertSelection))
+    }
   } catch (error) {
     console.warn("[TipTap] Toolbar command skipped:", error)
   }
@@ -262,4 +320,15 @@ const setParagraph = () => {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.toolbar-icon-btn {
+  height: 34px;
+  width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 9999px;
+}
+</style>

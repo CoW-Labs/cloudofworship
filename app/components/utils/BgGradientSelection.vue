@@ -1,5 +1,22 @@
 <template>
   <div
+    v-if="backgroundPanel"
+    class="grid h-[149.5px] w-[216.5px] grid-cols-6 gap-[8.5px] rounded-xl bg-[#222838] p-3"
+  >
+    <button
+      v-for="(gradient, index) in backgroundGradients"
+      :key="gradient"
+      type="button"
+      class="h-[25px] w-[25px] rounded transition-transform duration-150 hover:scale-110 focus-visible:ring-2 focus-visible:ring-[#E8D1F8]"
+      :class="gradient === value ? 'ring-2 ring-[#E8D1F8]' : ''"
+      :style="{ backgroundImage: gradient }"
+      :aria-label="`Use gradient ${index + 1} as background`"
+      :aria-pressed="gradient === value"
+      @click="$emit('select', { gradient })"
+    ></button>
+  </div>
+  <div
+    v-else
     class="bg-gradient-selection p-2 gap-2 grid"
     :class="{
       'grid-cols-6': count === 6,
@@ -40,6 +57,7 @@
 defineProps<{
   value?: string
   count?: number
+  backgroundPanel?: boolean
 }>()
 
 // Each entry is a ready-to-use CSS gradient value. It is stored on

@@ -1,31 +1,31 @@
 <template>
-  <div class="select-menu-ctn w-[80px]">
-    <USelectMenu
-      class="absolute border-0 shadow-none max-w-[80px] pr-1"
+  <div class="select-menu-ctn w-[100px] shrink-0">
+    <CowSelectMenu
+      class="w-full max-w-full border-0 shadow-none"
       searchable
-      searchable-placeholder="Search version"
-      select-class="bg-white dark:bg-primary-800 border-3 shadow-none outline-none w-[16ch] text-center"
+      searchable-placeholder="Search name or abbreviation"
+      select-class="h-[34px] w-full min-w-0 overflow-hidden bg-gray-100 dark:bg-[#171d2b] border-0 shadow-none outline-none rounded-full font-semibold text-gray-900 dark:text-white text-left pl-3 justify-between"
       size="xs"
       :options="bibleVersionSelectOptions"
       :model-value="bibleVersion"
       variant="none"
-      color="primary"
+      color="gray"
       clear-search-on-close
       :ui="{
-        base: 'bg-primary-500',
-        input: 'bg-primary-500',
-        color: {
-          primary: {
-            outline: 'shadow-sm bg-primary-500 ',
+        trailing: { padding: { xs: '' } },
+        icon: {
+          trailing: {
+            wrapper: 'bible-version-trailing flex items-center gap-1',
           },
         },
       }"
       :ui-menu="{
-        width: 'min-w-[140px]',
-        input: 'text-xs',
+        width: 'min-w-[280px]',
+        input: 'text-sm',
         empty: 'text-xs',
         option: {
-          size: 'text-xs',
+          size: 'text-sm',
+          padding: 'px-3 py-2.5',
         },
       }"
       @open="onOpen"
@@ -36,19 +36,24 @@
           : (bibleVersion = $event)
       "
     >
-      <template #option="{ option: version }">
-        <span v-if="version === '+ More Versions'" class="pb-5">
-          <UButton
-            size="xs"
-            class="w-full h-[30px] whitespace-nowrap absolute bottom-0 right-0 left-0"
-            @click="useGlobalEmit(appWideActions.openSettings, 'bible-version')"
-          >
-            <IconWrapper name="i-bx-plus" size="4" /> Add more
-          </UButton>
-        </span>
-        <span v-else class="truncate">{{ version }}</span>
+      <template #trailing>
+        <div class="w-px h-4 bg-gray-200 dark:bg-white/10"></div>
+        <IconWrapper
+          name="i-bx-chevron-down"
+          size="5"
+          class="text-gray-500 dark:text-[#a7afbd]"
+        />
       </template>
-    </USelectMenu>
+      <template #option="{ option: version }">
+        <span
+          v-if="version === '+ More Versions'"
+          class="text-primary-500 dark:text-primary-400 font-medium"
+        >
+          Add More
+        </span>
+        <span v-else class="truncate">{{ versionLabel(version) }}</span>
+      </template>
+    </CowSelectMenu>
   </div>
 </template>
 
@@ -70,8 +75,20 @@ const bibleVersion = ref<string>(
 )
 const emit = defineEmits(["change", "open", "close"])
 
-const { bibleVersionSelectOptions, populateBibleVersionOptions } =
-  useBibleVersionManager()
+const {
+  bibleVersionSelectOptions,
+  bibleVersionOptions,
+  populateBibleVersionOptions,
+} = useBibleVersionManager()
+
+// Display the full version name with its abbreviation, e.g. "King James Version (KJV)".
+// Falls back to the raw id when no matching name is known.
+const versionLabel = (id: string) => {
+  const name =
+    bibleVersionOptions.value.find((v) => v.id === id)?.name ||
+    bibleVersionObjects.find((v) => v.id === id)?.name
+  return name ? `${name} (${id})` : id
+}
 
 const onOpen = async () => {
   await populateBibleVersionOptions()
@@ -97,3 +114,18 @@ watch(bibleVersion, (newValue, oldValue) => {
   emit("change", newValue)
 })
 </script>
+
+<style>
+/* Deliberately global + !important: Nuxt UI's config-merge always tail-merges
+   the library's own "absolute inset-y-0 end-0" default for icon.trailing.wrapper
+   in AFTER any :ui override (see node_modules/@nuxt/ui/dist/runtime/utils/index.js
+   defuTwMerge — it runs the override and the library default through
+   tailwind-merge with the library default passed last, so its position utility
+   always wins). There is no way to turn that off via the :ui prop, so the
+   divider+chevron end up absolutely positioned over the label text instead of
+   flowing after it. Forcing position:static here is the only reliable fix. */
+.bible-version-trailing {
+  position: static !important;
+  padding-right: 0 !important;
+}
+</style>

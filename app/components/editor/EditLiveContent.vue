@@ -1,6 +1,8 @@
 <template>
   <div
-    class="main relative h-full min-h-0"
+    ref="editorRoot"
+    data-cow-popover-boundary
+    class="main relative h-full min-h-0 flex flex-col rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1"
     :class="containerOverflow === 'overflow-x-auto' ? '' : 'overflow-hidden'"
     @dragenter="onBgDragEnter"
     @dragover="onBgDragOver"
@@ -12,16 +14,16 @@
       tinted
       icon="i-bx-cloud-upload"
       sub="Drop to set as slide background"
-      class="absolute inset-0 z-20 pointer-events-none"
+      class="absolute inset-0 z-40 pointer-events-none"
     />
-    <div>
+    <div v-if="slide" class="shrink-0">
       <div
         v-if="slide"
-        class="toolbar w-[100%] px-3 py-1 min-h-[44px] bg-primary-100 dark:bg-[#222938] rounded-t-md flex items-center justify-between"
+        class="toolbar w-[100%] px-3 py-1 min-h-[44px] bg-[#f1f3f6] dark:bg-[#222938] flex items-center justify-between gap-1"
       >
         <template v-if="slide">
           <div
-            class="slide-name flex items-center gap-2 top-1 text-primary-900 dark:text-primary-100"
+            class="slide-name flex items-center gap-1 top-1 text-gray-700 dark:text-[#d5dae3] shrink-0"
           >
             <h4 class="font-medium text-nowrap">
               {{ useShortSlideName(slide, { longer: true }) }}
@@ -38,7 +40,7 @@
               :popper="{ placement: 'bottom' }"
             >
               <div
-                class="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow animate-pulse ml-2"
+                class="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow animate-pulse ml-1"
                 :style="{ backgroundColor: editingBy.theme || '#f59e0b' }"
               >
                 <img
@@ -54,320 +56,199 @@
             </UTooltip>
           </div>
           <div
-            class="actions flex items-center ml-4"
-            :class="containerOverflow"
+            class="right-group flex items-center gap-1 flex-1 justify-end min-w-0"
           >
-            <!-- <FontSelect
-            v-if="slide?.type === slideTypes?.text"
-            size="sm"
-            class="mr-2"
-            @change="$emit('update-bible-version', $event)"
-          /> -->
+            <div
+              class="actions flex items-center gap-1 min-w-0"
+              :class="containerOverflow"
+            >
+              <!-- VERSE SWITCH -->
+              <BibleVerseSwitch
+                v-if="
+                  (slide?.type === slideTypes?.bible ||
+                    slide?.type === slideTypes?.hymn ||
+                    slide?.type === slideTypes?.song ||
+                    slide?.type === slideTypes?.songSetlist) &&
+                  !isEmptySongSetlist
+                "
+                v-model="verse"
+                :slide="slide"
+                @previous-verse="handlePreviousVerse"
+                @next-verse="handleNextVerse"
+                @goto-verse="$emit('goto-verse', verse, selectedBibleVersion)"
+                @take-live="$emit('take-live')"
+                @predict="predictVerseInput($event as HTMLInputElement)"
+              />
+              <!-- Chapter verse list — revealed on hover of the verse switcher.
+                 Must stay the immediate next sibling of .verse-switch for the
+                 `.verse-switch:hover + .verse-preview` CSS to work. -->
+              <PreviewVerses
+                v-if="
+                  (slide?.type === slideTypes.hymn ||
+                    slide?.type === slideTypes.song ||
+                    slide?.type === slideTypes.songSetlist ||
+                    slide?.type === slideTypes.bible) &&
+                  !isEmptySongSetlist
+                "
+                class="preview-verses"
+                :slide="slide"
+                :verse="verse"
+                @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
+                @goto-song="goToSetlistSong"
+                @remove-song="removeSetlistSong"
+              />
+              <!-- Component to Auto complete Bible Books while typing -->
+              <BibleAutoComplete
+                v-if="slide?.type === slideTypes.bible && !verse?.includes(':')"
+                :verse="verse"
+                @goto-book="predictVerseInput(undefined, $event)"
+                @book-options="searchedBibleBookOptions = $event"
+              />
+
+              <!-- PAGE SWITCH — presentation slides -->
+              <div
+                v-if="slide?.type === slideTypes.presentation"
+                class="page-switch button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
+              >
+                <UTooltip text="Previous page" :popper="{ arrow: true }">
+                  <UButton
+                    variant="ghost"
+                    color="gray"
+                    class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
+                    icon="i-bx-chevron-left"
+                    :disabled="(slide.presentationPageIndex ?? 0) <= 0"
+                    @click="handlePreviousPage"
+                  />
+                </UTooltip>
+                <span
+                  class="text-xs font-medium px-1 text-gray-900 dark:text-[#d5dae3] min-w-[5ch] text-center"
+                >
+                  {{ (slide.presentationPageIndex ?? 0) + 1 }} /
+                  {{ slide.presentationObjects?.length ?? 1 }}
+                </span>
+                <UTooltip text="Next page" :popper="{ arrow: true }">
+                  <UButton
+                    variant="ghost"
+                    color="gray"
+                    class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
+                    icon="i-bx-chevron-right"
+                    :disabled="
+                      (slide.presentationPageIndex ?? 0) >=
+                      (slide.presentationObjects?.length ?? 1) - 1
+                    "
+                    @click="handleNextPage"
+                  />
+                </UTooltip>
+              </div>
+              <PreviewPages
+                v-if="slide?.type === slideTypes.presentation"
+                class="preview-pages"
+                :slide="slide"
+                @goto-page="handleGotoPage"
+              />
+              <BibleVersionSelect
+                v-if="slide?.type === slideTypes?.bible"
+                class="h-[34px] shrink-0"
+                :bibleVersionInherited="selectedBibleVersion"
+                @open="containerOverflow = ''"
+                @close="containerOverflow = 'overflow-x-auto'"
+                @change="onUpdateBibleVersion($event)"
+              />
+              <!-- TABS: Scripture / Background / Layout -->
+              <div class="tabs flex items-center gap-1 shrink-0">
+                <template v-for="(tab, i) in visibleTabs" :key="tab.key">
+                  <div
+                    v-if="i > 0"
+                    class="w-px h-4 bg-gray-200 dark:bg-white/10"
+                  ></div>
+                  <CoWPopover
+                    :open="activePanel === tab.key"
+                    :boundary="editorRoot"
+                    :max-width="
+                      tab.key === 'background'
+                        ? backgroundPopoverSize.width
+                        : tab.key === 'scripture'
+                        ? scripturePopoverSize.width
+                        : layoutPopoverSize.width
+                    "
+                    :max-height="
+                      tab.key === 'background'
+                        ? backgroundPopoverSize.height
+                        : tab.key === 'scripture'
+                        ? scripturePopoverSize.height
+                        : layoutPopoverSize.height
+                    "
+                    :boundary-overflow="120"
+                    :panel-class="
+                      tab.key === 'background'
+                        ? '!rounded-[18px] !bg-[#131724] !shadow-none !ring-0'
+                        : '!rounded-[18px] !bg-[#f1f3f6] !shadow-none !ring-0 dark:!bg-[#131724]'
+                    "
+                    @update:open="onPanelOpenChange(tab.key, $event)"
+                  >
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
+                      :class="
+                        activePanel === tab.key
+                          ? 'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white'
+                          : 'text-gray-500 dark:text-[#a7afbd] hover:text-gray-900 dark:hover:text-white'
+                      "
+                    >
+                      {{ tab.label }}
+                    </button>
+
+                    <template #panel>
+                      <div
+                        class="h-full w-full"
+                        :class="
+                          tab.key === 'background'
+                            ? 'bg-[#131724]'
+                            : 'bg-[#f1f3f6] dark:bg-[#131724]'
+                        "
+                      >
+                        <GotoScripture
+                          v-if="tab.key === 'scripture'"
+                          :verse="verse"
+                          :version="selectedBibleVersion"
+                          @goto-verse="onScriptureGoto"
+                          @close="activePanel = null"
+                          @resize="scripturePopoverSize = $event"
+                        />
+                        <SlideBackgroundPanel
+                          v-else-if="tab.key === 'background'"
+                          :slide="slide"
+                          @select="onSelectBackground"
+                          @loading-change="onBgPanelLoading"
+                          @upload-files="onPanelUploadFiles"
+                          @resize="backgroundPopoverSize = $event"
+                          @close="activePanel = null"
+                        />
+                        <BibleThemeSelection
+                          v-else
+                          :value="slide?.slideStyle?.theme"
+                          @select="onSelectTheme"
+                          @resize="layoutPopoverSize = $event"
+                        />
+                      </div>
+                    </template>
+                  </CoWPopover>
+                </template>
+              </div>
+            </div>
+
+            <!-- GO LIVE -->
             <UTooltip text="Take slide live" :popper="{ arrow: true }">
               <UButton
                 variant="ghost"
-                color="primary"
-                class="p-2 px-2 hover:text-red-600 hover:bg-red-300"
-                icon="i-bx-slideshow"
+                color="gray"
+                class="go-live shrink-0 rounded-full px-4 h-[34px] gap-1.5 font-medium bg-gray-200/80 dark:bg-[#2b3242] text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-[#333c4e]"
                 @click="$emit('take-live')"
               >
+                <GoLiveIcon class="w-4 h-4" />
+                Go Live
               </UButton>
             </UTooltip>
-
-            <!-- VERSE SWITCH -->
-            <div
-              v-if="
-                (slide?.type === slideTypes?.bible ||
-                  slide?.type === slideTypes?.hymn ||
-                  slide?.type === slideTypes?.song ||
-                  slide?.type === slideTypes?.songSetlist) &&
-                !isEmptySongSetlist
-              "
-              class="verse-switch button-group bg-primary-200 dark:bg-[#171d2b] rounded-l-md mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
-            >
-              <UTooltip text="Previous verse" :popper="{ arrow: true }">
-                <UButton
-                  variant="ghost"
-                  class="p-1"
-                  icon="i-bx-chevron-left"
-                  @click="handlePreviousVerse"
-                />
-              </UTooltip>
-              <UInput
-                placeholder="Verse"
-                size="xs"
-                variant="none"
-                id="bible-verse-input"
-                v-model="verse"
-                autocomplete="off"
-                :inputClass="`bg-white border-0 shadow-none outline-none text-center dark:text-primary-900 transition-all ${
-                  verse?.length > 20 ? 'px-1' : ''
-                }`"
-                :style="`width: ${
-                  slide?.type === slideTypes.bible
-                    ? (verse?.replaceAll(' ', '').length || 10) + 3
-                    : (verse?.length || 10) + 2
-                }ch`"
-                @focus="$event.target.select()"
-                @keydown.tab.prevent="predictVerseInput($event.target)"
-                @keydown.arrow-right.prevent="predictVerseInput($event.target)"
-                @keydown.enter="
-                  $emit('goto-verse', verse, selectedBibleVersion)
-                  ;($event.target as HTMLInputElement).blur()
-                "
-                @keydown="
-                  (e: KeyboardEvent) => {
-                    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-                      e.preventDefault()
-                      $emit('take-live')
-                    }
-                  }
-                "
-              />
-              <UTooltip text="Next verse" :popper="{ arrow: true }">
-                <UButton
-                  variant="ghost"
-                  class="p-1"
-                  icon="i-bx-chevron-right"
-                  @click="handleNextVerse"
-                />
-              </UTooltip>
-            </div>
-            <!-- Component to Auto complete Bible Books while typing -->
-            <BibleAutoComplete
-              v-if="slide?.type === slideTypes.bible && !verse?.includes(':')"
-              :verse="verse"
-              @goto-book="predictVerseInput(undefined, $event)"
-              @book-options="searchedBibleBookOptions = $event"
-            />
-            <PreviewVerses
-              v-if="
-                (slide?.type === slideTypes.hymn ||
-                  slide?.type === slideTypes.song ||
-                  slide?.type === slideTypes.songSetlist ||
-                  slide?.type === slideTypes.bible) &&
-                !isEmptySongSetlist
-              "
-              class="preview-verses"
-              :slide="slide"
-              :verse="verse"
-              @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
-              @goto-song="goToSetlistSong"
-              @remove-song="removeSetlistSong"
-            />
-
-            <!-- PAGE SWITCH — presentation slides -->
-            <div
-              v-if="slide?.type === slideTypes.presentation"
-              class="page-switch button-group bg-primary-200 dark:bg-[#171d2b] rounded-l-md mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
-            >
-              <UTooltip text="Previous page" :popper="{ arrow: true }">
-                <UButton
-                  variant="ghost"
-                  class="p-1"
-                  icon="i-bx-chevron-left"
-                  :disabled="(slide.presentationPageIndex ?? 0) <= 0"
-                  @click="handlePreviousPage"
-                />
-              </UTooltip>
-              <span
-                class="text-xs font-medium px-1 text-primary-900 dark:text-primary-100 min-w-[5ch] text-center"
-              >
-                {{ (slide.presentationPageIndex ?? 0) + 1 }} /
-                {{ slide.presentationObjects?.length ?? 1 }}
-              </span>
-              <UTooltip text="Next page" :popper="{ arrow: true }">
-                <UButton
-                  variant="ghost"
-                  class="p-1"
-                  icon="i-bx-chevron-right"
-                  :disabled="
-                    (slide.presentationPageIndex ?? 0) >=
-                    (slide.presentationObjects?.length ?? 1) - 1
-                  "
-                  @click="handleNextPage"
-                />
-              </UTooltip>
-            </div>
-            <PreviewPages
-              v-if="slide?.type === slideTypes.presentation"
-              class="preview-pages"
-              :slide="slide"
-              @goto-page="handleGotoPage"
-            />
-            <BibleVersionSelect
-              v-if="slide?.type === slideTypes?.bible"
-              class="bg-primary-200 dark:bg-[#171d2b] rounded-r-md mr-1 flex items-center gap-1 h-[32px] relative min-w-[80px]"
-              :bibleVersionInherited="selectedBibleVersion"
-              @open="containerOverflow = ''"
-              @close="containerOverflow = 'overflow-x-auto'"
-              @change="onUpdateBibleVersion($event)"
-            />
-            <!-- <UPopover
-              v-if="slide?.layout !== slideLayoutTypes.bible"
-              v-model:open="layoutPopoverOpen"
-            >
-              <UTooltip text="Switch slide layout" :popper="{ arrow: true }">
-                <UButton
-                  variant="ghost"
-                  icon="i-mingcute-layout-3-line"
-                  :disabled="!slide"
-                />
-              </UTooltip>
-              <template #panel>
-                <SlideLayoutSelection
-                  :value="slide?.layout"
-                  @select="onSelectLayout"
-                />
-              </template>
-            </UPopover> -->
-            <div
-              v-show="
-                slide?.type !== slideTypes.presentation &&(slide?.type !== slideTypes.media ||
-                (slide?.type === slideTypes.media &&
-                  (slide?.data as ExtendedFileT)?.type?.includes('audio')))
-              "
-              class="button-group flex rounded-md mx-1 p-1"
-              :class="{
-                'bg-primary-200 dark:bg-[#171d2b]':
-                  slide?.layout !== slideLayoutTypes.bible,
-              }"
-            >
-              <UPopover
-                v-if="slide?.type === slideTypes.bible"
-                v-model:open="gotoScriptureOpen"
-              >
-                <UTooltip text="Go to scripture" :popper="{ arrow: true }">
-                  <UButton
-                    variant="ghost"
-                    class="px-1.5"
-                    icon="i-bx-book-open"
-                    :disabled="!slide"
-                  />
-                </UTooltip>
-                <template #panel>
-                  <GotoScripture
-                    :verse="verse"
-                    :version="selectedBibleVersion"
-                    @goto-verse="
-                      $emit('goto-verse', $event, selectedBibleVersion)
-                    "
-                    @close="gotoScriptureOpen = false"
-                  />
-                </template>
-              </UPopover>
-              <UPopover v-model:open="bgEditBgPopoverOpen">
-                <UTooltip text="Style background" :popper="{ arrow: true }">
-                  <UButton
-                    variant="ghost"
-                    class="px-1.5"
-                    icon="i-bx-slider"
-                    :disabled="!slide"
-                  />
-                </UTooltip>
-                <template #panel>
-                  <BgStyle />
-                </template>
-              </UPopover>
-              <UPopover v-model:open="bgSelectPopoverOpen">
-                <UTooltip text="Add background" :popper="{ arrow: true }">
-                  <UButton
-                    variant="ghost"
-                    class="px-1.5"
-                    :icon="
-                      backgroundImageLoading || backgroundVideoLoading
-                        ? 'i-bx-loader-alt'
-                        : 'i-bx-images'
-                    "
-                    :loading="backgroundImageLoading || backgroundVideoLoading"
-                    :disabled="
-                      !slide || backgroundImageLoading || backgroundVideoLoading
-                    "
-                  />
-                </UTooltip>
-                <template #panel>
-                  <div class="p-2 w-[350px]">
-                    <UTabs
-                      :items="backgroundTabs"
-                      v-model:model-value="activeBackgroundTab"
-                      :ui="{ wrapper: 'space-y-2' }"
-                    />
-                    <div class="tab-content">
-                      <BgImageSelection
-                        v-if="activeBackgroundTabKey === backgroundTypes.image"
-                        :value="slide?.background"
-                        @loading-change="backgroundImageLoading = $event"
-                        @select="
-                          onSelectBackground(
-                            backgroundTypes.image,
-                            $event.image
-                          )
-                        "
-                      />
-                      <BgVideoSelection
-                        v-else-if="
-                          activeBackgroundTabKey === backgroundTypes.video
-                        "
-                        :value="slide?.background"
-                        @loading-change="backgroundVideoLoading = $event"
-                        @select="
-                          onSelectBackground(backgroundTypes.video, $event)
-                        "
-                      />
-                      <BgColorSelection
-                        v-else-if="
-                          activeBackgroundTabKey === backgroundTypes.solid
-                        "
-                        :value="slide?.background"
-                        @select="
-                          onSelectBackground(
-                            backgroundTypes.solid,
-                            $event.color
-                          )
-                        "
-                      />
-                      <BgGradientSelection
-                        v-else-if="
-                          activeBackgroundTabKey === backgroundTypes.gradient
-                        "
-                        :value="slide?.background"
-                        @select="
-                          onSelectBackground(
-                            backgroundTypes.gradient,
-                            $event.gradient
-                          )
-                        "
-                      />
-                    </div>
-                  </div>
-                </template>
-              </UPopover>
-              <UPopover
-                v-if="slide?.type === slideTypes.bible"
-                v-model:open="themePopoverOpen"
-              >
-                <UTooltip text="Slide Themes" :popper="{ arrow: true }">
-                  <UButton
-                    variant="ghost"
-                    class="px-1.5"
-                    icon="i-mdi-theme"
-                    :disabled="!slide"
-                  />
-                </UTooltip>
-                <template #panel>
-                  <BibleThemeSelection
-                    :value="slide?.slideStyle?.theme"
-                    @select="onSelectTheme"
-                  />
-                </template>
-              </UPopover>
-            </div>
-            <!-- <UButton
-          class="px-2 pr-3 ml-1 text-xs"
-          icon="i-bx-play-circle"
-          @click="$emit('update-live-output-slides')"
-          >Promote to Live</UButton
-        > -->
           </div>
         </template>
       </div>
@@ -399,89 +280,95 @@
       />
     </div>
 
-    <!-- MAIN CONTENT -->
-    <EmptyState
-      v-if="!slide"
-      icon="i-bx-slideshow"
-      svg-icon="NoSlidesIcon"
-      sub="Select slide above to start editing"
-      action=""
-      action-text=""
-    />
-    <template v-else-if="slide">
+    <!-- MAIN CONTENT — preview region (overlay panels layer on top) -->
+    <div class="body relative flex-1 min-h-0">
       <EmptyState
-        v-if="isEmptySongSetlist"
-        icon="i-lucide-list-music"
-        sub="Add songs to this setlist from the song list"
+        v-if="!slide"
+        icon="i-bx-slideshow"
+        svg-icon="NoSlidesIcon"
+        sub="Select slide above to start editing"
         action=""
         action-text=""
-        class="h-[100%] bg-[#222938] rounded-b-md"
       />
-      <!-- IMAGE NOT AVAILABLE ON THIS DEVICE NOTICE -->
-      <div
-        v-else-if="imageNotAvailable"
-        class="h-[100%] flex flex-col items-center justify-center gap-4 p-6 text-center bg-[#222938] rounded-b-md"
-      >
-        <IconWrapper name="i-bx-image-alt" size="12" class="text-primary-400" />
-        <div>
-          <h3 class="text-white font-semibold text-md">
-            Image not available on this device
-          </h3>
-          <p class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
-            This image was added on another device and isn't stored in the
-            cloud. Upgrade to Teams to sync media across all your devices.
-          </p>
-        </div>
-        <UButton
-          icon="i-bxs-award"
-          class="mt-1"
-          @click="useGlobalEmit('show-upgrade-modal')"
-        >
-          Upgrade to Teams
-        </UButton>
-      </div>
-      <div
-        v-else
-        class="h-[100%] relative text-white bg-[#222938] bg-no-repeat transition-all rounded-b-md overflow-hidden"
-        :class="{
-          'bg-center bg-cover':
-            slide?.slideStyle?.backgroundFillType ===
-              backgroundFillTypes.crop ||
-            slide?.slideStyle?.backgroundFillType == undefined,
-          'bg-top bg-cover':
-            slide?.slideStyle?.backgroundFillType ===
-            backgroundFillTypes.cropTop,
-          'bg-bottom bg-cover':
-            slide?.slideStyle?.backgroundFillType ===
-            backgroundFillTypes.cropBottom,
-          'bg-center bg-contain':
-            slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
-          'bg-center bg-stretch':
-            slide?.slideStyle?.backgroundFillType ===
-            backgroundFillTypes.stretch,
-          // 'bg-center':
-          //   slide?.slideStyle?.backgroundFillType === backgroundFillTypes.center,
-        }"
-        :style="useSlideBackground(slide)"
-      >
-        <!-- VIDEO BACKGROUND -->
-        <video
-          v-if="slide?.backgroundType === backgroundTypes.video"
-          :src="slide?.background"
-          class="h-[100%] w-[100%] object-cover absolute inset-0"
-          crossorigin="anonymous"
-        ></video>
-        <div class="bg-black opacity-30 absolute inset-0"></div>
-        <TipTap
-          v-if="slide"
-          :slide="slide"
-          @update="onUpdateSlideContent"
-          @change-focused-editor="focusedEditor = $event"
-          :layout="slide?.layout"
-          editable
+      <template v-else-if="slide">
+        <EmptyState
+          v-if="isEmptySongSetlist"
+          icon="i-lucide-list-music"
+          sub="Add songs to this setlist from the song list"
+          action=""
+          action-text=""
+          class="h-[100%] bg-[#222938] rounded-b-2xl"
         />
-      </div>
-    </template>
+        <!-- IMAGE NOT AVAILABLE ON THIS DEVICE NOTICE -->
+        <div
+          v-else-if="imageNotAvailable"
+          class="h-[100%] flex flex-col items-center justify-center gap-4 p-6 text-center bg-[#222938] rounded-b-2xl"
+        >
+          <IconWrapper
+            name="i-bx-image-alt"
+            size="12"
+            class="text-primary-400"
+          />
+          <div>
+            <h3 class="text-white font-semibold text-md">
+              Image not available on this device
+            </h3>
+            <p class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
+              This image was added on another device and isn't stored in the
+              cloud. Upgrade to Teams to sync media across all your devices.
+            </p>
+          </div>
+          <UButton
+            icon="i-bxs-award"
+            class="mt-1"
+            @click="useGlobalEmit('show-upgrade-modal')"
+          >
+            Upgrade to Teams
+          </UButton>
+        </div>
+        <div
+          v-else
+          class="h-[100%] relative text-white bg-[#222938] bg-no-repeat transition-all rounded-b-2xl overflow-hidden"
+          :class="{
+            'bg-center bg-cover':
+              slide?.slideStyle?.backgroundFillType ===
+                backgroundFillTypes.crop ||
+              slide?.slideStyle?.backgroundFillType == undefined,
+            'bg-top bg-cover':
+              slide?.slideStyle?.backgroundFillType ===
+              backgroundFillTypes.cropTop,
+            'bg-bottom bg-cover':
+              slide?.slideStyle?.backgroundFillType ===
+              backgroundFillTypes.cropBottom,
+            'bg-center bg-contain':
+              slide?.slideStyle?.backgroundFillType === backgroundFillTypes.fit,
+            'bg-center bg-stretch':
+              slide?.slideStyle?.backgroundFillType ===
+              backgroundFillTypes.stretch,
+            // 'bg-center':
+            //   slide?.slideStyle?.backgroundFillType === backgroundFillTypes.center,
+          }"
+          :style="useSlideBackground(slide)"
+        >
+          <!-- VIDEO BACKGROUND -->
+          <video
+            v-if="slide?.backgroundType === backgroundTypes.video"
+            :src="slide?.background"
+            class="h-[100%] w-[100%] object-cover absolute inset-0"
+            crossorigin="anonymous"
+          ></video>
+          <div class="bg-black opacity-30 absolute inset-0"></div>
+          <TipTap
+            v-if="slide"
+            :slide="slide"
+            @update="onUpdateSlideContent"
+            @change-focused-editor="focusedEditor = $event"
+            :layout="slide?.layout"
+            editable
+          />
+        </div>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -489,6 +376,7 @@
 import { useOnline } from "@vueuse/core"
 import { safeDBGet } from "~/composables/useIndexedDB"
 import { splitVerseByLines } from "~/composables/useHymn"
+import CoWPopover from "~/components/cow/CoWPopover.vue"
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
@@ -523,44 +411,80 @@ const emit = defineEmits([
 
 const appStore = useAppStore()
 
+const editorRoot = ref<HTMLElement | null>(null)
 const focusedEditor = ref<Editor | undefined>()
-const layoutPopoverOpen = ref<boolean>(false)
-const bgEditBgPopoverOpen = ref<boolean>(false)
-const bgSelectPopoverOpen = ref<boolean>(false)
-const activeBackgroundTab = ref<number>(0)
 const backgroundImageLoading = ref<boolean>(false)
 const backgroundVideoLoading = ref<boolean>(false)
 
-// Background type tabs shown inside the single "Add background" popover.
-// The Video tab is hidden for audio media slides (a video bg makes no sense there).
-const backgroundTabs = computed(() => {
+// Only one editor action popover can be open at a time.
+type PanelKey = "scripture" | "background" | "layout"
+type PopoverSize = { width: number; height: number }
+const activePanel = ref<PanelKey | null>(null)
+const getInitialBackgroundPopoverSize = (): PopoverSize =>
+  props.slide?.backgroundType === backgroundTypes.solid ||
+  props.slide?.backgroundType === backgroundTypes.gradient
+    ? { width: 401, height: 200 }
+    : { width: 753, height: 314 }
+const backgroundPopoverSize = ref<PopoverSize>(
+  getInitialBackgroundPopoverSize()
+)
+const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+
+// Toolbar tabs that toggle the overlay panels. Scripture/Layout are Bible-only;
+// Background mirrors the old "add background" visibility (hidden for presentation
+// and non-audio media slides).
+const visibleTabs = computed(() => {
   const isAudio = (props.slide?.data as ExtendedFileT)?.type?.includes("audio")
-  return [
-    { key: backgroundTypes.image, label: "Image" },
-    ...(isAudio ? [] : [{ key: backgroundTypes.video, label: "Video" }]),
-    { key: backgroundTypes.solid, label: "Color" },
-    {
-      key: backgroundTypes.gradient,
-      label: "Gradient",
-    },
-  ]
+  const isBible = props.slide?.type === slideTypes.bible
+  const showBackground =
+    props.slide?.type !== slideTypes.presentation &&
+    (props.slide?.type !== slideTypes.media || isAudio)
+  const tabs: { key: PanelKey; label: string }[] = []
+  if (isBible) tabs.push({ key: "scripture", label: "Scripture" })
+  if (showBackground) tabs.push({ key: "background", label: "Background" })
+  if (isBible) tabs.push({ key: "layout", label: "Layout" })
+  return tabs
 })
 
-const activeBackgroundTabKey = computed(
-  () => backgroundTabs.value[activeBackgroundTab.value]?.key
+const onPanelOpenChange = (key: PanelKey, open: boolean) => {
+  if (open) {
+    activePanel.value = key
+  } else if (activePanel.value === key) {
+    activePanel.value = null
+  }
+}
+
+// Navigate to a verse chosen in the Scripture picker, then close the panel.
+const onScriptureGoto = (title: string) => {
+  emit("goto-verse", title, selectedBibleVersion.value)
+  activePanel.value = null
+}
+
+// Reflect background upload/loading on the toolbar if needed.
+const onBgPanelLoading = (loading: boolean) => {
+  backgroundImageLoading.value = loading
+}
+
+// Files dropped/selected in the Background panel's upload zone — reuse the
+// existing drag-and-drop handlers so there's a single upload path.
+const onPanelUploadFiles = (files: File[], kind: "image" | "video") => {
+  files.forEach((file) => {
+    if (kind === "image") addDroppedBackgroundImage(file)
+    else addDroppedBackgroundVideo(file)
+  })
+}
+
+// Close any open panel when its trigger slide goes away or the type no longer
+// supports the active panel.
+watch(
+  () => props.slide?.id,
+  () => {
+    activePanel.value = null
+    backgroundPopoverSize.value = getInitialBackgroundPopoverSize()
+  }
 )
 
-// When the popover opens, jump to the tab matching the slide's current background.
-watch(bgSelectPopoverOpen, (open) => {
-  if (!open) return
-  const idx = backgroundTabs.value.findIndex(
-    (tab) => tab.key === props.slide?.backgroundType
-  )
-  activeBackgroundTab.value = idx === -1 ? 0 : idx
-})
-
-const themePopoverOpen = ref<boolean>(false)
-const gotoScriptureOpen = ref<boolean>(false)
 const slideContents = ref<Array<string>>([])
 const verse = ref<string>(props.slide?.title || "")
 const searchedBibleBookOptions = ref<string[]>([])
@@ -802,8 +726,6 @@ watch(
       // Different slide — always reset verse
       verse.value = newSlide?.title || ""
       slideContents.value = [...(newSlide?.contents || [])]
-      // Close the scripture picker — it was tied to the previous slide
-      gotoScriptureOpen.value = false
     } else if (newSlide?.title !== oldSlide?.title && !verseInputFocused) {
       // Same slide, title updated (e.g. after a successful gotoVerse) — update
       verse.value = newSlide?.title || ""
@@ -948,6 +870,9 @@ onMounted(() => {
   emitter.on(appWideActions.previousVerse, handleVoicePreviousVerse)
   emitter.on(appWideActions.gotoVerseNumber, handleVoiceGotoVerseNumber)
   emitter.on(appWideActions.changeBibleVersion, handleVoiceBibleVersionChange)
+
+  // Close an open overlay panel on Escape.
+  window.addEventListener("keydown", handlePanelEscape)
 })
 
 onUnmounted(() => {
@@ -955,7 +880,12 @@ onUnmounted(() => {
   emitter.off(appWideActions.previousVerse, handleVoicePreviousVerse)
   emitter.off(appWideActions.gotoVerseNumber, handleVoiceGotoVerseNumber)
   emitter.off(appWideActions.changeBibleVersion, handleVoiceBibleVersionChange)
+  window.removeEventListener("keydown", handlePanelEscape)
 })
+
+const handlePanelEscape = (e: KeyboardEvent) => {
+  if (e.key === "Escape" && activePanel.value) activePanel.value = null
+}
 
 emitter.on("pause-inactive-slide-video", () => {
   if (props.slide?.type === slideTypes.media) {
@@ -1007,8 +937,6 @@ const onSelectBackground = (
   backgroundType: string,
   data: string | { video: string; key?: string }
 ) => {
-  bgSelectPopoverOpen.value = false
-
   const tempSlide = {
     ...props.slide,
     background: typeof data === "string" ? data : data.video,
@@ -1022,7 +950,9 @@ const onSelectBackground = (
 // image/video, mirroring what BgImageSelection/BgVideoSelection do for uploads.
 const { isFreePlan, isTeamsPlan } = useSubscription()
 const maxDroppedBgImageSize = computed(() => (isFreePlan.value ? 3 : 10))
-const maxDroppedBgVideoSize = computed(() => (isTeamsPlan.value ? Infinity : 250))
+const maxDroppedBgVideoSize = computed(() =>
+  isTeamsPlan.value ? Infinity : 250
+)
 const isDraggingBackgroundFile = ref(false)
 let bgDragCounter = 0
 
@@ -1163,8 +1093,6 @@ const onBgDrop = (event: DragEvent) => {
 }
 
 const onSelectTheme = (themeId: string) => {
-  themePopoverOpen.value = false
-
   const tempSlide: Slide = {
     ...props.slide!!,
     slideStyle: {
@@ -1417,7 +1345,7 @@ const predictVerseInput = (
 .books-preview:hover {
   opacity: 1;
   visibility: visible;
-  max-height: 350px;
+  max-height: calc(100% - 3rem);
 }
 
 .preview-pages {

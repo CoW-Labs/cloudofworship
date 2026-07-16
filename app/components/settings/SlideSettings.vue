@@ -13,7 +13,7 @@
           label="Set default font"
           class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
         >
-          <USelectMenu
+          <CowSelectMenu
             class="border-0 shadow-none w-[200px]"
             searchable
             searchable-placeholder="Search fonts"
@@ -51,7 +51,7 @@
               >
               <span v-else>Select font</span>
             </template>
-          </USelectMenu>
+          </CowSelectMenu>
         </UFormGroup>
 
         <UFormGroup
@@ -84,7 +84,7 @@
           label="Set default slide alignment"
           class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
         >
-          <USelectMenu
+          <CowSelectMenu
             class="border-0 shadow-none max-w-[200px] capitalize"
             select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white capitalize"
             size="md"
@@ -174,7 +174,7 @@
           label="Set default background fill type"
           class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
         >
-          <USelectMenu
+          <CowSelectMenu
             class="border-0 shadow-none max-w-[200px] capitalize"
             select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white capitalize"
             size="md"
@@ -475,7 +475,7 @@
             label="Set slide overlay"
             class="flex w-full items-center justify-between py-2 px-2 hover:bg-primary/10"
           >
-            <USelectMenu
+            <CowSelectMenu
               class="border-0 shadow-none max-w-[200px]"
               select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
               size="md"
@@ -501,7 +501,7 @@
                 }
               "
             >
-            </USelectMenu>
+            </CowSelectMenu>
           </UFormGroup>
         </div>
       </UForm>
@@ -519,7 +519,7 @@
       </div>
       <UForm :state="{}">
         <UFormGroup label="Set default lines per slide">
-          <USelectMenu
+          <CowSelectMenu
             class="absolute border-0 shadow-none top-[6px]"
             select-class="border-3 shadow-none outline-none text-center w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
             size="md"
@@ -567,7 +567,7 @@
                 >Lines per slide</span
               >
             </template>
-          </USelectMenu>
+          </CowSelectMenu>
         </UFormGroup>
       </UForm>
     </div>

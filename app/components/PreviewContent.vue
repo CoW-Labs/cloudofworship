@@ -146,7 +146,7 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
-import { useAppStore } from "~/store/app"
+import { PANEL_SIZE_LIMITS, useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
   Hymn,
@@ -389,10 +389,9 @@ const countdownDuration = ref<number>(0)
 const countdownRAF = ref<number>(0)
 
 // Vertical resize between "Preview and Edit Content" and "Edit Content" sections
-const PREVIEW_MIN_HEIGHT = 240
-const PREVIEW_MAX_HEIGHT = 900
-const PREVIEW_DEFAULT_HEIGHT = 480
-const previewHeight = ref(PREVIEW_DEFAULT_HEIGHT)
+const PREVIEW_MIN_HEIGHT = PANEL_SIZE_LIMITS.previewHeight.min
+const PREVIEW_MAX_HEIGHT = PANEL_SIZE_LIMITS.previewHeight.max
+const previewHeight = ref(appStore.panelSize("previewHeight"))
 const previewColumn = ref<HTMLDivElement | null>(null)
 let vResizeStartY = 0
 let vResizeStartHeight = 0
@@ -413,6 +412,7 @@ const onVResizeMove = (event: MouseEvent) => {
   )
 }
 const onVResizeEnd = () => {
+  appStore.setPanelSize("previewHeight", previewHeight.value)
   document.removeEventListener("mousemove", onVResizeMove)
   document.removeEventListener("mouseup", onVResizeEnd)
   document.body.style.cursor = ""
@@ -503,6 +503,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  appStore.setPanelSize("previewHeight", previewHeight.value)
   slidesResizeObserver?.disconnect()
   slidesResizeObserver = null
   stopEditing()
@@ -1510,6 +1511,10 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
       // Record start time
       countdownStartTime.value = performance.now()
       const startTimeLeft = countdownTimeLeft.value
+
+      // Publish the playing state immediately so toolbar controls do not wait
+      // for the first one-second countdown tick before switching to pause.
+      updateCountdownSlide(slide, countdownTimeLeft.value, true)
 
       // Animation function
       const animate = (currentTime: number) => {

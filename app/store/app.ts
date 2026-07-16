@@ -16,6 +16,31 @@ import { bibleVersionObjects } from "~/utils/constants"
 import { useThrottleFn } from "@vueuse/core"
 import posthog from "posthog-js"
 
+export const PANEL_SIZE_LIMITS = {
+  quickActionsWidth: { min: 300, max: 550, default: 340 },
+  liveOutputWidth: { min: 400, max: 600, default: 450 },
+  previewHeight: { min: 240, max: 900, default: 480 },
+  livePreviewHeight: { min: 160, max: 700, default: 280 },
+  transcriptPanelHeight: { min: 190, max: 520, default: 280 },
+} as const
+
+export type PanelSizeKey = keyof typeof PANEL_SIZE_LIMITS
+export type PanelSizes = Record<PanelSizeKey, number>
+
+const getDefaultPanelSizes = (): PanelSizes => ({
+  quickActionsWidth: PANEL_SIZE_LIMITS.quickActionsWidth.default,
+  liveOutputWidth: PANEL_SIZE_LIMITS.liveOutputWidth.default,
+  previewHeight: PANEL_SIZE_LIMITS.previewHeight.default,
+  livePreviewHeight: PANEL_SIZE_LIMITS.livePreviewHeight.default,
+  transcriptPanelHeight: PANEL_SIZE_LIMITS.transcriptPanelHeight.default,
+})
+
+const clampPanelSize = (panel: PanelSizeKey, size: number) => {
+  const limits = PANEL_SIZE_LIMITS[panel]
+  const safeSize = Number.isFinite(size) ? size : limits.default
+  return Math.min(limits.max, Math.max(limits.min, safeSize))
+}
+
 function ensureUniqueIds(arr: Slide[]): Slide[] {
   const seenIds = new Set()
   return arr.filter((obj) => {
@@ -60,6 +85,7 @@ export const useAppStore = defineStore("app", {
     currentState: AppState
     pastStates: AppState[]
     futureStates: AppState[]
+    panelSizes: PanelSizes
   } => {
     return {
       currentState: {
@@ -142,6 +168,7 @@ export const useAppStore = defineStore("app", {
       // Undo/Redo stacks
       pastStates: [],
       futureStates: [],
+      panelSizes: getDefaultPanelSizes(),
     }
   },
   getters: {
@@ -150,8 +177,13 @@ export const useAppStore = defineStore("app", {
         (slide) => slide.scheduleId === state.currentState.activeSchedule?._id
       ),
     bibleVersions: (state) => state.currentState.settings.bibleVersions,
+    panelSize: (state) => (panel: PanelSizeKey) =>
+      clampPanelSize(panel, state.panelSizes?.[panel]),
   },
   actions: {
+    setPanelSize(panel: PanelSizeKey, size: number) {
+      this.panelSizes[panel] = clampPanelSize(panel, size)
+    },
     setSchedules(schedules: Schedule[]) {
       // onAppStateChange(this.pastStates, this.currentState)
       this.currentState.schedules = schedules?.filter(
