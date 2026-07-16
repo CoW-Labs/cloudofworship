@@ -29,33 +29,10 @@ const tabSessionId = `tab-${Date.now()}-${Math.random().toString(36).substring(2
 // Export the tab session ID for use in other modules
 export { tabSessionId }
 
-// Set true for one tick while we apply a live-slide selection received from a
-// peer, so the `liveSlideId` watcher in pages/index.vue does NOT re-broadcast
-// it back out. Without this guard, every client that receives a live-slide
-// would echo it to the room — harmless (it converges on value equality) but it
-// turns one selection into O(peers) extra socket frames. See index.vue.
-export const suppressLiveSlideBroadcast = ref(false)
-
-export interface CurrentPresenter {
-  userId: string
-  userName: string
-}
-
 export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const appStore = useAppStore()
   const authStore = useAuthStore()
   const toast = useToast()
-
-  // Shared across every consumer of this composable in the current app.
-  const currentPresenter = useState<CurrentPresenter | null>(
-    "current-presenter",
-    () => null
-  )
-  const isCurrentUserPresenting = computed(
-    () =>
-      !currentPresenter.value ||
-      currentPresenter.value.userId === authStore.user?._id
-  )
 
   // Track online users
   const onlineUsers = ref<OnlineUser[]>([])
@@ -379,51 +356,6 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         }
         break
 
-      case 'presenter-changed': {
-        const previousPresenter = currentPresenter.value
-        const nextPresenter =
-          data?.userId && data?.userName
-            ? {
-                userId: data.userId,
-                userName: data.userName,
-              }
-            : null
-
-        currentPresenter.value = nextPresenter
-
-        if (
-          nextPresenter &&
-          previousPresenter?.userId !== nextPresenter.userId
-        ) {
-          toast.add({
-            title: `${nextPresenter.userName} is now presenting`,
-            icon: 'i-tabler-presentation',
-            color: 'red',
-          })
-        }
-        break
-      }
-
-      case 'live-slide': {
-        // A peer took a slide live — mirror their selection locally and drive
-        // this operator's projection window. Cheap and infrequent: one id
-        // compare, one store write, one find, one broadcast per change.
-        const liveId = data?.id || data?._id || data?.slideId
-        if (!liveId || appStore.currentState.liveSlideId === liveId) break
-
-        // Suppress the index.vue watcher so we don't bounce this selection
-        // straight back out to the room.
-        suppressLiveSlideBroadcast.value = true
-        appStore.setLiveSlide(liveId)
-
-        // Project the fully-hydrated local copy (it carries client-only `data`
-        // that the server payload may not), falling back to the wire payload.
-        const localSlide = appStore.currentState.activeSlides.find(
-          (s) => s.id === liveId || s._id === liveId
-        )
-        useBroadcastPost(JSON.stringify(localSlide || data))
-        break
-      }
     }
   }
 
@@ -475,22 +407,6 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     }
   }
 
-  const claimPresenter = () => {
-    const socket = useNuxtApp().$socketio as Socket
-    if (typeof socket?.emit !== "function") return false
-
-    socket.emit('claim-presenter', {})
-    return true
-  }
-
-  const releasePresenter = () => {
-    const socket = useNuxtApp().$socketio as Socket
-    if (typeof socket?.emit !== "function") return false
-
-    socket.emit('release-presenter', {})
-    return true
-  }
-
   /**
    * Cleanup on unmount
    */
@@ -500,7 +416,6 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     slidesBeingEdited.value = {}
     slideLocks.value = {}
     onlineUsers.value = []
-    currentPresenter.value = null
     appStore.clearAllSlidesBeingEdited()
     appStore.setOnlineUsers([])
   }
@@ -512,8 +427,6 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     slidesBeingEdited: readonly(slidesBeingEdited),
     slideLocks: readonly(slideLocks),
     currentLockedSlideId: readonly(currentLockedSlideId),
-    currentPresenter: readonly(currentPresenter),
-    isCurrentUserPresenting,
 
     // Methods
     handleWebSocketMessage,
@@ -523,8 +436,6 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     isSlideLockedByOther,
     getSlideLock,
     releaseCurrentLock,
-    claimPresenter,
-    releasePresenter,
     cleanup,
   }
 }
