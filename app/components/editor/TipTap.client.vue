@@ -107,7 +107,11 @@
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
   >
-    <TiptapEditorContent :editor="uneditableEditorTwo" class="jost" />
+    <TiptapEditorContent
+      v-if="hasCountdownLabel"
+      :editor="uneditableEditorTwo"
+      class="jost"
+    />
     <TiptapEditorContent
       :editor="uneditableEditorThree"
       :class="useURLFriendlyString(slide?.slideStyle?.font || '')"
@@ -174,6 +178,28 @@ const isEditorViewReady = (editor: any) => {
 }
 
 const isEditorUsable = (editor: any) => Boolean(editor && !editor.isDestroyed)
+
+const hasCountdownLabel = computed(() =>
+  Boolean(
+    (props.slide?.contents?.[1] || "")
+      .replace(/<[^>]*>/g, "")
+      .trim()
+  )
+)
+
+const isDefaultEditableEditor = (editorIndex: number) => {
+  if (!props.editable || props.slide.type !== slideTypes.text) return false
+
+  return props.slide.layout === slideLayoutTypes.full_text
+    ? editorIndex === 1
+    : editorIndex === 0
+}
+
+const emitDefaultEditableEditor = (editorIndex: number, editor: any) => {
+  if (isDefaultEditableEditor(editorIndex) && isEditorUsable(editor)) {
+    emit("change-focused-editor", editor)
+  }
+}
 
 // Helper to safely call a command on an editor, guarding against destroyed / unmounted state
 const safeEditorCommand = (editor: any, fn: (e: any) => void) => {
@@ -301,6 +327,8 @@ const editorOne = ref(
       },
     },
     onCreate: ({ editor }) => {
+      emitDefaultEditableEditor(0, editor)
+
       // Apply default white color
       applyDefaultWhiteColor(editor)
 
@@ -342,6 +370,8 @@ const editorTwo = ref(
       },
     },
     onCreate: ({ editor }) => {
+      emitDefaultEditableEditor(1, editor)
+
       // Apply default white color
       applyDefaultWhiteColor(editor)
 
@@ -392,6 +422,25 @@ const editorThree = ref(
       emit("change-focused-editor", editor)
     },
   })
+)
+
+watch(
+  () => [props.slide.id, props.slide.type, props.slide.layout] as const,
+  () => {
+    if (!props.editable || props.slide.type !== slideTypes.text) return
+
+    nextTick(() => {
+      const editor =
+        props.slide.layout === slideLayoutTypes.full_text
+          ? editorTwo.value
+          : editorOne.value
+
+      if (isEditorUsable(editor)) {
+        emit("change-focused-editor", editor)
+      }
+    })
+  },
+  { immediate: true, flush: "post" }
 )
 
 const uneditableEditorOne = ref(

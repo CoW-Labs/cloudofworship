@@ -1,4 +1,27 @@
 <template>
+  <div v-if="backgroundPanel" class="h-full w-full p-3">
+    <div
+      class="grid h-full grid-cols-3 gap-[8.5px] overflow-y-auto overflow-x-hidden"
+    >
+      <button
+        v-for="image in backgroundImages"
+        :key="image"
+        type="button"
+        class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-cover transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[#E8D1F8]"
+        :class="image === value ? 'ring-2 ring-[#E8D1F8]' : ''"
+        :aria-label="image === value ? 'Selected background image' : 'Select background image'"
+        :aria-pressed="image === value"
+        @click="$emit('select', { image })"
+      >
+        <span
+          class="block h-full w-full bg-cover bg-center"
+          :style="{ backgroundImage: `url(${image})` }"
+        ></span>
+      </button>
+    </div>
+  </div>
+
+  <template v-else>
   <div class="bg-image-selection-ctn p-2">
     <div
       class="bg-image-selection grid gap-2 max-h-[190px] overflow-y-auto overflow-x-hidden"
@@ -39,7 +62,7 @@
       </UButton>
     </div>
   </div>
-  <div class="button-ctn p-2 pt-0">
+  <div v-if="!hideUpload" class="button-ctn p-2 pt-0">
     <FileDropzone
       v-if="!settingsPage"
       size="sm"
@@ -79,6 +102,7 @@
       >
     </label>
   </div>
+  </template>
 </template>
 
 <script setup lang="ts">
@@ -89,6 +113,8 @@ import type { Media } from "~/types"
 defineProps<{
   value?: string
   settingsPage?: boolean
+  hideUpload?: boolean
+  backgroundPanel?: boolean
 }>()
 
 const emit = defineEmits(["select", "loading-change"])

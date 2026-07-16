@@ -1,11 +1,11 @@
 <template>
   <div
     ref="versesPreview"
-    class="verse-preview behavior-smooth absolute bg-primary-100 dark:bg-primary-800 right-0 left-0 top-12 z-20 overflow-auto shadow-lg rounded-b-md"
+    class="verse-preview behavior-smooth absolute bg-white dark:bg-[#222938] right-0 left-0 top-[46px] z-20 overflow-auto shadow-lg rounded-b-2xl"
   >
     <div
       v-if="slide?.type === slideTypes.songSetlist"
-      class="sticky top-0 z-10 flex gap-2 overflow-x-auto bg-primary-200 dark:bg-primary-900 px-4 py-3 border-b border-primary-200 dark:border-primary-950"
+      class="sticky top-0 z-10 flex gap-2 overflow-x-auto bg-gray-100 dark:bg-[#171d2b] px-4 py-3 border-b border-gray-200 dark:border-[#2b3344]"
     >
       <div
         v-for="(item, index) in setlistData.songs"
@@ -15,8 +15,8 @@
         class="group relative min-w-[150px] max-w-[210px] rounded-md border border-transparent px-3 py-2 pr-9 text-left transition-all cursor-pointer outline-none text-black dark:text-white"
         :class="
           index === setlistData.activeSongIndex
-            ? 'bg-primary-300 dark:bg-primary-600 shadow-sm ring-2 ring-primary-300 dark:ring-primary-500/50'
-            : 'bg-primary-100 dark:bg-primary-700 hover:bg-primary-300 dark:hover:bg-primary-600 focus:bg-primary-300 dark:focus:bg-primary-600'
+            ? 'bg-gray-200 dark:bg-[#2b3242] shadow-sm ring-2 ring-primary-300 dark:ring-primary-500/50'
+            : 'bg-gray-100 dark:bg-[#171d2b] hover:bg-gray-200 dark:hover:bg-[#2b3242] focus:bg-gray-200 dark:focus:bg-[#2b3242]'
         "
         @click="$emit('goto-song', index)"
         @keydown.enter.prevent="$emit('goto-song', index)"
@@ -38,7 +38,7 @@
             size="xs"
             variant="ghost"
             color="gray"
-            class="h-8 w-8 p-0 grid place-items-center hover:bg-primary-300 dark:hover:bg-primary-500"
+            class="h-8 w-8 p-0 grid place-items-center hover:bg-gray-200 dark:hover:bg-[#333c4e]"
             @click.stop="$emit('remove-song', index)"
           />
         </div>
@@ -54,21 +54,23 @@
         v-for="(verseTemp, index) in allChapterVerses"
         :key="`verse-${index}`"
         :id="convertStringToSlug(`${bibleChapter + '-' + verseTemp?.verse}`)"
-        class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-200 dark:hover:bg-primary-600 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
+        class="item rounded-none flex gap-4 px-5 py-3 justify-start border-t border-gray-100 dark:border-[#2b3344] hover:bg-gray-100 dark:hover:bg-[#2b3344] cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
         :class="{
-          'bg-primary-300 dark:bg-primary-900':
+          'bg-gray-100 dark:bg-[#2b3344]':
             `${bibleChapter}:${verseTemp?.verse}` === verse,
         }"
         @click="$emit('goto-verse', `${bibleChapter}:${verseTemp?.verse}`)"
       >
-        <div class="flex-initial min-w-[8ch] text-xs font-semibold">
+        <div
+          class="flex-initial min-w-[7ch] text-xs font-semibold text-gray-500 dark:text-[#7d8695]"
+        >
           {{
             `${bibleChapter?.substring(bibleChapter?.lastIndexOf(" "))}:${
               verseTemp?.verse
             }`
           }}
         </div>
-        <div class="flex-initial w-[100%] text-xs">
+        <div class="flex-initial w-[100%] text-sm leading-relaxed">
           {{ verseTemp?.scripture }}
         </div>
       </UButton>
@@ -83,9 +85,9 @@
         v-for="(item, index) in hymnVersesWithChorus"
         :key="`hymn-${index}`"
         :id="item.type === 'chorus' ? 'chorus' : `verse-${item.verseNum}`"
-        class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-200 dark:hover:bg-primary-600 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
+        class="item rounded-none flex gap-4 px-5 py-3 justify-start border-t border-gray-100 dark:border-[#2b3344] hover:bg-gray-100 dark:hover:bg-[#2b3344] cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
         :class="{
-          'bg-primary-300 dark:bg-primary-900':
+          'bg-gray-100 dark:bg-[#2b3344]':
             item.type === 'chorus'
               ? verse === 'Chorus'
               : `Verse ${item.verseNum}` === verse,
@@ -97,10 +99,12 @@
           )
         "
       >
-        <div class="flex-initial min-w-[8ch] text-xs font-semibold">
+        <div
+          class="flex-initial min-w-[7ch] text-xs font-semibold text-gray-500 dark:text-[#7d8695]"
+        >
           {{ item.type === "chorus" ? "Chorus" : `Verse ${item.verseNum}` }}
         </div>
-        <div class="flex-initial w-[100%] text-xs">
+        <div class="flex-initial w-[100%] text-sm leading-relaxed">
           {{ item.content }}
         </div>
       </UButton>
@@ -115,17 +119,19 @@
         v-for="(verseTemp, index) in relatedData?.verses"
         :key="`verse-${index}`"
         :id="convertStringToSlug(`Verse ${Number(index) + 1}`)"
-        class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-200 dark:hover:bg-primary-600 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
+        class="item rounded-none flex gap-4 px-5 py-3 justify-start border-t border-gray-100 dark:border-[#2b3344] hover:bg-gray-100 dark:hover:bg-[#2b3344] cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
         :class="{
-          'bg-primary-300 dark:bg-primary-900':
+          'bg-gray-100 dark:bg-[#2b3344]':
             `Verse ${Number(index) + 1}` === verse,
         }"
         @click="$emit('goto-verse', `Verse ${Number(index) + 1}`)"
       >
-        <div class="flex-initial min-w-[8ch] text-xs font-semibold">
+        <div
+          class="flex-initial min-w-[7ch] text-xs font-semibold text-gray-500 dark:text-[#7d8695]"
+        >
           {{ `Verse ${Number(index) + 1}` }}
         </div>
-        <div class="flex-initial w-[100%] text-xs">
+        <div class="flex-initial w-[100%] text-sm leading-relaxed">
           {{ verseTemp }}
         </div>
       </UButton>

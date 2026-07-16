@@ -2,24 +2,28 @@
   <div>
     <UButton
       v-if="noTooltip"
-      :icon="buttonIcon"
+      :icon="$slots.icon ? undefined : buttonIcon"
       :button-size="buttonSize || 'xs'"
       :color="buttonColor"
       :variant="buttonVariant || 'ghost'"
       :class="buttonStyles"
       block
       @click.stop.prevent="isOpen = true"
-      >{{ buttonLabel }}
+    >
+      <template v-if="$slots.icon" #leading><slot name="icon" /></template>
+      {{ buttonLabel }}
     </UButton>
     <UTooltip v-else :text="header" :popper="{ placement: 'top' }">
       <UButton
-        :icon="buttonIcon"
+        :icon="$slots.icon ? undefined : buttonIcon"
         :button-size="buttonSize || 'xs'"
         :color="buttonColor"
         :variant="buttonVariant || 'ghost'"
         :class="buttonStyles"
         @click.stop.prevent="isOpen = true"
-        >{{ buttonLabel }}
+      >
+        <template v-if="$slots.icon" #leading><slot name="icon" /></template>
+        {{ buttonLabel }}
       </UButton>
     </UTooltip>
 

@@ -3,31 +3,20 @@
     class="select-menu-ctn"
     :class="size === 'lg' ? 'w-[170px]' : 'w-[140px]'"
   >
-    <USelectMenu
+    <CowSelectMenu
       class="absolute top-[6px] border-0 shadow-none"
       :class="size === 'lg' ? 'top-[6px]' : 'top-[10px]'"
       searchable
       searchable-placeholder="Search fonts"
-      :select-class="`border-3 shadow-none outline-none text-center ${
-        size === 'lg'
-          ? 'w-[170px] bg-primary-100 dark:bg-primary-800'
-          : 'w-[140px] bg-primary-200 dark:bg-primary-900 dark:text-white'
+      :select-class="`h-10 border-0 shadow-none outline-none text-center rounded-full bg-gray-100 dark:bg-[#222938] dark:text-white ${
+        size === 'lg' ? 'w-[170px]' : 'w-[140px]'
       }`"
       size="md"
       :options="fonts"
       v-model="font"
       variant="none"
-      color="primary"
+      color="gray"
       clear-search-on-close
-      :ui="{
-        base: 'bg-primary-500',
-        input: 'bg-primary-500',
-        color: {
-          primary: {
-            outline: 'shadow-sm bg-primary-500 ',
-          },
-        },
-      }"
       :ui-menu="{
         width: size === 'lg' ? 'w-[170px]' : 'w-[140px]',
         input: 'text-xs',
@@ -60,7 +49,7 @@
         >
         <span v-else>Select font</span>
       </template>
-    </USelectMenu>
+    </CowSelectMenu>
   </div>
 </template>
 

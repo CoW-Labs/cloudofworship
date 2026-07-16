@@ -14,7 +14,7 @@
           label="Set default Bible Version"
           class="flex items-center w-full justify-between py-1 px-0 hover:bg-primary/10"
         >
-          <USelectMenu
+          <CowSelectMenu
             class="border-0 shadow-none max-w-[200px]"
             searchable
             searchable-placeholder="Search version"

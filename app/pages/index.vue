@@ -36,7 +36,7 @@ useHead({
     },
   ],
 })
-import { useAppStore } from "~/store/app"
+import { PANEL_SIZE_LIMITS, useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { ref, computed } from "vue"
 import { useDebounceFn, useOnline } from "@vueuse/core"
@@ -54,15 +54,13 @@ const MAX_RETRIES = 10
 let retryCount = 0
 
 // Resizable panel widths
-const QA_MIN_WIDTH = 300
-const QA_MAX_WIDTH = 550
-const QA_DEFAULT_WIDTH = 340
-const LO_MIN_WIDTH = 400
-const LO_MAX_WIDTH = 600
-const LO_DEFAULT_WIDTH = 450
+const QA_MIN_WIDTH = PANEL_SIZE_LIMITS.quickActionsWidth.min
+const QA_MAX_WIDTH = PANEL_SIZE_LIMITS.quickActionsWidth.max
+const LO_MIN_WIDTH = PANEL_SIZE_LIMITS.liveOutputWidth.min
+const LO_MAX_WIDTH = PANEL_SIZE_LIMITS.liveOutputWidth.max
 
-const quickActionsWidth = ref(QA_DEFAULT_WIDTH)
-const liveOutputWidth = ref(LO_DEFAULT_WIDTH)
+const quickActionsWidth = ref(appStore.panelSize("quickActionsWidth"))
+const liveOutputWidth = ref(appStore.panelSize("liveOutputWidth"))
 
 let resizingPanel: "left" | "right" | null = null
 let resizeStartX = 0
@@ -96,6 +94,11 @@ const onResizeMove = (event: MouseEvent) => {
 }
 
 const onResizeEnd = () => {
+  if (resizingPanel === "left") {
+    appStore.setPanelSize("quickActionsWidth", quickActionsWidth.value)
+  } else if (resizingPanel === "right") {
+    appStore.setPanelSize("liveOutputWidth", liveOutputWidth.value)
+  }
   resizingPanel = null
   document.removeEventListener("mousemove", onResizeMove)
   document.removeEventListener("mouseup", onResizeEnd)
@@ -368,6 +371,8 @@ watch(
 
 // Cleanup on unmount
 onBeforeUnmount(() => {
+  appStore.setPanelSize("quickActionsWidth", quickActionsWidth.value)
+  appStore.setPanelSize("liveOutputWidth", liveOutputWidth.value)
   disconnectSocket()
   document.removeEventListener("mousemove", onResizeMove)
   document.removeEventListener("mouseup", onResizeEnd)

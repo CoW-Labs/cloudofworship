@@ -1,48 +1,67 @@
 <template>
   <div
     ref="panelRef"
-    class="goto-scripture flex flex-col w-[46rem] max-w-[90vw] h-[20rem] text-black dark:text-white overflow-hidden"
+    class="goto-scripture flex h-full w-full flex-col overflow-hidden bg-[#f1f3f6] text-gray-800 dark:bg-[#131724] dark:text-[#F8F9FB]"
   >
-    <!-- Columns -->
     <div
-      class="flex-1 min-h-0 grid grid-cols-[1.3fr_1fr_1fr] divide-x divide-primary-100 dark:divide-primary-800"
+      class="grid min-h-0 flex-1 grid-cols-[1.15fr_1fr_1fr] divide-x divide-white/80 dark:divide-[#0D0F1A]"
     >
-      <!-- BOOK -->
-      <div class="col-book flex flex-col min-h-0">
-        <div class="flex items-center justify-between px-4 pt-3">
-          <span class="text-xs font-bold tracking-wide text-primary-400"
-            >BOOK</span
-          >
+      <div class="col-book flex min-h-0 flex-col">
+        <div class="flex h-9 shrink-0 items-center px-3">
+          <span class="text-[12px] font-normal leading-[17px]">Book</span>
         </div>
-        <div class="px-4 py-2">
+        <div class="shrink-0 px-3 pb-3">
           <UTabs
-            :items="testamentTabs"
             v-model:model-value="testamentTabIndex"
-            size="xs"
-            :ui="{ list: { tab: { size: 'text-[11px]' } } }"
+            :items="testamentTabs"
+            :content="false"
+            class="w-fit"
+            :ui="{
+              wrapper: 'relative',
+              list: {
+                background: 'bg-gray-200 dark:bg-[#222838]',
+                rounded: 'rounded-full',
+                height: 'h-[33px]',
+                width: 'w-fit',
+                marker: {
+                  background: 'bg-white dark:bg-[#2B3140]',
+                  rounded: 'rounded-full',
+                  shadow: 'shadow-sm dark:shadow-none',
+                },
+                tab: {
+                  active: 'text-gray-950 dark:text-[#F8F9FB]',
+                  inactive:
+                    'text-gray-600 hover:text-gray-950 dark:text-[#9BA3B2] dark:hover:text-[#F8F9FB]',
+                  height: 'h-[25px]',
+                  size: 'text-[11px]',
+                  font: 'font-normal',
+                  rounded: 'rounded-full',
+                },
+              },
+            }"
           />
         </div>
-        <div class="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
+        <div class="min-h-0 flex-1 overflow-y-auto">
           <button
             v-for="b in books"
             :key="b.index"
             type="button"
             :data-active="b.index === selectedBookIndex"
-            class="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-left transition-colors"
+            class="flex h-8 w-full items-center justify-between gap-2 border-b border-white/80 px-3 text-left text-[12px] transition-colors dark:border-[#0D0F1A]"
             :class="
               b.index === selectedBookIndex
-                ? 'bg-primary-500 text-white'
-                : 'hover:bg-primary-100 dark:hover:bg-primary-800'
+                ? 'bg-white/80 text-gray-900 dark:bg-[#2B3140] dark:text-[#F8F9FB]'
+                : 'text-gray-600 hover:bg-white/55 hover:text-gray-900 dark:text-[#9BA3B2] dark:hover:bg-[#1a1f2d] dark:hover:text-[#F8F9FB]'
             "
             @click="selectBook(b.index)"
           >
-            <span class="font-medium truncate">{{ b.name }}</span>
+            <span class="truncate font-normal">{{ b.name }}</span>
             <span
-              class="text-xs shrink-0"
+              class="shrink-0 text-[10px]"
               :class="
                 b.index === selectedBookIndex
-                  ? 'text-white/70'
-                  : 'text-primary-400'
+                  ? 'text-gray-500 dark:text-[#F8F9FB]/70'
+                  : 'text-gray-400 dark:text-[#697181]'
               "
             >
               {{ b.chapters }}
@@ -51,75 +70,75 @@
         </div>
       </div>
 
-      <!-- CHAPTER -->
-      <div class="col-chapter flex flex-col min-h-0">
-        <div class="flex items-center gap-2 px-4 pt-3">
-          <span class="text-xs font-bold tracking-wide text-primary-400"
-            >CHAPTER</span
-          >
+      <div class="col-chapter flex min-h-0 flex-col">
+        <div class="flex h-9 shrink-0 items-center gap-2 px-3">
+          <span class="text-[12px] font-normal leading-[17px]">Chapter</span>
           <span
             v-if="chapterCount"
-            class="text-xs font-semibold text-primary-400 bg-primary-100 dark:bg-primary-800 rounded-full px-2 py-0.5"
+            class="rounded-full bg-white px-2 py-0.5 text-[10px] font-normal text-gray-500 dark:bg-[#222838] dark:text-[#9BA3B2]"
           >
             {{ chapterCount }}
           </span>
         </div>
-        <div class="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+        <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
           <div v-if="chapterCount" class="grid grid-cols-5 gap-2">
             <button
               v-for="ch in chapters"
               :key="ch"
               type="button"
               :data-active="ch === selectedChapter"
-              class="aspect-square rounded-lg text-sm font-medium grid place-items-center transition-colors"
+              class="grid h-7 place-items-center rounded-full text-[11px] font-normal transition-colors"
               :class="
                 ch === selectedChapter
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-primary-50 dark:bg-primary-800 hover:bg-primary-200 dark:hover:bg-primary-700'
+                  ? 'bg-white text-gray-900 ring-2 ring-primary-300 dark:bg-[#E8D1F8] dark:text-[#131724] dark:ring-0'
+                  : 'bg-white/70 text-gray-600 hover:bg-white hover:text-gray-900 dark:bg-[#222838] dark:text-[#9BA3B2] dark:hover:bg-[#2B3140] dark:hover:text-[#F8F9FB]'
               "
               @click="selectChapter(ch)"
             >
               {{ ch }}
             </button>
           </div>
-          <p v-else class="text-sm text-primary-400 py-6 text-center">
+          <p
+            v-else
+            class="py-6 text-center text-[11px] text-gray-400 dark:text-[#697181]"
+          >
             Select a book
           </p>
         </div>
       </div>
 
-      <!-- VERSE -->
-      <div class="col-verse flex flex-col min-h-0">
-        <div class="flex items-center gap-2 px-4 pt-3">
-          <span class="text-xs font-bold tracking-wide text-primary-400"
-            >VERSE</span
-          >
+      <div class="col-verse flex min-h-0 flex-col">
+        <div class="flex h-9 shrink-0 items-center gap-2 px-3">
+          <span class="text-[12px] font-normal leading-[17px]">Verse</span>
           <span
             v-if="verseCount"
-            class="text-xs font-semibold text-primary-400 bg-primary-100 dark:bg-primary-800 rounded-full px-2 py-0.5"
+            class="rounded-full bg-white px-2 py-0.5 text-[10px] font-normal text-gray-500 dark:bg-[#222838] dark:text-[#9BA3B2]"
           >
             {{ verseCount }}
           </span>
         </div>
-        <div class="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+        <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
           <div v-if="verseCount" class="grid grid-cols-5 gap-2">
             <button
               v-for="v in verses"
               :key="v"
               type="button"
               :data-active="isVerseSelected(v)"
-              class="aspect-square rounded-lg text-sm font-medium grid place-items-center transition-colors"
+              class="grid h-7 place-items-center rounded-full text-[11px] font-normal transition-colors"
               :class="
                 isVerseSelected(v)
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-primary-50 dark:bg-primary-800 hover:bg-primary-200 dark:hover:bg-primary-700'
+                  ? 'bg-white text-gray-900 ring-2 ring-primary-300 dark:bg-[#E8D1F8] dark:text-[#131724] dark:ring-0'
+                  : 'bg-white/70 text-gray-600 hover:bg-white hover:text-gray-900 dark:bg-[#222838] dark:text-[#9BA3B2] dark:hover:bg-[#2B3140] dark:hover:text-[#F8F9FB]'
               "
               @click="selectVerse(v)"
             >
               {{ v }}
             </button>
           </div>
-          <p v-else class="text-sm text-primary-400 py-6 text-center">
+          <p
+            v-else
+            class="py-6 text-center text-[11px] text-gray-400 dark:text-[#697181]"
+          >
             Select a chapter
           </p>
         </div>
@@ -144,7 +163,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "goto-verse", title: string): void
   (e: "close"): void
+  (e: "resize", size: { width: number; height: number }): void
 }>()
+
+const panelSize = { width: 753, height: 330 }
 
 const testamentTabs = [
   { label: "Old Testament", key: "old" },
@@ -153,11 +175,11 @@ const testamentTabs = [
 
 const panelRef = ref<HTMLDivElement | null>(null)
 const testament = ref<"old" | "new">("old")
-
-// Two-way binding for UTabs (index ↔ testament string)
 const testamentTabIndex = computed({
-  get: () => (testament.value === "old" ? 0 : 1),
-  set: (i: number) => { testament.value = i === 0 ? "old" : "new" },
+  get: () => (testament.value === "new" ? 1 : 0),
+  set: (index: number) => {
+    testament.value = index === 1 ? "new" : "old"
+  },
 })
 
 const selectedBookIndex = ref<number | null>(null)
@@ -266,6 +288,7 @@ const parseCurrentVerse = (raw?: string) => {
 }
 
 onMounted(async () => {
+  emit("resize", panelSize)
   prewarmScriptureVersion(props.version)
   parseCurrentVerse(props.verse)
   if (selectedBookIndex.value !== null && selectedChapter.value !== null) {
