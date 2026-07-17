@@ -89,6 +89,9 @@ export const useUserSettings = () => {
             ...appStore.currentState.settings.slideStyles,
             ...userSettings.slideStyles,
           },
+          overlaySettings:
+            userSettings.overlaySettings ||
+            appStore.currentState.settings.overlaySettings,
           bibleVersions: userSettings.bibleVersions || appStore.currentState.settings.bibleVersions,
           animations: userSettings.animations,
           microAnimations: userSettings.microAnimations ?? true,
@@ -149,6 +152,7 @@ export const useUserSettings = () => {
         defaultBibleVersion: settingsToSave.defaultBibleVersion,
         defaultBackground: settingsToSave.defaultBackground,
         slideStyles: settingsToSave.slideStyles,
+        overlaySettings: settingsToSave.overlaySettings,
         bibleVersions: settingsToSave.bibleVersions,
         animations: settingsToSave.animations,
         microAnimations: settingsToSave.microAnimations ?? true,

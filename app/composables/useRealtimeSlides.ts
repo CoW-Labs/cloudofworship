@@ -33,6 +33,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const appStore = useAppStore()
   const authStore = useAuthStore()
   const toast = useToast()
+  const { applyOverlaySettings } = useOverlaySettings()
 
   // Track online users
   const onlineUsers = ref<OnlineUser[]>([])
@@ -55,6 +56,13 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
     if (slideMatchesId(slide, appStore.currentState.liveSlideId)) {
       appStore.setLiveSlide("")
       useBroadcastPost(null)
+    }
+  }
+
+  const clearOverlaySlideIfDeleted = (slide: Slide) => {
+    if (slideMatchesId(slide, appStore.currentState.activeOverlaySlide?.id)) {
+      appStore.setActiveOverlaySlide(null)
+      useBroadcastOverlayPost(appWideActions.removeSlideOverlay)
     }
   }
 
@@ -160,6 +168,11 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             if (appStore.currentState.liveSlideId === mergedSlide.id) {
               useBroadcastPost(mergedSlide)
             }
+            if (appStore.currentState.activeOverlaySlide?.id === mergedSlide.id) {
+              const overlaySlide = applyOverlaySettings(mergedSlide)
+              appStore.setActiveOverlaySlide(overlaySlide)
+              useBroadcastOverlayPost(appWideActions.showSlideOverlay, overlaySlide)
+            }
           }
         }
         break
@@ -176,6 +189,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           )
           if (slideToRemove) {
             clearLiveSlideIfDeleted(slideToRemove)
+            clearOverlaySlideIfDeleted(slideToRemove)
             appStore.removeActiveSlide(slideToRemove)
             options.onSlideDeleted?.(slideId, data.deletedByName)
           }
@@ -221,6 +235,16 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
               const existingSlide = nextSlides[slideIndex]
               const mergedSlide = { ...existingSlide, ...updatedSlide }
               nextSlides.splice(slideIndex, 1, mergedSlide)
+              if (
+                appStore.currentState.activeOverlaySlide?.id === mergedSlide.id
+              ) {
+                const overlaySlide = applyOverlaySettings(mergedSlide)
+                appStore.setActiveOverlaySlide(overlaySlide)
+                useBroadcastOverlayPost(
+                  appWideActions.showSlideOverlay,
+                  overlaySlide
+                )
+              }
               changed = true
             }
           })
@@ -241,11 +265,28 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             )
             if (slideToRemove) {
               clearLiveSlideIfDeleted(slideToRemove)
+              clearOverlaySlideIfDeleted(slideToRemove)
               appStore.removeActiveSlide(slideToRemove)
             }
           })
           options.onBatchSlidesDeleted?.(data.slideIds, data.deletedByName)
         }
+        break
+
+      case 'show-slide-overlay': {
+        if (data?.tabId === tabSessionId) return
+        if (!data?.id) return
+        const overlaySlide = { ...data } as Slide
+        delete (overlaySlide as any).tabId
+        appStore.setActiveOverlaySlide(overlaySlide)
+        useBroadcastOverlayPost(appWideActions.showSlideOverlay, overlaySlide)
+        break
+      }
+
+      case 'remove-slide-overlay':
+        if (data?.tabId === tabSessionId) return
+        appStore.setActiveOverlaySlide(null)
+        useBroadcastOverlayPost(appWideActions.removeSlideOverlay)
         break
 
       case 'reorder-slides':

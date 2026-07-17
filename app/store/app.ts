@@ -10,6 +10,7 @@ import type {
   BibleVersion,
   AppState,
   OnlineUser,
+  OverlaySettings,
 } from "~/types/index"
 import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
@@ -149,6 +150,7 @@ export const useAppStore = defineStore("app", {
         alerts: [],
         activeAlert: null,
         activeOverlay: "none",
+        activeOverlaySlide: null,
         recentBibleSearches: [],
         failedUploadRequests: [],
         slidesLoading: false,
@@ -258,6 +260,13 @@ export const useAppStore = defineStore("app", {
         return
       }
 
+      if (
+        this.currentState.activeOverlaySlide?.id === slide.id ||
+        (slide._id && this.currentState.activeOverlaySlide?._id === slide._id)
+      ) {
+        this.currentState.activeOverlaySlide = null
+      }
+
       onAppStateChange(this.pastStates, this.currentState, "activeSlides", [
         ...this.currentState.activeSlides,
       ])
@@ -294,6 +303,16 @@ export const useAppStore = defineStore("app", {
       // onAppStateChange(this.pastStates, this.currentState)
       // console.log("setActiveSlides", slides)
       this.currentState.activeSlides = ensureUniqueIds(slides)
+      if (
+        this.currentState.activeOverlaySlide &&
+        !this.currentState.activeSlides.some(
+          (slide) =>
+            slide.id === this.currentState.activeOverlaySlide?.id ||
+            (slide._id && slide._id === this.currentState.activeOverlaySlide?._id)
+        )
+      ) {
+        this.currentState.activeOverlaySlide = null
+      }
       this.currentState.liveOutputSlidesId = Array.from(
         new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
@@ -333,6 +352,12 @@ export const useAppStore = defineStore("app", {
       //   }
       // })
     },
+    setOverlaySettings(settings: OverlaySettings) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        overlaySettings: settings,
+      }
+    },
     setDefaultBibleVersion(version: string) {
       this.currentState.settings = {
         ...this.currentState.settings,
@@ -353,6 +378,9 @@ export const useAppStore = defineStore("app", {
     },
     setActiveOverlay(overlay: string) {
       this.currentState.activeOverlay = overlay
+    },
+    setActiveOverlaySlide(slide: Slide | null) {
+      this.currentState.activeOverlaySlide = slide
     },
     setBackgroundVideos(bgVideos: BackgroundVideo[]) {
       this.currentState.backgroundVideos = bgVideos
@@ -616,6 +644,7 @@ export const useAppStore = defineStore("app", {
       this.setDefaultSlideBackgrounds()
       this.setAlerts([])
       this.setActiveAlert(null)
+      this.setActiveOverlaySlide(null)
       this.setRecentBibleSearches("")
       this.setFailedUploadRequests(null)
       this.setSlidesLoading(false)

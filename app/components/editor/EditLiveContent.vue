@@ -31,6 +31,7 @@
             <SlideChip
               :slide-type="slide?.type"
               :slide-sub-type="(slide?.data as ExtendedFileT)?.type"
+              :slide-mode="slide?.slideMode"
               dark-mode
             />
             <!-- Editing by indicator -->
@@ -238,15 +239,38 @@
             </div>
 
             <!-- GO LIVE -->
-            <UTooltip text="Take slide live" :popper="{ arrow: true }">
+            <UTooltip
+              :text="
+                slide.slideMode === 'overlay'
+                  ? isActiveOverlay
+                    ? 'Clear overlay'
+                    : 'Show overlay'
+                  : 'Take slide live'
+              "
+              :popper="{ arrow: true }"
+            >
               <UButton
                 variant="ghost"
                 color="gray"
                 class="go-live shrink-0 rounded-full px-4 h-[34px] gap-1.5 font-medium bg-gray-200/80 dark:bg-[#2b3242] text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-[#333c4e]"
                 @click="$emit('take-live')"
               >
-                <GoLiveIcon class="w-4 h-4" />
-                Go Live
+                <CloseIcon
+                  v-if="slide.slideMode === 'overlay' && isActiveOverlay"
+                  class="w-4 h-4"
+                />
+                <StackSimpleIcon
+                  v-else-if="slide.slideMode === 'overlay'"
+                  class="w-4 h-4"
+                />
+                <GoLiveIcon v-else class="w-4 h-4" />
+                {{
+                  slide.slideMode === "overlay"
+                    ? isActiveOverlay
+                      ? "Clear Overlay"
+                      : "Show Overlay"
+                    : "Go Live"
+                }}
               </UButton>
             </UTooltip>
           </div>
@@ -411,6 +435,11 @@ const props = defineProps<{
   } | null
 }>()
 
+const appStore = useAppStore()
+const isActiveOverlay = computed(
+  () => appStore.currentState.activeOverlaySlide?.id === props.slide?.id
+)
+
 const emit = defineEmits([
   "slide-update",
   "inactive-slide-update",
@@ -420,8 +449,6 @@ const emit = defineEmits([
   "update-lines-per-slide",
   "take-live",
 ])
-
-const appStore = useAppStore()
 
 // Render non-text slides from their existing HTML instead of asking six
 // TipTap/ProseMirror instances to parse every verse change.

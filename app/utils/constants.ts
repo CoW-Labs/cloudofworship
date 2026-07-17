@@ -8,6 +8,7 @@ export const slideTypes = {
   text: 'text',
   media: 'media',
   countdown: 'countdown',
+  time: 'time',
   presentation: 'presentation',
   // sermon: 'sermon',
   // carousel: 'carousel',
@@ -36,6 +37,9 @@ export const appWideActions = {
   addSongSlideToSetlist: 'add-song-slide-to-setlist',
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
+  newTimeSlide: 'new-time-slide',
+  showSlideOverlay: 'show-slide-overlay',
+  removeSlideOverlay: 'remove-slide-overlay',
   newSearchBible: 'new-search-bible',
   newTranscribe: 'new-transcribe',
   goLive: 'go-live',
@@ -215,6 +219,15 @@ export const quickActionsArr: QuickAction[] = [
     type: slideTypes.countdown,
     tier: "teams",
     // unreleased: true,
+  },
+  {
+    icon: "i-bx-clock",
+    name: "Add Time Slide",
+    desc: "Display the current time on a slide",
+    action: appWideActions.newTimeSlide,
+    meta: "time clock live clock current time",
+    type: slideTypes.time,
+    tier: "free",
   },
   {
     icon: "i-mdi-youtube",
@@ -513,6 +526,7 @@ export const slideLayoutTypes = {
   two_column: 'two-column',
   bible: 'bible',
   countdown: 'countdown',
+  time: 'time',
   empty: 'empty',
 }
 

@@ -16,6 +16,12 @@
           : slideType
     }}
     {{ slideSubType ? ` (${slideSubType})` : "" }}
+    <span
+      v-if="slideMode === 'overlay'"
+      class="ml-0.5 rounded-full bg-black/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase"
+    >
+      overlay
+    </span>
   </p>
 </template>
 
@@ -29,11 +35,13 @@ import TextSlideIcon from "~/components/svgs/TextSlideIcon.vue"
 import MediaIcon from "~/components/svgs/MediaIcon.vue"
 import CountdownIcon from "~/components/svgs/CountdownIcon.vue"
 import PptIcon from "~/components/svgs/PptIcon.vue"
+import TimeIcon from "~/components/svgs/TimeIcon.vue"
 
 const props = defineProps({
   slideType: String,
   slideSubType: String,
   darkMode: Boolean,
+  slideMode: String,
 })
 
 // Mirrors the custom line-icons rendered in QuickActions (see ActionCard's
@@ -54,6 +62,8 @@ const getIconBySlideType = (slideType?: string): Component | null => {
       return MediaIcon
     case slideTypes.countdown:
       return CountdownIcon
+    case slideTypes.time:
+      return TimeIcon
     case slideTypes.presentation:
       return PptIcon
   }
@@ -96,6 +106,11 @@ const getBGBySlideType = (slideType?: string) => {
         return "bg-gray-100 text-gray-700"
       }
       return "bg-gray-100 border border-gray-500 text-gray-700"
+    case slideTypes.time:
+      if (props.darkMode) {
+        return "bg-slate-100 text-slate-700"
+      }
+      return "bg-slate-100 border border-slate-500 text-slate-700"
     case slideTypes.presentation:
       if (props.darkMode) {
         return "bg-blue-100 text-blue-700"

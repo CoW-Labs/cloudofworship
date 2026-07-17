@@ -101,6 +101,7 @@
     </div> -->
 
     <LiveProjectionOnly
+      v-if="liveSlide"
       :content-visible="true"
       :id="liveSlide?.id"
       :full-screen="true"
@@ -274,6 +275,22 @@ const handleWebSocketMessage = (parsedData: any) => {
         const slideData = updateBlobBackgroundURl({ ...data })
         liveSlide.value = { ...slideData }
       }
+      if (
+        appStore.currentState.activeOverlaySlide?.id === data.id ||
+        appStore.currentState.activeOverlaySlide?.id === data.slideId
+      ) {
+        appStore.setActiveOverlaySlide(updateBlobBackgroundURl({ ...data }))
+      }
+      break
+    case "delete-slide":
+    case "slide-deleted":
+      if (
+        appStore.currentState.activeOverlaySlide?.id === data.slideId ||
+        appStore.currentState.activeOverlaySlide?.id === data.id ||
+        appStore.currentState.activeOverlaySlide?._id === data._id
+      ) {
+        appStore.setActiveOverlaySlide(null)
+      }
       break
     case "add-alert":
       appStore.setActiveAlert(data)
@@ -286,6 +303,12 @@ const handleWebSocketMessage = (parsedData: any) => {
       break
     case "remove-overlay":
       appStore.setActiveOverlay("")
+      break
+    case "show-slide-overlay":
+      appStore.setActiveOverlaySlide(updateBlobBackgroundURl({ ...data }))
+      break
+    case "remove-slide-overlay":
+      appStore.setActiveOverlaySlide(null)
       break
     case "updated-slides":
       break
