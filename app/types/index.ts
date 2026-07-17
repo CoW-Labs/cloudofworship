@@ -71,13 +71,14 @@ export interface Slide {
   hymnVerseIndex?: number // 0-based index of current hymn verse, used for chorus navigation
   hymnSubVerseIndex?: number // 0-based chunk index inside the current verse/chorus
   hymnSubVerseTotal?: number // total chunks in the current verse/chorus
-  data?: Song | Scripture | Hymn | Countdown | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
+  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
   slideStyle?: SlideStyle
   saved?: boolean
   createdAt?: string
   updatedAt?: string
   presentationObjects?: PresentationObject[] // only for presentation slides
   presentationPageIndex?: number // 0-based index of the currently displayed page
+  slideMode?: "slide" | "overlay"
 }
 
 export interface Template {
@@ -143,7 +144,14 @@ export interface Countdown {
   time: string
   timeLeft: string
   content: string
+  /** Remaining duration sent when playback starts so each output can tick locally. */
+  remainingMs?: number
   // style: string
+}
+
+export interface TimeSlideData {
+  id: string
+  label: string
 }
 
 export interface QuickAction {
@@ -270,6 +278,22 @@ export interface SlideStyle {
   textLinesBackground?: boolean
   bibleVersion?: string
   theme?: string // Theme ID for slide styling (e.g., for Bible slides)
+  overlayPlacement?: OverlayPosition
+  overlayScale?: number
+}
+
+export type OverlayPosition =
+  | "top-left"
+  | "top-middle"
+  | "top-right"
+  | "middle"
+  | "bottom-left"
+  | "bottom-middle"
+  | "bottom-right"
+
+export interface OverlaySettings {
+  position: OverlayPosition
+  scale: number
 }
 
 export interface Advert {
@@ -313,6 +337,7 @@ export interface AppSettings {
     }
   }
   slideStyles: SlideStyle
+  overlaySettings?: OverlaySettings
   bibleVersions: Array<any> // Check app.vue for bible versions array in a list
   animations?: boolean // Transitions between slides (e.g. crossfade)
   microAnimations?: boolean // Micro/text animations within a slide (come-up etc.)
@@ -352,6 +377,7 @@ export interface AppState {
   alerts: Array<Alert>
   activeAlert: Alert | null
   activeOverlay: string
+  activeOverlaySlide: Slide | null
   recentBibleSearches: Array<string>
   failedUploadRequests: Array<{ path: string; options: any; timestamp: number }>
   slidesLoading: boolean

@@ -405,6 +405,14 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('remove-overlay', { action: 'remove-overlay', data })
       })
 
+      socket.on('show-slide-overlay', (data) => {
+        onMessage?.('show-slide-overlay', { action: 'show-slide-overlay', data })
+      })
+
+      socket.on('remove-slide-overlay', (data) => {
+        onMessage?.('remove-slide-overlay', { action: 'remove-slide-overlay', data })
+      })
+
       // Ping/pong
       socket.on('pong', () => {
         // Heartbeat received

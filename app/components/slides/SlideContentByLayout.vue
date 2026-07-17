@@ -216,6 +216,7 @@
     }cqw`"
   >
     <div
+      v-if="hasCountdownTitle"
       class="content jost"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
@@ -225,11 +226,33 @@
       v-html="getSlideContentHtml(slide?.contents?.[2])"
     ></div>
   </div>
+
+  <div
+    v-else-if="slide?.layout === slideLayoutTypes.time"
+    class="slide-layout-ctn flex flex-col gap-[1cqw] h-[100%] justify-center"
+    :style="`padding: ${padding.top}cqw ${padding.right}cqw ${padding.bottom}cqw ${padding.left}cqw; font-size: ${
+      (slide?.slideStyle?.fontSize || 17.5) *
+      ((slide?.slideStyle?.fontSizePercent || currentState.settings.slideStyles.fontSizePercent || 100) / 100)
+    }cqw`"
+  >
+    <div
+      v-if="contentVisible && slide?.contents?.[1]"
+      class="content jost"
+      v-html="getSlideContentHtml(slide.contents[1])"
+    ></div>
+    <div
+      v-if="contentVisible"
+      class="content leading-none opacity-95"
+      :class="[useURLFriendlyString(slide?.slideStyle?.font || 'Inter')]"
+    >
+      {{ formattedTime }}
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
-import type { Slide } from "~/types"
+import type { Countdown, Slide } from "~/types"
 import useTheme, { type BibleTheme } from "~/composables/useTheme"
 
 const props = defineProps<{
@@ -239,9 +262,15 @@ const props = defineProps<{
 }>()
 
 const { currentState } = storeToRefs(useAppStore())
+const formattedTime = useLiveClock()
 const { getSlideTheme } = useTheme()
 const usesTipTapTextStyles = computed(
   () => props.slide.type === slideTypes.text
+)
+const hasCountdownTitle = computed(
+  () =>
+    props.slide.type === slideTypes.countdown &&
+    Boolean((props.slide.data as Countdown | undefined)?.content?.trim())
 )
 const inheritedFontClass = computed(() =>
   usesTipTapTextStyles.value

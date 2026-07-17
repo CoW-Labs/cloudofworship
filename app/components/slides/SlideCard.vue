@@ -30,7 +30,12 @@
         <h4 class="font-medium ws-nowrap mt-2 text-left text-xs">
           {{ useShortSlideName(slide) }}
         </h4>
-        <SlideChip :slide-type="slide?.type" class="mt-1" dark-mode />
+        <SlideChip
+          :slide-type="slide?.type"
+          :slide-mode="slide?.slideMode"
+          class="mt-1"
+          dark-mode
+        />
       </div>
 
       <!-- Editing indicator - avatar circle -->
@@ -62,7 +67,10 @@
     <!-- DELETE AND DUPLICATE SLIDE BUTTON -->
     <div class="actions absolute bottom-2 right-2 flex gap-1">
       <UTooltip
-        v-if="slide.type === slideTypes.text || slide.type === slideTypes.bible"
+        v-if="
+          slide.slideMode !== 'overlay' &&
+          (slide.type === slideTypes.text || slide.type === slideTypes.bible)
+        "
         text="Duplicate Slide"
       >
         <UButton
@@ -75,12 +83,26 @@
         </UButton>
       </UTooltip>
 
+      <UTooltip v-if="canDuplicateAsOverlay" text="Duplicate as Overlay">
+        <UButton
+          size="xs"
+          variant="ghost"
+          class="px-1.5 rounded-full !text-white hover:!bg-white/10"
+          @click.stop.prevent="$emit('duplicate-as-overlay', slide)"
+        >
+          <template #leading>
+            <StackSimpleIcon class="w-4 h-4" />
+          </template>
+        </UButton>
+      </UTooltip>
+
       <ConfirmDialog
         v-if="
-          slide?.type === slideTypes.text ||
-          slide?.type === slideTypes.media ||
-          slide?.type === slideTypes.hymn ||
-          slide?.type === slideTypes.song
+          slide?.slideMode !== 'overlay' &&
+          (slide?.type === slideTypes.text ||
+            slide?.type === slideTypes.media ||
+            slide?.type === slideTypes.hymn ||
+            slide?.type === slideTypes.song)
         "
         button-icon="i-bx-save"
         :header="
@@ -104,6 +126,7 @@
           (slide?.type === slideTypes.text ||
             slide?.type === slideTypes.media ||
             slide?.type === slideTypes.bible) &&
+          slide?.slideMode !== 'overlay' &&
           authStore.user?.role === 'superadmin'
         "
         text="Save as Template"
@@ -144,7 +167,11 @@
     v-else
     class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-[#171d2b] rounded-lg hover:bg-primary-50 dark:hover:bg-[#2b3242] transition-all cursor-pointer relative"
     :id="slide?.id"
-    @click="goLive(slide?.id || '0')"
+    @click="
+      slide?.slideMode === 'overlay'
+        ? handleOverlayAction()
+        : goLive(slide?.id || '0')
+    "
   >
     <DeferredSlidePreview
       preview-class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
@@ -154,7 +181,11 @@
     />
     <div class="texts flex-col justify-between">
       <h4 class="font-medium mt-2">{{ slide?.name }}</h4>
-      <SlideChip :slide-type="slide?.type" class="mt-1" />
+      <SlideChip
+        :slide-type="slide?.type"
+        :slide-mode="slide?.slideMode"
+        class="mt-1"
+      />
     </div>
     <!-- DELETE SLIDE BUTTON -->
     <div class="actions absolute bottom-2 right-2 flex gap-1">
@@ -206,16 +237,42 @@ const emit = defineEmits([
   "save-slide",
   "save-as-template",
   "duplicate",
+  "duplicate-as-overlay",
+  "show-overlay",
+  "clear-overlay",
   "delete",
   "bulk-selected",
   "click",
 ])
+
+const isActiveOverlay = computed(
+  () => currentState.value.activeOverlaySlide?.id === props.slide.id
+)
+const canDuplicateAsOverlay = computed(
+  () =>
+    props.slide.slideMode !== "overlay" &&
+    (props.slide.type === slideTypes.time ||
+      (props.slide.type === slideTypes.text &&
+        [slideLayoutTypes.full_text, slideLayoutTypes.heading_sub].includes(
+          props.slide.layout
+        )))
+)
+
+const handleOverlayAction = () => {
+  if (!hasAccessToFeature(appWideActions.showSlideOverlay)) {
+    useGlobalEmit(appWideActions.showUpgradeModal)
+    return
+  }
+
+  emit(isActiveOverlay.value ? "clear-overlay" : "show-overlay", props.slide)
+}
 
 const applyLiveSlide = (slideId: string) => {
   const slide = appStore.currentState.activeSlides.find(
     (activeSlide) => activeSlide.id === slideId || activeSlide._id === slideId
   )
   if (!slide) return
+  if (slide.slideMode === "overlay") return
 
   useBroadcastPost(slide)
   appStore.setLiveSlide(slideId)

@@ -73,6 +73,7 @@
                 bulkSelectSlides,
                 bulkSelectedSlides.includes(slide?.id),
                 getSlideEditor(slide.id)?.userId,
+                currentState.activeOverlaySlide?.id === slide.id,
               ]"
               :slide="slide"
               :live="false"
@@ -91,6 +92,9 @@
                     })
               "
               @duplicate="duplicatePreviewSlide"
+              @duplicate-as-overlay="duplicatePreviewSlideAsOverlay"
+              @show-overlay="showSlideOverlay"
+              @clear-overlay="clearSlideOverlay"
               @delete="deleteSlide"
               @save-slide="saveSlide(slide)"
               @save-as-template="openSaveTemplateModal(slide)"
@@ -126,10 +130,7 @@
         @goto-verse="gotoAction"
         @update-bible-version="gotoAction(activeSlide?.title!!, $event)"
         @take-live="
-          makeSlideActive(activeSlide!!, {
-            goLive: true,
-            newlyCreated: false,
-          })
+          handleTakeLiveAction(activeSlide!!)
         "
       />
     </AppSection>
@@ -170,6 +171,7 @@ import { isNotFoundError } from "~/utils/apiErrors"
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const toast = useToast()
+const { applyOverlaySettings } = useOverlaySettings()
 const churchId = authStore.user?.churchId
 const lastSelectedScheduleId = ref(appStore.currentState.activeSchedule?._id ?? null)
 
@@ -194,8 +196,10 @@ const {
   createMultipleMediaSlides,
   createPresentationSlide,
   createCountdownSlide,
+  createTimeSlide,
   saveSlideToLib,
   duplicateSlide,
+  duplicateSlideAsOverlay,
 } = useSlideCreation()
 const { gotoVerse } = useSlideNavigation()
 const { appendSongToSetlist } = useSongSetlist()
@@ -383,6 +387,7 @@ const stopEditing = () => {
 
 // Countdown state - kept in component for tight coupling with slide updates
 const activeCountdownInterval = ref<any>(null)
+const activeCountdownSlideId = ref<string | null>(null)
 const countdownTimeLeft = ref<number>(0)
 const countdownStartTime = ref<number>(0)
 const countdownDuration = ref<number>(0)
@@ -484,6 +489,52 @@ const duplicatePreviewSlide = (slide: Slide) => {
   slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   uploadOfflineSlides()
+}
+
+const duplicatePreviewSlideAsOverlay = (slide: Slide) => {
+  const newSlide = duplicateSlideAsOverlay(slide)
+  if (!newSlide) return
+
+  slides.value?.push(newSlide)
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  broadcastSlideCreated(newSlide)
+  uploadOfflineSlides()
+}
+
+const showSlideOverlay = (
+  slide: Slide,
+  options: { capture?: boolean } = { capture: true }
+) => {
+  const overlaySlide = applyOverlaySettings(slide)
+  appStore.setActiveOverlaySlide(overlaySlide)
+  useBroadcastOverlayPost(appWideActions.showSlideOverlay, overlaySlide)
+  broadcastSlideUpdate(appWideActions.showSlideOverlay, overlaySlide)
+  if (options.capture !== false) {
+    usePosthogCapture("SLIDE_OVERLAY_SHOWN", {
+      slideId: slide.id,
+      slideType: slide.type,
+    })
+  }
+}
+
+const clearSlideOverlay = () => {
+  appStore.setActiveOverlaySlide(null)
+  useBroadcastOverlayPost(appWideActions.removeSlideOverlay)
+  broadcastSlideUpdate(appWideActions.removeSlideOverlay, {})
+  usePosthogCapture("SLIDE_OVERLAY_CLEARED")
+}
+
+const handleTakeLiveAction = (slide: Slide) => {
+  if (slide.slideMode === "overlay") {
+    if (appStore.currentState.activeOverlaySlide?.id === slide.id) {
+      clearSlideOverlay()
+    } else {
+      showSlideOverlay(slide)
+    }
+    return
+  }
+
+  makeSlideActive(slide, { goLive: true, newlyCreated: false })
 }
 
 onMounted(() => {
@@ -619,6 +670,14 @@ emitter.on("new-slide", () => {
   const newSlide = createTextSlide()
   slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  uploadOfflineSlides()
+})
+
+emitter.on(appWideActions.newTimeSlide, () => {
+  const newSlide = createTimeSlide()
+  slides.value?.push(newSlide)
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
 })
 
@@ -854,7 +913,8 @@ emitter.on("new-countdown", (data: Countdown) => {
   if (data) {
     // Remove existing countdown slides
     const tempSlides = slides.value?.filter(
-      (slide) => slide.type !== slideTypes.countdown
+      (slide) =>
+        slide.type !== slideTypes.countdown || slide.slideMode === "overlay"
     )
     slides.value = tempSlides
     stopCountdown()
@@ -863,7 +923,10 @@ emitter.on("new-countdown", (data: Countdown) => {
     slides.value?.push(newSlide)
 
     // Take slide live if current active slide is a countdown
-    if (activeSlide.value?.type === slideTypes.countdown) {
+    if (
+      activeSlide.value?.type === slideTypes.countdown &&
+      activeSlide.value.slideMode !== "overlay"
+    ) {
       makeSlideActive(newSlide, { goLive: true, newlyCreated: true })
     } else {
       makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
@@ -960,10 +1023,7 @@ emitter.on(appWideActions.cancelSelectSlides, () => {
 
 emitter.on("promote-active-slide-live", () => {
   if (activeSlide.value) {
-    makeSlideActive(activeSlide.value!!, {
-      goLive: true,
-      newlyCreated: false,
-    })
+    handleTakeLiveAction(activeSlide.value)
   }
 })
 
@@ -983,6 +1043,7 @@ emitter.on("selected-schedule", (data: Schedule | string | null) => {
   // Clear live projection
   appStore.setLiveSlide("")
   useBroadcastPost(null)
+  clearSlideOverlay()
 })
 
 // Utility functions for offline sync
@@ -1331,6 +1392,14 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
       useBroadcastPost(null)
     }
 
+    if (
+      appStore.currentState.activeOverlaySlide &&
+      (appStore.currentState.activeOverlaySlide.id === slideId ||
+        appStore.currentState.activeOverlaySlide._id === slideId)
+    ) {
+      clearSlideOverlay()
+    }
+
     if (activeStoreSlide || wasLive) {
       broadcastSlideUpdate("delete-slide", {
         slideId: activeStoreSlide?.id || slideId,
@@ -1365,6 +1434,13 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   ) {
     appStore.setLiveSlide("")
     useBroadcastPost(null)
+  }
+
+  if (
+    appStore.currentState.activeOverlaySlide?.id === clientSlideId ||
+    appStore.currentState.activeOverlaySlide?._id === tempSlide._id
+  ) {
+    clearSlideOverlay()
   }
 
   const slideIndex = slides.value.findIndex(slideMatchesId)
@@ -1443,6 +1519,13 @@ const onUpdateSlide = (slide: Slide) => {
   updateSlideOnline(updatedSlide)
   updateLiveOutput(updatedSlide)
 
+  if (
+    appStore.currentState.activeOverlaySlide?.id === updatedSlide.id &&
+    updatedSlide.type !== slideTypes.countdown
+  ) {
+    showSlideOverlay(updatedSlide, { capture: false })
+  }
+
   // When updating of countdown slide is done, resume timer
   if (updatedSlide.type === slideTypes.countdown) {
     startCountdown(updatedSlide)
@@ -1458,21 +1541,34 @@ const onUpdateInactiveSlide = (slide: Slide) => {
   )
   slides.value?.splice(slideIndex || 0, 1, updatedSlide)
 
+  // Toolbar actions use the selected slide as their source of truth. Keep that
+  // reference in sync even when the edit intentionally uses the inactive-slide
+  // persistence path, otherwise toggle buttons continue reading stale styles.
+  if (activeSlide.value?.id === updatedSlide.id) {
+    activeSlide.value = updatedSlide
+  }
+
   updateSlideOnline(updatedSlide)
   updateLiveOutput(updatedSlide)
+
+  if (appStore.currentState.activeOverlaySlide?.id === updatedSlide.id) {
+    showSlideOverlay(updatedSlide, { capture: false })
+  }
 }
 
 // Countdown management functions
 const updateCountdownSlide = (
   slide: Slide,
   timeRemaining: number,
-  isPlaying: boolean = true
+  isPlaying: boolean = true,
+  options: { remainingMs?: number; syncOverlay?: boolean } = {}
 ) => {
   const tempSlide = { ...slide }
   const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
   tempSlide.data = {
     ...tempSlide.data,
     timeLeft: useMilliToTimeString(timeRemaining),
+    remainingMs: isPlaying ? options.remainingMs : undefined,
   } as Countdown
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
@@ -1480,7 +1576,24 @@ const updateCountdownSlide = (
   }
   tempSlide.contents = useSlideContent(tempSlide, tempSlide?.data!!)
   slides.value.splice(slideIndex, 1, tempSlide)
-  updateLiveOutput(tempSlide)
+
+  // Countdown controls are rendered from activeSlide, while timer ticks update
+  // the slides collection. Synchronize both so play/pause state is immediate.
+  if (activeSlide.value?.id === tempSlide.id) {
+    activeSlide.value = tempSlide
+  }
+
+  const isActiveOverlay =
+    appStore.currentState.activeOverlaySlide?.id === tempSlide.id
+
+  // Overlay outputs derive each visible second locally from remainingMs. Only
+  // write the persisted/shared store when playback state changes, not per tick.
+  if (!isActiveOverlay || options.syncOverlay) {
+    updateLiveOutput(tempSlide)
+  }
+  if (isActiveOverlay && options.syncOverlay) {
+    showSlideOverlay(tempSlide, { capture: false })
+  }
 }
 
 const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
@@ -1492,6 +1605,15 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
         : (slide.data as Countdown)?.timeLeft
     )
 
+    if (
+      activeCountdownInterval.value !== null &&
+      activeCountdownSlideId.value !== slide.id
+    ) {
+      cancelAnimationFrame(countdownRAF.value)
+      activeCountdownInterval.value = null
+      countdownTimeLeft.value = 0
+    }
+
     if (activeCountdownInterval.value === null || restartCountdown) {
       // Stop any existing animation
       if (countdownRAF.value) {
@@ -1499,7 +1621,7 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
       }
 
       // Reset or initialize countdown state
-      if (restartCountdown) {
+      if (restartCountdown || activeCountdownSlideId.value !== slide.id) {
         countdownTimeLeft.value = duration
         countdownDuration.value = duration
       } else {
@@ -1511,10 +1633,14 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
       // Record start time
       countdownStartTime.value = performance.now()
       const startTimeLeft = countdownTimeLeft.value
+      activeCountdownSlideId.value = slide.id
 
       // Publish the playing state immediately so toolbar controls do not wait
       // for the first one-second countdown tick before switching to pause.
-      updateCountdownSlide(slide, countdownTimeLeft.value, true)
+      updateCountdownSlide(slide, countdownTimeLeft.value, true, {
+        remainingMs: startTimeLeft,
+        syncOverlay: true,
+      })
 
       // Animation function
       const animate = (currentTime: number) => {
@@ -1527,7 +1653,9 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
           Math.floor(countdownTimeLeft.value / 1000)
         ) {
           countdownTimeLeft.value = remaining
-          updateCountdownSlide(slide, remaining)
+          updateCountdownSlide(slide, remaining, true, {
+            remainingMs: remaining,
+          })
         }
 
         if (remaining > 0) {
@@ -1535,8 +1663,9 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
           activeCountdownInterval.value = true
         } else {
           countdownTimeLeft.value = 0
-          updateCountdownSlide(slide, 0, false)
+          updateCountdownSlide(slide, 0, false, { syncOverlay: true })
           activeCountdownInterval.value = null
+          activeCountdownSlideId.value = null
         }
       }
 
@@ -1547,7 +1676,9 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
       // Pause the countdown
       cancelAnimationFrame(countdownRAF.value)
       activeCountdownInterval.value = null
-      updateCountdownSlide(slide, countdownTimeLeft.value, false)
+      updateCountdownSlide(slide, countdownTimeLeft.value, false, {
+        syncOverlay: true,
+      })
     }
   }
 }
@@ -1557,6 +1688,7 @@ const stopCountdown = () => {
     cancelAnimationFrame(countdownRAF.value)
   }
   activeCountdownInterval.value = null
+  activeCountdownSlideId.value = null
   countdownTimeLeft.value = 0
 }
 

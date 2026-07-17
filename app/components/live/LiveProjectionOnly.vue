@@ -241,6 +241,13 @@
       </Transition>
       <!-- End of SLIDE FACE -->
 
+      <OverlaySlideView
+        :size="fullScreen ? '' : 'sm'"
+        :dynamic-background="
+          displayedSlide?.backgroundType === backgroundTypes.video
+        "
+      />
+
       <template v-if="!fullScreen">
         <UTooltip
           class="absolute bottom-3 right-3 z-10"

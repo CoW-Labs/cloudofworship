@@ -392,6 +392,7 @@
           <UButton
             @click="useGlobalEmit(appWideActions.startCountdown, slide)"
             class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
+            :class="{ 'toolbar-toggle-active': countdownIsPlaying }"
             :aria-label="
               countdownIsPlaying ? 'Pause countdown' : 'Start countdown'
             "

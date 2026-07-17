@@ -368,6 +368,7 @@ const quickSearchSuggestionsByAction = {
     "service update banner",
   ],
   countdowns: ["Add Countdown Timer", "5 min timer", "30s timer"],
+  times: ["Add Time Slide", "current time", "clock", "live clock"],
   embeds: [
     "Add YouTube Video",
     "Add Vimeo Video",

@@ -35,7 +35,7 @@
     <!-- Using motionless slides to test bug with Bible Slides not moving to next slide in live view -->
     <!-- <Transition class="fade"> -->
     <LiveProjectionOnly
-      v-show="mostUpdatedLiveSlide"
+      v-if="mostUpdatedLiveSlide"
       :content-visible="true"
       :id="currentState.liveSlideId"
       :full-screen="true"
@@ -53,7 +53,10 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 import type { Slide } from "~/types"
-import type { LiveBroadcastEnvelope } from "~/composables/useBroadcastPost"
+import type {
+  LiveBroadcastEnvelope,
+  SlideOverlayBroadcast,
+} from "~/composables/useBroadcastPost"
 import { useAuthStore } from "~/store/auth"
 import {
   exitFullscreenSafely,
@@ -74,6 +77,7 @@ const mediaRecorderInterval = ref()
 const FPS = 10
 const mostUpdatedLiveSlide = ref<Slide | null>(null)
 const lastBroadcastTs = ref(0)
+const lastOverlayBroadcastTs = ref(0)
 
 useHead({
   title: "Live Projection - Cloud of Worship",
@@ -191,9 +195,30 @@ onMounted(() => {
       // Accept the old JSON envelope during hot updates, but use the direct
       // structured-clone object for all new messages.
       const envelope = (typeof data === "string" ? JSON.parse(data) : data) as
-        | LiveBroadcastEnvelope<Slide | null | string>
+        | LiveBroadcastEnvelope<
+            Slide | null | string | SlideOverlayBroadcast
+          >
         | undefined
       if (!envelope || typeof envelope.ts !== "number") return
+
+      const payload =
+        typeof envelope.payload === "string"
+          ? JSON.parse(envelope.payload)
+          : envelope.payload
+
+      if (
+        payload?.action === appWideActions.showSlideOverlay ||
+        payload?.action === appWideActions.removeSlideOverlay
+      ) {
+        if (envelope.ts < lastOverlayBroadcastTs.value) return
+        lastOverlayBroadcastTs.value = envelope.ts
+        appStore.setActiveOverlaySlide(
+          payload.action === appWideActions.showSlideOverlay
+            ? payload.slide || null
+            : null
+        )
+        return
+      }
 
       // Drop messages that arrive out of order (e.g. a background countdown
       // tick from a tab that hasn't yet caught up to a newer local live output
@@ -201,9 +226,7 @@ onMounted(() => {
       if (envelope.ts < lastBroadcastTs.value) return
       lastBroadcastTs.value = envelope.ts
 
-      const parsed = (typeof envelope.payload === "string"
-        ? JSON.parse(envelope.payload)
-        : envelope.payload) as Slide | null
+      const parsed = payload as Slide | null
 
       // null broadcast means the live slide was deleted — blank the projection
       if (parsed === null) {

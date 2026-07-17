@@ -71,7 +71,7 @@
           }}
         </div>
         <div class="flex-initial w-[100%] text-sm leading-relaxed">
-          {{ verseTemp?.scripture }}
+          {{ formatScripturePreview(verseTemp?.scripture) }}
         </div>
       </UButton>
     </template>
@@ -228,6 +228,13 @@ const convertStringToSlug = (str: string) => {
     .replaceAll("3 ", "three-")
     .replaceAll(" ", "-")
     .replaceAll(":", "-")
+}
+
+const formatScripturePreview = (scripture = "") => {
+  return scripture
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
 onMounted(() => {

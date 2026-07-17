@@ -10,6 +10,7 @@ import type {
   Countdown,
   ExtendedFileT,
   PresentationObject,
+  TimeSlideData,
 } from "~/types"
 import { tabSessionId } from "./useRealtimeSlides"
 
@@ -21,6 +22,7 @@ export default function useSlideCreation() {
   const appStore = useAppStore()
   const authStore = useAuthStore()
   const toast = useToast()
+  const { overlaySettings } = useOverlaySettings()
   const { saveSlideOnline } = useSlides()
   const { saveSong, saveSlide: saveSlideToLibrary, getLibraryItem } = useLibrary()
 
@@ -99,6 +101,51 @@ export default function useSlideCreation() {
     delete tempSlide._id
     tempSlide.id = useObjectID()
     usePosthogCapture("SLIDE_DUPLICATED")
+    return tempSlide
+  }
+
+  const duplicateSlideAsOverlay = (slideToDuplicate?: Slide): Slide | null => {
+    const isCompatibleTextSlide =
+      slideToDuplicate?.type === slideTypes.text &&
+      [slideLayoutTypes.full_text, slideLayoutTypes.heading_sub].includes(
+        slideToDuplicate.layout
+      )
+    const isTimeSlide = slideToDuplicate?.type === slideTypes.time
+
+    if (!slideToDuplicate || (!isCompatibleTextSlide && !isTimeSlide)) {
+      return null
+    }
+
+    const duplicatedData = isTimeSlide
+      ? { ...(slideToDuplicate.data as TimeSlideData), id: useID() }
+      : slideToDuplicate.data
+
+    const tempSlide: Slide = {
+      ...slideToDuplicate,
+      id: useObjectID(),
+      index: appStore.currentState.activeSlides.length,
+      name: `${slideToDuplicate.name || (isTimeSlide ? "Live Time" : "Text")}`,
+      slideMode: "overlay",
+      contents: [...slideToDuplicate.contents],
+      data: duplicatedData,
+      slideStyle: {
+        ...slideToDuplicate.slideStyle,
+        overlayPlacement: overlaySettings.value.position,
+        overlayScale: overlaySettings.value.scale,
+      },
+    }
+
+    if (isTimeSlide) {
+      tempSlide.contents = useSlideContent(
+        tempSlide,
+        duplicatedData as TimeSlideData
+      )
+    }
+
+    delete tempSlide._id
+    usePosthogCapture("SLIDE_DUPLICATED_AS_OVERLAY", {
+      sourceType: slideToDuplicate.type,
+    })
     return tempSlide
   }
 
@@ -603,6 +650,26 @@ export default function useSlideCreation() {
     return tempSlide
   }
 
+  const createTimeSlide = (label = ""): Slide => {
+    const tempSlide = { ...preSlideCreation() }
+    const timeData: TimeSlideData = { id: useID(), label }
+
+    tempSlide.layout = slideLayoutTypes.time
+    tempSlide.type = slideTypes.time
+    tempSlide.slideMode = "slide"
+    tempSlide.data = timeData
+    tempSlide.name = "Live Time"
+    tempSlide.contents = useSlideContent(tempSlide, timeData)
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: 17.5,
+      alignment: "center",
+      font: appStore.currentState.settings.defaultFont,
+    }
+    usePosthogCapture("NEW_TIME_SLIDE_CREATED")
+    return tempSlide
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Library
   // ─────────────────────────────────────────────────────────────────────────
@@ -658,8 +725,10 @@ export default function useSlideCreation() {
     createMediaSlide,
     createMultipleMediaSlides,
     createCountdownSlide,
+    createTimeSlide,
     createPresentationSlide,
     saveSlideToLib,
     duplicateSlide,
+    duplicateSlideAsOverlay,
   }
 }

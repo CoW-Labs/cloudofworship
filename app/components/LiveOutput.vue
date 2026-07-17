@@ -90,12 +90,15 @@
                 slide?.updatedAt,
                 slide?.name,
                 liveSlide?.id === slide?.id,
+                currentState.activeOverlaySlide?.id === slide?.id,
                 ctrlOrMetaActive,
               ]"
               :class="{
                 'bg-red-100 dark:bg-red-900': liveSlide?.id === slide?.id,
+                'bg-cyan-100 dark:bg-cyan-950':
+                  currentState.activeOverlaySlide?.id === slide?.id,
               }"
-              @click="setLiveSlide(slide?.id || '0')"
+              @click="handleScheduleSlideAction(slide)"
               @dblclick="useGlobalEmit(appWideActions.newActiveSlide, slide)"
               @dragstart="draggingSlide = slide"
               @dragover.prevent="
@@ -117,10 +120,16 @@
                 >
                   {{ slide?.name }}
                 </h4>
-                <SlideChip :slide-type="slide?.type" class="mt-1" />
+                <SlideChip
+                  :slide-type="slide?.type"
+                  :slide-mode="slide?.slideMode"
+                  class="mt-1"
+                />
               </div>
               <LiveSlideIndicator
-                :visible="liveSlide?.id === slide?.id"
+                :visible="
+                  slide.slideMode !== 'overlay' && liveSlide?.id === slide?.id
+                "
                 hide-text
                 class="mt-3 left-20 right-auto"
               />
@@ -131,14 +140,17 @@
                   :popper="{ placement: 'top' }"
                 >
                   <UButton
-                    icon="i-bx-edit"
                     size="xs"
                     variant="ghost"
                     class="px-1 text-primary-500 hover:bg-primary-white"
                     @click.stop.prevent="
                       useGlobalEmit(appWideActions.newActiveSlide, slide)
                     "
-                  />
+                  >
+                    <template #leading>
+                      <EditIcon class="w-4 h-4" />
+                    </template>
+                  </UButton>
                 </UTooltip>
 
                 <ConfirmDialog
@@ -149,6 +161,9 @@
                   label="Are you sure you want to delete this slide? This action is not reversible"
                   @confirm="useGlobalEmit(appWideActions.deleteSlide, slide)"
                 >
+                  <template #icon>
+                    <DeleteIcon class="w-4 h-4" />
+                  </template>
                 </ConfirmDialog>
               </div>
               <!-- SLIDE INDEX -->
@@ -178,6 +193,7 @@ import { tabSessionId } from "~/composables/useRealtimeSlides"
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const toast = useToast()
+const { applyOverlaySettings } = useOverlaySettings()
 const ctrlOrMetaActive = ref(false)
 const showTranscripts = ref(false)
 const draggingSlide = ref<Slide | null>(null)
@@ -186,6 +202,7 @@ const { currentState } = storeToRefs(appStore)
 const windowRefs = inject("windowRefs") as any[]
 
 const online = useOnline()
+const { hasAccessToFeature } = useSubscription()
 
 // Vertical resize between the "Live preview" panel and "Slide Schedule"
 const LIVE_PREVIEW_MIN_HEIGHT = PANEL_SIZE_LIMITS.livePreviewHeight.min
@@ -329,21 +346,25 @@ const liveOutputSlides = computed({
   },
 })
 
+const navigationSlides = computed(() =>
+  liveOutputSlides.value.filter((slide) => slide.slideMode !== "overlay")
+)
+
 const nextSlide = computed(() => {
-  const liveSlideIndex = liveOutputSlides.value.findIndex(
+  const liveSlideIndex = navigationSlides.value.findIndex(
     (slide: Slide) => slide.id === currentState.value.liveSlideId
   )
   // const tempSlides = liveOutputSlidesId.value?.map((id) =>
   //   appStore.activeSlides.find((slide) => slide.id === id)
   // ) as Slide[]
   const gotoSlideIndex = (liveSlideIndex as number) + 1
-  if (gotoSlideIndex < liveOutputSlides.value.length) {
-    return liveOutputSlides.value[gotoSlideIndex]
+  if (gotoSlideIndex < navigationSlides.value.length) {
+    return navigationSlides.value[gotoSlideIndex]
   }
 })
 
 const previousSlide = computed(() => {
-  const liveSlideIndex = liveOutputSlides.value.findIndex(
+  const liveSlideIndex = navigationSlides.value.findIndex(
     (slide: Slide) => slide.id === currentState.value?.liveSlideId
   )
   // const tempSlides = liveOutputSlidesId.value?.map((id) =>
@@ -351,8 +372,8 @@ const previousSlide = computed(() => {
   // ) as Slide[]
   if (!liveSlideIndex || liveSlideIndex < 1) return
   const gotoSlideIndex = liveSlideIndex - 1
-  if (gotoSlideIndex < liveOutputSlides.value.length) {
-    return liveOutputSlides.value[gotoSlideIndex]
+  if (gotoSlideIndex < navigationSlides.value.length) {
+    return navigationSlides.value[gotoSlideIndex]
   }
 })
 
@@ -374,8 +395,8 @@ onMounted(() => {
   shortcutCleanups.push(useCreateShortcut(
     "0",
     () => {
-      if (liveOutputSlides.value?.at(-1)?.id) {
-        setLiveSlide(liveOutputSlides.value?.at(-1)?.id!!)
+      if (navigationSlides.value?.at(-1)?.id) {
+        setLiveSlide(navigationSlides.value?.at(-1)?.id!!)
         return true
       }
       return false
@@ -389,8 +410,8 @@ onMounted(() => {
     shortcutCleanups.push(useCreateShortcut(
       digit.toString(),
       () => {
-        if (liveOutputSlides.value?.at(digit - 1)?.id) {
-          setLiveSlide(liveOutputSlides.value?.at(digit - 1)?.id!!)
+        if (navigationSlides.value?.at(digit - 1)?.id) {
+          setLiveSlide(navigationSlides.value?.at(digit - 1)?.id!!)
           return true
         }
         return false
@@ -422,10 +443,46 @@ const setLiveSlide = (slideId: string) => {
     (s) => s.id === slideId || s._id === slideId
   )
   if (!slide) return
+  if (slide.slideMode === "overlay") return
 
   // useDebounceFn(useBroadcastPost, 0)(JSON.stringify(slide))
   useBroadcastPost(slide)
   appStore.setLiveSlide(slideId)
+}
+
+const emitOverlaySocketAction = (action: string, slide?: Slide) => {
+  if (!online.value) return
+  const socket = useNuxtApp().$socketio as any
+  if (socket?.connected) {
+    socket.emit(action, { ...(slide || {}), tabId: tabSessionId })
+  }
+}
+
+const toggleSlideOverlay = (slide: Slide) => {
+  if (!hasAccessToFeature(appWideActions.showSlideOverlay)) {
+    useGlobalEmit(appWideActions.showUpgradeModal)
+    return
+  }
+
+  if (currentState.value.activeOverlaySlide?.id === slide.id) {
+    appStore.setActiveOverlaySlide(null)
+    useBroadcastOverlayPost(appWideActions.removeSlideOverlay)
+    emitOverlaySocketAction(appWideActions.removeSlideOverlay)
+    return
+  }
+
+  const overlaySlide = applyOverlaySettings(slide)
+  appStore.setActiveOverlaySlide(overlaySlide)
+  useBroadcastOverlayPost(appWideActions.showSlideOverlay, overlaySlide)
+  emitOverlaySocketAction(appWideActions.showSlideOverlay, overlaySlide)
+}
+
+const handleScheduleSlideAction = (slide: Slide) => {
+  if (slide.slideMode === "overlay") {
+    toggleSlideOverlay(slide)
+    return
+  }
+  setLiveSlide(slide.id)
 }
 
 const handleDropOnSetlist = (targetSlide: Slide) => {
