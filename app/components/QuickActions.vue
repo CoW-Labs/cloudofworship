@@ -654,7 +654,7 @@ const actions = computed(() => {
         name: `${book}`,
         desc: `Open the book of ${book}`,
         action: "new-bible",
-        meta: `${book} 0:0 1:1 2:2 3:3 4:4 5:5 6:6 7:7 8:8 9:9 10:10 -`,
+        meta: "",
         searchableOnly: true,
         bibleBookIndex: `${bibleBookIndex}`,
         type: slideTypes.bible,
@@ -720,6 +720,11 @@ watch(searchInput, (value) => {
   remoteBibleRequestId++
   remoteBibleActions.value = []
   isSearchingRemoteBible.value = false
+
+  // A confirmed Bible reference search ("Psa 101", "Eph 3:20") already tells
+  // us exactly which book/chapter/verse is wanted, so there's nothing the
+  // global song/scripture library search could usefully add — skip it.
+  if (isBibleReferenceSearch.value) return
 
   fetchRemoteSongsIfNeeded(query)
   fetchRemoteBibleIfNeeded(query)
@@ -926,7 +931,10 @@ onUnmounted(() => {
 })
 
 const bibleChapterAndVerse = computed(() => {
-  const regex = /\b\d+\s*:\s*\d+\b|\b\d+\s\d+\b/g
+  // The optional `(?:-\d+)?` captures a verse range like "5-6" so "John 3 5-6"
+  // / "John 3:5-6" resolve to chapter 3, verses 5-6 (useScripture understands
+  // the "start-end" verse form) instead of silently dropping the range.
+  const regex = /\b\d+\s*:\s*\d+(?:-\d+)?\b|\b\d+\s\d+(?:-\d+)?\b/g
   const bibleBookFollowedByJustChapterMatch = searchInput.value
     ?.replace("/", "")
     .match(/\b\w+\s+\d+\b(?!\S)/g)
@@ -947,6 +955,44 @@ const bibleChapterAndVerse = computed(() => {
     .match(regex)?.[0]
     ?.replaceAll(" ", ":")
   return match?.trim()
+})
+
+// The book-name-only portion of the query once a chapter/verse has been
+// recognised (see `bibleChapterAndVerse` above) — e.g. "Psa 101" -> "Psa",
+// "Psa 127 24" -> "Psa", "Psa 27:4" -> "Psa". Reads off the live
+// `searchInput` rather than a frozen/debounced copy so it can't get stuck on
+// a stale value once a two-digit number appears anywhere in the query.
+const bibleBookQuery = computed(() => {
+  if (!bibleChapterAndVerse.value) return ""
+  return (
+    searchInput.value
+      ?.replaceAll("/", "")
+      .replace(/\s*:\s*\d+(?:-\d+)?\s*$/, "")
+      .replace(/(\s+\d+(?:-\d+)?){1,2}\s*$/, "")
+      .trim() || ""
+  )
+})
+
+// Bible book actions only, used to confidently tell a real Bible reference
+// search ("Psa 101", "Eph 3:20") apart from a chapter-shaped number that just
+// happens to be glued onto an unrelated word ("hello 22"). A high fuzzysort
+// threshold (scores close to 0 are near-perfect matches, real book
+// abbreviations like "Psa"/"1 Sam"/"Eph" score well above -30, while noise
+// scores in the tens of thousands) filters out anything that isn't a
+// genuine book match.
+const bibleBookActions = computed(() =>
+  validActions.value.filter(
+    (action) => action.type === slideTypes.bible && action.bibleBookIndex
+  )
+)
+
+const isBibleReferenceSearch = computed(() => {
+  if (!bibleChapterAndVerse.value || !bibleBookQuery.value) return false
+  const bookMatches = fuzzysort.go(bibleBookQuery.value, bibleBookActions.value, {
+    keys: ["name"],
+    threshold: -1000,
+  })
+  return bookMatches.length > 0
 })
 
 // Parses natural language timer commands like "start 5 m timer",
@@ -1018,22 +1064,58 @@ const searchedActions = computed(() => {
       ? searchInputBeforeTwoDigitNumbers
       : searchInputBeforeTwoDigitNumbers?.substring(0, colonIndex)
 
-  let results: any = fuzzysort.go(searchInputBeforeColon, validActions.value, {
+  // Once a chapter/verse has been recognised, match book names on their own
+  // (see `bibleBookQuery`) instead of throwing the chapter/verse digits into
+  // the fuzzy search too — otherwise that either fails to match any book once
+  // the numbers are something fuzzysort can't line up against a book name
+  // (e.g. "Psa 103" matched nothing) or spuriously matches unrelated books
+  // whose letters happen to fuzzy-match the digits (e.g. "Psa 101" matching
+  // "Ephesians"). `bibleBookQuery` reads off the live `searchInput` rather
+  // than the frozen `searchInputBeforeColon` above — that freeze exists to
+  // stop the search from flickering while a verse's digits are still being
+  // typed, but once a full chapter/verse has been parsed out there's nothing
+  // left to protect against, and using the frozen copy can leave this stuck
+  // on a stale (even empty) value once a two-digit number appears anywhere.
+  const searchInputForMatch = bibleChapterAndVerse.value
+    ? bibleBookQuery.value
+    : searchInputBeforeColon
+
+  let results: any = fuzzysort.go(searchInputForMatch, validActions.value, {
     keys: ["name", "desc", "meta"],
+    // Once we're confident this is an actual Bible reference (see
+    // `isBibleReferenceSearch`), only keep genuine book-name matches instead
+    // of every loose fuzzy match — a 3-letter book abbreviation like "Psa"
+    // would otherwise also weakly match plenty of unrelated songs/hymns.
+    ...(isBibleReferenceSearch.value ? { threshold: -1000 } : {}),
   })
   results = results?.map((result: Fuzzysort.Result | any) => result.obj)
   results = results.filter((action: QuickAction) => action?.name)
 
-  // API-searched (global) songs, fetched alongside local library matches
-  // (see fetchRemoteSongsIfNeeded)
-  if (remoteSongActions.value.length > 0) {
-    results = results.concat(remoteSongActions.value)
+  // A confirmed Bible reference search only has room for Bible book matches —
+  // drop anything else (quick actions, songs, hymns) that fuzzysort happened
+  // to also weakly match on the bare book abbreviation.
+  if (isBibleReferenceSearch.value) {
+    results = results.filter(
+      (action: QuickAction) => action.type === slideTypes.bible
+    )
   }
 
-  // API-searched (global) Bible verses, fetched alongside local book matches
-  // (see fetchRemoteBibleIfNeeded)
-  if (remoteBibleActions.value.length > 0) {
-    results = results.concat(remoteBibleActions.value)
+  // A confirmed Bible reference search ("Psa 101", "Eph 3:20") already tells
+  // us exactly what the user wants, so the global song/scripture library
+  // search (see the `searchInput` watcher below) is skipped entirely and
+  // there's nothing useful it could add — keep only the local book matches.
+  if (!isBibleReferenceSearch.value) {
+    // API-searched (global) songs, fetched alongside local library matches
+    // (see fetchRemoteSongsIfNeeded)
+    if (remoteSongActions.value.length > 0) {
+      results = results.concat(remoteSongActions.value)
+    }
+
+    // API-searched (global) Bible verses, fetched alongside local book
+    // matches (see fetchRemoteBibleIfNeeded)
+    if (remoteBibleActions.value.length > 0) {
+      results = results.concat(remoteBibleActions.value)
+    }
   }
 
   // Sort by showing [searchableOnly] actions last
