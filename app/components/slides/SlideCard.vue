@@ -217,7 +217,7 @@ const applyLiveSlide = (slideId: string) => {
   )
   if (!slide) return
 
-  useBroadcastPost(JSON.stringify(slide))
+  useBroadcastPost(slide)
   appStore.setLiveSlide(slideId)
 }
 

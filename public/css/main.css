@@ -293,6 +293,24 @@ html.dark .cow-search-input input::placeholder {
   -webkit-backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
 }
+/* Verse/slide-content transitions (SlideContentByLayout) */
+.verse-transition-translate-up {
+  animation: come-up 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  -webkit-animation: come-up 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+.verse-transition-fade {
+  animation: verse-fade 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  -webkit-animation: verse-fade 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+    forwards;
+  will-change: opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
 .fade-in-right {
   animation: fade-in-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   -webkit-animation: fade-in-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)
@@ -347,6 +365,11 @@ html.dark .cow-search-input input::placeholder {
     animation: none;
     -webkit-animation: none;
   }
+  .verse-transition-translate-up,
+  .verse-transition-fade {
+    animation: none;
+    -webkit-animation: none;
+  }
   .fade-in-right,
   .fade-in-left {
     animation: none;
@@ -370,6 +393,15 @@ html.dark .cow-search-input input::placeholder {
     -moz-transform: translateY(0) translateZ(0);
     -ms-transform: translateY(0) translateZ(0);
     -o-transform: translateY(0) translateZ(0);
+  }
+}
+
+@keyframes verse-fade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
   }
 }
 

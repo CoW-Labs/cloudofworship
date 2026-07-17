@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="slide?.layout === slideLayoutTypes.heading_sub"
-    :class="{
+    :class="inheritsGlobalTextStyles ? {
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
@@ -14,7 +14,7 @@
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
       'single-line-spacing':
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
-    }"
+    } : {}"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
   >
     <TiptapEditorContent :editor="editorOne" />
@@ -22,7 +22,7 @@
   </div>
   <div
     v-else-if="slide?.layout === slideLayoutTypes.full_text"
-    :class="{
+    :class="inheritsGlobalTextStyles ? {
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
@@ -35,7 +35,7 @@
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
       'single-line-spacing':
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
-    }"
+    } : {}"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
   >
     <TiptapEditorContent
@@ -48,7 +48,7 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.two_column"
     class="slide-layout-ctn flex gap-4 h-[100%] justify-around items-center rounded-md px-12"
-    :class="{
+    :class="inheritsGlobalTextStyles ? {
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
@@ -60,7 +60,7 @@
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
       'single-line-spacing':
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
-    }"
+    } : {}"
   >
     <TiptapEditorContent :editor="editorOne" />
     <TiptapEditorContent :editor="editorTwo" />
@@ -68,7 +68,7 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.bible"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
-    :class="{
+    :class="inheritsGlobalTextStyles ? {
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
@@ -81,7 +81,7 @@
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
       'single-line-spacing':
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
-    }"
+    } : {}"
   >
     <TiptapEditorContent
       :editor="uneditableEditorOne"
@@ -92,7 +92,7 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.countdown"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center rounded-md px-12"
-    :class="{
+    :class="inheritsGlobalTextStyles ? {
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
       'center-live-content': slide?.slideStyle?.alignment === 'center',
@@ -105,7 +105,7 @@
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
       'single-line-spacing':
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
-    }"
+    } : {}"
   >
     <TiptapEditorContent
       v-if="hasCountdownLabel"
@@ -136,6 +136,9 @@ const props = defineProps<{
 
 const emit = defineEmits(["update", "change-focused-editor"])
 const appStore = useAppStore()
+const inheritsGlobalTextStyles = computed(
+  () => props.slide.type !== slideTypes.text
+)
 
 // Common extensions configuration for better code reusability
 const getCommonExtensions = (placeholder: string, includeHeading = true) => {
@@ -263,7 +266,7 @@ watch(
 watch(
   () => props.slide?.slideStyle?.font,
   (newFont) => {
-    if (!newFont) return
+    if (!newFont || !inheritsGlobalTextStyles.value) return
     const allEditors = [
       editorOne.value,
       editorTwo.value,
@@ -333,7 +336,10 @@ const editorOne = ref(
       applyDefaultWhiteColor(editor)
 
       // Apply default font if set
-      if (appStore.currentState?.settings?.defaultFont) {
+      if (
+        inheritsGlobalTextStyles.value &&
+        appStore.currentState?.settings?.defaultFont
+      ) {
         queueEditorCommand(editor, (e) =>
           e.commands.setFontFamily(appStore.currentState.settings.defaultFont)
         )
@@ -376,7 +382,10 @@ const editorTwo = ref(
       applyDefaultWhiteColor(editor)
 
       // Apply default font if set
-      if (appStore.currentState?.settings?.defaultFont) {
+      if (
+        inheritsGlobalTextStyles.value &&
+        appStore.currentState?.settings?.defaultFont
+      ) {
         queueEditorCommand(editor, (e) =>
           e.commands.setFontFamily(appStore.currentState.settings.defaultFont)
         )
@@ -408,7 +417,10 @@ const editorThree = ref(
       applyDefaultWhiteColor(editor)
 
       // Apply default font if set
-      if (appStore.currentState?.settings?.defaultFont) {
+      if (
+        inheritsGlobalTextStyles.value &&
+        appStore.currentState?.settings?.defaultFont
+      ) {
         queueEditorCommand(editor, (e) =>
           e.commands.setFontFamily(appStore.currentState.settings.defaultFont)
         )
@@ -621,7 +633,8 @@ const uneditableEditorThree = ref(
 
 /* Selection styling */
 .ProseMirror ::selection {
-  background: rgba(99, 102, 241, 0.2);
+  color: #ffffff;
+  background: rgba(168, 85, 247, 0.82);
 }
 
 /* Smooth transitions */

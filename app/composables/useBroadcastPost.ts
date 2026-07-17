@@ -1,16 +1,26 @@
-// Reuse single BroadcastChannel instance to prevent memory leaks
-let bcInstance: BroadcastChannel | null = null;
+// Reuse single BroadcastChannel instance to prevent memory leaks.
+let bcInstance: BroadcastChannel | null = null
 
-const useBroadcastPost = (data: any) => {
+export type LiveBroadcastEnvelope<T = unknown> = {
+  ts: number
+  payload: T
+}
+
+const useBroadcastPost = <T>(payload: T) => {
   if (!bcInstance) {
-    bcInstance = new BroadcastChannel("cow-live-channel");
+    bcInstance = new BroadcastChannel("cow-live-channel")
   }
-  // Stamp with wall-clock time (shared across tabs/windows on this device,
-  // since BroadcastChannel is same-origin/same-device only) so a receiver can
-  // drop a message that arrives out of order - e.g. a background countdown
-  // tick from another tab racing a newer manual live output change - instead
-  // of always applying whatever lands last.
-  bcInstance.postMessage(JSON.stringify({ ts: Date.now(), payload: data }));
-};
 
-export default useBroadcastPost;
+  const message: LiveBroadcastEnvelope<T> = {
+    ts: Date.now(),
+    payload,
+  }
+
+  // Slides can contain Vue/Pinia reactive proxies, which the structured-clone
+  // algorithm rejects with DataCloneError. Serialize the complete envelope
+  // once to strip those proxies. The receiver parses it once, avoiding the old
+  // payload-plus-envelope double serialization while remaining reliable.
+  bcInstance.postMessage(JSON.stringify(message))
+}
+
+export default useBroadcastPost

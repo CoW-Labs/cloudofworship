@@ -1,19 +1,29 @@
 <template>
   <div
     :class="{
-      'outlined-live-content': slide?.slideStyle?.textOutlined,
-      'bold-live-content': slide?.slideStyle?.textBold,
+      'outlined-live-content':
+        inheritsGlobalTextStyles && slide?.slideStyle?.textOutlined,
+      'bold-live-content':
+        inheritsGlobalTextStyles && slide?.slideStyle?.textBold,
       'text-lines-background-live-content':
-        slide?.slideStyle?.textLinesBackground,
-      'center-live-content': slide?.slideStyle?.alignment === 'center',
-      'left-live-content': slide?.slideStyle?.alignment === 'left',
-      'right-live-content': slide?.slideStyle?.alignment === 'right',
-      'uppercase-live-content': slide?.slideStyle?.lettercase === 'uppercase',
+        inheritsGlobalTextStyles && slide?.slideStyle?.textLinesBackground,
+      'center-live-content':
+        inheritsGlobalTextStyles && slide?.slideStyle?.alignment === 'center',
+      'left-live-content':
+        inheritsGlobalTextStyles && slide?.slideStyle?.alignment === 'left',
+      'right-live-content':
+        inheritsGlobalTextStyles && slide?.slideStyle?.alignment === 'right',
+      'uppercase-live-content':
+        inheritsGlobalTextStyles &&
+        slide?.slideStyle?.lettercase === 'uppercase',
       'double-line-spacing':
+        inheritsGlobalTextStyles &&
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.double,
       'normal-line-spacing':
+        inheritsGlobalTextStyles &&
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.normal,
       'single-line-spacing':
+        inheritsGlobalTextStyles &&
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
     class="live-content tiptap border-none w-[100%] h-[100%] pointer-events-none"
@@ -40,6 +50,12 @@ const props = defineProps<{
   padding: { top: number; right: number; bottom: number; left: number }
   contentVisible: boolean
 }>()
+
+// Text slides own their typography inside TipTap HTML. Global slide text
+// settings continue to style generated content such as songs and scripture.
+const inheritsGlobalTextStyles = computed(
+  () => props.slide.type !== slideTypes.text
+)
 
 const emit = defineEmits(["slide-update", "update-live-output-slides"])
 

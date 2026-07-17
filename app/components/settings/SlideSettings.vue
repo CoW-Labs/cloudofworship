@@ -422,7 +422,7 @@
             <URange
               :model-value="appStore.currentState.settings.transitionInterval"
               :min="0"
-              :max="5"
+              :max="3"
               :step="0.1"
               :disabled="!hasAccessToAnimations"
               @change="
@@ -431,7 +431,7 @@
                   : handleUpgradeClick()
               "
             />
-            <span class="text-sm"> 5s</span>
+            <span class="text-sm"> 3s</span>
           </div>
         </UFormGroup>
         <UFormGroup
@@ -448,6 +448,59 @@
                 : handleUpgradeClick()
             "
           />
+        </UFormGroup>
+        <UFormGroup
+          label="Verse-to-verse transition"
+          class="flex w-full items-center justify-between py-2 px-2 hover:bg-primary/10"
+        >
+          <CowSelectMenu
+            class="border-0 shadow-none max-w-[200px]"
+            select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
+            size="md"
+            :options="verseTransitionStyleOptions"
+            :model-value="appStore.currentState.settings.verseTransitionStyle || 'off'"
+            :disabled="!hasAccessToAnimations"
+            variant="none"
+            color="primary"
+            :ui="selectUI"
+            :ui-menu="selectMenuUI"
+            @change="
+              (event: any) => {
+                if (!hasAccessToAnimations) {
+                  handleUpgradeClick()
+                  return
+                }
+                appStore.setVerseTransitionStyle(event.key)
+              }
+            "
+          />
+        </UFormGroup>
+        <UFormGroup
+          v-if="
+            (appStore.currentState.settings.verseTransitionStyle || 'off') !==
+            'off'
+          "
+          label="Verse-to-verse transition interval"
+          class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
+        >
+          <div
+            class="flex px-0 items-center gap-2 font-semibold w-full min-w-[200px]"
+          >
+            <span class="text-sm">0s</span>
+            <URange
+              :model-value="appStore.currentState.settings.verseTransitionInterval"
+              :min="0"
+              :max="1.5"
+              :step="0.1"
+              :disabled="!hasAccessToAnimations"
+              @change="
+                hasAccessToAnimations
+                  ? appStore.setVerseTransitionInterval($event)
+                  : handleUpgradeClick()
+              "
+            />
+            <span class="text-sm"> 1.5s</span>
+          </div>
         </UFormGroup>
       </UForm>
     </div>
@@ -606,6 +659,12 @@ const hasAccessToOverlays = computed(() => {
   if (!isPremiumFeatureEnabled.value) return true
   return hasAccessToFeature("overlays-themes")
 })
+
+const verseTransitionStyleOptions = [
+  { key: "off", label: "Off" },
+  { key: "fade", label: "Fade" },
+  { key: "slide-up", label: "Slide up" },
+]
 
 // Show teams badge if feature is locked
 const showTeamsBadge = computed(() => {

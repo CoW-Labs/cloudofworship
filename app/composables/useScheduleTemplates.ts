@@ -42,18 +42,16 @@ export default function useScheduleTemplates() {
     const toHtml = (text?: string) =>
       text ? `<p>${text.replace(/\n/g, "<br>")}</p>` : ""
 
-    if (seed.heading) {
-      // heading-and-subtitle layout renders contents[0] (heading) + contents[1]
-      slide.layout = slideLayoutTypes.heading_sub
-      slide.contents = [
-        `<h1>${seed.heading}</h1>`,
+    // Template text slides always use the single editable textbox. A heading,
+    // when present, remains a heading node inside that same TipTap document.
+    slide.layout = slideLayoutTypes.full_text
+    slide.contents = [
+      "",
+      [
+        seed.heading ? `<h1>${seed.heading}</h1>` : "",
         toHtml(seed.subtitle ?? seed.body),
-      ]
-    } else {
-      // full-text layout renders contents[1]
-      slide.layout = slideLayoutTypes.full_text
-      slide.contents = ["", toHtml(seed.body ?? seed.subtitle)]
-    }
+      ].join(""),
+    ]
 
     slide.name = seed.heading || seed.subtitle || "Text slide"
     return slide

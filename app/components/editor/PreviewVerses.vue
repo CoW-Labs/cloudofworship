@@ -1,7 +1,7 @@
 <template>
   <div
     ref="versesPreview"
-    class="verse-preview behavior-smooth absolute bg-white dark:bg-[#222938] right-0 left-0 top-[46px] z-20 overflow-auto shadow-lg rounded-b-2xl"
+    class="verse-preview behavior-smooth absolute bg-white dark:bg-[#222938] right-0 left-0 top-[46px] z-40 overflow-auto shadow-lg rounded-b-2xl"
   >
     <div
       v-if="slide?.type === slideTypes.songSetlist"

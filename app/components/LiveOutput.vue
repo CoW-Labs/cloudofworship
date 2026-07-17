@@ -7,6 +7,7 @@
     >
       <div class="relative w-full h-full flex items-center justify-center">
         <LiveProjectionOnly
+          v-if="liveSlide"
           slide-label
           :slide="liveSlide"
           :full-screen="false"
@@ -286,20 +287,30 @@ const broadcastSlideReorder = (slideOrder: string[]) => {
   }
 }
 
-const liveSlide = computed(() => {
-  return currentState.value?.activeSlides.find(
-    (slide) => slide.id === currentState.value.liveSlideId
-  )
-})
+// Build the lookup once per activeSlides mutation. The previous implementation
+// ran Array.find for every live-output id, turning each verse update into an
+// O(n²) schedule scan on larger services.
+const activeSlidesById = computed(
+  () =>
+    new Map(
+      currentState.value.activeSlides.map((slide) => [slide.id, slide] as const)
+    )
+)
+
+const liveSlide = computed(() =>
+  currentState.value.liveSlideId
+    ? activeSlidesById.value.get(currentState.value.liveSlideId)
+    : undefined
+)
 
 const liveOutputSlides = computed({
   get() {
-    const tempSlides = currentState.value?.liveOutputSlidesId?.map((id) =>
-      currentState.value?.activeSlides.find((slide) => slide.id === id)
-    ) as Slide[]
+    const tempSlides = (currentState.value.liveOutputSlidesId ?? [])
+      .map((id) => activeSlidesById.value.get(id))
+      .filter((slide): slide is Slide => Boolean(slide))
 
     // Filter by current active schedule
-    return tempSlides?.filter(
+    return tempSlides.filter(
       (slide) => slide.scheduleId === currentState.value?.activeSchedule?._id
     )
   },
@@ -319,20 +330,20 @@ const liveOutputSlides = computed({
 })
 
 const nextSlide = computed(() => {
-  const liveSlideIndex = liveOutputSlides.value?.findIndex(
+  const liveSlideIndex = liveOutputSlides.value.findIndex(
     (slide: Slide) => slide.id === currentState.value.liveSlideId
   )
   // const tempSlides = liveOutputSlidesId.value?.map((id) =>
   //   appStore.activeSlides.find((slide) => slide.id === id)
   // ) as Slide[]
   const gotoSlideIndex = (liveSlideIndex as number) + 1
-  if (gotoSlideIndex < liveOutputSlides.value?.length) {
+  if (gotoSlideIndex < liveOutputSlides.value.length) {
     return liveOutputSlides.value[gotoSlideIndex]
   }
 })
 
 const previousSlide = computed(() => {
-  const liveSlideIndex = liveOutputSlides.value?.findIndex(
+  const liveSlideIndex = liveOutputSlides.value.findIndex(
     (slide: Slide) => slide.id === currentState.value?.liveSlideId
   )
   // const tempSlides = liveOutputSlidesId.value?.map((id) =>
@@ -340,7 +351,7 @@ const previousSlide = computed(() => {
   // ) as Slide[]
   if (!liveSlideIndex || liveSlideIndex < 1) return
   const gotoSlideIndex = liveSlideIndex - 1
-  if (gotoSlideIndex < liveOutputSlides.value?.length) {
+  if (gotoSlideIndex < liveOutputSlides.value.length) {
     return liveOutputSlides.value[gotoSlideIndex]
   }
 })
@@ -413,7 +424,7 @@ const setLiveSlide = (slideId: string) => {
   if (!slide) return
 
   // useDebounceFn(useBroadcastPost, 0)(JSON.stringify(slide))
-  useBroadcastPost(JSON.stringify(slide))
+  useBroadcastPost(slide)
   appStore.setLiveSlide(slideId)
 }
 

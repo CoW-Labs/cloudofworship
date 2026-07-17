@@ -982,7 +982,7 @@ emitter.on("selected-schedule", (data: Schedule | string | null) => {
 
   // Clear live projection
   appStore.setLiveSlide("")
-  useBroadcastPost(JSON.stringify(null))
+  useBroadcastPost(null)
 })
 
 // Utility functions for offline sync
@@ -1328,7 +1328,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
     if (wasLive) {
       appStore.setLiveSlide("")
-      useBroadcastPost(JSON.stringify(null))
+      useBroadcastPost(null)
     }
 
     if (activeStoreSlide || wasLive) {
@@ -1364,7 +1364,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     appStore.currentState.liveSlideId === tempSlide._id
   ) {
     appStore.setLiveSlide("")
-    useBroadcastPost(JSON.stringify(null))
+    useBroadcastPost(null)
   }
 
   const slideIndex = slides.value.findIndex(slideMatchesId)

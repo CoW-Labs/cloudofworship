@@ -74,7 +74,14 @@ export default function useSlideCreation() {
 
   const createTextSlide = (): Slide => {
     const tempSlide = { ...preSlideCreation() }
-    tempSlide.slideStyle = { ...tempSlide.slideStyle, alignment: "left" }
+    // Text-slide typography is stored in its TipTap HTML. Do not seed it with
+    // global typography, otherwise global alignment/case/font/weight settings
+    // override the formatting chosen in the text toolbar.
+    tempSlide.slideStyle = {
+      isMediaMuted: tempSlide.slideStyle?.isMediaMuted,
+      isMediaPlaying: tempSlide.slideStyle?.isMediaPlaying,
+      backgroundFillType: tempSlide.slideStyle?.backgroundFillType,
+    }
     tempSlide.background =
       appStore.currentState.settings.defaultBackground.default?.background ||
       appStore.currentState.settings.defaultBackground.text?.background

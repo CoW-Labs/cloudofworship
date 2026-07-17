@@ -119,6 +119,8 @@ export const useAppStore = defineStore("app", {
           },
           animations: true,
           microAnimations: true,
+          verseTransitionStyle: "off",
+          verseTransitionInterval: 0.3,
           footnotes: false,
           songAndHymnLabelsVisibility: false,
           liveWindowFullscreen: true, // Default to fullscreen mode
@@ -474,6 +476,20 @@ export const useAppStore = defineStore("app", {
       }
       usePosthogCapture("MICRO_ANIMATIONS_SETTINGS_CHANGED")
     },
+    setVerseTransitionStyle(verseTransitionStyle: "off" | "fade" | "slide-up") {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        verseTransitionStyle: verseTransitionStyle,
+      }
+      usePosthogCapture("VERSE_TRANSITION_STYLE_SETTINGS_CHANGED")
+    },
+    setVerseTransitionInterval(interval: number) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        verseTransitionInterval: interval,
+      }
+      usePosthogCapture("VERSE_TRANSITION_INTERVAL_SETTINGS_CHANGED")
+    },
     setFootnotes(footnotes: boolean) {
       this.currentState.settings = {
         ...this.currentState.settings,
@@ -672,7 +688,9 @@ export const useAppStore = defineStore("app", {
     // Update a specific slide in the active slides array (for realtime updates)
     updateSlideInActiveSlides(updatedSlide: Slide) {
       const slideIndex = this.currentState.activeSlides.findIndex(
-        (s) => s.id === updatedSlide.id || s._id === updatedSlide._id
+        (s) =>
+          s.id === updatedSlide.id ||
+          (!!updatedSlide._id && s._id === updatedSlide._id)
       )
       if (slideIndex !== -1) {
         const existingSlide = this.currentState.activeSlides[slideIndex]
