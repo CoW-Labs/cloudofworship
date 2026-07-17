@@ -36,15 +36,25 @@ export default function useSlides() {
   }
 
   const updateLiveOutput = (updatedSlide: Slide, options?: { forceGoLive: boolean }) => {
-    // Post to the live window first — before any Pinia/localStorage work —
-    // so the projector sees the new slide as early as possible.
-    if (updatedSlide.id === appStore.currentState.liveSlideId || options?.forceGoLive) {
-      appStore.setLiveSlide(updatedSlide.id)
-      useBroadcastPost(JSON.stringify(updatedSlide))
-    }
+    const shouldUpdateLiveSlide =
+      updatedSlide.id === appStore.currentState.liveSlideId ||
+      options?.forceGoLive
 
-    // Persist schedule state after broadcasting (non-critical path).
-    appStore.replaceScheduleActiveSlides(slides.value || [])
+    // Update only the changed slide. Replacing the full schedule array here
+    // made every verse navigation re-filter and re-render unrelated slides.
+    appStore.updateSlideInActiveSlides(updatedSlide)
+
+    if (shouldUpdateLiveSlide) {
+      // Same-slide verse changes already have the correct live id. Avoid a
+      // second Pinia mutation, persistence pass, and shared-state broadcast.
+      if (appStore.currentState.liveSlideId !== updatedSlide.id) {
+        appStore.setLiveSlide(updatedSlide.id)
+      }
+
+      // Send immediately after the targeted local update. The channel applies
+      // one serialization boundary so Vue reactive proxies remain clone-safe.
+      useBroadcastPost(updatedSlide)
+    }
   }
 
   /**

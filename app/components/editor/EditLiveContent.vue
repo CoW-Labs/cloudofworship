@@ -16,7 +16,7 @@
       sub="Drop to set as slide background"
       class="absolute inset-0 z-40 pointer-events-none"
     />
-    <div v-if="slide" class="shrink-0">
+    <div v-if="slide" class="z-20 shrink-0">
       <div
         v-if="slide"
         class="toolbar w-[100%] px-3 py-1 min-h-[44px] bg-[#f1f3f6] dark:bg-[#222938] flex items-center justify-between gap-1"
@@ -281,7 +281,7 @@
     </div>
 
     <!-- MAIN CONTENT — preview region (overlay panels layer on top) -->
-    <div class="body relative flex-1 min-h-0">
+    <div class="body relative z-0 flex-1 min-h-0 overflow-hidden isolate">
       <EmptyState
         v-if="!slide"
         icon="i-bx-slideshow"
@@ -329,6 +329,7 @@
         <div
           v-else
           class="h-[100%] relative text-white bg-[#222938] bg-no-repeat transition-all rounded-b-2xl overflow-hidden"
+          style="container-type: inline-size"
           :class="{
             'bg-center bg-cover':
               slide?.slideStyle?.backgroundFillType ===
@@ -358,13 +359,24 @@
             crossorigin="anonymous"
           ></video>
           <div class="bg-black opacity-30 absolute inset-0"></div>
-          <TipTap
-            v-if="slide"
+          <div
+            v-if="slide?.type === slideTypes.text"
+            class="text-slide-editor-preview"
+          >
+            <TipTap
+              :slide="slide"
+              @update="onUpdateSlideContent"
+              @change-focused-editor="focusedEditor = $event"
+              :layout="slide?.layout"
+              editable
+            />
+          </div>
+          <LiveContent
+            v-else
             :slide="slide"
-            @update="onUpdateSlideContent"
-            @change-focused-editor="focusedEditor = $event"
-            :layout="slide?.layout"
-            editable
+            :padding="editorPreviewPadding"
+            :content-visible="true"
+            class="static-slide-editor-preview z-10"
           />
         </div>
       </template>
@@ -410,6 +422,20 @@ const emit = defineEmits([
 ])
 
 const appStore = useAppStore()
+
+// Render non-text slides from their existing HTML instead of asking six
+// TipTap/ProseMirror instances to parse every verse change.
+const editorPreviewPadding = computed(() => {
+  const padding = appStore.currentState.settings.slideStyles.windowPadding
+  const scale = (value: number | undefined) => ((value || 24) * 6) / 24
+
+  return {
+    top: scale(padding?.top),
+    right: scale(padding?.right),
+    bottom: scale(padding?.bottom),
+    left: scale(padding?.left),
+  }
+})
 
 const editorRoot = ref<HTMLElement | null>(null)
 const focusedEditor = ref<Editor | undefined>()
@@ -1367,5 +1393,59 @@ const predictVerseInput = (
   opacity: 1;
   visibility: visible;
   max-height: 350px;
+}
+
+/* Lightweight, selectable preview for generated slide content. This keeps the
+   direct-HTML performance path while giving the text an editor-like affordance. */
+.text-slide-editor-preview,
+.static-slide-editor-preview {
+  position: absolute !important;
+  inset: 0;
+  transform: scale(0.88);
+  transform-origin: center;
+  pointer-events: auto !important;
+  user-select: text !important;
+  cursor: text;
+}
+
+.text-slide-editor-preview :deep(.tiptap-editor) {
+  border-radius: 0.4rem;
+  box-shadow: 0 0 0 1px rgba(203, 213, 225, 0.32);
+  transition: box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.text-slide-editor-preview :deep(.tiptap-editor:hover),
+.text-slide-editor-preview :deep(.tiptap-editor:focus) {
+  background-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 1px rgba(226, 232, 240, 0.72);
+}
+
+.text-slide-editor-preview :deep(.ProseMirror::selection),
+.text-slide-editor-preview :deep(.ProseMirror *::selection) {
+  color: #ffffff;
+  background-color: rgba(168, 85, 247, 0.82);
+}
+
+.static-slide-editor-preview :deep(.content),
+.static-slide-editor-preview :deep(.content *) {
+  pointer-events: auto;
+  user-select: text !important;
+}
+
+.static-slide-editor-preview :deep(.content) {
+  border-radius: 0.4rem;
+  box-shadow: 0 0 0 1px rgba(203, 213, 225, 0.32);
+  transition: box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.static-slide-editor-preview :deep(.content:hover) {
+  background-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 1px rgba(226, 232, 240, 0.72);
+}
+
+.static-slide-editor-preview :deep(.content::selection),
+.static-slide-editor-preview :deep(.content *::selection) {
+  color: #ffffff;
+  background-color: rgba(148, 163, 184, 0.62);
 }
 </style>

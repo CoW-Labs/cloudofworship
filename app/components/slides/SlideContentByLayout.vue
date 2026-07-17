@@ -6,20 +6,24 @@
   >
     <div
       v-if="contentVisible"
+      :key="contentKey(0)"
       class="content"
       :class="[
-        useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-        currentState.settings.microAnimations !== false ? 'come-up-1' : '',
+        inheritedFontClass,
+        verseTransitionClass,
       ]"
+      :style="verseTransitionStyleVar"
       v-html="getSlideContentHtml(slide?.contents?.[0])"
     ></div>
     <div
       v-if="contentVisible"
+      :key="contentKey(1)"
       class="content"
       :class="[
-        useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-        currentState.settings.microAnimations !== false ? 'come-up-2' : '',
+        inheritedFontClass,
+        verseTransitionClass,
       ]"
+      :style="verseTransitionStyleVar"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
   </div>
@@ -27,18 +31,17 @@
   <div
     v-else-if="slide?.layout === slideLayoutTypes.full_text"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
-    :style="`padding: ${padding.top}cqw ${padding.right}cqw ${padding.bottom}cqw ${padding.left}cqw; font-size: ${
-      (slide?.slideStyle?.fontSize!!) *
-      ((slide?.slideStyle?.fontSizePercent || currentState.settings.slideStyles.fontSizePercent || 100) / 100)
-    }cqw`"
+    :style="fullTextLayoutStyle"
   >
     <div
       v-if="contentVisible"
+      :key="contentKey(1)"
       class="content"
       :class="[
-        useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-        currentState.settings.microAnimations !== false ? 'come-up-1' : '',
+        inheritedFontClass,
+        verseTransitionClass,
       ]"
+      :style="verseTransitionStyleVar"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
   </div>
@@ -50,14 +53,18 @@
   >
     <div
       v-if="contentVisible"
+      :key="contentKey(0)"
       class="content"
-      :class="[currentState.settings.microAnimations !== false ? 'come-up-1' : '']"
+      :class="[verseTransitionClass]"
+      :style="verseTransitionStyleVar"
       v-html="getSlideContentHtml(slide?.contents?.[0])"
     ></div>
     <div
       v-if="contentVisible"
+      :key="contentKey(1)"
       class="content"
-      :class="[currentState.settings.microAnimations !== false ? 'come-up-2' : '']"
+      :class="[verseTransitionClass]"
+      :style="verseTransitionStyleVar"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
   </div>
@@ -83,21 +90,22 @@
     <template v-if="bibleTheme.layout.labelPosition === 'top'">
       <div
         v-if="contentVisible"
+        :key="contentKey(1)"
         class="content bible-label"
-        :class="[
-          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
-          bibleThemeClasses.label,
-        ]"
+        :class="[verseTransitionClass, bibleThemeClasses.label]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
       <div
         v-if="contentVisible"
+        :key="contentKey(0)"
         class="content bible-content flex-1"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
+          verseTransitionClass,
           bibleThemeClasses.content,
         ]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
     </template>
@@ -106,21 +114,22 @@
     <template v-else-if="bibleTheme.layout.labelPosition === 'left'">
       <div
         v-if="contentVisible"
+        :key="contentKey(1)"
         class="content bible-label writing-mode-vertical rotate-180"
-        :class="[
-          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
-          bibleThemeClasses.label,
-        ]"
+        :class="[verseTransitionClass, bibleThemeClasses.label]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
       <div
         v-if="contentVisible"
+        :key="contentKey(0)"
         class="content bible-content flex-1"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
+          verseTransitionClass,
           bibleThemeClasses.content,
         ]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
     </template>
@@ -129,21 +138,22 @@
     <template v-else-if="bibleTheme.layout.labelPosition === 'right'">
       <div
         v-if="contentVisible"
+        :key="contentKey(1)"
         class="content bible-label writing-mode-vertical"
-        :class="[
-          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
-          bibleThemeClasses.label,
-        ]"
+        :class="[verseTransitionClass, bibleThemeClasses.label]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
       <div
         v-if="contentVisible"
+        :key="contentKey(0)"
         class="content bible-content flex-1"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
+          verseTransitionClass,
           bibleThemeClasses.content,
         ]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
     </template>
@@ -152,21 +162,22 @@
     <template v-else-if="bibleTheme.layout.labelPosition === 'overlay'">
       <div
         v-if="contentVisible"
+        :key="contentKey(0)"
         class="content bible-content"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
+          verseTransitionClass,
           bibleThemeClasses.content,
         ]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
       <div
         v-if="contentVisible"
+        :key="contentKey(1)"
         class="content bible-label"
-        :class="[
-          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
-          bibleThemeClasses.label,
-        ]"
+        :class="[verseTransitionClass, bibleThemeClasses.label]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
     </template>
@@ -175,21 +186,22 @@
     <template v-else>
       <div
         v-if="contentVisible"
+        :key="contentKey(0)"
         class="content bible-content"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
-          currentState.settings.microAnimations !== false ? 'come-up-1' : '',
+          verseTransitionClass,
           bibleThemeClasses.content,
         ]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
       <div
         v-if="contentVisible"
+        :key="contentKey(1)"
         class="content bible-label"
-        :class="[
-          currentState.settings.microAnimations !== false ? 'come-up-2' : '',
-          bibleThemeClasses.label,
-        ]"
+        :class="[verseTransitionClass, bibleThemeClasses.label]"
+        :style="verseTransitionStyleVar"
         v-html="getSlideContentHtml(slide?.contents?.[1])"
       ></div>
     </template>
@@ -228,12 +240,36 @@ const props = defineProps<{
 
 const { currentState } = storeToRefs(useAppStore())
 const { getSlideTheme } = useTheme()
+const usesTipTapTextStyles = computed(
+  () => props.slide.type === slideTypes.text
+)
+const inheritedFontClass = computed(() =>
+  usesTipTapTextStyles.value
+    ? ""
+    : useURLFriendlyString(props.slide?.slideStyle?.font || "Inter")
+)
+const fullTextLayoutStyle = computed(() => {
+  const paddingStyle = `padding: ${props.padding.top}cqw ${props.padding.right}cqw ${props.padding.bottom}cqw ${props.padding.left}cqw;`
+  if (usesTipTapTextStyles.value) return paddingStyle
+
+  const fontSize =
+    (props.slide?.slideStyle?.fontSize || 0) *
+    ((props.slide?.slideStyle?.fontSizePercent ||
+      currentState.value.settings.slideStyles.fontSizePercent ||
+      100) /
+      100)
+  return `${paddingStyle} font-size: ${fontSize}cqw;`
+})
 
 const lineBackgroundSelector =
   "p:not(.scripture-label):not(.song-label):not(.countdown-label):not(.copyright-content), h1, h2, h3, h4"
 
 const getSlideContentHtml = (content = "") => {
-  if (!props.slide?.slideStyle?.textLinesBackground || !content) {
+  if (
+    usesTipTapTextStyles.value ||
+    !props.slide?.slideStyle?.textLinesBackground ||
+    !content
+  ) {
     return content
   }
 
@@ -294,6 +330,33 @@ const bibleThemeClasses = computed(() => {
   }
 
   return classes
+})
+
+// Resolves the verse/line-to-line transition setting to its CSS animation
+// class. Off by default.
+const verseTransitionEnabled = computed(
+  () => (currentState.value.settings.verseTransitionStyle ?? "off") !== "off"
+)
+const verseTransitionClass = computed(() => {
+  const style = currentState.value.settings.verseTransitionStyle ?? "off"
+  if (style === "slide-up") return "verse-transition-translate-up"
+  if (style === "fade") return "verse-transition-fade"
+  return ""
+})
+
+// Key for a content slot. Only changes per verse when a transition is enabled,
+// so Vue remounts the div and replays the CSS animation. When off, the key is
+// stable per slot so content patches IN PLACE — no remount, no re-parse of the
+// v-html, and no live-vs-editor desync flash on navigation.
+const contentKey = (index: number) =>
+  verseTransitionEnabled.value
+    ? `${index}::${props.slide?.contents?.[index] ?? ""}`
+    : `slot-${index}`
+
+// Duration for the verse transition animation, user-adjustable (0-1.5s).
+const verseTransitionStyleVar = computed(() => {
+  const interval = currentState.value.settings.verseTransitionInterval ?? 0.3
+  return { animationDuration: `${interval}s` }
 })
 </script>
 

@@ -53,6 +53,7 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 import type { Slide } from "~/types"
+import type { LiveBroadcastEnvelope } from "~/composables/useBroadcastPost"
 import { useAuthStore } from "~/store/auth"
 import {
   exitFullscreenSafely,
@@ -185,9 +186,14 @@ onMounted(() => {
   initializeLiveSlide()
 
   // Store cleanup function to properly dispose of BroadcastChannel
-  const cleanupBroadcast = useBroadcastMessage((data: string) => {
+  const cleanupBroadcast = useBroadcastMessage((data) => {
     try {
-      const envelope = JSON.parse(data)
+      // Accept the old JSON envelope during hot updates, but use the direct
+      // structured-clone object for all new messages.
+      const envelope = (typeof data === "string" ? JSON.parse(data) : data) as
+        | LiveBroadcastEnvelope<Slide | null | string>
+        | undefined
+      if (!envelope || typeof envelope.ts !== "number") return
 
       // Drop messages that arrive out of order (e.g. a background countdown
       // tick from a tab that hasn't yet caught up to a newer local live output
@@ -195,7 +201,9 @@ onMounted(() => {
       if (envelope.ts < lastBroadcastTs.value) return
       lastBroadcastTs.value = envelope.ts
 
-      const parsed = JSON.parse(envelope.payload)
+      const parsed = (typeof envelope.payload === "string"
+        ? JSON.parse(envelope.payload)
+        : envelope.payload) as Slide | null
 
       // null broadcast means the live slide was deleted — blank the projection
       if (parsed === null) {

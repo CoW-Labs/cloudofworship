@@ -1,7 +1,7 @@
 <template>
   <div
     v-show="slide?.type !== slideTypes.presentation"
-    class="absolute z-10 top-[46px] left-1/2 -translate-x-1/2 max-w-[calc(100%-1rem)] flex justify-center"
+    class="absolute z-30 top-[46px] left-1/2 -translate-x-1/2 max-w-[calc(100%-1rem)] flex justify-center"
     :class="containerOverflow"
   >
     <div

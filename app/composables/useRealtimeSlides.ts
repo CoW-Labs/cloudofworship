@@ -54,7 +54,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const clearLiveSlideIfDeleted = (slide: Slide) => {
     if (slideMatchesId(slide, appStore.currentState.liveSlideId)) {
       appStore.setLiveSlide("")
-      useBroadcastPost(JSON.stringify(null))
+      useBroadcastPost(null)
     }
   }
 
@@ -158,7 +158,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
 
             // If slide is live, update the live output
             if (appStore.currentState.liveSlideId === mergedSlide.id) {
-              useBroadcastPost(JSON.stringify(mergedSlide))
+              useBroadcastPost(mergedSlide)
             }
           }
         }

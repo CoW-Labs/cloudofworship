@@ -154,7 +154,7 @@
           })
         "
         @open="containerOverflow = ''"
-        @close="containerOverflow = 'overflow-x-auto'"
+        @close="onFontMenuClose"
       />
       <UTooltip text="Change text color" :popper="{ arrow: true }">
         <label class="cursor-pointer">
@@ -222,6 +222,18 @@ const isEditorReady = computed(() => {
   }
 })
 
+watch(
+  () => props.editor,
+  (editor) => {
+    savedSelection.value = null
+    if (!editor || editor.isDestroyed) return
+
+    const { from, to } = editor.state.selection
+    savedSelection.value = { from, to }
+  },
+  { immediate: true }
+)
+
 // Computed property for current text color
 const currentColor = computed(() => {
   if (!isEditorReady.value) return "#ffffff"
@@ -233,6 +245,18 @@ const saveSelection = () => {
   if (!editor || !isEditorReady.value) return
 
   const { from, to } = editor.state.selection
+
+  // Opening a dropdown can move DOM focus away from ProseMirror and collapse
+  // its current selection. Keep the last real range so subsequent toolbar
+  // changes continue to target the same highlighted text.
+  if (
+    !editor.isFocused &&
+    from === to &&
+    savedSelection.value?.from !== savedSelection.value?.to
+  ) {
+    return
+  }
+
   savedSelection.value = { from, to }
 }
 
@@ -256,7 +280,7 @@ const onToolbarMouseDown = (event: MouseEvent) => {
 // highlighted. It only re-focuses — it never blurs — so it triggers no save.
 const reassertSelection = () => {
   const editor = props.editor
-  if (!editor || !isEditorReady.value || editor.isFocused) return
+  if (!editor || !isEditorReady.value) return
 
   const chain = editor.chain().focus()
   const selection = savedSelection.value
@@ -267,6 +291,11 @@ const reassertSelection = () => {
     chain.setTextSelection({ from, to })
   }
   chain.run()
+}
+
+const onFontMenuClose = () => {
+  containerOverflow.value = "overflow-x-auto"
+  nextTick(() => requestAnimationFrame(reassertSelection))
 }
 
 const runCommand = (
@@ -294,7 +323,14 @@ const runCommand = (
     // dropdown). Plain buttons keep focus via the mousedown preventDefault, so
     // they don't need — or want — the extra frame.
     if (options.restoreFocus) {
-      nextTick(() => requestAnimationFrame(reassertSelection))
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          reassertSelection()
+          // Popover controls may move focus after their change event. A second
+          // frame keeps the editor selection active after that final focus hop.
+          requestAnimationFrame(reassertSelection)
+        })
+      })
     }
   } catch (error) {
     console.warn("[TipTap] Toolbar command skipped:", error)
@@ -307,7 +343,7 @@ const onColorChange = (event: Event) => {
   const color = target.value
 
   // Set color and maintain focus
-  runCommand((chain) => chain.setColor(color))
+  runCommand((chain) => chain.setColor(color), { restoreFocus: true })
 }
 
 const toggleHeading = (level: number) => {
