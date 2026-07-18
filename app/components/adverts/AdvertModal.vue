@@ -25,25 +25,17 @@ import type { Advert } from "~/types"
 
 const props = defineProps<{
   activeAdvert: Advert | null
+  modelValue: boolean
 }>()
 
-const visible = ref(false)
-const stateChange = ref(0)
+const emit = defineEmits<{
+  (e: "update:modelValue", value: boolean): void
+}>()
 
-watch(
-  () => props.activeAdvert,
-  (newVal, oldVal) => {
-    if (newVal && stateChange.value === 0) {
-      setTimeout(() => {
-        visible.value = true
-        usePosthogCapture("ADVERT_MODAL_OPENED")
-      }, 10000)
-    }
-    stateChange.value += 1
-  }
-)
-
-const emit = defineEmits(["close"])
+const visible = computed({
+  get: () => props.modelValue,
+  set: (value: boolean) => emit("update:modelValue", value),
+})
 
 const onAdvertClicked = () => {
   usePosthogCapture("ADVERT_CLICKED")

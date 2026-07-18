@@ -32,7 +32,7 @@ useHead({
   link: [
     {
       rel: "manifest",
-      href: "/live-manifest.json",
+      href: "/manifest.json",
     },
   ],
 })
