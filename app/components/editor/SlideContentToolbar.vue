@@ -1,41 +1,16 @@
 <template>
   <div
     v-show="slide?.type !== slideTypes.presentation"
-    class="absolute z-30 top-[46px] left-1/2 -translate-x-1/2 max-w-[calc(100%-1rem)] flex justify-center"
+    class="absolute z-30 top-[46px] left-2 right-2 flex"
     :class="containerOverflow"
   >
     <div
-      class="content-toolbar-pill flex items-center gap-1 bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
+      class="content-toolbar-pill mx-auto shrink-0 flex items-center gap-1 bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
     >
-      <!-- UNDO / REDO -->
-      <UTooltip text="Undo" :popper="{ placement: 'top' }">
-        <UButton
-          variant="ghost"
-          color="gray"
-          class="toolbar-icon-btn text-gray-500 dark:text-[#7d8695] hover:text-gray-900 dark:hover:text-white disabled:opacity-40"
-          :disabled="!pastStates.length"
-          @click="appStore.undo()"
-        >
-          <UndoIcon class="w-4 h-4" />
-        </UButton>
-      </UTooltip>
-      <UTooltip text="Redo" :popper="{ placement: 'top' }">
-        <UButton
-          variant="ghost"
-          color="gray"
-          class="toolbar-icon-btn text-gray-500 dark:text-[#7d8695] hover:text-gray-900 dark:hover:text-white disabled:opacity-40"
-          :disabled="!futureStates.length"
-          @click="appStore.redo()"
-        >
-          <RedoIcon class="w-4 h-4" />
-        </UButton>
-      </UTooltip>
-      <div class="w-px h-4 bg-gray-200 dark:bg-white/10 mx-1"></div>
-
       <UTooltip
         v-if="isMediaFileButNotExternalMedia"
         text="Background fill type"
-        :popper="{ placement: 'top' }"
+        :popper="toolbarTooltipPopper"
       >
         <CowSelectMenu
           v-model="backgroundFillType"
@@ -81,7 +56,7 @@
           (slide?.data as any)?.type === 'vimeo')
       "
       >
-        <UTooltip text="Mute/Unmute media" :popper="{ placement: 'top' }">
+        <UTooltip text="Mute/Unmute media" :popper="toolbarTooltipPopper">
           <UButton
             @click="
               $emit('update-style', {
@@ -102,7 +77,7 @@
             >{{ slide.slideStyle?.isMediaMuted ? "Unmute" : "Mute" }}</UButton
           >
         </UTooltip>
-        <UTooltip text="Repeat media" :popper="{ placement: 'top' }">
+        <UTooltip text="Repeat media" :popper="toolbarTooltipPopper">
           <UButton
             @click="
               $emit('update-style', {
@@ -123,7 +98,7 @@
             >Loop</UButton
           >
         </UTooltip>
-        <UTooltip text="Play/pause media" :popper="{ placement: 'top' }">
+        <UTooltip text="Play/pause media" :popper="toolbarTooltipPopper">
           <UButton
             @click="
               $emit('update-style', {
@@ -144,7 +119,7 @@
             {{ slide.slideStyle?.isMediaPlaying ? "Pause" : "Play" }}</UButton
           >
         </UTooltip>
-        <UTooltip text="Restart media" :popper="{ placement: 'top' }">
+        <UTooltip text="Restart media" :popper="toolbarTooltipPopper">
           <UButton
             @click="
               () => {
@@ -165,7 +140,7 @@
         <div
           class="flex items-center gap-1 bg-gray-100 dark:bg-[#171d2b] rounded-md px-2"
         >
-          <UTooltip text="Seek to specific time" :popper="{ placement: 'top' }">
+          <UTooltip text="Seek to specific time" :popper="toolbarTooltipPopper">
             <UInput
               v-model="seekTime"
               type="number"
@@ -181,7 +156,7 @@
               @keyup.enter="handleSeek"
             />
           </UTooltip>
-          <UTooltip text="Go to time" :popper="{ placement: 'top' }">
+          <UTooltip text="Go to time" :popper="toolbarTooltipPopper">
             <UButton
               @click="handleSeek"
               class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
@@ -242,7 +217,7 @@
           )
         "
         text="Set line spacing"
-        :popper="{ placement: 'top' }"
+        :popper="toolbarTooltipPopper"
       >
         <CowSelectMenu
           v-model="lineSpacing"
@@ -286,7 +261,7 @@
       <!-- SLIDE CONTENT CASE CONTROLS -->
       <UTooltip
         text="Uppercase"
-        :popper="{ placement: 'top' }"
+        :popper="toolbarTooltipPopper"
         v-if="
           !(
             slide?.type === slideTypes.text ||
@@ -321,7 +296,7 @@
       <!-- SLIDE CONTENT BOLD CONTROLS -->
       <UTooltip
         text="Bold text"
-        :popper="{ placement: 'top' }"
+        :popper="toolbarTooltipPopper"
         v-if="
           !(
             slide?.type === slideTypes.text ||
@@ -352,7 +327,7 @@
       <!-- SLIDE CONTENT LINE BACKGROUND CONTROLS -->
       <UTooltip
         text="Line background"
-        :popper="{ placement: 'top' }"
+        :popper="toolbarTooltipPopper"
         v-if="
           !(
             slide?.type === slideTypes.media ||
@@ -387,7 +362,7 @@
       >
         <UTooltip
           :text="countdownIsPlaying ? 'Pause countdown' : 'Start countdown'"
-          :popper="{ placement: 'top' }"
+          :popper="toolbarTooltipPopper"
         >
           <UButton
             @click="useGlobalEmit(appWideActions.startCountdown, slide)"
@@ -404,7 +379,7 @@
             <PlayIcon v-else class="w-5 h-5" />
           </UButton>
         </UTooltip>
-        <UTooltip text="Restart countdown" :popper="{ placement: 'top' }">
+        <UTooltip text="Restart countdown" :popper="toolbarTooltipPopper">
           <UButton
             @click="useGlobalEmit(appWideActions.restartCountdown, slide)"
             class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
@@ -425,7 +400,7 @@
         "
         class="button-group rounded-md p-1 flex items-center gap-1"
       >
-        <UTooltip text="Align left">
+        <UTooltip text="Align left" :popper="toolbarTooltipPopper">
           <UButton
             @click="
               $emit('update-style', { ...slide.slideStyle, alignment: 'left' })
@@ -442,7 +417,7 @@
             <AlignLeftIcon class="w-5 h-5" />
           </UButton>
         </UTooltip>
-        <UTooltip text="Align center">
+        <UTooltip text="Align center" :popper="toolbarTooltipPopper">
           <UButton
             @click="
               $emit('update-style', {
@@ -462,7 +437,7 @@
             <AlignCenterIcon class="w-5 h-5" />
           </UButton>
         </UTooltip>
-        <UTooltip text="Align right">
+        <UTooltip text="Align right" :popper="toolbarTooltipPopper">
           <UButton
             @click="
               $emit('update-style', { ...slide.slideStyle, alignment: 'right' })
@@ -486,7 +461,7 @@
         v-if="slide?.type === slideTypes.song"
         class="button-group song-controls bg-gray-100 dark:bg-[#171d2b] rounded-md mx-1 p-1 px-0 h-[36px] mt-[2px] flex items-center gap-1"
       >
-        <UTooltip text="Refresh song lyrics" :popper="{ placement: 'top' }">
+        <UTooltip text="Refresh song lyrics" :popper="toolbarTooltipPopper">
           <UButton
             @click="refreshSongLyrics(slide?.songId || '')"
             :class="[
@@ -509,16 +484,12 @@
 </template>
 
 <script setup lang="ts">
-import { useAppStore } from "~/store/app"
 import type { ExtendedFileT, ExternalVideo, Slide } from "~/types"
 import { appWideActions } from "~/utils/constants"
 
 const props = defineProps<{
   slide: Slide
 }>()
-
-const appStore = useAppStore()
-const { currentState, pastStates, futureStates } = storeToRefs(appStore)
 
 const backgroundFillType = ref<string>(
   props.slide.slideStyle?.backgroundFillType || ""
@@ -527,6 +498,10 @@ const lineSpacing = ref<string>(props.slide.slideStyle?.lineSpacing || "")
 const isLoading = ref<boolean>(false)
 const containerOverflow = ref<string>("overflow-x-auto")
 const seekTime = ref<number>(0)
+const toolbarTooltipPopper = {
+  placement: "top" as const,
+  strategy: "fixed" as const,
+}
 
 const countdownIsPlaying = computed(
   () =>

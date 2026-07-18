@@ -102,14 +102,14 @@ const shortcuts = ref([
     cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + F`,
     name: "[Works only on live display] Use to take display fullscreen",
   },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Z`,
-    name: "Undo previous action",
-  },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Y`,
-    name: "Redo previous action",
-  },
+  // {
+  //   cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Z`,
+  //   name: "Undo previous action",
+  // },
+  // {
+  //   cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Y`,
+  //   name: "Redo previous action",
+  // },
   {
     cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + ,`,
     name: "Open App Settings",

@@ -35,11 +35,10 @@
     <!-- Using motionless slides to test bug with Bible Slides not moving to next slide in live view -->
     <!-- <Transition class="fade"> -->
     <LiveProjectionOnly
-      v-if="mostUpdatedLiveSlide"
       :content-visible="true"
       :id="currentState.liveSlideId"
       :full-screen="true"
-      :slide="mostUpdatedLiveSlide!!"
+      :slide="mostUpdatedLiveSlide"
       :slide-label="false"
       :slide-styles="currentState.settings.slideStyles"
       :audio-muted="mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!"

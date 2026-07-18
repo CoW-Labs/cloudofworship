@@ -335,7 +335,7 @@ const focusChangeSource = ref<"keyboard" | "mouse">("mouse")
 const onRowMouseEnter = (index: number) => {
   focusChangeSource.value = "mouse"
   focusedActionIndex.value = index
-  hasInteracted.value = true
+  hasInteracted.value = false
 }
 const songsScrollerRef = ref<{ scrollToItem: (index: number) => void } | null>(
   null

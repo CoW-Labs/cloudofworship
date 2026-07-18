@@ -7,10 +7,10 @@
     :class="
       backgroundPanel
         ? [
-            'min-h-0 rounded-[8px] border border-dashed border-[#505866] bg-transparent p-0 text-[#F8F9FB] transition-colors',
+            'min-h-0 rounded-[8px] border border-dashed border-gray-300 bg-white p-0 text-gray-700 transition-colors dark:border-[#505866] dark:bg-transparent dark:text-[#F8F9FB]',
             isDragOver
-              ? 'border-[#9BA3B2] bg-white/[0.03]'
-              : 'hover:border-[#9BA3B2]',
+              ? 'border-gray-500 bg-gray-100 dark:border-[#9BA3B2] dark:bg-white/[0.03]'
+              : 'hover:border-gray-500 dark:hover:border-[#9BA3B2]',
           ]
         : [
             'min-h-[200px] rounded-lg border-2 border-dashed border-primary-200 p-6 py-8',
@@ -32,7 +32,10 @@
     />
 
     <template v-if="backgroundPanel">
-      <UIcon :name="icon" class="mb-4 h-7 w-7 text-[#9BA3B2]" />
+      <UIcon
+        :name="icon"
+        class="mb-4 h-7 w-7 text-gray-400 dark:text-[#9BA3B2]"
+      />
       <p class="max-w-[140px] text-[12px] font-normal leading-[17px]">
         <span
           v-for="line in backgroundDescriptionLines"

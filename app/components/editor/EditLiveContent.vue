@@ -180,11 +180,7 @@
                         : layoutPopoverSize.height
                     "
                     :boundary-overflow="120"
-                    :panel-class="
-                      tab.key === 'background'
-                        ? '!rounded-[18px] !bg-[#131724] !shadow-none !ring-0'
-                        : '!rounded-[18px] !bg-[#f1f3f6] !shadow-none !ring-0 dark:!bg-[#131724]'
-                    "
+                    panel-class="!rounded-[18px] !bg-[#f1f3f6] !shadow-none !ring-0 dark:!bg-[#131724]"
                     @update:open="onPanelOpenChange(tab.key, $event)"
                   >
                     <button
@@ -201,12 +197,7 @@
 
                     <template #panel>
                       <div
-                        class="h-full w-full"
-                        :class="
-                          tab.key === 'background'
-                            ? 'bg-[#131724]'
-                            : 'bg-[#f1f3f6] dark:bg-[#131724]'
-                        "
+                        class="h-full w-full bg-[#f1f3f6] dark:bg-[#131724]"
                       >
                         <GotoScripture
                           v-if="tab.key === 'scripture'"
