@@ -98,6 +98,48 @@ export const getChapterVerseCount = async (
   return index?.chapterVerseCounts.get(`${book}:${chapter}`) ?? 0
 }
 
+/**
+ * Synchronous validity check for a scripture reference, used to keep impossible
+ * references (e.g. "3 John 7:8" — 3 John has a single chapter) out of search
+ * results before they're ever offered as a pickable action.
+ *
+ * - The chapter is validated against `bibleBookChapters` (static per-book
+ *   chapter counts), so an out-of-range chapter is rejected even when no Bible
+ *   version has been downloaded.
+ * - The verse is only validated when the in-memory verse index for `version`
+ *   has already been built; if it hasn't (version not downloaded / not
+ *   prewarmed) the verse is treated as unknown and NOT rejected — a reference
+ *   is never hidden merely because the data needed to verify its verse isn't
+ *   loaded. Prewarm with prewarmScriptureVersion() to enable the verse check.
+ *
+ * `book` is 1-based (matching bibleBooks / bibleBookIndex). Returns false only
+ * when the reference is provably impossible; otherwise true.
+ */
+export const isScriptureReferenceValidSync = (
+  book: number,
+  chapter: number,
+  verse: number | string = 1,
+  version: string = ''
+): boolean => {
+  if (!book || !chapter || chapter < 1) return false
+
+  const maxChapter = bibleBookChapters?.[book - 1]
+  if (maxChapter && chapter > maxChapter) return false
+
+  const resolvedVersion =
+    version ||
+    useAppStore().currentState.settings.defaultBibleVersion ||
+    'KJV'
+  const index = versionIndexCache.get(resolvedVersion)
+  // Verse existence can only be confirmed against a built index — without one
+  // we trust the chapter-level check above and keep the reference.
+  if (!index) return true
+
+  const startVerse = Number(String(verse).split('-')[0] || 1)
+  if (!startVerse || startVerse < 1) return false
+  return index.verseMap.has(`${book}:${chapter}:${startVerse}`)
+}
+
 const useScripture = async (label: string = '1:1:1', version: string = ''): Promise<Scripture | null> => {
   const db = useIndexedDB()
   const appStore = useAppStore()

@@ -28,7 +28,10 @@
       <Transition name="fade-sm">
         <UpdateNotification />
       </Transition>
-      <AdvertModal :active-advert="currentState.activeAdvert" />
+      <AdvertModal
+        v-model="showAdvertModal"
+        :active-advert="currentState.activeAdvert"
+      />
       <UpgradePlanModal />
     </ClientOnly>
   </div>
@@ -490,9 +493,31 @@ const tempBibleVersion = (version: string, data: any) => ({
   updatedAt: new Date().toISOString(),
 })
 
+const showAdvertModal = ref(false)
+const SHOWN_ADVERTS_KEY = "cow-shown-advert-ids"
+
+const hasAdvertBeenShown = (id: string) => {
+  const shownIds: string[] = JSON.parse(
+    localStorage.getItem(SHOWN_ADVERTS_KEY) || "[]"
+  )
+  return shownIds.includes(id)
+}
+
+const markAdvertAsShown = (id: string) => {
+  const shownIds: string[] = JSON.parse(
+    localStorage.getItem(SHOWN_ADVERTS_KEY) || "[]"
+  )
+  if (!shownIds.includes(id)) {
+    shownIds.push(id)
+    localStorage.setItem(SHOWN_ADVERTS_KEY, JSON.stringify(shownIds))
+  }
+}
+
 const fetchActiveAdvert = async () => {
-  const { data, error } = await useAPIFetch(`/advert/active`)
-  appStore.setActiveAdvert(data.value as Advert)
+  const { data } = await useAPIFetch(`/advert/active`)
+  const advert = data.value as Advert | null
+  appStore.setActiveAdvert(advert)
+  return advert
 }
 
 const downloadEssentialResources = async () => {
@@ -1134,11 +1159,23 @@ async function openWindows() {
 // WINDOW MANAGEMENT CODE ENDS HERE
 
 onMounted(async () => {
-  downloadEssentialResources().catch((err) => {
-    console.error("Failed to finish loading resources:", err)
-    loadingResources.value = false
-  })
-  fetchActiveAdvert()
+  const [, advertResult] = await Promise.allSettled([
+    downloadEssentialResources().catch((err) => {
+      console.error("Failed to finish loading resources:", err)
+      loadingResources.value = false
+    }),
+    fetchActiveAdvert(),
+  ])
+
+  const advert = advertResult.status === "fulfilled" ? advertResult.value : null
+  if (advert && !hasAdvertBeenShown(advert._id)) {
+    setTimeout(() => {
+      showAdvertModal.value = true
+      markAdvertAsShown(advert._id)
+      usePosthogCapture("ADVERT_MODAL_OPENED")
+    }, 10000)
+  }
+
   if (location.hostname !== "localhost") {
     useGtag()
   }

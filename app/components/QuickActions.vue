@@ -270,6 +270,10 @@
 import type { Hymn, QuickAction, Song } from "~/types"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
+import {
+  prewarmScriptureVersion,
+  isScriptureReferenceValidSync,
+} from "~/composables/useScripture"
 import { quickActionsArr } from "~/utils/constants"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
@@ -497,6 +501,31 @@ const bibleSearchQuery = ref<string>("")
 const hymns = ref<Hymn[]>([])
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const libraryPage = ref<string>("")
+
+// Active Bible version, used to validate parsed references against the right
+// verse index (see the reference filter in `searchedActions`).
+const defaultBibleVersion = computed(
+  () => appStore.currentState.settings.defaultBibleVersion || "KJV"
+)
+
+// Bumped once the verse index for the active version has been built. Read inside
+// `searchedActions` so it re-runs and can drop impossible references (e.g. a
+// verse that doesn't exist) as soon as the data needed to verify them is ready
+// — the chapter-level check works without it, this only refines it.
+const scriptureIndexReadyTick = ref(0)
+// Building the verse index means parsing a ~6MB / 31k-verse translation, so it's
+// deferred until the user actually types a Bible reference (see the watch on
+// `isBibleReferenceSearch` below) rather than run at app startup. Idempotent:
+// `getVersionIndex` caches the built index, and `prewarmedVersion` stops repeat
+// builds/recomputes for a version that's already indexed.
+const prewarmedVersion = ref<string | null>(null)
+const ensureScriptureIndex = async () => {
+  const version = defaultBibleVersion.value
+  if (prewarmedVersion.value === version) return
+  prewarmedVersion.value = version
+  await prewarmScriptureVersion(version)
+  scriptureIndexReadyTick.value++
+}
 
 // Persistent quick-filter chips shown in the home state. Visual shortcuts that
 // trigger existing actions; gated through the same subscription check as cards.
@@ -998,6 +1027,13 @@ const isBibleReferenceSearch = computed(() => {
   return bookMatches.length > 0
 })
 
+// Build the verse index the first time the user actually looks up a Bible
+// reference — that's when the verse-level validity check becomes relevant, and
+// it keeps the heavy one-time parse off the app-startup path.
+watch(isBibleReferenceSearch, (isReference) => {
+  if (isReference) ensureScriptureIndex()
+})
+
 // Parses natural language timer commands like "start 5 m timer",
 // "start 30min timer" or "start 1h timer" typed into the search box,
 // so they can be surfaced as an instant-create countdown action.
@@ -1093,6 +1129,28 @@ const searchedActions = computed(() => {
   })
   results = results?.map((result: Fuzzysort.Result | any) => result.obj)
   results = results.filter((action: QuickAction) => action?.name)
+
+  // Drop Bible references whose parsed chapter/verse can't exist in the active
+  // version — e.g. "3 John 7:8" (3 John has a single chapter). Otherwise they'd
+  // be offered as a pickable result that only ever shows "Preview unavailable"
+  // and fails to create a slide. Book-only references (no chapter/verse parsed
+  // yet, whole book) are always kept. Reading the ready tick lets this recompute
+  // and apply the verse-level check once the verse index has finished building.
+  void scriptureIndexReadyTick.value
+  results = results.filter((action: QuickAction) => {
+    if (action?.type !== slideTypes.bible) return true
+    const bookIndex = Number(action?.bibleBookIndex)
+    if (!bookIndex) return true
+    const reference = action?.bibleChapterAndVerse || bibleChapterAndVerse.value
+    if (!reference) return true
+    const [chapterStr, verseStr] = String(reference).split(":")
+    return isScriptureReferenceValidSync(
+      bookIndex,
+      Number(chapterStr),
+      verseStr ?? 1,
+      defaultBibleVersion.value
+    )
+  })
 
   // A confirmed Bible reference search only has room for Bible book matches —
   // drop anything else (quick actions, songs, hymns) that fuzzysort happened
