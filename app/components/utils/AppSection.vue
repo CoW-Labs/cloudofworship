@@ -30,8 +30,6 @@
         </span>
       </h2>
       <div class="actions flex flex-row-reverse items-center gap-1.5 shrink-0">
-        <!-- Custom header actions (e.g. inline toolbars) rendered right-most -->
-        <slot name="actions" />
         <div class="action-inner" v-for="secondaryButton in secondaryButtons">
           <ConfirmDialog
             v-if="secondaryButton.visible && secondaryButton.confirmAction"
@@ -173,6 +171,8 @@
             </template>
           </UPopover>
         </div>
+        <!-- Custom header actions (e.g. inline toolbars) rendered left-most -->
+        <slot name="actions" />
       </div>
     </div>
     <div

@@ -7,8 +7,7 @@
         v-for="video in backgroundVideos"
         :key="video?.id"
         type="button"
-        class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-black transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[#E8D1F8]"
-        :class="video?.url === value ? 'ring-2 ring-[#E8D1F8]' : ''"
+        class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-black transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#E8D1F8]"
         :aria-label="video?.url === value ? 'Selected background video' : 'Select background video'"
         :aria-pressed="video?.url === value"
         @click="$emit('select', { video: video?.url, key: video?.id })"
@@ -22,6 +21,10 @@
           preload="metadata"
           crossorigin="anonymous"
         ></video>
+        <span
+          v-if="video?.url === value"
+          class="pointer-events-none absolute inset-0 z-10 rounded-[4px] border-2 border-[#E8D1F8]"
+        ></span>
       </button>
     </div>
   </div>
@@ -36,7 +39,7 @@
         :key="video?.id"
         @click="$emit('select', { video: video?.url, key: video?.id })"
         class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
-        :class="[settingsPage ? 'w-[195px] h-[100px]' : 'w-full h-[60px]']"
+        :class="settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]'"
       >
         <video
           class="bg-image w-[100%] h-[100%] transition rounded-md opacity-100 hover:opacity-30 object-cover"
@@ -46,6 +49,10 @@
           autoplay
           crossorigin="anonymous"
         ></video>
+        <span
+          v-if="video?.url === value"
+          class="pointer-events-none absolute inset-0 z-10 rounded-md border-2 border-[#E8D1F8]"
+        ></span>
         <IconWrapper
           v-if="video?.url === value"
           name="i-bx-check"

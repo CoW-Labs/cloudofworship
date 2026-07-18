@@ -7,8 +7,7 @@
         v-for="image in backgroundImages"
         :key="image"
         type="button"
-        class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-cover transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[#E8D1F8]"
-        :class="image === value ? 'ring-2 ring-[#E8D1F8]' : ''"
+        class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-cover transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#E8D1F8]"
         :aria-label="image === value ? 'Selected background image' : 'Select background image'"
         :aria-pressed="image === value"
         @click="$emit('select', { image })"
@@ -16,6 +15,10 @@
         <span
           class="block h-full w-full bg-cover bg-center"
           :style="{ backgroundImage: `url(${image})` }"
+        ></span>
+        <span
+          v-if="image === value"
+          class="pointer-events-none absolute inset-0 z-10 rounded-[4px] border-2 border-[#E8D1F8]"
         ></span>
       </button>
     </div>
@@ -32,7 +35,7 @@
         :key="image"
         @click="$emit('select', { image })"
         class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
-        :class="[settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]']"
+        :class="settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]'"
       >
         <div
           class="bg-image w-full h-full transition rounded-md opacity-100 hover:opacity-30 bg-cover"
@@ -42,6 +45,10 @@
           ]"
           :style="`background-image: url(${image})`"
         ></div>
+        <span
+          v-if="image === value"
+          class="pointer-events-none absolute inset-0 z-10 rounded-md border-2 border-[#E8D1F8]"
+        ></span>
         <IconWrapper
           v-if="image === value"
           name="i-bx-check"

@@ -1,7 +1,8 @@
 <template>
   <Transition
     name="overlay-panel"
-    :duration="{ enter: 500, leave: 440 }"
+    appear
+    :duration="{ enter: 220, leave: 180 }"
   >
     <div
       v-if="overlaySlide"
@@ -15,14 +16,7 @@
           '--overlay-origin': transformOrigin,
         }"
       >
-        <div
-          ref="panelRef"
-          class="overlay-slide-panel relative isolate"
-          :style="{
-            '--overlay-circle-scale': String(circleScale),
-            '--overlay-surface-origin': surfaceOrigin,
-          }"
-        >
+        <div class="overlay-slide-panel relative isolate">
           <div
             class="overlay-slide-surface absolute inset-0"
             :class="{ 'overlay-slide-surface--dynamic': dynamicBackground }"
@@ -95,10 +89,6 @@ let countdownTimeout: ReturnType<typeof setTimeout> | null = null
 const timeFontClass = computed(() =>
   useURLFriendlyString(overlaySlide.value?.slideStyle?.font || "Inter")
 )
-const panelRef = ref<HTMLElement | null>(null)
-const circleScale = ref(0.18)
-let resizeObserver: ResizeObserver | null = null
-
 const resolvedSettings = computed(() =>
   getOverlaySettingsForSlide(overlaySlide.value)
 )
@@ -128,7 +118,6 @@ const verticalPosition = computed(() => {
   return "center"
 })
 
-const surfaceOrigin = computed(() => `${horizontalPosition.value} center`)
 const transformOrigin = computed(
   () => `${horizontalPosition.value} ${verticalPosition.value}`
 )
@@ -179,34 +168,7 @@ watch(
   { immediate: true }
 )
 
-const updateCircleScale = () => {
-  if (!panelRef.value) return
-  const width = panelRef.value.offsetWidth
-  const height = panelRef.value.offsetHeight
-  if (width > 0 && height > 0) {
-    circleScale.value = Math.min(1, height / width)
-  }
-}
-
-watch(
-  () => overlaySlide.value?.id,
-  async (slideId) => {
-    resizeObserver?.disconnect()
-    resizeObserver = null
-    if (!slideId) return
-
-    await nextTick()
-    updateCircleScale()
-    if (panelRef.value && typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(updateCircleScale)
-      resizeObserver.observe(panelRef.value)
-    }
-  },
-  { immediate: true }
-)
-
 onBeforeUnmount(() => {
-  resizeObserver?.disconnect()
   stopCountdownClock()
 })
 </script>
@@ -228,6 +190,7 @@ onBeforeUnmount(() => {
   padding: clamp(20px, 3.2cqw, 58px) clamp(30px, 5cqw, 92px);
   backface-visibility: hidden;
   contain: layout style;
+  transform-origin: var(--overlay-origin);
 }
 
 .overlay-slide-surface {
@@ -236,7 +199,6 @@ onBeforeUnmount(() => {
   background: rgb(107 114 128 / 0.72);
   box-shadow: 0 16px 45px rgb(0 0 0 / 0.3);
   backdrop-filter: blur(8px);
-  transform-origin: var(--overlay-surface-origin);
   backface-visibility: hidden;
 }
 
@@ -308,83 +270,42 @@ onBeforeUnmount(() => {
   margin-bottom: 0;
 }
 
-.overlay-panel-enter-active .overlay-slide-surface {
-  animation: overlay-surface-in 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change: opacity, transform;
+.overlay-panel-enter-active {
+  transition: opacity 220ms ease-out;
+  will-change: opacity;
 }
 
-.overlay-panel-enter-active .overlay-slide-content {
-  animation: overlay-content-in 210ms cubic-bezier(0.22, 1, 0.36, 1) 270ms both;
-  will-change: opacity, transform;
+.overlay-panel-enter-active .overlay-slide-panel {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 
-.overlay-panel-leave-active .overlay-slide-content {
-  animation: overlay-content-out 120ms cubic-bezier(0.4, 0, 1, 1) both;
-  will-change: opacity, transform;
+.overlay-panel-leave-active .overlay-slide-panel {
+  transition: transform 180ms ease-in;
+  will-change: transform;
 }
 
-.overlay-panel-leave-active .overlay-slide-surface {
-  animation: overlay-surface-out 330ms cubic-bezier(0.4, 0, 1, 1) 90ms both;
-  will-change: opacity, transform;
+.overlay-panel-leave-active {
+  transition: opacity 180ms ease-in;
+  will-change: opacity;
 }
 
-@keyframes overlay-surface-in {
-  0% {
-    opacity: 0;
-    transform: scaleX(var(--overlay-circle-scale));
-  }
-  16% {
-    opacity: 1;
-    transform: scaleX(var(--overlay-circle-scale));
-  }
-  100% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
+.overlay-panel-enter-from,
+.overlay-panel-leave-to {
+  opacity: 0;
 }
 
-@keyframes overlay-surface-out {
-  0% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
-  78% {
-    opacity: 1;
-    transform: scaleX(var(--overlay-circle-scale));
-  }
-  100% {
-    opacity: 0;
-    transform: scaleX(var(--overlay-circle-scale));
-  }
-}
-
-@keyframes overlay-content-in {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 4px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes overlay-content-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
+.overlay-panel-enter-from .overlay-slide-panel,
+.overlay-panel-leave-to .overlay-slide-panel {
+  transform: scale(0.8);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .overlay-panel-enter-active .overlay-slide-surface,
-  .overlay-panel-enter-active .overlay-slide-content,
-  .overlay-panel-leave-active .overlay-slide-surface,
-  .overlay-panel-leave-active .overlay-slide-content {
-    animation-duration: 1ms;
-    animation-delay: 0ms;
+  .overlay-panel-enter-active,
+  .overlay-panel-leave-active,
+  .overlay-panel-enter-active .overlay-slide-panel,
+  .overlay-panel-leave-active .overlay-slide-panel {
+    transition-duration: 1ms;
   }
 }
 </style>

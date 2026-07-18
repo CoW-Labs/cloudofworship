@@ -1,12 +1,12 @@
 <template>
   <div
     v-if="isEditorReady"
-    class="absolute z-10 top-[46px] left-1/2 -translate-x-1/2 max-w-[calc(100%-1rem)] flex justify-center"
+    class="absolute z-10 top-[46px] left-2 right-2 flex"
     :class="containerOverflow"
     @mousedown.capture="onToolbarMouseDown"
   >
     <div
-      class="content-toolbar-pill flex items-center gap-1 bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
+      class="content-toolbar-pill mx-auto shrink-0 flex items-center gap-1 bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
     >
       <UButton
         @click="runCommand((chain) => chain.toggleBold())"
@@ -156,25 +156,40 @@
         @open="containerOverflow = ''"
         @close="onFontMenuClose"
       />
-      <UTooltip text="Change text color" :popper="{ arrow: true }">
-        <label class="cursor-pointer">
-          <input
-            type="color"
-            @input="onColorChange"
-            class="sr-only"
-            :value="currentColor"
-          />
-          <div
-            class="min-w-10 h-10 flex items-center justify-center rounded-full p-1.5 text-gray-600 dark:text-[#a7afbd] bg-gray-100 dark:bg-[#171d2b] hover:bg-gray-200 dark:hover:bg-[#2b3242] cursor-pointer transition-colors"
+      <UPopover
+        v-model:open="colorPaletteOpen"
+        mode="click"
+        :popper="{ placement: 'bottom', strategy: 'fixed' }"
+        :ui="{
+          ring: 'ring-0',
+          background: 'bg-transparent',
+          shadow: 'shadow-xl',
+        }"
+        @update:open="onColorPaletteOpenChange"
+      >
+        <UTooltip text="Change text color" :popper="toolbarTooltipPopper">
+          <button
+            type="button"
+            class="toolbar-color-btn"
+            :aria-label="`Change text color, current color ${currentColor}`"
           >
-            <span class="i-bx-palette text-lg"></span>
-            <div
-              class="absolute w-[80%] rounded-xl h-1 bottom-[3px]"
-              :style="`background: ${currentColor}`"
-            ></div>
-          </div>
-        </label>
-      </UTooltip>
+            <span
+              class="h-[15px] w-[15px] rounded-full ring-1 ring-black/15 dark:ring-white/25"
+              :style="{ backgroundColor: currentColor }"
+            ></span>
+          </button>
+        </UTooltip>
+
+        <template #panel>
+          <BgColorSelection
+            background-panel
+            color-purpose="text"
+            :colors="textColorPalette"
+            :value="currentColor"
+            @select="onColorChange($event.color)"
+          />
+        </template>
+      </UPopover>
       <UButton
         @click="runCommand((chain) => chain.toggleBlockquote())"
         class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
@@ -210,6 +225,38 @@ const props = defineProps<{
 
 const containerOverflow = ref("overflow-x-auto")
 const savedSelection = ref<{ from: number; to: number } | null>(null)
+const colorPaletteOpen = ref(false)
+const toolbarTooltipPopper = {
+  placement: "top" as const,
+  strategy: "fixed" as const,
+  arrow: true,
+}
+const textColorPalette = [
+  "#FFFFFF",
+  "#DDE1E8",
+  "#818CF8",
+  "#E8D1F8",
+  "#BD7AEA",
+  "#7209B7",
+  "#FCEFD4",
+  "#F6D08E",
+  "#EFAD3E",
+  "#F79009",
+  "#F97066",
+  "#B42318",
+  "#D1FADF",
+  "#32D583",
+  "#14B8A6",
+  "#027A48",
+  "#D1E0FF",
+  "#528BFF",
+  "#2970FF",
+  "#004EEB",
+  "#22D3EE",
+  "#3B4252",
+  "#131724",
+  "#0D0F1A",
+]
 
 const isEditorReady = computed(() => {
   const editor = props.editor
@@ -236,8 +283,9 @@ watch(
 
 // Computed property for current text color
 const currentColor = computed(() => {
-  if (!isEditorReady.value) return "#ffffff"
-  return props.editor?.getAttributes("textStyle").color || "#ffffff"
+  if (!isEditorReady.value) return "#FFFFFF"
+  const color = props.editor?.getAttributes("textStyle").color || "#FFFFFF"
+  return color.startsWith("#") ? color.toUpperCase() : color
 })
 
 const saveSelection = () => {
@@ -298,6 +346,16 @@ const onFontMenuClose = () => {
   nextTick(() => requestAnimationFrame(reassertSelection))
 }
 
+const onColorPaletteOpenChange = (open: boolean) => {
+  if (open) {
+    saveSelection()
+    containerOverflow.value = ""
+    return
+  }
+
+  onFontMenuClose()
+}
+
 const runCommand = (
   apply: (chain: any) => any,
   options: { restoreFocus?: boolean } = {}
@@ -337,13 +395,10 @@ const runCommand = (
   }
 }
 
-// Handle color change with proper focus management
-const onColorChange = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const color = target.value
-
-  // Set color and maintain focus
+// Apply a palette color while preserving the selected editor range.
+const onColorChange = (color: string) => {
   runCommand((chain) => chain.setColor(color), { restoreFocus: true })
+  colorPaletteOpen.value = false
 }
 
 const toggleHeading = (level: number) => {
@@ -366,5 +421,26 @@ const setParagraph = () => {
   justify-content: center;
   flex-shrink: 0;
   border-radius: 9999px;
+}
+.toolbar-color-btn {
+  height: 26px;
+  width: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: rgb(243 244 246);
+  transition: background-color 150ms ease;
+}
+.toolbar-color-btn:hover {
+  background: rgb(229 231 235);
+}
+:global(html.dark) .toolbar-color-btn {
+  background: #171d2b;
+}
+:global(html.dark) .toolbar-color-btn:hover {
+  background: #2b3242;
 }
 </style>

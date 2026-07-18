@@ -7,7 +7,6 @@
     >
       <div class="relative w-full h-full flex items-center justify-center">
         <LiveProjectionOnly
-          v-if="liveSlide"
           slide-label
           :slide="liveSlide"
           :full-screen="false"
@@ -54,6 +53,20 @@
       ]"
       :is-live-window-active="windowRefs?.length > 0"
     >
+      <template #actions>
+        <CowButton
+          variant="primary"
+          size="2xs"
+          class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
+          :disabled="!liveSlide"
+          @click="goIntermission"
+        >
+          <template #leading>
+            <IconWrapper name="i-bx-coffee" size="3.5" />
+          </template>
+          Intermission
+        </CowButton>
+      </template>
       <div class="main flex flex-col flex-1 min-h-0">
         <div
           v-if="liveOutputSlides?.length === 0 || !liveOutputSlides"
@@ -475,6 +488,12 @@ const toggleSlideOverlay = (slide: Slide) => {
   appStore.setActiveOverlaySlide(overlaySlide)
   useBroadcastOverlayPost(appWideActions.showSlideOverlay, overlaySlide)
   emitOverlaySocketAction(appWideActions.showSlideOverlay, overlaySlide)
+}
+
+const goIntermission = () => {
+  if (!liveSlide.value) return
+  useBroadcastPost(null)
+  appStore.setLiveSlide("")
 }
 
 const handleScheduleSlideAction = (slide: Slide) => {

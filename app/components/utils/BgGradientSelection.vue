@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="backgroundPanel"
-    class="grid h-[149.5px] w-[216.5px] grid-cols-6 gap-[8.5px] rounded-xl bg-[#222838] p-3"
+    class="grid h-[149.5px] w-[216.5px] grid-cols-6 gap-[8.5px] rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
   >
     <button
       v-for="(gradient, index) in backgroundGradients"

@@ -1,16 +1,16 @@
 <template>
   <div
     v-if="backgroundPanel"
-    class="grid h-[149.5px] w-[216.5px] grid-cols-6 gap-[8.5px] rounded-xl bg-[#222838] p-3"
+    class="grid h-[149.5px] w-[216.5px] grid-cols-6 gap-[8.5px] rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
   >
     <button
-      v-for="color in backgroundPanelColors"
+      v-for="color in panelColors"
       :key="color"
       type="button"
       class="h-[25px] w-[25px] rounded transition-transform duration-150 hover:scale-110 focus-visible:ring-2 focus-visible:ring-[#E8D1F8]"
       :class="color === value ? 'ring-2 ring-[#E8D1F8]' : ''"
       :style="{ backgroundColor: color }"
-      :aria-label="`Use ${color} as background colour`"
+      :aria-label="`Use ${color} as ${colorPurpose} colour`"
       :aria-pressed="color === value"
       @click="$emit('select', { color })"
     ></button>
@@ -54,11 +54,18 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
-  value?: string
-  count?: number
-  backgroundPanel?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    value?: string
+    count?: number
+    backgroundPanel?: boolean
+    colors?: string[]
+    colorPurpose?: string
+  }>(),
+  {
+    colorPurpose: "background",
+  }
+)
 
 const backgroundPanelColors = [
   "#E8D1F8",
@@ -86,6 +93,10 @@ const backgroundPanelColors = [
   "#2970FF",
   "#0D0F1A",
 ]
+
+const panelColors = computed(() =>
+  props.colors?.length ? props.colors : backgroundPanelColors
+)
 
 const backgroundColors = [
   "#a855f7", // Purple

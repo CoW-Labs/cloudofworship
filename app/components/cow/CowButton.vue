@@ -117,18 +117,18 @@ const buttonUi = {
 
 .cow-button--danger {
   color: #fff !important;
-  background-color: #991b1b !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 0 0 #450a0a,
-    0 10px 16px -10px rgba(69, 10, 10, 0.6);
+  background-color: #dc2626 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 0 0 #7f1d1d,
+    0 10px 16px -10px rgba(127, 29, 29, 0.6);
 }
 
 .cow-button--danger:hover {
-  background-color: #7f1d1d !important;
+  background-color: #e23c3c !important;
 }
 
 .cow-button--danger:active:not(:disabled) {
   transform: translateY(3px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 0 #450a0a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 0 #7f1d1d;
 }
 
 .cow-button:disabled {

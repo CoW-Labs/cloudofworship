@@ -1,19 +1,19 @@
 <template>
   <div
-    class="slide-background-panel flex h-full w-full overflow-hidden bg-[#131724] text-[#F8F9FB]"
+    class="slide-background-panel flex h-full w-full overflow-hidden bg-gray-50 text-gray-800 dark:bg-[#131724] dark:text-[#F8F9FB]"
   >
     <aside
-      class="h-full w-[158px] shrink-0 border-r border-white/[0.06] bg-[#131724]"
+      class="h-full w-[158px] shrink-0 border-r border-gray-200 bg-[#f1f3f6] dark:border-white/[0.06] dark:bg-[#131724]"
     >
       <button
         v-for="section in sections"
         :key="section.key"
         type="button"
-        class="flex h-9 w-full items-center border-b border-[#0D0F1A] px-[15px] text-left text-[12px] font-normal leading-none transition-colors duration-150"
+        class="flex h-9 w-full items-center border-b border-gray-200 px-[15px] text-left text-[12px] font-normal leading-none transition-colors duration-150 dark:border-[#0D0F1A]"
         :class="
           activeSection === section.key
-            ? 'bg-[#2B3140] text-[#F8F9FB]'
-            : 'bg-[#131724] text-[#9BA3B2] hover:bg-[#1a1f2d] hover:text-[#F8F9FB]'
+            ? 'bg-white text-gray-900 dark:bg-[#2B3140] dark:text-[#F8F9FB]'
+            : 'bg-[#f1f3f6] text-gray-500 hover:bg-white hover:text-gray-900 dark:bg-[#131724] dark:text-[#9BA3B2] dark:hover:bg-[#1a1f2d] dark:hover:text-[#F8F9FB]'
         "
         :aria-pressed="activeSection === section.key"
         @click="activeSection = section.key"
@@ -24,14 +24,14 @@
 
     <section class="relative h-full min-w-0 flex-1 overflow-hidden">
       <h3
-        class="absolute left-3 top-[13px] z-10 text-[12px] font-normal leading-[17px] text-[#F8F9FB]"
+        class="absolute left-3 top-[13px] z-10 text-[12px] font-normal leading-[17px] text-gray-800 dark:text-[#F8F9FB]"
       >
         {{ activeHeading }}
       </h3>
 
       <template v-if="activeSection === 'image'">
         <div
-          class="absolute left-3 top-9 h-[268px] w-[382px] overflow-hidden rounded-xl bg-[#222838]"
+          class="absolute left-3 top-9 h-[268px] w-[382px] overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
         >
           <BgImageSelection
             background-panel
@@ -54,7 +54,7 @@
 
       <template v-else-if="activeSection === 'video'">
         <div
-          class="absolute left-3 top-9 h-[268px] w-[382px] overflow-hidden rounded-xl bg-[#222838]"
+          class="absolute left-3 top-9 h-[268px] w-[382px] overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
         >
           <BgVideoSelection
             background-panel

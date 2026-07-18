@@ -118,13 +118,12 @@ const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const verses = ref<BibleVerse[]>()
 const focusedActionIndex = ref(0)
-// Preview only shows for the active row once the user has actually
-// interacted with the list (hover or first arrow key press) — not for the
-// index-0 default before any interaction.
+// `active` is reserved for keyboard navigation. ActionCard owns hover preview
+// state so it closes when the pointer leaves both the card and its preview.
 const hasInteracted = ref(false)
 const onRowMouseEnter = (index: number) => {
   focusedActionIndex.value = index
-  hasInteracted.value = true
+  hasInteracted.value = false
 }
 const quickActions = ref<HTMLDivElement | null>(null)
 const selectedFilter = ref<string>("old")

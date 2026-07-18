@@ -309,13 +309,13 @@ export const quickActionsArr: QuickAction[] = [
     // unreleased: true,
     // type: slideTypes.text
   },
-  {
-    icon: "i-ph-file-ppt",
-    name: "Import Slides from PowerPoint",
-    desc: "Import slides from a PowerPoint file",
-    action: appWideActions.newPresentation,
-    meta: "power point pptx ppt Google slides presentation canva import",
-  },
+  // {
+  //   icon: "i-ph-file-ppt",
+  //   name: "Import Slides from PowerPoint",
+  //   desc: "Import slides from a PowerPoint file",
+  //   action: appWideActions.newPresentation,
+  //   meta: "power point pptx ppt Google slides presentation canva import",
+  // },
   {
     icon: "i-ph-file-pdf",
     name: "Import Slides from PDF",

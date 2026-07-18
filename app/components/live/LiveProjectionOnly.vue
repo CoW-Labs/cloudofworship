@@ -1,7 +1,9 @@
 <template>
   <div
     class="live-output-ctn w-[100%] min-h-[220px] relative"
-    :class="{ 'no-animations': currentState.settings.microAnimations === false }"
+    :class="{
+      'no-animations': currentState.settings.microAnimations === false,
+    }"
     :style="`--cow-transition-duration: ${
       currentState.settings.animations
         ? currentState.settings.transitionInterval ?? 0.7
@@ -159,8 +161,9 @@
       <!-- Keyed by the displayed slide id so a slide change swaps the whole
            face via the crossfade, while same-slide edits (e.g. Bible verse
            navigation) keep the same key and update in place with no crossfade. -->
-      <Transition :name="transitionName">
+      <Transition :name="transitionName" appear>
         <div
+          v-if="displayedSlide"
           :key="displayedSlide?.id"
           class="slide-face relative h-full"
           style="z-index: 2"
@@ -170,7 +173,8 @@
             class="absolute inset-0 bg-no-repeat"
             :class="{
               'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
-              'h-[88vh] rounded-none border-none min-h-[100%]': fullScreenHeight,
+              'h-[88vh] rounded-none border-none min-h-[100%]':
+                fullScreenHeight,
               'bg-cover': displayedSlide?.type !== slideTypes.media,
               'bg-center bg-cover':
                 displayedSlide?.slideStyle?.backgroundFillType ===
@@ -237,6 +241,53 @@
                 : { top: 0, right: 0, bottom: 0, left: 0 }
             "
           />
+        </div>
+
+        <!-- INTERMISSION / IDLE STATE - no slide is live -->
+        <div
+          v-else
+          key="intermission"
+          class="slide-face intermission-face relative flex items-center justify-center bg-transparent"
+          :class="{
+            'h-[100vh]': fullScreen,
+            'h-[88vh]': fullScreenHeight,
+            'h-full': !fullScreen && !fullScreenHeight,
+          }"
+          style="z-index: 2"
+        >
+          <div
+            class="intermission-content flex flex-col items-center"
+            :class="fullScreen ? 'gap-6' : 'gap-2'"
+          >
+            <div class="intermission-logo-wrap">
+              <img
+                v-if="churchLogoUrl"
+                :src="churchLogoUrl"
+                :alt="churchName || 'Church logo'"
+                class="intermission-logo object-contain rounded-2xl"
+                :class="fullScreen ? 'w-32 h-32' : 'w-10 h-10'"
+              />
+              <Logo
+                v-else
+                class="intermission-logo"
+                :class="fullScreen ? 'w-28 h-28' : 'w-8 h-8'"
+              />
+            </div>
+            <h2
+              v-if="churchName"
+              class="intermission-text text-white font-semibold tracking-wide text-center px-6"
+              :class="fullScreen ? 'text-4xl' : 'text-xs'"
+            >
+              {{ churchName }}
+            </h2>
+            <p
+              v-if="churchBranch"
+              class="intermission-text intermission-text--delayed text-white/60 text-center px-6"
+              :class="fullScreen ? 'text-xl' : 'text-[10px]'"
+            >
+              {{ churchBranch }}
+            </p>
+          </div>
         </div>
       </Transition>
       <!-- End of SLIDE FACE -->
@@ -306,6 +357,7 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
 import type { ExtendedFileT, Slide, SlideStyle, ExternalVideo } from "~/types"
 import {
   exitFullscreenSafely,
@@ -322,12 +374,14 @@ const iframe = ref<HTMLIFrameElement | null>(null)
 const isLargePreviewOpen = ref<boolean>(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const route = useRoute()
 const { currentState } = storeToRefs(appStore)
+const { church } = storeToRefs(authStore)
 const emit = defineEmits(["activate-fullscreen"])
 
 const props = defineProps<{
-  slide: Slide
+  slide?: Slide | null
   contentVisible: Boolean
   fullScreen: Boolean
   slideStyles: SlideStyle
@@ -336,10 +390,18 @@ const props = defineProps<{
   fullScreenHeight?: string
 }>()
 
+// Intermission state (shown when no slide is live) — church branding, with a
+// CoW logo fallback when the church hasn't uploaded one.
+const churchLogoUrl = computed(() => church.value?.logo || null)
+const churchName = computed(() => church.value?.name || "")
+const churchBranch = computed(
+  () => church.value?.type || church.value?.branch || ""
+)
+
 // The slide currently rendered in the crossfading face. It lags props.slide by
 // the (image) preload so the incoming background doesn't flash blank mid-fade.
 // Same-slide edits share this object's reactivity and update in place.
-const displayedSlide = ref<Slide>(props.slide)
+const displayedSlide = ref<Slide | null | undefined>(props.slide)
 
 // Resolve the Vue transition name from the transition type. Only `fade` is
 // implemented today; future types (slide/zoom/cut) plug in here + one CSS block.
@@ -663,4 +725,43 @@ const activateFullScreen = () => {
 }
 </script>
 
-<style></style>
+<style>
+.intermission-logo-wrap {
+  animation: intermission-pulse 4s ease-in-out infinite;
+}
+
+.intermission-text {
+  animation: intermission-fade 4s ease-in-out infinite;
+}
+
+.intermission-text--delayed {
+  animation-delay: 0.4s;
+}
+
+@keyframes intermission-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes intermission-fade {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.no-animations .intermission-logo-wrap,
+.no-animations .intermission-text {
+  animation: none;
+}
+</style>

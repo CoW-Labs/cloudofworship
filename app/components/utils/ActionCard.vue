@@ -7,6 +7,8 @@
         ? 'border-t first:border-t-0 border-white/80 dark:border-[#171d2b]'
         : ''
     "
+    @mouseenter="isCardHovered = true"
+    @mouseleave="isCardHovered = false"
   >
     <button
       class="action-card flex items-center gap-3 transition-colors cursor-pointer text-left w-[100%]"
@@ -82,6 +84,8 @@
           ref="previewEl"
           class="action-excerpt text-xs w-[300px] max-h-[260px] shadow-lg whitespace-pre-line z-[100] fixed"
           :style="previewPositionStyle"
+          @mouseenter="isPreviewHovered = true"
+          @mouseleave="isPreviewHovered = false"
         >
           <AppSection heading="Preview" :sub-heading="action?.name || ''">
             <div
@@ -175,6 +179,9 @@ const previewError = ref(false)
 const cardRow = ref<HTMLElement | null>(null)
 const previewEl = ref<HTMLElement | null>(null)
 const previewPosition = ref({ top: 0, left: 0 })
+const isCardHovered = ref(false)
+const isPreviewHovered = ref(false)
+const isSearchInputFocused = ref(false)
 
 const previewPositionStyle = computed(() => ({
   top: `${previewPosition.value.top}px`,
@@ -235,13 +242,34 @@ const updatePreviewPosition = () => {
   previewPosition.value = { top, left }
 }
 
-// The parent list is the single source of truth for which row is "active" —
-// it sets this both on mouse hover and on keyboard navigation, so whichever
-// interaction happened most recently wins and there's only ever one preview
-// on screen. Since hovering the row is what makes it active (not leaving it),
-// moving the pointer off the row toward the floating preview box to scroll
-// doesn't close it — only a different row becoming active does.
-const shouldShowPreview = computed(() => canPreview.value && !!props.active)
+// Hover owns its own lifecycle so the teleported preview can remain open while
+// the pointer crosses the small gap between the card and preview. `active` is
+// reserved for keyboard navigation and is only honoured while the search input
+// belonging to this action list actually has focus.
+const isInputInThisActionList = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) return false
+  if (!target.matches("input, textarea, [contenteditable='true']")) return false
+
+  const actionsList = cardRow.value?.closest(".actions-ctn")
+  const actionListContext = actionsList?.parentElement
+  return !!actionListContext?.contains(target)
+}
+
+const handleDocumentFocusIn = (event: FocusEvent) => {
+  isSearchInputFocused.value = isInputInThisActionList(event.target)
+}
+
+const handleDocumentFocusOut = (event: FocusEvent) => {
+  isSearchInputFocused.value = isInputInThisActionList(event.relatedTarget)
+}
+
+const shouldShowPreview = computed(
+  () =>
+    canPreview.value &&
+    (isCardHovered.value ||
+      isPreviewHovered.value ||
+      (!!props.active && isSearchInputFocused.value))
+)
 
 let previewTimeout: ReturnType<typeof setTimeout> | null = null
 const clearPreviewTimeout = () => {
@@ -270,8 +298,16 @@ watch(shouldShowPreview, (show) => {
   }
 })
 
+onMounted(() => {
+  isSearchInputFocused.value = isInputInThisActionList(document.activeElement)
+  document.addEventListener("focusin", handleDocumentFocusIn)
+  document.addEventListener("focusout", handleDocumentFocusOut)
+})
+
 onUnmounted(() => {
   clearPreviewTimeout()
+  document.removeEventListener("focusin", handleDocumentFocusIn)
+  document.removeEventListener("focusout", handleDocumentFocusOut)
 })
 
 const fetchPreviewContent = async () => {

@@ -209,10 +209,7 @@
               }"
               :class="`relative z-30 border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
             />
-            <UIcon
-              name="i-bx-menu"
-              class="w-5 h-5 text-gray-500 dark:text-gray-300"
-            />
+            <MenuIcon class="text-gray-500 dark:text-gray-400" />
           </button>
           <template #panel>
             <ProfileMiniModal

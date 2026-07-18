@@ -469,7 +469,9 @@ const focusedActionIndex = ref<number>(0)
 const hasInteracted = ref(false)
 const onRowMouseEnter = (index: number) => {
   focusedActionIndex.value = index
-  hasInteracted.value = true
+  // Hover previews are owned by ActionCard. Keep `active` exclusively for
+  // keyboard navigation so it cannot become sticky after the pointer leaves.
+  hasInteracted.value = false
 }
 
 // Any hover-preview (bible/hymn/song excerpt) is tied to `hasInteracted` being
@@ -1189,22 +1191,24 @@ const searchedActions = computed(() => {
 
     if (!groupedResults.has(groupKey)) groupedResults.set(groupKey, [])
     const group = groupedResults.get(groupKey) as QuickAction[]
-    const cap = groupKey === "settings" || groupKey === "action" ? 3 : 4
+    const cap = groupKey === "settings" ? 3 : groupKey === "action" ? 6 : 4
     if (group.length < cap) group.push(action)
   }
 
   // Enforce a fixed reading order for the well-known groups — plain
   // quickActionsArr actions (untyped, e.g. "Create New Schedule", "Go Live")
-  // first, then Bible, settings, songs, and hymns — regardless of which group
-  // happened to appear first in the raw fuzzy-matched results. Any other
-  // group (media, countdown, etc.) keeps its original relative order and is
-  // appended afterwards.
+  // first, then Bible, settings, songs, hymns, time, and countdown —
+  // regardless of which group happened to appear first in the raw
+  // fuzzy-matched results. Any other group (media, etc.) keeps its original
+  // relative order and is appended afterwards.
   const priorityGroupOrder = [
     "action",
     slideTypes.bible,
     "settings",
     slideTypes.song,
     slideTypes.hymn,
+    slideTypes.time,
+    slideTypes.countdown,
   ]
   const orderedGroups = [
     ...priorityGroupOrder

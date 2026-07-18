@@ -228,14 +228,25 @@
       </div>
       <div
         class="storage-chart flex rounded-full overflow-hidden my-2 w-full bg-gray-200 dark:bg-gray-800"
+        role="progressbar"
+        aria-label="Cloud storage used"
+        :aria-valuenow="cloudStoragePercentage"
+        aria-valuemin="0"
+        aria-valuemax="100"
       >
         <div
-          class="storage-chart-bar-inner h-[10px] bg-primary-500 transition-all"
-          :style="{
-            width: `${(cloudStorageUsed / maxCloudStorage) * 100}%`,
-          }"
+          class="storage-chart-bar-inner h-[10px] transition-all"
+          :class="cloudStorageOverage > 0 ? 'bg-red-500' : 'bg-primary-500'"
+          :style="{ width: `${cloudStoragePercentage}%` }"
         ></div>
       </div>
+
+      <p
+        v-if="cloudStorageOverage > 0"
+        class="mt-3 text-sm font-medium text-red-500"
+      >
+        {{ formatMegabytes(cloudStorageOverage) }} over your storage limit
+      </p>
 
       <table class="table-auto w-full">
         <tbody>
@@ -248,7 +259,9 @@
                 Cloud Storage Used
               </div>
             </td>
-            <td>{{ formatMegabytes(cloudStorageUsed) }}</td>
+            <td class="text-right">
+              {{ formatMegabytes(cloudStorageUsed) }}
+            </td>
           </tr>
           <tr class="border-b border-gray-200 dark:border-gray-800 h-[50px]">
             <td>
@@ -259,7 +272,9 @@
                 Available Storage
               </div>
             </td>
-            <td>{{ formatMegabytes(maxCloudStorage - cloudStorageUsed) }}</td>
+            <td class="text-right">
+              {{ formatMegabytes(availableCloudStorage) }}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -292,11 +307,14 @@
 
 <script setup lang="ts">
 import type { Media, Slide } from "~/types"
+import { useOnline } from "@vueuse/core"
 import { useAuthStore } from "~/store/auth"
 import { useAppStore } from "~/store/app"
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
+const { fetchChurch } = useChurch()
+const online = useOnline()
 const emitter = useNuxtApp().$emitter as any
 const toast = useToast()
 const db = useIndexedDB()
@@ -307,6 +325,11 @@ const bibleAndHymnsTableSize = ref<number>(0)
 const deletePrompt = ref<boolean>(false)
 const deletePromptText = ref<string>("")
 const activeTab = ref<number>(0)
+
+watch(activeTab, async (tab) => {
+  if (tab !== 1 || !online.value || !authStore.user?.churchId) return
+  await fetchChurch(authStore.user.churchId, false)
+})
 
 // ── Per-file media visibility ──────────────────────────────────────────────
 type MediaKind = "video" | "image" | "audio" | "presentation" | "other"
@@ -365,9 +388,24 @@ const getTypeLabel = (mime: string, name: string): string => {
   return subtype ? subtype.toUpperCase() : "FILE"
 }
 
-const maxCloudStorage = 100 // 100 MB max storage per user
+const { getStorageLimit } = useSubscription()
+const maxCloudStorage = computed(() => getStorageLimit())
 const cloudStorageUsed = computed(() => {
-  return (authStore.church?.storageUsed || 0) / 1024 / 1024 // Convert bytes to MB
+  return Math.max(0, (authStore.church?.storageUsed || 0) / 1024 / 1024)
+})
+const availableCloudStorage = computed(() =>
+  Math.max(0, maxCloudStorage.value - cloudStorageUsed.value)
+)
+const cloudStorageOverage = computed(() =>
+  Math.max(0, cloudStorageUsed.value - maxCloudStorage.value)
+)
+const cloudStoragePercentage = computed(() => {
+  if (maxCloudStorage.value <= 0) return 0
+
+  return Math.min(
+    100,
+    Math.max(0, (cloudStorageUsed.value / maxCloudStorage.value) * 100)
+  )
 })
 
 const storageSettingsTabs = [
@@ -392,7 +430,7 @@ const totalDataSize = computed(() => {
 
 const formatMegabytes = (sizeInMegabytes: number) => {
   if (sizeInMegabytes >= 1024) {
-    return `${sizeInMegabytes.toFixed(2)} GB`
+    return `${(sizeInMegabytes / 1024).toFixed(2)} GB`
   } else {
     return `${sizeInMegabytes.toFixed(2)} MB`
   }

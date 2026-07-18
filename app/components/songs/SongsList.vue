@@ -106,7 +106,7 @@ const focusedActionIndex = ref(0)
 const hasInteracted = ref(false)
 const onRowMouseEnter = (index: number) => {
   focusedActionIndex.value = index
-  hasInteracted.value = true
+  hasInteracted.value = false
 }
 const quickActions = ref<HTMLDivElement | null>(null)
 const authStore = useAuthStore()

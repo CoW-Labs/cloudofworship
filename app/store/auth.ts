@@ -29,6 +29,8 @@ export interface Church {
   type: string
   address: string
   pastor: string
+  logo?: string
+  branch?: string
   isNotAChurch?: boolean
   howYouFoundUs?: string
   createdAt: string
