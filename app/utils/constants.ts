@@ -150,7 +150,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newSong,
     meta: "",
     type: slideTypes.song,
-    tier: "teams",
+    tier: "free",
   },
   {
     icon: "i-lucide-list-music",
