@@ -95,7 +95,6 @@ import type {
   Media,
   BackgroundVideo,
   Schedule,
-  Song,
   SlideStyle,
   Advert,
   ExtendedFileT,
@@ -255,45 +254,6 @@ const fetchUser = async () => {
   return null
 }
 
-const fetchChurchSongs = async () => {
-  try {
-    const { data } = await useAPIFetch(
-      `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
-    )
-    const onlineCount = data.value ? (data.value as unknown as number) : 0
-    const offlineCount = await db.library.where("type").equals("song").count()
-    if (onlineCount > offlineCount) {
-      // Delete songs that are not in the online database
-      await db.library.where("type").equals("song").delete()
-
-      // Add online songs
-      const promise = await useAPIFetch(
-        `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
-      )
-      const data: Song[] = (await promise.data.value) as unknown as Song[]
-      const libraryData: LibraryItem[] = data?.map((song) => ({
-        id: song.id,
-        type: "song",
-        content: JSON.parse(JSON.stringify(song)),
-        createdAt: song.createdAt,
-        updatedAt: song.updatedAt,
-      }))
-
-      // Use bulkPut instead of bulkAdd to avoid blocking on duplicates
-      // Process in chunks to avoid blocking
-      const chunkSize = 50
-      for (let i = 0; i < libraryData.length; i += chunkSize) {
-        const chunk = libraryData.slice(i, i + chunkSize)
-        await db.library.bulkPut(chunk).catch((err) => {
-          console.error("Failed to save song chunk:", err)
-        })
-      }
-    }
-  } catch (err: any) {
-    console.log(err)
-  }
-}
-
 // Get Church Info and see if registered
 const fetchChurch = async () => {
   const churchId = authStore.user?.churchId
@@ -304,7 +264,8 @@ const fetchChurch = async () => {
     if (data.value) {
       const church = data.value as unknown as Church
       authStore.setChurch(church)
-      fetchChurchSongs()
+      // Song catalog syncs (non-destructively) via refreshLibrary() in the
+      // Phase 2 background init — no separate fetch needed here.
     }
     if (error.value) {
       console.warn("Unable to refresh church information:", error.value)
