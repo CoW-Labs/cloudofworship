@@ -31,7 +31,7 @@
 
   <div v-else class="bg-image-selection-ctn p-2">
     <div
-      :class="{ 'gap-4 grid-cols-3 max-h-full': settingsPage }"
+      :class="{ 'gap-4 grid-cols-3 max-h-full pb-16': settingsPage }"
       class="bg-image-selection grid gap-2 grid-cols-3 max-h-[200px] overflow-y-auto overflow-x-hidden"
     >
       <UButton
@@ -73,9 +73,8 @@
         /> -->
       </UButton>
     </div>
-    <div v-if="!hideUpload" class="button-ctn pt-2">
+    <div v-if="!hideUpload && !settingsPage" class="button-ctn pt-2">
       <FileDropzone
-        v-if="!settingsPage"
         size="sm"
         icon="i-bx-film"
         accept="video/*"
@@ -83,35 +82,38 @@
         @change="saveAndSelectVideos($event)"
         :loading="videoUploadLoading"
       />
-      <label class="relative" v-else>
+    </div>
+    <Teleport to="#settings-modal-device-action">
+      <!-- Fixed to the settings modal, outside its scrolling content. -->
+      <div
+        v-if="!hideUpload && settingsPage"
+        class="pointer-events-auto w-[190px] shadow-xl transition-all"
+      >
         <input
+          ref="videoFileInput"
           type="file"
-          name=""
-          id=""
-          class="absolute inset-0 opacity-0 cursor-pointer"
+          class="hidden"
           accept="video/*"
           multiple
-          @change="
-            saveAndSelectVideos(
-              Array.from(($event.target as HTMLInputElement)?.files || [])
-            )
-          "
+          @change="onVideoFileSelect"
         />
-        <UButton
-          class="z-1 mt-2"
+        <CowButton
+          variant="primary"
+          size="lg"
           block
-          variant="outline"
           :icon="videoUploadLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
           :loading="videoUploadLoading"
-          size="sm"
-          >{{
+          :disabled="videoUploadLoading"
+          @click="openVideoFilePicker"
+        >
+          {{
             videoUploadLoading
               ? `Adding ${currentVideoIndex}/${totalVideos}...`
               : "Add from device"
-          }}</UButton
-        >
-      </label>
-    </div>
+          }}
+        </CowButton>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -137,6 +139,7 @@ defineProps<{
 
 const emit = defineEmits(["select", "loading-change"])
 const videoUploadLoading = ref(false)
+const videoFileInput = ref<HTMLInputElement | null>(null)
 const currentVideoIndex = ref(0)
 const totalVideos = ref(0)
 const deletingVideoId = ref<string | null>(null)
@@ -145,6 +148,17 @@ const bgVideoToBeSelected = ref<string | null>(null)
 const localVideoObjectUrls = new Set<string>()
 const defaultBackgroundVideos = [...appStore.currentState.backgroundVideos]
 const backgroundVideos = ref<BackgroundVideo[]>([...defaultBackgroundVideos])
+
+const openVideoFilePicker = () => {
+  videoFileInput.value?.click()
+}
+
+const onVideoFileSelect = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ""
+  void saveAndSelectVideos(files)
+}
 
 const revokeLocalVideoObjectUrls = () => {
   const usedBackgrounds = new Set(

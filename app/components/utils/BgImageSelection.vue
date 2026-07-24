@@ -25,10 +25,11 @@
   </div>
 
   <template v-else>
+  <div>
   <div class="bg-image-selection-ctn p-2">
     <div
       class="bg-image-selection grid gap-2 max-h-[190px] overflow-y-auto overflow-x-hidden"
-      :class="settingsPage ? 'gap-4 grid-cols-3 max-h-full' : 'grid-cols-3'"
+      :class="settingsPage ? 'gap-4 grid-cols-3 max-h-full pb-16' : 'grid-cols-3'"
     >
       <UButton
         v-for="image in backgroundImages"
@@ -69,45 +70,47 @@
       </UButton>
     </div>
   </div>
-  <div v-if="!hideUpload" class="button-ctn p-2 pt-0">
+  <div v-if="!hideUpload && !settingsPage" class="button-ctn p-2 pt-0">
     <FileDropzone
-      v-if="!settingsPage"
       size="sm"
       accept="image/*"
       :maxFileSize="maxFileSize"
       @change="saveAndSelectImages($event)"
       class="max-w-[320px]"
-      :class="{ 'max-w-full': settingsPage }"
       :loading="imageCompressionLoading"
     />
-    <label v-else class="relative">
+  </div>
+  <Teleport to="#settings-modal-device-action">
+    <!-- Fixed to the settings modal, outside its scrolling content. -->
+    <div
+      v-if="!hideUpload && settingsPage"
+      class="pointer-events-auto w-[190px] shadow-xl transition-all"
+    >
       <input
+        ref="imageFileInput"
         type="file"
-        name=""
-        id=""
-        class="absolute inset-0 opacity-0 cursor-pointer"
+        class="hidden"
         accept="image/*"
         multiple
-        @change="
-          saveAndSelectImages(
-            Array.from(($event.target as HTMLInputElement)?.files || [])
-          )
-        "
+        @change="onImageFileSelect"
       />
-      <UButton
-        class="z-1 mt-2"
+      <CowButton
+        variant="primary"
+        size="lg"
         block
-        variant="outline"
         :icon="imageCompressionLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
         :loading="imageCompressionLoading"
-        size="sm"
-        >{{
+        :disabled="imageCompressionLoading"
+        @click="openImageFilePicker"
+      >
+        {{
           imageCompressionLoading
             ? `Adding ${currentImageIndex}/${totalImages}...`
             : "Add from device"
-        }}</UButton
-      >
-    </label>
+        }}
+      </CowButton>
+    </div>
+  </Teleport>
   </div>
   </template>
 </template>
@@ -132,6 +135,7 @@ const maxFileSize = computed(() => (isFreePlan ? 3 : 10))
 const toast = useToast()
 const db = useIndexedDB()
 const imageCompressionLoading = ref(false)
+const imageFileInput = ref<HTMLInputElement | null>(null)
 const currentImageIndex = ref(0)
 const totalImages = ref(0)
 const deletingImageId = ref<string | null>(null)
@@ -171,6 +175,17 @@ const defaultBackgroundImages = [
   // ---
 ]
 const backgroundImages = ref<string[]>([...defaultBackgroundImages])
+
+const openImageFilePicker = () => {
+  imageFileInput.value?.click()
+}
+
+const onImageFileSelect = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ""
+  void saveAndSelectImages(files)
+}
 
 const revokeLocalImageObjectUrls = () => {
   localImageObjectUrls.forEach((url) => URL.revokeObjectURL(url))
