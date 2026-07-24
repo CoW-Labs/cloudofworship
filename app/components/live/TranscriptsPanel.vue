@@ -73,50 +73,38 @@
           </Transition>
         </div>
 
-        <!-- More actions popover -->
-        <UPopover mode="click" :popper="{ placement: 'bottom-end' }">
+        <!-- More actions menu -->
+        <MoreActionsMenu v-slot="{ close }" flush>
           <UButton
-            icon="i-bx-dots-vertical-rounded"
             color="gray"
             variant="ghost"
-            size="xs"
-          />
-          <template #panel="{ close }">
-            <div class="p-1 flex flex-col gap-0.5 min-w-[160px]">
-              <UButton
-                icon="i-lucide-trash"
-                color="gray"
-                variant="ghost"
-                size="xs"
-                class="justify-start"
-                :disabled="segments.length === 0"
-                @click="
-                  () => {
-                    handleClear()
-                    close()
-                  }
-                "
-              >
-                Clear transcript
-              </UButton>
-              <UButton
-                color="gray"
-                variant="ghost"
-                size="xs"
-                class="justify-start"
-                @click="
-                  () => {
-                    $emit('close')
-                    close()
-                  }
-                "
-              >
-                <template #leading><CloseIcon class="w-4 h-4" /></template>
-                Close panel
-              </UButton>
-            </div>
-          </template>
-        </UPopover>
+            block
+            :disabled="segments.length === 0"
+            @click="
+              () => {
+                handleClear()
+                close()
+              }
+            "
+          >
+            <template #leading><DeleteIcon class="w-4 h-4" /></template>
+            Clear transcript
+          </UButton>
+          <UButton
+            color="gray"
+            variant="ghost"
+            block
+            @click="
+              () => {
+                $emit('close')
+                close()
+              }
+            "
+          >
+            <template #leading><CloseIcon class="w-4 h-4" /></template>
+            Close panel
+          </UButton>
+        </MoreActionsMenu>
       </div>
     </template>
 

@@ -1215,13 +1215,13 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
   }
 }
 
-// Listen to see if active slide is in active schedule, and to scroll to newest slide if in active schedule
+// Scroll to the active slide only when a slide is added. Changing the active
+// slide alone should not move the grid.
 watch(
-  () => ({
-    length: slides.value?.length,
-    activeId: activeSlide.value?.id,
-  }),
-  () => {
+  () => slides.value?.length ?? 0,
+  (newLength, oldLength) => {
+    if (newLength <= oldLength) return
+
     nextTick(() => {
       scrollToSlide(activeSlide.value?.id)
       const slideId = activeSlide.value?.id

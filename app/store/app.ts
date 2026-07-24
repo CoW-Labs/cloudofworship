@@ -20,7 +20,7 @@ import posthog from "posthog-js"
 export const PANEL_SIZE_LIMITS = {
   quickActionsWidth: { min: 300, max: 550, default: 340 },
   liveOutputWidth: { min: 400, max: 600, default: 450 },
-  previewHeight: { min: 240, max: 900, default: 480 },
+  previewHeight: { min: 240, max: 900, default: 290 },
   livePreviewHeight: { min: 160, max: 700, default: 280 },
   transcriptPanelHeight: { min: 190, max: 520, default: 280 },
 } as const

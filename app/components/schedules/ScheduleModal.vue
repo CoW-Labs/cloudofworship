@@ -111,6 +111,7 @@
                 }"
                 @delete="deleteSchedule($event)"
                 @duplicate="duplicateSchedule($event)"
+                @rename="renameSchedule"
               />
             </div>
           </div>
@@ -274,6 +275,37 @@ const createFromTemplate = async (template: ScheduleTemplate) => {
   }
 
   emit("close")
+}
+
+// Same rename path as the navbar's schedule switcher: update local state first,
+// then persist (the API layer queues the request when offline).
+const renameSchedule = async (schedule: Schedule, name: string) => {
+  const updatedSchedule: Schedule = {
+    ...schedule,
+    name,
+    updatedAt: new Date().toISOString(),
+  }
+
+  if (schedule._id === appStore.currentState.activeSchedule?._id) {
+    // Also refreshes the entry in currentState.schedules
+    appStore.setActiveSchedule(updatedSchedule)
+  } else {
+    const updatedScheduleList = [...appStore.currentState.schedules]
+    const index = updatedScheduleList.findIndex(
+      (sch) => sch?._id === schedule._id
+    )
+    if (index === -1) return
+    updatedScheduleList.splice(index, 1, updatedSchedule)
+    appStore.setSchedules(updatedScheduleList)
+  }
+
+  const { updateSchedule } = useSchedules()
+  await updateSchedule(schedule._id, { name })
+
+  usePosthogCapture("SCHEDULE_RENAMED", {
+    scheduleId: schedule._id,
+    scheduleName: name,
+  })
 }
 
 const duplicateSchedule = async (schedule: Schedule) => {

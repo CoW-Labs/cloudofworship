@@ -1,6 +1,6 @@
 <template>
   <div
-    class="verse-switch button-group bg-gray-100 dark:bg-[#171d2b] rounded-full flex items-center gap-1 h-[34px] px-1 relative text-gray-700 dark:text-[#d5dae3]"
+    class="verse-switch button-group ml-2 bg-white dark:bg-[#171d2b] rounded-full flex items-center gap-1 h-[34px] px-1 relative text-gray-700 dark:text-[#d5dae3]"
   >
     <UTooltip text="Previous verse" :popper="{ arrow: true }">
       <UButton

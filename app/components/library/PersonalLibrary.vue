@@ -86,13 +86,10 @@
                 @mouseenter="onRowMouseEnter(index)"
               >
                 <template #actions>
-                  <MoreActionsMenu v-slot="{ close }">
+                  <MoreActionsMenu v-slot="{ close }" flush>
                     <UButton
                       variant="ghost"
                       color="gray"
-                      icon="i-bx-edit"
-                      class="justify-start"
-                      size="sm"
                       block
                       @click="
                         () => {
@@ -101,6 +98,7 @@
                         }
                       "
                     >
+                      <template #leading><EditIcon class="w-4 h-4" /></template>
                       Edit
                     </UButton>
                     <ConfirmDialog
@@ -108,10 +106,9 @@
                       button-icon="i-tabler-trash"
                       button-color="red"
                       button-variant="ghost"
-                      button-size="sm"
                       no-tooltip
                       header="Delete song"
-                      button-styles="justify-start"
+                      button-styles="more-item-danger"
                       label="Are you sure you want to delete this song from your library? This action is not reversible"
                       @confirm="
                         () => {
@@ -119,7 +116,9 @@
                           close()
                         }
                       "
-                    />
+                    >
+                      <template #icon><DeleteIcon class="w-4 h-4" /></template>
+                    </ConfirmDialog>
                   </MoreActionsMenu>
                 </template>
               </ActionCard>
@@ -189,13 +188,10 @@
                 @mouseenter="onRowMouseEnter(index)"
               >
                 <template #actions>
-                  <MoreActionsMenu v-slot="{ close }">
+                  <MoreActionsMenu v-slot="{ close }" flush>
                     <UButton
                       variant="ghost"
                       color="gray"
-                      icon="i-bx-edit"
-                      class="justify-start"
-                      size="sm"
                       block
                       @click="
                         () => {
@@ -204,6 +200,7 @@
                         }
                       "
                     >
+                      <template #leading><EditIcon class="w-4 h-4" /></template>
                       Edit
                     </UButton>
                     <ConfirmDialog
@@ -211,10 +208,9 @@
                       button-icon="i-tabler-trash"
                       button-color="red"
                       button-variant="ghost"
-                      button-size="sm"
                       no-tooltip
                       header="Delete song"
-                      button-styles="justify-start"
+                      button-styles="more-item-danger"
                       label="Are you sure you want to delete this song from your library? This action is not reversible"
                       @confirm="
                         () => {
@@ -222,7 +218,9 @@
                           close()
                         }
                       "
-                    />
+                    >
+                      <template #icon><DeleteIcon class="w-4 h-4" /></template>
+                    </ConfirmDialog>
                   </MoreActionsMenu>
                 </template>
               </ActionCard>

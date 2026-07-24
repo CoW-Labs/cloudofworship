@@ -1,6 +1,12 @@
 <template>
-  <label class="cow-toggle" :class="{ 'cow-toggle--disabled': disabled }">
-    <span class="cow-toggle__label">{{ label }}</span>
+  <label
+    class="cow-toggle"
+    :class="[
+      { 'cow-toggle--disabled': disabled },
+      { 'cow-toggle--bare': bare },
+    ]"
+  >
+    <span v-if="!bare" class="cow-toggle__label">{{ label }}</span>
 
     <span class="cow-toggle__control">
       <input
@@ -28,6 +34,10 @@ const props = withDefaults(
     trueLabel?: string
     falseLabel?: string
     disabled?: boolean
+    // Renders the switch on its own — no card chrome, no visible label text.
+    // Used when the surrounding row (e.g. SettingsRow) already owns the label
+    // and the card background.
+    bare?: boolean
   }>(),
   {
     modelValue: true,
@@ -35,6 +45,7 @@ const props = withDefaults(
     trueLabel: "Yes",
     falseLabel: "No",
     disabled: false,
+    bare: false,
   }
 )
 
@@ -80,6 +91,25 @@ const onChange = (event: Event) => {
 .cow-toggle--disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+
+/* Switch only — the consumer supplies the row/card around it. */
+.cow-toggle.cow-toggle--bare {
+  display: inline-flex;
+  gap: 0;
+  padding: 0;
+  border-radius: 999px;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.cow-toggle.cow-toggle--bare:hover {
+  background-color: transparent;
+}
+
+.cow-toggle.cow-toggle--bare:active:not(.cow-toggle--disabled) {
+  transform: none;
+  box-shadow: none;
 }
 
 .cow-toggle__label {
@@ -158,6 +188,12 @@ html.dark .cow-toggle:hover {
 html.dark .cow-toggle:active:not(.cow-toggle--disabled) {
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2), 0 2px 0 0 #0d1320,
     0 8px 12px -10px rgba(0, 0, 0, 0.6);
+}
+
+html.dark .cow-toggle.cow-toggle--bare,
+html.dark .cow-toggle.cow-toggle--bare:hover {
+  background-color: transparent;
+  box-shadow: none;
 }
 
 html.dark .cow-toggle__label {
