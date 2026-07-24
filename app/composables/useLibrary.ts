@@ -43,15 +43,17 @@ export default function useLibrary() {
   // Reactive loading state
   const loading = ref<boolean>(true)
 
-  // Observable for library items from IndexedDB
+  // Observable for library items from IndexedDB.
+  // NOTE: don't toggle `loading` in here — this re-runs on every write to the
+  // `library` table (including the delete+put during a refresh), so flipping
+  // the skeleton on each emission causes a visible flash. `loading` is owned by
+  // the fetch/refresh functions instead.
   const libraryItems = useObservable<LibraryItem[]>(
     liveQuery(async () => {
-      loading.value = true
       const data = await useIndexedDB()
         .library.orderBy('createdAt')
         .reverse()
         .toArray()
-      loading.value = false
       return data
     }) as any
   )
@@ -186,15 +188,6 @@ export default function useLibrary() {
     try {
       const db = useIndexedDB()
 
-      // Delete all existing slide-type entries first so removed saves don't linger
-      const existingSlideIds = await db.library
-        .where('type')
-        .equals(libraryTypes.slide)
-        .primaryKeys()
-      if (existingSlideIds.length > 0) {
-        await db.library.bulkDelete(existingSlideIds)
-      }
-
       const librarySlides: LibraryItem[] = slides
         .map((slide) => {
           const cacheableSlide = toCacheableSlide(slide)
@@ -213,7 +206,19 @@ export default function useLibrary() {
         })
         .filter((item): item is LibraryItem => Boolean(item))
 
-      await db.library.bulkPut(librarySlides)
+      // Replace all slide entries in a single transaction so the liveQuery only
+      // emits once (after commit) and never observes the empty mid-state between
+      // the delete and the put — which would otherwise flicker the list.
+      await db.transaction('rw', db.library, async () => {
+        const existingSlideIds = await db.library
+          .where('type')
+          .equals(libraryTypes.slide)
+          .primaryKeys()
+        if (existingSlideIds.length > 0) {
+          await db.library.bulkDelete(existingSlideIds)
+        }
+        await db.library.bulkPut(librarySlides)
+      })
     } catch (error) {
       console.error('Error caching slides in library:', error)
     }
@@ -337,15 +342,6 @@ export default function useLibrary() {
     try {
       const db = useIndexedDB()
 
-      // Delete all existing song-type entries first so removed songs don't linger
-      const existingSongIds = await db.library
-        .where('type')
-        .equals(libraryTypes.song)
-        .primaryKeys()
-      if (existingSongIds.length > 0) {
-        await db.library.bulkDelete(existingSongIds)
-      }
-
       const librarySongs: LibraryItem[] = songs
         .map((song) => {
           const cacheableSong = toCacheableSong(song)
@@ -365,7 +361,19 @@ export default function useLibrary() {
         })
         .filter((item): item is LibraryItem => Boolean(item))
 
-      await db.library.bulkPut(librarySongs)
+      // Replace all song entries in a single transaction so the liveQuery only
+      // emits once (after commit) and never observes the empty mid-state between
+      // the delete and the put — which would otherwise flicker the list.
+      await db.transaction('rw', db.library, async () => {
+        const existingSongIds = await db.library
+          .where('type')
+          .equals(libraryTypes.song)
+          .primaryKeys()
+        if (existingSongIds.length > 0) {
+          await db.library.bulkDelete(existingSongIds)
+        }
+        await db.library.bulkPut(librarySongs)
+      })
     } catch (error) {
       console.error('Error caching songs in library:', error)
     }

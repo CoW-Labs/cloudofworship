@@ -330,9 +330,11 @@ export default function useSlideCreation() {
       // ── Regular file (image / video / audio) ─────────────────────────────
       tempSlide.backgroundType = file.type === "audio" ? "image" : file.type
       tempSlide.background = file.type === "audio" ? randomImage : file.url
-      tempSlide.backgroundVideoKey = file.type?.includes("video")
-        ? appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey
-        : null
+      // Uploaded media has no preset background video. Its own bytes are
+      // rehydrated from IndexedDB by slide.id (not backgroundVideoKey), so
+      // inheriting the church default preset key here only mis-tags the slide
+      // and lets retrieveSlidesOnline overwrite it with an unrelated preset.
+      tempSlide.backgroundVideoKey = null
       tempSlide.data = file
       tempSlide.name = useSlideName(tempSlide)
 
@@ -457,8 +459,15 @@ export default function useSlideCreation() {
           if (isTeamsPlan.value) {
             const uploadPromises = files.map(async (file: ExtendedFileT, index: number) => {
               const blob = compressedBlobs[index]
-              // Only upload image files; skip videos, audio, and external files
-              if (!blob?.type?.includes("image")) return null
+              // Upload image and video files for durable, cross-device storage.
+              // (Videos pass through compressedBlobs uncompressed, so the blob is
+              // the original.) The local IndexedDB copy remains the playback
+              // source on every device — the hosted URL is only a fetch fallback.
+              // Audio and external files are still skipped.
+              const isUploadable =
+                !!blob &&
+                (blob.type?.includes("image") || blob.type?.includes("video"))
+              if (!isUploadable || !blob) return null
               try {
                 const uploaded = await useUploadImage(blob)
                 return { uploaded, index }

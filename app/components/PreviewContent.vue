@@ -1181,9 +1181,14 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
             (bg) => bg.id === slide.backgroundVideoKey
           )?.url
         } else if (
-          slide.backgroundType === backgroundTypes.image &&
+          (slide.backgroundType === backgroundTypes.image ||
+            slide.backgroundType === backgroundTypes.video) &&
           slide.background?.includes("blob:")
         ) {
+          // Custom (non-preset) image AND video backgrounds: the server may hold
+          // a stale, session-dead blob: URL. Restore the still-valid locally
+          // rehydrated background so the "server wins" merge can't clobber a
+          // working slide with a broken URL.
           const previousBackground = appStore.currentState.activeSlides.find(
             (s) => s.id === slide.id
           )?.background

@@ -8,7 +8,10 @@
       background: 'bg-transparent dark:bg-transparent',
       ring: '',
       shadow: 'shadow-none',
-      fullscreen: 'w-[80vw] max-w-[900px] h-auto rounded-2xl',
+      base: 'relative text-left rtl:text-right flex flex-col overflow-hidden',
+      inner: 'fixed inset-0 overflow-hidden',
+      fullscreen:
+        'w-[94vw] sm:w-[92vw] lg:w-[80vw] max-w-[900px] h-[85vh] max-h-[680px] rounded-2xl',
       overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
     }"
   >
@@ -25,14 +28,14 @@
         </button>
       </template>
 
-      <div class="flex gap-3 w-[100%] h-[100%]">
+      <div class="flex flex-col lg:flex-row gap-3 w-full h-full">
         <div
-          class="lhs w-[230px] shrink-0 flex flex-col gap-1 h-[100%] rounded-2xl bg-[#f1f3f6] dark:bg-[#1b212e] p-1.5 overflow-y-auto"
+          class="lhs w-full lg:w-[230px] shrink-0 flex flex-row lg:flex-col gap-1 h-auto lg:h-full rounded-2xl bg-[#f1f3f6] dark:bg-[#1b212e] p-1.5 overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto"
         >
           <button
             v-for="tab in tabs"
             :key="tab.name"
-            class="settings-tab w-full rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors"
+            class="settings-tab w-auto lg:w-full shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors"
             :class="
               activeTab === tab.name
                 ? 'bg-primary-500 text-white shadow-sm'
@@ -43,7 +46,9 @@
             {{ tab?.name }}
           </button>
         </div>
-        <div class="rhs flex-1 min-w-0 rounded-2xl px-5 pt-1 h-[600px]">
+        <div
+          class="rhs flex-1 min-w-0 min-h-0 rounded-2xl px-1 sm:px-3 lg:px-5 pt-1 h-full overflow-y-auto"
+        >
           <!-- SUB-SETTINGS HEADER -->
           <h3 class="font-semibold text-lg mb-4 text-gray-900 dark:text-white">
             {{ activeTab }}

@@ -54,7 +54,38 @@ export default function useSlides() {
       // Send immediately after the targeted local update. The channel applies
       // one serialization boundary so Vue reactive proxies remain clone-safe.
       useBroadcastPost(updatedSlide)
+
+      // Local-first: if this slide's media is still a remote URL on this device
+      // (e.g. a teammate's slide received via socket that idle-prefetch hasn't
+      // localized yet), fetch+cache it once, then re-broadcast with the local
+      // object URL so the operator preview and projection play locally instead
+      // of streaming. Gated on a remote URL, so the creating device (already a
+      // blob: URL) and verse navigation never trigger it.
+      localizeLiveSlideMedia(updatedSlide)
     }
+  }
+
+  const { rehydrateSlideMedia } = useSlideMediaCache()
+
+  const localizeLiveSlideMedia = (liveSlide: Slide) => {
+    const bg = liveSlide.background
+    const isRemote = !!bg && (bg.startsWith("http://") || bg.startsWith("https://"))
+    const bearsMedia =
+      liveSlide.type === slideTypes.media ||
+      liveSlide.type === slideTypes.presentation ||
+      !!liveSlide.backgroundVideoKey
+    if (!isRemote || !bearsMedia) return
+
+    rehydrateSlideMedia({ ...liveSlide }, { allowDownload: true })
+      .then((rehydrated) => {
+        // Nothing was localized (no local/remote copy available) — leave as-is.
+        if (rehydrated.background === bg) return
+        appStore.updateSlideInActiveSlides(rehydrated)
+        if (appStore.currentState.liveSlideId === rehydrated.id) {
+          useBroadcastPost(rehydrated)
+        }
+      })
+      .catch((err) => console.warn("Go-live media localize failed:", err))
   }
 
   /**
