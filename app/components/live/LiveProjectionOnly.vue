@@ -255,7 +255,22 @@
           }"
           style="z-index: 2"
         >
+          <!-- MEDIA INTERMISSION (video / image) — shown clean, no branding -->
+          <BackgroundVideo
+            v-if="isIntermissionMedia && intermissionVideoUrl"
+            :source="intermissionVideoUrl"
+            :repeat="true"
+            :visible="true"
+          />
+          <img
+            v-else-if="isIntermissionMedia && intermissionImageUrl"
+            :src="intermissionImageUrl"
+            class="h-full w-full object-cover absolute inset-0"
+            alt=""
+          />
+          <!-- DEFAULT CHURCH BRANDING (also the fallback while media resolves) -->
           <div
+            v-else
             class="intermission-content flex flex-col items-center"
             :class="fullScreen ? 'gap-6' : 'gap-2'"
           >
@@ -397,6 +412,74 @@ const churchName = computed(() => church.value?.name || "")
 const churchBranch = computed(
   () => church.value?.type || church.value?.branch || ""
 )
+
+// Custom media intermission (operator-chosen video/image, shown with no
+// branding). Settings sync into the live window via pinia-shared-state.
+const { rehydrateSlideMedia } = useSlideMediaCache()
+const intermissionSettings = computed(
+  () => currentState.value.settings.intermission
+)
+const isIntermissionMedia = computed(
+  () =>
+    intermissionSettings.value?.mode === "media" &&
+    !!intermissionSettings.value?.background
+)
+const intermissionImageUrl = computed(() =>
+  intermissionSettings.value?.backgroundType === backgroundTypes.image
+    ? intermissionSettings.value?.background || null
+    : null
+)
+// Resolved LOCAL object URL for the intermission video (created in THIS
+// document). Kept ready even while a slide is live so switching to intermission
+// is instant; the <BackgroundVideo> only mounts inside the idle v-else block.
+const intermissionVideoUrl = ref<string | null>(null)
+
+const revokeIntermissionVideoUrl = () => {
+  if (intermissionVideoUrl.value?.startsWith("blob:")) {
+    URL.revokeObjectURL(intermissionVideoUrl.value)
+  }
+}
+
+const resolveIntermissionVideo = async () => {
+  const s = intermissionSettings.value
+  if (
+    s?.mode !== "media" ||
+    s?.backgroundType !== backgroundTypes.video ||
+    !s?.backgroundVideoKey
+  ) {
+    revokeIntermissionVideoUrl()
+    intermissionVideoUrl.value = null
+    return
+  }
+
+  // Local-first: resolve (downloading once if needed) the cached video into a
+  // fresh object URL. A non-media slide type + backgroundVideoKey routes through
+  // rehydrateBackgroundVideoSlide, which reads db.cached by key — never streams.
+  const resolved = await rehydrateSlideMedia(
+    {
+      id: "__intermission__",
+      type: slideTypes.text,
+      backgroundType: backgroundTypes.video,
+      background: s.background,
+      backgroundVideoKey: s.backgroundVideoKey,
+    } as unknown as Slide,
+    { allowDownload: true }
+  )
+
+  const prev = intermissionVideoUrl.value
+  intermissionVideoUrl.value = resolved.background || null
+  if (prev && prev !== intermissionVideoUrl.value && prev.startsWith("blob:")) {
+    URL.revokeObjectURL(prev)
+  }
+}
+
+watch(
+  () => intermissionSettings.value,
+  () => resolveIntermissionVideo(),
+  { deep: true }
+)
+onMounted(() => resolveIntermissionVideo())
+onBeforeUnmount(() => revokeIntermissionVideoUrl())
 
 // The slide currently rendered in the crossfading face. It lags props.slide by
 // the (image) preload so the incoming background doesn't flash blank mid-fade.

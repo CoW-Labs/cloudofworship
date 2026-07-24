@@ -592,6 +592,17 @@ export const useAppStore = defineStore("app", {
       usePosthogCapture("DEFAULT_BACKGROUND_SETTINGS_CHANGED")
       // console.log("setDefaultSlideBackground", this.currentState.settings)
     },
+    setIntermissionSettings(payload: AppSettings["intermission"]) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        intermission: {
+          mode: "default",
+          ...this.currentState.settings.intermission,
+          ...payload,
+        },
+      }
+      usePosthogCapture("INTERMISSION_SETTINGS_CHANGED")
+    },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)
     // },

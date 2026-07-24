@@ -353,6 +353,12 @@ export interface AppSettings {
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number
   alertLimit?: number
+  intermission?: {
+    mode: "default" | "media" // "default" = church-branding screen (logo/name)
+    backgroundType?: string // backgroundTypes.image | backgroundTypes.video
+    background?: string // resolved URL (https / blob / object URL)
+    backgroundVideoKey?: string | null // IndexedDB (db.cached) key for video mode
+  }
 }
 
 export interface OnlineUser {

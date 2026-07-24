@@ -61,18 +61,25 @@ const emit = defineEmits<{
   (e: "change", value: number): void
 }>()
 
-const draft = ref<number>(props.modelValue)
+// Settings can come back from localStorage as strings, so coerce anything the
+// caller hands us to a finite number before it reaches `.toFixed`/the slider.
+const toNumber = (value: unknown): number => {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
+
+const draft = ref<number>(toNumber(props.modelValue))
 
 watch(
   () => props.modelValue,
   (value) => {
-    draft.value = value
+    draft.value = toNumber(value)
   }
 )
 
 // Trim the float noise a 0.1-step range produces (1.2000000000000002 → 1.2).
 const formatted = (value: number) =>
-  `${Number(value.toFixed(2))}${props.suffix}`
+  `${Number(toNumber(value).toFixed(2))}${props.suffix}`
 
 const onInput = (value: number) => {
   draft.value = value

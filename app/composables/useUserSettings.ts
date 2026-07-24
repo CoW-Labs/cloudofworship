@@ -104,6 +104,9 @@ export const useUserSettings = () => {
             userSettings.transcriptionVoiceBibleVersionCommands ?? true,
           transitionInterval: userSettings.transitionInterval,
           alertLimit: userSettings.alertLimit,
+          intermission:
+            userSettings.intermission ??
+            appStore.currentState.settings.intermission,
         }
 
         // Merge with current settings to preserve app version and other non-saved fields
@@ -165,6 +168,7 @@ export const useUserSettings = () => {
           settingsToSave.transcriptionVoiceBibleVersionCommands ?? true,
         transitionInterval: settingsToSave.transitionInterval,
         alertLimit: settingsToSave.alertLimit,
+        intermission: settingsToSave.intermission,
       }
 
       // Use unique key with timestamp to prevent caching
