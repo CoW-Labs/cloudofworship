@@ -78,6 +78,23 @@ const mostUpdatedLiveSlide = ref<Slide | null>(null)
 const lastBroadcastTs = ref(0)
 const lastOverlayBroadcastTs = ref(0)
 
+// Local-first media for the projection window. blob: URLs are scoped to the
+// operator document that created them, so they die when that tab closes/reloads.
+// We rehydrate incoming media from THIS window's shared IndexedDB (downloading
+// once if needed) and cache the localized URLs per source signature so repeated
+// same-slide broadcasts (e.g. verse changes) don't re-download, re-create object
+// URLs, or reload the <video>.
+const { rehydrateSlideMedia } = useSlideMediaCache()
+const localizedLiveMedia = new Map<
+  string,
+  { background?: string; dataUrl?: string }
+>()
+
+const slideNeedsLocalMedia = (slide: Slide) =>
+  slide.type === slideTypes.media ||
+  slide.type === slideTypes.presentation ||
+  !!slide.backgroundVideoKey
+
 useHead({
   title: "Live Projection - Cloud of Worship",
   meta: [
@@ -254,6 +271,24 @@ onMounted(() => {
         slideId: updatedSlide?.id,
       })
 
+      // For media-bearing slides, swap in a local object URL so the projection
+      // never depends on the operator tab's blob: URL (which dies when that tab
+      // closes). Use the cached localized URL when we've already resolved this
+      // source; otherwise rehydrate asynchronously below.
+      let pendingRehydrateSig: string | null = null
+      if (slideNeedsLocalMedia(updatedSlide)) {
+        const sig = `${updatedSlide.id}|${updatedSlide.background ?? ""}`
+        const cached = localizedLiveMedia.get(sig)
+        if (cached) {
+          if (cached.background) updatedSlide.background = cached.background
+          if (cached.dataUrl && updatedSlide.data) {
+            ;(updatedSlide.data as any).url = cached.dataUrl
+          }
+        } else {
+          pendingRehydrateSig = sig
+        }
+      }
+
       // Check if this is just a content update within the same slide
       const isSameSlide = mostUpdatedLiveSlide.value?.id === updatedSlide.id
 
@@ -266,6 +301,25 @@ onMounted(() => {
         requestAnimationFrame(() => {
           mostUpdatedLiveSlide.value = updatedSlide
         })
+      }
+
+      // First time we've seen this media source: ensure a local copy exists in
+      // this window (download once if needed), then re-apply with the local URL.
+      if (pendingRehydrateSig) {
+        const sig = pendingRehydrateSig
+        rehydrateSlideMedia(updatedSlide, { allowDownload: true })
+          .then((rehydrated) => {
+            localizedLiveMedia.set(sig, {
+              background: rehydrated.background,
+              dataUrl: (rehydrated.data as any)?.url,
+            })
+            if (mostUpdatedLiveSlide.value?.id === rehydrated.id) {
+              mostUpdatedLiveSlide.value = { ...rehydrated }
+            }
+          })
+          .catch((err) =>
+            console.warn("Live media rehydrate failed:", err)
+          )
       }
     } catch (error) {
       console.error("Failed to parse broadcast message:", error)

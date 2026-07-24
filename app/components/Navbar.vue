@@ -400,11 +400,22 @@ const commitScheduleName = async () => {
   })
 
   const { updateSchedule } = useSchedules()
-  await updateSchedule(schedule._id, { name })
+  const result = await updateSchedule(schedule._id, { name })
+  if (result.status === "failed") {
+    // Do not overwrite a newer rename if this request resolves out of order.
+    if (
+      currentState.value.activeSchedule?._id === schedule._id &&
+      currentState.value.activeSchedule?.name === name
+    ) {
+      appStore.setActiveSchedule(schedule)
+    }
+    return
+  }
 
   usePosthogCapture("SCHEDULE_RENAMED", {
     scheduleId: schedule._id,
     scheduleName: name,
+    persistence: result.status,
   })
 }
 

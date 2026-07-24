@@ -97,6 +97,20 @@ withDefaults(
   justify-content: stretch;
   flex-shrink: 1;
 }
+
+@media (max-width: 639px) {
+  .settings-row:not(.settings-row--stacked) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .settings-row__control {
+    min-width: 0;
+    justify-content: stretch;
+    flex-shrink: 1;
+  }
+}
 </style>
 
 <style>

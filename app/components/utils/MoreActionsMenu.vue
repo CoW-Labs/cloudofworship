@@ -64,6 +64,14 @@ const triggerRef = ref<HTMLElement | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
 const panelStyle = ref<Record<string, string>>({})
 
+const stopListeningForScroll = () => {
+  window.removeEventListener("scroll", handleScroll, true)
+}
+
+const startListeningForScroll = () => {
+  window.addEventListener("scroll", handleScroll, true)
+}
+
 const openMenu = async () => {
   const rect = triggerRef.value?.getBoundingClientRect()
   // Anchored by its right edge so `transform` stays free for the open animation
@@ -75,6 +83,7 @@ const openMenu = async () => {
     }
   }
   open.value = true
+  startListeningForScroll()
   emit("update:open", true)
 
   // Flip above the trigger when the panel would run past the viewport bottom
@@ -90,7 +99,9 @@ const openMenu = async () => {
 }
 
 const close = () => {
+  if (!open.value) return
   open.value = false
+  stopListeningForScroll()
   emit("update:open", false)
 }
 
@@ -101,15 +112,11 @@ const toggle = () => {
 // Close instead of tracking scroll offsets — avoids the menu drifting out of
 // sync with its trigger when the (often virtualized) list underneath it scrolls.
 const handleScroll = () => {
-  if (open.value) close()
+  close()
 }
 
-onMounted(() => {
-  window.addEventListener("scroll", handleScroll, true)
-})
-
 onUnmounted(() => {
-  window.removeEventListener("scroll", handleScroll, true)
+  stopListeningForScroll()
 })
 
 defineExpose({ close })

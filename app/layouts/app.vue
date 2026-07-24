@@ -97,7 +97,6 @@ import type {
   Schedule,
   SlideStyle,
   Advert,
-  ExtendedFileT,
   Slide,
   Hymn,
   AppSettings,
@@ -683,6 +682,13 @@ const retrieveAllMediaFilesFromDB = async () => {
   // For active slides - use Promise.all instead of forEach
   const slides = [...appStore.currentState.activeSlides]
 
+  // Rehydrate each slide's media from IndexedDB → a fresh local object URL.
+  // Local-only here (allowDownload: false) so startup stays cheap; missing
+  // copies are pulled later by the non-blocking prefetch below. The helper is
+  // IndexedDB-first, so a slide whose durable `background` is now a hosted
+  // https URL still plays from its local copy instead of streaming.
+  const { rehydrateSlideMedia, prefetchScheduleMedia } = useSlideMediaCache()
+
   // Process slides in parallel but in small batches to avoid blocking
   const processSlidesInBatches = async (
     slidesToProcess: Slide[],
@@ -691,67 +697,9 @@ const retrieveAllMediaFilesFromDB = async () => {
     for (let i = 0; i < slidesToProcess.length; i += batchSize) {
       const batch = slidesToProcess.slice(i, i + batchSize)
       await Promise.all(
-        batch.map(async (slide: Slide) => {
-          if (
-            slide.type === slideTypes.media &&
-            slide.background?.startsWith("blob:")
-          ) {
-            const mediaObj = await db.media.where({ id: slide.id }).toArray()
-            if (mediaObj[0]) {
-              // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
-              const arrayBuffer = mediaObj[0]?.data as ArrayBuffer
-              const blob = new Blob([arrayBuffer], {
-                type: mediaObj[0]?.content?.type,
-              })
-              const fileUrl = URL.createObjectURL(blob)
-              if (slide.data) {
-                slide.data = slide.data as ExtendedFileT
-                slide.data.url = fileUrl
-              }
-              if (!(slide.data as ExtendedFileT)?.type?.includes("audio")) {
-                slide.background = fileUrl
-              }
-            }
-          } else if (
-            slide.type === slideTypes.presentation &&
-            slide.presentationObjects?.length
-          ) {
-            // Restore blob URLs for each presentation page from IndexedDB
-            const restored: typeof slide.presentationObjects = []
-            for (const obj of slide.presentationObjects) {
-              const key = `${slide.id}-page-${obj.page}`
-              const mediaObj = await safeDBGet(db.media, key)
-              if (mediaObj?.data) {
-                const blob = new Blob([mediaObj.data as ArrayBuffer], {
-                  type: "image/png",
-                })
-                restored.push({
-                  page: obj.page,
-                  imageUrl: URL.createObjectURL(blob),
-                })
-              } else {
-                restored.push(obj)
-              }
-            }
-            slide.presentationObjects = restored
-            slide.background =
-              restored[slide.presentationPageIndex ?? 0]?.imageUrl ||
-              slide.background
-          } else if (slide?.backgroundVideoKey) {
-            const cachedBackgroundVideo = await safeDBGet(
-              db.cached,
-              slide?.backgroundVideoKey
-            )
-            if (cachedBackgroundVideo) {
-              const arrayBuffer = cachedBackgroundVideo?.data as ArrayBuffer
-              const blob = new Blob([arrayBuffer], {
-                type: cachedBackgroundVideo?.content?.type,
-              })
-              const fileUrl = URL.createObjectURL(blob)
-              slide.background = fileUrl
-            }
-          }
-        })
+        batch.map((slide: Slide) =>
+          rehydrateSlideMedia(slide, { allowDownload: false })
+        )
       )
     }
   }
@@ -759,6 +707,13 @@ const retrieveAllMediaFilesFromDB = async () => {
   await processSlidesInBatches(slides)
   appStore.setActiveSlides(slides)
   appStore.setSlidesLoading(false)
+
+  // Idle prefetch: download any not-yet-cached videos for this schedule into
+  // IndexedDB in the background so they're ready (and local) before service,
+  // without blocking startup.
+  prefetchScheduleMedia(slides).catch((err) =>
+    console.warn("Background media prefetch failed:", err)
+  )
 
   // For saved slides - process asynchronously without blocking
   db.library

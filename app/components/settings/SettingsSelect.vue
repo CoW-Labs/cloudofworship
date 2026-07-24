@@ -34,7 +34,7 @@ withDefaults(
   }>(),
   {
     options: () => [],
-    width: "w-[220px]",
+    width: "w-full sm:w-[220px]",
   }
 )
 </script>

@@ -279,6 +279,24 @@ const createFromTemplate = async (template: ScheduleTemplate) => {
 
 // Same rename path as the navbar's schedule switcher: update local state first,
 // then persist (the API layer queues the request when offline).
+const replaceScheduleLocally = (schedule: Schedule) => {
+  if (schedule._id === appStore.currentState.activeSchedule?._id) {
+    // Also refreshes the entry in currentState.schedules
+    appStore.setActiveSchedule(schedule)
+    return true
+  }
+
+  const updatedScheduleList = [...appStore.currentState.schedules]
+  const index = updatedScheduleList.findIndex(
+    (item) => item?._id === schedule._id
+  )
+  if (index === -1) return false
+
+  updatedScheduleList.splice(index, 1, schedule)
+  appStore.setSchedules(updatedScheduleList)
+  return true
+}
+
 const renameSchedule = async (schedule: Schedule, name: string) => {
   const updatedSchedule: Schedule = {
     ...schedule,
@@ -286,25 +304,25 @@ const renameSchedule = async (schedule: Schedule, name: string) => {
     updatedAt: new Date().toISOString(),
   }
 
-  if (schedule._id === appStore.currentState.activeSchedule?._id) {
-    // Also refreshes the entry in currentState.schedules
-    appStore.setActiveSchedule(updatedSchedule)
-  } else {
-    const updatedScheduleList = [...appStore.currentState.schedules]
-    const index = updatedScheduleList.findIndex(
-      (sch) => sch?._id === schedule._id
-    )
-    if (index === -1) return
-    updatedScheduleList.splice(index, 1, updatedSchedule)
-    appStore.setSchedules(updatedScheduleList)
-  }
+  if (!replaceScheduleLocally(updatedSchedule)) return
 
   const { updateSchedule } = useSchedules()
-  await updateSchedule(schedule._id, { name })
+  const result = await updateSchedule(schedule._id, { name })
+  if (result.status === "failed") {
+    const currentSchedule = appStore.currentState.schedules.find(
+      (item) => item?._id === schedule._id
+    )
+    // Do not overwrite a newer rename if this request resolves out of order.
+    if (currentSchedule?.name === name) {
+      replaceScheduleLocally(schedule)
+    }
+    return
+  }
 
   usePosthogCapture("SCHEDULE_RENAMED", {
     scheduleId: schedule._id,
     scheduleName: name,
+    persistence: result.status,
   })
 }
 
