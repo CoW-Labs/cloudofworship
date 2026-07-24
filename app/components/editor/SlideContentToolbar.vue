@@ -459,7 +459,7 @@
       <!-- SONG CONTROLS -->
       <div
         v-if="slide?.type === slideTypes.song"
-        class="button-group song-controls bg-gray-100 dark:bg-[#171d2b] rounded-md mx-1 p-1 px-0 h-[36px] mt-[2px] flex items-center gap-1"
+        class="button-group song-controls bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 px-0 h-[36px] mt-[2px] flex items-center gap-1"
       >
         <UTooltip text="Refresh song lyrics" :popper="toolbarTooltipPopper">
           <UButton

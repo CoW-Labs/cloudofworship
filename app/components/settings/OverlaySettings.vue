@@ -1,88 +1,57 @@
 <template>
-  <div class="settings-ctn h-full overflow-y-auto mb-[2.5%] pb-[15%]">
-    <div class="settings-group">
-      <div class="mb-4">
-        <h3 class="text-md font-semibold">Content Overlay Layout</h3>
-        <p class="text-xs text-gray-500 mt-1">
-          These settings apply to text, countdown, and time overlays.
-        </p>
-      </div>
+  <div
+    class="settings-ctn h-full overflow-y-auto mb-[2.5%] p-1 pb-[15%] flex flex-col gap-8"
+  >
+    <SettingsGroup
+      title="Content Overlay Layout"
+      note="These settings apply to text, countdown, and time overlays."
+    >
+      <SettingsRow label="Position">
+        <SettingsSelect
+          :options="positionOptions"
+          value-attribute="key"
+          option-attribute="label"
+          :model-value="overlaySettings.position"
+          @change="updatePosition($event)"
+        />
+      </SettingsRow>
 
-      <UForm :state="{}">
-        <UFormGroup
-          label="Position"
-          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
-        >
-          <CowSelectMenu
-            class="border-0 shadow-none max-w-[220px]"
-            select-class="w-[220px] bg-gray-100 dark:bg-gray-800 dark:text-white"
-            size="md"
-            :options="positionOptions"
-            :model-value="overlaySettings.position"
-            variant="none"
-            color="primary"
-            :ui-menu="selectMenuUI"
-            @change="updatePosition($event.key)"
-          />
-        </UFormGroup>
+      <SettingsSlider
+        label="Size"
+        v-model="draftScale"
+        :min="50"
+        :max="200"
+        :step="5"
+        suffix="%"
+        @change="commitScale"
+      />
+    </SettingsGroup>
 
-        <UFormGroup
-          label="Size"
-          class="flex flex-col py-3 px-2 hover:bg-primary/10"
-        >
-          <div class="flex items-center gap-3 w-full mt-2">
-            <span class="text-sm w-10">50%</span>
-            <URange
-              :model-value="draftScale"
-              :min="50"
-              :max="200"
-              :step="5"
-              @update:model-value="draftScale = Number($event)"
-              @change="commitScale"
-            />
-            <span class="text-sm w-12 text-right">200%</span>
-          </div>
-          <div class="text-xs text-gray-500 mt-2">
-            Current size: {{ draftScale }}%
-          </div>
-        </UFormGroup>
-      </UForm>
-    </div>
+    <SettingsGroup title="Overlays & Themes">
+      <template #badge>
+        <IconWrapper
+          v-if="showTeamsBadge && !hasAccessToOverlays"
+          name="i-bxs-award"
+          class="inline-flex w-5 h-5 text-[#FF8980] cursor-pointer"
+          @click="handleUpgradeClick"
+        />
+      </template>
 
-    <UDivider class="my-6" />
-
-    <div class="settings-group relative">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold relative">
-          Overlays & Themes
-          <IconWrapper
-            v-if="showTeamsBadge && !hasAccessToOverlays"
-            name="i-bxs-award"
-            class="inline-flex w-6 h-6 text-xs ml-2 text-[#FF8980] absolute -top-1 cursor-pointer"
-            @click="handleUpgradeClick"
-          />
-        </h3>
-      </div>
-      <UForm :state="{}">
-        <UFormGroup
-          label="Decorative overlay"
-          class="flex w-full items-center justify-between py-2 px-2 hover:bg-primary/10"
-        >
-          <CowSelectMenu
-            class="border-0 shadow-none max-w-[220px]"
-            select-class="w-[220px] bg-gray-100 dark:bg-gray-800 dark:text-white"
-            size="md"
-            :options="decorativeOverlayOptions"
-            :model-value="appStore.currentState.activeOverlay"
-            :disabled="!hasAccessToOverlays"
-            variant="none"
-            color="primary"
-            :ui-menu="selectMenuUI"
-            @change="updateDecorativeOverlay($event.key)"
-          />
-        </UFormGroup>
-      </UForm>
-    </div>
+      <SettingsRow
+        label="Decorative overlay"
+        description="Adds an ambient effect on top of every live slide."
+        :disabled="!hasAccessToOverlays"
+      >
+        <SettingsSelect
+          :options="decorativeOverlayOptions"
+          value-attribute="key"
+          option-attribute="label"
+          :model-value="appStore.currentState.activeOverlay"
+          :disabled="!hasAccessToOverlays"
+          @change="updateDecorativeOverlay($event)"
+        />
+      </SettingsRow>
+    </SettingsGroup>
   </div>
 </template>
 
@@ -122,13 +91,6 @@ const hasAccessToOverlays = computed(() => {
 })
 
 const showTeamsBadge = computed(() => isPremiumFeatureEnabled.value)
-
-const selectMenuUI = {
-  width: "w-[220px]",
-  input: "text-xs",
-  empty: "text-xs",
-  option: { size: "text-xs" },
-}
 
 const draftScale = ref(overlaySettings.value.scale)
 

@@ -64,92 +64,132 @@
       </div>
     </button>
 
-    <!-- DELETE AND DUPLICATE SLIDE BUTTON -->
-    <div class="actions absolute bottom-2 right-2 flex gap-1">
-      <UTooltip
-        v-if="
-          slide.slideMode !== 'overlay' &&
-          (slide.type === slideTypes.text || slide.type === slideTypes.bible)
-        "
-        text="Duplicate Slide"
+    <!-- SLIDE ACTIONS MENU -->
+    <div
+      class="actions absolute bottom-2 right-2 flex gap-1"
+      :class="{ 'menu-open': actionsMenuOpen }"
+    >
+      <MoreActionsMenu
+        v-slot="{ close }"
+        flush
+        trigger-class="rounded-full hover:!bg-white/10"
+        icon-class="text-white"
+        @update:open="actionsMenuOpen = $event"
       >
         <UButton
-          size="xs"
+          v-if="
+            slide.slideMode !== 'overlay' &&
+            (slide.type === slideTypes.text || slide.type === slideTypes.bible)
+          "
           variant="ghost"
-          class="px-1.5 rounded-full !text-white hover:!bg-white/10"
-          @click.stop.prevent="$emit('duplicate', slide)"
+          color="gray"
+          block
+          @click.stop.prevent="
+            () => {
+              $emit('duplicate', slide)
+              close()
+            }
+          "
         >
           <template #leading><CopyIcon class="w-4 h-4" /></template>
+          Duplicate Slide
         </UButton>
-      </UTooltip>
 
-      <UTooltip v-if="canDuplicateAsOverlay" text="Duplicate as Overlay">
         <UButton
-          size="xs"
+          v-if="canDuplicateAsOverlay"
           variant="ghost"
-          class="px-1.5 rounded-full !text-white hover:!bg-white/10"
-          @click.stop.prevent="$emit('duplicate-as-overlay', slide)"
+          color="gray"
+          block
+          @click.stop.prevent="
+            () => {
+              $emit('duplicate-as-overlay', slide)
+              close()
+            }
+          "
         >
-          <template #leading>
-            <StackSimpleIcon class="w-4 h-4" />
-          </template>
+          <template #leading><StackSimpleIcon class="w-4 h-4" /></template>
+          Duplicate as Overlay
         </UButton>
-      </UTooltip>
 
-      <ConfirmDialog
-        v-if="
-          slide?.slideMode !== 'overlay' &&
-          (slide?.type === slideTypes.text ||
-            slide?.type === slideTypes.media ||
-            slide?.type === slideTypes.hymn ||
-            slide?.type === slideTypes.song)
-        "
-        button-icon="i-bx-save"
-        :header="
-          slide?.type === slideTypes.hymn
-            ? 'Save Hymn as Song'
-            : 'Save to Library'
-        "
-        button-styles="px-1.5 rounded-full !text-white hover:!bg-white/10"
-        :label="
-          slide?.type === slideTypes.hymn
-            ? 'You are about to save this hymn as a song for easy update, song slide benefits and future access. Continue?'
-            : 'You are about to save this slide to your library for quick and easy access in the future. Continue?'
-        "
-        @confirm="handleSaveConfirm"
-      >
-        <template #icon><SaveIcon class="w-4 h-4" /></template>
-      </ConfirmDialog>
+        <ConfirmDialog
+          v-if="
+            slide?.slideMode !== 'overlay' &&
+            (slide?.type === slideTypes.text ||
+              slide?.type === slideTypes.media ||
+              slide?.type === slideTypes.hymn ||
+              slide?.type === slideTypes.song)
+          "
+          button-icon="i-bx-save"
+          no-tooltip
+          button-variant="ghost"
+          button-color="gray"
+          :button-label="
+            slide?.type === slideTypes.hymn
+              ? 'Save Hymn as Song'
+              : 'Save to Library'
+          "
+          :header="
+            slide?.type === slideTypes.hymn
+              ? 'Save Hymn as Song'
+              : 'Save to Library'
+          "
+          button-styles=""
+          :label="
+            slide?.type === slideTypes.hymn
+              ? 'You are about to save this hymn as a song for easy update, song slide benefits and future access. Continue?'
+              : 'You are about to save this slide to your library for quick and easy access in the future. Continue?'
+          "
+          @confirm="
+            () => {
+              handleSaveConfirm()
+              close()
+            }
+          "
+        >
+          <template #icon><SaveIcon class="w-4 h-4" /></template>
+        </ConfirmDialog>
 
-      <UTooltip
-        v-if="
-          (slide?.type === slideTypes.text ||
-            slide?.type === slideTypes.media ||
-            slide?.type === slideTypes.bible) &&
-          slide?.slideMode !== 'overlay' &&
-          authStore.user?.role === 'superadmin'
-        "
-        text="Save as Template"
-      >
         <UButton
-          size="xs"
+          v-if="
+            (slide?.type === slideTypes.text ||
+              slide?.type === slideTypes.media ||
+              slide?.type === slideTypes.bible) &&
+            slide?.slideMode !== 'overlay' &&
+            authStore.user?.role === 'superadmin'
+          "
           variant="ghost"
-          class="px-1.5 rounded-full !text-white hover:!bg-white/10"
-          @click.stop.prevent="handleSaveAsTemplateClick"
+          color="gray"
+          block
+          @click.stop.prevent="
+            () => {
+              handleSaveAsTemplateClick()
+              close()
+            }
+          "
         >
           <template #leading><TemplatesIcon class="w-4 h-4" /></template>
+          Save as Template
         </UButton>
-      </UTooltip>
 
-      <ConfirmDialog
-        button-icon="i-tabler-trash"
-        header="Delete slide"
-        button-styles="px-1.5 rounded-full !text-white hover:!bg-white/10"
-        label="Are you sure you want to delete this slide? This action is not reversible"
-        @confirm="useGlobalEmit(appWideActions.deleteSlide, slide)"
-      >
-        <template #icon><DeleteIcon class="w-4 h-4" /></template>
-      </ConfirmDialog>
+        <ConfirmDialog
+          button-icon="i-tabler-trash"
+          no-tooltip
+          button-variant="ghost"
+          button-color="red"
+          button-label="Delete Slide"
+          header="Delete slide"
+          button-styles="more-item-danger"
+          label="Are you sure you want to delete this slide? This action is not reversible"
+          @confirm="
+            () => {
+              useGlobalEmit(appWideActions.deleteSlide, slide)
+              close()
+            }
+          "
+        >
+          <template #icon><DeleteIcon class="w-4 h-4" /></template>
+        </ConfirmDialog>
+      </MoreActionsMenu>
     </div>
     <div
       v-if="selectable"
@@ -245,6 +285,8 @@ const emit = defineEmits([
   "click",
 ])
 
+const actionsMenuOpen = ref(false)
+
 const isActiveOverlay = computed(
   () => currentState.value.activeOverlaySlide?.id === props.slide.id
 )
@@ -315,7 +357,8 @@ const handleSaveAsTemplateClick = () => {
   transition: 0.3s;
 }
 
-.slide-card:hover .actions {
+.slide-card:hover .actions,
+.slide-card .actions.menu-open {
   visibility: visible;
   opacity: 1;
   transform: translateX(0);

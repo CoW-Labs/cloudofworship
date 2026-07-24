@@ -1,5 +1,5 @@
 <template #default="{ defaultProps }">
-  <div class="flex mt-4 px-4 h-[calc(100vh-80px)]">
+  <div class="flex mt-2 px-4 h-[calc(100vh-80px)]">
     <div
       :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }"
       class="h-full"

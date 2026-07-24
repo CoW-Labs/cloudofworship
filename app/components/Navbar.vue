@@ -24,16 +24,54 @@
         </UButton> -->
       </div>
       <div class="projects-ctn">
-        <!-- <IconWrapper name="i-bx-spinner-dots" v-if="slidesAndScheduleLoading" /> -->
-        <UButton
-          variant="ghost"
-          color="gray"
-          size="xs"
-          trailing-icon="i-bx-chevron-down"
-          @click="scheduleModalVisible = true"
+        <!-- SCHEDULE SWITCHER — left half renames the active schedule inline,
+             right half (chevron) opens the schedule modal. -->
+        <div
+          class="schedule-switcher relative flex items-stretch h-9 rounded-full bg-white dark:bg-[#171d2b] overflow-hidden"
         >
-          {{ currentState.activeSchedule?.name || "Untitled" }}
-        </UButton>
+          <input
+            v-if="isEditingName"
+            ref="scheduleNameInput"
+            v-model="scheduleNameDraft"
+            class="schedule-switcher__input bg-transparent px-4 text-sm font-normal outline-none"
+            :style="{ width: scheduleNameWidth }"
+            type="text"
+            @keydown.enter.prevent="commitScheduleName"
+            @keydown.esc.prevent="cancelScheduleNameEdit"
+            @blur="commitScheduleName"
+          />
+          <button
+            v-else
+            ref="scheduleNameButton"
+            type="button"
+            class="schedule-switcher__name max-w-[280px] truncate px-4 text-sm font-normal hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
+            title="Click to rename schedule"
+            @click="startScheduleNameEdit"
+          >
+            {{ currentState.activeSchedule?.name || "Untitled" }}
+          </button>
+          <!-- Off-layout twin of the input text, used to measure the width the
+               input should animate to as the draft name changes. -->
+          <span
+            v-if="isEditingName"
+            ref="scheduleNameSizer"
+            class="schedule-switcher__sizer px-4 text-sm font-normal"
+            aria-hidden="true"
+            >{{ scheduleNameDraft }}</span
+          >
+          <span
+            class="w-px my-2 bg-gray-200 dark:bg-[#2a3244] shrink-0"
+            aria-hidden="true"
+          />
+          <button
+            type="button"
+            class="schedule-switcher__trigger grid w-9 place-items-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
+            aria-label="Open schedules"
+            @click="scheduleModalVisible = true"
+          >
+            <UIcon name="i-bx-chevron-down" class="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <div
         class="actions text-sm flex gap-2 items-center justify-end w-[310px]"
@@ -273,6 +311,103 @@ const displayOnlineUsers = computed(() =>
     .slice(0, 5)
 )
 
+// Inline rename of the active schedule (left half of the schedule switcher)
+const isEditingName = ref(false)
+const isNameEditClosing = ref(false)
+const scheduleNameDraft = ref("")
+const scheduleNameWidth = ref("")
+const scheduleNameInput = ref<HTMLInputElement | null>(null)
+const scheduleNameButton = ref<HTMLButtonElement | null>(null)
+const scheduleNameSizer = ref<HTMLSpanElement | null>(null)
+
+// Keep the collapse in sync with the CSS transition on .schedule-switcher__input
+const NAME_TRANSITION_MS = 320
+// Extra room the field gains on open, so the expansion is visible even when the
+// name already fits.
+const NAME_EDIT_PADDING = 56
+const NAME_MIN_WIDTH = 160
+const NAME_MAX_WIDTH = 320
+
+const clampNameWidth = (width: number) =>
+  Math.min(Math.max(width, NAME_MIN_WIDTH), NAME_MAX_WIDTH)
+
+// Width the input should animate to for the current draft text.
+const measureNameWidth = () =>
+  clampNameWidth(
+    (scheduleNameSizer.value?.offsetWidth || 0) + NAME_EDIT_PADDING
+  )
+
+const startScheduleNameEdit = async () => {
+  if (!currentState.value.activeSchedule) {
+    scheduleModalVisible.value = true
+    return
+  }
+  // Start the input at the exact width of the label it replaces, then grow.
+  scheduleNameWidth.value = `${scheduleNameButton.value?.offsetWidth || 0}px`
+  scheduleNameDraft.value = currentState.value.activeSchedule?.name || ""
+  isEditingName.value = true
+
+  await nextTick()
+  scheduleNameInput.value?.focus()
+  scheduleNameInput.value?.select()
+  requestAnimationFrame(() => {
+    scheduleNameWidth.value = `${measureNameWidth()}px`
+  })
+}
+
+// Grow/shrink with the text while typing.
+watch(scheduleNameDraft, async () => {
+  if (!isEditingName.value || isNameEditClosing.value) return
+  await nextTick()
+  scheduleNameWidth.value = `${measureNameWidth()}px`
+})
+
+// Shrink back to label width before swapping the input out, so the field
+// collapses instead of snapping.
+const closeScheduleNameEdit = () => {
+  // Closing flag flips right away so a trailing blur can't re-enter while the
+  // collapse animation is still running.
+  isNameEditClosing.value = true
+  // Collapse to the label's own width — capped at the label's max-width so a
+  // long name lands exactly where the truncated button will sit.
+  scheduleNameWidth.value = `${Math.min(
+    (scheduleNameSizer.value?.offsetWidth || 0) + 1,
+    280
+  )}px`
+  setTimeout(() => {
+    isEditingName.value = false
+    isNameEditClosing.value = false
+  }, NAME_TRANSITION_MS)
+}
+
+const cancelScheduleNameEdit = () => {
+  if (isNameEditClosing.value) return
+  closeScheduleNameEdit()
+}
+
+const commitScheduleName = async () => {
+  if (!isEditingName.value || isNameEditClosing.value) return
+  closeScheduleNameEdit()
+
+  const schedule = currentState.value.activeSchedule
+  const name = scheduleNameDraft.value.trim()
+  if (!schedule || !name || name === schedule.name) return
+
+  appStore.setActiveSchedule({
+    ...schedule,
+    name,
+    updatedAt: new Date().toISOString(),
+  })
+
+  const { updateSchedule } = useSchedules()
+  await updateSchedule(schedule._id, { name })
+
+  usePosthogCapture("SCHEDULE_RENAMED", {
+    scheduleId: schedule._id,
+    scheduleName: name,
+  })
+}
+
 const handleInviteClick = () => {
   if (isPremiumFeatureEnabled.value) {
     if (hasAccessToFeature("open-invite-modal")) {
@@ -361,6 +496,29 @@ emitter?.on("sign-out", () => {
 </script>
 
 <style scoped>
+/* Schedule name field grows/shrinks fluidly instead of snapping to size.
+   Duration must stay in sync with NAME_TRANSITION_MS in the script. */
+.schedule-switcher__input {
+  transition: width 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: width;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedule-switcher__input {
+    transition: none;
+  }
+}
+
+/* Off-layout twin of the input text — measured, never seen. */
+.schedule-switcher__sizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre;
+}
+
 /* User joined popup zoom-in animation */
 .user-joined-enter-active {
   animation: zoom-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);

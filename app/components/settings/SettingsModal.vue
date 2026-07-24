@@ -4,49 +4,48 @@
     v-model="settingsModalOpen"
     @close="$emit('close-modal')"
     :ui="{
-      rounded: 'rounded-xl',
-      fullscreen: 'w-[80vw] max-w-[900px] h-auto rounded-xl',
-      // width: 'w-[1000px] sm:max-w-lg',
+      rounded: 'rounded-2xl',
+      background: 'bg-transparent dark:bg-transparent',
+      ring: '',
+      shadow: 'shadow-none',
+      fullscreen: 'w-[80vw] max-w-[900px] h-auto rounded-2xl',
+      overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
     }"
   >
-    <AppSection
-      heading="App Settings"
-      class="border-0"
-      heading-styles="text-lg font-semibold"
-      :secondary-buttons="[
-        {
-          label: '',
-          action: 'close-modal',
-          icon: 'i-mdi-close',
-          color: 'primary',
-          confirmAction: false,
-          visible: true,
-          variant: 'ghost',
-        },
-      ]"
-    >
-      <div class="flex gap-2 w-[100%] h-[100%]">
-        <div class="lhs min-w-[220px] flex flex-col gap-1 h-[100%]">
-          <UButton
+    <AppSection heading="App Settings" heading-styles="text-lg font-semibold">
+      <template #actions>
+        <button
+          class="grid h-8 w-8 place-items-center rounded-lg leading-none transition-colors hover:bg-gray-100 dark:hover:bg-[#222938]"
+          aria-label="Close settings"
+          @click="$emit('close-modal')"
+        >
+          <CloseIcon
+            class="block h-4 w-4 text-gray-600 dark:text-[#a7afbd]"
+          />
+        </button>
+      </template>
+
+      <div class="flex gap-3 w-[100%] h-[100%]">
+        <div
+          class="lhs w-[230px] shrink-0 flex flex-col gap-1 h-[100%] rounded-2xl bg-[#f1f3f6] dark:bg-[#1b212e] p-1.5 overflow-y-auto"
+        >
+          <button
             v-for="tab in tabs"
-            variant="ghost"
-            block
-            size="lg"
-            class="justify-start text-black dark:text-white"
-            :class="[
-              {
-                'text-white bg-primary-500 hover:bg-primary-500':
-                  activeTab === tab.name,
-              },
-            ]"
+            :key="tab.name"
+            class="settings-tab w-full rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors"
+            :class="
+              activeTab === tab.name
+                ? 'bg-primary-500 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-white dark:text-[#a7afbd] dark:hover:bg-[#222938]'
+            "
             @click="activeTab = tab.name"
           >
             {{ tab?.name }}
-          </UButton>
+          </button>
         </div>
-        <div class="rhs w-[100%] rounded-lg p-6 pt-2 h-[600px]">
+        <div class="rhs flex-1 min-w-0 rounded-2xl px-5 pt-1 h-[600px]">
           <!-- SUB-SETTINGS HEADER -->
-          <h3 class="font-semibold text-lg mb-4">
+          <h3 class="font-semibold text-lg mb-4 text-gray-900 dark:text-white">
             {{ activeTab }}
           </h3>
           <Transition name="fade-sm">

@@ -96,18 +96,6 @@
         </button>
       </div>
 
-      <Transition name="fade-sm">
-        <NotFoundBanner
-          v-if="searchInput.length >= 4 && hasAccessToFeature('new-song')"
-          icon="i-bx-music"
-          sub="Are you looking for contemporary songs and not hymns?"
-          action="new-song-search"
-          :query="searchInput"
-          action-text="Search here"
-          class="h-auto"
-        />
-      </Transition>
-
       <!-- BASIC ACTIONS -->
       <div
         v-if="searchInput.length < 2"

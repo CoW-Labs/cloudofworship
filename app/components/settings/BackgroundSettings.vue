@@ -1,86 +1,80 @@
 <template>
-  <div class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] pb-[15%]">
-    <!-- SLIDE BACKGROUNDS -->
-    <div class="settings-group">
-      <!-- <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">
-
-          <div class="text-primary">Settings ONLY apply to new slides</div>
-        </h3>
-      </div> -->
-      <UForm :state="{}">
-        <UFormGroup label="Set default slide background" class="px-2 py-3">
-          <UTabs
-            :items="slideBackgroundTabs"
-            v-model:model-value="activeSlideBackgroundTab"
-          />
-          <Transition class="fade">
-            <div class="tab-content">
-              <BgVideoSelection
-                v-if="activeSlideBackgroundTab === 0"
-                settings-page
-                :value="
-                  appStore.currentState.settings.defaultBackground.default
-                    ?.background
-                "
-                @select="
-                  appStore.setDefaultSlideBackground(
-                    backgroundTypes.video,
-                    $event.video,
-                    $event.key
-                  )
-                "
-              />
-              <BgImageSelection
-                v-else-if="activeSlideBackgroundTab === 1"
-                settings-page
-                :value="
-                  appStore.currentState.settings.defaultBackground.default
-                    ?.background
-                "
-                @select="
-                  appStore.setDefaultSlideBackground(
-                    backgroundTypes.image,
-                    $event.image,
-                    null
-                  )
-                "
-              />
-              <BgColorSelection
-                v-else-if="activeSlideBackgroundTab === 2"
-                :count="12"
-                :value="
-                  appStore.currentState.settings.defaultBackground.default
-                    ?.background
-                "
-                @select="
-                  appStore.setDefaultSlideBackground(
-                    backgroundTypes.solid,
-                    $event.color,
-                    null
-                  )
-                "
-              />
-              <BgGradientSelection
-                v-else-if="activeSlideBackgroundTab === 3"
-                :count="12"
-                :value="
-                  appStore.currentState.settings.defaultBackground.default
-                    ?.background
-                "
-                @select="
-                  appStore.setDefaultSlideBackground(
-                    backgroundTypes.gradient,
-                    $event.gradient,
-                    null
-                  )
-                "
-              />
-            </div>
-          </Transition>
-        </UFormGroup>
-      </UForm>
-    </div>
+  <div class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] p-1 pb-[15%]">
+    <SettingsGroup
+      title="Default Slide Background"
+      note="These settings ONLY apply to new slides."
+    >
+      <div class="rounded-2xl bg-[#f1f3f6] dark:bg-[#1b212e] p-2">
+        <UTabs
+          :items="slideBackgroundTabs"
+          v-model:model-value="activeSlideBackgroundTab"
+        />
+        <Transition name="fade">
+          <div class="tab-content mt-2">
+            <BgVideoSelection
+              v-if="activeSlideBackgroundTab === 0"
+              settings-page
+              :value="
+                appStore.currentState.settings.defaultBackground.default
+                  ?.background
+              "
+              @select="
+                appStore.setDefaultSlideBackground(
+                  backgroundTypes.video,
+                  $event.video,
+                  $event.key
+                )
+              "
+            />
+            <BgImageSelection
+              v-else-if="activeSlideBackgroundTab === 1"
+              settings-page
+              :value="
+                appStore.currentState.settings.defaultBackground.default
+                  ?.background
+              "
+              @select="
+                appStore.setDefaultSlideBackground(
+                  backgroundTypes.image,
+                  $event.image,
+                  null
+                )
+              "
+            />
+            <BgColorSelection
+              v-else-if="activeSlideBackgroundTab === 2"
+              :count="12"
+              :value="
+                appStore.currentState.settings.defaultBackground.default
+                  ?.background
+              "
+              @select="
+                appStore.setDefaultSlideBackground(
+                  backgroundTypes.solid,
+                  $event.color,
+                  null
+                )
+              "
+            />
+            <BgGradientSelection
+              v-else-if="activeSlideBackgroundTab === 3"
+              :count="12"
+              :value="
+                appStore.currentState.settings.defaultBackground.default
+                  ?.background
+              "
+              @select="
+                appStore.setDefaultSlideBackground(
+                  backgroundTypes.gradient,
+                  $event.gradient,
+                  null
+                )
+              "
+            />
+          </div>
+        </Transition>
+      </div>
+    </SettingsGroup>
   </div>
 </template>
 

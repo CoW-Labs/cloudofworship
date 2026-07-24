@@ -64,6 +64,15 @@
 import type { ButtonVariant } from "@nuxt/ui/dist/runtime/types"
 
 const isOpen = ref(false)
+
+// Present only when this dialog is a row inside a MoreActionsMenu
+const moreActionsMenu = inject<{ suppress: (value: boolean) => void } | null>(
+  "more-actions-menu",
+  null
+)
+watch(isOpen, (value) => moreActionsMenu?.suppress(value))
+onUnmounted(() => moreActionsMenu?.suppress(false))
+
 const props = defineProps<{
   header: string
   label: string

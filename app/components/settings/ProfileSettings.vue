@@ -1,31 +1,20 @@
 <template>
-  <div class="settings-ctn h-[100%]">
-    <UFormGroup label="Full Name">
-      <UInput
-        class="border-0 shadow-none max-w-[250px]"
-        input-class=" bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
-        size="md"
-        v-model="fullName"
-      />
-    </UFormGroup>
-    <UFormGroup label="Email" class="mt-4">
-      <UInput
-        class="border-0 shadow-none max-w-[250px]"
-        input-class=" bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
-        size="md"
-        v-model="email"
-      />
-    </UFormGroup>
-    <UButton
-      @click="updateProfile()"
-      variant="outline"
+  <div class="settings-ctn h-[100%] max-w-[380px] flex flex-col gap-4 p-1">
+    <CowInput v-model="fullName" label="Full name" />
+    <CowInput v-model="email" label="Email" type="email" />
+
+    <CowButton
+      variant="primary"
+      block
+      class="mt-2"
       :disabled="
         email === authStore.user?.email && fullName === authStore.user?.fullname
       "
-      class="mt-6 w-full max-w-[250px] justify-center"
+      :loading="loading"
+      @click="updateProfile()"
     >
       Update Profile
-    </UButton>
+    </CowButton>
   </div>
 </template>
 
@@ -37,8 +26,10 @@ const toast = useToast()
 
 const fullName = ref<string>(authStore.user?.fullname || "")
 const email = ref<string>(authStore.user?.email || "")
+const loading = ref<boolean>(false)
 
 const updateProfile = async () => {
+  loading.value = true
   const { data, error } = await useAPIFetch("/user/update", {
     method: "PUT",
     body: {
@@ -46,6 +37,8 @@ const updateProfile = async () => {
       email: email.value,
     },
   })
+  loading.value = false
+
   if (error.value) {
     toast.add({
       color: "red",

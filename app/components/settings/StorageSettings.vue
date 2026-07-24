@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] pb-[15%]">
+  <div class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] p-1 pb-[15%]">
     <!-- Tabs -->
     <UTabs v-model="activeTab" :items="storageSettingsTabs" class="mb-4">
       <template #default="{ item }">
@@ -10,297 +10,269 @@
     </UTabs>
 
     <!-- Local Storage Tab -->
-    <div v-if="activeTab === 0">
-      <div class="header flex items-center justify-between gap-2">
-        <div class="col flex items-center gap-2">
-          <Icon name="i-lucide-hard-drive" class="w-8 h-8" />
-          <h3 class="text-lg font-semibold">
-            {{ formatMegabytes(totalDataSize) }}
-            <span class="text-sm font-normal">stored on this computer</span>
-          </h3>
-        </div>
-        <Icon
-          v-if="loading"
-          name="i-lucide-loader-2"
-          class="w-6 h-6 animate-spin"
-        />
-      </div>
-      <div class="storage-chart flex rounded-full overflow-hidden my-2 w-full">
-        <div
-          class="storage-chart-bar-inner h-[10px] bg-primary-500 transition-all"
-          :style="{
-            width: `${(cachedTableSize / totalDataSize) * 100}%`,
-          }"
-        ></div>
-        <div
-          class="storage-chart-bar-inner h-[10px] bg-teal-500 transition-all"
-          :style="{
-            width: `${(libraryTableSize / totalDataSize) * 100}%`,
-          }"
-        ></div>
-        <div
-          class="storage-chart-bar-inner h-[10px] bg-cyan-500 transition-all"
-          :style="{
-            width: `${(bibleAndHymnsTableSize / totalDataSize) * 100}%`,
-          }"
-        ></div>
-        <div
-          class="storage-chart-bar-inner h-[10px] bg-blue-500 transition-all"
-          :style="{
-            width: `${(mediaTableSize / totalDataSize) * 100}%`,
-          }"
-        ></div>
-      </div>
-
-      <table class="table-auto w-full">
-        <tbody>
-          <tr class="border-b border-gray-200 dark:border-gray-800 h-[50px]">
-            <td>
-              <div class="flex items-center gap-2">
-                <div
-                  class="colored-circle rounded-full w-3 h-3 bg-primary-500"
-                ></div>
-                Background Videos and Images
-              </div>
-            </td>
-            <td class="text-right">{{ formatMegabytes(cachedTableSize) }}</td>
-          </tr>
-          <tr class="border-b border-gray-200 dark:border-gray-800 h-[50px]">
-            <td>
-              <div class="flex items-center gap-2">
-                <div
-                  class="colored-circle rounded-full w-3 h-3 bg-teal-500"
-                ></div>
-                Library Items
-              </div>
-            </td>
-            <td class="text-right">{{ formatMegabytes(libraryTableSize) }}</td>
-          </tr>
-          <tr class="border-b border-gray-200 dark:border-gray-800 h-[50px]">
-            <td>
-              <div class="flex items-center gap-2">
-                <div
-                  class="colored-circle rounded-full w-3 h-3 bg-cyan-500"
-                ></div>
-                Bible versions and hymns
-              </div>
-            </td>
-            <td class="text-right">
-              {{ formatMegabytes(bibleAndHymnsTableSize) }}
-            </td>
-          </tr>
-          <tr
-            class="border-gray-200 dark:border-gray-800 h-[50px] cursor-pointer select-none"
-            @click="mediaExpanded = !mediaExpanded"
-          >
-            <td>
-              <div class="flex items-center gap-2">
-                <div
-                  class="colored-circle rounded-full w-3 h-3 bg-blue-500"
-                ></div>
-                Media Slides (Images, Videos, Audio)
-                <span
-                  v-if="mediaGroups.length"
-                  class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500"
-                >
-                  {{ mediaGroups.length }}
-                  {{ mediaGroups.length === 1 ? "file" : "files" }}
-                </span>
-              </div>
-            </td>
-            <td class="text-right">
-              <div class="flex justify-end gap-2">
-                {{ formatMegabytes(mediaTableSize) }}
-                <Icon
-                  name="i-lucide-chevron-down"
-                  class="w-4 h-4 transition-transform"
-                  :class="mediaExpanded ? 'rotate-180' : ''"
-                />
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <!-- Expandable per-file media list -->
-      <div v-if="mediaExpanded" class="media-files mt-0 pl-4">
-        <!-- <div class="flex items-center justify-between py-2">
-          <span class="text-xs text-gray-500">
-            {{ mediaGroups.length }}
-            {{ mediaGroups.length === 1 ? "file" : "files" }} ·
-            {{ formatMegabytes(mediaTableSize) }} total
-          </span>
-          <button
-            v-if="mediaGroups.length"
-            class="text-xs font-medium text-red-500 hover:text-red-600"
-            @click="
-              removeAllMediaPrompt
-                ? removeAllMedia()
-                : (removeAllMediaPrompt = true)
-            "
-          >
-            {{ removeAllMediaPrompt ? "Confirm remove all" : "Remove all" }}
-          </button>
-        </div> -->
-
-        <div
-          v-if="!mediaGroups.length"
-          class="py-6 text-center text-sm text-gray-500"
-        >
-          No media files stored on this device.
-        </div>
-
-        <div
-          v-for="group in mediaGroups"
-          :key="group.baseId"
-          class="flex items-center gap-3 py-2 border-t border-gray-50"
-        >
-          <div
-            class="relative w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0"
-            :class="kindMeta[group.kind].class"
-          >
-            <Icon :name="kindMeta[group.kind].icon" class="w-5 h-5" />
-            <span
-              class="absolute bottom-0 inset-x-0 text-[7px] leading-3 font-bold text-center bg-black/30 rounded-b-lg"
-            >
-              {{ kindMeta[group.kind].label }}
-            </span>
+    <div v-if="activeTab === 0" class="flex flex-col gap-4">
+      <div class="rounded-2xl bg-white dark:bg-[#131a27] p-4">
+        <div class="header flex items-center justify-between gap-2">
+          <div class="col flex items-center gap-2">
+            <Icon name="i-lucide-hard-drive" class="w-7 h-7" />
+            <h3 class="text-lg font-semibold">
+              {{ formatMegabytes(totalDataSize) }}
+              <span class="text-sm font-normal">stored on this computer</span>
+            </h3>
           </div>
-          <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium truncate">{{ group.name }}</p>
-            <p class="text-xs text-gray-500">{{ group.subtitle }}</p>
-          </div>
-          <span class="text-sm text-gray-500 whitespace-nowrap">
-            {{ formatMegabytes(group.sizeMB) }}
-          </span>
-          <UButton
-            color="gray"
-            variant="ghost"
-            size="xs"
-            icon="i-lucide-trash-2"
-            @click="deleteMediaGroup(group)"
+          <Icon
+            v-if="loading"
+            name="i-lucide-loader-2"
+            class="w-6 h-6 animate-spin"
           />
         </div>
+        <div class="storage-chart flex rounded-full overflow-hidden my-3 w-full">
+          <div
+            class="storage-chart-bar-inner h-[10px] bg-primary-500 transition-all"
+            :style="{
+              width: `${(cachedTableSize / totalDataSize) * 100}%`,
+            }"
+          ></div>
+          <div
+            class="storage-chart-bar-inner h-[10px] bg-teal-500 transition-all"
+            :style="{
+              width: `${(libraryTableSize / totalDataSize) * 100}%`,
+            }"
+          ></div>
+          <div
+            class="storage-chart-bar-inner h-[10px] bg-cyan-500 transition-all"
+            :style="{
+              width: `${(bibleAndHymnsTableSize / totalDataSize) * 100}%`,
+            }"
+          ></div>
+          <div
+            class="storage-chart-bar-inner h-[10px] bg-blue-500 transition-all"
+            :style="{
+              width: `${(mediaTableSize / totalDataSize) * 100}%`,
+            }"
+          ></div>
+        </div>
+
+        <table class="table-auto w-full">
+          <tbody>
+            <tr class="border-b border-gray-100 dark:border-white/5 h-[48px]">
+              <td>
+                <div class="flex items-center gap-2 text-sm">
+                  <div
+                    class="colored-circle rounded-full w-3 h-3 bg-primary-500"
+                  ></div>
+                  Background Videos and Images
+                </div>
+              </td>
+              <td class="text-right text-sm">
+                {{ formatMegabytes(cachedTableSize) }}
+              </td>
+            </tr>
+            <tr class="border-b border-gray-100 dark:border-white/5 h-[48px]">
+              <td>
+                <div class="flex items-center gap-2 text-sm">
+                  <div
+                    class="colored-circle rounded-full w-3 h-3 bg-teal-500"
+                  ></div>
+                  Library Items
+                </div>
+              </td>
+              <td class="text-right text-sm">
+                {{ formatMegabytes(libraryTableSize) }}
+              </td>
+            </tr>
+            <tr class="border-b border-gray-100 dark:border-white/5 h-[48px]">
+              <td>
+                <div class="flex items-center gap-2 text-sm">
+                  <div
+                    class="colored-circle rounded-full w-3 h-3 bg-cyan-500"
+                  ></div>
+                  Bible versions and hymns
+                </div>
+              </td>
+              <td class="text-right text-sm">
+                {{ formatMegabytes(bibleAndHymnsTableSize) }}
+              </td>
+            </tr>
+            <tr
+              class="h-[48px] cursor-pointer select-none"
+              @click="mediaExpanded = !mediaExpanded"
+            >
+              <td>
+                <div class="flex items-center gap-2 text-sm">
+                  <div
+                    class="colored-circle rounded-full w-3 h-3 bg-blue-500"
+                  ></div>
+                  Media Slides (Images, Videos, Audio)
+                  <span
+                    v-if="mediaGroups.length"
+                    class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#222938] text-gray-500 dark:text-[#9aa3b2]"
+                  >
+                    {{ mediaGroups.length }}
+                    {{ mediaGroups.length === 1 ? "file" : "files" }}
+                  </span>
+                </div>
+              </td>
+              <td class="text-right text-sm">
+                <div class="flex justify-end gap-2 items-center">
+                  {{ formatMegabytes(mediaTableSize) }}
+                  <Icon
+                    name="i-lucide-chevron-down"
+                    class="w-4 h-4 transition-transform"
+                    :class="mediaExpanded ? 'rotate-180' : ''"
+                  />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Expandable per-file media list -->
+        <div v-if="mediaExpanded" class="media-files pl-4 come-up-1">
+          <div
+            v-if="!mediaGroups.length"
+            class="py-6 text-center text-sm text-gray-500 dark:text-[#9aa3b2]"
+          >
+            No media files stored on this device.
+          </div>
+
+          <div
+            v-for="group in mediaGroups"
+            :key="group.baseId"
+            class="flex items-center gap-3 py-2 border-t border-gray-100 dark:border-white/5"
+          >
+            <div
+              class="relative w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0"
+              :class="kindMeta[group.kind].class"
+            >
+              <Icon :name="kindMeta[group.kind].icon" class="w-5 h-5" />
+              <span
+                class="absolute bottom-0 inset-x-0 text-[7px] leading-3 font-bold text-center bg-black/30 rounded-b-xl"
+              >
+                {{ kindMeta[group.kind].label }}
+              </span>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium truncate">{{ group.name }}</p>
+              <p class="text-xs text-gray-500 dark:text-[#9aa3b2]">
+                {{ group.subtitle }}
+              </p>
+            </div>
+            <span
+              class="text-sm text-gray-500 dark:text-[#9aa3b2] whitespace-nowrap"
+            >
+              {{ formatMegabytes(group.sizeMB) }}
+            </span>
+            <button
+              class="grid h-8 w-8 place-items-center rounded-lg text-gray-500 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-[#9aa3b2] dark:hover:bg-red-500/10"
+              :aria-label="`Remove ${group.name}`"
+              @click="deleteMediaGroup(group)"
+            >
+              <DeleteIcon class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div class="danger-zone mt-4 bg-red-100 dark:bg-red-900 rounded-md p-4">
-        <h3 class="font-medium">Danger Zone</h3>
-        <p class="text-xs mb-4 mt-2">
+      <div
+        class="danger-zone rounded-2xl bg-red-50 dark:bg-red-900/25 ring-1 ring-red-200 dark:ring-red-500/20 p-4"
+      >
+        <h3 class="font-semibold text-sm text-red-700 dark:text-red-200">
+          Danger Zone
+        </h3>
+        <p class="text-xs mb-4 mt-2 text-red-700/80 dark:text-red-200/80">
           This is a danger zone. If you are not sure what you are doing, do not
           delete anything here. If you are sure, click the button below.
         </p>
-        <UInput
+        <CowInput
           v-if="deletePrompt"
           v-model="deletePromptText"
-          placeholder="Type 'intentionally deleting' to confirm"
-          input-class=" bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-          class="mb-4"
-          size="xs"
-        >
-        </UInput>
-        <UButton
-          color="danger"
+          label="Type 'intentionally deleting' to confirm"
+          class="mb-4 come-up-1"
+        />
+        <CowButton
+          variant="danger"
           block
-          icon="i-bx-trash"
-          variant="outline"
           :disabled="
             deletePrompt ? deletePromptText !== 'intentionally deleting' : false
           "
           @click="deletePrompt ? deleteAllData() : (deletePrompt = true)"
         >
+          <template #leading>
+            <DeleteIcon class="w-4 h-4" />
+          </template>
           Clear all data on this device
-        </UButton>
+        </CowButton>
       </div>
     </div>
 
     <!-- Cloud Storage Tab -->
-    <div v-else-if="activeTab === 1">
-      <div class="header flex items-center justify-between gap-2">
-        <div class="col flex items-center gap-2">
-          <Icon name="i-lucide-cloud" class="w-8 h-8" />
-          <h3 class="text-lg font-semibold">
-            {{ formatMegabytes(cloudStorageUsed) }}
-            <span class="text-sm font-normal"
-              >of {{ formatMegabytes(maxCloudStorage) }} used in cloud</span
-            >
-          </h3>
-        </div>
-      </div>
-      <div
-        class="storage-chart flex rounded-full overflow-hidden my-2 w-full bg-gray-200 dark:bg-gray-800"
-        role="progressbar"
-        aria-label="Cloud storage used"
-        :aria-valuenow="cloudStoragePercentage"
-        aria-valuemin="0"
-        aria-valuemax="100"
-      >
-        <div
-          class="storage-chart-bar-inner h-[10px] transition-all"
-          :class="cloudStorageOverage > 0 ? 'bg-red-500' : 'bg-primary-500'"
-          :style="{ width: `${cloudStoragePercentage}%` }"
-        ></div>
-      </div>
-
-      <p
-        v-if="cloudStorageOverage > 0"
-        class="mt-3 text-sm font-medium text-red-500"
-      >
-        {{ formatMegabytes(cloudStorageOverage) }} over your storage limit
-      </p>
-
-      <table class="table-auto w-full">
-        <tbody>
-          <tr class="border-b border-gray-200 dark:border-gray-800 h-[50px]">
-            <td>
-              <div class="flex items-center gap-2">
-                <div
-                  class="colored-circle rounded-full w-3 h-3 bg-primary-500"
-                ></div>
-                Cloud Storage Used
-              </div>
-            </td>
-            <td class="text-right">
+    <div v-else-if="activeTab === 1" class="flex flex-col gap-4">
+      <div class="rounded-2xl bg-white dark:bg-[#131a27] p-4">
+        <div class="header flex items-center justify-between gap-2">
+          <div class="col flex items-center gap-2">
+            <Icon name="i-lucide-cloud" class="w-7 h-7" />
+            <h3 class="text-lg font-semibold">
               {{ formatMegabytes(cloudStorageUsed) }}
-            </td>
-          </tr>
-          <tr class="border-b border-gray-200 dark:border-gray-800 h-[50px]">
-            <td>
-              <div class="flex items-center gap-2">
-                <div
-                  class="colored-circle rounded-full w-3 h-3 bg-gray-400"
-                ></div>
-                Available Storage
-              </div>
-            </td>
-            <td class="text-right">
-              {{ formatMegabytes(availableCloudStorage) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <!-- TODO: Uncomment this when payments are fully released -->
-      <!-- <div class="info-zone mt-4 bg-blue-100 dark:bg-blue-900 rounded-md p-4">
-        <h3 class="font-medium">Cloud Storage Information</h3>
-        <p class="text-xs mt-2">
-          Your cloud storage is used for files uploaded to the Cloud of Worship
-          servers. Each user on the free plan has a maximum storage allowance of
-          <span class="font-semibold"
-            >{{ formatMegabytes(maxCloudStorage) }}.</span
-          >
-        </p>
-        <UButton
-          color="transparent"
-          block
-          variant="outline"
-          class="mt-4"
-          :disabled="
-            deletePrompt ? deletePromptText !== 'intentionally deleting' : false
-          "
+              <span class="text-sm font-normal"
+                >of {{ formatMegabytes(maxCloudStorage) }} used in cloud</span
+              >
+            </h3>
+          </div>
+        </div>
+        <div
+          class="storage-chart flex rounded-full overflow-hidden my-3 w-full bg-gray-200 dark:bg-[#222938]"
+          role="progressbar"
+          aria-label="Cloud storage used"
+          :aria-valuenow="cloudStoragePercentage"
+          aria-valuemin="0"
+          aria-valuemax="100"
         >
-          Upgrade to a larger storage plan
-        </UButton>
-      </div> -->
+          <div
+            class="storage-chart-bar-inner h-[10px] transition-all"
+            :class="cloudStorageOverage > 0 ? 'bg-red-500' : 'bg-primary-500'"
+            :style="{ width: `${cloudStoragePercentage}%` }"
+          ></div>
+        </div>
+
+        <p
+          v-if="cloudStorageOverage > 0"
+          class="mt-3 text-sm font-medium text-red-500"
+        >
+          {{ formatMegabytes(cloudStorageOverage) }} over your storage limit
+        </p>
+
+        <table class="table-auto w-full">
+          <tbody>
+            <tr class="border-b border-gray-100 dark:border-white/5 h-[48px]">
+              <td>
+                <div class="flex items-center gap-2 text-sm">
+                  <div
+                    class="colored-circle rounded-full w-3 h-3 bg-primary-500"
+                  ></div>
+                  Cloud Storage Used
+                </div>
+              </td>
+              <td class="text-right text-sm">
+                {{ formatMegabytes(cloudStorageUsed) }}
+              </td>
+            </tr>
+            <tr class="h-[48px]">
+              <td>
+                <div class="flex items-center gap-2 text-sm">
+                  <div
+                    class="colored-circle rounded-full w-3 h-3 bg-gray-400"
+                  ></div>
+                  Available Storage
+                </div>
+              </td>
+              <td class="text-right text-sm">
+                {{ formatMegabytes(availableCloudStorage) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
