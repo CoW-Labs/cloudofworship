@@ -1075,6 +1075,15 @@ const timerQuickAction = computed((): QuickAction | null => {
   }
 })
 
+// Reference set of the static, user-runnable quick actions (the ones authored
+// in `quickActionsArr`). Used by the search grouping to tell an *action* the
+// user can run — "Display Bible", "Add Media", "Add Countdown Timer" — apart
+// from a dynamic library *result* (an actual Bible verse, song or hymn), which
+// is built fresh in the `actions` computed and so isn't in this set. Built once
+// (the array is a module constant); membership is by object reference, which
+// survives the `.filter()` in `validActions`.
+const staticQuickActions = new Set<QuickAction>(quickActionsArr)
+
 const searchedActions = computed(() => {
   const twoDigitNumbers = searchInput.value
     ?.replace("/", "")
@@ -1217,7 +1226,19 @@ const searchedActions = computed(() => {
 
   for (const action of results as QuickAction[]) {
     const isSettingsAction = action?.action === appWideActions.openSettings
-    const groupKey = action?.type || (isSettingsAction ? "settings" : "action")
+    // A static entry from `quickActionsArr` is an action the user can run, so
+    // group them all together in the "action" bucket regardless of the slide
+    // `type` they carry — otherwise "Add Media" (type media), "Display Bible"
+    // (type bible), "Add Countdown Timer" (type countdown) etc. get scattered
+    // into the bible/media/countdown content groups. Dynamic library results
+    // (real Bible verses, songs, hymns) aren't in `quickActionsArr`, so they
+    // keep their type group. Settings actions stay in their own adjacent bucket.
+    const isStaticAction = staticQuickActions.has(action)
+    const groupKey = isSettingsAction
+      ? "settings"
+      : isStaticAction
+      ? "action"
+      : action?.type || "action"
 
     if (groupKey === slideTypes.song) {
       const key = songKey(action?.songData)
@@ -1237,20 +1258,20 @@ const searchedActions = computed(() => {
 
     if (!groupedResults.has(groupKey)) groupedResults.set(groupKey, [])
     const group = groupedResults.get(groupKey) as QuickAction[]
-    const cap = groupKey === "settings" ? 3 : groupKey === "action" ? 6 : 4
+    const cap = groupKey === "settings" ? 3 : groupKey === "action" ? 8 : 4
     if (group.length < cap) group.push(action)
   }
 
-  // Enforce a fixed reading order for the well-known groups — plain
-  // quickActionsArr actions (untyped, e.g. "Create New Schedule", "Go Live")
-  // first, then Bible, settings, songs, hymns, time, and countdown —
-  // regardless of which group happened to appear first in the raw
-  // fuzzy-matched results. Any other group (media, etc.) keeps its original
-  // relative order and is appended afterwards.
+  // Enforce a fixed reading order for the well-known groups — all runnable
+  // actions first (the quickActionsArr entries, then their settings siblings,
+  // kept adjacent so the Actions section reads as one block), then the dynamic
+  // content groups: Bible, songs, hymns, time, and countdown — regardless of
+  // which group happened to appear first in the raw fuzzy-matched results. Any
+  // other group keeps its original relative order and is appended afterwards.
   const priorityGroupOrder = [
     "action",
-    slideTypes.bible,
     "settings",
+    slideTypes.bible,
     slideTypes.song,
     slideTypes.hymn,
     slideTypes.time,
@@ -1265,7 +1286,57 @@ const searchedActions = computed(() => {
       .map(([, group]) => group),
   ]
 
-  return orderedGroups.flat()
+  const ordered = orderedGroups.flat()
+
+  // ── Float the best name matches to the very top ──────────────────────────
+  // The grouping above enforces a fixed reading order by group (actions,
+  // settings, Bible, songs, …). On its own that buries an entry whose NAME the
+  // user typed (or nearly typed) beneath an entire higher-priority group —
+  // e.g. "countdown" lists several loosely-matched songs before "Add Countdown
+  // Timer" — or beneath weak desc/meta matches — e.g. "bible" lists
+  // "Transcribe Sermon" / "Recent schedule" (matched on their descriptions)
+  // above "Display Bible". So, independently of the grouping, fuzzy-match the
+  // query against the *name* alone and pin the best few on top. fuzzysort
+  // catches exact, full-substring AND close matches (a typo or a dropped
+  // word), and its -1000 threshold (the same cutoff used for Bible-book
+  // matching above) keeps those while dropping unrelated noise. The pinned
+  // ones are kept in their existing grouped order rather than raw fuzzysort
+  // score, so when both an action and some content match ("bible" →
+  // "Display Bible" vs a song titled "Bible Studies") the action still leads.
+  // Capped at four. Skipped for confirmed Bible reference searches, whose
+  // results are already exclusively the correct Bible books.
+  const bestMatchQuery = searchInput.value?.replaceAll("/", "").trim() ?? ""
+
+  if (isBibleReferenceSearch.value || bestMatchQuery.length < 2) {
+    return ordered
+  }
+
+  const pinned: QuickAction[] = []
+  const pinnedSet = new Set<QuickAction>()
+  const pin = (action?: QuickAction | null) => {
+    if (!action || pinnedSet.has(action) || pinned.length >= 4) return
+    pinnedSet.add(action)
+    pinned.push(action)
+  }
+
+  // A parsed timer command ("start 5 min timer") is an explicit instant-create
+  // intent — keep it at the very top rather than in the last-ranked countdown
+  // group.
+  if (timerQuickAction.value) pin(timerQuickAction.value)
+
+  const closeNameMatches = new Set(
+    fuzzysort
+      .go(bestMatchQuery, ordered, { key: "name", threshold: -1000 })
+      .map((result) => result.obj as QuickAction)
+  )
+  for (const action of ordered) {
+    if (pinned.length >= 4) break
+    if (closeNameMatches.has(action)) pin(action)
+  }
+
+  if (pinned.length === 0) return ordered
+
+  return [...pinned, ...ordered.filter((action) => !pinnedSet.has(action))]
 })
 
 watch(page, () => {
