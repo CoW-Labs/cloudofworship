@@ -30,30 +30,34 @@
     <UModal
       v-model="isOpen"
       :ui="{
-        width: 'w-full sm:max-w-sm',
+        rounded: 'rounded-2xl',
+        background: 'bg-transparent dark:bg-transparent',
+        ring: '',
+        shadow: 'shadow-none',
+        width: 'w-[94vw] sm:max-w-md',
+        overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
       }"
     >
-      <div class="p-6">
-        <div class="flex flex-col justify-center h-full">
-          <h4 class="text-md font-medium">{{ header }}</h4>
-          <p class="mt-2 text-xs">{{ label }}</p>
-          <div class="flex items-center justify-end gap-2 mt-6">
-            <UButton variant="outline" color="gray" @click="handleCancel"
-              >Cancel</UButton
-            >
-            <UButton
-              :color="
-                header?.split(' ')[0] === 'Delete' ||
-                header?.split(' ')[0] === 'Sign'
-                  ? 'red'
-                  : 'primary'
-              "
-              @click="handleYesAction"
-              >{{
-                header !== "Sign out" ? header?.split(" ")[0] : header
-              }}</UButton
-            >
-          </div>
+      <div
+        class="confirm-dialog rounded-2xl bg-white dark:bg-[#171d2b] border border-white/80 dark:border-[#202838] overflow-hidden p-6"
+      >
+        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">
+          {{ header }}
+        </h4>
+        <p class="mt-2 text-sm text-gray-500 dark:text-[#9aa3b2]">
+          {{ label }}
+        </p>
+        <div class="flex items-center justify-end gap-3 mt-6">
+          <CowButton variant="secondary" size="md" @click="handleCancel">
+            Cancel
+          </CowButton>
+          <CowButton
+            :variant="isDestructive ? 'danger' : 'primary'"
+            size="md"
+            @click="handleYesAction"
+          >
+            {{ actionLabel }}
+          </CowButton>
         </div>
       </div>
     </UModal>
@@ -85,6 +89,18 @@ const props = defineProps<{
   noTooltip?: boolean
 }>()
 const emit = defineEmits(["confirm"])
+
+// Destructive actions (Delete/Sign out) use the danger button variant.
+const isDestructive = computed(() => {
+  const first = props.header?.split(" ")[0]
+  return first === "Delete" || first === "Sign"
+})
+
+// Confirm button label: the leading verb of the header (e.g. "Delete"),
+// except "Sign out" which keeps its full label.
+const actionLabel = computed(() =>
+  props.header !== "Sign out" ? props.header?.split(" ")[0] : props.header
+)
 
 const handleYesAction = () => {
   emit("confirm")

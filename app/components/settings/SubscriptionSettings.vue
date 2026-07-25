@@ -281,10 +281,21 @@
     <!-- Cancel Confirmation Modal -->
     <UModal
       v-model="showCancelConfirm"
-      :ui="{ rounded: 'rounded-2xl', width: 'w-full sm:max-w-md' }"
+      :ui="{
+        rounded: 'rounded-2xl',
+        background: 'bg-transparent dark:bg-transparent',
+        ring: '',
+        shadow: 'shadow-none',
+        width: 'w-[94vw] sm:max-w-md',
+        overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
+      }"
     >
-      <div class="p-6">
-        <h3 class="font-semibold text-lg mb-2">Cancel Subscription?</h3>
+      <div
+        class="rounded-2xl bg-white dark:bg-[#171d2b] border border-white/80 dark:border-[#202838] overflow-hidden p-6"
+      >
+        <h3 class="font-semibold text-lg mb-2 text-gray-900 dark:text-white">
+          Cancel Subscription?
+        </h3>
         <p class="text-sm text-gray-600 dark:text-[#9aa3b2] mb-5">
           Are you sure you want to cancel your subscription? You will continue
           to have access to Teams features until the end of your current billing
