@@ -272,7 +272,7 @@
           <div
             v-else
             class="intermission-content flex flex-col items-center"
-            :class="fullScreen ? 'gap-6' : 'gap-2'"
+            :class="fullScreen ? 'gap-8' : 'gap-3'"
           >
             <div class="intermission-logo-wrap">
               <img
@@ -280,25 +280,25 @@
                 :src="churchLogoUrl"
                 :alt="churchName || 'Church logo'"
                 class="intermission-logo object-contain rounded-2xl"
-                :class="fullScreen ? 'w-32 h-32' : 'w-10 h-10'"
+                :class="fullScreen ? 'w-64 h-64' : 'w-20 h-20'"
               />
               <Logo
                 v-else
                 class="intermission-logo"
-                :class="fullScreen ? 'w-28 h-28' : 'w-8 h-8'"
+                :class="fullScreen ? 'w-56 h-56' : 'w-16 h-16'"
               />
             </div>
             <h2
               v-if="churchName"
               class="intermission-text text-white font-semibold tracking-wide text-center px-6"
-              :class="fullScreen ? 'text-4xl' : 'text-xs'"
+              :class="fullScreen ? 'text-6xl' : 'text-lg'"
             >
               {{ churchName }}
             </h2>
             <p
               v-if="churchBranch"
               class="intermission-text intermission-text--delayed text-white/60 text-center px-6"
-              :class="fullScreen ? 'text-xl' : 'text-[10px]'"
+              :class="fullScreen ? 'text-4xl' : 'text-base'"
             >
               {{ churchBranch }}
             </p>
