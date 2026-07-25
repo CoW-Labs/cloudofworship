@@ -9,6 +9,15 @@
     @dragleave="onBgDragLeave"
     @drop="onBgDrop"
   >
+    <!-- MEDIA DOWNLOAD PROGRESS — shown while this slide's video/media is being
+         fetched into the local cache. Mirrors the loading bar in the Navbar. -->
+    <UProgress
+      v-if="mediaDownloadProgress !== null"
+      class="absolute inset-x-0 top-0 z-50 rounded-none"
+      :value="mediaDownloadValue"
+      :max="100"
+      size="xs"
+    />
     <EmptyState
       v-if="isDraggingBackgroundFile && slide"
       tinted
@@ -429,6 +438,24 @@ const props = defineProps<{
 const appStore = useAppStore()
 const isActiveOverlay = computed(
   () => appStore.currentState.activeOverlaySlide?.id === props.slide?.id
+)
+
+// Live download progress for the current slide's media. Media slides are cached
+// under `slide.id`; background videos under `slide.backgroundVideoKey`.
+const { progressFor } = useMediaDownloadProgress()
+const mediaDownloadProgress = computed<number | null>(() => {
+  const slide = props.slide
+  if (!slide) return null
+  const byId = progressFor(slide.id)
+  if (byId !== null) return byId
+  return progressFor(slide.backgroundVideoKey)
+})
+// UProgress renders determinate when given a finite value, otherwise (unknown
+// total size → NaN) it falls back to the indeterminate animation.
+const mediaDownloadValue = computed<number | undefined>(() =>
+  Number.isFinite(mediaDownloadProgress.value)
+    ? (mediaDownloadProgress.value as number)
+    : undefined
 )
 
 const emit = defineEmits([

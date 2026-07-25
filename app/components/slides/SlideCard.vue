@@ -64,6 +64,11 @@
       </div>
     </button>
 
+    <!-- Bottom gradient for action icon contrast -->
+    <div
+      class="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/50 to-transparent rounded-b-lg"
+    ></div>
+
     <!-- SLIDE ACTIONS MENU -->
     <div
       class="actions absolute bottom-2 right-2 flex gap-1"

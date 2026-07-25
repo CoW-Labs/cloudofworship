@@ -1,4 +1,4 @@
-import { useAuthStore } from "~/store/auth"
+import useUploadFile from "~/composables/useUploadFile"
 
 type UploadImageResponseT = {
   message: string
@@ -12,47 +12,16 @@ type UploadImageResponseT = {
   }
 }
 
-type UploadImageErrorT = {
-  data?: { message?: string }
-  message?: string
-}
-
+/**
+ * Upload a single image blob and return its hosted record.
+ *
+ * Thin wrapper around {@link useUploadFile}: images under 5 MB take the direct
+ * upload path, while anything larger transparently falls back to the presigned
+ * multipart path. Kept as a named helper so existing image call sites read
+ * clearly and don't have to know about the routing.
+ */
 const useUploadImage = async (image: Blob): Promise<UploadImageResponseT> => {
-  const authStore = useAuthStore()
-  const churchId = authStore.user?.churchId
-  if (!churchId) {
-    useToast().add({
-      title: "Church account not found",
-      description: "Please sign in again before uploading a file.",
-      icon: "i-bx-error",
-      color: "red",
-    })
-    authStore.signOut()
-    throw new Error("No church ID available for file upload")
-  }
-  const formdata = new FormData()
-  formdata.append("file", image)
-
-  const { data, error } = await useAPIFetch<
-    UploadImageResponseT,
-    UploadImageErrorT
-  >(`/church/${churchId}/files`, {
-    method: "POST",
-    body: formdata,
-    key: `upload-image-${image?.size}`,
-  })
-  if (error.value) {
-    throw new Error(
-      error.value.data?.message ||
-        error.value.message ||
-        "File upload failed"
-    )
-  }
-  if (!data.value) {
-    throw new Error("File upload completed without a response")
-  }
-
-  return data.value
+  return useUploadFile(image)
 }
 
 export default useUploadImage

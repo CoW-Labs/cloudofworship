@@ -14,6 +14,8 @@ import type { ExtendedFileT, Media, Slide } from "~/types"
  * - Background videos cache bytes in `db.cached` keyed by `backgroundVideoKey`.
  */
 export default function useSlideMediaCache() {
+  const { beginDownload, setProgress, endDownload } = useMediaDownloadProgress()
+
   const isRemoteUrl = (url?: string | null): url is string =>
     !!url && (url.startsWith("http://") || url.startsWith("https://"))
 
@@ -33,10 +35,29 @@ export default function useSlideMediaCache() {
   // ── Download helpers (one-time, populate IndexedDB) ──────────────────────
   // Reuse useDetailedFetch (progress-capable) exactly like saveAllBackgroundVideos.
 
+  // Download a URL to a Blob while bridging useDetailedFetch's per-fetch progress
+  // ref into the shared, app-wide download store keyed by `id`, so components can
+  // render a progress bar. Progress is reported as the stream is consumed, so the
+  // tracking must span the `.blob()` read — not just the initial fetch call.
+  const trackedDownloadBlob = async (
+    id: string,
+    url: string
+  ): Promise<Blob> => {
+    const progressRef = ref("0")
+    beginDownload(id)
+    const stop = watch(progressRef, (value) => setProgress(id, Number(value)))
+    try {
+      const response = await useDetailedFetch(url, progressRef)
+      return await response.blob()
+    } finally {
+      stop()
+      endDownload(id)
+    }
+  }
+
   const downloadIntoMedia = async (id: string, url: string): Promise<void> => {
     try {
-      const response = await useDetailedFetch(url, ref("0"))
-      const blob = await response.blob()
+      const blob = await trackedDownloadBlob(id, url)
       const arrayBuffer = await blob.arrayBuffer()
       await safeDBOperation((db) =>
         db.media.put({
@@ -54,8 +75,7 @@ export default function useSlideMediaCache() {
 
   const downloadIntoCached = async (id: string, url: string): Promise<void> => {
     try {
-      const response = await useDetailedFetch(url, ref("0"))
-      const blob = await response.blob()
+      const blob = await trackedDownloadBlob(id, url)
       // Match saveAllBackgroundVideos' convention: store the raw Blob.
       await safeDBOperation((db) =>
         db.cached.put({
