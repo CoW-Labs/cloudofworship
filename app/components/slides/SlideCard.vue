@@ -210,7 +210,7 @@
   </div>
   <button
     v-else
-    class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-[#171d2b] rounded-lg hover:bg-primary-50 dark:hover:bg-[#2b3242] transition-all cursor-pointer relative"
+    class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-[#171d2b] rounded-lg hover:bg-white dark:hover:bg-[#2b3242] transition-all cursor-pointer relative"
     :id="slide?.id"
     @click="
       slide?.slideMode === 'overlay'

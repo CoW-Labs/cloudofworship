@@ -139,7 +139,7 @@
               v-else
               class="h-[calc(100vh-300px)]"
               :items="savedSlides"
-              :item-size="100"
+              :item-size="84"
               key-field="id"
               v-slot="{ item: slide }"
             >
@@ -240,7 +240,7 @@
               v-else
               class="h-[calc(100vh-300px)]"
               :items="savedSlidesSearchResults"
-              :item-size="100"
+              :item-size="84"
               key-field="id"
               v-slot="{ item: slide }"
             >

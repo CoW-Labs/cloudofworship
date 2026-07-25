@@ -2,7 +2,7 @@
   <UButton
     variant="ghost"
     :as="isRenaming ? 'div' : 'button'"
-    class="schedule-card group flex items-center justify-between border-b border-gray-100 w-full dark:border-[#202838] py-3 last:border-0 text-black dark:text-white"
+    class="schedule-card group flex items-center justify-between border-b border-gray-100 w-full dark:border-[#202838] py-3 last:border-0 text-black dark:text-white transition-colors hover:!bg-white dark:hover:!bg-[#2b3242]"
     @click="!isRenaming && $emit('select', schedule)"
   >
     <div class="flex items-center gap-3 min-w-0">

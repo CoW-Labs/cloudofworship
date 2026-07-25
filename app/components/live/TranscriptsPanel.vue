@@ -256,7 +256,7 @@
         <button
           v-for="result in visibleScriptureResults"
           :key="result._id"
-          class="w-full text-left py-3 px-3 hover:bg-primary-50 dark:hover:bg-[#2b3242] transition-colors cursor-pointer group"
+          class="w-full text-left py-3 px-3 hover:bg-white dark:hover:bg-[#2b3242] transition-colors cursor-pointer group"
           @click="handleScriptureClick(result)"
         >
           <div class="flex items-center gap-1.5 mb-0.5">
