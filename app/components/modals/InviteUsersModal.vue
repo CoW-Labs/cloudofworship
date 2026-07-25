@@ -3,61 +3,77 @@
     <UModal
       v-model="visible"
       :ui="{
-        base: 'min-w-[600px]',
+        rounded: 'rounded-2xl',
+        background: 'bg-transparent dark:bg-transparent',
+        ring: '',
+        shadow: 'shadow-none',
+        width: 'w-[94vw] sm:max-w-[600px]',
+        overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
       }"
       @close="emit('close')"
     >
-      <UCard
-        :ui="{
-          ring: '',
-          divide: 'divide-y divide-gray-100 dark:divide-gray-800',
-        }"
+      <div
+        class="invite-card rounded-2xl bg-white dark:bg-[#171d2b] border border-white/80 dark:border-[#202838] overflow-hidden"
       >
-        <template #header>
-          <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-md truncate">
-              Invite people to {{ authStore.church?.type }} Media
-            </h2>
-            <div class="actions flex items-center gap-2">
-              <UButton
-                icon="i-bx-link"
-                variant="ghost"
-                @click="copyToClipboard"
-                >{{ copied ? "Copied!" : "Copy link" }}</UButton
-              >
+        <!-- HEADER -->
+        <div
+          class="flex items-center justify-between gap-3 px-5 py-4"
+        >
+          <h2
+            class="font-semibold text-base truncate text-gray-900 dark:text-white"
+          >
+            Invite people to {{ authStore.church?.type }} Media
+          </h2>
+          <div class="actions flex items-center gap-2 shrink-0">
+            <CowButton
+              variant="secondary"
+              size="2xs"
+              class="!px-3 !py-1.5 text-xs gap-1.5"
+              @click="copyToClipboard"
+            >
+              <CopyIcon class="w-3.5 h-3.5" />
+              {{ copied ? "Copied!" : "Copy invite link" }}
+            </CowButton>
 
-              <UButton
-                icon="i-mdi-close"
-                variant="ghost"
-                @click="
-                  () => {
-                    visible = false
-                    emit('close')
-                  }
-                "
-              ></UButton>
-            </div>
-          </div>
-        </template>
-        <div class="invite-content">
-          <div class="flex invite-input gap-2 mb-2">
-            <UFormGroup size="lg" class="w-[100%]">
-              <UInput
-                placeholder="Enter email addresses"
-                v-model="emailInput"
+            <button
+              class="grid h-8 w-8 place-items-center rounded-lg leading-none transition-colors hover:bg-gray-100 dark:hover:bg-[#222938]"
+              aria-label="Close invite modal"
+              @click="closeModal"
+            >
+              <CloseIcon
+                class="block h-4 w-4 text-gray-600 dark:text-[#a7afbd]"
               />
-              <!-- <p>jhjdhjkh</p> -->
-            </UFormGroup>
-            <UButton :loading="loading" class="px-4" @click="sendEmailInvite">
-              Send Invite
-            </UButton>
+            </button>
           </div>
-          <p class="text-sm text-gray-400">
+        </div>
+
+        <!-- BODY -->
+        <div class="invite-content p-5">
+          <div class="flex invite-input items-start gap-2">
+            <CowInput
+              class="flex-1"
+              label="Email addresses"
+              v-model="emailInput"
+              @keyup.enter="sendEmailInvite"
+            />
+            <CowButton
+              variant="primary"
+              size="lg"
+              :loading="loading"
+              class="shrink-0"
+              @click="sendEmailInvite"
+            >
+              Send Invite
+            </CowButton>
+          </div>
+          <p class="text-xs text-gray-400 dark:text-[#9aa3b2] mt-2">
             Use commas to separate email addresses
           </p>
+
           <div class="members flex-col flex gap-4 mt-6">
             <div
               v-for="(member, index) in authStore.church?.users"
+              :key="member?.fullname"
               class="member flex items-center justify-between"
             >
               <div class="photo-name flex gap-4 items-center font-medium">
@@ -66,42 +82,39 @@
                   :text="member?.fullname?.split(' ')?.[0]?.[0]"
                   size="sm"
                   :ui="{
+                    rounded: 'rounded-full',
                     text: `text-[${member?.theme}] dark:text-[${member?.theme}] font-semibold`,
                   }"
                   :class="`border-[${member?.theme}] bg-[${member?.theme}20] dark:bg-[${member?.theme}20]`"
                 />
                 {{ member?.fullname }}
               </div>
-              <div class="role text-sm">
+              <div class="role text-sm text-gray-500 dark:text-[#9aa3b2]">
                 {{ index === 0 ? "Admin" : "Member" }}
               </div>
             </div>
           </div>
-        </div>
-        <div
-          class="h-[88%] p-4 py-6 mt-8 flex justify-center gap-6 bg-primary-100 dark:bg-primary-950 rounded-lg text-primary-900 relative overflow-hidden"
-        >
-          <!-- <IconWrapper name="i-tabler-rocket" size="16" /> -->
-          <IconWrapper
-            name="i-tabler-rocket"
-            size="24"
-            class="absolute opacity-10 -bottom-3 -left-3"
-          />
-          <div class="texts-action text-center max-w-[300px] dark:text-primary">
-            <div>
+
+          <!-- PROMO BANNER -->
+          <div
+            class="promo p-6 mt-8 flex justify-center gap-6 bg-primary-100 dark:bg-primary-950 rounded-2xl text-primary-900 relative overflow-hidden"
+          >
+            <IconWrapper
+              name="i-tabler-rocket"
+              size="24"
+              class="absolute opacity-10 -bottom-3 -left-3"
+            />
+            <div
+              class="texts-action text-center max-w-[300px] dark:text-primary"
+            >
               <h2 class="text-md font-semibold">The more, the merrier.</h2>
-              <p class="text-sm mt-1 mb-2">
+              <p class="text-sm mt-1">
                 Invite more people to try out Cloud of Worship.
               </p>
             </div>
-            <!-- <div class="btn-row flex gap-2 justify-center">
-              <UButton icon="i-bx-share-alt" class="mt-2 text-primary-100">
-                Share
-              </UButton>
-            </div> -->
           </div>
         </div>
-      </UCard>
+      </div>
     </UModal>
   </div>
 </template>
@@ -131,6 +144,11 @@ watch(
     visible.value = props.visible
   }
 )
+
+const closeModal = () => {
+  visible.value = false
+  emit("close")
+}
 
 const copyToClipboard = () => {
   const input = document.createElement("input")
