@@ -469,7 +469,11 @@ export default function useSlideCreation() {
                 (blob.type?.includes("image") || blob.type?.includes("video"))
               if (!isUploadable || !blob) return null
               try {
-                const uploaded = await useUploadImage(blob)
+                // useUploadFile routes small images through the direct path and
+                // videos (which exceed 5 MB / are media) through the presigned
+                // multipart path. Pass the original filename so the server-side
+                // record and multipart initiation carry a meaningful name.
+                const uploaded = await useUploadFile(blob, { name: file.name })
                 return { uploaded, index }
               } catch (err) {
                 console.error("Image upload failed for", file.name, err)
