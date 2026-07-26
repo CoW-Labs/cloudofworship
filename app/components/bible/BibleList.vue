@@ -91,6 +91,10 @@
 import type { QuickAction, Song } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
+import {
+  prewarmScriptureVersion,
+  isScriptureReferenceValidSync,
+} from "~/composables/useScripture"
 let searchInputBeforeTwoDigitNumbers = ""
 import fuzzysort from "fuzzysort"
 
@@ -158,6 +162,30 @@ const scriptureActions: QuickAction[] = bibleBooks?.map((book, index) => {
 })
 actions.value = scriptureActions
 
+// Active Bible version, used to validate parsed references against the right
+// verse index (see the reference filter in `searchedActions`).
+const defaultBibleVersion = computed(
+  () => currentState.value.settings.defaultBibleVersion || "KJV"
+)
+
+// Bumped once the verse index for the active version has been built. Read inside
+// `searchedActions` so it re-runs and can drop impossible references (e.g. a
+// verse that doesn't exist) as soon as the data needed to verify them is ready
+// — the chapter-level check works without it, this only refines it.
+const scriptureIndexReadyTick = ref(0)
+// Building the verse index means parsing a ~6MB / 31k-verse translation, so it's
+// deferred until a chapter/verse has actually been typed rather than run when
+// the panel opens. Idempotent: `getVersionIndex` caches the built index, and
+// `prewarmedVersion` stops repeat builds/recomputes for an indexed version.
+const prewarmedVersion = ref<string | null>(null)
+const ensureScriptureIndex = async () => {
+  const version = defaultBibleVersion.value
+  if (prewarmedVersion.value === version) return
+  prewarmedVersion.value = version
+  await prewarmScriptureVersion(version)
+  scriptureIndexReadyTick.value++
+}
+
 const bibleChapterAndVerse = computed(() => {
   const regex = /\b\d+\s*:\s*\d+\b|\b\d+\s\d+\b/g
   const bibleBookFollowedByJustChapterMatch = searchInput.value
@@ -181,6 +209,20 @@ const bibleChapterAndVerse = computed(() => {
     ?.replaceAll(" ", ":")
   return match?.trim()
 })
+
+// This panel only ever searches Bible books, so any parsed chapter/verse is a
+// genuine reference — no need for the extra "is this really a book?" check
+// QuickActions does before paying for the index build.
+// `immediate` matters here: this panel can be opened with `query` already
+// pre-filled, in which case the reference exists before the watcher registers
+// and a lazy-only trigger would never build the index.
+watch(
+  bibleChapterAndVerse,
+  (reference) => {
+    if (reference) ensureScriptureIndex()
+  },
+  { immediate: true }
+)
 
 const searchedActions = computed<QuickAction[]>(() => {
   const twoDigitNumbers = searchInput.value?.match(/\b\d{2}\b/g)
@@ -206,6 +248,30 @@ const searchedActions = computed<QuickAction[]>(() => {
     }
   )
   results = results?.map((result: Fuzzysort.Result | any) => result.obj)
+
+  // Drop Bible references whose parsed chapter/verse can't exist in the active
+  // version — e.g. "3 John 7:8" (3 John has a single chapter). Otherwise they'd
+  // be offered as a pickable result that only ever shows "Preview unavailable"
+  // and toasts "Chapter not found" instead of creating a slide. Book-only
+  // references (no chapter/verse parsed yet, whole book) are always kept.
+  // Filtering here, before the `slice(0, 10)` below, keeps impossible matches
+  // from crowding valid ones out of the list. Reading the ready tick lets this
+  // recompute and apply the verse-level check once the index has been built.
+  void scriptureIndexReadyTick.value
+  results = results.filter((action: QuickAction) => {
+    if (action?.type !== slideTypes.bible) return true
+    const bookIndex = Number(action?.bibleBookIndex)
+    if (!bookIndex) return true
+    const reference = action?.bibleChapterAndVerse || bibleChapterAndVerse.value
+    if (!reference) return true
+    const [chapterStr, verseStr] = String(reference).split(":")
+    return isScriptureReferenceValidSync(
+      bookIndex,
+      Number(chapterStr),
+      verseStr ?? 1,
+      defaultBibleVersion.value
+    )
+  })
 
   // Sort by showing [searchableOnly] actions last
   results.sort((a: QuickAction, b: QuickAction) => {
