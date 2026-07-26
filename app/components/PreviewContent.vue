@@ -830,22 +830,7 @@ emitter.on("new-song", async (data: Song) => {
       const setlistSlide = getRelevantSongSetlist()
 
       if (setlistSlide) {
-        toast.add({
-          icon: "i-lucide-list-music",
-          title: "Add song to setlist?",
-          description: `${song.title} can be added to ${setlistSlide.name} or inserted as its own slide.`,
-          timeout: 0,
-          actions: [
-            {
-              label: "Add to setlist",
-              click: () => addSongToSetlist(setlistSlide, song),
-            },
-            {
-              label: "Separate slide",
-              click: () => addSongAsSeparateSlide(song),
-            },
-          ],
-        })
+        addSongToSetlist(setlistSlide, song)
       } else {
         addSongAsSeparateSlide(song)
       }

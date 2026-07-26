@@ -20,6 +20,7 @@
         },
       }"
       :ui-menu="{
+        container: 'bible-version-menu',
         width: 'min-w-[280px]',
         input: 'text-sm',
         empty: 'text-xs',
@@ -127,5 +128,15 @@ watch(bibleVersion, (newValue, oldValue) => {
 .bible-version-trailing {
   position: static !important;
   padding-right: 0 !important;
+}
+
+/* Same tail-merge problem as above: uiMenu.container's library default is
+   "z-20 group", and any z-* we pass through :ui-menu loses to it in twMerge.
+   The dropdown lives in the editor toolbar row, whose sibling
+   SlideContentToolbar pill is z-30 — so at z-20 the menu paints underneath it.
+   Only the (non-conflicting) class name survives the merge, so the z-index has
+   to be applied here. */
+.bible-version-menu {
+  z-index: 40 !important;
 }
 </style>

@@ -89,9 +89,9 @@
                 @take-live="$emit('take-live')"
                 @predict="predictVerseInput($event as HTMLInputElement)"
               />
-              <!-- Chapter verse list — revealed on hover of the verse switcher.
-                 Must stay the immediate next sibling of .verse-switch for the
-                 `.verse-switch:hover + .verse-preview` CSS to work. -->
+              <!-- Chapter verse list — revealed on hover of the verse switcher,
+                 or while its input has focus. Must stay the immediate next
+                 sibling of .verse-switch for the `+ .verse-preview` CSS to work. -->
               <PreviewVerses
                 v-if="
                   (slide?.type === slideTypes.hymn ||
@@ -1419,9 +1419,20 @@ const predictVerseInput = (
   max-height: 1400px;
 } */
 .verse-switch:hover + .verse-preview,
-.verse-switch:focus-within + .books-preview,
 .verse-preview:hover,
 .books-preview:hover {
+  opacity: 1;
+  visibility: visible;
+  max-height: calc(100% - 3rem);
+}
+
+/* Keep the chapter list open while the verse input has focus, so the operator
+   can type a reference and still see where they are. Suppressed while the book
+   autocomplete is on screen (a bare book name, no ":") — there the chapter list
+   has nothing valid to show, and the book list below takes over.
+   `~` rather than `+` for .books-preview: .verse-preview sits between them. */
+.actions:not(:has(.books-preview)) .verse-switch:focus-within + .verse-preview,
+.verse-switch:focus-within ~ .books-preview {
   opacity: 1;
   visibility: visible;
   max-height: calc(100% - 3rem);
