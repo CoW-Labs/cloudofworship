@@ -10,7 +10,7 @@
     ]"
   >
     <button
-      :class="['transition-all', { 'opacity-70 ': selectable }]"
+      :class="['transition-all text-left', { 'opacity-70 ': selectable }]"
       @click="$emit('click')"
     >
       <DeferredSlidePreview
