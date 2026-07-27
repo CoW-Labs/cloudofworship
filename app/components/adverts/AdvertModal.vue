@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import type { Advert } from "~/types"
+import { escapePriority } from "~/composables/useEscapeKey"
 
 const props = defineProps<{
   activeAdvert: Advert | null
@@ -36,6 +37,18 @@ const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit("update:modelValue", value),
 })
+
+// `prevent-close` stops an accidental overlay click from dismissing the advert,
+// but that also opts the modal out of Headless UI's Escape handling — Escape
+// should still dismiss it.
+useEscapeKey(
+  () => {
+    if (!visible.value) return false
+    visible.value = false
+    return true
+  },
+  { priority: escapePriority.modal }
+)
 
 const onAdvertClicked = () => {
   usePosthogCapture("ADVERT_CLICKED")

@@ -42,6 +42,7 @@
 </template>
 <script setup lang="ts">
 import MoreIcon from "~/components/svgs/MoreIcon.vue"
+import { escapePriority } from "~/composables/useEscapeKey"
 
 defineProps<{
   // Full-bleed rows separated by dividers, instead of padded, spaced buttons
@@ -108,6 +109,17 @@ const close = () => {
 const toggle = () => {
   open.value ? close() : openMenu()
 }
+
+// Escape closes the menu. Suppressed while a row's own dialog is open, so that
+// press dismisses the dialog instead.
+useEscapeKey(
+  () => {
+    if (!open.value || suppressed.value) return false
+    close()
+    return true
+  },
+  { priority: escapePriority.popover }
+)
 
 // Close instead of tracking scroll offsets — avoids the menu drifting out of
 // sync with its trigger when the (often virtualized) list underneath it scrolls.

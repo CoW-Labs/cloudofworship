@@ -263,6 +263,7 @@ import {
   isScriptureReferenceValidSync,
 } from "~/composables/useScripture"
 import { quickActionsArr } from "~/utils/constants"
+import { escapePriority } from "~/composables/useEscapeKey"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
@@ -942,6 +943,33 @@ onMounted(() => {
 
   document.addEventListener("mousedown", handleOutsidePointerDown)
 })
+
+// Escape steps back out of the pane, mirroring what clicking the section
+// heading does: an active search is cleared first, then a sub-page (Bible,
+// songs, media…) returns to the actions home. Registered at the lowest
+// priority so any overlay on top of the pane — a modal, popover or editor
+// panel — gets the press first, and it bails while a Headless UI dialog is
+// open since that closes itself on Escape without going through this stack.
+useEscapeKey(
+  () => {
+    if (document.querySelector('[role="dialog"]')) return false
+
+    if (searchInput.value) {
+      searchInput.value = ""
+      isSearchFocused.value = false
+      searchInputEl.value?.input?.blur()
+      return true
+    }
+
+    if (page.value !== "") {
+      page.value = ""
+      return true
+    }
+
+    return false
+  },
+  { priority: escapePriority.pane }
+)
 
 onUnmounted(() => {
   if (quickSearchSuggestionInterval)
