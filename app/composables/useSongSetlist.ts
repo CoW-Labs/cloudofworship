@@ -85,24 +85,33 @@ export default function useSongSetlist() {
     return tempSlide
   }
 
+  /**
+   * Adds a song to a setlist. By default the song lands at the top of the list
+   * and becomes the active song, so the newest addition is what the operator
+   * sees. Pass `position: "end"` to keep an existing order intact (e.g. when
+   * seeding a setlist from a schedule template).
+   */
   const appendSongToSetlist = async (
     slide: Slide,
     song: Song,
-    options?: { makeActive?: boolean }
+    options?: { position?: "start" | "end" }
   ): Promise<Slide | null> => {
     const item = await createSetlistItem(song)
     if (!item) return null
 
     const data = getSetlistData(slide)
-    const songs = [...data.songs, item]
-    const activeSongIndex = options?.makeActive ? songs.length - 1 : data.activeSongIndex
+    const addToEnd = options?.position === "end"
+    const songs = addToEnd ? [...data.songs, item] : [item, ...data.songs]
+    const activeSongIndex = addToEnd
+      ? Math.min(Math.max(data.activeSongIndex || 0, 0), songs.length - 1)
+      : 0
 
     return await refreshSongSetlistSlide(
       {
         ...slide,
         data: { songs, activeSongIndex },
       },
-      { activeSongIndex, verseIndex: options?.makeActive ? 0 : undefined }
+      { activeSongIndex, verseIndex: addToEnd ? undefined : 0 }
     )
   }
 

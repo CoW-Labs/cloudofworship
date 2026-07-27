@@ -275,9 +275,7 @@ export default function useSlideCreation() {
 
     if (song) {
       const { appendSongToSetlist } = useSongSetlist()
-      const slideWithSong = await appendSongToSetlist(tempSlide, song, {
-        makeActive: true,
-      })
+      const slideWithSong = await appendSongToSetlist(tempSlide, song)
       if (slideWithSong) {
         usePosthogCapture("NEW_SONG_SETLIST_SLIDE_CREATED")
         return slideWithSong

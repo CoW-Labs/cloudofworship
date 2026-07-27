@@ -94,7 +94,11 @@ export default function useScheduleTemplates() {
         if (!seed.songs.length) return null
         let slide = await createSongSetlistSlide(seed.songs[0])
         for (const song of seed.songs.slice(1)) {
-          const updated = await appendSongToSetlist(slide, song)
+          // keep the template's own ordering — new songs only jump to the top
+          // when a user adds them
+          const updated = await appendSongToSetlist(slide, song, {
+            position: "end",
+          })
           if (updated) slide = updated
         }
         return slide
