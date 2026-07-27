@@ -603,6 +603,11 @@ html.dark .cow-search-input input::placeholder {
 .live-output {
   color: #ffffff;
   user-select: none;
+  /* Previews are rendered inside <button> elements (slide cards), which the UA
+     stylesheet centers. Text slides carry their own alignment in the TipTap
+     HTML and skip the *-live-content alignment classes, so without this reset
+     they'd inherit that centering and disagree with the editor/live output. */
+  text-align: left;
   /* background-color: #000000; */
   /* Slide text/padding is sized in cqw units (see .tiptap.live-content below),
      so this box must be a size container for those units to resolve against

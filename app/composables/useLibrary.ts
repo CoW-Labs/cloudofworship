@@ -5,7 +5,7 @@ import { liveQuery } from 'dexie'
 import { useObservable } from '@vueuse/rxjs'
 import { useOnline } from '@vueuse/core'
 import fuzzysort from 'fuzzysort'
-import { safeDBGet } from './useIndexedDB'
+import { safeDBGet, safeDBOperation } from './useIndexedDB'
 
 export default function useLibrary() {
   const authStore = useAuthStore()
@@ -469,6 +469,17 @@ export default function useLibrary() {
   }
 
   /**
+   * Drop a slide's locally cached media. Presentation slides write one record per
+   * page keyed `${slideId}-page-${n}`, so a single delete by ID would miss them.
+   */
+  const deleteLocalMedia = async (slideId: string) => {
+    await safeDBOperation((db) => db.media.delete(slideId))
+    await safeDBOperation((db) =>
+      db.media.where('id').startsWith(`${slideId}-page-`).delete()
+    )
+  }
+
+  /**
    * Delete a slide from the library
    */
   const deleteSlide = async (slideId: string) => {
@@ -479,9 +490,20 @@ export default function useLibrary() {
         .library.delete(slideId)
         .catch((err) => console.error('Failed to delete slide:', err))
 
+      // The library copy was the last thing keeping this slide's media around —
+      // slide deletion deliberately leaves the blob alone while the slide is
+      // saved — so free it now. Unless the slide is still sitting in a schedule,
+      // in which case that copy is still playing from it.
+      const stillInSchedule = appStore.currentState.activeSlides.some(
+        (slide) => slide.id === slideId || slide._id === slideId
+      )
+      if (!stillInSchedule) {
+        await deleteLocalMedia(slideId)
+      }
+
       toast.add({ icon: 'i-tabler-trash', title: 'Slide has been deleted' })
 
-      // Also unsave the slide online
+      // Also unsave the slide online — this is what releases the uploaded file
       await unsaveSlideOnline(slideId)
     } catch (error) {
       console.error('Error deleting slide from library:', error)
