@@ -137,9 +137,9 @@
       <CowDropdown
         :label="entityTypeLabel"
         v-model="churchType"
-        :options="churchTypes"
+        :options="entityTypes"
       />
-      <CowInput label="Head of ministry" v-model="churchPastor" />
+      <CowInput :label="entityHeadLabel" v-model="churchPastor" />
 
       <CowButton
         block
@@ -263,7 +263,7 @@
 import { useAuthStore } from "~/store/auth"
 import type { User, Church } from "~/store/auth"
 import type { ApiErrorT, SignupResponseT } from "~/types/api-responses"
-import { churchesArr } from "~/utils/constants"
+import { appWideActions, churchesArr } from "~/utils/constants"
 
 definePageMeta({
   layout: "auth",
@@ -289,6 +289,7 @@ const { user } = storeToRefs(authStore)
 const { sendEmailInvitations } = useUser()
 const { initUTMTracking, getUTMParams } = useUTMParams()
 const toast = useToast()
+const emitter = useNuxtApp().$emitter as any
 const signupMethod = ref<"email" | "google">("email")
 const signupVisualState = useSignupVisualState()
 
@@ -309,6 +310,18 @@ const churchTypes = [
   "Online Campus",
   "House Fellowship / Center",
 ]
+// Parish/branch language doesn't fit a non-church account, so these accounts
+// get their own set of types rather than sharing the church list.
+const organizationTypes = [
+  "Conference",
+  "Meetup",
+  "NGO",
+  "Non-profit",
+  "Ministry",
+  "School / Campus Group",
+  "Online Community",
+  "Other",
+]
 const howYouFoundUsOptions = [
   "Google Search",
   "Social Media (Facebook, Instagram, etc.)",
@@ -322,6 +335,9 @@ const howYouFoundUsOptions = [
 const step = ref(route.query.registerChurch ? 3 : 1)
 const loading = ref(false)
 const googleLoading = ref(false)
+// True once onboarding has handed the user over to the plan chooser, so we
+// know a modal close means "done onboarding" rather than some other gate.
+const awaitingUpgradeChoice = ref(false)
 
 // Step 1
 const email = ref("")
@@ -370,6 +386,12 @@ const entityNameInputLabel = computed(() =>
 const entityTypeLabel = computed(() =>
   creatingForChurch.value ? "Church type" : "Organization type"
 )
+const entityTypes = computed(() =>
+  creatingForChurch.value ? churchTypes : organizationTypes
+)
+const entityHeadLabel = computed(() =>
+  creatingForChurch.value ? "Head of ministry" : "Head of organization"
+)
 const churchName = computed(() =>
   church.value === OTHER_CHURCH_OPTION ? otherChurch.value.trim() : church.value
 )
@@ -409,6 +431,11 @@ const getErrorMessage = (error: ApiErrorT | null | undefined) =>
 watch(creatingForChurch, (isCreatingForChurch) => {
   if (!isCreatingForChurch) {
     church.value = OTHER_CHURCH_OPTION
+  }
+
+  // The two lists share no options, so anything already picked is now stale.
+  if (!entityTypes.value.includes(churchType.value)) {
+    churchType.value = ""
   }
 })
 
@@ -734,18 +761,13 @@ const finishOnboarding = async () => {
       })
     }
 
-    if (signupMethod.value === "google") {
-      // Google accounts arrive pre-verified — stay on this last step and let
-      // the user decide on a plan right here instead of bouncing to "/".
-      useGlobalEmit("show-upgrade-modal", planId ? { planId } : undefined)
-    } else {
-      // Always surface the plan chooser once onboarding wraps up,
-      // before the operator settles on the home screen.
-      await navigateTo("/")
-      setTimeout(() => {
-        useGlobalEmit("show-upgrade-modal", planId ? { planId } : undefined)
-      }, 500)
-    }
+    // Stay on this last step and let the user decide on a plan right here
+    // instead of bouncing to "/" first — closing the modal takes them home.
+    awaitingUpgradeChoice.value = true
+    useGlobalEmit(
+      appWideActions.showUpgradeModal,
+      planId ? { planId } : undefined
+    )
   } else {
     usePosthogCapture("SIGNUP_COMPLETE_UNVERIFIED", {
       userId: authStore.user?._id,
@@ -762,6 +784,12 @@ const finishOnboarding = async () => {
     }
     goToVerify()
   }
+}
+
+const handleUpgradeModalClosed = () => {
+  if (!awaitingUpgradeChoice.value) return
+  awaitingUpgradeChoice.value = false
+  navigateTo("/")
 }
 
 const goToVerify = () => {
@@ -853,6 +881,8 @@ const handleGoogleSignUp = async () => {
 onMounted(() => {
   initUTMTracking(route)
 
+  emitter.on(appWideActions.upgradeModalClosed, handleUpgradeModalClosed)
+
   usePosthogCapture("SIGNUP_PAGE_VIEWED", {
     step: route.query.registerChurch ? 3 : 1,
     hasReferral: !!route.query.from_lyrics,
@@ -872,6 +902,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  emitter.off(appWideActions.upgradeModalClosed, handleUpgradeModalClosed)
+
   signupVisualState.value = {
     step: 1,
     fullName: "",

@@ -79,6 +79,7 @@ export const appWideActions = {
   selectAllSlides: 'select-all-slides',
   cancelSelectSlides: 'cancel-select-slides',
   showUpgradeModal: 'show-upgrade-modal',
+  upgradeModalClosed: 'upgrade-modal-closed',
   signOut: 'sign-out',
 }
 
