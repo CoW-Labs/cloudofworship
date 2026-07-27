@@ -50,6 +50,7 @@
     <!-- </Transition> -->
 
     <AlertView />
+    <StreamingConfirmOverlay />
   </div>
 </template>
 <script setup lang="ts">

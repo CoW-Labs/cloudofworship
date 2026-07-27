@@ -16,6 +16,7 @@
     :is-live-window-active="windowRefs?.length > 0"
   >
     <div class="main">
+      <StreamingStatusIndicator class="mb-2" />
       <div
         v-if="liveOutputSlides?.length === 0 || !liveOutputSlides"
         class="ctn overflow-auto mb-4 overflow-x-hidden"
