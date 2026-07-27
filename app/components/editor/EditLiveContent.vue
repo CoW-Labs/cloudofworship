@@ -424,6 +424,7 @@ import type {
   Song,
   SongSetlistData,
 } from "~/types"
+import { escapePriority } from "~/composables/useEscapeKey"
 
 const props = defineProps<{
   slide?: Slide
@@ -948,9 +949,6 @@ onMounted(() => {
   emitter.on(appWideActions.previousVerse, handleVoicePreviousVerse)
   emitter.on(appWideActions.gotoVerseNumber, handleVoiceGotoVerseNumber)
   emitter.on(appWideActions.changeBibleVersion, handleVoiceBibleVersionChange)
-
-  // Close an open overlay panel on Escape.
-  window.addEventListener("keydown", handlePanelEscape)
 })
 
 onUnmounted(() => {
@@ -959,12 +957,18 @@ onUnmounted(() => {
   emitter.off(appWideActions.previousVerse, handleVoicePreviousVerse)
   emitter.off(appWideActions.gotoVerseNumber, handleVoiceGotoVerseNumber)
   emitter.off(appWideActions.changeBibleVersion, handleVoiceBibleVersionChange)
-  window.removeEventListener("keydown", handlePanelEscape)
 })
 
-const handlePanelEscape = (e: KeyboardEvent) => {
-  if (e.key === "Escape" && activePanel.value) activePanel.value = null
-}
+// Close an open overlay panel on Escape, ahead of the Quick Actions pane's
+// own back-navigation but behind anything layered on top of the editor.
+useEscapeKey(
+  () => {
+    if (!activePanel.value) return false
+    activePanel.value = null
+    return true
+  },
+  { priority: escapePriority.panel }
+)
 
 emitter.on("pause-inactive-slide-video", () => {
   if (props.slide?.type === slideTypes.media) {

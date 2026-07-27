@@ -30,6 +30,7 @@
 
 <script setup lang="ts">
 import type { CSSProperties } from "vue"
+import { escapePriority } from "~/composables/useEscapeKey"
 
 const props = withDefaults(
   defineProps<{
@@ -140,9 +141,15 @@ const onPointerDown = (event: PointerEvent) => {
   }
 }
 
-const onKeyDown = (event: KeyboardEvent) => {
-  if (props.open && event.key === "Escape") close()
-}
+// Escape closes the popover before it reaches anything underneath it.
+useEscapeKey(
+  () => {
+    if (!props.open) return false
+    close()
+    return true
+  },
+  { priority: escapePriority.popover }
+)
 
 watch(
   () => props.open,
@@ -182,7 +189,6 @@ watch(
 onMounted(() => {
   resolvedBoundary.value = resolveBoundary()
   document.addEventListener("pointerdown", onPointerDown)
-  document.addEventListener("keydown", onKeyDown)
   window.addEventListener("resize", updatePosition)
   window.addEventListener("scroll", updatePosition, true)
 })
@@ -190,7 +196,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   boundaryObserver?.disconnect()
   document.removeEventListener("pointerdown", onPointerDown)
-  document.removeEventListener("keydown", onKeyDown)
   window.removeEventListener("resize", updatePosition)
   window.removeEventListener("scroll", updatePosition, true)
 })

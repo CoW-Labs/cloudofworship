@@ -128,6 +128,7 @@ import { useAuthStore } from "~/store/auth"
 import type { Schedule, ScheduleTemplate } from "~/types"
 import { appWideActions } from "~/utils/constants"
 import { scheduleTemplates } from "~/utils/scheduleTemplates"
+import { escapePriority } from "~/composables/useEscapeKey"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -177,6 +178,19 @@ const closeScheduleModal = () => {
     })
   }
 }
+
+// `prevent-close` keeps a stray click on the overlay from dismissing the modal,
+// which also opts it out of Headless UI's own Escape handling — so wire Escape
+// up explicitly. It goes through `closeScheduleModal`, which still refuses to
+// close (and says why) until a schedule has been selected or created.
+useEscapeKey(
+  () => {
+    if (!visible.value) return false
+    closeScheduleModal()
+    return true
+  },
+  { priority: escapePriority.modal }
+)
 
 const openAllSchedules = () => {
   useGlobalEmit(appWideActions.newSchedulesList)
