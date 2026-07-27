@@ -408,7 +408,13 @@ const emitter = useNuxtApp().$emitter as any
 watch(visible, (isVisible) => {
   if (isVisible) {
     nextTick(() => animateMissionIn())
+    return
   }
+
+  // Onboarding screens keep the user in place while this modal is open, so
+  // announce every close (X, Esc, overlay, free tier, successful payment) —
+  // that's their cue to move the user on to the app.
+  useGlobalEmit(appWideActions.upgradeModalClosed)
 })
 
 onMounted(async () => {

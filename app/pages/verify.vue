@@ -159,9 +159,17 @@ const router = useRouter()
 const route = useRoute()
 let resendCooldownTimer: ReturnType<typeof setInterval> | null = null
 
-// Store reference to upgrade modal
-const showUpgradeModalWithPlan = ref(false)
 const pendingPlanId = ref<string | null>(null)
+// True once verification has handed the user over to the plan chooser, so we
+// know a modal close means "done onboarding" rather than some other gate.
+const awaitingUpgradeChoice = ref(false)
+const emitter = useNuxtApp().$emitter as any
+
+const handleUpgradeModalClosed = () => {
+  if (!awaitingUpgradeChoice.value) return
+  awaitingUpgradeChoice.value = false
+  router.push("/")
+}
 
 const beginEmailEdit = () => {
   editableEmail.value = email.value
@@ -234,6 +242,8 @@ const saveEmail = async () => {
 }
 
 onMounted(async () => {
+  emitter.on(appWideActions.upgradeModalClosed, handleUpgradeModalClosed)
+
   if (!getToken()) {
     navigateTo("/login")
     return
@@ -337,26 +347,29 @@ const verifyEmail = async () => {
       }
     }
 
+    if (authStore.user) {
+      authStore.setUser({ ...authStore.user, emailVerified: true })
+    }
+
     // New signups reach verify as the tail end of onboarding — surface the
-    // plan chooser once they're back on the signup screen, whether or not a
-    // plan was preselected.
+    // plan chooser right here, whether or not a plan was preselected, and let
+    // closing the modal be what takes them into the app.
     const isNewUserOnboarding = !!route.query.newUser || !!pendingPlanId.value
+    const isOnTeamsPlan = authStore.church?.subscriptionPlan === "teams"
 
-    if (isNewUserOnboarding) {
+    if (isNewUserOnboarding && !isOnTeamsPlan) {
       const planId = pendingPlanId.value
-      await router.push("/signup")
 
-      const isOnTeamsPlan = authStore.church?.subscriptionPlan === "teams"
-      if (!isOnTeamsPlan) {
-        usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
-          planId,
-          email: email.value,
-        })
+      usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
+        planId,
+        email: email.value,
+      })
 
-        setTimeout(() => {
-          useGlobalEmit("show-upgrade-modal", planId ? { planId } : undefined)
-        }, 500)
-      }
+      awaitingUpgradeChoice.value = true
+      useGlobalEmit(
+        appWideActions.showUpgradeModal,
+        planId ? { planId } : undefined
+      )
     } else {
       router.push("/")
     }
@@ -411,6 +424,8 @@ const resendCode = async () => {
 }
 
 onBeforeUnmount(() => {
+  emitter.off(appWideActions.upgradeModalClosed, handleUpgradeModalClosed)
+
   if (resendCooldownTimer) {
     clearInterval(resendCooldownTimer)
   }
