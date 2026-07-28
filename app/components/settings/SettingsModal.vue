@@ -47,55 +47,61 @@
           </button>
         </div>
         <div
-          class="rhs relative flex-1 min-w-0 min-h-0 rounded-2xl px-1 sm:px-3 lg:px-5 pt-1 h-full overflow-hidden"
+          class="rhs relative flex-1 min-w-0 min-h-0 rounded-2xl px-1 sm:px-3 lg:px-5 pt-1 h-full overflow-clip"
         >
           <div
             id="settings-modal-device-action"
             class="pointer-events-none absolute bottom-6 right-6 z-50"
           ></div>
-          <div class="h-full overflow-y-auto">
+          <div class="flex h-full min-h-0 flex-col">
             <!-- SUB-SETTINGS HEADER -->
-            <h3 class="font-semibold text-lg mb-4 text-gray-900 dark:text-white">
+            <h3
+              class="shrink-0 font-semibold text-lg mb-4 text-gray-900 dark:text-white"
+            >
               {{ activeTab }}
             </h3>
-            <Transition name="fade-sm">
-              <!-- ACCOUNT & PROFILE SETTINGS -->
-              <ProfileSettings v-if="activeTab === 'Account/Profile Settings'" />
-              <!-- SUBSCRIPTION SETTINGS -->
-              <SubscriptionSettings
-                v-else-if="activeTab === 'Subscription Settings'"
-              />
-              <!-- DISPLAY SETTINGS -->
-              <DisplaySettings v-else-if="activeTab === 'Display Settings'" />
-              <!-- CAMERA & MIC SETTINGS -->
-              <CameraAndMicSettings
-                v-else-if="activeTab === 'Microphone Settings'"
-              />
-              <!-- SLIDE SETTINGS -->
-              <SlideSettings
-                v-else-if="activeTab === 'Slide Settings'"
-                @select-active-tab="activeTab = $event"
-              />
-              <!-- OVERLAY SETTINGS -->
-              <OverlaySettings v-else-if="activeTab === 'Overlay Settings'" />
-              <!-- BACKGROUND SETTINGS -->
-              <BackgroundSettings
-                v-else-if="activeTab === 'Slide Background Settings'"
-              />
-              <!-- INTERMISSION SETTINGS -->
-              <IntermissionSettings
-                v-else-if="activeTab === 'Intermission Settings'"
-              />
-              <!-- BIBLE VERSION SETTINGS -->
-              <BibleVersionSettings
-                v-else-if="activeTab === 'Bible Version Settings'"
-              />
-              <!-- STORAGE SETTINGS -->
-              <StorageSettings v-else-if="activeTab === 'Storage Settings'" />
+            <div class="min-h-0 flex-1 overflow-clip">
+              <Transition name="fade-sm">
+                <!-- ACCOUNT & PROFILE SETTINGS -->
+                <ProfileSettings
+                  v-if="activeTab === 'Account/Profile Settings'"
+                />
+                <!-- SUBSCRIPTION SETTINGS -->
+                <SubscriptionSettings
+                  v-else-if="activeTab === 'Subscription Settings'"
+                />
+                <!-- DISPLAY SETTINGS -->
+                <DisplaySettings v-else-if="activeTab === 'Display Settings'" />
+                <!-- CAMERA & MIC SETTINGS -->
+                <CameraAndMicSettings
+                  v-else-if="activeTab === 'Microphone Settings'"
+                />
+                <!-- SLIDE SETTINGS -->
+                <SlideSettings
+                  v-else-if="activeTab === 'Slide Settings'"
+                  @select-active-tab="activeTab = $event"
+                />
+                <!-- OVERLAY SETTINGS -->
+                <OverlaySettings v-else-if="activeTab === 'Overlay Settings'" />
+                <!-- BACKGROUND SETTINGS -->
+                <BackgroundSettings
+                  v-else-if="activeTab === 'Slide Background Settings'"
+                />
+                <!-- INTERMISSION SETTINGS -->
+                <IntermissionSettings
+                  v-else-if="activeTab === 'Intermission Settings'"
+                />
+                <!-- BIBLE VERSION SETTINGS -->
+                <BibleVersionSettings
+                  v-else-if="activeTab === 'Bible Version Settings'"
+                />
+                <!-- STORAGE SETTINGS -->
+                <StorageSettings v-else-if="activeTab === 'Storage Settings'" />
 
-              <!-- OTHER SETTINGS -->
-              <OtherSettings v-else-if="activeTab === 'Other Settings'" />
-            </Transition>
+                <!-- OTHER SETTINGS -->
+                <OtherSettings v-else-if="activeTab === 'Other Settings'" />
+              </Transition>
+            </div>
           </div>
         </div>
       </div>
