@@ -195,7 +195,13 @@
         </span>
       </div>
 
-      <CowButton block type="submit" class="mt-3" :loading="loading">
+      <CowButton
+        block
+        type="submit"
+        class="mt-3"
+        :disabled="step4Disabled"
+        :loading="loading"
+      >
         Continue
       </CowButton>
       <CowButton
@@ -399,6 +405,10 @@ const ministryHead = computed(() => churchPastor.value.trim())
 
 const step3Disabled = computed(
   () => !(churchName.value && churchType.value && ministryHead.value)
+)
+
+const step4Disabled = computed(
+  () => !addedEmails.value.length && !useValidEmail(inviteInput.value)
 )
 
 watch(
@@ -717,6 +727,8 @@ const removeInvite = (index: number) => {
 }
 
 const handleStep4 = async () => {
+  addInvite()
+
   if (addedEmails.value.length && authStore.user?.churchId) {
     loading.value = true
     await sendEmailInvitations(authStore.user.churchId, addedEmails.value)
