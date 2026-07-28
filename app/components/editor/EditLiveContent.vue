@@ -18,6 +18,22 @@
       :max="100"
       size="xs"
     />
+    <div
+      v-if="currentLocalTransfer?.status === 'failed'"
+      class="absolute inset-x-2 top-2 z-50 flex items-center justify-between gap-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700 shadow dark:bg-red-950/90 dark:text-red-200"
+    >
+      <span class="truncate">
+        This media is only available for this session and is not durably saved.
+      </span>
+      <div class="flex shrink-0 items-center gap-2">
+        <button class="font-semibold hover:underline" @click="retryLocalSave">
+          Retry
+        </button>
+        <button class="font-semibold hover:underline" @click="removeFailedMedia">
+          Remove
+        </button>
+      </div>
+    </div>
     <EmptyState
       v-if="isDraggingBackgroundFile && slide"
       tinted
@@ -253,6 +269,10 @@
                 variant="ghost"
                 color="gray"
                 class="go-live shrink-0 rounded-full px-4 h-[34px] gap-1.5 font-medium bg-gray-200/80 dark:bg-[#2b3242] text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-[#333c4e]"
+                :disabled="
+                  currentLocalTransfer?.status === 'pending' ||
+                  currentLocalTransfer?.status === 'failed'
+                "
                 @click="$emit('take-live')"
               >
                 <CloseIcon
@@ -410,7 +430,6 @@
 
 <script setup lang="ts">
 import { useOnline } from "@vueuse/core"
-import { safeDBGet } from "~/composables/useIndexedDB"
 import { splitVerseByLines } from "~/composables/useHymn"
 import CoWPopover from "~/components/cow/CoWPopover.vue"
 import type { Editor } from "@tiptap/core"
@@ -418,7 +437,6 @@ import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import type {
   ExtendedFileT,
-  Media,
   Slide,
   SlideStyle,
   Song,
@@ -437,16 +455,35 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
+const localMedia = useLocalMediaStorage()
 const isActiveOverlay = computed(
   () => appStore.currentState.activeOverlaySlide?.id === props.slide?.id
 )
 
 // Live download progress for the current slide's media. Media slides are cached
 // under `slide.id`; background videos under `slide.backgroundVideoKey`.
-const { progressFor } = useMediaDownloadProgress()
+const {
+  progressFor,
+  transferFor,
+  beginLocalSave,
+  setLocalSaveProgress,
+  completeLocalSave,
+  failLocalSave,
+} = useMediaDownloadProgress()
+const currentLocalTransfer = computed(() =>
+  props.slide
+    ? transferFor(props.slide.id) ||
+      transferFor(props.slide.backgroundVideoKey)
+    : null
+)
 const mediaDownloadProgress = computed<number | null>(() => {
   const slide = props.slide
   if (!slide) return null
+  const localTransfer =
+    transferFor(slide.id) || transferFor(slide.backgroundVideoKey)
+  if (localTransfer?.status === "pending") {
+    return localTransfer.progress * 100
+  }
   const byId = progressFor(slide.id)
   if (byId !== null) return byId
   return progressFor(slide.backgroundVideoKey)
@@ -458,6 +495,79 @@ const mediaDownloadValue = computed<number | undefined>(() =>
     ? (mediaDownloadProgress.value as number)
     : undefined
 )
+
+const retryLocalSave = async () => {
+  const slide = props.slide
+  if (!slide) return
+  beginLocalSave(slide.id)
+  try {
+    if (slide.type === slideTypes.presentation) {
+      for (const page of slide.presentationObjects || []) {
+        const response = await fetch(page.imageUrl)
+        const blob = await response.blob()
+        await localMedia.saveBlob({
+          key: `${slide.id}-page-${page.page}`,
+          groupId: slide.id,
+          category: "presentation-page",
+          kind: "image",
+          blob,
+          mimeType: blob.type || "image/png",
+          recoverable: false,
+          userInitiated: true,
+          onProgress: (fraction) =>
+            setLocalSaveProgress(slide.id, fraction),
+        })
+        page.imageUrl =
+          (await localMedia.getPlaybackUrl(
+            `${slide.id}-page-${page.page}`
+          )) || page.imageUrl
+      }
+      slide.background =
+        slide.presentationObjects?.[slide.presentationPageIndex || 0]
+          ?.imageUrl || slide.background
+    } else {
+      const file = slide.data as ExtendedFileT
+      if (!(file?.blob instanceof Blob)) {
+        throw new Error("The original session file is no longer available.")
+      }
+      const blob =
+        file.type === "image" ? await useCompressedImage(file.blob) : file.blob
+      await localMedia.saveBlob({
+        key: slide.id,
+        groupId: slide.id,
+        category: "slide",
+        kind:
+          file.type === "audio"
+            ? "audio"
+            : file.type === "video"
+            ? "video"
+            : "image",
+        blob,
+        mimeType: blob.type,
+        originalName: file.name,
+        recoverable: false,
+        userInitiated: true,
+        onProgress: (fraction) =>
+          setLocalSaveProgress(slide.id, fraction),
+      })
+      const url = await localMedia.getPlaybackUrl(slide.id)
+      if (url) {
+        file.url = url
+        if (file.type !== "audio") slide.background = url
+      }
+      delete file.blob
+    }
+    completeLocalSave(slide.id)
+    emit("slide-update", slide)
+  } catch (error) {
+    failLocalSave(slide.id, error)
+  }
+}
+
+const removeFailedMedia = () => {
+  if (!props.slide) return
+  ;(useNuxtApp().$emitter as Emitter<any>).emit("delete-slide", props.slide)
+}
 
 const emit = defineEmits([
   "slide-update",
@@ -588,10 +698,9 @@ const isEmptySongSetlist = computed(
 )
 
 /**
- * Detect if the current media slide has an image that cannot be retrieved from IndexedDB.
- * This happens when the slide was synced from another device — the background is a stale
- * blob: URL and there's no matching media entry in IndexedDB on this device.
- * Only show the upgrade notice when the image truly can't be recovered locally.
+ * Detect media that cannot be restored on this device. Every lookup goes
+ * through the shared storage service so legacy IndexedDB bytes are migrated
+ * lazily before we show the unavailable notice.
  */
 const imageNotAvailable = ref(false)
 
@@ -612,16 +721,14 @@ watch(
     // If the background is already a remote URL, it's available everywhere
     if (bg.startsWith("http://") || bg.startsWith("https://")) return
 
-    // For blob: or data: URLs, check if the media data exists in IndexedDB
     try {
-      const db = useIndexedDB()
-      const mediaObj = await safeDBGet(db.media, newSlideId)
-      if (!mediaObj?.data) {
-        // No local media data found — image is not available on this device
-        // Guard against stale watcher: only set if slide hasn't changed
-        if (props.slide?.id === newSlideId) {
-          imageNotAvailable.value = true
-        }
+      const localUrl = await localMedia.ensureLocal(newSlideId, {
+        category: "slide",
+        kind: "image",
+        groupId: newSlideId,
+      })
+      if (!localUrl && props.slide?.id === newSlideId) {
+        imageNotAvailable.value = true
       }
     } catch (err) {
       console.error("Error checking media availability:", err)
@@ -1018,12 +1125,23 @@ const removeSetlistSong = async (songIndex: number) => {
 
 const onSelectBackground = (
   backgroundType: string,
-  data: string | { video: string; key?: string }
+  data:
+    | string
+    | { image: string; key?: string }
+    | { video: string; key?: string }
 ) => {
+  const isImage = typeof data !== "string" && "image" in data
+  const isVideo = typeof data !== "string" && "video" in data
   const tempSlide = {
     ...props.slide,
-    background: typeof data === "string" ? data : data.video,
-    backgroundVideoKey: typeof data === "string" ? undefined : data.key,
+    background:
+      typeof data === "string"
+        ? data
+        : isImage
+        ? data.image
+        : data.video,
+    backgroundImageKey: isImage ? data.key : undefined,
+    backgroundVideoKey: isVideo ? data.key : undefined,
     backgroundType,
   } as Slide
   emit("slide-update", tempSlide)
@@ -1031,11 +1149,8 @@ const onSelectBackground = (
 
 // Drag-and-drop a file onto the slide preview — treated as adding a background
 // image/video, mirroring what BgImageSelection/BgVideoSelection do for uploads.
-const { isFreePlan, isTeamsPlan } = useSubscription()
-const maxDroppedBgImageSize = computed(() => (isFreePlan.value ? 3 : 10))
-const maxDroppedBgVideoSize = computed(() =>
-  isTeamsPlan.value ? Infinity : 250
-)
+const maxDroppedBgImageSize = computed(() => Infinity)
+const maxDroppedBgVideoSize = computed(() => Infinity)
 const isDraggingBackgroundFile = ref(false)
 let bgDragCounter = 0
 
@@ -1061,7 +1176,6 @@ const onBgDragLeave = (event: DragEvent) => {
 
 const addDroppedBackgroundImage = async (file: File) => {
   const online = useOnline()
-  const db = useIndexedDB()
   try {
     const compressedBlob = await useCompressedImage(file)
     const compressedFile =
@@ -1072,28 +1186,32 @@ const addDroppedBackgroundImage = async (file: File) => {
             lastModified: file.lastModified,
           })
 
-    let uploadedFile = null
+    const id = `/custom-image-bg-${useID(6)}.${file.type?.split("/")?.[1]}`
+    await localMedia.saveBlob({
+      key: id,
+      groupId: id,
+      category: "background",
+      kind: "image",
+      blob: compressedFile,
+      originalName: file.name,
+      recoverable: false,
+      userInitiated: true,
+    })
     if (online.value) {
-      uploadedFile = await useUploadImage(compressedFile)
+      try {
+        const uploadedFile = await useUploadImage(compressedFile)
+        await useIndexedDB().localMediaFiles.update(id, {
+          remoteUrl: uploadedFile.file.url,
+          recoverable: true,
+          updatedAt: new Date().toISOString(),
+        })
+      } catch (error) {
+        console.warn("Background image cloud upload failed:", error)
+      }
     }
-
-    const imageUrl = uploadedFile
-      ? uploadedFile.file.url
-      : URL.createObjectURL(compressedFile)
-    const tempMedia: Media = {
-      id: `/custom-image-bg-${useID(6)}.${file.type?.split("/")?.[1]}`,
-      data: uploadedFile ? uploadedFile.file.url : compressedFile,
-      content: "image",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    await db.cached
-      .add(tempMedia)
-      .catch((err) =>
-        console.error("Failed to save dropped background image:", err)
-      )
-
-    onSelectBackground(backgroundTypes.image, imageUrl)
+    const imageUrl = await localMedia.getPlaybackUrl(id)
+    if (!imageUrl) throw new Error("The saved image could not be opened.")
+    onSelectBackground(backgroundTypes.image, { image: imageUrl, key: id })
   } catch (error) {
     console.error("Failed to add dropped background image:", error)
     useToast().add({
@@ -1105,24 +1223,35 @@ const addDroppedBackgroundImage = async (file: File) => {
 }
 
 const addDroppedBackgroundVideo = async (file: File) => {
-  const db = useIndexedDB()
   try {
     const id = `/custom-video-bg-${useID(6)}.${file.type?.split("/")?.[1]}`
-    const tempMedia: Media = {
-      id,
-      data: file,
-      content: "video",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    await localMedia.saveBlob({
+      key: id,
+      groupId: id,
+      category: "background",
+      kind: "video",
+      blob: file,
+      originalName: file.name,
+      recoverable: false,
+      userInitiated: true,
+    })
+    const { isTeamsPlan } = useSubscription()
+    if (navigator.onLine && isTeamsPlan.value) {
+      try {
+        const uploaded = await useUploadFile(file, { name: file.name })
+        await useIndexedDB().localMediaFiles.update(id, {
+          remoteUrl: uploaded.file.url,
+          recoverable: true,
+          updatedAt: new Date().toISOString(),
+        })
+      } catch (error) {
+        console.warn("Background video cloud upload failed:", error)
+      }
     }
-    await db.cached
-      .add(tempMedia)
-      .catch((err) =>
-        console.error("Failed to save dropped background video:", err)
-      )
-
+    const videoUrl = await localMedia.getPlaybackUrl(id)
+    if (!videoUrl) throw new Error("The saved video could not be opened.")
     onSelectBackground(backgroundTypes.video, {
-      video: URL.createObjectURL(file),
+      video: videoUrl,
       key: id,
     })
   } catch (error) {

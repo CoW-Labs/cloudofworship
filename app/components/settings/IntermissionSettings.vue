@@ -40,6 +40,7 @@
                     backgroundType: backgroundTypes.video,
                     background: $event.video,
                     backgroundVideoKey: $event.key,
+                    backgroundImageKey: null,
                   })
                 "
               />
@@ -53,6 +54,7 @@
                     backgroundType: backgroundTypes.image,
                     background: $event.image,
                     backgroundVideoKey: null,
+                    backgroundImageKey: $event.key || null,
                   })
                 "
               />

@@ -87,7 +87,7 @@ const props = defineProps({
   },
   maxVideoFileSize: {
     type: Number,
-    default: 250, // Videos only (MB); Infinity = no limit
+    default: Infinity,
   },
   icon: {
     type: String,

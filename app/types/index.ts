@@ -65,6 +65,7 @@ export interface Slide {
   backgroundType?: string
   background?: string
   backgroundVideoKey?: string | null
+  backgroundImageKey?: string | null
   title?: string // For hymn and song titles, also for scripture labels (e.g Ephesians 3:1)
   songId?: string // only for hymns/songs, could be [hymn.number] or [song.id]
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
@@ -239,6 +240,37 @@ export interface Media {
   updatedAt?: string
 }
 
+export type LocalMediaBackend = "opfs" | "tauri-fs"
+export type LocalMediaCategory =
+  | "slide"
+  | "presentation-page"
+  | "background"
+  | "preset"
+export type LocalMediaKind = "image" | "audio" | "video"
+
+/**
+ * Searchable, device-local metadata for a binary file whose bytes live outside
+ * IndexedDB. The `relativePath` is always relative to the platform's managed
+ * media root and must never contain a user-supplied filename.
+ */
+export interface LocalMediaFileRecord {
+  key: string
+  groupId: string
+  backend: LocalMediaBackend
+  category: LocalMediaCategory
+  kind: LocalMediaKind
+  relativePath: string
+  mimeType: string
+  size: number
+  originalName?: string
+  remoteUrl?: string
+  recoverable: boolean
+  lastAccessedAt: string
+  createdAt: string
+  updatedAt: string
+  storageVersion: 1
+}
+
 export interface BackgroundVideo {
   id: string
   url: string
@@ -319,21 +351,25 @@ export interface AppSettings {
       backgroundType: string
       background: string
       backgroundVideoKey: string | null
+      backgroundImageKey?: string | null
     }
     hymn: {
       backgroundType: string
       background: string
       backgroundVideoKey: string | null
+      backgroundImageKey?: string | null
     }
     bible: {
       backgroundType: string
       background: string
       backgroundVideoKey: string | null
+      backgroundImageKey?: string | null
     }
     text: {
       backgroundType: string
       background: string
       backgroundVideoKey: string | null
+      backgroundImageKey?: string | null
     }
   }
   slideStyles: SlideStyle
@@ -357,7 +393,8 @@ export interface AppSettings {
     mode: "default" | "media" // "default" = church-branding screen (logo/name)
     backgroundType?: string // backgroundTypes.image | backgroundTypes.video
     background?: string // resolved URL (https / blob / object URL)
-    backgroundVideoKey?: string | null // IndexedDB (db.cached) key for video mode
+    backgroundVideoKey?: string | null // Device-local media key for video mode
+    backgroundImageKey?: string | null // Device-local media key for image mode
   }
 }
 

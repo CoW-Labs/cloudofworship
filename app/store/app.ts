@@ -570,7 +570,8 @@ export const useAppStore = defineStore("app", {
     setDefaultSlideBackground(
       type: string,
       background: string,
-      backgroundVideoKey?: string | null
+      backgroundVideoKey?: string | null,
+      backgroundImageKey?: string | null
     ) {
       console.log(
         "setDefaultSlideBackground",
@@ -586,6 +587,7 @@ export const useAppStore = defineStore("app", {
             backgroundType: type,
             background,
             backgroundVideoKey: backgroundVideoKey || null,
+            backgroundImageKey: backgroundImageKey || null,
           },
         },
       }

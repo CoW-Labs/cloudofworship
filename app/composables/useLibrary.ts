@@ -5,7 +5,7 @@ import { liveQuery } from 'dexie'
 import { useObservable } from '@vueuse/rxjs'
 import { useOnline } from '@vueuse/core'
 import fuzzysort from 'fuzzysort'
-import { safeDBGet, safeDBOperation } from './useIndexedDB'
+import { safeDBGet } from './useIndexedDB'
 
 export default function useLibrary() {
   const authStore = useAuthStore()
@@ -13,6 +13,7 @@ export default function useLibrary() {
   const toast = useToast()
   const online = useOnline()
   const getChurchId = () => authStore.church?._id || authStore.user?.churchId
+  const localMedia = useLocalMediaStorage()
 
   const toCacheableSlide = (slide: Slide): Slide | null => {
     try {
@@ -188,23 +189,22 @@ export default function useLibrary() {
     try {
       const db = useIndexedDB()
 
-      const librarySlides: LibraryItem[] = slides
-        .map((slide) => {
+      const librarySlides = slides.reduce<LibraryItem[]>((items, slide) => {
           const cacheableSlide = toCacheableSlide(slide)
-          if (!cacheableSlide) return null
+          if (!cacheableSlide) return items
 
           const slideId = cacheableSlide._id || cacheableSlide.id
-          if (!slideId) return null
+          if (!slideId) return items
 
-          return {
+          items.push({
             id: slideId,
             type: libraryTypes.slide,
             content: cacheableSlide,
             createdAt: cacheableSlide.createdAt || new Date().toISOString(),
             updatedAt: cacheableSlide.updatedAt || new Date().toISOString(),
-          }
-        })
-        .filter((item): item is LibraryItem => Boolean(item))
+          })
+          return items
+        }, [])
 
       // Replace all slide entries in a single transaction so the liveQuery only
       // emits once (after commit) and never observes the empty mid-state between
@@ -342,24 +342,23 @@ export default function useLibrary() {
     try {
       const db = useIndexedDB()
 
-      const librarySongs: LibraryItem[] = songs
-        .map((song) => {
+      const librarySongs = songs.reduce<LibraryItem[]>((items, song) => {
           const cacheableSong = toCacheableSong(song)
-          if (!cacheableSong) return null
+          if (!cacheableSong) return items
 
           // Key on the client `id` so delete/lookup (which use song.id) keep working.
           const songId = cacheableSong.id || cacheableSong._id
-          if (!songId) return null
+          if (!songId) return items
 
-          return {
+          items.push({
             id: songId,
             type: libraryTypes.song,
             content: cacheableSong,
             createdAt: cacheableSong.createdAt || new Date().toISOString(),
             updatedAt: cacheableSong.updatedAt || new Date().toISOString(),
-          }
-        })
-        .filter((item): item is LibraryItem => Boolean(item))
+          })
+          return items
+        }, [])
 
       // Replace all song entries in a single transaction so the liveQuery only
       // emits once (after commit) and never observes the empty mid-state between
@@ -473,10 +472,7 @@ export default function useLibrary() {
    * page keyed `${slideId}-page-${n}`, so a single delete by ID would miss them.
    */
   const deleteLocalMedia = async (slideId: string) => {
-    await safeDBOperation((db) => db.media.delete(slideId))
-    await safeDBOperation((db) =>
-      db.media.where('id').startsWith(`${slideId}-page-`).delete()
-    )
+    await localMedia.deleteGroup(slideId)
   }
 
   /**

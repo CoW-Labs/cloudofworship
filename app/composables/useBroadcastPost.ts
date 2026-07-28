@@ -1,4 +1,5 @@
 import type { Slide } from "~/types"
+import { isSessionMediaUrl } from "~/utils/mediaTransport"
 
 // Reuse single BroadcastChannel instance to prevent memory leaks.
 let bcInstance: BroadcastChannel | null = null
@@ -27,7 +28,12 @@ const useBroadcastPost = <T>(payload: T) => {
   // algorithm rejects with DataCloneError. Serialize the complete envelope
   // once to strip those proxies. The receiver parses it once, avoiding the old
   // payload-plus-envelope double serialization while remaining reliable.
-  bcInstance.postMessage(JSON.stringify(message))
+  bcInstance.postMessage(
+    JSON.stringify(message, (key, value) => {
+      if (key === "blob") return undefined
+      return isSessionMediaUrl(value) ? "" : value
+    })
+  )
 }
 
 export const useBroadcastOverlayPost = (

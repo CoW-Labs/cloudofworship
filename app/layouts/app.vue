@@ -91,8 +91,6 @@ import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
 import type { User } from "~/store/auth"
 import type {
-  LibraryItem,
-  Media,
   BackgroundVideo,
   Schedule,
   SlideStyle,
@@ -103,7 +101,7 @@ import type {
 } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { appWideActions } from "~/utils/constants"
-import { safeDBGet, safeDBOperation } from "~/composables/useIndexedDB"
+import { safeDBOperation } from "~/composables/useIndexedDB"
 
 useHead({
   title: "Cloud of Worship",
@@ -127,6 +125,7 @@ const config = useRuntimeConfig()
 const { getToken } = useAuthToken()
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
+const localMedia = useLocalMediaStorage()
 const appInfo = ref<AppSettings>()
 const { refreshLibrary } = useLibrary()
 const { fetchPlans } = useSubscriptionPlans()
@@ -381,28 +380,12 @@ emitter.on("close-live-window", async () => {
 
 const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
   const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
-  const savedVideos = await Promise.all(
-    videoIds.map((id) => db.cached.get(`/video-bg-${id}.mp4`))
+  const savedKeys = new Set(
+    (await localMedia.listRecords()).map((record) => record.key)
   )
-
-  const savedBgVideoMap = new Map(
-    videoIds.map((id, index) => [id, savedVideos[index]])
+  const missingVideoIds = videoIds.filter(
+    (id) => !savedKeys.has(`/video-bg-${id}.mp4`)
   )
-
-  const saveBackground = (blob: any, index: number) => {
-    const tempMedia: Media = {
-      id: `/video-bg-${index}.mp4`,
-      data: blob,
-      content: "video",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    db.cached
-      .put(tempMedia)
-      .catch((err) => console.error(`Failed to save video-bg-${index}:`, err))
-  }
-
-  const missingVideoIds = videoIds.filter((id) => !savedBgVideoMap.get(id))
 
   if (missingVideoIds.length === 0) {
     setLoadingTask("videos", "Background videos are already cached.", 100)
@@ -415,25 +398,32 @@ const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
     100
   )
 
-  const progressRef = options?.wait ? downloadProgress : ref("0")
   const downloadMissingVideos = async () => {
-    const videoDownloadPromises = missingVideoIds.map(async (id) => {
+    const downloadVideo = async (id: number) => {
       try {
-        const bgVideoPromise = await useDetailedFetch(
-          `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`,
-          progressRef
-        )
-        const bgVideoBlob = await bgVideoPromise.blob()
-        saveBackground(bgVideoBlob, id)
+        const url = `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`
+        await localMedia.downloadToLocal({
+          key: `/video-bg-${id}.mp4`,
+          groupId: `/video-bg-${id}.mp4`,
+          category: "preset",
+          kind: "video",
+          url,
+          mimeType: "video/mp4",
+          recoverable: true,
+          onProgress: (fraction) => {
+            if (options?.wait && Number.isFinite(fraction)) {
+              downloadProgress.value = (fraction * 100).toFixed(2)
+            }
+          },
+        })
       } catch (err) {
         console.warn(`Failed to download video-bg-${id} (offline?):`, err)
       }
-    })
+    }
 
     const batchSize = 2
-    for (let i = 0; i < videoDownloadPromises.length; i += batchSize) {
-      const batch = videoDownloadPromises.slice(i, i + batchSize)
-      await Promise.all(batch)
+    for (let i = 0; i < missingVideoIds.length; i += batchSize) {
+      await Promise.all(missingVideoIds.slice(i, i + batchSize).map(downloadVideo))
     }
   }
 
@@ -678,14 +668,41 @@ const retrieveSchedules = async () => {
 
 const retrieveAllMediaFilesFromDB = async () => {
   const db = useIndexedDB()
+  const mediaStorage = useLocalMediaStorage()
+
+  const defaultBackground =
+    appStore.currentState.settings.defaultBackground.default
+  if (defaultBackground?.backgroundImageKey) {
+    const url = await mediaStorage.ensureLocal(
+      defaultBackground.backgroundImageKey,
+      {
+        url: defaultBackground.background,
+        category: "background",
+        kind: "image",
+        groupId: defaultBackground.backgroundImageKey,
+      }
+    )
+    if (url) defaultBackground.background = url
+  }
+
+  const intermission = appStore.currentState.settings.intermission
+  if (intermission?.backgroundImageKey) {
+    const url = await mediaStorage.ensureLocal(intermission.backgroundImageKey, {
+      url: intermission.background,
+      category: "background",
+      kind: "image",
+      groupId: intermission.backgroundImageKey,
+    })
+    if (url) intermission.background = url
+  }
 
   // For active slides - use Promise.all instead of forEach
   const slides = [...appStore.currentState.activeSlides]
 
-  // Rehydrate each slide's media from IndexedDB → a fresh local object URL.
+  // Rehydrate each slide through the active platform media backend.
   // Local-only here (allowDownload: false) so startup stays cheap; missing
   // copies are pulled later by the non-blocking prefetch below. The helper is
-  // IndexedDB-first, so a slide whose durable `background` is now a hosted
+  // Local-first, so a slide whose durable `background` is now a hosted
   // https URL still plays from its local copy instead of streaming.
   const { rehydrateSlideMedia, prefetchScheduleMedia } = useSlideMediaCache()
 
@@ -708,10 +725,9 @@ const retrieveAllMediaFilesFromDB = async () => {
   appStore.setActiveSlides(slides)
   appStore.setSlidesLoading(false)
 
-  // Idle prefetch: download any not-yet-cached videos for this schedule into
-  // IndexedDB in the background so they're ready (and local) before service,
-  // without blocking startup.
-  prefetchScheduleMedia(slides).catch((err) =>
+  // Idle prefetch: prepare all downloadable schedule media without blocking
+  // startup.
+  prefetchScheduleMedia(slides, appStore.currentState.liveSlideId).catch((err) =>
     console.warn("Background media prefetch failed:", err)
   )
 
@@ -722,34 +738,12 @@ const retrieveAllMediaFilesFromDB = async () => {
     .toArray()
     .then((savedSlides) => {
       // Process saved slides in background
-      savedSlides?.forEach((slide) => {
-        if ((slide.content as Slide)?.background?.startsWith("blob:")) {
-          safeDBGet(db.media, slide.id)
-            .then((resp) => {
-              if (!resp) return
-              const media = resp
-
-              const arrayBuffer: ArrayBuffer = media?.data as ArrayBuffer
-              const blob = new Blob([arrayBuffer], {
-                type: media?.content?.type,
-              })
-              const fileUrl = URL.createObjectURL(blob)
-              const updatedLibraryItem: LibraryItem = {
-                ...slide,
-                content: {
-                  ...slide.content,
-                  background: fileUrl,
-                  data: { ...(slide.content as Slide).data, url: fileUrl },
-                } as Slide,
-              }
-              db.library
-                .update(slide.id, updatedLibraryItem)
-                .catch((err) =>
-                  console.error("Failed to update library item:", err)
-                )
-            })
-            .catch((err) => console.error("Failed to get media:", err))
-        }
+      savedSlides?.forEach(async (item) => {
+        const content = item.content as Slide
+        const rehydrated = await rehydrateSlideMedia(content, {
+          allowDownload: false,
+        })
+        await db.library.update(item.id, { ...item, content: rehydrated })
       })
     })
     .catch((err) => console.error("Failed to get saved slides:", err))
@@ -759,14 +753,8 @@ const retrieveAllMediaFilesFromDB = async () => {
 
 const setCachedVideosURL = async () => {
   const cachedVideos = await useBackgroundVideos()
-  const tempCachedVideos: BackgroundVideo[] = cachedVideos?.map(
-    (cached: Media) => ({
-      id: cached?.id,
-      url: URL.createObjectURL(cached?.data as Blob),
-    })
-  )
-  cachedVideosURLs.value = tempCachedVideos
-  appStore.setBackgroundVideos(tempCachedVideos)
+  cachedVideosURLs.value = cachedVideos
+  appStore.setBackgroundVideos(cachedVideos)
 }
 
 // WINDOW MANAGEMENT CODE STARTS HERE
@@ -1075,6 +1063,9 @@ async function openWindows() {
 // WINDOW MANAGEMENT CODE ENDS HERE
 
 onMounted(async () => {
+  useLocalMediaStorage()
+    .reconcileOrphans()
+    .catch((err) => console.warn("Local media reconciliation failed:", err))
   const [, advertResult] = await Promise.allSettled([
     downloadEssentialResources().catch((err) => {
       console.error("Failed to finish loading resources:", err)

@@ -85,6 +85,7 @@ const lastOverlayBroadcastTs = ref(0)
 // same-slide broadcasts (e.g. verse changes) don't re-download, re-create object
 // URLs, or reload the <video>.
 const { rehydrateSlideMedia } = useSlideMediaCache()
+const localMedia = useLocalMediaStorage()
 const localizedLiveMedia = new Map<
   string,
   { background?: string; dataUrl?: string }
@@ -93,6 +94,7 @@ const localizedLiveMedia = new Map<
 const slideNeedsLocalMedia = (slide: Slide) =>
   slide.type === slideTypes.media ||
   slide.type === slideTypes.presentation ||
+  !!slide.backgroundImageKey ||
   !!slide.backgroundVideoKey
 
 useHead({
@@ -333,6 +335,13 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  const urls = new Set<string>()
+  localizedLiveMedia.forEach((media) => {
+    if (media.background) urls.add(media.background)
+    if (media.dataUrl) urls.add(media.dataUrl)
+  })
+  urls.forEach((url) => localMedia.releasePlaybackUrl(url))
+  localizedLiveMedia.clear()
   window.removeEventListener("fullscreenchange", checkFullScreen)
   window.removeEventListener("webkitfullscreenchange", checkFullScreen)
   window.removeEventListener("mozfullscreenchange", checkFullScreen)
