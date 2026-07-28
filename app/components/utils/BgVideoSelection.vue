@@ -78,7 +78,7 @@
         size="sm"
         icon="i-bx-film"
         accept="video/*"
-        :maxFileSize="maxFileSize"
+        :maxVideoFileSize="maxFileSize"
         @change="saveAndSelectVideos($event)"
         :loading="videoUploadLoading"
       />
@@ -118,17 +118,17 @@
 </template>
 
 <script setup lang="ts">
+import { useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
-import { useAuthStore } from "~/store/auth"
-import type { Media, BackgroundVideo } from "~/types"
+import type { BackgroundVideo } from "~/types"
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
-const { isFreePlan } = useSubscription()
+const online = useOnline()
+const { isTeamsPlan } = useSubscription()
 
-const maxFileSize = computed(() => (isFreePlan ? 3 : 10))
+const maxFileSize = computed(() => Infinity)
 const toast = useToast()
-const db = useIndexedDB()
+const localMedia = useLocalMediaStorage()
 
 defineProps<{
   value?: string
@@ -166,15 +166,18 @@ const revokeLocalVideoObjectUrls = () => {
   )
   localVideoObjectUrls.forEach((url) => {
     if (!usedBackgrounds.has(url)) {
-      URL.revokeObjectURL(url)
+      localMedia.releasePlaybackUrl(url)
     }
   })
   localVideoObjectUrls.clear()
 }
 
 const getAllLocallySavedVideos = async () => {
-  const db = useIndexedDB()
-  const videos = await db.cached.where({ content: "video" }).toArray()
+  const videos = (await localMedia.listRecords()).filter(
+    (record) =>
+      record.kind === "video" &&
+      (record.category === "background" || record.category === "preset")
+  )
   const videoTypes = [
     ".mp4",
     ".webm",
@@ -195,18 +198,19 @@ const getAllLocallySavedVideos = async () => {
   const chunkSize = 15
   for (let i = 0; i < videos.length; i += chunkSize) {
     const chunk = videos.slice(i, i + chunkSize)
-    chunk.forEach((video) => {
-      if (!videoTypes.some((extension) => video.id.includes(extension))) {
-        return
-      }
+    for (const video of chunk) {
+      if (!videoTypes.some((extension) => video.key.includes(extension))) continue
 
-      const blobURL = URL.createObjectURL(video.data as unknown as Blob)
-      localVideoObjectUrls.add(blobURL)
-      locallySavedVideos.push({ id: video.id, url: blobURL })
-      if (video.id === bgVideoToBeSelected.value) {
-        bgVideoToBeSelected.value = blobURL
+      const playbackUrl = await localMedia.getPlaybackUrl(video.key)
+      if (!playbackUrl) continue
+      if (playbackUrl.startsWith("blob:")) {
+        localVideoObjectUrls.add(playbackUrl)
       }
-    })
+      locallySavedVideos.push({ id: video.key, url: playbackUrl })
+      if (video.key === bgVideoToBeSelected.value) {
+        bgVideoToBeSelected.value = playbackUrl
+      }
+    }
 
     // Allow UI to breathe between chunks
     if (i + chunkSize < videos.length) {
@@ -225,8 +229,6 @@ const getAllLocallySavedVideos = async () => {
 const saveAndSelectVideos = async (files: File[]) => {
   if (!files || files.length === 0) return
 
-  const db = useIndexedDB()
-
   videoUploadLoading.value = true
   emit("loading-change", true)
   totalVideos.value = files.length
@@ -237,22 +239,37 @@ const saveAndSelectVideos = async (files: File[]) => {
       currentVideoIndex.value = i + 1
 
       const randomId = useID(6)
-      const tempMedia: Media = {
-        id: `/custom-video-bg-${randomId}.${file.type?.split("/")?.[1]}`,
-        data: file,
-        content: "video",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      const mediaKey = `/custom-video-bg-${randomId}.${
+        file.type?.split("/")?.[1]
+      }`
+      await localMedia.saveBlob({
+        key: mediaKey,
+        groupId: mediaKey,
+        category: "background",
+        kind: "video",
+        blob: file,
+        mimeType: file.type,
+        originalName: file.name,
+        recoverable: false,
+        userInitiated: true,
+      })
+      if (online.value && isTeamsPlan.value) {
+        try {
+          const uploaded = await useUploadFile(file, { name: file.name })
+          await useIndexedDB().localMediaFiles.update(mediaKey, {
+            remoteUrl: uploaded.file.url,
+            recoverable: true,
+            updatedAt: new Date().toISOString(),
+          })
+        } catch (error) {
+          console.warn("Background video cloud upload failed:", error)
+        }
       }
-
-      await db.cached
-        .add(tempMedia)
-        .catch((err) => console.error("Failed to save custom video:", err))
 
       // Select the last added video
       if (i === files.length - 1) {
-        bgVideoToBeSelected.value = tempMedia.id
-        selectedVideoKey = tempMedia.id
+        bgVideoToBeSelected.value = mediaKey
+        selectedVideoKey = mediaKey
       }
     }
 
@@ -263,6 +280,15 @@ const saveAndSelectVideos = async (files: File[]) => {
         key: selectedVideoKey || bgVideoToBeSelected.value,
       })
     }
+  } catch (error) {
+    console.error("Failed to save custom video:", error)
+    toast.add({
+      title: "Local media storage is unavailable",
+      description:
+        "This browser cannot durably save the background video.",
+      icon: "i-bx-error",
+      color: "red",
+    })
   } finally {
     videoUploadLoading.value = false
     emit("loading-change", false)

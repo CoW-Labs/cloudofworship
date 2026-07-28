@@ -26,29 +26,53 @@
             class="w-6 h-6 animate-spin"
           />
         </div>
+        <div
+          class="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-gray-50 p-3 text-xs dark:bg-[#0d1420]"
+        >
+          <div>
+            <span class="text-gray-500 dark:text-[#9aa3b2]">Backend</span>
+            <p class="font-medium">{{ backendLabel }}</p>
+          </div>
+          <div>
+            <span class="text-gray-500 dark:text-[#9aa3b2]">Persistence</span>
+            <p class="font-medium">{{ persistenceLabel }}</p>
+          </div>
+          <div>
+            <span class="text-gray-500 dark:text-[#9aa3b2]">Available</span>
+            <p class="font-medium">{{ formatBytes(localAvailableBytes) }}</p>
+          </div>
+          <div>
+            <span class="text-gray-500 dark:text-[#9aa3b2]">Transfers</span>
+            <p class="font-medium">
+              {{ pendingTransferCount }} writes,
+              {{ migrationCount }} migrations,
+              {{ failedTransferCount }} failed
+            </p>
+          </div>
+        </div>
         <div class="storage-chart flex rounded-full overflow-hidden my-3 w-full">
           <div
             class="storage-chart-bar-inner h-[10px] bg-primary-500 transition-all"
             :style="{
-              width: `${(cachedTableSize / totalDataSize) * 100}%`,
+              width: `${(cachedTableSize / storageChartTotal) * 100}%`,
             }"
           ></div>
           <div
             class="storage-chart-bar-inner h-[10px] bg-teal-500 transition-all"
             :style="{
-              width: `${(libraryTableSize / totalDataSize) * 100}%`,
+              width: `${(libraryTableSize / storageChartTotal) * 100}%`,
             }"
           ></div>
           <div
             class="storage-chart-bar-inner h-[10px] bg-cyan-500 transition-all"
             :style="{
-              width: `${(bibleAndHymnsTableSize / totalDataSize) * 100}%`,
+              width: `${(bibleAndHymnsTableSize / storageChartTotal) * 100}%`,
             }"
           ></div>
           <div
             class="storage-chart-bar-inner h-[10px] bg-blue-500 transition-all"
             :style="{
-              width: `${(mediaTableSize / totalDataSize) * 100}%`,
+              width: `${(mediaTableSize / storageChartTotal) * 100}%`,
             }"
           ></div>
         </div>
@@ -103,7 +127,7 @@
                   <div
                     class="colored-circle rounded-full w-3 h-3 bg-blue-500"
                   ></div>
-                  Media Slides (Images, Videos, Audio)
+                  Local Media (Images, Videos, Audio)
                   <span
                     v-if="mediaGroups.length"
                     class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#222938] text-gray-500 dark:text-[#9aa3b2]"
@@ -155,7 +179,8 @@
             <div class="min-w-0 flex-1">
               <p class="text-sm font-medium truncate">{{ group.name }}</p>
               <p class="text-xs text-gray-500 dark:text-[#9aa3b2]">
-                {{ group.subtitle }}
+                {{ group.subtitle }} ·
+                {{ group.recoverable ? "recoverable" : "local only" }}
               </p>
             </div>
             <span
@@ -278,7 +303,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Media, Slide } from "~/types"
+import type { LocalMediaCategory, Slide } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { useAuthStore } from "~/store/auth"
 import { useAppStore } from "~/store/app"
@@ -290,6 +315,9 @@ const online = useOnline()
 const emitter = useNuxtApp().$emitter as any
 const toast = useToast()
 const db = useIndexedDB()
+const localMedia = useLocalMediaStorage()
+const { deleteSlide: deleteLibrarySlide } = useLibrary()
+const { localTransfers, migrationCount } = useMediaDownloadProgress()
 const loading = ref<boolean>(true)
 const cachedTableSize = ref<number>(0)
 const libraryTableSize = ref<number>(0)
@@ -297,6 +325,31 @@ const bibleAndHymnsTableSize = ref<number>(0)
 const deletePrompt = ref<boolean>(false)
 const deletePromptText = ref<string>("")
 const activeTab = ref<number>(0)
+const localAvailableBytes = ref(0)
+const localPersistent = ref<boolean | null>(null)
+const localStorageAvailable = ref(true)
+const backendLabel = computed(() =>
+  localMedia.backend === "opfs" ? "OPFS" : "Native filesystem"
+)
+const persistenceLabel = computed(() => {
+  if (!localStorageAvailable.value) return "Unsupported"
+  if (localMedia.backend === "tauri-fs") return "Persistent"
+  if (localPersistent.value === true) return "Persistent"
+  if (localPersistent.value === false) return "Best effort"
+  return "Unknown"
+})
+const pendingTransferCount = computed(
+  () =>
+    Object.values(localTransfers).filter(
+      (transfer) => transfer.status === "pending"
+    ).length
+)
+const failedTransferCount = computed(
+  () =>
+    Object.values(localTransfers).filter(
+      (transfer) => transfer.status === "failed"
+    ).length
+)
 
 watch(activeTab, async (tab) => {
   if (tab !== 1 || !online.value || !authStore.user?.churchId) return
@@ -315,6 +368,9 @@ interface MediaGroup {
   name: string
   subtitle: string
   slideExists: boolean
+  libraryExists: boolean
+  category: LocalMediaCategory
+  recoverable: boolean
 }
 
 const kindMeta: Record<
@@ -341,7 +397,13 @@ const mediaExpanded = ref<boolean>(false)
 const removeAllMediaPrompt = ref<boolean>(false)
 
 const mediaTableSize = computed(() =>
-  mediaGroups.value.reduce((total, group) => total + group.sizeMB, 0)
+  mediaGroups.value
+    .filter(
+      (group) =>
+        group.category === "slide" ||
+        group.category === "presentation-page"
+    )
+    .reduce((total, group) => total + group.sizeMB, 0)
 )
 
 const getMediaKind = (mime: string, pageCount: number): MediaKind => {
@@ -399,6 +461,7 @@ const totalDataSize = computed(() => {
     mediaTableSize.value
   )
 })
+const storageChartTotal = computed(() => Math.max(totalDataSize.value, 0.001))
 
 const formatMegabytes = (sizeInMegabytes: number) => {
   if (sizeInMegabytes >= 1024) {
@@ -407,6 +470,8 @@ const formatMegabytes = (sizeInMegabytes: number) => {
     return `${sizeInMegabytes.toFixed(2)} MB`
   }
 }
+
+const formatBytes = (bytes: number) => formatMegabytes(bytes / 1024 / 1024)
 
 const getStoreSize = async (store: any) => {
   let storeSize = 0
@@ -423,35 +488,69 @@ const loadMediaFiles = async () => {
       ?.filter((slide) => slide?.id)
       .map((slide) => [slide.id, slide])
   )
+  const librarySlideIds = new Set(
+    (await db.library.where("type").equals("slide").toArray()).flatMap(
+      (item) => {
+        const slide = item.content as Slide
+        return [item.id, slide?.id, slide?._id].filter(
+          (id): id is string => !!id
+        )
+      }
+    )
+  )
   const groups = new Map<
     string,
-    { ids: string[]; size: number; mime: string }
+    {
+      ids: string[]
+      size: number
+      mime: string
+      category: LocalMediaCategory
+      recoverable: boolean
+      originalName?: string
+    }
   >()
 
-  await safeDBOperation((database) =>
-    database.media.each((item: Media) => {
-      const id = item.id
-      const baseId = id.includes("-page-") ? id.split("-page-")[0] : id
-      const size =
-        (item?.data as ArrayBuffer)?.byteLength || item?.content?.size || 0
-
-      let group = groups.get(baseId)
-      if (!group) {
-        group = { ids: [], size: 0, mime: item?.content?.type || "" }
-        groups.set(baseId, group)
+  const records = await localMedia.listRecords()
+  for (const record of records) {
+    const baseId = record.groupId
+    let group = groups.get(baseId)
+    if (!group) {
+      group = {
+        ids: [],
+        size: 0,
+        mime: record.mimeType,
+        category: record.category,
+        recoverable: true,
+        originalName: record.originalName,
       }
-      group.ids.push(id)
-      group.size += size
-    })
-  )
+      groups.set(baseId, group)
+    }
+    group.ids.push(record.key)
+    group.size += record.size
+    group.recoverable = group.recoverable && record.recoverable
+  }
+
+  cachedTableSize.value =
+    records
+      .filter(
+        (record) =>
+          record.category === "background" || record.category === "preset"
+      )
+      .reduce((total, record) => total + record.size, 0) /
+    1024 /
+    1024
 
   mediaGroups.value = Array.from(groups.entries())
     .map(([baseId, group]) => {
       const slide = slideMap.get(baseId)
-      const kind = getMediaKind(group.mime, group.ids.length)
+      const kind =
+        group.category === "presentation-page"
+          ? "presentation"
+          : getMediaKind(group.mime, group.ids.length)
       const name =
         slide?.name ||
         (slide?.data as any)?.name ||
+        group.originalName ||
         `Media ${baseId.slice(0, 6)}`
       const sizeMB = group.size / 1024 / 1024
       const subtitle =
@@ -468,55 +567,80 @@ const loadMediaFiles = async () => {
         name,
         subtitle,
         slideExists: !!slide,
+        libraryExists: librarySlideIds.has(baseId),
+        category: group.category,
+        recoverable: group.recoverable,
       }
     })
     .sort((a, b) => b.size - a.size)
 }
 
 const deleteMediaGroup = async (group: MediaGroup) => {
-  mediaGroups.value = mediaGroups.value.filter(
-    (item) => item.baseId !== group.baseId
-  )
-
-  if (group.slideExists) {
-    // Reuse full slide-deletion flow (API + socket broadcast + DB cleanup,
-    // respecting any copy saved in the Library).
-    emitter.emit("delete-slide", { id: group.baseId })
-  } else {
-    // Orphaned media record with no owning slide — free it directly.
-    for (const id of group.ids) {
-      await safeDBOperation((database) => database.media.delete(id))
+  try {
+    if (group.libraryExists) {
+      await deleteLibrarySlide(group.baseId)
     }
+    if (group.slideExists) {
+      // Reuse full slide-deletion flow (API + socket broadcast + DB cleanup,
+      // respecting any copy saved in the Library).
+      emitter.emit("delete-slide", { id: group.baseId })
+    } else if (!group.libraryExists) {
+      await localMedia.deleteGroup(group.baseId)
+    }
+    mediaGroups.value = mediaGroups.value.filter(
+      (item) => item.baseId !== group.baseId
+    )
+    toast.add({ title: `${group.name} removed`, icon: "i-tabler-trash" })
+  } catch (error: any) {
+    toast.add({
+      title: "Media is still in use",
+      description: error?.message,
+      icon: "i-bx-error",
+      color: "red",
+    })
   }
-
-  toast.add({ title: `${group.name} removed`, icon: "i-tabler-trash" })
 }
 
 const removeAllMedia = async () => {
   const groups = [...mediaGroups.value]
-  mediaGroups.value = []
   removeAllMediaPrompt.value = false
+  const retained: MediaGroup[] = []
 
   for (const group of groups) {
-    if (group.slideExists) {
-      emitter.emit("delete-slide", { id: group.baseId })
-    } else {
-      for (const id of group.ids) {
-        await safeDBOperation((database) => database.media.delete(id))
+    try {
+      if (group.libraryExists) {
+        await deleteLibrarySlide(group.baseId)
       }
+      if (group.slideExists) {
+        emitter.emit("delete-slide", { id: group.baseId })
+      } else if (!group.libraryExists) {
+        await localMedia.deleteGroup(group.baseId)
+      }
+    } catch {
+      retained.push(group)
     }
   }
+  mediaGroups.value = retained
 
-  toast.add({ title: "All media files removed", icon: "i-tabler-trash" })
+  toast.add({
+    title: retained.length
+      ? "Media still in use was kept"
+      : "All media files removed",
+    icon: retained.length ? "i-bx-info-circle" : "i-tabler-trash",
+  })
 }
 
 const calculateBackgroundVideosAndImagesTableSize = async () => {
-  let totalSize = 0
-  db.cached.count
-  await db.cached.each((item: any) => {
-    totalSize += item?.data?.size || 0
-  })
-  cachedTableSize.value = totalSize / 1024 / 1024
+  const records = await localMedia.listRecords()
+  cachedTableSize.value =
+    records
+      .filter(
+        (record) =>
+          record.category === "background" || record.category === "preset"
+      )
+      .reduce((total, record) => total + record.size, 0) /
+    1024 /
+    1024
 }
 
 const calculateLibraryTableSize = async () => {
@@ -531,6 +655,7 @@ const calculateBibleAndHymnsTableSize = async () => {
 const deleteAllData = async () => {
   loading.value = true
 
+  await localMedia.clearAll()
   await db.delete()
   deletePrompt.value = false
   deletePromptText.value = ""
@@ -539,6 +664,12 @@ const deleteAllData = async () => {
 
 onMounted(async () => {
   loading.value = true
+  localStorageAvailable.value = await localMedia.isAvailable()
+  if (localStorageAvailable.value) {
+    const capacity = await localMedia.estimateCapacity()
+    localAvailableBytes.value = capacity.available
+    localPersistent.value = capacity.persistent
+  }
   await loadMediaFiles()
   await calculateBackgroundVideosAndImagesTableSize()
   await calculateLibraryTableSize()

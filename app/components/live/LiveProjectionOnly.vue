@@ -424,24 +424,48 @@ const isIntermissionMedia = computed(
     intermissionSettings.value?.mode === "media" &&
     !!intermissionSettings.value?.background
 )
+const intermissionImageLocalUrl = ref<string | null>(null)
 const intermissionImageUrl = computed(() =>
   intermissionSettings.value?.backgroundType === backgroundTypes.image
-    ? intermissionSettings.value?.background || null
+    ? intermissionImageLocalUrl.value ||
+      intermissionSettings.value?.background ||
+      null
     : null
 )
 // Resolved LOCAL object URL for the intermission video (created in THIS
 // document). Kept ready even while a slide is live so switching to intermission
 // is instant; the <BackgroundVideo> only mounts inside the idle v-else block.
 const intermissionVideoUrl = ref<string | null>(null)
+const localMedia = useLocalMediaStorage()
 
 const revokeIntermissionVideoUrl = () => {
-  if (intermissionVideoUrl.value?.startsWith("blob:")) {
-    URL.revokeObjectURL(intermissionVideoUrl.value)
-  }
+  localMedia.releasePlaybackUrl(intermissionVideoUrl.value)
 }
 
 const resolveIntermissionVideo = async () => {
   const s = intermissionSettings.value
+  if (
+    s?.mode === "media" &&
+    s?.backgroundType === backgroundTypes.image &&
+    s?.backgroundImageKey
+  ) {
+    const previous = intermissionImageLocalUrl.value
+    intermissionImageLocalUrl.value = await localMedia.ensureLocal(
+      s.backgroundImageKey,
+      {
+        url: s.background,
+        category: "background",
+        kind: "image",
+        groupId: s.backgroundImageKey,
+      }
+    )
+    if (previous && previous !== intermissionImageLocalUrl.value) {
+      localMedia.releasePlaybackUrl(previous)
+    }
+  } else if (intermissionImageLocalUrl.value) {
+    localMedia.releasePlaybackUrl(intermissionImageLocalUrl.value)
+    intermissionImageLocalUrl.value = null
+  }
   if (
     s?.mode !== "media" ||
     s?.backgroundType !== backgroundTypes.video ||
@@ -453,8 +477,8 @@ const resolveIntermissionVideo = async () => {
   }
 
   // Local-first: resolve (downloading once if needed) the cached video into a
-  // fresh object URL. A non-media slide type + backgroundVideoKey routes through
-  // rehydrateBackgroundVideoSlide, which reads db.cached by key — never streams.
+  // fresh playback URL. A non-media slide type + backgroundVideoKey routes
+  // through the shared local media service.
   const resolved = await rehydrateSlideMedia(
     {
       id: "__intermission__",
@@ -468,8 +492,8 @@ const resolveIntermissionVideo = async () => {
 
   const prev = intermissionVideoUrl.value
   intermissionVideoUrl.value = resolved.background || null
-  if (prev && prev !== intermissionVideoUrl.value && prev.startsWith("blob:")) {
-    URL.revokeObjectURL(prev)
+  if (prev && prev !== intermissionVideoUrl.value) {
+    localMedia.releasePlaybackUrl(prev)
   }
 }
 
@@ -479,7 +503,10 @@ watch(
   { deep: true }
 )
 onMounted(() => resolveIntermissionVideo())
-onBeforeUnmount(() => revokeIntermissionVideoUrl())
+onBeforeUnmount(() => {
+  revokeIntermissionVideoUrl()
+  localMedia.releasePlaybackUrl(intermissionImageLocalUrl.value)
+})
 
 // The slide currently rendered in the crossfading face. It lags props.slide by
 // the (image) preload so the incoming background doesn't flash blank mid-fade.

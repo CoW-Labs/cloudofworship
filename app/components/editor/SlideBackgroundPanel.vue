@@ -37,7 +37,7 @@
             background-panel
             hide-upload
             :value="slide?.background"
-            @select="$emit('select', backgroundTypes.image, $event.image)"
+            @select="$emit('select', backgroundTypes.image, $event)"
             @loading-change="$emit('loading-change', $event)"
           />
         </div>
@@ -111,16 +111,22 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: "select", type: string, data: string | { video: string; key?: string }): void
+  (
+    e: "select",
+    type: string,
+    data:
+      | string
+      | { image: string; key?: string }
+      | { video: string; key?: string }
+  ): void
   (e: "loading-change", loading: boolean): void
   (e: "upload-files", files: File[], kind: "image" | "video"): void
   (e: "resize", size: PanelSize): void
   (e: "close"): void
 }>()
 
-const { isFreePlan, isTeamsPlan } = useSubscription()
-const maxImageSize = computed(() => (isFreePlan.value ? 3 : 10))
-const maxVideoSize = computed(() => (isTeamsPlan.value ? Infinity : 250))
+const maxImageSize = computed(() => Infinity)
+const maxVideoSize = computed(() => Infinity)
 
 const isAudio = computed(() =>
   (props.slide?.data as ExtendedFileT)?.type?.includes("audio")

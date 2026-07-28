@@ -2,6 +2,7 @@ import { useDebounceFn, useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
+import { toTransportSafeSlide } from "~/utils/mediaTransport"
 import {
   getAPIErrorMessage,
   isForbiddenError,
@@ -73,6 +74,7 @@ export default function useSlides() {
     const bearsMedia =
       liveSlide.type === slideTypes.media ||
       liveSlide.type === slideTypes.presentation ||
+      !!liveSlide.backgroundImageKey ||
       !!liveSlide.backgroundVideoKey
     if (!isRemote || !bearsMedia) return
 
@@ -209,13 +211,14 @@ export default function useSlides() {
       }
 
       loading.value = true
+      const transportSlide = await toTransportSafeSlide(slide)
       // appStore.setSlidesLoading(true)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides`,
         {
           method: 'POST',
-          body: slide,
+          body: transportSlide,
           key: 'create-slide',
         }
       )
@@ -268,12 +271,15 @@ export default function useSlides() {
       }
 
       loading.value = true
+      const transportSlides = await Promise.all(
+        slides.map((slide) => toTransportSafeSlide(slide))
+      )
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/batch`,
         {
           method: 'POST',
-          body: slides,
+          body: transportSlides,
           key: `batch-create-slides-${Date.now()}`,
         }
       )
@@ -337,12 +343,13 @@ export default function useSlides() {
       }
 
       loading.value = true
+      const transportSlide = await toTransportSafeSlide(slide)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/${slide._id}`,
         {
           method: 'PUT',
-          body: slide,
+          body: transportSlide,
           key: `update-slide-${slide._id}`,
         }
       )
@@ -391,13 +398,16 @@ export default function useSlides() {
       }
 
       loading.value = true
+      const transportSlides = await Promise.all(
+        slides.map((slide) => toTransportSafeSlide(slide))
+      )
       // appStore.setSlidesLoading(true)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/batch`,
         {
           method: 'PUT',
-          body: slides,
+          body: transportSlides,
           key: 'batch-update-slides',
           dedupe: 'defer',
         }
@@ -574,13 +584,14 @@ export default function useSlides() {
 
       loading.value = true
       appStore.setSlidesLoading(true)
+      const transportSlide = await toTransportSafeSlide(slide)
 
       await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/${slide._id}/save`,
         {
           method: 'PUT',
           // Send the full slide so the backend can recreate it if it was deleted
-          body: slide,
+          body: transportSlide,
           key: `save-slide-${slide._id}`,
         }
       )

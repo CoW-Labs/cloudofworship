@@ -2,6 +2,7 @@ import type { AppSettings } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { useDebounceFn } from "@vueuse/core"
+import { toTransportSafeMediaSetting } from "~/utils/mediaTransport"
 
 // Track the timestamp of the last local settings change across composable instances
 // so that fetchUserSettings can skip overwriting in-flight user edits
@@ -148,12 +149,25 @@ export const useUserSettings = () => {
       error.value = null
 
       const settingsToSave = settings || appStore.currentState.settings
+      const safeDefaultBackground = Object.fromEntries(
+        await Promise.all(
+          Object.entries(settingsToSave.defaultBackground).map(
+            async ([key, value]) => [
+              key,
+              await toTransportSafeMediaSetting(value),
+            ]
+          )
+        )
+      )
+      const safeIntermission = await toTransportSafeMediaSetting(
+        settingsToSave.intermission
+      )
 
       // Extract only the fields that should be saved to the backend
       const backendSettings = {
         defaultFont: settingsToSave.defaultFont,
         defaultBibleVersion: settingsToSave.defaultBibleVersion,
-        defaultBackground: settingsToSave.defaultBackground,
+        defaultBackground: safeDefaultBackground,
         slideStyles: settingsToSave.slideStyles,
         overlaySettings: settingsToSave.overlaySettings,
         bibleVersions: settingsToSave.bibleVersions,
@@ -168,7 +182,7 @@ export const useUserSettings = () => {
           settingsToSave.transcriptionVoiceBibleVersionCommands ?? true,
         transitionInterval: settingsToSave.transitionInterval,
         alertLimit: settingsToSave.alertLimit,
-        intermission: settingsToSave.intermission,
+        intermission: safeIntermission,
       }
 
       // Use unique key with timestamp to prevent caching

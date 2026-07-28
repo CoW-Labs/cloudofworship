@@ -37,7 +37,8 @@
                 appStore.setDefaultSlideBackground(
                   backgroundTypes.image,
                   $event.image,
-                  null
+                  null,
+                  $event.key
                 )
               "
             />

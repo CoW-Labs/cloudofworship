@@ -159,6 +159,7 @@ import type {
   ExtendedFileT,
   PresentationObject,
 } from "~/types"
+import { toTransportSafePayload } from "~/utils/mediaTransport"
 import { appWideActions } from "~/utils/constants"
 import { isNotFoundError } from "~/utils/apiErrors"
 
@@ -208,9 +209,8 @@ const { appendSongToSetlist } = useSongSetlist()
 const online = useOnline()
 
 // Drag-and-drop media files onto the slide grid — mirrors the AddMedia.vue flow
-const { isFreePlan, isTeamsPlan } = useSubscription()
-const maxDroppedImageSize = computed(() => (isFreePlan.value ? 3 : 10))
-const maxDroppedVideoSize = computed(() => (isTeamsPlan.value ? Infinity : 250))
+const maxDroppedImageSize = computed(() => Infinity)
+const maxDroppedVideoSize = computed(() => Infinity)
 const isDraggingMediaFile = ref(false)
 let mediaDragCounter = 0
 
@@ -291,14 +291,15 @@ const onMediaDrop = (event: DragEvent) => {
  * Send slide update via Socket.IO for realtime collaboration
  * Only sends when online. Includes tabId to allow same user on different tabs/devices to receive updates
  */
-const broadcastSlideUpdate = (action: string, data: any) => {
+const broadcastSlideUpdate = async (action: string, data: any) => {
   // Don't broadcast when offline
   if (!online.value) return
 
   const nuxtApp = useNuxtApp()
   const socket = nuxtApp.$socketio as any
   if (socket?.connected) {
-    socket.emit(action, { ...data, tabId: tabSessionId })
+    const safeData = await toTransportSafePayload(data)
+    socket.emit(action, { ...safeData, tabId: tabSessionId })
   }
 }
 
@@ -524,7 +525,74 @@ const clearSlideOverlay = () => {
   usePosthogCapture("SLIDE_OVERLAY_CLEARED")
 }
 
-const handleTakeLiveAction = (slide: Slide) => {
+const { isLocalMediaReady, transferFor } = useMediaDownloadProgress()
+const projectionMediaStorage = useLocalMediaStorage()
+const { rehydrateSlideMedia: prepareSlideMediaForProjection } =
+  useSlideMediaCache()
+
+const handleTakeLiveAction = async (slide: Slide) => {
+  const requiredKeys = [
+    ...(slide.type === slideTypes.media ||
+    slide.type === slideTypes.presentation
+      ? [slide.id]
+      : []),
+    ...(slide.backgroundVideoKey ? [slide.backgroundVideoKey] : []),
+    ...(slide.backgroundImageKey ? [slide.backgroundImageKey] : []),
+  ]
+  const blockedKey = requiredKeys.find((key) => !isLocalMediaReady(key))
+  if (blockedKey) {
+    const transfer = transferFor(blockedKey)
+    toast.add({
+      title:
+        transfer?.status === "failed"
+          ? "Media is not saved locally"
+          : "Media is still being saved",
+      description:
+        transfer?.status === "failed"
+          ? "Retry or remove this media before taking it live."
+          : "Wait for local storage to finish before taking it live.",
+      icon: "i-bx-error",
+      color: "red",
+    })
+    return
+  }
+
+  const externalType = (slide.data as any)?.type
+  const localKeys = [
+    ...(slide.type === slideTypes.media &&
+    externalType !== "youtube" &&
+    externalType !== "vimeo"
+      ? [slide.id]
+      : []),
+    ...(slide.type === slideTypes.presentation
+      ? (slide.presentationObjects || []).map(
+          (page) => `${slide.id}-page-${page.page}`
+        )
+      : []),
+    ...(slide.backgroundVideoKey ? [slide.backgroundVideoKey] : []),
+    ...(slide.backgroundImageKey ? [slide.backgroundImageKey] : []),
+  ]
+
+  if (localKeys.length) {
+    await prepareSlideMediaForProjection(slide, { allowDownload: true })
+    const verified = await Promise.all(
+      localKeys.map(async (key) =>
+        Boolean(await projectionMediaStorage.getPlaybackUrl(key))
+      )
+    )
+    if (verified.some((value) => !value)) {
+      toast.add({
+        title: "Media is not ready for projection",
+        description:
+          "A verified local copy is required before this slide can go live.",
+        icon: "i-bx-error",
+        color: "red",
+      })
+      return
+    }
+    appStore.updateSlideInActiveSlides(slide)
+  }
+
   if (slide.slideMode === "overlay") {
     if (appStore.currentState.activeOverlaySlide?.id === slide.id) {
       clearSlideOverlay()
@@ -1450,26 +1518,10 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     await deleteSlideAPI(tempSlide)
   }
 
-  // Delete Probable Media files linked in DB (as long as they are not saved in Library)
-  const db = useIndexedDB()
+  // Delete local media bytes and metadata when no library item still owns it.
   const itemSaved = await getLibraryItem(clientSlideId)
   if (!itemSaved) {
-    if (tempSlide?.type === slideTypes.presentation) {
-      // Presentation slides write one IndexedDB record per page, keyed as
-      // `${slideId}-page-${n}`. A single .delete(slideId) would miss all of
-      // them, so we delete every record whose key starts with the slide ID.
-      await db.media
-        .where("id")
-        .startsWith(`${clientSlideId}-page-`)
-        .delete()
-        .catch((err) =>
-          console.error("Failed to delete presentation media pages:", err)
-        )
-    } else {
-      await db.media
-        .delete(clientSlideId)
-        .catch((err) => console.error("Failed to delete media:", err))
-    }
+    await useLocalMediaStorage().deleteGroup(clientSlideId)
   }
 
   if (addToast) {

@@ -1,13 +1,21 @@
 import Dexie from 'dexie'
 import type { Table } from 'dexie'
-import type { Song, Media, LibraryItem, Scripture, Hymn } from '~/types'
+import type {
+  Song,
+  Media,
+  LibraryItem,
+  Scripture,
+  Hymn,
+  LocalMediaFileRecord,
+} from '~/types'
 
 
-class WorshipCloudDatabase extends Dexie {
+export class WorshipCloudDatabase extends Dexie {
   public songs!: Table<Song>
   public media!: Table<Media>
   public library!: Table<LibraryItem, string>
   public cached!: Table<Media>
+  public localMediaFiles!: Table<LocalMediaFileRecord, string>
   public bibleAndHymns!: Table<{
     id: string
     data: Array<Scripture | Hymn>
@@ -23,6 +31,15 @@ class WorshipCloudDatabase extends Dexie {
       library: 'id,type,content,createdAt,updatedAt',
       cached: 'id,content,data,createdAt,updatedAt',
       bibleAndHymns: 'id,data,createdAt,updatedAt'
+    })
+    this.version(3).stores({
+      songs: "id,lyrics,title,album,cover,artist,verses,createdAt,updatedAt",
+      media: "id,content,data,createdAt,updatedAt",
+      library: "id,type,content,createdAt,updatedAt",
+      cached: "id,content,data,createdAt,updatedAt",
+      localMediaFiles:
+        "key,groupId,backend,category,kind,lastAccessedAt,createdAt,updatedAt",
+      bibleAndHymns: "id,data,createdAt,updatedAt",
     })
   }
 

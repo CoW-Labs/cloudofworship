@@ -210,12 +210,11 @@ const props = defineProps<{
 }>()
 
 const authStore = useAuthStore()
-const { isTeamsPlan, isFreePlan } = useSubscription()
 
-// Free plan: 3MB soft-limit for images; Teams plan: larger (10MB) allowed
-const maxFileSize = computed(() => (isFreePlan.value ? 3 : 10))
-// Videos: 250MB cap for non-teams plans; Teams plan has no limit
-const maxVideoFileSize = computed(() => (isTeamsPlan.value ? Infinity : 250))
+// Local limits are capacity-based. Cloud subscription limits remain enforced
+// independently by the upload API.
+const maxFileSize = computed(() => Infinity)
+const maxVideoFileSize = computed(() => Infinity)
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const files = ref()
 const emit = defineEmits(["close"])
@@ -449,7 +448,7 @@ const addMediaEmitter = () => {
         url: fileObj.url,
         thumbnail: fileObj.thumbnail,
         isExternal: true,
-      } as ExtendedFileT & { isExternal: boolean }
+      } as unknown as ExtendedFileT & { isExternal: boolean }
     }
 
     // Fresh object URL from the original blob — the cached preview URL is
