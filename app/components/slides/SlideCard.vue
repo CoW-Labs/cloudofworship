@@ -12,6 +12,7 @@
     <button
       :class="['transition-all text-left', { 'opacity-70 ': selectable }]"
       @click="$emit('click')"
+      @dblclick.prevent="$emit('take-live')"
     >
       <DeferredSlidePreview
         preview-class="slide-preview text-white overflow-hidden md-preview"
@@ -288,6 +289,7 @@ const emit = defineEmits([
   "delete",
   "bulk-selected",
   "click",
+  "take-live",
 ])
 
 const actionsMenuOpen = ref(false)
