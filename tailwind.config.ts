@@ -50,6 +50,13 @@ export default <Partial<Config>>{
   safelist: colorClasses,
   theme: {
     extend: {
+      // Height-based breakpoints for the operator screen. Laptop viewports are
+      // wide but short (e.g. 1280x585), so density has to key off height, not
+      // width — `short:` tightens chrome, `shorter:` tightens it further.
+      screens: {
+        short: { raw: "(max-height: 760px)" },
+        shorter: { raw: "(max-height: 620px)" },
+      },
       colors: {
         'purple': {
           '50': '#faf5ff',

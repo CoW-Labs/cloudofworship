@@ -29,7 +29,10 @@
         <button class="font-semibold hover:underline" @click="retryLocalSave">
           Retry
         </button>
-        <button class="font-semibold hover:underline" @click="removeFailedMedia">
+        <button
+          class="font-semibold hover:underline"
+          @click="removeFailedMedia"
+        >
           Remove
         </button>
       </div>
@@ -221,9 +224,7 @@
                     </button>
 
                     <template #panel>
-                      <div
-                        class="h-full w-full bg-[#f1f3f6] dark:bg-[#131724]"
-                      >
+                      <div class="h-full w-full bg-[#f1f3f6] dark:bg-[#131724]">
                         <GotoScripture
                           v-if="tab.key === 'scripture'"
                           :verse="verse"
@@ -284,13 +285,13 @@
                   class="w-4 h-4"
                 />
                 <GoLiveIcon v-else class="w-4 h-4" />
-                {{
+                <!-- {{
                   slide.slideMode === "overlay"
                     ? isActiveOverlay
                       ? "Clear Overlay"
                       : "Show Overlay"
                     : "Go Live"
-                }}
+                }} -->
               </UButton>
             </UTooltip>
           </div>
@@ -472,8 +473,7 @@ const {
 } = useMediaDownloadProgress()
 const currentLocalTransfer = computed(() =>
   props.slide
-    ? transferFor(props.slide.id) ||
-      transferFor(props.slide.backgroundVideoKey)
+    ? transferFor(props.slide.id) || transferFor(props.slide.backgroundVideoKey)
     : null
 )
 const mediaDownloadProgress = computed<number | null>(() => {
@@ -514,13 +514,11 @@ const retryLocalSave = async () => {
           mimeType: blob.type || "image/png",
           recoverable: false,
           userInitiated: true,
-          onProgress: (fraction) =>
-            setLocalSaveProgress(slide.id, fraction),
+          onProgress: (fraction) => setLocalSaveProgress(slide.id, fraction),
         })
         page.imageUrl =
-          (await localMedia.getPlaybackUrl(
-            `${slide.id}-page-${page.page}`
-          )) || page.imageUrl
+          (await localMedia.getPlaybackUrl(`${slide.id}-page-${page.page}`)) ||
+          page.imageUrl
       }
       slide.background =
         slide.presentationObjects?.[slide.presentationPageIndex || 0]
@@ -547,8 +545,7 @@ const retryLocalSave = async () => {
         originalName: file.name,
         recoverable: false,
         userInitiated: true,
-        onProgress: (fraction) =>
-          setLocalSaveProgress(slide.id, fraction),
+        onProgress: (fraction) => setLocalSaveProgress(slide.id, fraction),
       })
       const url = await localMedia.getPlaybackUrl(slide.id)
       if (url) {
@@ -1024,32 +1021,36 @@ const handleVoiceBibleVersionChange = (version: string) => {
 }
 
 onMounted(() => {
-  shortcutCleanups.push(useCreateShortcut("ArrowRight", () => {
-    if (props.slide?.type === slideTypes.presentation) {
-      handleNextPage()
-      return true
-    }
-    if (nextVerse.value) {
-      resolveLastVerse(nextVerse.value).then((resolvedVerse) => {
-        emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
-      })
-      return true
-    }
-    return false
-  }))
-  shortcutCleanups.push(useCreateShortcut("ArrowLeft", () => {
-    if (props.slide?.type === slideTypes.presentation) {
-      handlePreviousPage()
-      return true
-    }
-    if (previousVerse.value) {
-      resolveLastVerse(previousVerse.value).then((resolvedVerse) => {
-        emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
-      })
-      return true
-    }
-    return false
-  }))
+  shortcutCleanups.push(
+    useCreateShortcut("ArrowRight", () => {
+      if (props.slide?.type === slideTypes.presentation) {
+        handleNextPage()
+        return true
+      }
+      if (nextVerse.value) {
+        resolveLastVerse(nextVerse.value).then((resolvedVerse) => {
+          emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+        })
+        return true
+      }
+      return false
+    })
+  )
+  shortcutCleanups.push(
+    useCreateShortcut("ArrowLeft", () => {
+      if (props.slide?.type === slideTypes.presentation) {
+        handlePreviousPage()
+        return true
+      }
+      if (previousVerse.value) {
+        resolveLastVerse(previousVerse.value).then((resolvedVerse) => {
+          emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+        })
+        return true
+      }
+      return false
+    })
+  )
 
   // Listen for voice command events
   emitter.on(appWideActions.nextVerse, handleVoiceNextVerse)
@@ -1135,11 +1136,7 @@ const onSelectBackground = (
   const tempSlide = {
     ...props.slide,
     background:
-      typeof data === "string"
-        ? data
-        : isImage
-        ? data.image
-        : data.video,
+      typeof data === "string" ? data : isImage ? data.image : data.video,
     backgroundImageKey: isImage ? data.key : undefined,
     backgroundVideoKey: isVideo ? data.key : undefined,
     backgroundType,

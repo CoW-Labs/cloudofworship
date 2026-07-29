@@ -136,6 +136,18 @@ html.dark .cow-search-input input::placeholder {
 .slides-grid {
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 }
+/* Short viewports get less vertical room for the slide grid, so narrow the
+   cards to keep the same number of thumbnails per row as a 1600x900 screen. */
+@media screen and (max-height: 760px) {
+  .slides-grid {
+    grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  }
+}
+@media screen and (max-height: 620px) {
+  .slides-grid {
+    grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+  }
+}
 .bg-stretch {
   background-size: 100% 100%;
 }
