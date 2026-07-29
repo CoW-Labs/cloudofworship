@@ -553,6 +553,13 @@ export const lineSpacingTypes = {
   double: 'double',
 }
 
+// Bounds for the slide-to-slide transition duration, in seconds. Shared by the
+// settings slider and the live projection so a stored value from an older,
+// wider range can never drive a longer transition than the UI can express.
+export const MIN_TRANSITION_INTERVAL = 0
+export const MAX_TRANSITION_INTERVAL = 3
+export const DEFAULT_TRANSITION_INTERVAL = 0.7
+
 // Slide-to-slide transition types for the live projection.
 // `fade` is the only implemented type today; extend with slide/zoom/cut later.
 export const transitionTypes = {

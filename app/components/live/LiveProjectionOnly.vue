@@ -5,9 +5,7 @@
       'no-animations': currentState.settings.microAnimations === false,
     }"
     :style="`--cow-transition-duration: ${
-      currentState.settings.animations
-        ? currentState.settings.transitionInterval ?? 0.7
-        : 0
+      currentState.settings.animations ? transitionDuration : 0
     }s`"
   >
     <div
@@ -404,6 +402,20 @@ const props = defineProps<{
   slideLabel?: Boolean
   fullScreenHeight?: string
 }>()
+
+// Settings saved under an older, wider range can still hold an interval well
+// past what the settings slider allows, which would stall the projection on a
+// multi-second crossfade. Clamp to the same bounds the slider offers.
+const transitionDuration = computed(() => {
+  const stored = currentState.value.settings.transitionInterval
+  if (stored === null || stored === undefined) return DEFAULT_TRANSITION_INTERVAL
+  const interval = Number(stored)
+  if (!Number.isFinite(interval)) return DEFAULT_TRANSITION_INTERVAL
+  return Math.min(
+    MAX_TRANSITION_INTERVAL,
+    Math.max(MIN_TRANSITION_INTERVAL, interval)
+  )
+})
 
 // Intermission state (shown when no slide is live) — church branding, with a
 // CoW logo fallback when the church hasn't uploaded one.

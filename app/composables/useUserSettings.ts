@@ -85,10 +85,18 @@ export const useUserSettings = () => {
               ...userSettings.defaultBackground?.text,
             },
           },
-          // Deep merge slideStyles to preserve all properties
+          // Deep merge slideStyles to preserve all properties.
+          // lineSpacing is coerced back to "normal" when the account predates
+          // the setting (or stored it empty) — without a value no line-spacing
+          // class is applied and generated content renders with cramped,
+          // overlapping lines.
           slideStyles: {
             ...appStore.currentState.settings.slideStyles,
             ...userSettings.slideStyles,
+            lineSpacing:
+              userSettings.slideStyles?.lineSpacing ||
+              appStore.currentState.settings.slideStyles?.lineSpacing ||
+              lineSpacingTypes.normal,
           },
           overlaySettings:
             userSettings.overlaySettings ||

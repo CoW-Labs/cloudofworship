@@ -68,7 +68,12 @@ export default function useSlideCreation() {
         isMediaMuted: true,
         isMediaPlaying: false,
         lettercase: appStore.currentState.settings.slideStyles.lettercase,
-        lineSpacing: appStore.currentState.settings.slideStyles.lineSpacing,
+        // Never leave this unset — with no lineSpacing the rendered slide gets
+        // no line-spacing class and long content (scripture especially) draws
+        // with overlapping lines.
+        lineSpacing:
+          appStore.currentState.settings.slideStyles.lineSpacing ||
+          lineSpacingTypes.normal,
         textOutlined: appStore.currentState.settings.slideStyles.textOutlined,
         textBold: appStore.currentState.settings.slideStyles.textBold,
         textLinesBackground:

@@ -63,9 +63,13 @@ const emit = defineEmits<{
 
 // Settings can come back from localStorage as strings, so coerce anything the
 // caller hands us to a finite number before it reaches `.toFixed`/the slider.
+// Values saved under an older, wider range also survive in stored settings, so
+// clamp too — the native input pins its handle to min/max regardless, and an
+// unclamped readout would disagree with where the handle actually sits.
 const toNumber = (value: unknown): number => {
   const num = Number(value)
-  return Number.isFinite(num) ? num : 0
+  if (!Number.isFinite(num)) return props.min
+  return Math.min(props.max, Math.max(props.min, num))
 }
 
 const draft = ref<number>(toNumber(props.modelValue))
