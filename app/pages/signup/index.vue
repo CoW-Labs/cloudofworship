@@ -554,7 +554,7 @@ const createEmailAccount = async () => {
 
   if (error.value) {
     const emailExists = error.value?.data?.error?.includes("E11000")
-    usePosthogCapture("SIGNUP_STEP1_FAILED", {
+    usePosthogCapture("SIGNUP_CREATE_ACCOUNT_FAILED", {
       method: "email",
       email: email.value,
       error: emailExists
@@ -576,7 +576,7 @@ const createEmailAccount = async () => {
 
   token.value = data.value?.token || null
   authStore.setUser(newUser)
-  usePosthogCapture("SIGNUP_STEP1_COMPLETED", {
+  usePosthogCapture("SIGNUP_CREATE_ACCOUNT_COMPLETED", {
     method: "email",
     userId: newUser._id,
     email: email.value,
@@ -590,7 +590,7 @@ const handleStep1 = async () => {
 
   signupMethod.value = "email"
   loading.value = true
-  usePosthogCapture("SIGNUP_STEP1_ATTEMPTED", {
+  usePosthogCapture("SIGNUP_CREATE_ACCOUNT_ATTEMPTED", {
     method: "email",
     email: email.value,
   })
@@ -607,7 +607,7 @@ const handleStep2 = async () => {
   if (!fullNameValue) return
 
   loading.value = true
-  usePosthogCapture("SIGNUP_STEP2_ATTEMPTED", {
+  usePosthogCapture("SIGNUP_ADD_FULL_NAME_ATTEMPTED", {
     method: signupMethod.value,
     userId: authStore.user?._id,
     hasFullName: true,
@@ -626,7 +626,7 @@ const handleStep2 = async () => {
   if (authStore.user.fullname !== fullNameValue) {
     const updatedUser = await updateUserProfile({ fullname: fullNameValue })
     if (!updatedUser) {
-      usePosthogCapture("SIGNUP_STEP2_FAILED", {
+      usePosthogCapture("SIGNUP_ADD_FULL_NAME_FAILED", {
         method: signupMethod.value,
         userId: authStore.user?._id,
         error: "Failed to update full name",
@@ -636,7 +636,7 @@ const handleStep2 = async () => {
     }
   }
 
-  usePosthogCapture("SIGNUP_STEP2_COMPLETED", {
+  usePosthogCapture("SIGNUP_ADD_FULL_NAME_COMPLETED", {
     method: signupMethod.value,
     userId: authStore.user._id,
     fullName: fullNameValue,
@@ -655,7 +655,7 @@ const handleStep3 = async () => {
   }
 
   loading.value = true
-  usePosthogCapture("SIGNUP_STEP3_ATTEMPTED", {
+  usePosthogCapture("SIGNUP_ADD_CHURCH_ATTEMPTED", {
     userId: authStore.user?._id,
     churchName: churchName.value,
     churchType: churchType.value,
@@ -676,7 +676,7 @@ const handleStep3 = async () => {
   })
 
   if (error.value) {
-    usePosthogCapture("SIGNUP_STEP3_FAILED", {
+    usePosthogCapture("SIGNUP_ADD_CHURCH_FAILED", {
       userId: authStore.user?._id,
       error: getErrorMessage(error.value as ApiErrorT),
     })
@@ -688,7 +688,7 @@ const handleStep3 = async () => {
   } else {
     const newChurch = normalizeChurchPayload(data.value as ChurchPayload)
     if (!newChurch?._id) {
-      usePosthogCapture("SIGNUP_STEP3_FAILED", {
+      usePosthogCapture("SIGNUP_ADD_CHURCH_FAILED", {
         userId: authStore.user?._id,
         error: "Church response missing id",
       })
@@ -703,7 +703,7 @@ const handleStep3 = async () => {
 
     authStore.setChurch(newChurch)
     authStore.setUser({ ...authStore.user, churchId: newChurch._id } as User)
-    usePosthogCapture("SIGNUP_STEP3_COMPLETED", {
+    usePosthogCapture("SIGNUP_ADD_CHURCH_COMPLETED", {
       userId: authStore.user?._id,
       churchId: newChurch._id,
       churchName: newChurch.name,
@@ -826,7 +826,7 @@ const getChurch = async () => {
 const handleGoogleSignUp = async () => {
   googleLoading.value = true
   signupMethod.value = "google"
-  usePosthogCapture("SIGNUP_STEP1_ATTEMPTED", { method: "google" })
+  usePosthogCapture("SIGNUP_CREATE_ACCOUNT_ATTEMPTED", { method: "google" })
 
   try {
     const { user: gUser } = await googleSignIn()
@@ -844,7 +844,7 @@ const handleGoogleSignUp = async () => {
     )
 
     if (error.value) {
-      usePosthogCapture("SIGNUP_STEP1_FAILED", {
+      usePosthogCapture("SIGNUP_CREATE_ACCOUNT_FAILED", {
         method: "google",
         email: gUser?.email,
         error: error.value?.data?.error?.includes("E11000")
@@ -865,7 +865,7 @@ const handleGoogleSignUp = async () => {
       token.value = data.value?.token || null
       authStore.setUser(newUser)
       fullName.value = newUser.fullname || gUser?.displayName || ""
-      usePosthogCapture("SIGNUP_STEP1_COMPLETED", {
+      usePosthogCapture("SIGNUP_CREATE_ACCOUNT_COMPLETED", {
         method: "google",
         userId: newUser._id,
         email: gUser?.email,
@@ -875,7 +875,7 @@ const handleGoogleSignUp = async () => {
       step.value = 2
     }
   } catch (error: any) {
-    usePosthogCapture("SIGNUP_STEP1_FAILED", {
+    usePosthogCapture("SIGNUP_CREATE_ACCOUNT_FAILED", {
       method: "google",
       error: error?.message,
     })
