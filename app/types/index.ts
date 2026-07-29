@@ -34,6 +34,20 @@ export interface SubscriptionDetails {
   billingHistory: SubscriptionBillingRecord[]
 }
 
+export interface BillingTransaction {
+  _id: string
+  provider: "paystack" | "dodo"
+  providerReference: string
+  status: "successful" | "failed" | "pending" | "reversed"
+  kind: "initial_payment" | "renewal" | "unknown"
+  amount: string
+  currency: string
+  reversedAmount: string | null
+  occurredAt: string
+  statusChangedAt: string
+  failureReason: string | null
+}
+
 export interface PresentationObject {
   page: number
   imageUrl: string

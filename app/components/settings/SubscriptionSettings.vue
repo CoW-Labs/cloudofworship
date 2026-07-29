@@ -213,10 +213,7 @@
 
       <!-- Billing History Section -->
       <div
-        v-if="
-          subscriptionData?.billingHistory &&
-          subscriptionData.billingHistory.length > 0
-        "
+        v-if="transactions.length > 0"
         class="billing-history-section rounded-2xl bg-white dark:bg-[#131a27] ring-1 ring-gray-200 dark:ring-white/10 p-4"
       >
         <h4 class="font-semibold text-sm mb-3">Billing History</h4>
@@ -227,26 +224,31 @@
                 class="border-b border-gray-200 dark:border-white/10 text-left"
               >
                 <th class="py-2 px-2 font-medium">Date</th>
-                <th class="py-2 px-2 font-medium">Plan</th>
+                <th class="py-2 px-2 font-medium">Type</th>
                 <th class="py-2 px-2 font-medium">Amount</th>
                 <th class="py-2 px-2 font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="record in subscriptionData.billingHistory"
-                :key="record.id"
+                v-for="transaction in transactions"
+                :key="transaction._id"
                 class="border-b border-gray-100 dark:border-white/5 last:border-0"
               >
                 <td class="py-3 px-2">
-                  {{ formatDate(record.lastPaidAt || record.createdAt) }}
-                </td>
-                <td class="py-3 px-2 capitalize">
-                  {{ record.plan }}
+                  {{ formatDate(transaction.occurredAt) }}
                 </td>
                 <td class="py-3 px-2">
-                  <template v-if="record.amount">
-                    {{ formatCurrency(record.amount, record.currency) }}
+                  {{ formatTransactionKind(transaction.kind) }}
+                </td>
+                <td class="py-3 px-2">
+                  <template v-if="transaction.amount">
+                    {{
+                      formatCurrency(
+                        parseFloat(transaction.amount),
+                        transaction.currency
+                      )
+                    }}
                   </template>
                   <template v-else>
                     <span class="text-gray-400">-</span>
@@ -254,11 +256,11 @@
                 </td>
                 <td class="py-3 px-2">
                   <UBadge
-                    :color="getStatusColor(record.status)"
+                    :color="getStatusColor(transaction.status)"
                     size="xs"
                     :ui="{ rounded: 'rounded-full' }"
                   >
-                    {{ record.status }}
+                    {{ transaction.status }}
                   </UBadge>
                 </td>
               </tr>
@@ -269,7 +271,7 @@
 
       <!-- No Billing History -->
       <div
-        v-else-if="!isFreeTrial && subscriptionData?.subscriptionPlan === 'free'"
+        v-else-if="!transactionsLoading"
         class="no-billing-history text-center py-8 text-gray-500 dark:text-[#9aa3b2]"
       >
         <Icon name="i-bx-receipt" class="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -327,7 +329,7 @@
 
 <script setup lang="ts">
 import { useAuthStore } from "~/store/auth"
-import type { SubscriptionDetails } from "~/types"
+import type { BillingTransaction, SubscriptionDetails } from "~/types"
 
 const authStore = useAuthStore()
 const toast = useToast()
@@ -343,6 +345,9 @@ const showCancelConfirm = ref(false)
 const subscriptionData = ref<SubscriptionDetails | null>(
   authStore.subscriptionDetails
 )
+
+const transactions = ref<BillingTransaction[]>([])
+const transactionsLoading = ref(true)
 
 const isFreeTrial = computed(() => subscriptionData.value?.isFreeTrial ?? false)
 
@@ -390,13 +395,29 @@ const formatCurrency = (amount: number, currency: string | null) => {
 const getStatusColor = (status: string) => {
   switch (status) {
     case "active":
+    case "successful":
       return "green"
     case "canceled":
+    case "pending":
       return "amber"
+    case "failed":
+    case "reversed":
+      return "red"
     case "inactive":
       return "gray"
     default:
       return "gray"
+  }
+}
+
+const formatTransactionKind = (kind: BillingTransaction["kind"]) => {
+  switch (kind) {
+    case "initial_payment":
+      return "Initial Payment"
+    case "renewal":
+      return "Renewal"
+    default:
+      return "Other"
   }
 }
 
@@ -423,6 +444,23 @@ const fetchSubscriptionDetails = async (showLoader = true) => {
   }
 
   loading.value = false
+}
+
+const fetchTransactions = async () => {
+  transactionsLoading.value = true
+
+  const { data, error: fetchError } = await useAPIFetch(
+    "/billing/transactions",
+    { query: { limit: 100 } }
+  )
+
+  if (fetchError.value) {
+    transactionsLoading.value = false
+    return
+  }
+
+  transactions.value = (data.value as any)?.data?.transactions || []
+  transactionsLoading.value = false
 }
 
 const cancelSubscription = async () => {
@@ -467,6 +505,7 @@ onMounted(() => {
   // If no cached data, show loader
   const hasCachedData = !!authStore.subscriptionDetails
   fetchSubscriptionDetails(!hasCachedData)
+  fetchTransactions()
 })
 </script>
 
