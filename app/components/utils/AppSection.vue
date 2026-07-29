@@ -144,6 +144,26 @@
                       </div>
                     </div>
                   </UButton>
+                  <template
+                    v-if="secondaryButton.action === appWideActions.goLive"
+                  >
+                    <div class="line border-b dark:border-gray-800"></div>
+                    <UButton
+                      class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-primary-900"
+                      color="black"
+                      variant="ghost"
+                      icon="i-mdi-youtube"
+                      size="sm"
+                      @click="useGlobalEmit(appWideActions.goLiveYoutube)"
+                    >
+                      <div class="pl-2">
+                        <div class="text-sm">Go Live (YouTube)</div>
+                        <div class="text-xs opacity-80">
+                          Stream this display to your connected YouTube channel
+                        </div>
+                      </div>
+                    </UButton>
+                  </template>
                 </div>
               </template>
             </UPopover>

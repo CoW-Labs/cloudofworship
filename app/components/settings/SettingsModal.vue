@@ -77,6 +77,8 @@
             />
             <!-- STORAGE SETTINGS -->
             <StorageSettings v-else-if="activeTab === 'Storage Settings'" />
+            <!-- STREAMING SETTINGS -->
+            <StreamingSettings v-else-if="activeTab === 'Streaming Settings'" />
 
             <!-- OTHER SETTINGS -->
             <OtherSettings v-else-if="activeTab === 'Other Settings'" />
@@ -108,6 +110,7 @@ const tabs = [
   { name: "Slide Background Settings", active: false },
   { name: "Bible Version Settings", active: false },
   { name: "Storage Settings", active: false },
+  { name: "Streaming Settings", active: false },
   { name: "Other Settings", active: false },
 ]
 const activeTab = ref(props.page || "Slide Settings")

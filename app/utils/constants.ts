@@ -39,6 +39,7 @@ export const appWideActions = {
   newSearchBible: 'new-search-bible',
   newTranscribe: 'new-transcribe',
   goLive: 'go-live',
+  goLiveYoutube: 'go-live-youtube',
   closeLiveWindow: 'close-live-window',
   openSettings: 'open-settings',
   newActiveSlide: 'new-active-slide',

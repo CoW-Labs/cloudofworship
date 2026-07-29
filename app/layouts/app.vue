@@ -409,6 +409,30 @@ emitter.on("go-live", async () => {
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
 
+emitter.on("go-live-youtube", async () => {
+  const { isTauri } = useTauri()
+
+  if (isTauri) {
+    await openTauriLiveWindow()
+  } else {
+    openWindows()
+  }
+
+  // The Live window is a fresh page load — its Vue app (and the
+  // StreamingConfirmOverlay's BroadcastChannel listener) may not be mounted
+  // yet by the time we post this, so a single broadcast can be missed
+  // outright. Repeat it a few times over ~2.5s; harmless if the listener was
+  // already there (the overlay only re-arms when idle/ended/error).
+  const requestConfirmRetryDelaysMs = [0, 300, 800, 1500, 2500]
+  requestConfirmRetryDelaysMs.forEach((delay) => {
+    setTimeout(() => {
+      useYoutubeStreamBroadcastPost(JSON.stringify({ type: "request-confirm" }))
+    }, delay)
+  })
+
+  usePosthogCapture("GO_LIVE_YOUTUBE_BUTTON_CLICKED")
+})
+
 emitter.on("close-live-window", async () => {
   await closeAllWindows()
   usePosthogCapture("CLOSE_LIVE_WINDOW_BUTTON_CLICKED")
