@@ -176,6 +176,31 @@ export const useYoutubeStreaming = (options?: { onStatusChange?: (state: Youtube
   const start = async () => {
     stoppedIntentionally = false
 
+    // Check before touching any media device — no point prompting for
+    // screen/mic permission if there's nowhere to actually send the stream.
+    try {
+      const { data, error: fetchError } = await useAPIFetch<{ data: { connected: boolean } }>(
+        "/streaming/integrations/youtube"
+      )
+      if (fetchError.value || !data.value?.data?.connected) {
+        toast.add({
+          title: "No YouTube stream key configured",
+          description: "Add one in Settings → Streaming Settings first",
+          icon: "i-bx-error-circle",
+          color: "red",
+        })
+        return
+      }
+    } catch {
+      toast.add({
+        title: "Couldn't verify YouTube connection",
+        description: "Check your connection and try again",
+        icon: "i-bx-error-circle",
+        color: "red",
+      })
+      return
+    }
+
     state.value.status = "requesting-media"
     state.value.error = null
     emitStatusChange()
