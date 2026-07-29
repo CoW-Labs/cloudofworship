@@ -197,7 +197,7 @@
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import draggable from "vuedraggable"
-import { PANEL_SIZE_LIMITS, useAppStore } from "~/store/app"
+import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
 import type { Slide } from "~/types"
@@ -217,20 +217,33 @@ const windowRefs = inject("windowRefs") as any[]
 const online = useOnline()
 const { hasAccessToFeature } = useSubscription()
 
-// Vertical resize between the "Live preview" panel and "Slide Schedule"
-const LIVE_PREVIEW_MIN_HEIGHT = PANEL_SIZE_LIMITS.livePreviewHeight.min
-const LIVE_PREVIEW_MAX_HEIGHT = PANEL_SIZE_LIMITS.livePreviewHeight.max
-const TRANSCRIPT_PANEL_MIN_HEIGHT = PANEL_SIZE_LIMITS.transcriptPanelHeight.min
-const TRANSCRIPT_PANEL_MAX_HEIGHT = PANEL_SIZE_LIMITS.transcriptPanelHeight.max
-const livePreviewHeight = ref(appStore.panelSize("livePreviewHeight"))
-const transcriptPanelHeight = ref(appStore.panelSize("transcriptPanelHeight"))
+// Vertical resize between the "Live preview" panel and "Slide Schedule".
+// Both heights are fractions of the column, so the schedule keeps a usable
+// share of the panel on short screens.
+const { panelBounds, panelSize, commitPanelSize } = usePanelLayout()
+const livePreviewBounds = panelBounds("livePreviewHeight")
+const transcriptBounds = panelBounds("transcriptPanelHeight")
+const livePreviewLayoutHeight = panelSize("livePreviewHeight")
+const transcriptLayoutHeight = panelSize("transcriptPanelHeight")
+const livePreviewHeight = ref(livePreviewLayoutHeight.value)
+const transcriptPanelHeight = ref(transcriptLayoutHeight.value)
 const liveColumn = ref<HTMLDivElement | null>(null)
 let vResizeStartY = 0
 let vResizeStartHeight = 0
+let isVResizing = false
 let transcriptResizeStartY = 0
 let transcriptResizeStartHeight = 0
+let isTranscriptResizing = false
+
+watch(livePreviewLayoutHeight, (height) => {
+  if (!isVResizing) livePreviewHeight.value = height
+})
+watch(transcriptLayoutHeight, (height) => {
+  if (!isTranscriptResizing) transcriptPanelHeight.value = height
+})
 
 const startVResize = (event: MouseEvent) => {
+  isVResizing = true
   vResizeStartY = event.clientY
   vResizeStartHeight = livePreviewHeight.value
   document.addEventListener("mousemove", onVResizeMove)
@@ -240,13 +253,15 @@ const startVResize = (event: MouseEvent) => {
 }
 const onVResizeMove = (event: MouseEvent) => {
   const delta = event.clientY - vResizeStartY
+  const { min, max } = livePreviewBounds.value
   livePreviewHeight.value = Math.min(
-    LIVE_PREVIEW_MAX_HEIGHT,
-    Math.max(LIVE_PREVIEW_MIN_HEIGHT, vResizeStartHeight + delta)
+    max,
+    Math.max(min, vResizeStartHeight + delta)
   )
 }
 const onVResizeEnd = () => {
-  appStore.setPanelSize("livePreviewHeight", livePreviewHeight.value)
+  isVResizing = false
+  commitPanelSize("livePreviewHeight", livePreviewHeight.value)
   document.removeEventListener("mousemove", onVResizeMove)
   document.removeEventListener("mouseup", onVResizeEnd)
   document.body.style.cursor = ""
@@ -254,6 +269,7 @@ const onVResizeEnd = () => {
 }
 
 const startTranscriptResize = (event: MouseEvent) => {
+  isTranscriptResizing = true
   transcriptResizeStartY = event.clientY
   transcriptResizeStartHeight = transcriptPanelHeight.value
   document.addEventListener("mousemove", onTranscriptResizeMove)
@@ -264,17 +280,16 @@ const startTranscriptResize = (event: MouseEvent) => {
 
 const onTranscriptResizeMove = (event: MouseEvent) => {
   const delta = event.clientY - transcriptResizeStartY
+  const { min, max } = transcriptBounds.value
   transcriptPanelHeight.value = Math.min(
-    TRANSCRIPT_PANEL_MAX_HEIGHT,
-    Math.max(TRANSCRIPT_PANEL_MIN_HEIGHT, transcriptResizeStartHeight + delta)
+    max,
+    Math.max(min, transcriptResizeStartHeight + delta)
   )
 }
 
 const onTranscriptResizeEnd = () => {
-  appStore.setPanelSize(
-    "transcriptPanelHeight",
-    transcriptPanelHeight.value
-  )
+  isTranscriptResizing = false
+  commitPanelSize("transcriptPanelHeight", transcriptPanelHeight.value)
   document.removeEventListener("mousemove", onTranscriptResizeMove)
   document.removeEventListener("mouseup", onTranscriptResizeEnd)
   document.body.style.cursor = ""
@@ -283,11 +298,8 @@ const onTranscriptResizeEnd = () => {
 
 onBeforeUnmount(() => {
   shortcutCleanups.splice(0).forEach((cleanup) => cleanup())
-  appStore.setPanelSize("livePreviewHeight", livePreviewHeight.value)
-  appStore.setPanelSize(
-    "transcriptPanelHeight",
-    transcriptPanelHeight.value
-  )
+  // Not persisted here — the resize handlers commit on drag end, and saving on
+  // unmount would mark a viewport-derived height as user-chosen.
   document.removeEventListener("mousemove", onVResizeMove)
   document.removeEventListener("mouseup", onVResizeEnd)
   document.removeEventListener("mousemove", onTranscriptResizeMove)

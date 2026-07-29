@@ -4,7 +4,7 @@
   >
     <div
       v-if="heading || subHeading"
-      class="heading flex items-center justify-between px-4 py-3 shrink-0"
+      class="heading flex items-center justify-between px-4 py-3 shrink-0 short:px-3 short:py-2"
       :class="headingStyles"
     >
       <h2
@@ -176,8 +176,8 @@
       </div>
     </div>
     <div
-      :class="`slot-ctn px-3 pb-3 text-sm flex flex-col flex-1 min-h-0 ${
-        heading || subHeading ? '' : 'pt-3'
+      :class="`slot-ctn px-3 pb-3 text-sm flex flex-col flex-1 min-h-0 short:px-2 short:pb-2 ${
+        heading || subHeading ? '' : 'pt-3 short:pt-2'
       } ${slotCtnStyles || ''}`"
     >
       <slot></slot>

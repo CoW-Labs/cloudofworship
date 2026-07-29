@@ -1,7 +1,7 @@
 <template>
   <Transition>
     <div
-      class="navbar-ctn relative h-[50px] w-[100%] flex justify-between items-center px-4"
+      class="navbar-ctn relative h-[50px] w-[100%] flex justify-between items-center px-4 short:h-[42px] short:px-3"
       v-if="route.name !== 'live'"
     >
       <UProgress
@@ -9,9 +9,9 @@
         :class="{ 'opacity-1': currentState.slidesLoading && online }"
         size="xs"
       />
-      <div class="logo flex items-center gap-2 w-[310px]">
-        <Logo class="w-[38px]" />
-        <h1 class="text-md font-semibold">Cloud of Worship</h1>
+      <div class="logo flex items-center gap-2 w-[310px] short:w-[240px]">
+        <Logo class="w-[38px] short:w-[30px]" />
+        <h1 class="text-md font-semibold short:text-sm">Cloud of Worship</h1>
         <!-- TEST-ONLY: trigger the upgrade/plan modal -->
         <!-- <UButton
           variant="soft"
@@ -27,7 +27,7 @@
         <!-- SCHEDULE SWITCHER — left half renames the active schedule inline,
              right half (chevron) opens the schedule modal. -->
         <div
-          class="schedule-switcher relative flex items-stretch h-9 rounded-full bg-white dark:bg-[#171d2b] overflow-hidden"
+          class="schedule-switcher relative flex items-stretch h-9 short:h-8 rounded-full bg-white dark:bg-[#171d2b] overflow-hidden"
         >
           <input
             v-if="isEditingName"

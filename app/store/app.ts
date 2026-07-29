@@ -17,13 +17,32 @@ import { bibleVersionObjects } from "~/utils/constants"
 import { useThrottleFn } from "@vueuse/core"
 import posthog from "posthog-js"
 
+// Absolute floors/ceilings for every resizable panel. These are hard usability
+// stops only — the effective bounds a user drags against are derived from the
+// viewport in `usePanelLayout`, so a 1280x585 screen gets the same panel
+// *proportions* as a 1600x900 one instead of the same absolute pixels.
 export const PANEL_SIZE_LIMITS = {
-  quickActionsWidth: { min: 300, max: 550, default: 340 },
-  liveOutputWidth: { min: 400, max: 600, default: 450 },
-  previewHeight: { min: 240, max: 900, default: 290 },
-  livePreviewHeight: { min: 160, max: 700, default: 280 },
-  transcriptPanelHeight: { min: 190, max: 520, default: 280 },
+  quickActionsWidth: { min: 240, max: 550, default: 340 },
+  liveOutputWidth: { min: 320, max: 600, default: 450 },
+  previewHeight: { min: 170, max: 900, default: 290 },
+  livePreviewHeight: { min: 140, max: 700, default: 280 },
+  transcriptPanelHeight: { min: 160, max: 520, default: 280 },
 } as const
+
+// Fraction of the axis each panel wants to occupy, measured off the reference
+// 1600x900 layout the design was drawn at (e.g. 450/1600 ≈ 0.28 for LiveOutput).
+// `min`/`max` are the draggable range as fractions; they are intersected with
+// the absolute limits above.
+export const PANEL_SIZE_RATIOS = {
+  quickActionsWidth: { axis: "width", ideal: 0.21, min: 0.18, max: 0.34 },
+  liveOutputWidth: { axis: "width", ideal: 0.28, min: 0.25, max: 0.38 },
+  previewHeight: { axis: "height", ideal: 0.35, min: 0.26, max: 0.6 },
+  livePreviewHeight: { axis: "height", ideal: 0.34, min: 0.22, max: 0.55 },
+  transcriptPanelHeight: { axis: "height", ideal: 0.34, min: 0.22, max: 0.5 },
+} as const satisfies Record<
+  PanelSizeKey,
+  { axis: "width" | "height"; ideal: number; min: number; max: number }
+>
 
 export type PanelSizeKey = keyof typeof PANEL_SIZE_LIMITS
 export type PanelSizes = Record<PanelSizeKey, number>
@@ -87,6 +106,7 @@ export const useAppStore = defineStore("app", {
     pastStates: AppState[]
     futureStates: AppState[]
     panelSizes: PanelSizes
+    panelSizesTouched: Partial<Record<PanelSizeKey, boolean>>
   } => {
     return {
       currentState: {
@@ -173,6 +193,7 @@ export const useAppStore = defineStore("app", {
       pastStates: [],
       futureStates: [],
       panelSizes: getDefaultPanelSizes(),
+      panelSizesTouched: {},
     }
   },
   getters: {
@@ -183,10 +204,20 @@ export const useAppStore = defineStore("app", {
     bibleVersions: (state) => state.currentState.settings.bibleVersions,
     panelSize: (state) => (panel: PanelSizeKey) =>
       clampPanelSize(panel, state.panelSizes?.[panel]),
+    // A panel is "user-sized" once it has been dragged. Sizes that still sit on
+    // the legacy fixed default were never chosen by anyone, so `usePanelLayout`
+    // is free to replace them with a viewport-proportional size.
+    isPanelUserSized: (state) => (panel: PanelSizeKey) => {
+      if (state.panelSizesTouched?.[panel]) return true
+      const saved = state.panelSizes?.[panel]
+      return saved != null && saved !== PANEL_SIZE_LIMITS[panel].default
+    },
   },
   actions: {
     setPanelSize(panel: PanelSizeKey, size: number) {
       this.panelSizes[panel] = clampPanelSize(panel, size)
+      if (!this.panelSizesTouched) this.panelSizesTouched = {}
+      this.panelSizesTouched[panel] = true
     },
     setSchedules(schedules: Schedule[]) {
       // onAppStateChange(this.pastStates, this.currentState)

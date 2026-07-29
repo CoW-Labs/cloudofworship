@@ -147,7 +147,7 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
-import { PANEL_SIZE_LIMITS, useAppStore } from "~/store/app"
+import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
   Hymn,
@@ -394,15 +394,24 @@ const countdownStartTime = ref<number>(0)
 const countdownDuration = ref<number>(0)
 const countdownRAF = ref<number>(0)
 
-// Vertical resize between "Preview and Edit Content" and "Edit Content" sections
-const PREVIEW_MIN_HEIGHT = PANEL_SIZE_LIMITS.previewHeight.min
-const PREVIEW_MAX_HEIGHT = PANEL_SIZE_LIMITS.previewHeight.max
-const previewHeight = ref(appStore.panelSize("previewHeight"))
+// Vertical resize between "Preview and Edit Content" and "Edit Content" sections.
+// The split is a fraction of the available column height, so the editor below
+// stays visible on short screens instead of being pushed off the bottom.
+const { panelBounds, panelSize, commitPanelSize } = usePanelLayout()
+const previewBounds = panelBounds("previewHeight")
+const previewLayoutHeight = panelSize("previewHeight")
+const previewHeight = ref(previewLayoutHeight.value)
 const previewColumn = ref<HTMLDivElement | null>(null)
 let vResizeStartY = 0
 let vResizeStartHeight = 0
+let isVResizing = false
+
+watch(previewLayoutHeight, (height) => {
+  if (!isVResizing) previewHeight.value = height
+})
 
 const startVResize = (event: MouseEvent) => {
+  isVResizing = true
   vResizeStartY = event.clientY
   vResizeStartHeight = previewHeight.value
   document.addEventListener("mousemove", onVResizeMove)
@@ -412,13 +421,12 @@ const startVResize = (event: MouseEvent) => {
 }
 const onVResizeMove = (event: MouseEvent) => {
   const delta = event.clientY - vResizeStartY
-  previewHeight.value = Math.min(
-    PREVIEW_MAX_HEIGHT,
-    Math.max(PREVIEW_MIN_HEIGHT, vResizeStartHeight + delta)
-  )
+  const { min, max } = previewBounds.value
+  previewHeight.value = Math.min(max, Math.max(min, vResizeStartHeight + delta))
 }
 const onVResizeEnd = () => {
-  appStore.setPanelSize("previewHeight", previewHeight.value)
+  isVResizing = false
+  commitPanelSize("previewHeight", previewHeight.value)
   document.removeEventListener("mousemove", onVResizeMove)
   document.removeEventListener("mouseup", onVResizeEnd)
   document.body.style.cursor = ""
@@ -441,7 +449,10 @@ const bulkSelectedSlides = ref<string[]>([])
 const slideGridColumns = ref(1)
 const slideVirtualStartRow = ref(0)
 const slideViewportHeight = ref(0)
-const slideCardRowHeight = 132
+// Grid geometry is measured from the DOM (see updateSlideGridMetrics) because
+// the card width and height both shrink on short viewports. These are only the
+// fallbacks used before the first measurement lands.
+const slideCardRowHeight = ref(132)
 const slideGridGap = 12
 const slideMinCardWidth = 170
 const slideOverscanRows = 3
@@ -622,7 +633,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  appStore.setPanelSize("previewHeight", previewHeight.value)
+  // Not persisted here — onVResizeEnd already commits, and saving on unmount
+  // would mark a viewport-derived height as user-chosen.
   slidesResizeObserver?.disconnect()
   slidesResizeObserver = null
   stopEditing()
@@ -647,14 +659,34 @@ const updateSlideGridMetrics = () => {
   if (!scrollEl) return
 
   slideViewportHeight.value = scrollEl.clientHeight
+
+  // Read the resolved grid rather than re-deriving it from a fixed card width:
+  // `.slides-grid` narrows its columns on short viewports, so a hardcoded
+  // 170px would put the virtualiser's row maths out of step with the layout.
+  const gridEl = slidesGrid.value
+  const templateColumns = gridEl
+    ? getComputedStyle(gridEl).gridTemplateColumns
+    : ""
+  const measuredColumns = templateColumns.includes("px")
+    ? templateColumns.split(/\s+/).filter(Boolean).length
+    : 0
   slideGridColumns.value = Math.max(
     1,
-    Math.floor(
-      (scrollEl.clientWidth + slideGridGap) / (slideMinCardWidth + slideGridGap)
-    )
+    measuredColumns ||
+      Math.floor(
+        (scrollEl.clientWidth + slideGridGap) /
+          (slideMinCardWidth + slideGridGap)
+      )
   )
+
+  const cardHeight =
+    (gridEl?.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0
+  if (cardHeight > 0) {
+    slideCardRowHeight.value = Math.round(cardHeight + slideGridGap)
+  }
+
   slideVirtualStartRow.value = Math.floor(
-    scrollEl.scrollTop / slideCardRowHeight
+    scrollEl.scrollTop / slideCardRowHeight.value
   )
 }
 
@@ -662,7 +694,7 @@ const onSlidesGridScroll = () => {
   const scrollEl = slidesScroll.value
   if (!scrollEl) return
   slideVirtualStartRow.value = Math.floor(
-    scrollEl.scrollTop / slideCardRowHeight
+    scrollEl.scrollTop / slideCardRowHeight.value
   )
 }
 
@@ -676,7 +708,7 @@ const virtualStartRow = computed(() => {
 
 const virtualVisibleRows = computed(() => {
   return (
-    Math.ceil(slideViewportHeight.value / slideCardRowHeight) +
+    Math.ceil(slideViewportHeight.value / slideCardRowHeight.value) +
     slideOverscanRows * 2
   )
 })
@@ -704,12 +736,12 @@ const virtualSlides = computed(() => {
 })
 
 const virtualTopSpacer = computed(
-  () => virtualStartRow.value * slideCardRowHeight
+  () => virtualStartRow.value * slideCardRowHeight.value
 )
 const virtualBottomSpacer = computed(() => {
   return Math.max(
     0,
-    (totalSlideRows.value - virtualEndRow.value) * slideCardRowHeight
+    (totalSlideRows.value - virtualEndRow.value) * slideCardRowHeight.value
   )
 })
 
@@ -721,11 +753,11 @@ const scrollToSlide = (slideId?: string) => {
   if (slideIndex < 0) return
 
   const row = Math.floor(slideIndex / slideGridColumns.value)
-  const top = row * slideCardRowHeight
+  const top = row * slideCardRowHeight.value
 
   if (
     top < scrollEl.scrollTop ||
-    top + slideCardRowHeight > scrollEl.scrollTop + scrollEl.clientHeight
+    top + slideCardRowHeight.value > scrollEl.scrollTop + scrollEl.clientHeight
   ) {
     scrollEl.scrollTop = top
     onSlidesGridScroll()

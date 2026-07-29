@@ -1,5 +1,7 @@
 <template #default="{ defaultProps }">
-  <div class="flex mt-2 px-4 h-[calc(100vh-80px)]">
+  <div
+    class="flex mt-2 px-4 h-[calc(100vh-80px)] short:mt-1 short:px-3 short:h-[calc(100vh-64px)]"
+  >
     <div
       :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }"
       class="h-full"
@@ -36,7 +38,7 @@ useHead({
     },
   ],
 })
-import { PANEL_SIZE_LIMITS, useAppStore } from "~/store/app"
+import { useAppStore } from "~/store/app"
 import { ref } from "vue"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import type { Emitter } from "mitt"
@@ -48,16 +50,27 @@ const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
 const MAX_RETRIES = 10
 let retryCount = 0
 
-// Resizable panel widths
-const QA_MIN_WIDTH = PANEL_SIZE_LIMITS.quickActionsWidth.min
-const QA_MAX_WIDTH = PANEL_SIZE_LIMITS.quickActionsWidth.max
-const LO_MIN_WIDTH = PANEL_SIZE_LIMITS.liveOutputWidth.min
-const LO_MAX_WIDTH = PANEL_SIZE_LIMITS.liveOutputWidth.max
+// Resizable panel widths — bounds and defaults track the viewport so the three
+// columns keep their proportions on smaller screens instead of squeezing the
+// centre column down to two thumbnails per row.
+const { panelBounds, panelSize, commitPanelSize } = usePanelLayout()
+const quickActionsBounds = panelBounds("quickActionsWidth")
+const liveOutputBounds = panelBounds("liveOutputWidth")
+const quickActionsLayoutWidth = panelSize("quickActionsWidth")
+const liveOutputLayoutWidth = panelSize("liveOutputWidth")
 
-const quickActionsWidth = ref(appStore.panelSize("quickActionsWidth"))
-const liveOutputWidth = ref(appStore.panelSize("liveOutputWidth"))
+const quickActionsWidth = ref(quickActionsLayoutWidth.value)
+const liveOutputWidth = ref(liveOutputLayoutWidth.value)
 
 let resizingPanel: "left" | "right" | null = null
+
+// Follow the viewport on resize, but never fight the user mid-drag.
+watch(quickActionsLayoutWidth, (width) => {
+  if (!resizingPanel) quickActionsWidth.value = width
+})
+watch(liveOutputLayoutWidth, (width) => {
+  if (!resizingPanel) liveOutputWidth.value = width
+})
 let resizeStartX = 0
 let resizeStartWidth = 0
 
@@ -76,23 +89,25 @@ const onResizeMove = (event: MouseEvent) => {
   if (!resizingPanel) return
   const delta = event.clientX - resizeStartX
   if (resizingPanel === "left") {
+    const { min, max } = quickActionsBounds.value
     quickActionsWidth.value = Math.min(
-      QA_MAX_WIDTH,
-      Math.max(QA_MIN_WIDTH, resizeStartWidth + delta)
+      max,
+      Math.max(min, resizeStartWidth + delta)
     )
   } else {
+    const { min, max } = liveOutputBounds.value
     liveOutputWidth.value = Math.min(
-      LO_MAX_WIDTH,
-      Math.max(LO_MIN_WIDTH, resizeStartWidth - delta)
+      max,
+      Math.max(min, resizeStartWidth - delta)
     )
   }
 }
 
 const onResizeEnd = () => {
   if (resizingPanel === "left") {
-    appStore.setPanelSize("quickActionsWidth", quickActionsWidth.value)
+    commitPanelSize("quickActionsWidth", quickActionsWidth.value)
   } else if (resizingPanel === "right") {
-    appStore.setPanelSize("liveOutputWidth", liveOutputWidth.value)
+    commitPanelSize("liveOutputWidth", liveOutputWidth.value)
   }
   resizingPanel = null
   document.removeEventListener("mousemove", onResizeMove)
