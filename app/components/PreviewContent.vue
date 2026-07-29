@@ -109,7 +109,8 @@
           icon="i-tabler-device-desktop-plus"
           svg-icon="NoSlidesIcon"
           sub="No slides yet"
-          action="new-slide"
+          :action="appWideActions.newBible"
+          action-data="23:43:19"
           action-text="Create new slide"
         />
       </div>

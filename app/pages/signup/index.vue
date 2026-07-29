@@ -159,7 +159,9 @@
       class="flex flex-col gap-3.5 come-up-2"
       @submit.prevent="handleStep4"
     >
-      <div class="flex gap-2 items-end">
+      <!-- items-stretch matches the button's height to the input; mb-1 leaves
+           room for the button's 4px bottom ledge so both bottoms line up -->
+      <div class="flex gap-2 items-stretch">
         <CowInput
           class="flex-1"
           label="Email address"
@@ -170,7 +172,7 @@
         <CowButton
           type="button"
           variant="secondary"
-          class="shrink-0 !rounded-2xl"
+          class="shrink-0 !rounded-2xl mb-1"
           :disabled="!useValidEmail(inviteInput)"
           @click="addInvite"
         >

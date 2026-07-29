@@ -51,7 +51,7 @@
       variant="primary"
       size="sm"
       class="!px-5"
-      @click="useGlobalEmit(action)"
+      @click="useGlobalEmit(action, actionData)"
     >
       {{ actionText }}
     </CowButton>
@@ -66,6 +66,9 @@ defineProps<{
   sub: string
   actionText?: string
   action?: string
+  // Optional payload for the emitted action, e.g. a scripture shortLabel
+  // ("book:chapter:verse") for a new-bible action.
+  actionData?: string
   desc?: string
   isWider?: boolean
   // Optional custom SVG icon. Currently supports "NoSlidesIcon" — when set it
