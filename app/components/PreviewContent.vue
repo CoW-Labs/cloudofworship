@@ -91,6 +91,7 @@
                       newlyCreated: false,
                     })
               "
+              @take-live="bulkSelectSlides ? null : handleTakeLiveAction(slide)"
               @duplicate="duplicatePreviewSlide"
               @duplicate-as-overlay="duplicatePreviewSlideAsOverlay"
               @show-overlay="showSlideOverlay"
