@@ -113,7 +113,10 @@
             color="gray"
           >
             <template #leading>
-              <PauseIcon v-if="slide.slideStyle?.isMediaPlaying" class="w-4 h-4" />
+              <PauseIcon
+                v-if="slide.slideStyle?.isMediaPlaying"
+                class="w-4 h-4"
+              />
               <PlayIcon v-else class="w-4 h-4" />
             </template>
             {{ slide.slideStyle?.isMediaPlaying ? "Pause" : "Play" }}</UButton
@@ -177,7 +180,7 @@
         "
         size="lg"
         :selected-font="slide?.slideStyle?.font"
-        class="min-w-[170px] top-[-4px]"
+        class="min-w-[150px] top-[-4px]"
         @open="containerOverflow = ''"
         @close="containerOverflow = 'overflow-x-auto'"
         @change="$emit('update-font', $event)"
@@ -344,8 +347,7 @@
           "
           class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
           :class="{
-            'toolbar-toggle-active':
-              slide?.slideStyle?.textLinesBackground,
+            'toolbar-toggle-active': slide?.slideStyle?.textLinesBackground,
           }"
           :aria-pressed="Boolean(slide?.slideStyle?.textLinesBackground)"
           variant="ghost"
@@ -409,8 +411,7 @@
             color="gray"
             class="toolbar-icon-btn"
             :class="{
-              'toolbar-toggle-active':
-                slide?.slideStyle?.alignment === 'left',
+              'toolbar-toggle-active': slide?.slideStyle?.alignment === 'left',
             }"
             :aria-pressed="slide?.slideStyle?.alignment === 'left'"
           >
@@ -446,8 +447,7 @@
             color="gray"
             class="toolbar-icon-btn"
             :class="{
-              'toolbar-toggle-active':
-                slide?.slideStyle?.alignment === 'right',
+              'toolbar-toggle-active': slide?.slideStyle?.alignment === 'right',
             }"
             :aria-pressed="slide?.slideStyle?.alignment === 'right'"
           >

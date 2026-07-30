@@ -189,6 +189,9 @@ export default function useSlideCreation() {
       ...tempSlide.slideStyle,
       fontSize: Number(fontSize),
       font: appStore.currentState.settings.defaultFont,
+      // Bible-only default, set in Bible Slide Settings. Seeded per slide so an
+      // existing slide keeps its theme when the default later changes.
+      theme: appStore.currentState.settings.slideStyles.theme || "default",
     }
     tempSlide.contents = useSlideContent(tempSlide, scripture)
     usePosthogCapture("NEW_BIBLE_SLIDE_CREATED")
@@ -519,11 +522,14 @@ export default function useSlideCreation() {
             }
           }
 
-          // 2c — Upload compressed image blobs to the cloud (Teams plan, images only).
+          // 2c — Upload compressed image blobs to the cloud (every plan gets
+          // durable cross-device storage up to its quota — 100MB free, 5GB
+          // Teams — the server rejects with a quota error once exceeded).
           // Promise.all ensures batchCreateSlides never fires until every image
           // upload has finished.
           const remoteUrls = new Map<number, string>()
-          if (isTeamsPlan.value) {
+          let quotaExceeded = false
+          if (navigator.onLine) {
             const uploadPromises = files.map(async (file: ExtendedFileT, index: number) => {
               const blob = compressedBlobs[index]
               // Upload image and video files for durable, cross-device storage.
@@ -545,7 +551,11 @@ export default function useSlideCreation() {
                 const uploaded = await useUploadFile(blob, { name: file.name })
                 return { uploaded, index }
               } catch (err) {
-                console.error("Image upload failed for", file.name, err)
+                if (/quota|storage limit|storage full/i.test(String(err))) {
+                  quotaExceeded = true
+                } else {
+                  console.error("Image upload failed for", file.name, err)
+                }
                 return null
               }
             })
@@ -567,6 +577,19 @@ export default function useSlideCreation() {
                 })
               }
             }
+          }
+
+          if (quotaExceeded) {
+            toast.add({
+              title: isTeamsPlan.value
+                ? "Cloud storage full"
+                : "Free cloud storage full",
+              description: isTeamsPlan.value
+                ? "This media will only be available on this device until you free up cloud storage."
+                : "This media will only be available on this device. Upgrade to Teams for 5GB of synced cloud storage.",
+              icon: "i-bx-cloud",
+              color: "amber",
+            })
           }
 
           // 2e — POST all new slides to the backend with their final URLs
@@ -670,6 +693,7 @@ export default function useSlideCreation() {
 
         beginLocalSave(tempSlide.id)
         let localSaveFailed = false
+        let quotaExceeded = false
         const remotePageUrls = new Map<number, string>()
         for (const obj of presentationObjects) {
           try {
@@ -698,8 +722,9 @@ export default function useSlideCreation() {
               if (obj.page === 1) tempSlide.background = localUrl
             }
 
-            // 2b — Upload to cloud on Teams plan
-            if (isTeamsPlan.value && navigator.onLine) {
+            // 2b — Upload to cloud (every plan, up to its storage quota — the
+            // server rejects with a quota error once exceeded).
+            if (navigator.onLine) {
               try {
                 const uploaded = await useUploadImage(blob)
                 remotePageUrls.set(obj.page, uploaded.file.url)
@@ -712,7 +737,11 @@ export default function useSlideCreation() {
                   }
                 )
               } catch (uploadErr) {
-                console.error(`Cloud upload failed for page ${obj.page}:`, uploadErr)
+                if (/quota|storage limit|storage full/i.test(String(uploadErr))) {
+                  quotaExceeded = true
+                } else {
+                  console.error(`Cloud upload failed for page ${obj.page}:`, uploadErr)
+                }
               }
             }
           } catch (err) {
@@ -728,6 +757,19 @@ export default function useSlideCreation() {
           return
         }
         completeLocalSave(tempSlide.id)
+
+        if (quotaExceeded) {
+          toast.add({
+            title: isTeamsPlan.value
+              ? "Cloud storage full"
+              : "Free cloud storage full",
+            description: isTeamsPlan.value
+              ? "This presentation will only be available on this device until you free up cloud storage."
+              : "This presentation will only be available on this device. Upgrade to Teams for 5GB of synced cloud storage.",
+            icon: "i-bx-cloud",
+            color: "amber",
+          })
+        }
 
         // 2c — Create a transport-safe server copy. Local object URLs never
         // leave this document and each projection window resolves its own URL.

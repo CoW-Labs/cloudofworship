@@ -130,7 +130,7 @@ export const useUserSettings = () => {
         // Downloaded Bible availability is device-local IndexedDB state, so
         // backend/persisted settings can be stale after a reload. Refresh the
         // flags after hydrating settings so BibleVersionSelect sees local files
-        // without requiring the user to visit Bible Version Settings first.
+        // without requiring the user to visit Bible Slide Settings first.
         const { populateBibleVersionOptions } = useBibleVersionManager()
         await populateBibleVersionOptions(mergedSettings.bibleVersions)
 

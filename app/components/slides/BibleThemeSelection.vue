@@ -1,9 +1,17 @@
 <template>
   <div
-    class="bible-theme-selection flex h-full w-full flex-col overflow-hidden bg-[#f1f3f6] text-gray-800 dark:bg-[#131724] dark:text-[#F8F9FB]"
+    class="bible-theme-selection flex w-full flex-col text-gray-800 dark:text-[#F8F9FB]"
+    :class="
+      embedded
+        ? 'rounded-2xl bg-[#f1f3f6] p-2 dark:bg-[#1b212e]'
+        : 'h-full overflow-hidden bg-[#f1f3f6] dark:bg-[#131724]'
+    "
   >
-    <div class="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-      <div class="grid grid-cols-3 gap-[8.5px]">
+    <div :class="embedded ? '' : 'min-h-0 flex-1 overflow-y-auto px-3 py-3'">
+      <div
+        class="grid gap-[8.5px]"
+        :class="embedded ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-3'"
+      >
         <button
           v-for="theme in bibleThemes"
           :key="theme.id"
@@ -75,6 +83,11 @@ import useTheme from "~/composables/useTheme"
 
 const props = defineProps<{
   value?: string
+  /**
+   * Renders the grid inline (e.g. inside a settings panel) instead of as a
+   * popover panel: no panel chrome, no fixed height, no resize handshake.
+   */
+  embedded?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -92,5 +105,7 @@ const selectTheme = (themeId: string) => {
   emit("select", themeId)
 }
 
-onMounted(() => emit("resize", panelSize))
+onMounted(() => {
+  if (!props.embedded) emit("resize", panelSize)
+})
 </script>

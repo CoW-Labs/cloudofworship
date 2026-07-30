@@ -83,22 +83,10 @@
         </CowButton>
       </div>
 
-      <div
-        class="active-alert rounded-md bg-primary-100 dark:bg-primary-900 p-4"
-      >
-        <div
-          class="text-sm text-primary-500 font-semibold flex items-center gap-2"
-        >
-          <IconWrapper name="i-bx-bulb" size="4"></IconWrapper>
-          Hint
-        </div>
-        <p class="mt-2 text-sm">
-          Add an
-          <span class="font-bold">empty line</span> if you wish to forcefully
-          break your lyrics into verses. This feature is especially useful for
-          adding a worship lineup.
-        </p>
-      </div>
+      <Hint>
+        Add an empty line if you wish to forcefully break your lyrics into
+        verses. This feature is especially useful for adding a worship lineup.
+      </Hint>
       <CowTextarea v-model="lyrics" label="Lyrics" :rows="12" autoresize />
       <CowToggle
         v-model="isSongPublic"

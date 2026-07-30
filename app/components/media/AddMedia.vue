@@ -6,20 +6,10 @@
 
     <!-- FILES TAB -->
     <div v-if="activeTab === 0" class="collector-ctn flex flex-col gap-3 mt-4">
-      <div
-        class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
-      >
-        <InfoIcon class="w-4 h-4 text-primary-500" />
-        <div class="flex-1">
-          <h4 class="text-md font-semibold">
-            Add image, video or audio slides
-          </h4>
-          <p class="text-sm">
-            You can now add files by dragging and dropping them here or by
-            copying and pasting them from your file explorer.
-          </p>
-        </div>
-      </div>
+      <Hint title="Add image, video or audio slides">
+        You can now add files by dragging and dropping them here or by copying
+        and pasting them from your file explorer.
+      </Hint>
 
       <FileDropzone
         :maxFileSize="maxFileSize"
@@ -32,18 +22,10 @@
 
     <!-- YOUTUBE/VIMEO TAB -->
     <div v-if="activeTab === 1" class="collector-ctn flex flex-col gap-3 mt-4">
-      <div
-        class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
-      >
-        <InfoIcon class="w-4 h-4 text-primary-500" />
-        <div class="flex-1">
-          <h4 class="text-md font-semibold">Add YouTube or Vimeo videos</h4>
-          <p class="text-sm">
-            Paste a YouTube or Vimeo URL below to add external videos to your
-            schedule.
-          </p>
-        </div>
-      </div>
+      <Hint title="Add YouTube or Vimeo videos">
+        Paste a YouTube or Vimeo URL below to add external videos to your
+        schedule.
+      </Hint>
 
       <!-- YouTube/Vimeo URL Input -->
       <div class="flex flex-col gap-2">

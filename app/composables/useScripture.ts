@@ -182,7 +182,7 @@ const useScripture = async (label: string = '1:1:1', version: string = ''): Prom
             {
               label: 'Download Bible version',
               click: () =>
-                useGlobalEmit(appWideActions.openSettings, 'Bible Version Settings'),
+                useGlobalEmit(appWideActions.openSettings, 'Bible Slide Settings'),
             },
           ],
         })
