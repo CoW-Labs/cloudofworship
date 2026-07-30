@@ -1,7 +1,7 @@
 <template>
   <div
     class="select-menu-ctn"
-    :class="size === 'lg' ? 'w-[170px]' : 'w-[140px]'"
+    :class="size === 'lg' ? 'w-[150px]' : 'w-[140px]'"
   >
     <CowSelectMenu
       class="absolute top-[6px] border-0 shadow-none"
@@ -9,7 +9,7 @@
       searchable
       searchable-placeholder="Search fonts"
       :select-class="`h-10 border-0 shadow-none outline-none text-center rounded-full bg-gray-100 dark:bg-[#222938] dark:text-white ${
-        size === 'lg' ? 'w-[170px]' : 'w-[140px]'
+        size === 'lg' ? 'w-[150px]' : 'w-[140px]'
       }`"
       size="md"
       :options="fonts"
@@ -18,7 +18,7 @@
       color="gray"
       clear-search-on-close
       :ui-menu="{
-        width: size === 'lg' ? 'w-[170px]' : 'w-[140px]',
+        width: size === 'lg' ? 'w-[150px]' : 'w-[140px]',
         input: 'text-xs',
         empty: 'text-xs',
         option: {

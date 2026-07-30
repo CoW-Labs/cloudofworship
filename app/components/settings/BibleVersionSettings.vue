@@ -58,6 +58,22 @@
         </CowButton>
       </div>
     </SettingsGroup>
+
+    <SettingsGroup
+      title="Default Bible Theme"
+      note="Every new Bible slide is created with this theme. Slides already in a schedule keep the theme they were made with — change those from the slide's theme menu."
+    >
+      <BibleThemeSelection
+        embedded
+        :value="appStore.currentState.settings.slideStyles.theme"
+        @select="
+          appStore.setSlideStyles({
+            ...appStore.currentState.settings.slideStyles,
+            theme: $event,
+          })
+        "
+      />
+    </SettingsGroup>
   </div>
 </template>
 

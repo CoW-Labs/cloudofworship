@@ -232,7 +232,10 @@
           class="relative z-30"
           :ui="{
             ring: 'ring-0',
-            background: 'bg-white dark-bg-gray-900 border-0',
+            rounded: 'rounded-xl',
+            shadow:
+              'shadow-xl shadow-gray-900/10 dark:shadow-2xl dark:shadow-black/60',
+            background: 'bg-white dark:bg-[#222838] border-0',
           }"
         >
           <button

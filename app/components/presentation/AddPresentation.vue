@@ -10,30 +10,20 @@
 
     <div class="flex flex-col gap-3 mt-3">
       <!-- Info banner -->
-      <div
-        class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
+      <Hint
+        :title="
+          fileType === 'ppt' ? 'Import PowerPoint slides' : 'Import PDF slides'
+        "
       >
-        <InfoIcon class="w-4 h-4 text-primary-500 mt-0.5 shrink-0" />
-        <div class="flex-1">
-          <h4 class="text-md font-semibold">
-            {{
-              fileType === "ppt"
-                ? "Import PowerPoint slides"
-                : "Import PDF slides"
-            }}
-          </h4>
-          <p class="text-sm">
-            Each page is converted into an image and bundled into a single
-            presentation slide.
-          </p>
-          <p class="text-xs mt-2 text-gray-500 dark:text-gray-400">
-            <template v-if="fileType === 'pdf'">
-              Tip: Export as PDF from Canva, PowerPoint, or Google Slides for
-              best results.
-            </template>
-          </p>
-        </div>
-      </div>
+        <p>
+          Each page is converted into an image and bundled into a single
+          presentation slide.
+        </p>
+        <p v-if="fileType === 'pdf'" class="mt-2">
+          Tip: Export as PDF from Canva, PowerPoint, or Google Slides for best
+          results.
+        </p>
+      </Hint>
 
       <!-- PPT feature-flag notice -->
       <div

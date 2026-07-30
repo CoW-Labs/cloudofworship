@@ -358,18 +358,40 @@
             <h3 class="text-white font-semibold text-md">
               Image not available on this device
             </h3>
-            <p class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
-              This image was added on another device and isn't stored in the
-              cloud. Upgrade to Teams to sync media across all your devices.
+            <p
+              v-if="cloudStorageOverQuota"
+              class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto"
+            >
+              This image was added on another device. You've used all of your
+              {{ isTeamsPlan ? "Teams" : "free" }} cloud storage, so it
+              couldn't be synced here.
+              {{
+                isTeamsPlan
+                  ? "Free up cloud storage to sync it."
+                  : "Upgrade to Teams for 5GB of synced storage."
+              }}
+            </p>
+            <p v-else class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
+              This image was added on another device and hasn't finished
+              syncing to the cloud yet. Reconnect that device to the internet
+              to sync it here.
             </p>
           </div>
-          <UButton
-            icon="i-bxs-award"
+          <CowButton
+            v-if="cloudStorageOverQuota"
+            size="sm"
             class="mt-1"
-            @click="useGlobalEmit('show-upgrade-modal')"
+            @click="
+              isTeamsPlan
+                ? useGlobalEmit(appWideActions.openSettings, 'Storage Settings')
+                : useGlobalEmit('show-upgrade-modal')
+            "
           >
-            Upgrade to Teams
-          </UButton>
+            <template #leading>
+              <IconWrapper name="i-bxs-award" class="w-4 h-4" />
+            </template>
+            {{ isTeamsPlan ? "Manage Storage" : "Upgrade to Teams" }}
+          </CowButton>
         </div>
         <div
           v-else
@@ -431,11 +453,12 @@
 
 <script setup lang="ts">
 import { useOnline } from "@vueuse/core"
-import { splitVerseByLines } from "~/composables/useHymn"
+import { remapChunkIndex, splitVerseByLines } from "~/composables/useHymn"
 import CoWPopover from "~/components/cow/CoWPopover.vue"
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
 import type {
   ExtendedFileT,
   Slide,
@@ -456,6 +479,7 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const localMedia = useLocalMediaStorage()
 const isActiveOverlay = computed(
   () => appStore.currentState.activeOverlaySlide?.id === props.slide?.id
@@ -736,6 +760,16 @@ watch(
   },
   { immediate: true }
 )
+
+// Every plan uploads media to the cloud up to its storage quota, so the most
+// likely reason a slide isn't available on this device is that the church is
+// over quota. Tailor the notice to that (fixable) case vs. an unrelated sync
+// gap (e.g. the other device was offline when the media was added).
+const { isTeamsPlan, getStorageLimit } = useSubscription()
+const cloudStorageOverQuota = computed(() => {
+  const usedMB = (authStore.church?.storageUsed || 0) / 1024 / 1024
+  return usedMB >= getStorageLimit()
+})
 
 // Track total verses in the current Bible chapter for sequential navigation
 const chapterVerseCount = ref<number>(0)
@@ -1232,8 +1266,7 @@ const addDroppedBackgroundVideo = async (file: File) => {
       recoverable: false,
       userInitiated: true,
     })
-    const { isTeamsPlan } = useSubscription()
-    if (navigator.onLine && isTeamsPlan.value) {
+    if (navigator.onLine) {
       try {
         const uploaded = await useUploadFile(file, { name: file.name })
         await useIndexedDB().localMediaFiles.update(id, {
@@ -1242,7 +1275,20 @@ const addDroppedBackgroundVideo = async (file: File) => {
           updatedAt: new Date().toISOString(),
         })
       } catch (error) {
-        console.warn("Background video cloud upload failed:", error)
+        if (/quota|storage limit|storage full/i.test(String(error))) {
+          useToast().add({
+            title: isTeamsPlan.value
+              ? "Cloud storage full"
+              : "Free cloud storage full",
+            description: isTeamsPlan.value
+              ? "This video will only be available on this device until you free up cloud storage."
+              : "This video will only be available on this device. Upgrade to Teams for 5GB of synced cloud storage.",
+            icon: "i-bx-cloud",
+            color: "amber",
+          })
+        } else {
+          console.warn("Background video cloud upload failed:", error)
+        }
       }
     }
     const videoUrl = await localMedia.getPlaybackUrl(id)
@@ -1389,6 +1435,12 @@ const onUpdateSongLyrics = (song: Song) => {
 }
 
 const onUpdateSongLines = async (linesPerSlide: number) => {
+  // Captured before anything re-chunks, so the active chunk can be re-pointed
+  // at the line the operator is actually reading (see remapChunkIndex)
+  const previousLinesPerSlide =
+    props.slide?.slideStyle?.linesPerSlide ??
+    appStore.currentState.settings.slideStyles.linesPerSlide
+
   if (props.slide?.type === slideTypes.hymn) {
     if (!props.slide) return
     appStore.setSlideStyles({
@@ -1413,11 +1465,12 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
       rawText = hymn.verses?.[verseIndex]?.trim() ?? ""
     }
     const chunks = splitVerseByLines(rawText, linesPerSlide)
-    const clampedIdx = Math.min(
+    const activeIdx = remapChunkIndex(
+      splitVerseByLines(rawText, previousLinesPerSlide),
       props.slide.hymnSubVerseIndex ?? 0,
-      chunks.length - 1
+      chunks
     )
-    const displayVerse = chunks[clampedIdx] ?? ""
+    const displayVerse = chunks[activeIdx] ?? ""
     const tempSlide: Slide = {
       ...props.slide,
       slideStyle: {
@@ -1425,7 +1478,7 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
         linesPerSlide,
         fontSize: Number(useScreenFontSize(displayVerse)),
       },
-      hymnSubVerseIndex: clampedIdx,
+      hymnSubVerseIndex: activeIdx,
       hymnSubVerseTotal: chunks.length,
     }
     tempSlide.contents = useSlideContent(tempSlide, hymn, displayVerse)
@@ -1450,11 +1503,24 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
       ...props.slide.slideStyle,
       linesPerSlide,
     }
+    const activeSongIndex = setlistData.value.activeSongIndex
+    const activeItem = setlistData.value.songs[activeSongIndex]
+    // useSong() re-chunks the song object in place, so snapshot the current
+    // arrangement before asking for the new one
+    const previousVerses = [...(activeItem?.song?.verses || [])]
+    const previousVerseIndex = activeItem?.verseIndex || 0
+    const rechunkedSong = activeItem
+      ? await useSong(activeItem.song || activeItem.songId, linesPerSlide)
+      : null
     const updatedSlide = await refreshSongSetlistSlide(props.slide, {
-      activeSongIndex: setlistData.value.activeSongIndex,
-      verseIndex:
-        setlistData.value.songs[setlistData.value.activeSongIndex]
-          ?.verseIndex || 0,
+      activeSongIndex,
+      verseIndex: rechunkedSong?.verses?.length
+        ? remapChunkIndex(
+            previousVerses,
+            previousVerseIndex,
+            rechunkedSong.verses
+          )
+        : previousVerseIndex,
     })
     emit("slide-update", { ...updatedSlide, slideStyle })
     return
@@ -1462,16 +1528,34 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
 
   // console.log("updating song lines", linesPerSlide)
   const song = (props.slide?.data as Song) || props.slide?.songId
+  // useSong() re-chunks the song object in place, so snapshot the current
+  // arrangement before asking for the new one
+  const previousVerses = [...((song as Song)?.verses || [])]
+  const currentSongVerseNumber = Number(verse.value?.split(" ")?.[1])
+  const previousVerseIndex = Number.isFinite(currentSongVerseNumber)
+    ? currentSongVerseNumber - 1
+    : 0
   const tempSong: Song | null = await useSong(song, linesPerSlide)
   // console.log(tempSong)
   if (tempSong) {
+    const activeVerseIndex = previousVerses.length
+      ? remapChunkIndex(
+          previousVerses,
+          previousVerseIndex,
+          tempSong.verses || []
+        )
+      : Math.min(
+          Math.max(previousVerseIndex, 0),
+          Math.max((tempSong.verses?.length || 1) - 1, 0)
+        )
+    const currentSongVerse = tempSong.verses?.[activeVerseIndex]
     const tempSlide: Slide = {
       title: tempSong.title,
       ...props.slide!!,
       data: tempSong,
     }
-    const currentSongVerseNumber = Number(verse.value?.split(" ")?.[1])
-    const currentSongVerse = song.verses?.[currentSongVerseNumber - 1]
+    tempSlide.title = `Verse ${activeVerseIndex + 1}`
+    verse.value = tempSlide.title
 
     tempSlide.name = useSlideName(tempSlide)
     let fontSize = useScreenFontSize(currentSongVerse || "")

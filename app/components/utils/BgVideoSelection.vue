@@ -253,7 +253,7 @@ const saveAndSelectVideos = async (files: File[]) => {
         recoverable: false,
         userInitiated: true,
       })
-      if (online.value && isTeamsPlan.value) {
+      if (online.value) {
         try {
           const uploaded = await useUploadFile(file, { name: file.name })
           await useIndexedDB().localMediaFiles.update(mediaKey, {
@@ -262,7 +262,20 @@ const saveAndSelectVideos = async (files: File[]) => {
             updatedAt: new Date().toISOString(),
           })
         } catch (error) {
-          console.warn("Background video cloud upload failed:", error)
+          if (/quota|storage limit|storage full/i.test(String(error))) {
+            toast.add({
+              title: isTeamsPlan.value
+                ? "Cloud storage full"
+                : "Free cloud storage full",
+              description: isTeamsPlan.value
+                ? "This video will only be available on this device until you free up cloud storage."
+                : "This video will only be available on this device. Upgrade to Teams for 5GB of synced cloud storage.",
+              icon: "i-bx-cloud",
+              color: "amber",
+            })
+          } else {
+            console.warn("Background video cloud upload failed:", error)
+          }
         }
       }
 

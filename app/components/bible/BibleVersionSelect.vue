@@ -33,7 +33,7 @@
       @close="$emit('close')"
       @change="
         $event === '+ More Versions'
-          ? useGlobalEmit(appWideActions.openSettings, 'Bible Version Settings')
+          ? useGlobalEmit(appWideActions.openSettings, 'Bible Slide Settings')
           : (bibleVersion = $event)
       "
     >
@@ -109,7 +109,7 @@ watch(
 
 watch(bibleVersion, (newValue, oldValue) => {
   if (newValue === "+ More Versions") {
-    useGlobalEmit(appWideActions.openSettings, "Bible Version Settings")
+    useGlobalEmit(appWideActions.openSettings, "Bible Slide Settings")
     bibleVersion.value = oldValue
   }
   emit("change", newValue)
