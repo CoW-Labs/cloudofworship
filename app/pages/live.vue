@@ -86,16 +86,45 @@ const lastOverlayBroadcastTs = ref(0)
 // URLs, or reload the <video>.
 const { rehydrateSlideMedia } = useSlideMediaCache()
 const localMedia = useLocalMediaStorage()
-const localizedLiveMedia = new Map<
-  string,
-  { background?: string; dataUrl?: string }
->()
+type LocalizedMedia = {
+  background?: string
+  dataUrl?: string
+  presentationObjects?: Slide["presentationObjects"]
+}
+const localizedLiveMedia = new Map<string, LocalizedMedia>()
 
 const slideNeedsLocalMedia = (slide: Slide) =>
   slide.type === slideTypes.media ||
   slide.type === slideTypes.presentation ||
   !!slide.backgroundImageKey ||
   !!slide.backgroundVideoKey
+
+// A presentation ships every page in one slide object; paging only changes
+// presentationPageIndex, and the broadcast blanks blob:/asset: URLs — so its
+// background is "" on the wire for every page. Keying on the background made
+// all pages share one cache entry and page 2+ kept re-applying page 1's URL.
+// Key presentations on the slide id and cache the whole localized page list.
+const mediaSignature = (slide: Slide) =>
+  slide.type === slideTypes.presentation
+    ? `presentation:${slide.id}`
+    : `${slide.id}|${slide.background ?? ""}`
+
+const applyLocalizedMedia = (slide: Slide, cached: LocalizedMedia) => {
+  // Presentations resolve their background from the cached page list so the
+  // page currently being projected wins. A presentation with no localized page
+  // list (nothing cached locally) falls through to the generic handling below.
+  if (slide.type === slideTypes.presentation && cached.presentationObjects?.length) {
+    slide.presentationObjects = cached.presentationObjects
+    slide.background =
+      cached.presentationObjects[slide.presentationPageIndex ?? 0]?.imageUrl ||
+      slide.background
+    return
+  }
+  if (cached.background) slide.background = cached.background
+  if (cached.dataUrl && slide.data) {
+    ;(slide.data as any).url = cached.dataUrl
+  }
+}
 
 useHead({
   title: "Live Projection - Cloud of Worship",
@@ -279,13 +308,10 @@ onMounted(() => {
       // source; otherwise rehydrate asynchronously below.
       let pendingRehydrateSig: string | null = null
       if (slideNeedsLocalMedia(updatedSlide)) {
-        const sig = `${updatedSlide.id}|${updatedSlide.background ?? ""}`
+        const sig = mediaSignature(updatedSlide)
         const cached = localizedLiveMedia.get(sig)
         if (cached) {
-          if (cached.background) updatedSlide.background = cached.background
-          if (cached.dataUrl && updatedSlide.data) {
-            ;(updatedSlide.data as any).url = cached.dataUrl
-          }
+          applyLocalizedMedia(updatedSlide, cached)
         } else {
           pendingRehydrateSig = sig
         }
@@ -311,12 +337,20 @@ onMounted(() => {
         const sig = pendingRehydrateSig
         rehydrateSlideMedia(updatedSlide, { allowDownload: true })
           .then((rehydrated) => {
-            localizedLiveMedia.set(sig, {
+            const localized: LocalizedMedia = {
               background: rehydrated.background,
               dataUrl: (rehydrated.data as any)?.url,
-            })
-            if (mostUpdatedLiveSlide.value?.id === rehydrated.id) {
-              mostUpdatedLiveSlide.value = { ...rehydrated }
+              presentationObjects: rehydrated.presentationObjects,
+            }
+            localizedLiveMedia.set(sig, localized)
+            // Re-apply onto whatever is on screen now rather than adopting
+            // `rehydrated` wholesale — the operator may have paged ahead while
+            // the download ran, and that newer page index must win.
+            const current = mostUpdatedLiveSlide.value
+            if (current?.id === rehydrated.id) {
+              const next = { ...current }
+              applyLocalizedMedia(next, localized)
+              mostUpdatedLiveSlide.value = next
             }
           })
           .catch((err) =>
@@ -339,6 +373,9 @@ onBeforeUnmount(() => {
   localizedLiveMedia.forEach((media) => {
     if (media.background) urls.add(media.background)
     if (media.dataUrl) urls.add(media.dataUrl)
+    media.presentationObjects?.forEach((page) => {
+      if (page.imageUrl) urls.add(page.imageUrl)
+    })
   })
   urls.forEach((url) => localMedia.releasePlaybackUrl(url))
   localizedLiveMedia.clear()
