@@ -148,6 +148,7 @@ export const useAppStore = defineStore("app", {
           closeLiveWindowWithOperator: false, // Default: live window stays open when operator tab closes
           transcriptionAutoActions: true,
           transcriptionVoiceBibleVersionCommands: true,
+          uploadVideosToCloud: true,
           // motionlessSlides: true,
           transitionInterval: 0.7,
           slideStyles: {
@@ -367,6 +368,7 @@ export const useAppStore = defineStore("app", {
         transcriptionAutoActions: settings.transcriptionAutoActions ?? true,
         transcriptionVoiceBibleVersionCommands:
           settings.transcriptionVoiceBibleVersionCommands ?? true,
+        uploadVideosToCloud: settings.uploadVideosToCloud ?? true,
       }
     },
     setSlideStyles(styles: SlideStyle) {
@@ -562,6 +564,15 @@ export const useAppStore = defineStore("app", {
         songAndHymnLabelsVisibility: songAndHymnLabelsVisibility,
       }
       usePosthogCapture("SONG_AND_HYMN_LABELS_SETTINGS_CHANGED")
+    },
+    setUploadVideosToCloud(uploadVideosToCloud: boolean) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        uploadVideosToCloud: uploadVideosToCloud,
+      }
+      usePosthogCapture("UPLOAD_VIDEOS_TO_CLOUD_SETTINGS_CHANGED", {
+        enabled: uploadVideosToCloud,
+      })
     },
     // setMotionlessSlides(motionlessSlides: boolean) {
     //   this.currentState.settings = {

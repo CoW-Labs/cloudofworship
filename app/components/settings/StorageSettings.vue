@@ -33,24 +33,26 @@
             <span class="text-gray-500 dark:text-[#9aa3b2]">Backend</span>
             <p class="font-medium">{{ backendLabel }}</p>
           </div>
-          <div>
+          <!-- <div>
             <span class="text-gray-500 dark:text-[#9aa3b2]">Persistence</span>
             <p class="font-medium">{{ persistenceLabel }}</p>
-          </div>
+          </div> -->
           <div>
             <span class="text-gray-500 dark:text-[#9aa3b2]">Available</span>
             <p class="font-medium">{{ formatBytes(localAvailableBytes) }}</p>
           </div>
-          <div>
+          <!-- <div>
             <span class="text-gray-500 dark:text-[#9aa3b2]">Transfers</span>
             <p class="font-medium">
               {{ pendingTransferCount }} writes,
               {{ migrationCount }} migrations,
               {{ failedTransferCount }} failed
             </p>
-          </div>
+          </div> -->
         </div>
-        <div class="storage-chart flex rounded-full overflow-hidden my-3 w-full">
+        <div
+          class="storage-chart flex rounded-full overflow-hidden my-3 w-full"
+        >
           <div
             class="storage-chart-bar-inner h-[10px] bg-primary-500 transition-all"
             :style="{
@@ -198,37 +200,6 @@
           </div>
         </div>
       </div>
-
-      <div
-        class="danger-zone rounded-2xl bg-red-50 dark:bg-red-900/25 ring-1 ring-red-200 dark:ring-red-500/20 p-4"
-      >
-        <h3 class="font-semibold text-sm text-red-700 dark:text-red-200">
-          Danger Zone
-        </h3>
-        <p class="text-xs mb-4 mt-2 text-red-700/80 dark:text-red-200/80">
-          This is a danger zone. If you are not sure what you are doing, do not
-          delete anything here. If you are sure, click the button below.
-        </p>
-        <CowInput
-          v-if="deletePrompt"
-          v-model="deletePromptText"
-          label="Type 'intentionally deleting' to confirm"
-          class="mb-4 come-up-1"
-        />
-        <CowButton
-          variant="danger"
-          block
-          :disabled="
-            deletePrompt ? deletePromptText !== 'intentionally deleting' : false
-          "
-          @click="deletePrompt ? deleteAllData() : (deletePrompt = true)"
-        >
-          <template #leading>
-            <DeleteIcon class="w-4 h-4" />
-          </template>
-          Clear all data on this device
-        </CowButton>
-      </div>
     </div>
 
     <!-- Cloud Storage Tab -->
@@ -298,6 +269,58 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- CLOUD UPLOAD PREFERENCES — panel-wide, applies on both tabs -->
+    <SettingsGroup
+      title="Cloud Uploads"
+      note="Videos are the largest files you can add. Turning this off keeps new videos on this device only."
+      class="my-6"
+    >
+      <SettingsRow
+        label="Upload videos to cloud"
+        description="Applies to videos added as media slides."
+      >
+        <CowToggle
+          bare
+          label="Upload videos to cloud"
+          :model-value="
+            appStore.currentState.settings.uploadVideosToCloud !== false
+          "
+          @update:model-value="appStore.setUploadVideosToCloud($event)"
+        />
+      </SettingsRow>
+    </SettingsGroup>
+
+    <div
+      class="danger-zone rounded-2xl bg-red-50 dark:bg-red-900/25 ring-1 ring-red-200 dark:ring-red-500/20 p-4"
+    >
+      <h3 class="font-semibold text-sm text-red-700 dark:text-red-200">
+        Danger Zone
+      </h3>
+      <p class="text-xs mb-4 mt-2 text-red-700/80 dark:text-red-200/80">
+        This is a danger zone. If you are not sure what you are doing, do not
+        delete anything here. If you are sure, click the button below.
+      </p>
+      <CowInput
+        v-if="deletePrompt"
+        v-model="deletePromptText"
+        label="Type 'intentionally deleting' to confirm"
+        class="mb-4 come-up-1"
+      />
+      <CowButton
+        variant="danger"
+        block
+        :disabled="
+          deletePrompt ? deletePromptText !== 'intentionally deleting' : false
+        "
+        @click="deletePrompt ? deleteAllData() : (deletePrompt = true)"
+      >
+        <template #leading>
+          <DeleteIcon class="w-4 h-4" />
+        </template>
+        Clear all data on this device
+      </CowButton>
     </div>
   </div>
 </template>
@@ -400,8 +423,7 @@ const mediaTableSize = computed(() =>
   mediaGroups.value
     .filter(
       (group) =>
-        group.category === "slide" ||
-        group.category === "presentation-page"
+        group.category === "slide" || group.category === "presentation-page"
     )
     .reduce((total, group) => total + group.sizeMB, 0)
 )

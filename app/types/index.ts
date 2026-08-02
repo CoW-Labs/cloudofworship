@@ -399,6 +399,7 @@ export interface AppSettings {
   closeLiveWindowWithOperator?: boolean // Whether live window closes when operator tab closes (browser only)
   transcriptionAutoActions?: boolean
   transcriptionVoiceBibleVersionCommands?: boolean
+  uploadVideosToCloud?: boolean // Upload video media slides to cloud (S3). Defaults to true.
 
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number

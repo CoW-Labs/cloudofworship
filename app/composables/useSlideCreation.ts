@@ -529,6 +529,11 @@ export default function useSlideCreation() {
           // upload has finished.
           const remoteUrls = new Map<number, string>()
           let quotaExceeded = false
+          // Videos are the heaviest thing a church can push to the cloud, so
+          // they get their own opt-out (Settings → Storage). Off means the video
+          // stays device-local; images and audio are unaffected.
+          const uploadVideos =
+            appStore.currentState.settings.uploadVideosToCloud !== false
           if (navigator.onLine) {
             const uploadPromises = files.map(async (file: ExtendedFileT, index: number) => {
               const blob = compressedBlobs[index]
@@ -537,10 +542,11 @@ export default function useSlideCreation() {
               // the original.) The local durable copy remains the playback
               // source on every device — the hosted URL is only a fetch fallback.
               // Audio and external files are still skipped.
+              const isVideo = !!blob?.type?.includes("video")
               const isUploadable =
                 !!blob &&
                 (blob.type?.includes("image") ||
-                  blob.type?.includes("video") ||
+                  (isVideo && uploadVideos) ||
                   blob.type?.includes("audio"))
               if (!isUploadable || !blob) return null
               try {
