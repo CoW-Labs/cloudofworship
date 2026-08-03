@@ -32,7 +32,7 @@
         @click="close"
       >
         <div class="auth-collage__card" @click.stop>
-          <img :src="active" alt="" draggable="false" />
+          <img :src="activeFull || active" alt="" draggable="false" />
           <button
             type="button"
             class="auth-collage__close"
@@ -52,10 +52,15 @@ const TILE_COUNT = 18
 const COLS = 7
 const PER_STRIP = 36
 
+/* Tiles load downscaled (880px) copies — that is the only thing on the page-load
+   critical path. The modal upgrades to the full-res original after it opens. */
 const images = Array.from(
   { length: TILE_COUNT },
-  (_, i) => `/collage/collage-img-${i + 1}.webp`
+  (_, i) => `/collage/thumbs/collage-img-${i + 1}.webp`
 )
+
+const toFullRes = (thumb: string) =>
+  thumb.replace("/collage/thumbs/", "/collage/")
 
 interface Column {
   loop: string[]
@@ -85,6 +90,7 @@ const columns: Column[] = Array.from({ length: COLS }, (_, c) => {
 
 const SHARED = "collage-shared"
 const active = ref<string | null>(null)
+const activeFull = ref<string | null>(null)
 const isTransitioning = ref(false)
 const isClosingBackdrop = ref(false)
 let sharedEl: HTMLElement | null = null
@@ -92,12 +98,31 @@ let sharedEl: HTMLElement | null = null
 const supportsVT = () =>
   typeof document !== "undefined" && "startViewTransition" in document
 
+/* Swap in the full-res original once it has decoded. The modal opens on the
+   already-cached thumb so the shared-element morph never waits on the network. */
+let pendingSrc: string | null = null
+
+const upgradeToFullRes = (thumb: string) => {
+  const full = toFullRes(thumb)
+  const loader = new Image()
+  // `pendingSrc` is set synchronously in open(), so a cached full-res that fires
+  // onload before the view-transition callback assigns `active` still lands.
+  loader.onload = () => {
+    if (pendingSrc === thumb) activeFull.value = full
+  }
+  loader.src = full
+}
+
 const open = (img: string, e: MouseEvent) => {
   if (isTransitioning.value) return
 
   const imgEl = (e.currentTarget as HTMLElement).querySelector(
     "img"
   ) as HTMLElement | null
+
+  pendingSrc = img
+  activeFull.value = null
+  upgradeToFullRes(img)
 
   if (!supportsVT() || !imgEl) {
     active.value = img
@@ -123,6 +148,8 @@ const open = (img: string, e: MouseEvent) => {
 
 const close = async () => {
   if (isTransitioning.value) return
+
+  pendingSrc = null
 
   if (!supportsVT()) {
     active.value = null
