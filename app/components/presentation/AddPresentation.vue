@@ -104,7 +104,7 @@
       </Transition>
 
       <!-- Conversion progress -->
-      <Transition name="fade-sm">
+      <!-- <Transition name="fade-sm">
         <div
           v-if="isConverting"
           class="flex items-center gap-3 px-3 py-3 rounded-md bg-primary-50 dark:bg-primary-900 text-sm"
@@ -117,7 +117,7 @@
             statusMessage || "Processing…"
           }}</span>
         </div>
-      </Transition>
+      </Transition> -->
 
       <!-- Error -->
       <Transition name="fade-sm">
@@ -175,8 +175,8 @@
       >
         <p v-if="fileType === 'pdf'">
           Import PDF files directly into Cloud of Worship. Each page becomes an
-          image slide you can present right away, no uploads required,
-          processed instantly on your device.
+          image slide you can present right away, no uploads required, processed
+          instantly on your device.
         </p>
         <p v-else>
           Import PowerPoint files directly into Cloud of Worship. Each slide
