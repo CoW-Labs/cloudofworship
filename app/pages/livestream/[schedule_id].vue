@@ -251,6 +251,12 @@ const handleWebSocketMessage = async (parsedData: any) => {
         await prefetchScheduleMedia(slides, currentState.value.liveSlideId)
       }
       break
+    case "live-slide":
+      // The operator changed what is on screen. This is the only thing that
+      // seeds liveSlide — without it the page renders nothing at all.
+      // A null payload means intermission: blank the stream.
+      liveSlide.value = data ? await localizeSlide({ ...data }) : null
+      break
     case "new-slide":
     case "slide-created":
       // New slide created in real-time
