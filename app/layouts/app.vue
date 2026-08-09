@@ -35,53 +35,30 @@
       <UpgradePlanModal />
     </ClientOnly>
   </div>
-  <div
-    v-else
-    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center bg-white px-6 text-gray-900 dark:bg-[#111722] dark:text-white"
-  >
-    <div class="wrapper w-full max-w-md text-center">
-      <section class="min-w-0">
-        <div class="logo mb-8 flex items-center justify-center gap-3">
-          <Logo class="w-[56px] shrink-0" />
-          <div class="min-w-0">
-            <h1 class="truncate text-2xl font-semibold">Cloud of Worship</h1>
-          </div>
-        </div>
+  <Transition name="fade-sm">
+    <div
+      v-if="loadingResources"
+      class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 z-50 grid place-items-center bg-white px-6 text-[#131724] dark:bg-[#131724] dark:text-white"
+    >
+      <div class="wrapper flex w-full max-w-[324px] flex-col items-center">
+        <CoWSplashLogo class="w-[76px] shrink-0" />
 
-        <div class="space-y-4">
-          <div class="space-y-2 flex items-center justify-between">
-            <div class="min-w-0 text-center">
-              <h2 class="truncate text-sm font-semibold">
-                {{ loadingDetail || currentLoadingTask.description }}
-              </h2>
-            </div>
-            <span class="block text-sm font-semibold tabular-nums">
-              {{ overallLoadingProgress }}%
-            </span>
-          </div>
-
-          <UProgress size="2xl" :value="overallLoadingProgress || undefined" :max="100" />
-
+        <div
+          class="bar mt-[34px] h-1 w-full overflow-hidden rounded-full bg-[#e6e8ef] dark:bg-[#222838]"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="overallLoadingProgress"
+          :aria-label="loadingDetail || currentLoadingTask.description"
+        >
           <div
-            class="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-400"
-          >
-            <UIcon
-              :name="isAppOnline ? 'i-lucide-wifi' : 'i-lucide-wifi-off'"
-              class="h-4 w-4 shrink-0"
-              dynamic
-            />
-            <span>
-              {{
-                isAppOnline
-                  ? "Online refresh enabled. Cached data remains available."
-                  : "Offline mode. Using resources already saved on this device."
-              }}
-            </span>
-          </div>
+            class="h-full rounded-full bg-current transition-[width] duration-500 ease-out"
+            :style="{ width: `${Math.max(overallLoadingProgress, 3)}%` }"
+          />
         </div>
-      </section>
+      </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
