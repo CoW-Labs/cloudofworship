@@ -239,6 +239,29 @@ const disconnectSocket = () => {
   appStore.setOnlineUsers([])
 }
 
+// Feed the slide that is currently on screen to livestream viewers. Nothing
+// else broadcasts it, so /livestream/:schedule_id stays blank without this.
+watch(
+  () => appStore.currentState.liveSlideId,
+  (liveSlideId) => {
+    if (!socketInstance.value?.isConnected()) return
+
+    // Intermission clears liveSlideId (see goIntermission in LiveOutput). Send
+    // an explicit null so viewers blank out instead of holding the last slide.
+    if (!liveSlideId) {
+      socketInstance.value.sendLiveSlide(null)
+      return
+    }
+
+    const liveSlide = appStore.currentState.activeSlides.find(
+      (slide) => slide.id === liveSlideId
+    )
+    if (liveSlide) {
+      socketInstance.value.sendLiveSlide(liveSlide)
+    }
+  }
+)
+
 onMounted(async () => {
   const emailChange = useRoute().query.email_change
 
