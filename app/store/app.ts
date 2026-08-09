@@ -10,11 +10,56 @@ import type {
   BibleVersion,
   AppState,
   OnlineUser,
+  OverlaySettings,
 } from "~/types/index"
 import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
 import { useThrottleFn } from "@vueuse/core"
 import posthog from "posthog-js"
+
+// Absolute floors/ceilings for every resizable panel. These are hard usability
+// stops only — the effective bounds a user drags against are derived from the
+// viewport in `usePanelLayout`, so a 1280x585 screen gets the same panel
+// *proportions* as a 1600x900 one instead of the same absolute pixels.
+export const PANEL_SIZE_LIMITS = {
+  quickActionsWidth: { min: 240, max: 550, default: 340 },
+  liveOutputWidth: { min: 320, max: 600, default: 450 },
+  previewHeight: { min: 170, max: 900, default: 290 },
+  livePreviewHeight: { min: 140, max: 700, default: 280 },
+  transcriptPanelHeight: { min: 160, max: 520, default: 280 },
+} as const
+
+// Fraction of the axis each panel wants to occupy, measured off the reference
+// 1600x900 layout the design was drawn at (e.g. 450/1600 ≈ 0.28 for LiveOutput).
+// `min`/`max` are the draggable range as fractions; they are intersected with
+// the absolute limits above.
+export const PANEL_SIZE_RATIOS = {
+  quickActionsWidth: { axis: "width", ideal: 0.21, min: 0.18, max: 0.34 },
+  liveOutputWidth: { axis: "width", ideal: 0.28, min: 0.25, max: 0.38 },
+  previewHeight: { axis: "height", ideal: 0.35, min: 0.26, max: 0.6 },
+  livePreviewHeight: { axis: "height", ideal: 0.34, min: 0.22, max: 0.55 },
+  transcriptPanelHeight: { axis: "height", ideal: 0.34, min: 0.22, max: 0.5 },
+} as const satisfies Record<
+  PanelSizeKey,
+  { axis: "width" | "height"; ideal: number; min: number; max: number }
+>
+
+export type PanelSizeKey = keyof typeof PANEL_SIZE_LIMITS
+export type PanelSizes = Record<PanelSizeKey, number>
+
+const getDefaultPanelSizes = (): PanelSizes => ({
+  quickActionsWidth: PANEL_SIZE_LIMITS.quickActionsWidth.default,
+  liveOutputWidth: PANEL_SIZE_LIMITS.liveOutputWidth.default,
+  previewHeight: PANEL_SIZE_LIMITS.previewHeight.default,
+  livePreviewHeight: PANEL_SIZE_LIMITS.livePreviewHeight.default,
+  transcriptPanelHeight: PANEL_SIZE_LIMITS.transcriptPanelHeight.default,
+})
+
+const clampPanelSize = (panel: PanelSizeKey, size: number) => {
+  const limits = PANEL_SIZE_LIMITS[panel]
+  const safeSize = Number.isFinite(size) ? size : limits.default
+  return Math.min(limits.max, Math.max(limits.min, safeSize))
+}
 
 function ensureUniqueIds(arr: Slide[]): Slide[] {
   const seenIds = new Set()
@@ -60,6 +105,8 @@ export const useAppStore = defineStore("app", {
     currentState: AppState
     pastStates: AppState[]
     futureStates: AppState[]
+    panelSizes: PanelSizes
+    panelSizesTouched: Partial<Record<PanelSizeKey, boolean>>
   } => {
     return {
       currentState: {
@@ -92,12 +139,16 @@ export const useAppStore = defineStore("app", {
             },
           },
           animations: true,
+          microAnimations: true,
+          verseTransitionStyle: "off",
+          verseTransitionInterval: 0.3,
           footnotes: false,
           songAndHymnLabelsVisibility: false,
           liveWindowFullscreen: true, // Default to fullscreen mode
           closeLiveWindowWithOperator: false, // Default: live window stays open when operator tab closes
           transcriptionAutoActions: true,
           transcriptionVoiceBibleVersionCommands: true,
+          uploadVideosToCloud: true,
           // motionlessSlides: true,
           transitionInterval: 0.7,
           slideStyles: {
@@ -120,6 +171,7 @@ export const useAppStore = defineStore("app", {
         alerts: [],
         activeAlert: null,
         activeOverlay: "none",
+        activeOverlaySlide: null,
         recentBibleSearches: [],
         failedUploadRequests: [],
         slidesLoading: false,
@@ -141,6 +193,8 @@ export const useAppStore = defineStore("app", {
       // Undo/Redo stacks
       pastStates: [],
       futureStates: [],
+      panelSizes: getDefaultPanelSizes(),
+      panelSizesTouched: {},
     }
   },
   getters: {
@@ -149,8 +203,23 @@ export const useAppStore = defineStore("app", {
         (slide) => slide.scheduleId === state.currentState.activeSchedule?._id
       ),
     bibleVersions: (state) => state.currentState.settings.bibleVersions,
+    panelSize: (state) => (panel: PanelSizeKey) =>
+      clampPanelSize(panel, state.panelSizes?.[panel]),
+    // A panel is "user-sized" once it has been dragged. Sizes that still sit on
+    // the legacy fixed default were never chosen by anyone, so `usePanelLayout`
+    // is free to replace them with a viewport-proportional size.
+    isPanelUserSized: (state) => (panel: PanelSizeKey) => {
+      if (state.panelSizesTouched?.[panel]) return true
+      const saved = state.panelSizes?.[panel]
+      return saved != null && saved !== PANEL_SIZE_LIMITS[panel].default
+    },
   },
   actions: {
+    setPanelSize(panel: PanelSizeKey, size: number) {
+      this.panelSizes[panel] = clampPanelSize(panel, size)
+      if (!this.panelSizesTouched) this.panelSizesTouched = {}
+      this.panelSizesTouched[panel] = true
+    },
     setSchedules(schedules: Schedule[]) {
       // onAppStateChange(this.pastStates, this.currentState)
       this.currentState.schedules = schedules?.filter(
@@ -223,6 +292,13 @@ export const useAppStore = defineStore("app", {
         return
       }
 
+      if (
+        this.currentState.activeOverlaySlide?.id === slide.id ||
+        (slide._id && this.currentState.activeOverlaySlide?._id === slide._id)
+      ) {
+        this.currentState.activeOverlaySlide = null
+      }
+
       onAppStateChange(this.pastStates, this.currentState, "activeSlides", [
         ...this.currentState.activeSlides,
       ])
@@ -259,6 +335,16 @@ export const useAppStore = defineStore("app", {
       // onAppStateChange(this.pastStates, this.currentState)
       // console.log("setActiveSlides", slides)
       this.currentState.activeSlides = ensureUniqueIds(slides)
+      if (
+        this.currentState.activeOverlaySlide &&
+        !this.currentState.activeSlides.some(
+          (slide) =>
+            slide.id === this.currentState.activeOverlaySlide?.id ||
+            (slide._id && slide._id === this.currentState.activeOverlaySlide?._id)
+        )
+      ) {
+        this.currentState.activeOverlaySlide = null
+      }
       this.currentState.liveOutputSlidesId = Array.from(
         new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
@@ -282,6 +368,7 @@ export const useAppStore = defineStore("app", {
         transcriptionAutoActions: settings.transcriptionAutoActions ?? true,
         transcriptionVoiceBibleVersionCommands:
           settings.transcriptionVoiceBibleVersionCommands ?? true,
+        uploadVideosToCloud: settings.uploadVideosToCloud ?? true,
       }
     },
     setSlideStyles(styles: SlideStyle) {
@@ -297,6 +384,12 @@ export const useAppStore = defineStore("app", {
       //     textOutlined: styles.textOutlined, // only this property inherited for now
       //   }
       // })
+    },
+    setOverlaySettings(settings: OverlaySettings) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        overlaySettings: settings,
+      }
     },
     setDefaultBibleVersion(version: string) {
       this.currentState.settings = {
@@ -318,6 +411,9 @@ export const useAppStore = defineStore("app", {
     },
     setActiveOverlay(overlay: string) {
       this.currentState.activeOverlay = overlay
+    },
+    setActiveOverlaySlide(slide: Slide | null) {
+      this.currentState.activeOverlaySlide = slide
     },
     setBackgroundVideos(bgVideos: BackgroundVideo[]) {
       this.currentState.backgroundVideos = bgVideos
@@ -434,6 +530,27 @@ export const useAppStore = defineStore("app", {
       }
       usePosthogCapture("ANIMATIONS_SETTINGS_CHANGED")
     },
+    setMicroAnimations(microAnimations: boolean) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        microAnimations: microAnimations,
+      }
+      usePosthogCapture("MICRO_ANIMATIONS_SETTINGS_CHANGED")
+    },
+    setVerseTransitionStyle(verseTransitionStyle: "off" | "fade" | "slide-up") {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        verseTransitionStyle: verseTransitionStyle,
+      }
+      usePosthogCapture("VERSE_TRANSITION_STYLE_SETTINGS_CHANGED")
+    },
+    setVerseTransitionInterval(interval: number) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        verseTransitionInterval: interval,
+      }
+      usePosthogCapture("VERSE_TRANSITION_INTERVAL_SETTINGS_CHANGED")
+    },
     setFootnotes(footnotes: boolean) {
       this.currentState.settings = {
         ...this.currentState.settings,
@@ -447,6 +564,15 @@ export const useAppStore = defineStore("app", {
         songAndHymnLabelsVisibility: songAndHymnLabelsVisibility,
       }
       usePosthogCapture("SONG_AND_HYMN_LABELS_SETTINGS_CHANGED")
+    },
+    setUploadVideosToCloud(uploadVideosToCloud: boolean) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        uploadVideosToCloud: uploadVideosToCloud,
+      }
+      usePosthogCapture("UPLOAD_VIDEOS_TO_CLOUD_SETTINGS_CHANGED", {
+        enabled: uploadVideosToCloud,
+      })
     },
     // setMotionlessSlides(motionlessSlides: boolean) {
     //   this.currentState.settings = {
@@ -486,7 +612,8 @@ export const useAppStore = defineStore("app", {
     setDefaultSlideBackground(
       type: string,
       background: string,
-      backgroundVideoKey?: string | null
+      backgroundVideoKey?: string | null,
+      backgroundImageKey?: string | null
     ) {
       console.log(
         "setDefaultSlideBackground",
@@ -502,11 +629,23 @@ export const useAppStore = defineStore("app", {
             backgroundType: type,
             background,
             backgroundVideoKey: backgroundVideoKey || null,
+            backgroundImageKey: backgroundImageKey || null,
           },
         },
       }
       usePosthogCapture("DEFAULT_BACKGROUND_SETTINGS_CHANGED")
       // console.log("setDefaultSlideBackground", this.currentState.settings)
+    },
+    setIntermissionSettings(payload: AppSettings["intermission"]) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        intermission: {
+          mode: "default",
+          ...this.currentState.settings.intermission,
+          ...payload,
+        },
+      }
+      usePosthogCapture("INTERMISSION_SETTINGS_CHANGED")
     },
     // setActiveLiveWindows(windows: any[]) {
     //   this.activeLiveWindows = JSON.stringify(windows)
@@ -560,6 +699,7 @@ export const useAppStore = defineStore("app", {
       this.setDefaultSlideBackgrounds()
       this.setAlerts([])
       this.setActiveAlert(null)
+      this.setActiveOverlaySlide(null)
       this.setRecentBibleSearches("")
       this.setFailedUploadRequests(null)
       this.setSlidesLoading(false)
@@ -632,7 +772,9 @@ export const useAppStore = defineStore("app", {
     // Update a specific slide in the active slides array (for realtime updates)
     updateSlideInActiveSlides(updatedSlide: Slide) {
       const slideIndex = this.currentState.activeSlides.findIndex(
-        (s) => s.id === updatedSlide.id || s._id === updatedSlide._id
+        (s) =>
+          s.id === updatedSlide.id ||
+          (!!updatedSlide._id && s._id === updatedSlide._id)
       )
       if (slideIndex !== -1) {
         const existingSlide = this.currentState.activeSlides[slideIndex]

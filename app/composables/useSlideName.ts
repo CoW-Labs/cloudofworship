@@ -5,6 +5,7 @@ import type {
   Slide,
   Song,
   SongSetlistData,
+  TimeSlideData,
 } from "~/types/index"
 import { slideLayoutTypes, slideTypes } from "~/utils/constants"
 
@@ -44,6 +45,8 @@ const useSlideName = (slide: Slide) => {
       return `Hymn ${slide?.songId}`
     case slideTypes.countdown:
       return (slide?.data as Countdown)?.time?.replace('00:', '')
+    case slideTypes.time:
+      return (slide?.data as TimeSlideData)?.label || "Live Time"
     default:
       return `${slide?.title}`
   }

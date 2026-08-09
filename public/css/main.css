@@ -1,7 +1,7 @@
 @import url("./fonts-critical.css");
 
 body {
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: Geist, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 /* body.tauri {
   zoom: 0.9;
@@ -19,6 +19,31 @@ body {
   justify-content: center;
   align-items: center;
   margin: 0 0.2rem;
+}
+
+/* Shared QuickActions-style search input chrome, reused across list panels */
+.cow-search-input input {
+  min-height: 42px;
+  border-radius: 8px;
+  border: 0;
+  box-shadow: none;
+  background: #f8fafc;
+  font-size: 14px;
+  color: #374151;
+}
+.cow-search-input input:focus {
+  border: 0;
+  box-shadow: none;
+}
+.cow-search-input input::placeholder {
+  color: #9ca3af;
+}
+html.dark .cow-search-input input {
+  background: #2b3242;
+  color: #d5dae3;
+}
+html.dark .cow-search-input input::placeholder {
+  color: #9aa3b2;
 }
 
 /* PWA TOAST STYLES */
@@ -110,6 +135,18 @@ body {
 
 .slides-grid {
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+/* Short viewports get less vertical room for the slide grid, so narrow the
+   cards to keep the same number of thumbnails per row as a 1600x900 screen. */
+@media screen and (max-height: 760px) {
+  .slides-grid {
+    grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  }
+}
+@media screen and (max-height: 620px) {
+  .slides-grid {
+    grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+  }
 }
 .bg-stretch {
   background-size: 100% 100%;
@@ -268,12 +305,85 @@ body {
   -webkit-backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
 }
+/* Verse/slide-content transitions (SlideContentByLayout) */
+.verse-transition-translate-up {
+  animation: come-up 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  -webkit-animation: come-up 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+.verse-transition-fade {
+  animation: verse-fade 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  -webkit-animation: verse-fade 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+    forwards;
+  will-change: opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+.fade-in-right {
+  animation: fade-in-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  -webkit-animation: fade-in-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+    forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+.fade-in-left {
+  animation: fade-in-left 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  -webkit-animation: fade-in-left 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+    forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+/* SLIDE-TO-SLIDE CROSSFADE (whole slide face: background + text) */
+/* Duration is driven by --cow-transition-duration set inline on the live container. */
+/* will-change lives on the *-active classes only, so it is applied by Vue during the
+   transition and dropped afterwards — idle slides never pin a compositor layer. */
+.cow-slide-fade-enter-active,
+.cow-slide-fade-leave-active {
+  transition: opacity var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  -webkit-transition: opacity var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: opacity;
+}
+.cow-slide-fade-enter-from,
+.cow-slide-fade-leave-to {
+  opacity: 0;
+}
+.cow-slide-fade-enter-to,
+.cow-slide-fade-leave-from {
+  opacity: 1;
+}
+/* The leaving slide is pulled out of flow so the entering slide keeps driving
+   the container height while the two overlap during the crossfade. */
+.cow-slide-fade-leave-active {
+  position: absolute;
+  inset: 0;
+}
+
 .no-animations {
   .come-up-1 {
     animation: none;
     -webkit-animation: none;
   }
   .come-up-2 {
+    animation: none;
+    -webkit-animation: none;
+  }
+  .verse-transition-translate-up,
+  .verse-transition-fade {
+    animation: none;
+    -webkit-animation: none;
+  }
+  .fade-in-right,
+  .fade-in-left {
     animation: none;
     -webkit-animation: none;
   }
@@ -295,6 +405,53 @@ body {
     -moz-transform: translateY(0) translateZ(0);
     -ms-transform: translateY(0) translateZ(0);
     -o-transform: translateY(0) translateZ(0);
+  }
+}
+
+@keyframes verse-fade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(24px) translateZ(0);
+    -webkit-transform: translateX(24px) translateZ(0);
+    -moz-transform: translateX(24px) translateZ(0);
+    -ms-transform: translateX(24px) translateZ(0);
+    -o-transform: translateX(24px) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateZ(0);
+    -webkit-transform: translateX(0) translateZ(0);
+    -moz-transform: translateX(0) translateZ(0);
+    -ms-transform: translateX(0) translateZ(0);
+    -o-transform: translateX(0) translateZ(0);
+  }
+}
+
+@keyframes fade-in-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-24px) translateZ(0);
+    -webkit-transform: translateX(-24px) translateZ(0);
+    -moz-transform: translateX(-24px) translateZ(0);
+    -ms-transform: translateX(-24px) translateZ(0);
+    -o-transform: translateX(-24px) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateZ(0);
+    -webkit-transform: translateX(0) translateZ(0);
+    -moz-transform: translateX(0) translateZ(0);
+    -ms-transform: translateX(0) translateZ(0);
+    -o-transform: translateX(0) translateZ(0);
   }
 }
 .marquee {
@@ -458,7 +615,17 @@ body {
 .live-output {
   color: #ffffff;
   user-select: none;
+  /* Previews are rendered inside <button> elements (slide cards), which the UA
+     stylesheet centers. Text slides carry their own alignment in the TipTap
+     HTML and skip the *-live-content alignment classes, so without this reset
+     they'd inherit that centering and disagree with the editor/live output. */
+  text-align: left;
   /* background-color: #000000; */
+  /* Slide text/padding is sized in cqw units (see .tiptap.live-content below),
+     so this box must be a size container for those units to resolve against
+     its own width instead of the viewport's. Keeps small previews (operator
+     panel, schedule thumbnails) proportionally accurate to the full-screen output. */
+  container-type: inline-size;
 }
 .left-live-content {
   text-align: left;
@@ -531,7 +698,7 @@ body {
   padding: 0.75rem;
   border-radius: 0;
   border: 0;
-  font-size: 3vw;
+  font-size: 3cqw;
   -webkit-border-radius: 0;
   -moz-border-radius: 0;
   -ms-border-radius: 0;
@@ -576,23 +743,23 @@ body {
 .tiptap.live-content h6 {
   line-height: 1.4;
   font-weight: 600;
-  margin: 2vw 0;
+  margin: 2cqw 0;
 }
 
 .tiptap.live-content h1 {
-  font-size: 6vw;
+  font-size: 6cqw;
 }
 
 .tiptap.live-content h2 {
-  font-size: 5.5vw;
+  font-size: 5.5cqw;
 }
 
 .tiptap.live-content h3 {
-  font-size: 5vw;
+  font-size: 5cqw;
 }
 
 .tiptap.live-content h4 {
-  font-size: 4.7vw;
+  font-size: 4.7cqw;
 }
 
 .tiptap.live-content code {
@@ -616,7 +783,7 @@ body {
   color: inherit;
   padding: 0;
   background: none;
-  font-size: 2.5vw;
+  font-size: 2.5cqw;
 }
 
 .tiptap.live-content img {
@@ -653,21 +820,21 @@ body {
 
 .tiptap.live-content .scripture-label {
   margin-top: 3%;
-  font-size: 2vw;
+  font-size: 2cqw;
 }
 
 .tiptap.live-content .song-label {
   margin-top: 3%;
-  font-size: 1.5vw;
+  font-size: 1.5cqw;
 }
 
 .tiptap.live-content .countdown-label {
   margin-top: 5%;
-  font-size: 3vw;
+  font-size: 3cqw;
 }
 
 .tiptap.live-content .copyright-content {
-  font-size: 1vw;
+  font-size: 1cqw;
   margin-top: 1%;
   max-width: 50%;
   color: #ffffff80;
@@ -688,27 +855,6 @@ body {
 /* LIVE CONTENT LG PREVIEW */
 .lg-preview .slide-layout-ctn {
   min-height: calc(220px - 24px);
-}
-.lg-preview .tiptap.live-content {
-  font-size: 0.512vw;
-  line-height: 0.704vw;
-}
-.lg-preview .tiptap.live-content .scripture-content,
-.lg-preview .tiptap.live-content .countdown-content,
-.lg-preview .tiptap.live-content .song-content {
-  font-size: 0.512vw !important;
-  line-height: 0.704vw !important;
-}
-
-.lg-preview .tiptap.live-content .scripture-label,
-.lg-preview .tiptap.live-content .countdown-label,
-.lg-preview .tiptap.live-content .song-label {
-  font-size: 0.32vw;
-}
-
-.lg-preview .tiptap.live-content .copyright-content {
-  font-size: 0.192vw;
-  line-height: 1.2;
 }
 
 .tiptap.live-content p {

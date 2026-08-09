@@ -34,6 +34,20 @@ export interface SubscriptionDetails {
   billingHistory: SubscriptionBillingRecord[]
 }
 
+export interface BillingTransaction {
+  _id: string
+  provider: "paystack" | "dodo"
+  providerReference: string
+  status: "successful" | "failed" | "pending" | "reversed"
+  kind: "initial_payment" | "renewal" | "unknown"
+  amount: string
+  currency: string
+  reversedAmount: string | null
+  occurredAt: string
+  statusChangedAt: string
+  failureReason: string | null
+}
+
 export interface PresentationObject {
   page: number
   imageUrl: string
@@ -65,19 +79,21 @@ export interface Slide {
   backgroundType?: string
   background?: string
   backgroundVideoKey?: string | null
+  backgroundImageKey?: string | null
   title?: string // For hymn and song titles, also for scripture labels (e.g Ephesians 3:1)
   songId?: string // only for hymns/songs, could be [hymn.number] or [song.id]
   hasChorus?: boolean // only for hymns, to tell if the hymns include a chorus
   hymnVerseIndex?: number // 0-based index of current hymn verse, used for chorus navigation
   hymnSubVerseIndex?: number // 0-based chunk index inside the current verse/chorus
   hymnSubVerseTotal?: number // total chunks in the current verse/chorus
-  data?: Song | Scripture | Hymn | Countdown | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
+  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
   slideStyle?: SlideStyle
   saved?: boolean
   createdAt?: string
   updatedAt?: string
   presentationObjects?: PresentationObject[] // only for presentation slides
   presentationPageIndex?: number // 0-based index of the currently displayed page
+  slideMode?: "slide" | "overlay"
 }
 
 export interface Template {
@@ -90,6 +106,28 @@ export interface Template {
   thumbnail?: string
   createdAt: string
   updatedAt: string
+}
+
+// ── Schedule starter templates ──────────────────────────────────────────────
+// A "schedule template" is a themed collection of slide *seeds* that get
+// resolved into real slides (via useSlideCreation) when a new schedule is
+// created from the template. This is separate from `Template` above, which is a
+// single-slide "Slide Templates" feature.
+export type ScheduleTemplateSeed =
+  | { type: 'text'; heading?: string; subtitle?: string; body?: string }
+  | { type: 'bible'; ref: string } // numeric "book:chapter:verse" label, e.g. "43:3:16-17"
+  | { type: 'hymn'; number: string }
+  | { type: 'song'; song: Song }
+  | { type: 'song-setlist'; songs: Song[] }
+  | { type: 'countdown'; time: string; label: string } // time like "05:00"
+  | { type: 'media'; mediaType: 'image' | 'youtube'; url: string; name?: string }
+
+export interface ScheduleTemplate {
+  key: string
+  label: string
+  description: string
+  image: string // preview thumbnail
+  slides: ScheduleTemplateSeed[]
 }
 
 export interface Schedule {
@@ -121,7 +159,14 @@ export interface Countdown {
   time: string
   timeLeft: string
   content: string
+  /** Remaining duration sent when playback starts so each output can tick locally. */
+  remainingMs?: number
   // style: string
+}
+
+export interface TimeSlideData {
+  id: string
+  label: string
 }
 
 export interface QuickAction {
@@ -136,9 +181,12 @@ export interface QuickAction {
   bibleBookIndex?: string
   bibleChapterAndVerse?: string
   hymnIndex?: string
+  songData?: Song
+  countdownData?: Countdown
   searchableOnly?: boolean
   meta?: string
   tier?: 'free' | 'teams' // Subscription tier required for this action
+  recentSearch?: boolean // Marks a recently opened item (e.g. recent Bible search), shows RecentClockIcon
 }
 
 export interface Scripture {
@@ -187,6 +235,7 @@ export interface Song {
   churchId?: string
   createdAt?: string
   updatedAt?: string
+  fromSaved?: boolean // client-side only, set when the song came from the personal library
 }
 
 export interface ExternalVideo {
@@ -203,6 +252,37 @@ export interface Media {
   data?: ArrayBuffer | File | string | ExternalVideo
   createdAt?: string
   updatedAt?: string
+}
+
+export type LocalMediaBackend = "opfs" | "tauri-fs"
+export type LocalMediaCategory =
+  | "slide"
+  | "presentation-page"
+  | "background"
+  | "preset"
+export type LocalMediaKind = "image" | "audio" | "video"
+
+/**
+ * Searchable, device-local metadata for a binary file whose bytes live outside
+ * IndexedDB. The `relativePath` is always relative to the platform's managed
+ * media root and must never contain a user-supplied filename.
+ */
+export interface LocalMediaFileRecord {
+  key: string
+  groupId: string
+  backend: LocalMediaBackend
+  category: LocalMediaCategory
+  kind: LocalMediaKind
+  relativePath: string
+  mimeType: string
+  size: number
+  originalName?: string
+  remoteUrl?: string
+  recoverable: boolean
+  lastAccessedAt: string
+  createdAt: string
+  updatedAt: string
+  storageVersion: 1
 }
 
 export interface BackgroundVideo {
@@ -244,6 +324,22 @@ export interface SlideStyle {
   textLinesBackground?: boolean
   bibleVersion?: string
   theme?: string // Theme ID for slide styling (e.g., for Bible slides)
+  overlayPlacement?: OverlayPosition
+  overlayScale?: number
+}
+
+export type OverlayPosition =
+  | "top-left"
+  | "top-middle"
+  | "top-right"
+  | "middle"
+  | "bottom-left"
+  | "bottom-middle"
+  | "bottom-right"
+
+export interface OverlaySettings {
+  position: OverlayPosition
+  scale: number
 }
 
 export interface Advert {
@@ -269,36 +365,52 @@ export interface AppSettings {
       backgroundType: string
       background: string
       backgroundVideoKey: string | null
+      backgroundImageKey?: string | null
     }
     hymn: {
       backgroundType: string
       background: string
       backgroundVideoKey: string | null
+      backgroundImageKey?: string | null
     }
     bible: {
       backgroundType: string
       background: string
       backgroundVideoKey: string | null
+      backgroundImageKey?: string | null
     }
     text: {
       backgroundType: string
       background: string
       backgroundVideoKey: string | null
+      backgroundImageKey?: string | null
     }
   }
   slideStyles: SlideStyle
+  overlaySettings?: OverlaySettings
   bibleVersions: Array<any> // Check app.vue for bible versions array in a list
-  animations?: boolean
+  animations?: boolean // Transitions between slides (e.g. crossfade)
+  microAnimations?: boolean // Micro/text animations within a slide (come-up etc.)
+  verseTransitionStyle?: "off" | "fade" | "slide-up" // Verse/line-to-line transition within the same slide
+  verseTransitionInterval?: number // Duration (seconds) of the verse/line-to-line transition
   footnotes?: boolean
   songAndHymnLabelsVisibility: boolean
   liveWindowFullscreen?: boolean // Whether live window opens in fullscreen mode
   closeLiveWindowWithOperator?: boolean // Whether live window closes when operator tab closes (browser only)
   transcriptionAutoActions?: boolean
   transcriptionVoiceBibleVersionCommands?: boolean
+  uploadVideosToCloud?: boolean // Upload video media slides to cloud (S3). Defaults to true.
 
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number
   alertLimit?: number
+  intermission?: {
+    mode: "default" | "media" // "default" = church-branding screen (logo/name)
+    backgroundType?: string // backgroundTypes.image | backgroundTypes.video
+    background?: string // resolved URL (https / blob / object URL)
+    backgroundVideoKey?: string | null // Device-local media key for video mode
+    backgroundImageKey?: string | null // Device-local media key for image mode
+  }
 }
 
 export interface OnlineUser {
@@ -323,6 +435,7 @@ export interface AppState {
   alerts: Array<Alert>
   activeAlert: Alert | null
   activeOverlay: string
+  activeOverlaySlide: Slide | null
   recentBibleSearches: Array<string>
   failedUploadRequests: Array<{ path: string; options: any; timestamp: number }>
   slidesLoading: boolean

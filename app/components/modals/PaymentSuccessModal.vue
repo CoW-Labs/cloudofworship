@@ -116,6 +116,8 @@
 </template>
 
 <script setup lang="ts">
+import { escapePriority } from "~/composables/useEscapeKey"
+
 const props = defineProps<{
   modelValue: boolean
   planName: string
@@ -130,6 +132,19 @@ const isOpen = computed({
   get: () => props.modelValue,
   set: (value) => emit("update:modelValue", value),
 })
+
+// `prevent-close` keeps a stray overlay click from dismissing the confirmation,
+// which also opts it out of Headless UI's Escape handling — Escape should still
+// dismiss it.
+useEscapeKey(
+  () => {
+    if (!isOpen.value) return false
+    isOpen.value = false
+    emit("close")
+    return true
+  },
+  { priority: escapePriority.modal }
+)
 
 // Confetti animation
 const triggerConfetti = () => {
@@ -184,6 +199,7 @@ const triggerConfetti = () => {
 const handleClose = () => {
   isOpen.value = false
   emit("close")
+  navigateTo("/")
   setTimeout(() => {
     useGlobalEmit("open-invite-modal")
   }, 300)

@@ -3,6 +3,7 @@ import { useAppStore } from '~/store/app'
 import type { LibraryItem, Slide, Song } from '~/types'
 import { liveQuery } from 'dexie'
 import { useObservable } from '@vueuse/rxjs'
+import { useOnline } from '@vueuse/core'
 import fuzzysort from 'fuzzysort'
 import { safeDBGet } from './useIndexedDB'
 
@@ -10,7 +11,9 @@ export default function useLibrary() {
   const authStore = useAuthStore()
   const appStore = useAppStore()
   const toast = useToast()
+  const online = useOnline()
   const getChurchId = () => authStore.church?._id || authStore.user?.churchId
+  const localMedia = useLocalMediaStorage()
 
   const toCacheableSlide = (slide: Slide): Slide | null => {
     try {
@@ -25,18 +28,33 @@ export default function useLibrary() {
     }
   }
 
+  const toCacheableSong = (song: Song): Song | null => {
+    try {
+      return structuredClone(toRaw(song))
+    } catch {
+      try {
+        return JSON.parse(JSON.stringify(toRaw(song))) as Song
+      } catch (error) {
+        console.error('Unable to prepare song for library cache:', error)
+        return null
+      }
+    }
+  }
+
   // Reactive loading state
   const loading = ref<boolean>(true)
 
-  // Observable for library items from IndexedDB
+  // Observable for library items from IndexedDB.
+  // NOTE: don't toggle `loading` in here — this re-runs on every write to the
+  // `library` table (including the delete+put during a refresh), so flipping
+  // the skeleton on each emission causes a visible flash. `loading` is owned by
+  // the fetch/refresh functions instead.
   const libraryItems = useObservable<LibraryItem[]>(
     liveQuery(async () => {
-      loading.value = true
       const data = await useIndexedDB()
         .library.orderBy('createdAt')
         .reverse()
         .toArray()
-      loading.value = false
       return data
     }) as any
   )
@@ -171,36 +189,192 @@ export default function useLibrary() {
     try {
       const db = useIndexedDB()
 
-      // Delete all existing slide-type entries first so removed saves don't linger
-      const existingSlideIds = await db.library
-        .where('type')
-        .equals(libraryTypes.slide)
-        .primaryKeys()
-      if (existingSlideIds.length > 0) {
-        await db.library.bulkDelete(existingSlideIds)
-      }
-
-      const librarySlides: LibraryItem[] = slides
-        .map((slide) => {
+      const librarySlides = slides.reduce<LibraryItem[]>((items, slide) => {
           const cacheableSlide = toCacheableSlide(slide)
-          if (!cacheableSlide) return null
+          if (!cacheableSlide) return items
 
           const slideId = cacheableSlide._id || cacheableSlide.id
-          if (!slideId) return null
+          if (!slideId) return items
 
-          return {
+          items.push({
             id: slideId,
             type: libraryTypes.slide,
             content: cacheableSlide,
             createdAt: cacheableSlide.createdAt || new Date().toISOString(),
             updatedAt: cacheableSlide.updatedAt || new Date().toISOString(),
-          }
-        })
-        .filter((item): item is LibraryItem => Boolean(item))
+          })
+          return items
+        }, [])
 
-      await db.library.bulkPut(librarySlides)
+      // Replace all slide entries in a single transaction so the liveQuery only
+      // emits once (after commit) and never observes the empty mid-state between
+      // the delete and the put — which would otherwise flicker the list.
+      await db.transaction('rw', db.library, async () => {
+        const existingSlideIds = await db.library
+          .where('type')
+          .equals(libraryTypes.slide)
+          .primaryKeys()
+        if (existingSlideIds.length > 0) {
+          await db.library.bulkDelete(existingSlideIds)
+        }
+        await db.library.bulkPut(librarySlides)
+      })
     } catch (error) {
       console.error('Error caching slides in library:', error)
+    }
+  }
+
+  // A song counts as "already on the server" if either its client id or its
+  // server _id appears in the catalog. Local saves usually only carry the
+  // client `id`, while catalog songs carry both — so we match on either.
+  const collectSongIds = (songs: Song[]): Set<string> => {
+    const ids = new Set<string>()
+    songs.forEach((song) => {
+      if (song.id) ids.add(song.id)
+      if (song._id) ids.add(song._id)
+    })
+    return ids
+  }
+
+  const isSongInSet = (song: Song, ids: Set<string>): boolean =>
+    Boolean((song.id && ids.has(song.id)) || (song._id && ids.has(song._id)))
+
+  /**
+   * Best-effort, silent upload of a single local-only song to the church
+   * catalog. Failures — including the server's duplicate guard (409) — are
+   * swallowed; the caller keeps the local copy either way.
+   */
+  const uploadLocalSong = async (
+    song: Song,
+    churchId: string
+  ): Promise<boolean> => {
+    try {
+      const { error } = await useAPIFetch(`/church/${churchId}/songs`, {
+        method: 'POST',
+        body: {
+          ...song,
+          createdBy: authStore.user?._id,
+          churchId,
+        },
+        key: `library-upload-song-${song.id || song._id}`,
+      })
+      return !error.value
+    } catch (error) {
+      console.error('Error uploading local song to catalog:', error)
+      return false
+    }
+  }
+
+  /**
+   * Fetch the church's song catalog from the API and merge it with locally
+   * saved songs, mirroring fetchSavedSlides.
+   *
+   * Unlike slides, the backend has no dedicated "saved songs" collection — the
+   * only server-backed set is the full church catalog (/songs/all), so that is
+   * treated as the source of truth. Any local-only songs (e.g. created offline,
+   * which AddSong saves locally without uploading) are pushed up and preserved
+   * rather than wiped, so a refresh never loses a song.
+   */
+  const fetchSavedSongs = async (): Promise<Song[]> => {
+    try {
+      const churchId = getChurchId()
+      if (!churchId) {
+        console.warn('No church available to fetch saved songs')
+        return []
+      }
+
+      loading.value = true
+      const { data, error } = await useAPIFetch(
+        `/church/${churchId}/songs/all?churchId=${churchId}`,
+        {
+          method: 'GET',
+          key: 'get-library-church-songs',
+        }
+      )
+
+      if (error.value) {
+        throw new Error(error.value?.message || 'Failed to fetch church songs')
+      }
+
+      const remoteSongs = (data.value as Song[]) || []
+
+      // Find songs that live only in this device's IndexedDB.
+      const db = useIndexedDB()
+      const localSongItems = await db.library
+        .where('type')
+        .equals(libraryTypes.song)
+        .toArray()
+
+      const remoteIds = collectSongIds(remoteSongs)
+      const localOnlySongs = localSongItems
+        .map((item) => item.content as Song)
+        .filter((song) => (song.id || song._id) && !isSongInSet(song, remoteIds))
+
+      // Best-effort push of local-only songs up to the catalog (online only) so
+      // teammates see them too. The local copy is kept regardless of outcome.
+      if (online.value && localOnlySongs.length > 0) {
+        await Promise.allSettled(
+          localOnlySongs.map((song) => uploadLocalSong(song, churchId))
+        )
+      }
+
+      // Merge: remote catalog is the source of truth, plus every local-only song
+      // so offline / failed-upload songs survive the cache replacement.
+      const mergedSongs = [...remoteSongs, ...localOnlySongs]
+
+      await cacheSongsInLibrary(mergedSongs)
+
+      return mergedSongs
+    } catch (error) {
+      console.error('Error fetching saved songs:', error)
+      return []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Cache songs in IndexedDB library.
+   * Replaces all existing song entries so IndexedDB mirrors the merged set
+   * (server catalog + preserved local-only songs) exactly.
+   */
+  const cacheSongsInLibrary = async (songs: Song[]) => {
+    try {
+      const db = useIndexedDB()
+
+      const librarySongs = songs.reduce<LibraryItem[]>((items, song) => {
+          const cacheableSong = toCacheableSong(song)
+          if (!cacheableSong) return items
+
+          // Key on the client `id` so delete/lookup (which use song.id) keep working.
+          const songId = cacheableSong.id || cacheableSong._id
+          if (!songId) return items
+
+          items.push({
+            id: songId,
+            type: libraryTypes.song,
+            content: cacheableSong,
+            createdAt: cacheableSong.createdAt || new Date().toISOString(),
+            updatedAt: cacheableSong.updatedAt || new Date().toISOString(),
+          })
+          return items
+        }, [])
+
+      // Replace all song entries in a single transaction so the liveQuery only
+      // emits once (after commit) and never observes the empty mid-state between
+      // the delete and the put — which would otherwise flicker the list.
+      await db.transaction('rw', db.library, async () => {
+        const existingSongIds = await db.library
+          .where('type')
+          .equals(libraryTypes.song)
+          .primaryKeys()
+        if (existingSongIds.length > 0) {
+          await db.library.bulkDelete(existingSongIds)
+        }
+        await db.library.bulkPut(librarySongs)
+      })
+    } catch (error) {
+      console.error('Error caching songs in library:', error)
     }
   }
 
@@ -294,6 +468,14 @@ export default function useLibrary() {
   }
 
   /**
+   * Drop a slide's locally cached media. Presentation slides write one record per
+   * page keyed `${slideId}-page-${n}`, so a single delete by ID would miss them.
+   */
+  const deleteLocalMedia = async (slideId: string) => {
+    await localMedia.deleteGroup(slideId)
+  }
+
+  /**
    * Delete a slide from the library
    */
   const deleteSlide = async (slideId: string) => {
@@ -304,9 +486,20 @@ export default function useLibrary() {
         .library.delete(slideId)
         .catch((err) => console.error('Failed to delete slide:', err))
 
+      // The library copy was the last thing keeping this slide's media around —
+      // slide deletion deliberately leaves the blob alone while the slide is
+      // saved — so free it now. Unless the slide is still sitting in a schedule,
+      // in which case that copy is still playing from it.
+      const stillInSchedule = appStore.currentState.activeSlides.some(
+        (slide) => slide.id === slideId || slide._id === slideId
+      )
+      if (!stillInSchedule) {
+        await deleteLocalMedia(slideId)
+      }
+
       toast.add({ icon: 'i-tabler-trash', title: 'Slide has been deleted' })
 
-      // Also unsave the slide online
+      // Also unsave the slide online — this is what releases the uploaded file
       await unsaveSlideOnline(slideId)
     } catch (error) {
       console.error('Error deleting slide from library:', error)
@@ -376,10 +569,12 @@ export default function useLibrary() {
   }
 
   /**
-   * Refresh library by fetching saved items from the API
+   * Refresh library by fetching saved items from the API.
+   * Songs and slides come from different backend sources (the church catalog
+   * vs. the saved-slides collection), so fetch them in parallel.
    */
   const refreshLibrary = async () => {
-    await fetchSavedSlides()
+    await Promise.all([fetchSavedSlides(), fetchSavedSongs()])
   }
 
   return {
@@ -388,7 +583,9 @@ export default function useLibrary() {
     savedSongs,
     savedSlides,
     fetchSavedSlides,
+    fetchSavedSongs,
     cacheSlidesInLibrary,
+    cacheSongsInLibrary,
     saveSong,
     saveSlide,
     deleteSong,

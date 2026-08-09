@@ -12,13 +12,12 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-alert': 'teams',
   'remove-alert': 'teams',
   'new-countdown': 'teams',
+  'new-time-slide': 'teams',
+  'show-slide-overlay': 'teams',
+  'remove-slide-overlay': 'teams',
   'new-youtube-video': 'teams',
   'new-vimeo-video': 'teams',
   'open-invite-modal': 'teams',
-  'space-management': 'teams',
-  'animations-transitions': 'teams',
-  'overlays-themes': 'teams',
-  'new-song': 'teams',
   'livestream-url': 'teams',
   'new-transcribe': 'teams',
 
@@ -28,6 +27,7 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-hymn': 'free',
   'new-media': 'free',
   'new-bible': 'free',
+  'new-song': 'free',
   'new-song-setlist': 'free',
   'add-song': 'free',
   'new-library': 'free',
@@ -35,6 +35,10 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-schedule': 'free',
   'toggle-dark-mode': 'free',
   'open-shortcuts': 'free',
+  // Niche in-app settings — free to use, no longer paywalled.
+  'space-management': 'free',
+  'animations-transitions': 'free',
+  'overlays-themes': 'free',
 }
 
 export default function useSubscription() {

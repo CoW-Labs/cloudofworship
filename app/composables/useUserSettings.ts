@@ -2,6 +2,7 @@ import type { AppSettings } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { useDebounceFn } from "@vueuse/core"
+import { toTransportSafeMediaSetting } from "~/utils/mediaTransport"
 
 // Track the timestamp of the last local settings change across composable instances
 // so that fetchUserSettings can skip overwriting in-flight user edits
@@ -84,13 +85,25 @@ export const useUserSettings = () => {
               ...userSettings.defaultBackground?.text,
             },
           },
-          // Deep merge slideStyles to preserve all properties
+          // Deep merge slideStyles to preserve all properties.
+          // lineSpacing is coerced back to "normal" when the account predates
+          // the setting (or stored it empty) — without a value no line-spacing
+          // class is applied and generated content renders with cramped,
+          // overlapping lines.
           slideStyles: {
             ...appStore.currentState.settings.slideStyles,
             ...userSettings.slideStyles,
+            lineSpacing:
+              userSettings.slideStyles?.lineSpacing ||
+              appStore.currentState.settings.slideStyles?.lineSpacing ||
+              lineSpacingTypes.normal,
           },
+          overlaySettings:
+            userSettings.overlaySettings ||
+            appStore.currentState.settings.overlaySettings,
           bibleVersions: userSettings.bibleVersions || appStore.currentState.settings.bibleVersions,
           animations: userSettings.animations,
+          microAnimations: userSettings.microAnimations ?? true,
           footnotes: userSettings.footnotes,
           songAndHymnLabelsVisibility: userSettings.songAndHymnLabelsVisibility,
           liveWindowFullscreen: userSettings.liveWindowFullscreen,
@@ -100,6 +113,9 @@ export const useUserSettings = () => {
             userSettings.transcriptionVoiceBibleVersionCommands ?? true,
           transitionInterval: userSettings.transitionInterval,
           alertLimit: userSettings.alertLimit,
+          intermission:
+            userSettings.intermission ??
+            appStore.currentState.settings.intermission,
         }
 
         // Merge with current settings to preserve app version and other non-saved fields
@@ -114,7 +130,7 @@ export const useUserSettings = () => {
         // Downloaded Bible availability is device-local IndexedDB state, so
         // backend/persisted settings can be stale after a reload. Refresh the
         // flags after hydrating settings so BibleVersionSelect sees local files
-        // without requiring the user to visit Bible Version Settings first.
+        // without requiring the user to visit Bible Slide Settings first.
         const { populateBibleVersionOptions } = useBibleVersionManager()
         await populateBibleVersionOptions(mergedSettings.bibleVersions)
 
@@ -141,15 +157,30 @@ export const useUserSettings = () => {
       error.value = null
 
       const settingsToSave = settings || appStore.currentState.settings
+      const safeDefaultBackground = Object.fromEntries(
+        await Promise.all(
+          Object.entries(settingsToSave.defaultBackground).map(
+            async ([key, value]) => [
+              key,
+              await toTransportSafeMediaSetting(value),
+            ]
+          )
+        )
+      )
+      const safeIntermission = await toTransportSafeMediaSetting(
+        settingsToSave.intermission
+      )
 
       // Extract only the fields that should be saved to the backend
       const backendSettings = {
         defaultFont: settingsToSave.defaultFont,
         defaultBibleVersion: settingsToSave.defaultBibleVersion,
-        defaultBackground: settingsToSave.defaultBackground,
+        defaultBackground: safeDefaultBackground,
         slideStyles: settingsToSave.slideStyles,
+        overlaySettings: settingsToSave.overlaySettings,
         bibleVersions: settingsToSave.bibleVersions,
         animations: settingsToSave.animations,
+        microAnimations: settingsToSave.microAnimations ?? true,
         footnotes: settingsToSave.footnotes,
         songAndHymnLabelsVisibility: settingsToSave.songAndHymnLabelsVisibility,
         liveWindowFullscreen: settingsToSave.liveWindowFullscreen,
@@ -159,6 +190,7 @@ export const useUserSettings = () => {
           settingsToSave.transcriptionVoiceBibleVersionCommands ?? true,
         transitionInterval: settingsToSave.transitionInterval,
         alertLimit: settingsToSave.alertLimit,
+        intermission: safeIntermission,
       }
 
       // Use unique key with timestamp to prevent caching

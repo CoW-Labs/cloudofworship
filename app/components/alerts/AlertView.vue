@@ -12,12 +12,11 @@
         },
       ]"
     >
-      <IconWrapper
-        :name="currentState?.activeAlert.icon"
-        class="bg-primary-900 z-10"
-        :class="props.size === 'sm' ? 'px-2' : 'px-[1.5vw]'"
-        :size="props.size === 'sm' ? '2' : '8'"
-      />
+      <div
+        class="bg-primary-900 z-10 self-stretch aspect-square shrink-0 flex items-center justify-center px-4"
+      >
+        <InfoIcon :class="props.size === 'sm' ? 'w-2 h-2' : 'w-8 h-8'" />
+      </div>
       <div
         class="inner"
         :style="`animation-duration: ${animationDuration}`"

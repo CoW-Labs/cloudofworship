@@ -1,105 +1,147 @@
 <template>
-  <AppSection
-    heading="Preview and Edit Content"
-    :secondary-buttons="[
-      {
-        label: bulkActionLabel,
-        action: 'select-slides',
-        icon: bulkActionIcon,
-        color: 'primary',
-        confirmAction: false,
-        visible: true,
-      },
-      {
-        label: 'Delete Slides',
-        action: 'delete-selected-slides',
-        icon: 'i-tabler-trash',
-        color: 'red',
-        confirmAction: true,
-        visible: bulkSelectedSlides.length > 0,
-      },
-    ]"
-    slot-ctn-styles="flex flex-col justify-between h-[calc(100vh-182px)]"
-    class="flex-[2]"
-    @delete-selected-slides="deleteMultipleSlides(bulkSelectedSlides)"
-  >
-    <div
-      ref="slidesScroll"
-      class="slides-ctn overflow-y-scroll mb-4 rounded-md transition h-[50%]"
-      :class="[
-        slides?.length === 0 ? 'bg-primary-100 dark:bg-primary-900' : '',
+  <div ref="previewColumn" class="preview-column flex flex-col h-full min-w-0">
+    <AppSection
+      heading="Preview and Edit Content"
+      :secondary-buttons="[
+        {
+          label: 'Select Slides',
+          action: appWideActions.selectSlides,
+          icon: '',
+          color: 'primary',
+          confirmAction: false,
+          visible: !bulkSelectSlides,
+        },
+        {
+          label: 'Select All',
+          action: appWideActions.selectAllSlides,
+          icon: 'i-bx-checkbox',
+          color: 'primary',
+          confirmAction: false,
+          visible: bulkSelectSlides,
+        },
+        {
+          label: 'Cancel',
+          action: appWideActions.cancelSelectSlides,
+          icon: 'i-mdi-close',
+          color: 'gray',
+          confirmAction: false,
+          visible: bulkSelectSlides,
+        },
+        {
+          label: 'Delete Slides',
+          action: 'delete-selected-slides',
+          color: 'red',
+          confirmAction: true,
+          visible: bulkSelectedSlides.length > 0,
+        },
       ]"
-      @scroll.passive="onSlidesGridScroll"
+      :style="{ height: previewHeight + 'px', flexShrink: 0 }"
+      class="min-h-0"
+      @delete-selected-slides="deleteMultipleSlides(bulkSelectedSlides)"
     >
-      <div v-if="slides?.length > 0" class="virtual-slides-grid">
-        <div :style="{ height: `${virtualTopSpacer}px` }" />
-        <div ref="slidesGrid" class="grid slides-grid gap-3">
-          <SlideCard
-            v-for="{ slide, index } in virtualSlides"
-            :key="slide.id"
-            v-memo="[
-              slide.id,
-              slide.updatedAt,
-              slide.name,
-              activeSlide?.id === slide?.id,
-              bulkSelectSlides,
-              bulkSelectedSlides.includes(slide?.id),
-              getSlideEditor(slide.id)?.userId,
-            ]"
-            :slide="slide"
-            :live="false"
-            :selectable="bulkSelectSlides"
-            :id="slide?.id?.replace(/\d+/g, '')"
-            :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
-            :editing-by="getSlideEditor(slide.id)"
-            grid-type
-            :selected="activeSlide?.id === slide?.id"
-            @click="
-              bulkSelectSlides
-                ? null
-                : makeSlideActive(slide, {
-                    goLive: false,
-                    newlyCreated: false,
-                  })
-            "
-            @duplicate="duplicatePreviewSlide"
-            @delete="deleteSlide"
-            @save-slide="saveSlide(slide)"
-            @save-as-template="openSaveTemplateModal(slide)"
-            @bulk-selected="addToSelectedSlides(slide?.id, $event)"
-          />
+      <div
+        ref="slidesScroll"
+        class="slides-ctn relative overflow-y-scroll rounded-lg transition flex-1 min-h-0 bg-gray-100 dark:bg-[#222938] touch-pan-y"
+        :class="[slides?.length === 0 ? '' : 'p-2']"
+        @scroll.passive="onSlidesGridScroll"
+        @dragenter="onMediaDragEnter"
+        @dragover="onMediaDragOver"
+        @dragleave="onMediaDragLeave"
+        @drop="onMediaDrop"
+      >
+        <EmptyState
+          v-if="isDraggingMediaFile"
+          tinted
+          icon="i-bx-cloud-upload"
+          sub="Drop to add as media slide"
+          class="absolute inset-0 z-20 pointer-events-none"
+        />
+        <div v-if="isLoadingSlides" class="grid slides-grid gap-3">
+          <CowSkeleton variant="grid" :count="10" />
         </div>
-        <div :style="{ height: `${virtualBottomSpacer}px` }" />
+        <div v-else-if="slides?.length > 0" class="virtual-slides-grid">
+          <div :style="{ height: `${virtualTopSpacer}px` }" />
+          <div ref="slidesGrid" class="grid slides-grid gap-3">
+            <SlideCard
+              v-for="{ slide, index } in virtualSlides"
+              :key="slide.id"
+              v-memo="[
+                slide.id,
+                slide.updatedAt,
+                slide.name,
+                activeSlide?.id === slide?.id,
+                bulkSelectSlides,
+                bulkSelectedSlides.includes(slide?.id),
+                getSlideEditor(slide.id)?.userId,
+                currentState.activeOverlaySlide?.id === slide.id,
+              ]"
+              :slide="slide"
+              :live="false"
+              :selectable="bulkSelectSlides"
+              :id="slide?.id?.replace(/\d+/g, '')"
+              :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
+              :editing-by="getSlideEditor(slide.id)"
+              grid-type
+              :selected="activeSlide?.id === slide?.id"
+              @click="
+                bulkSelectSlides
+                  ? null
+                  : makeSlideActive(slide, {
+                      goLive: false,
+                      newlyCreated: false,
+                    })
+              "
+              @take-live="bulkSelectSlides ? null : handleTakeLiveAction(slide)"
+              @duplicate="duplicatePreviewSlide"
+              @duplicate-as-overlay="duplicatePreviewSlideAsOverlay"
+              @show-overlay="showSlideOverlay"
+              @clear-overlay="clearSlideOverlay"
+              @delete="deleteSlide"
+              @save-slide="saveSlide(slide)"
+              @save-as-template="openSaveTemplateModal(slide)"
+              @bulk-selected="addToSelectedSlides(slide?.id, $event)"
+            />
+          </div>
+          <div :style="{ height: `${virtualBottomSpacer}px` }" />
+        </div>
+        <EmptyState
+          v-else
+          icon="i-tabler-device-desktop-plus"
+          svg-icon="NoSlidesIcon"
+          sub="No slides yet"
+          :action="appWideActions.newBible"
+          action-data="23:43:19"
+          action-text="Create new slide"
+        />
       </div>
-      <EmptyState
-        v-else
-        icon="i-tabler-device-desktop-plus"
-        class="dark:text-white"
-        sub="No slides yet"
-        action="new-slide"
-        action-text="Create new slide"
-      />
-    </div>
-    <EditLiveContent
-      :slide="activeSlide"
-      :editing-by="activeSlide?.id ? getSlideEditor(activeSlide.id) : undefined"
-      @slide-update="onUpdateSlide"
-      @inactive-slide-update="onUpdateInactiveSlide"
-      @goto-verse="gotoAction"
-      @update-bible-version="gotoAction(activeSlide?.title!!, $event)"
-      @take-live="
-        makeSlideActive(activeSlide!!, {
-          goLive: true,
-          newlyCreated: false,
-        })
-      "
+    </AppSection>
+
+    <div
+      class="v-resize-handle h-3 shrink-0 rounded cursor-ns-resize opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
+      @mousedown.prevent="startVResize($event)"
     />
+
+    <AppSection class="flex-1 min-h-0" slot-ctn-styles="!p-0">
+      <EditLiveContent
+        :slide="activeSlide"
+        :editing-by="
+          activeSlide?.id ? getSlideEditor(activeSlide.id) : undefined
+        "
+        @slide-update="onUpdateSlide"
+        @inactive-slide-update="onUpdateInactiveSlide"
+        @goto-verse="gotoAction"
+        @update-bible-version="gotoAction(activeSlide?.title!!, $event)"
+        @take-live="
+          handleTakeLiveAction(activeSlide!!)
+        "
+      />
+    </AppSection>
 
     <SaveAsTemplateModal
       v-model="showSaveTemplateModal"
       :slide="slideToSaveAsTemplate"
     />
-  </AppSection>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -117,7 +159,9 @@ import type {
   Countdown,
   Schedule,
   ExtendedFileT,
+  PresentationObject,
 } from "~/types"
+import { toTransportSafePayload } from "~/utils/mediaTransport"
 import { appWideActions } from "~/utils/constants"
 import { isNotFoundError } from "~/utils/apiErrors"
 
@@ -130,7 +174,9 @@ import { isNotFoundError } from "~/utils/apiErrors"
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const toast = useToast()
+const { applyOverlaySettings } = useOverlaySettings()
 const churchId = authStore.user?.churchId
+const lastSelectedScheduleId = ref(appStore.currentState.activeSchedule?._id ?? null)
 
 // Composables
 const {
@@ -151,9 +197,12 @@ const {
   createSongSetlistSlide,
   createMediaSlide,
   createMultipleMediaSlides,
+  createPresentationSlide,
   createCountdownSlide,
+  createTimeSlide,
   saveSlideToLib,
   duplicateSlide,
+  duplicateSlideAsOverlay,
 } = useSlideCreation()
 const { gotoVerse } = useSlideNavigation()
 const { appendSongToSetlist } = useSongSetlist()
@@ -161,18 +210,98 @@ const { appendSongToSetlist } = useSongSetlist()
 // Online status for conditional API/WS calls
 const online = useOnline()
 
+// Drag-and-drop media files onto the slide grid — mirrors the AddMedia.vue flow
+const maxDroppedImageSize = computed(() => Infinity)
+const maxDroppedVideoSize = computed(() => Infinity)
+const isDraggingMediaFile = ref(false)
+let mediaDragCounter = 0
+
+const isFileDrag = (event: DragEvent) =>
+  Array.from(event.dataTransfer?.types || []).includes("Files")
+
+const onMediaDragEnter = (event: DragEvent) => {
+  if (!isFileDrag(event)) return
+  mediaDragCounter++
+  isDraggingMediaFile.value = true
+}
+
+const onMediaDragOver = (event: DragEvent) => {
+  if (!isFileDrag(event)) return
+  event.preventDefault()
+}
+
+const onMediaDragLeave = (event: DragEvent) => {
+  if (!isFileDrag(event)) return
+  mediaDragCounter = Math.max(0, mediaDragCounter - 1)
+  if (mediaDragCounter === 0) isDraggingMediaFile.value = false
+}
+
+const onMediaDrop = (event: DragEvent) => {
+  if (!isFileDrag(event)) return
+  event.preventDefault()
+  mediaDragCounter = 0
+  isDraggingMediaFile.value = false
+
+  const droppedFiles = Array.from(event.dataTransfer?.files || [])
+  if (droppedFiles.length === 0) return
+
+  const validFiles: File[] = []
+  droppedFiles.forEach((file) => {
+    if (
+      file.type.startsWith("image") &&
+      file.size > maxDroppedImageSize.value * 1024 * 1024
+    ) {
+      toast.add({
+        title: `Image size exceeds ${maxDroppedImageSize.value}MB`,
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+      return
+    }
+    if (
+      file.type.startsWith("video") &&
+      file.size > maxDroppedVideoSize.value * 1024 * 1024
+    ) {
+      toast.add({
+        title: `Video size exceeds ${maxDroppedVideoSize.value}MB`,
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+      return
+    }
+    if (!/^(image|video|audio)/.test(file.type)) return
+    validFiles.push(file)
+  })
+  if (validFiles.length === 0) return
+
+  // Same shape AddMedia.vue's addMediaEmitter builds for regular files.
+  // fromDrop tells QuickActions.vue not to switch its panel to the Add Media
+  // page — the slides are already created, no need to navigate there too.
+  const mediaFiles = validFiles.map((file) => ({
+    blob: file,
+    name: file.name,
+    size: file.size,
+    type: file.type?.split("/")?.[0],
+    url: URL.createObjectURL(file),
+    fromDrop: true,
+  })) as unknown as ExtendedFileT[]
+
+  useGlobalEmit(appWideActions.newMedia, mediaFiles)
+}
+
 /**
  * Send slide update via Socket.IO for realtime collaboration
  * Only sends when online. Includes tabId to allow same user on different tabs/devices to receive updates
  */
-const broadcastSlideUpdate = (action: string, data: any) => {
+const broadcastSlideUpdate = async (action: string, data: any) => {
   // Don't broadcast when offline
   if (!online.value) return
 
   const nuxtApp = useNuxtApp()
   const socket = nuxtApp.$socketio as any
   if (socket?.connected) {
-    socket.emit(action, { ...data, tabId: tabSessionId })
+    const safeData = await toTransportSafePayload(data)
+    socket.emit(action, { ...safeData, tabId: tabSessionId })
   }
 }
 
@@ -261,25 +390,71 @@ const stopEditing = () => {
 
 // Countdown state - kept in component for tight coupling with slide updates
 const activeCountdownInterval = ref<any>(null)
+const activeCountdownSlideId = ref<string | null>(null)
 const countdownTimeLeft = ref<number>(0)
 const countdownStartTime = ref<number>(0)
 const countdownDuration = ref<number>(0)
 const countdownRAF = ref<number>(0)
 
+// Vertical resize between "Preview and Edit Content" and "Edit Content" sections.
+// The split is a fraction of the available column height, so the editor below
+// stays visible on short screens instead of being pushed off the bottom.
+const { panelBounds, panelSize, commitPanelSize } = usePanelLayout()
+const previewBounds = panelBounds("previewHeight")
+const previewLayoutHeight = panelSize("previewHeight")
+const previewHeight = ref(previewLayoutHeight.value)
+const previewColumn = ref<HTMLDivElement | null>(null)
+let vResizeStartY = 0
+let vResizeStartHeight = 0
+let isVResizing = false
+
+watch(previewLayoutHeight, (height) => {
+  if (!isVResizing) previewHeight.value = height
+})
+
+const startVResize = (event: MouseEvent) => {
+  isVResizing = true
+  vResizeStartY = event.clientY
+  vResizeStartHeight = previewHeight.value
+  document.addEventListener("mousemove", onVResizeMove)
+  document.addEventListener("mouseup", onVResizeEnd)
+  document.body.style.cursor = "ns-resize"
+  document.body.style.userSelect = "none"
+}
+const onVResizeMove = (event: MouseEvent) => {
+  const delta = event.clientY - vResizeStartY
+  const { min, max } = previewBounds.value
+  previewHeight.value = Math.min(max, Math.max(min, vResizeStartHeight + delta))
+}
+const onVResizeEnd = () => {
+  isVResizing = false
+  commitPanelSize("previewHeight", previewHeight.value)
+  document.removeEventListener("mousemove", onVResizeMove)
+  document.removeEventListener("mouseup", onVResizeEnd)
+  document.body.style.cursor = ""
+  document.body.style.userSelect = ""
+}
+
 // Component state
 const windowHeight = ref<number>(0)
 const activeSlide = ref<Slide>()
 const { currentState } = storeToRefs(appStore)
+// Drives the slide-grid skeleton. Kept separate from appStore.slidesLoading
+// (which only tracks the network request) so the skeleton stays up through
+// the local `slides` ref sync + grid render that happens after the fetch
+// resolves, not just the fetch itself.
+const isLoadingSlides = ref(false)
 const slidesGrid = ref<HTMLDivElement | null>(null)
 const slidesScroll = ref<HTMLDivElement | null>(null)
-const bulkActionLabel = ref<string>("Select Slides")
-const bulkActionIcon = ref<string>("")
 const bulkSelectSlides = ref<boolean>(false)
 const bulkSelectedSlides = ref<string[]>([])
 const slideGridColumns = ref(1)
 const slideVirtualStartRow = ref(0)
 const slideViewportHeight = ref(0)
-const slideCardRowHeight = 132
+// Grid geometry is measured from the DOM (see updateSlideGridMetrics) because
+// the card width and height both shrink on short viewports. These are only the
+// fallbacks used before the first measurement lands.
+const slideCardRowHeight = ref(132)
 const slideGridGap = 12
 const slideMinCardWidth = 170
 const slideOverscanRows = 3
@@ -330,6 +505,119 @@ const duplicatePreviewSlide = (slide: Slide) => {
   uploadOfflineSlides()
 }
 
+const duplicatePreviewSlideAsOverlay = (slide: Slide) => {
+  const newSlide = duplicateSlideAsOverlay(slide)
+  if (!newSlide) return
+
+  slides.value?.push(newSlide)
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  broadcastSlideCreated(newSlide)
+  uploadOfflineSlides()
+}
+
+const showSlideOverlay = (
+  slide: Slide,
+  options: { capture?: boolean } = { capture: true }
+) => {
+  const overlaySlide = applyOverlaySettings(slide)
+  appStore.setActiveOverlaySlide(overlaySlide)
+  useBroadcastOverlayPost(appWideActions.showSlideOverlay, overlaySlide)
+  broadcastSlideUpdate(appWideActions.showSlideOverlay, overlaySlide)
+  if (options.capture !== false) {
+    usePosthogCapture("SLIDE_OVERLAY_SHOWN", {
+      slideId: slide.id,
+      slideType: slide.type,
+    })
+  }
+}
+
+const clearSlideOverlay = () => {
+  appStore.setActiveOverlaySlide(null)
+  useBroadcastOverlayPost(appWideActions.removeSlideOverlay)
+  broadcastSlideUpdate(appWideActions.removeSlideOverlay, {})
+  usePosthogCapture("SLIDE_OVERLAY_CLEARED")
+}
+
+const { isLocalMediaReady, transferFor } = useMediaDownloadProgress()
+const projectionMediaStorage = useLocalMediaStorage()
+const { rehydrateSlideMedia: prepareSlideMediaForProjection } =
+  useSlideMediaCache()
+
+const handleTakeLiveAction = async (slide: Slide) => {
+  const requiredKeys = [
+    ...(slide.type === slideTypes.media ||
+    slide.type === slideTypes.presentation
+      ? [slide.id]
+      : []),
+    ...(slide.backgroundVideoKey ? [slide.backgroundVideoKey] : []),
+    ...(slide.backgroundImageKey ? [slide.backgroundImageKey] : []),
+  ]
+  const blockedKey = requiredKeys.find((key) => !isLocalMediaReady(key))
+  if (blockedKey) {
+    const transfer = transferFor(blockedKey)
+    toast.add({
+      title:
+        transfer?.status === "failed"
+          ? "Media is not saved locally"
+          : "Media is still being saved",
+      description:
+        transfer?.status === "failed"
+          ? "Retry or remove this media before taking it live."
+          : "Wait for local storage to finish before taking it live.",
+      icon: "i-bx-error",
+      color: "red",
+    })
+    return
+  }
+
+  const externalType = (slide.data as any)?.type
+  const localKeys = [
+    ...(slide.type === slideTypes.media &&
+    externalType !== "youtube" &&
+    externalType !== "vimeo"
+      ? [slide.id]
+      : []),
+    ...(slide.type === slideTypes.presentation
+      ? (slide.presentationObjects || []).map(
+          (page) => `${slide.id}-page-${page.page}`
+        )
+      : []),
+    ...(slide.backgroundVideoKey ? [slide.backgroundVideoKey] : []),
+    ...(slide.backgroundImageKey ? [slide.backgroundImageKey] : []),
+  ]
+
+  if (localKeys.length) {
+    await prepareSlideMediaForProjection(slide, { allowDownload: true })
+    const verified = await Promise.all(
+      localKeys.map(async (key) =>
+        Boolean(await projectionMediaStorage.getPlaybackUrl(key))
+      )
+    )
+    if (verified.some((value) => !value)) {
+      toast.add({
+        title: "Media is not ready for projection",
+        description:
+          "A verified local copy is required before this slide can go live.",
+        icon: "i-bx-error",
+        color: "red",
+      })
+      return
+    }
+    appStore.updateSlideInActiveSlides(slide)
+  }
+
+  if (slide.slideMode === "overlay") {
+    if (appStore.currentState.activeOverlaySlide?.id === slide.id) {
+      clearSlideOverlay()
+    } else {
+      showSlideOverlay(slide)
+    }
+    return
+  }
+
+  makeSlideActive(slide, { goLive: true, newlyCreated: false })
+}
+
 onMounted(() => {
   windowHeight.value = document.documentElement.offsetHeight
   addEventListener("resize", () => {
@@ -347,9 +635,13 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  // Not persisted here — onVResizeEnd already commits, and saving on unmount
+  // would mark a viewport-derived height as user-chosen.
   slidesResizeObserver?.disconnect()
   slidesResizeObserver = null
   stopEditing()
+  document.removeEventListener("mousemove", onVResizeMove)
+  document.removeEventListener("mouseup", onVResizeEnd)
 })
 
 // Move presence with the user's active slide: release the slide they left and
@@ -369,14 +661,34 @@ const updateSlideGridMetrics = () => {
   if (!scrollEl) return
 
   slideViewportHeight.value = scrollEl.clientHeight
+
+  // Read the resolved grid rather than re-deriving it from a fixed card width:
+  // `.slides-grid` narrows its columns on short viewports, so a hardcoded
+  // 170px would put the virtualiser's row maths out of step with the layout.
+  const gridEl = slidesGrid.value
+  const templateColumns = gridEl
+    ? getComputedStyle(gridEl).gridTemplateColumns
+    : ""
+  const measuredColumns = templateColumns.includes("px")
+    ? templateColumns.split(/\s+/).filter(Boolean).length
+    : 0
   slideGridColumns.value = Math.max(
     1,
-    Math.floor(
-      (scrollEl.clientWidth + slideGridGap) / (slideMinCardWidth + slideGridGap)
-    )
+    measuredColumns ||
+      Math.floor(
+        (scrollEl.clientWidth + slideGridGap) /
+          (slideMinCardWidth + slideGridGap)
+      )
   )
+
+  const cardHeight =
+    (gridEl?.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0
+  if (cardHeight > 0) {
+    slideCardRowHeight.value = Math.round(cardHeight + slideGridGap)
+  }
+
   slideVirtualStartRow.value = Math.floor(
-    scrollEl.scrollTop / slideCardRowHeight
+    scrollEl.scrollTop / slideCardRowHeight.value
   )
 }
 
@@ -384,7 +696,7 @@ const onSlidesGridScroll = () => {
   const scrollEl = slidesScroll.value
   if (!scrollEl) return
   slideVirtualStartRow.value = Math.floor(
-    scrollEl.scrollTop / slideCardRowHeight
+    scrollEl.scrollTop / slideCardRowHeight.value
   )
 }
 
@@ -398,7 +710,7 @@ const virtualStartRow = computed(() => {
 
 const virtualVisibleRows = computed(() => {
   return (
-    Math.ceil(slideViewportHeight.value / slideCardRowHeight) +
+    Math.ceil(slideViewportHeight.value / slideCardRowHeight.value) +
     slideOverscanRows * 2
   )
 })
@@ -426,12 +738,12 @@ const virtualSlides = computed(() => {
 })
 
 const virtualTopSpacer = computed(
-  () => virtualStartRow.value * slideCardRowHeight
+  () => virtualStartRow.value * slideCardRowHeight.value
 )
 const virtualBottomSpacer = computed(() => {
   return Math.max(
     0,
-    (totalSlideRows.value - virtualEndRow.value) * slideCardRowHeight
+    (totalSlideRows.value - virtualEndRow.value) * slideCardRowHeight.value
   )
 })
 
@@ -443,11 +755,11 @@ const scrollToSlide = (slideId?: string) => {
   if (slideIndex < 0) return
 
   const row = Math.floor(slideIndex / slideGridColumns.value)
-  const top = row * slideCardRowHeight
+  const top = row * slideCardRowHeight.value
 
   if (
     top < scrollEl.scrollTop ||
-    top + slideCardRowHeight > scrollEl.scrollTop + scrollEl.clientHeight
+    top + slideCardRowHeight.value > scrollEl.scrollTop + scrollEl.clientHeight
   ) {
     scrollEl.scrollTop = top
     onSlidesGridScroll()
@@ -460,6 +772,14 @@ emitter.on("new-slide", () => {
   const newSlide = createTextSlide()
   slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  uploadOfflineSlides()
+})
+
+emitter.on(appWideActions.newTimeSlide, () => {
+  const newSlide = createTimeSlide()
+  slides.value?.push(newSlide)
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
 })
 
@@ -505,8 +825,7 @@ emitter.on("update-or-create-bible", async (data: string) => {
   const existingBibleSlide =
     slides.value?.find(
       (s: Slide) =>
-        s.type === slideTypes.bible &&
-        s.id === currentState.value?.liveSlideId
+        s.type === slideTypes.bible && s.id === currentState.value?.liveSlideId
     ) || slides.value?.find((s: Slide) => s.type === slideTypes.bible)
 
   // Resolve the shortLabel to a scripture object — needed for both paths
@@ -613,22 +932,7 @@ emitter.on("new-song", async (data: Song) => {
       const setlistSlide = getRelevantSongSetlist()
 
       if (setlistSlide) {
-        toast.add({
-          icon: "i-lucide-list-music",
-          title: "Add song to setlist?",
-          description: `${song.title} can be added to ${setlistSlide.name} or inserted as its own slide.`,
-          timeout: 0,
-          actions: [
-            {
-              label: "Add to setlist",
-              click: () => addSongToSetlist(setlistSlide, song),
-            },
-            {
-              label: "Separate slide",
-              click: () => addSongAsSeparateSlide(song),
-            },
-          ],
-        })
+        addSongToSetlist(setlistSlide, song)
       } else {
         addSongAsSeparateSlide(song)
       }
@@ -670,6 +974,22 @@ emitter.on("new-media", async (data: ExtendedFileT[]) => {
   }
 })
 
+emitter.on("new-presentation", async (data: {
+  fileName?: string
+  presentationObjects?: PresentationObject[]
+  fromImport?: boolean
+}) => {
+  if (!data?.presentationObjects?.length || !data.fileName) return
+
+  const newSlide = createPresentationSlide(
+    data.fileName,
+    data.presentationObjects
+  )
+
+  slides.value?.push(newSlide)
+  appStore.appendActiveSlide(newSlide)
+})
+
 emitter.on("new-active-slide", (data: Slide) => {
   if (data) {
     makeSlideActive(data, { goLive: false, newlyCreated: true })
@@ -680,7 +1000,8 @@ emitter.on("new-countdown", (data: Countdown) => {
   if (data) {
     // Remove existing countdown slides
     const tempSlides = slides.value?.filter(
-      (slide) => slide.type !== slideTypes.countdown
+      (slide) =>
+        slide.type !== slideTypes.countdown || slide.slideMode === "overlay"
     )
     slides.value = tempSlides
     stopCountdown()
@@ -689,7 +1010,10 @@ emitter.on("new-countdown", (data: Countdown) => {
     slides.value?.push(newSlide)
 
     // Take slide live if current active slide is a countdown
-    if (activeSlide.value?.type === slideTypes.countdown) {
+    if (
+      activeSlide.value?.type === slideTypes.countdown &&
+      activeSlide.value.slideMode !== "overlay"
+    ) {
       makeSlideActive(newSlide, { goLive: true, newlyCreated: true })
     } else {
       makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
@@ -771,44 +1095,42 @@ emitter.on("batch-update-slides", (slides: Slide[]) => {
   batchUpdateSlides(slides)
 })
 
-emitter.on("select-slides", () => {
-  if (bulkActionLabel.value === "Select Slides") {
-    bulkSelectSlides.value = !bulkSelectSlides.value
-    bulkActionLabel.value = "Select All"
-    bulkActionIcon.value = "i-bx-checkbox"
-    toast.add({
-      title: "Click button twice to cancel",
-      icon: "i-bx-info-circle",
-      color: "green",
-    })
-  } else if (bulkActionLabel.value === "Select All") {
-    addAllSlidesToSelectedSlides()
-    bulkActionLabel.value = "Cancel"
-    bulkActionIcon.value = "i-mdi-close"
-  } else if (bulkActionLabel.value === "Cancel") {
-    removeAllSelectedSlides()
-    bulkActionLabel.value = "Select Slides"
-    bulkActionIcon.value = ""
-    bulkSelectSlides.value = !bulkSelectSlides.value
-  }
+emitter.on(appWideActions.selectSlides, () => {
+  bulkSelectSlides.value = true
+})
+
+emitter.on(appWideActions.selectAllSlides, () => {
+  addAllSlidesToSelectedSlides()
+})
+
+emitter.on(appWideActions.cancelSelectSlides, () => {
+  removeAllSelectedSlides()
+  bulkSelectSlides.value = false
 })
 
 emitter.on("promote-active-slide-live", () => {
   if (activeSlide.value) {
-    makeSlideActive(activeSlide.value!!, {
-      goLive: true,
-      newlyCreated: false,
-    })
+    handleTakeLiveAction(activeSlide.value)
   }
 })
 
-emitter.on("selected-schedule", (data: Schedule) => {
+emitter.on("selected-schedule", (data: Schedule | string | null) => {
   // Clear Edit Content pane
   // activeSlide.value = undefined
 
+  const incomingId = typeof data === "string" ? data : data?._id ?? null
+  const isReselectingSameSchedule =
+    incomingId != null && incomingId === lastSelectedScheduleId.value
+  lastSelectedScheduleId.value = incomingId
+
+  // App boot re-emits this for the already-active schedule (e.g. on reload) —
+  // only clear the live slide when the schedule actually changes.
+  if (isReselectingSameSchedule) return
+
   // Clear live projection
   appStore.setLiveSlide("")
-  useBroadcastPost(JSON.stringify(null))
+  useBroadcastPost(null)
+  clearSlideOverlay()
 })
 
 // Utility functions for offline sync
@@ -906,77 +1228,92 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
     return
   }
 
-  // appStore.setSlidesLoading(true)
-  const { data, error } = await useAPIFetch(
-    `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
-  )
-  if (!error.value) {
-    let tempSlides = (data.value as Slide[]) || []
-    if (!Array.isArray(tempSlides)) {
-      console.warn(
-        "retrieveSlidesOnline: unexpected response shape",
-        data.value
-      )
-      return
-    }
-    tempSlides.forEach((slide) => {
-      if (
-        slide.backgroundType === backgroundTypes.video &&
-        (slide.backgroundVideoKey === "video-bg-1" ||
-          slide.backgroundVideoKey === "/video-bg-1.mp4" ||
-          slide.backgroundVideoKey === "video-bg-2" ||
-          slide.backgroundVideoKey === "/video-bg-2.mp4" ||
-          slide.backgroundVideoKey === "video-bg-3" ||
-          slide.backgroundVideoKey === "/video-bg-3.mp4" ||
-          slide.backgroundVideoKey === "video-bg-4" ||
-          slide.backgroundVideoKey === "/video-bg-4.mp4" ||
-          slide.backgroundVideoKey === "video-bg-5" ||
-          slide.backgroundVideoKey === "/video-bg-5.mp4" ||
-          slide.backgroundVideoKey === "video-bg-6" ||
-          slide.backgroundVideoKey === "/video-bg-6.mp4")
-      ) {
-        slide.background = appStore.currentState.backgroundVideos?.find(
-          (bg) => bg.id === slide.backgroundVideoKey
-        )?.url
-        // console.log(
-        //   appStore.currentState.backgroundVideos?.find(
-        //     (bg) => bg.id === slide.backgroundVideoKey
-        //   )?.url
-        // )
-      } else if (
-        slide.backgroundType === backgroundTypes.image &&
-        slide.background?.includes("blob:")
-      ) {
-        const previousBackground = appStore.currentState.activeSlides.find(
-          (s) => s.id === slide.id
-        )?.background
-        if (previousBackground) {
-          slide.background = previousBackground
-        }
-      } else {
-        // console.log("not found")
-      }
-    })
-    // Sort slides by index
-    tempSlides = [...tempSlides].sort((a, b) => a.index - b.index)
+  // Only block the grid with a skeleton when there's nothing on screen yet —
+  // background refreshes (e.g. "refresh-slides") shouldn't blank out
+  // already-rendered slides.
+  const showSkeletonWhileLoading = !slides.value?.length
+  if (showSkeletonWhileLoading) isLoadingSlides.value = true
+  appStore.setSlidesLoading(true)
 
-    appStore.setActiveSlides(
-      useMergeObjectArray(tempSlides, [...appStore.currentState.activeSlides])
+  try {
+    const { data, error } = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
     )
-    // appStore.setSlidesLoading(false)
-    appStore.setLastSynced(new Date().toISOString())
-  } else {
-    console.warn("Unable to refresh schedule slides:", error.value)
+    if (!error.value) {
+      let tempSlides = (data.value as Slide[]) || []
+      if (!Array.isArray(tempSlides)) {
+        console.warn(
+          "retrieveSlidesOnline: unexpected response shape",
+          data.value
+        )
+        return
+      }
+      tempSlides.forEach((slide) => {
+        if (
+          slide.backgroundType === backgroundTypes.video &&
+          (slide.backgroundVideoKey === "video-bg-1" ||
+            slide.backgroundVideoKey === "/video-bg-1.mp4" ||
+            slide.backgroundVideoKey === "video-bg-2" ||
+            slide.backgroundVideoKey === "/video-bg-2.mp4" ||
+            slide.backgroundVideoKey === "video-bg-3" ||
+            slide.backgroundVideoKey === "/video-bg-3.mp4" ||
+            slide.backgroundVideoKey === "video-bg-4" ||
+            slide.backgroundVideoKey === "/video-bg-4.mp4" ||
+            slide.backgroundVideoKey === "video-bg-5" ||
+            slide.backgroundVideoKey === "/video-bg-5.mp4" ||
+            slide.backgroundVideoKey === "video-bg-6" ||
+            slide.backgroundVideoKey === "/video-bg-6.mp4")
+        ) {
+          slide.background = appStore.currentState.backgroundVideos?.find(
+            (bg) => bg.id === slide.backgroundVideoKey
+          )?.url
+        } else if (
+          (slide.backgroundType === backgroundTypes.image ||
+            slide.backgroundType === backgroundTypes.video) &&
+          slide.background?.includes("blob:")
+        ) {
+          // Custom (non-preset) image AND video backgrounds: the server may hold
+          // a stale, session-dead blob: URL. Restore the still-valid locally
+          // rehydrated background so the "server wins" merge can't clobber a
+          // working slide with a broken URL.
+          const previousBackground = appStore.currentState.activeSlides.find(
+            (s) => s.id === slide.id
+          )?.background
+          if (previousBackground) {
+            slide.background = previousBackground
+          }
+        }
+      })
+      // Sort slides by index
+      tempSlides = [...tempSlides].sort((a, b) => a.index - b.index)
+
+      appStore.setActiveSlides(
+        useMergeObjectArray(tempSlides, [...appStore.currentState.activeSlides])
+      )
+      appStore.setLastSynced(new Date().toISOString())
+    } else {
+      console.warn("Unable to refresh schedule slides:", error.value)
+    }
+  } finally {
+    appStore.setSlidesLoading(false)
+    if (showSkeletonWhileLoading) {
+      // Wait for the activeSlides watcher to sync the local `slides` ref and
+      // for Vue to flush that update (including mounting the slide cards)
+      // before dropping the skeleton, so the grid never shows an empty/half
+      // -rendered frame between "fetch done" and "slides actually painted".
+      await nextTick()
+      isLoadingSlides.value = false
+    }
   }
 }
 
-// Listen to see if active slide is in active schedule, and to scroll to newest slide if in active schedule
+// Scroll to the active slide only when a slide is added. Changing the active
+// slide alone should not move the grid.
 watch(
-  () => ({
-    length: slides.value?.length,
-    activeId: activeSlide.value?.id,
-  }),
-  () => {
+  () => slides.value?.length ?? 0,
+  (newLength, oldLength) => {
+    if (newLength <= oldLength) return
+
     nextTick(() => {
       scrollToSlide(activeSlide.value?.id)
       const slideId = activeSlide.value?.id
@@ -1133,7 +1470,8 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   const tempSlide = slides.value.find(slideMatchesId) as Slide | undefined
 
   if (!tempSlide) {
-    const activeStoreSlide = appStore.currentState.activeSlides.find(slideMatchesId)
+    const activeStoreSlide =
+      appStore.currentState.activeSlides.find(slideMatchesId)
     const wasLive =
       appStore.currentState.liveSlideId === slideId ||
       (activeStoreSlide
@@ -1143,7 +1481,15 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
     if (wasLive) {
       appStore.setLiveSlide("")
-      useBroadcastPost(JSON.stringify(null))
+      useBroadcastPost(null)
+    }
+
+    if (
+      appStore.currentState.activeOverlaySlide &&
+      (appStore.currentState.activeOverlaySlide.id === slideId ||
+        appStore.currentState.activeOverlaySlide._id === slideId)
+    ) {
+      clearSlideOverlay()
     }
 
     if (activeStoreSlide || wasLive) {
@@ -1154,7 +1500,9 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     }
 
     appStore.setActiveSlides(
-      appStore.currentState.activeSlides.filter((slide) => !slideMatchesId(slide))
+      appStore.currentState.activeSlides.filter(
+        (slide) => !slideMatchesId(slide)
+      )
     )
     return
   }
@@ -1177,7 +1525,14 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     appStore.currentState.liveSlideId === tempSlide._id
   ) {
     appStore.setLiveSlide("")
-    useBroadcastPost(JSON.stringify(null))
+    useBroadcastPost(null)
+  }
+
+  if (
+    appStore.currentState.activeOverlaySlide?.id === clientSlideId ||
+    appStore.currentState.activeOverlaySlide?._id === tempSlide._id
+  ) {
+    clearSlideOverlay()
   }
 
   const slideIndex = slides.value.findIndex(slideMatchesId)
@@ -1197,26 +1552,10 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     await deleteSlideAPI(tempSlide)
   }
 
-  // Delete Probable Media files linked in DB (as long as they are not saved in Library)
-  const db = useIndexedDB()
+  // Delete local media bytes and metadata when no library item still owns it.
   const itemSaved = await getLibraryItem(clientSlideId)
   if (!itemSaved) {
-    if (tempSlide?.type === slideTypes.presentation) {
-      // Presentation slides write one IndexedDB record per page, keyed as
-      // `${slideId}-page-${n}`. A single .delete(slideId) would miss all of
-      // them, so we delete every record whose key starts with the slide ID.
-      await db.media
-        .where("id")
-        .startsWith(`${clientSlideId}-page-`)
-        .delete()
-        .catch((err) =>
-          console.error("Failed to delete presentation media pages:", err)
-        )
-    } else {
-      await db.media
-        .delete(clientSlideId)
-        .catch((err) => console.error("Failed to delete media:", err))
-    }
+    await useLocalMediaStorage().deleteGroup(clientSlideId)
   }
 
   if (addToast) {
@@ -1234,8 +1573,6 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
   })
   toast.add({ title: "Multiple slides deleted", icon: "i-tabler-trash" })
   bulkSelectedSlides.value = []
-  bulkActionLabel.value = "Select Slides"
-  bulkActionIcon.value = ""
   bulkSelectSlides.value = false
 }
 
@@ -1258,6 +1595,13 @@ const onUpdateSlide = (slide: Slide) => {
   updateSlideOnline(updatedSlide)
   updateLiveOutput(updatedSlide)
 
+  if (
+    appStore.currentState.activeOverlaySlide?.id === updatedSlide.id &&
+    updatedSlide.type !== slideTypes.countdown
+  ) {
+    showSlideOverlay(updatedSlide, { capture: false })
+  }
+
   // When updating of countdown slide is done, resume timer
   if (updatedSlide.type === slideTypes.countdown) {
     startCountdown(updatedSlide)
@@ -1273,21 +1617,34 @@ const onUpdateInactiveSlide = (slide: Slide) => {
   )
   slides.value?.splice(slideIndex || 0, 1, updatedSlide)
 
+  // Toolbar actions use the selected slide as their source of truth. Keep that
+  // reference in sync even when the edit intentionally uses the inactive-slide
+  // persistence path, otherwise toggle buttons continue reading stale styles.
+  if (activeSlide.value?.id === updatedSlide.id) {
+    activeSlide.value = updatedSlide
+  }
+
   updateSlideOnline(updatedSlide)
   updateLiveOutput(updatedSlide)
+
+  if (appStore.currentState.activeOverlaySlide?.id === updatedSlide.id) {
+    showSlideOverlay(updatedSlide, { capture: false })
+  }
 }
 
 // Countdown management functions
 const updateCountdownSlide = (
   slide: Slide,
   timeRemaining: number,
-  isPlaying: boolean = true
+  isPlaying: boolean = true,
+  options: { remainingMs?: number; syncOverlay?: boolean } = {}
 ) => {
   const tempSlide = { ...slide }
   const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
   tempSlide.data = {
     ...tempSlide.data,
     timeLeft: useMilliToTimeString(timeRemaining),
+    remainingMs: isPlaying ? options.remainingMs : undefined,
   } as Countdown
   tempSlide.slideStyle = {
     ...tempSlide.slideStyle,
@@ -1295,7 +1652,24 @@ const updateCountdownSlide = (
   }
   tempSlide.contents = useSlideContent(tempSlide, tempSlide?.data!!)
   slides.value.splice(slideIndex, 1, tempSlide)
-  updateLiveOutput(tempSlide)
+
+  // Countdown controls are rendered from activeSlide, while timer ticks update
+  // the slides collection. Synchronize both so play/pause state is immediate.
+  if (activeSlide.value?.id === tempSlide.id) {
+    activeSlide.value = tempSlide
+  }
+
+  const isActiveOverlay =
+    appStore.currentState.activeOverlaySlide?.id === tempSlide.id
+
+  // Overlay outputs derive each visible second locally from remainingMs. Only
+  // write the persisted/shared store when playback state changes, not per tick.
+  if (!isActiveOverlay || options.syncOverlay) {
+    updateLiveOutput(tempSlide)
+  }
+  if (isActiveOverlay && options.syncOverlay) {
+    showSlideOverlay(tempSlide, { capture: false })
+  }
 }
 
 const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
@@ -1307,6 +1681,15 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
         : (slide.data as Countdown)?.timeLeft
     )
 
+    if (
+      activeCountdownInterval.value !== null &&
+      activeCountdownSlideId.value !== slide.id
+    ) {
+      cancelAnimationFrame(countdownRAF.value)
+      activeCountdownInterval.value = null
+      countdownTimeLeft.value = 0
+    }
+
     if (activeCountdownInterval.value === null || restartCountdown) {
       // Stop any existing animation
       if (countdownRAF.value) {
@@ -1314,7 +1697,7 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
       }
 
       // Reset or initialize countdown state
-      if (restartCountdown) {
+      if (restartCountdown || activeCountdownSlideId.value !== slide.id) {
         countdownTimeLeft.value = duration
         countdownDuration.value = duration
       } else {
@@ -1326,6 +1709,14 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
       // Record start time
       countdownStartTime.value = performance.now()
       const startTimeLeft = countdownTimeLeft.value
+      activeCountdownSlideId.value = slide.id
+
+      // Publish the playing state immediately so toolbar controls do not wait
+      // for the first one-second countdown tick before switching to pause.
+      updateCountdownSlide(slide, countdownTimeLeft.value, true, {
+        remainingMs: startTimeLeft,
+        syncOverlay: true,
+      })
 
       // Animation function
       const animate = (currentTime: number) => {
@@ -1338,7 +1729,9 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
           Math.floor(countdownTimeLeft.value / 1000)
         ) {
           countdownTimeLeft.value = remaining
-          updateCountdownSlide(slide, remaining)
+          updateCountdownSlide(slide, remaining, true, {
+            remainingMs: remaining,
+          })
         }
 
         if (remaining > 0) {
@@ -1346,8 +1739,9 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
           activeCountdownInterval.value = true
         } else {
           countdownTimeLeft.value = 0
-          updateCountdownSlide(slide, 0, false)
+          updateCountdownSlide(slide, 0, false, { syncOverlay: true })
           activeCountdownInterval.value = null
+          activeCountdownSlideId.value = null
         }
       }
 
@@ -1358,7 +1752,9 @@ const startCountdown = (slide: Slide, restartCountdown: boolean = false) => {
       // Pause the countdown
       cancelAnimationFrame(countdownRAF.value)
       activeCountdownInterval.value = null
-      updateCountdownSlide(slide, countdownTimeLeft.value, false)
+      updateCountdownSlide(slide, countdownTimeLeft.value, false, {
+        syncOverlay: true,
+      })
     }
   }
 }
@@ -1368,6 +1764,7 @@ const stopCountdown = () => {
     cancelAnimationFrame(countdownRAF.value)
   }
   activeCountdownInterval.value = null
+  activeCountdownSlideId.value = null
   countdownTimeLeft.value = 0
 }
 

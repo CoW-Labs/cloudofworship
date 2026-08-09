@@ -1,18 +1,26 @@
 <template #default="{ defaultProps }">
-  <div class="flex mt-4 px-4">
-    <div :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }">
+  <div
+    class="flex mt-2 px-4 h-[calc(100vh-80px)] short:mt-1 short:px-3 short:h-[calc(100vh-64px)]"
+  >
+    <div
+      :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }"
+      class="h-full"
+    >
       <QuickActions />
     </div>
     <div
-      class="w-[5px] flex-shrink-0 mx-[2px] cursor-ew-resize rounded hover:bg-primary-300/50 dark:hover:bg-primary-700/50 transition-colors"
+      class="w-2 flex-shrink-0 mx-1 cursor-ew-resize rounded opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
       @mousedown.prevent="startResize('left', $event)"
     />
-    <PreviewContent class="min-w-0" />
+    <PreviewContent class="flex-1 min-w-0 h-full" />
     <div
-      class="w-[5px] flex-shrink-0 mx-[2px] cursor-ew-resize rounded hover:bg-primary-300/50 dark:hover:bg-primary-700/50 transition-colors"
+      class="w-2 flex-shrink-0 mx-1 cursor-ew-resize rounded opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
       @mousedown.prevent="startResize('right', $event)"
     />
-    <div :style="{ width: liveOutputWidth + 'px', flexShrink: 0 }">
+    <div
+      :style="{ width: liveOutputWidth + 'px', flexShrink: 0 }"
+      class="h-full"
+    >
       <LiveOutput />
     </div>
   </div>
@@ -26,39 +34,43 @@ useHead({
   link: [
     {
       rel: "manifest",
-      href: "/live-manifest.json",
+      href: "/manifest.json",
     },
   ],
 })
 import { useAppStore } from "~/store/app"
-import { useAuthStore } from "~/store/auth"
-import { ref, computed } from "vue"
+import { ref } from "vue"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import type { Emitter } from "mitt"
-import type { Slide } from "~/types"
-import type { Socket } from "socket.io-client"
-import { suppressLiveSlideBroadcast } from "~/composables/useRealtimeSlides"
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const toast = useToast()
 const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
 const MAX_RETRIES = 10
 let retryCount = 0
 
-// Resizable panel widths
-const QA_MIN_WIDTH = 200
-const QA_MAX_WIDTH = 500
-const QA_DEFAULT_WIDTH = 330
-const LO_MIN_WIDTH = 250
-const LO_MAX_WIDTH = 600
-const LO_DEFAULT_WIDTH = 400
+// Resizable panel widths — bounds and defaults track the viewport so the three
+// columns keep their proportions on smaller screens instead of squeezing the
+// centre column down to two thumbnails per row.
+const { panelBounds, panelSize, commitPanelSize } = usePanelLayout()
+const quickActionsBounds = panelBounds("quickActionsWidth")
+const liveOutputBounds = panelBounds("liveOutputWidth")
+const quickActionsLayoutWidth = panelSize("quickActionsWidth")
+const liveOutputLayoutWidth = panelSize("liveOutputWidth")
 
-const quickActionsWidth = ref(QA_DEFAULT_WIDTH)
-const liveOutputWidth = ref(LO_DEFAULT_WIDTH)
+const quickActionsWidth = ref(quickActionsLayoutWidth.value)
+const liveOutputWidth = ref(liveOutputLayoutWidth.value)
 
 let resizingPanel: "left" | "right" | null = null
+
+// Follow the viewport on resize, but never fight the user mid-drag.
+watch(quickActionsLayoutWidth, (width) => {
+  if (!resizingPanel) quickActionsWidth.value = width
+})
+watch(liveOutputLayoutWidth, (width) => {
+  if (!resizingPanel) liveOutputWidth.value = width
+})
 let resizeStartX = 0
 let resizeStartWidth = 0
 
@@ -77,19 +89,26 @@ const onResizeMove = (event: MouseEvent) => {
   if (!resizingPanel) return
   const delta = event.clientX - resizeStartX
   if (resizingPanel === "left") {
+    const { min, max } = quickActionsBounds.value
     quickActionsWidth.value = Math.min(
-      QA_MAX_WIDTH,
-      Math.max(QA_MIN_WIDTH, resizeStartWidth + delta)
+      max,
+      Math.max(min, resizeStartWidth + delta)
     )
   } else {
+    const { min, max } = liveOutputBounds.value
     liveOutputWidth.value = Math.min(
-      LO_MAX_WIDTH,
-      Math.max(LO_MIN_WIDTH, resizeStartWidth - delta)
+      max,
+      Math.max(min, resizeStartWidth - delta)
     )
   }
 }
 
 const onResizeEnd = () => {
+  if (resizingPanel === "left") {
+    commitPanelSize("quickActionsWidth", quickActionsWidth.value)
+  } else if (resizingPanel === "right") {
+    commitPanelSize("liveOutputWidth", liveOutputWidth.value)
+  }
   resizingPanel = null
   document.removeEventListener("mousemove", onResizeMove)
   document.removeEventListener("mouseup", onResizeEnd)
@@ -220,35 +239,6 @@ const disconnectSocket = () => {
   appStore.setOnlineUsers([])
 }
 
-const sendLiveSlideToSocket = (slide: Slide) => {
-  if (!socketInstance.value?.isConnected()) {
-    console.error(
-      "Error sending live slide to socket",
-      "Socket.IO not connected"
-    )
-  } else {
-    socketInstance.value.sendLiveSlide(slide)
-  }
-}
-
-watch(
-  () => appStore.currentState.liveSlideId,
-  (liveSlideId) => {
-    // Don't re-broadcast a selection we just applied from a peer.
-    if (suppressLiveSlideBroadcast.value) {
-      suppressLiveSlideBroadcast.value = false
-      return
-    }
-    const liveSlide = appStore.currentState.activeSlides.find(
-      (slide) => slide.id === liveSlideId
-    )
-    if (liveSlide) {
-      sendLiveSlideToSocket(liveSlide)
-    }
-  },
-  { deep: true }
-)
-
 onMounted(async () => {
   const emailChange = useRoute().query.email_change
 
@@ -280,6 +270,11 @@ onMounted(async () => {
 
   // APP-WIDE SHORTCUTS
   useCreateShortcut("/", () => useGlobalEmit(appWideActions.quickActionsFocus))
+  useCreateShortcut(
+    "k",
+    () => useGlobalEmit(appWideActions.quickActionsFocus),
+    { ctrlOrMeta: true, allowInEditable: true }
+  )
 
   // Prevent default action on specific keys
   document.addEventListener("keydown", function (event) {
@@ -362,6 +357,8 @@ watch(
 
 // Cleanup on unmount
 onBeforeUnmount(() => {
+  appStore.setPanelSize("quickActionsWidth", quickActionsWidth.value)
+  appStore.setPanelSize("liveOutputWidth", liveOutputWidth.value)
   disconnectSocket()
   document.removeEventListener("mousemove", onResizeMove)
   document.removeEventListener("mouseup", onResizeEnd)

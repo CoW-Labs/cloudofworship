@@ -1,7 +1,37 @@
 <template>
-  <div class="bg-image-selection-ctn p-2">
+  <div v-if="backgroundPanel" class="h-full w-full p-3">
     <div
-      :class="{ 'gap-4 grid-cols-3 max-h-full': settingsPage }"
+      class="grid h-full grid-cols-3 gap-[8.5px] overflow-y-auto overflow-x-hidden"
+    >
+      <button
+        v-for="video in backgroundVideos"
+        :key="video?.id"
+        type="button"
+        class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-black transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#E8D1F8]"
+        :aria-label="video?.url === value ? 'Selected background video' : 'Select background video'"
+        :aria-pressed="video?.url === value"
+        @click="$emit('select', { video: video?.url, key: video?.id })"
+      >
+        <video
+          class="h-full w-full object-cover"
+          :src="video?.url"
+          muted
+          autoplay
+          playsinline
+          preload="metadata"
+          crossorigin="anonymous"
+        ></video>
+        <span
+          v-if="video?.url === value"
+          class="pointer-events-none absolute inset-0 z-10 rounded-[4px] border-2 border-[#E8D1F8]"
+        ></span>
+      </button>
+    </div>
+  </div>
+
+  <div v-else class="bg-image-selection-ctn p-2">
+    <div
+      :class="{ 'gap-4 grid-cols-3 max-h-full pb-16': settingsPage }"
       class="bg-image-selection grid gap-2 grid-cols-3 max-h-[200px] overflow-y-auto overflow-x-hidden"
     >
       <UButton
@@ -9,7 +39,7 @@
         :key="video?.id"
         @click="$emit('select', { video: video?.url, key: video?.id })"
         class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
-        :class="[settingsPage ? 'w-[180px] h-[100px]' : 'w-[90px] h-[50px]']"
+        :class="settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]'"
       >
         <video
           class="bg-image w-[100%] h-[100%] transition rounded-md opacity-100 hover:opacity-30 object-cover"
@@ -19,6 +49,10 @@
           autoplay
           crossorigin="anonymous"
         ></video>
+        <span
+          v-if="video?.url === value"
+          class="pointer-events-none absolute inset-0 z-10 rounded-md border-2 border-[#E8D1F8]"
+        ></span>
         <IconWrapper
           v-if="video?.url === value"
           name="i-bx-check"
@@ -39,75 +73,111 @@
         /> -->
       </UButton>
     </div>
-    <div class="button-ctn pt-2">
+    <div v-if="!hideUpload && !settingsPage" class="button-ctn pt-2">
       <FileDropzone
-        v-if="!settingsPage"
         size="sm"
         icon="i-bx-film"
-        :maxFileSize="maxFileSize"
+        accept="video/*"
+        :maxVideoFileSize="maxFileSize"
         @change="saveAndSelectVideos($event)"
         :loading="videoUploadLoading"
       />
-      <label class="relative" v-else>
+    </div>
+    <Teleport to="#settings-modal-device-action">
+      <!-- Fixed to the settings modal, outside its scrolling content. -->
+      <div
+        v-if="!hideUpload && settingsPage"
+        class="pointer-events-auto w-[190px] shadow-xl transition-all"
+      >
         <input
+          ref="videoFileInput"
           type="file"
-          name=""
-          id=""
-          class="absolute inset-0 opacity-0 cursor-pointer"
+          class="hidden"
           accept="video/*"
           multiple
-          @change="saveAndSelectVideos(Array.from($event.target?.files || []))"
+          @change="onVideoFileSelect"
         />
-        <UButton
-          class="z-1 mt-2"
+        <CowButton
+          variant="primary"
+          size="lg"
           block
-          variant="outline"
           :icon="videoUploadLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
           :loading="videoUploadLoading"
-          size="sm"
-          >{{
+          :disabled="videoUploadLoading"
+          @click="openVideoFilePicker"
+        >
+          {{
             videoUploadLoading
               ? `Adding ${currentVideoIndex}/${totalVideos}...`
               : "Add from device"
-          }}</UButton
-        >
-      </label>
-    </div>
+          }}
+        </CowButton>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
-import { useAuthStore } from "~/store/auth"
-import type { Media, BackgroundVideo } from "~/types"
+import type { BackgroundVideo } from "~/types"
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
-const { isFreePlan } = useSubscription()
+const online = useOnline()
+const { isTeamsPlan } = useSubscription()
 
-const maxFileSize = computed(() => (isFreePlan ? 3 : 10))
+const maxFileSize = computed(() => Infinity)
 const toast = useToast()
-const db = useIndexedDB()
+const localMedia = useLocalMediaStorage()
 
 defineProps<{
   value?: string
   settingsPage?: boolean
+  hideUpload?: boolean
+  backgroundPanel?: boolean
 }>()
 
-const emit = defineEmits(["select"])
+const emit = defineEmits(["select", "loading-change"])
 const videoUploadLoading = ref(false)
+const videoFileInput = ref<HTMLInputElement | null>(null)
 const currentVideoIndex = ref(0)
 const totalVideos = ref(0)
 const deletingVideoId = ref<string | null>(null)
 
 const bgVideoToBeSelected = ref<string | null>(null)
-const backgroundVideos = ref<BackgroundVideo[]>(
-  appStore.currentState.backgroundVideos
-)
+const localVideoObjectUrls = new Set<string>()
+const defaultBackgroundVideos = [...appStore.currentState.backgroundVideos]
+const backgroundVideos = ref<BackgroundVideo[]>([...defaultBackgroundVideos])
+
+const openVideoFilePicker = () => {
+  videoFileInput.value?.click()
+}
+
+const onVideoFileSelect = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ""
+  void saveAndSelectVideos(files)
+}
+
+const revokeLocalVideoObjectUrls = () => {
+  const usedBackgrounds = new Set(
+    appStore.currentState.activeSlides.map((s) => s.background).filter(Boolean)
+  )
+  localVideoObjectUrls.forEach((url) => {
+    if (!usedBackgrounds.has(url)) {
+      localMedia.releasePlaybackUrl(url)
+    }
+  })
+  localVideoObjectUrls.clear()
+}
 
 const getAllLocallySavedVideos = async () => {
-  const db = useIndexedDB()
-  const videos = await db.cached.where({ content: "video" }).toArray()
+  const videos = (await localMedia.listRecords()).filter(
+    (record) =>
+      record.kind === "video" &&
+      (record.category === "background" || record.category === "preset")
+  )
   const videoTypes = [
     ".mp4",
     ".webm",
@@ -117,7 +187,9 @@ const getAllLocallySavedVideos = async () => {
     ".mkv",
     ".ogg",
     ".flv",
-  ]
+  ] as const
+
+  revokeLocalVideoObjectUrls()
 
   // Create Object URLs from locally saved videos - process in batches
   const locallySavedVideos: BackgroundVideo[] = []
@@ -126,24 +198,19 @@ const getAllLocallySavedVideos = async () => {
   const chunkSize = 15
   for (let i = 0; i < videos.length; i += chunkSize) {
     const chunk = videos.slice(i, i + chunkSize)
-    chunk.forEach((video) => {
-      const blobURL = URL.createObjectURL(video.data as unknown as Blob)
-      if (
-        video.id?.includes(videoTypes[0]) ||
-        video.id?.includes(videoTypes[1]) ||
-        video.id?.includes(videoTypes[2]) ||
-        video.id?.includes(videoTypes[3]) ||
-        video.id?.includes(videoTypes[4]) ||
-        video.id?.includes(videoTypes[5])
-      ) {
-        locallySavedVideos.push({ id: video.id, url: blobURL })
-        if (video.id === bgVideoToBeSelected.value) {
-          bgVideoToBeSelected.value = blobURL
-        }
-      } else {
-        return // Ignore non-video files
+    for (const video of chunk) {
+      if (!videoTypes.some((extension) => video.key.includes(extension))) continue
+
+      const playbackUrl = await localMedia.getPlaybackUrl(video.key)
+      if (!playbackUrl) continue
+      if (playbackUrl.startsWith("blob:")) {
+        localVideoObjectUrls.add(playbackUrl)
       }
-    })
+      locallySavedVideos.push({ id: video.key, url: playbackUrl })
+      if (video.key === bgVideoToBeSelected.value) {
+        bgVideoToBeSelected.value = playbackUrl
+      }
+    }
 
     // Allow UI to breathe between chunks
     if (i + chunkSize < videos.length) {
@@ -151,43 +218,71 @@ const getAllLocallySavedVideos = async () => {
     }
   }
 
-  locallySavedVideos.forEach((video) => {
-    if (backgroundVideos.value.find((bgVideo) => bgVideo.id === video.id)) {
-      return
-    }
-    backgroundVideos.value.push(video)
+  const videosById = new Map<string, BackgroundVideo>()
+  ;[...defaultBackgroundVideos, ...locallySavedVideos].forEach((video) => {
+    if (!video?.id || videosById.has(video.id)) return
+    videosById.set(video.id, video)
   })
+  backgroundVideos.value = Array.from(videosById.values())
 }
 
 const saveAndSelectVideos = async (files: File[]) => {
   if (!files || files.length === 0) return
 
-  const db = useIndexedDB()
-
   videoUploadLoading.value = true
+  emit("loading-change", true)
   totalVideos.value = files.length
+  let selectedVideoKey: string | null = null
 
   try {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+    for (const [i, file] of files.entries()) {
       currentVideoIndex.value = i + 1
 
       const randomId = useID(6)
-      const tempMedia: Media = {
-        id: `/custom-video-bg-${randomId}.${file.type?.split("/")?.[1]}`,
-        data: file,
-        content: "video",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      const mediaKey = `/custom-video-bg-${randomId}.${
+        file.type?.split("/")?.[1]
+      }`
+      await localMedia.saveBlob({
+        key: mediaKey,
+        groupId: mediaKey,
+        category: "background",
+        kind: "video",
+        blob: file,
+        mimeType: file.type,
+        originalName: file.name,
+        recoverable: false,
+        userInitiated: true,
+      })
+      if (online.value) {
+        try {
+          const uploaded = await useUploadFile(file, { name: file.name })
+          await useIndexedDB().localMediaFiles.update(mediaKey, {
+            remoteUrl: uploaded.file.url,
+            recoverable: true,
+            updatedAt: new Date().toISOString(),
+          })
+        } catch (error) {
+          if (/quota|storage limit|storage full/i.test(String(error))) {
+            toast.add({
+              title: isTeamsPlan.value
+                ? "Cloud storage full"
+                : "Free cloud storage full",
+              description: isTeamsPlan.value
+                ? "This video will only be available on this device until you free up cloud storage."
+                : "This video will only be available on this device. Upgrade to Teams for 5GB of synced cloud storage.",
+              icon: "i-bx-cloud",
+              color: "amber",
+            })
+          } else {
+            console.warn("Background video cloud upload failed:", error)
+          }
+        }
       }
-
-      await db.cached
-        .add(tempMedia)
-        .catch((err) => console.error("Failed to save custom video:", err))
 
       // Select the last added video
       if (i === files.length - 1) {
-        bgVideoToBeSelected.value = tempMedia.id
+        bgVideoToBeSelected.value = mediaKey
+        selectedVideoKey = mediaKey
       }
     }
 
@@ -195,11 +290,21 @@ const saveAndSelectVideos = async (files: File[]) => {
     if (bgVideoToBeSelected.value) {
       emit("select", {
         video: bgVideoToBeSelected.value,
-        key: bgVideoToBeSelected.value,
+        key: selectedVideoKey || bgVideoToBeSelected.value,
       })
     }
+  } catch (error) {
+    console.error("Failed to save custom video:", error)
+    toast.add({
+      title: "Local media storage is unavailable",
+      description:
+        "This browser cannot durably save the background video.",
+      icon: "i-bx-error",
+      color: "red",
+    })
   } finally {
     videoUploadLoading.value = false
+    emit("loading-change", false)
     currentVideoIndex.value = 0
     totalVideos.value = 0
   }
@@ -231,4 +336,8 @@ const handleDeleteVideo = async (video: BackgroundVideo) => {
 }
 
 getAllLocallySavedVideos()
+
+onBeforeUnmount(() => {
+  revokeLocalVideoObjectUrls()
+})
 </script>
