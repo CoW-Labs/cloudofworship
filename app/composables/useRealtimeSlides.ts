@@ -29,17 +29,11 @@ const tabSessionId = `tab-${Date.now()}-${Math.random().toString(36).substring(2
 // Export the tab session ID for use in other modules
 export { tabSessionId }
 
-// Set true for one tick while we apply a live-slide selection received from a
-// peer, so the `liveSlideId` watcher in pages/index.vue does NOT re-broadcast
-// it back out. Without this guard, every client that receives a live-slide
-// would echo it to the room — harmless (it converges on value equality) but it
-// turns one selection into O(peers) extra socket frames. See index.vue.
-export const suppressLiveSlideBroadcast = ref(false)
-
 export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const appStore = useAppStore()
   const authStore = useAuthStore()
   const toast = useToast()
+  const { applyOverlaySettings } = useOverlaySettings()
 
   // Track online users
   const onlineUsers = ref<OnlineUser[]>([])
@@ -61,7 +55,14 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const clearLiveSlideIfDeleted = (slide: Slide) => {
     if (slideMatchesId(slide, appStore.currentState.liveSlideId)) {
       appStore.setLiveSlide("")
-      useBroadcastPost(JSON.stringify(null))
+      useBroadcastPost(null)
+    }
+  }
+
+  const clearOverlaySlideIfDeleted = (slide: Slide) => {
+    if (slideMatchesId(slide, appStore.currentState.activeOverlaySlide?.id)) {
+      appStore.setActiveOverlaySlide(null)
+      useBroadcastOverlayPost(appWideActions.removeSlideOverlay)
     }
   }
 
@@ -165,7 +166,12 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
 
             // If slide is live, update the live output
             if (appStore.currentState.liveSlideId === mergedSlide.id) {
-              useBroadcastPost(JSON.stringify(mergedSlide))
+              useBroadcastPost(mergedSlide)
+            }
+            if (appStore.currentState.activeOverlaySlide?.id === mergedSlide.id) {
+              const overlaySlide = applyOverlaySettings(mergedSlide)
+              appStore.setActiveOverlaySlide(overlaySlide)
+              useBroadcastOverlayPost(appWideActions.showSlideOverlay, overlaySlide)
             }
           }
         }
@@ -183,6 +189,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           )
           if (slideToRemove) {
             clearLiveSlideIfDeleted(slideToRemove)
+            clearOverlaySlideIfDeleted(slideToRemove)
             appStore.removeActiveSlide(slideToRemove)
             options.onSlideDeleted?.(slideId, data.deletedByName)
           }
@@ -228,6 +235,16 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
               const existingSlide = nextSlides[slideIndex]
               const mergedSlide = { ...existingSlide, ...updatedSlide }
               nextSlides.splice(slideIndex, 1, mergedSlide)
+              if (
+                appStore.currentState.activeOverlaySlide?.id === mergedSlide.id
+              ) {
+                const overlaySlide = applyOverlaySettings(mergedSlide)
+                appStore.setActiveOverlaySlide(overlaySlide)
+                useBroadcastOverlayPost(
+                  appWideActions.showSlideOverlay,
+                  overlaySlide
+                )
+              }
               changed = true
             }
           })
@@ -248,11 +265,28 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             )
             if (slideToRemove) {
               clearLiveSlideIfDeleted(slideToRemove)
+              clearOverlaySlideIfDeleted(slideToRemove)
               appStore.removeActiveSlide(slideToRemove)
             }
           })
           options.onBatchSlidesDeleted?.(data.slideIds, data.deletedByName)
         }
+        break
+
+      case 'show-slide-overlay': {
+        if (data?.tabId === tabSessionId) return
+        if (!data?.id) return
+        const overlaySlide = { ...data } as Slide
+        delete (overlaySlide as any).tabId
+        appStore.setActiveOverlaySlide(overlaySlide)
+        useBroadcastOverlayPost(appWideActions.showSlideOverlay, overlaySlide)
+        break
+      }
+
+      case 'remove-slide-overlay':
+        if (data?.tabId === tabSessionId) return
+        appStore.setActiveOverlaySlide(null)
+        useBroadcastOverlayPost(appWideActions.removeSlideOverlay)
         break
 
       case 'reorder-slides':
@@ -363,26 +397,6 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         }
         break
 
-      case 'live-slide': {
-        // A peer took a slide live — mirror their selection locally and drive
-        // this operator's projection window. Cheap and infrequent: one id
-        // compare, one store write, one find, one broadcast per change.
-        const liveId = data?.id || data?._id || data?.slideId
-        if (!liveId || appStore.currentState.liveSlideId === liveId) break
-
-        // Suppress the index.vue watcher so we don't bounce this selection
-        // straight back out to the room.
-        suppressLiveSlideBroadcast.value = true
-        appStore.setLiveSlide(liveId)
-
-        // Project the fully-hydrated local copy (it carries client-only `data`
-        // that the server payload may not), falling back to the wire payload.
-        const localSlide = appStore.currentState.activeSlides.find(
-          (s) => s.id === liveId || s._id === liveId
-        )
-        useBroadcastPost(JSON.stringify(localSlide || data))
-        break
-      }
     }
   }
 

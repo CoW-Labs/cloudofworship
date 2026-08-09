@@ -5,11 +5,12 @@
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold">Save as Template</h3>
           <UButton
-            icon="i-bx-x"
             color="gray"
             variant="ghost"
             @click="isOpen = false"
-          />
+          >
+            <template #leading><CloseIcon class="w-5 h-5" /></template>
+          </UButton>
         </div>
       </template>
 
@@ -19,10 +20,8 @@
           class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-4"
         >
           <div class="flex items-start gap-3">
-            <IconWrapper
-              name="i-bx-info-circle"
-              size="5"
-              class="text-amber-600 dark:text-amber-400 mt-0.5"
+            <InfoIcon
+              class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5"
             />
             <div>
               <h4 class="font-semibold text-amber-900 dark:text-amber-100">
@@ -60,7 +59,7 @@
 
         <!-- Category -->
         <UFormGroup label="Category" size="lg" required>
-          <USelectMenu
+          <CowSelectMenu
             v-model="templateData.category"
             :options="categories"
             placeholder="Select category"
@@ -75,7 +74,7 @@
           <div
             class="text-sm text-primary-500 font-semibold flex items-center gap-2"
           >
-            <IconWrapper name="i-bx-info-circle" size="4"></IconWrapper>
+            <InfoIcon class="w-4 h-4" />
             Note
           </div>
           <p class="mt-2 text-sm">

@@ -105,6 +105,9 @@ const gotoVerseNumberPatterns: RegExp[] = [
   new RegExp(
     `\\b(?:let us|let s|lets)\\s+(?:go|move|turn|jump)\\s+(?:to\\s+)?(?:the\\s+)?(?:bible\\s+)?verse\\s+(?:number\\s+)?(${verseNumberPattern})\\b`,
   ),
+  new RegExp(
+    `\\bverses?\\s+(?:number\\s+)?(${verseNumberPattern})\\b`,
+  ),
 ]
 
 const bibleVersionCommandPatterns: RegExp[] = [
@@ -112,7 +115,11 @@ const bibleVersionCommandPatterns: RegExp[] = [
   /\b(?:switch|change|set)\s+(?:the\s+)?(?:bible\s+)?(?:version|translation)\s+(?:to|into|over\s+to|as)\s+(.+?)$/,
   /\b(?:switch|change|set|use|open|show|display)\s+(?:the\s+)?(?:bible\s+)?(?:to|into|over\s+to|in|with|using|as)\s+(.+?)$/,
   /\b(?:use|open|show|display)\s+(?:the\s+)?(.+?)\s+(?:bible|version|translation)$/,
+  /\bgive\s+me\s+(?:the\s+)?(?:bible\s+)?(?:in|with|using)\s+(?:the\s+)?(.+?)\s+(?:bible|version|translation)$/,
+  /\bgive\s+me\s+(?:the\s+)?(?:bible\s+)?(?:in|with|using)\s+(.+?)$/,
+  /\bgive\s+me\s+(?:the\s+)?(.+?)\s+(?:bible|version|translation)$/,
   /\b(?:use|switch\s+to|change\s+to|set\s+to)\s+(.+?)$/,
+  /\bgive\s+me\s+(?:the\s+)?(.+?)$/,
 ]
 
 const bibleVersionAliases: Record<string, string[]> = {

@@ -1,36 +1,43 @@
 <template>
-  <div class="login-main section">
-    <div class="header flex flex-col items-center text-center mb-12">
-      <Logo class="w-28 h-28" />
-      <p class="max-w-[200px] mx-auto">
-        Forgot your password for
-        <span class="font-semibold">Cloud of Worship</span>
+  <div class="w-full flex flex-col items-center">
+    <div class="flex flex-col items-center text-center mb-8 come-up-1">
+      <Logo class="w-32 h-32 mb-12" />
+      <h1
+        class="text-[2.5rem] lg:text-[2rem] xl:text-[2.5rem] leading-none font-bold mb-3"
+      >
+        Forgot password?
+      </h1>
+      <p
+        class="text-gray-500 dark:text-gray-400 text-[15px] lg:text-[13px] xl:text-[15px] max-w-[22rem]"
+      >
+        Please enter the email linked to your account. A reset link will be sent
+        to this address.
       </p>
     </div>
-    <form
-      class="flex flex-col gap-3 max-w-[325px] mx-auto"
-      @submit="requestReset"
-    >
-      <UFormGroup size="lg">
-        <UInput placeholder="Your email" v-model="email" />
-      </UFormGroup>
 
-      <UButton
+    <form
+      class="w-full flex flex-col gap-4 come-up-2"
+      @submit.prevent="requestReset"
+    >
+      <CowInput label="Email address" type="email" v-model="email" />
+
+      <CowButton
         block
-        size="lg"
-        class="mt-6"
         type="submit"
         :disabled="!useValidEmail(email)"
         :loading="loading"
-        @click="requestReset"
       >
-        Send Reset Email
-      </UButton>
-      <p class="text-sm flex items-center justify-center gap-0">
+        Continue
+      </CowButton>
+
+      <p class="text-sm text-center text-gray-500 dark:text-gray-400">
         Remember your password?
-        <UButton size="sm" class="p-1" variant="link" to="/login"
-          >Log in</UButton
+        <NuxtLink
+          to="/login"
+          class="text-primary-500 dark:text-primary-400 font-medium hover:underline"
         >
+          Log in
+        </NuxtLink>
       </p>
     </form>
   </div>
@@ -39,6 +46,7 @@
 <script setup lang="ts">
 definePageMeta({
   layout: "auth",
+  authVariant: "centered",
 })
 
 // SEO Meta Tags
@@ -89,10 +97,12 @@ useHead({
 const toast = useToast()
 const email = ref("")
 const loading = ref(false)
+const successMessage = (targetEmail: string) =>
+  `If an account exists for ${targetEmail}, a password reset email will be sent. Check your inbox.`
 
 const requestReset = async () => {
   loading.value = true
-  const { data, error } = await useAPIFetch<{ data: string }>(
+  const { error } = await useAPIFetch<{ data: string }>(
     "/auth/request-password-reset",
     {
       method: "POST",
@@ -102,22 +112,18 @@ const requestReset = async () => {
     }
   )
 
-  // If error occurred
   if (error.value) {
     toast.add({
-      title: error.value?.data?.message,
+      title: "Something went wrong. Please try again.",
       color: "red",
       icon: "i-bx-error",
     })
   } else {
     toast.add({
-      title:
-        data.value?.data ||
-        `Password reset email sent to ${email.value}. Check your inbox.`,
+      title: successMessage(email.value),
       color: "green",
       icon: "i-bx-check-circle",
     })
-    // Optionally navigate to login or stay
   }
   loading.value = false
 }

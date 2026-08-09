@@ -8,6 +8,7 @@ export interface User {
   _id: string
   fullname: string
   email: string
+  phone?: string
   role: string
   avatar: string
   theme: string
@@ -28,6 +29,12 @@ export interface Church {
   type: string
   address: string
   pastor: string
+  logo?: string
+  branch?: string
+  isNotAChurch?: boolean
+  howYouFoundUs?: string
+  createdAt: string
+  updatedAt: string
   userIds?: string[]
   users: User[]
   storageUsed?: number
@@ -77,10 +84,9 @@ export const useAuthStore = defineStore('auth', {
       const appStore = useAppStore()
       const { isTauri } = useTauri()
 
-      // Clear token based on environment
-      if (isTauri) {
-        this.token = null
-      } else {
+      this.token = null
+
+      if (!isTauri) {
         const cookie = useCookie('token')
         cookie.value = undefined
       }

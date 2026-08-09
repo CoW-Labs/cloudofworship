@@ -6,96 +6,52 @@
 
     <!-- FILES TAB -->
     <div v-if="activeTab === 0" class="collector-ctn flex flex-col gap-3 mt-4">
-      <div
-        class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
-      >
-        <IconWrapper
-          name="i-bx-info-circle"
-          size="4"
-          class="text-primary-500"
-        />
-        <div class="flex-1">
-          <h4 class="text-md font-semibold">
-            Add image, video or audio slides
-          </h4>
-          <p class="text-sm">
-            You can now add files by dragging and dropping them here or by
-            copying and pasting them from your file explorer.
-          </p>
-        </div>
-      </div>
+      <Hint title="Add image, video or audio slides">
+        You can now add files by dragging and dropping them here or by copying
+        and pasting them from your file explorer.
+      </Hint>
 
       <FileDropzone
         :maxFileSize="maxFileSize"
         :maxVideoFileSize="maxVideoFileSize"
+        accept="video/*,image/*,audio/*"
+        description="image, video or audio files."
         @change="onDropzoneChange"
       />
-      <label v-if="isTauri" class="flex flex-col center text-center">
-        <div
-          class="text-center w-full mx-auto px-2 py-2 mt-1 bg-primary-500 rounded-md flex items-center text-primary-500 cursor-pointer gap-1 border border-primary-500 bg-transparent"
-        >
-          <IconWrapper name="i-bx-folder-open" size="5" />
-          Choose files
-        </div>
-        <input
-          type="file"
-          class="invisible"
-          accept="video/*,image/*,audio/*"
-          multiple
-          @change="onDropzoneChange(($event.target as HTMLInputElement)?.files || [])"
-        />
-      </label>
     </div>
 
     <!-- YOUTUBE/VIMEO TAB -->
     <div v-if="activeTab === 1" class="collector-ctn flex flex-col gap-3 mt-4">
-      <div
-        class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
-      >
-        <IconWrapper
-          name="i-bx-info-circle"
-          size="4"
-          class="text-primary-500"
-        />
-        <div class="flex-1">
-          <h4 class="text-md font-semibold">Add YouTube or Vimeo videos</h4>
-          <p class="text-sm">
-            Paste a YouTube or Vimeo URL below to add external videos to your
-            schedule.
-          </p>
-        </div>
-      </div>
+      <Hint title="Add YouTube or Vimeo videos">
+        Paste a YouTube or Vimeo URL below to add external videos to your
+        schedule.
+      </Hint>
 
       <!-- YouTube/Vimeo URL Input -->
       <div class="flex flex-col gap-2">
-        <UInput
-          v-model="externalVideoUrl"
-          placeholder="Paste YouTube or Vimeo URL here..."
-          class="flex-1"
-          size="lg"
-          icon="i-bx-link"
-        />
-        <UButton
+        <CowInput v-model="externalVideoUrl" label="YouTube or Vimeo URL" />
+        <CowButton
+          variant="primary"
           @click="addExternalVideo"
           :disabled="!externalVideoUrl"
-          icon="i-bx-plus"
           size="lg"
           class="justify-center mt-1"
         >
           Add external video
-        </UButton>
+        </CowButton>
       </div>
     </div>
     <!-- PREVIEW AND CREATE BUTTON -->
     <div v-if="fileObjs?.length > 0" class="preview-ctn flex flex-col mt-8">
-      <UButton
-        class="mb-2 w-[100%] flex justify-between"
-        trailing-icon="i-bx-chevron-right"
+      <CowButton
+        variant="primary"
+        class="mb-2"
+        block
         @click="addMediaEmitter"
         size="lg"
         >Create {{ fileObjs?.length }} Slide{{
           fileObjs?.length > 1 ? "s" : ""
-        }}</UButton
+        }}</CowButton
       >
       <Transition name="fade-sm">
         <div
@@ -217,7 +173,7 @@
             <div
               class="bg-primary-800 opacity-0 absolute inset-0 flex items-center justify-center rounded-md group-hover:opacity-90 transition-all"
             >
-              <IconWrapper name="i-bx-trash" size="8" class="text-white" />
+              <DeleteIcon class="w-8 h-8 text-white" />
             </div>
           </div>
         </div>
@@ -235,14 +191,12 @@ const props = defineProps<{
   initialTab?: number
 }>()
 
-const { isTauri } = useTauri()
 const authStore = useAuthStore()
-const { isTeamsPlan, isFreePlan } = useSubscription()
 
-// Free plan: 3MB soft-limit for images; Teams plan: larger (10MB) allowed
-const maxFileSize = computed(() => (isFreePlan.value ? 3 : 10))
-// Videos: 250MB cap for non-teams plans; Teams plan has no limit
-const maxVideoFileSize = computed(() => (isTeamsPlan.value ? Infinity : 250))
+// Local limits are capacity-based. Cloud subscription limits remain enforced
+// independently by the upload API.
+const maxFileSize = computed(() => Infinity)
+const maxVideoFileSize = computed(() => Infinity)
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const files = ref()
 const emit = defineEmits(["close"])
@@ -476,7 +430,7 @@ const addMediaEmitter = () => {
         url: fileObj.url,
         thumbnail: fileObj.thumbnail,
         isExternal: true,
-      } as ExtendedFileT & { isExternal: boolean }
+      } as unknown as ExtendedFileT & { isExternal: boolean }
     }
 
     // Fresh object URL from the original blob — the cached preview URL is

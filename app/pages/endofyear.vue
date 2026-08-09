@@ -299,13 +299,13 @@ const reformedData = computed(() => {
     const churchName = `<span class="text-primary-300 font-semibold">${
       church?.type || church?.name || "Church"
     }</span>`
-    const churchCreationDate =
-      church?.createdAt || user?.createdAt
-        ? new Date(church?.createdAt || user?.createdAt).toLocaleDateString(
-            "en-US",
-            { month: "long", year: "numeric" }
-          )
-        : "2025"
+    const creationDateSource = church?.createdAt || user?.createdAt
+    const churchCreationDate = creationDateSource
+      ? new Date(creationDateSource).toLocaleDateString("en-US", {
+          month: "long",
+          year: "numeric",
+        })
+      : "2025"
     maintext = maintext.replace(/May 2025/g, churchCreationDate)
     subtext = subtext.replace(/May 2025/g, churchCreationDate)
     maintext = maintext.replace(/{{church_name}}/g, churchName)

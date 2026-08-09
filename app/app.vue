@@ -1,6 +1,8 @@
 <template>
   <div class="dark:bg-gray-900">
-    <NuxtLoadingIndicator />
+    <NuxtLoadingIndicator
+      color="repeating-linear-gradient(to right, #A855F7 0%, #8946C9 50%, #A855F7 100%)"
+    />
     <NuxtLayout :app-version="appVersion">
       <NuxtPage />
       <UNotifications>

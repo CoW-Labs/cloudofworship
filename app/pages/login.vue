@@ -1,86 +1,80 @@
 <template>
-  <div class="login-main section">
-    <div class="header flex flex-col items-center text-center mb-12">
-      <Logo class="w-28 h-28" />
-      <p class="max-w-[200px] mx-auto">
-        Log in to continue with
-        <span class="font-semibold">Cloud of Worship</span>
+  <div class="w-full">
+    <div class="flex flex-col items-center text-center mb-8 come-up-1">
+      <Logo class="w-32 h-32 mb-12" />
+      <h1
+        class="text-[2.5rem] lg:text-[2rem] xl:text-[2.5rem] leading-none font-bold mb-3"
+      >
+        Welcome back
+      </h1>
+      <p
+        class="text-gray-500 dark:text-gray-400 text-[15px] lg:text-[13px] xl:text-[15px] max-w-[20rem]"
+      >
+        Lyrics, scripture, slides, no install required. <br />
+        Trusted by
+        <span class="font-semibold text-gray-900 dark:text-white">3,000+</span>
+        churches.
       </p>
     </div>
-    <form class="flex flex-col gap-3 max-w-[325px] mx-auto" @submit="login">
-      <UFormGroup size="lg">
-        <UInput placeholder="Your email" v-model="email" />
-      </UFormGroup>
-      <UFormGroup size="lg">
-        <div class="flex relative">
-          <UInput
-            placeholder="Your password"
-            :type="passwordType"
-            class="w-[100%]"
-            v-model="password"
-            @update:model-value="passwordInputHover = true"
-            @blur="passwordInputHover = false"
-          />
-          <UButton
-            class="absolute right-0 top-0 bottom-0 dark:hover:bg-primary-300"
-            color="gray"
-            variant="ghost"
-            size="sm"
-            @click="
-              passwordType === 'password'
-                ? (passwordType = 'text')
-                : (passwordType = 'password')
-            "
-          >
-            <IconWrapper
-              size="5"
-              :name="
-                passwordType === 'password'
-                  ? 'i-tabler-eye'
-                  : 'i-tabler-eye-off'
-              "
-              dark-text
-            />
-          </UButton>
-        </div>
-        <UButton
-          size="sm"
-          class="p-1 w-full justify-center mt-2"
-          variant="link"
-          to="/forgot-password"
-        >
-          I can't remember my password
-        </UButton>
-      </UFormGroup>
 
-      <UButton
-        block
-        size="lg"
-        class="mt-6"
-        type="submit"
-        :disabled="!(useValidEmail(email) && password.length >= 8)"
-        :loading="loading"
-      >
-        Log In
-      </UButton>
-      <UButton
+    <form class="flex flex-col gap-3.5 come-up-2" @submit.prevent="login">
+      <CowButton
         v-if="!isTauri"
+        variant="secondary"
         block
-        size="lg"
-        class="mt-0"
-        color="white"
         type="button"
         :loading="googleLoading"
         @click="handleGoogleSignIn"
       >
-        <GoogleIcon />
-        Sign in with Google
-      </UButton>
-      <p class="text-sm flex items-center justify-center gap-0">
-        I don't have an account.
-        <UButton size="sm" class="p-1" variant="link" to="/signup" type="button"
-          >Create an account</UButton
+        <GoogleIcon class="w-5 h-5" />
+        Continue with Google
+      </CowButton>
+
+      <div
+        v-if="!isTauri"
+        class="flex items-center gap-4 my-1 text-gray-500 text-sm"
+      >
+        <span class="h-px flex-1 bg-gray-200 dark:bg-gray-700/70" />
+        Or
+        <span class="h-px flex-1 bg-gray-200 dark:bg-gray-700/70" />
+      </div>
+
+      <CowInput label="Email address" type="email" v-model="email" />
+
+      <CowInput
+        label="Your password"
+        type="password"
+        v-model="password"
+        :error="errorMsg"
+      >
+        <template #hint>
+          <NuxtLink
+            to="/forgot-password"
+            class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            Forgot password?
+          </NuxtLink>
+        </template>
+      </CowInput>
+
+      <CowButton
+        block
+        type="submit"
+        class="mt-3"
+        :disabled="!(useValidEmail(email) && password.length >= 8)"
+        :loading="loading"
+      >
+        Continue
+      </CowButton>
+
+      <p class="text-sm text-center text-gray-500 dark:text-gray-400">
+        New here?
+        <NuxtLink
+          to="/signup"
+          class="text-primary-500 dark:text-primary-400 font-medium hover:underline"
         >
+          Create an account.
+        </NuxtLink>
       </p>
     </form>
   </div>
@@ -138,15 +132,19 @@ const { isTauri } = useTauri()
 const toast = useToast()
 const email = ref("")
 const password = ref("")
-const passwordType = ref("password")
-const passwordInputHover = ref(false)
+const errorMsg = ref("")
 const loading = ref(false)
 const googleLoading = ref(false)
 const { token } = useAuthToken()
 const { appVersion } = useAppVersion()
 
-const login = async (event) => {
-  event.preventDefault()
+watch([email, password], () => {
+  errorMsg.value = ""
+})
+
+const login = async (event?: Event) => {
+  event?.preventDefault()
+  errorMsg.value = ""
   loading.value = true
 
   try {
@@ -172,16 +170,15 @@ const login = async (event) => {
         error: error.value?.data?.message,
       })
 
-      toast.add({
-        title: error.value?.data?.message,
-        color: "red",
-        icon: "i-bx-error",
-      })
+      errorMsg.value = error.value?.data?.message || "Something went wrong"
     } else {
       if (
         !data.value?.data?.user?.emailVerified &&
         new Date().getTime() > new Date(inaccessibleDate).getTime()
       ) {
+        token.value = data.value?.token
+        authStore.setUser(data.value?.data?.user!!)
+
         // If account is no longer accessible and user is not verified
         usePosthogCapture("LOGIN_FAILED", {
           method: "email_password",
@@ -190,11 +187,12 @@ const login = async (event) => {
         })
 
         toast.add({
-          title: "Account is no longer accessible. Verify your email to proceed",
+          title:
+            "Account is no longer accessible. Verify your email to proceed",
           color: "red",
           icon: "i-bx-error",
         })
-        navigateTo("/verify")
+        navigateTo("/verify?newUser=1")
       } else {
         token.value = data.value?.token
         authStore.setUser(data.value?.data?.user!!)
@@ -207,7 +205,8 @@ const login = async (event) => {
         })
 
         if (data.value?.data?.user?.emailVerified) {
-          navigateTo("/")
+          const hasChurch = !!data.value?.data?.user?.churchId
+          navigateTo(hasChurch ? "/" : "/signup?registerChurch=1")
         } else {
           goToVerify()
         }
@@ -278,7 +277,12 @@ const handleGoogleSignIn = async () => {
         email: user?.email,
         emailVerified: data.value?.data?.user?.emailVerified,
       })
-      navigateTo("/")
+      if (data.value?.data?.user?.emailVerified) {
+        const hasChurch = !!data.value?.data?.user?.churchId
+        navigateTo(hasChurch ? "/" : "/signup?registerChurch=1")
+      } else {
+        goToVerify()
+      }
     }
   } catch (error: any) {
     usePosthogCapture("LOGIN_FAILED", {

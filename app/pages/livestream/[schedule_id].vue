@@ -101,6 +101,7 @@
     </div> -->
 
     <LiveProjectionOnly
+      v-if="liveSlide"
       :content-visible="true"
       :id="liveSlide?.id"
       :full-screen="true"
@@ -116,7 +117,7 @@
 </template>
 <script setup lang="ts">
 import type { Emitter } from "mitt"
-import type { BackgroundVideo, Media, Slide } from "~/types"
+import type { BackgroundVideo, Slide } from "~/types"
 import { useAppStore } from "@/store/app"
 import { useOnline } from "@vueuse/core"
 const appStore = useAppStore()
@@ -130,7 +131,8 @@ const loadingResources = ref<boolean>(true)
 const online = useOnline()
 const downloadStep = ref<number>(0)
 const cachedVideosURLs = ref<BackgroundVideo[]>()
-const db = useIndexedDB()
+const localMedia = useLocalMediaStorage()
+const { rehydrateSlideMedia, prefetchScheduleMedia } = useSlideMediaCache()
 const connectionStatus = ref<
   "connecting" | "connected" | "disconnected" | "failed"
 >("connecting")
@@ -163,28 +165,10 @@ onMounted(() => {
 })
 
 const saveAllBackgroundVideos = async () => {
-  // Use Promise.all to fetch all videos in parallel - non-blocking
   const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
-  const savedVideos = await Promise.all(
-    videoIds.map((id) => db.cached.get(`/video-bg-${id}.mp4`))
+  const savedKeys = new Set(
+    (await localMedia.listRecords()).map((record) => record.key)
   )
-
-  const savedBgVideoMap = new Map(
-    videoIds.map((id, index) => [id, savedVideos[index]])
-  )
-
-  const saveBackground = (blob: any, index: number) => {
-    const tempMedia = {
-      id: `/video-bg-${index}.mp4`,
-      data: blob,
-      content: "video",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    db.cached
-      .add(tempMedia)
-      .catch((err) => console.error(`Failed to save video-bg-${index}:`, err))
-  }
 
   downloadResource.value = "background videos"
 
@@ -200,34 +184,37 @@ const saveAllBackgroundVideos = async () => {
     10: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-10.mp4?v=v1",
   }
 
-  const videoDownloadPromises = videoIds
-    .filter((id) => !savedBgVideoMap.get(id))
-    .map(async (id) => {
-      const bgVideoPromise = await useDetailedFetch(
-        videoUrlMap[id],
-        downloadProgress
-      )
-      const bgVideoBlob = await bgVideoPromise.blob()
-      saveBackground(bgVideoBlob, id)
-    })
+  const missingVideoIds = videoIds.filter(
+    (id) => !savedKeys.has(`/video-bg-${id}.mp4`)
+  )
 
-  // Process in batches to avoid blocking
   const batchSize = 2
-  for (let i = 0; i < videoDownloadPromises.length; i += batchSize) {
-    const batch = videoDownloadPromises.slice(i, i + batchSize)
-    await Promise.all(batch)
+  for (let i = 0; i < missingVideoIds.length; i += batchSize) {
+    await Promise.all(
+      missingVideoIds.slice(i, i + batchSize).map(async (id) => {
+        await localMedia.downloadToLocal({
+          key: `/video-bg-${id}.mp4`,
+          groupId: `/video-bg-${id}.mp4`,
+          category: "preset",
+          kind: "video",
+          url: videoUrlMap[id]!,
+          mimeType: "video/mp4",
+          recoverable: true,
+          onProgress: (fraction) => {
+            if (Number.isFinite(fraction)) {
+              downloadProgress.value = (fraction * 100).toFixed(2)
+            }
+          },
+        })
+      })
+    )
   }
 }
 
 const setCachedVideosURL = async () => {
-  const cachedVideos = (await useBackgroundVideos()) as Media[]
-  const tempCachedVideos = cachedVideos?.map((cached: Media) => ({
-    id: cached?.id,
-    url: URL.createObjectURL(cached?.data as Blob),
-  }))
-  cachedVideosURLs.value = tempCachedVideos as BackgroundVideo[]
-  // console.log(tempCachedVideosURLs)
-  appStore.setBackgroundVideos(tempCachedVideos)
+  const cachedVideos = await useBackgroundVideos()
+  cachedVideosURLs.value = cachedVideos
+  appStore.setBackgroundVideos(cachedVideos)
 }
 
 const updateBlobBackgroundURl = (slide: Slide) => {
@@ -248,19 +235,21 @@ const updateBlobBackgroundURls = (slides: Slide[]) => {
   return slides?.map((slide) => updateBlobBackgroundURl(slide))
 }
 
-const handleWebSocketMessage = (parsedData: any) => {
-  const { data, action, message } = parsedData
+const localizeSlide = async (slide: Slide) =>
+  await rehydrateSlideMedia(updateBlobBackgroundURl({ ...slide }), {
+    allowDownload: true,
+  })
+
+const handleWebSocketMessage = async (parsedData: any) => {
+  const { data, action } = parsedData
 
   switch (action) {
     case "connected":
       // Only process if data contains slides array
       if (Array.isArray(data)) {
-        updateBlobBackgroundURls(data)
+        const slides = updateBlobBackgroundURls(data)
+        await prefetchScheduleMedia(slides, currentState.value.liveSlideId)
       }
-      break
-    case "live-slide":
-      const tempSlide = updateBlobBackgroundURl({ ...data })
-      liveSlide.value = { ...tempSlide }
       break
     case "new-slide":
     case "slide-created":
@@ -275,8 +264,24 @@ const handleWebSocketMessage = (parsedData: any) => {
         liveSlide.value?.id === data.slideId
       ) {
         // Create a new object to trigger Vue reactivity
-        const slideData = updateBlobBackgroundURl({ ...data })
+        const slideData = await localizeSlide({ ...data })
         liveSlide.value = { ...slideData }
+      }
+      if (
+        appStore.currentState.activeOverlaySlide?.id === data.id ||
+        appStore.currentState.activeOverlaySlide?.id === data.slideId
+      ) {
+        appStore.setActiveOverlaySlide(await localizeSlide({ ...data }))
+      }
+      break
+    case "delete-slide":
+    case "slide-deleted":
+      if (
+        appStore.currentState.activeOverlaySlide?.id === data.slideId ||
+        appStore.currentState.activeOverlaySlide?.id === data.id ||
+        appStore.currentState.activeOverlaySlide?._id === data._id
+      ) {
+        appStore.setActiveOverlaySlide(null)
       }
       break
     case "add-alert":
@@ -291,6 +296,12 @@ const handleWebSocketMessage = (parsedData: any) => {
     case "remove-overlay":
       appStore.setActiveOverlay("")
       break
+    case "show-slide-overlay":
+      appStore.setActiveOverlaySlide(await localizeSlide({ ...data }))
+      break
+    case "remove-slide-overlay":
+      appStore.setActiveOverlaySlide(null)
+      break
     case "updated-slides":
       break
     default:
@@ -304,7 +315,7 @@ const socketManager = useSocketIO({
   baseRetryDelay: 1000,
   maxRetryDelay: 30000,
   connectionTimeout: 10000,
-  onMessage: (event, data) => handleWebSocketMessage(data),
+  onMessage: (event, data) => void handleWebSocketMessage(data),
   onConnected: () => {
     connectionStatus.value = "connected"
     showConnectionError.value = false

@@ -1,25 +1,16 @@
 <template>
   <div class="select-menu-ctn w-[120px]">
-    <USelectMenu
+    <CowSelectMenu
       class="border-0 shadow-none"
       searchable
       searchable-placeholder="Search fonts"
-      select-class="border-3 shadow-none outline-none text-center text-primary-500 w-[120px] h-10 bg-primary-100 dark:bg-primary-900 dark:text-primary-400"
+      select-class="border-0 shadow-none outline-none text-center rounded-full w-[120px] h-10 bg-gray-100 dark:bg-[#222938] text-gray-600 dark:text-[#a7afbd]"
       size="md"
       :options="fonts"
       v-model="font"
       variant="none"
-      color="primary"
+      color="gray"
       clear-search-on-close
-      :ui="{
-        base: 'bg-primary-500',
-        input: 'bg-primary-500',
-        color: {
-          primary: {
-            outline: 'shadow-sm bg-primary-500 ',
-          },
-        },
-      }"
       :ui-menu="{
         width: 'w-[140px]',
         input: 'text-xs',
@@ -53,7 +44,7 @@
         >
         <span v-else>Select font</span>
       </template>
-    </USelectMenu>
+    </CowSelectMenu>
   </div>
 </template>
 

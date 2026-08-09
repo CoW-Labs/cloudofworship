@@ -1,0 +1,84 @@
+Area,Test Case,Steps,Expected Result,Priority,Notes
+Auth Layout,Split layout renders on desktop,"1. Open /login on a screen ≥1024px wide
+2. Observe left and right panels","Left panel shows collage (AuthCollageContainer); right panel shows form",High,
+Auth Layout,Centered layout has no left panel,"1. Open /forgot-password or /reset-password
+2. Observe page","No collage panel; form is centred in full width",High,authVariant: centered is set in page meta
+Auth Layout,Left panel hidden on mobile,"1. Open /login on viewport < 1024px
+2. Observe","No left collage panel visible; form takes full width",High,
+Auth Layout,Dark mode applies to layout,"1. Enable dark mode
+2. Open any auth page","Background switches to #0b1120; text to near-white",Medium,
+Auth Layout,Collage switches to MultiplayerDemo at signup step 3+,"1. Start signup flow
+2. Progress to step 3","Left panel transitions from collage to MultiplayerDemoContainer",High,useSignupVisualState drives this
+Auth Collage,Collage images scroll automatically,"1. Open /login on desktop
+2. Wait 2–3 s","Columns animate; odd columns scroll down, even columns scroll up",Medium,
+Auth Collage,Clicking a tile opens modal,"1. Open /login on desktop
+2. Click any collage tile","Image expands into a modal overlay with close button",Medium,
+Auth Collage,Modal closes on backdrop click,"1. Open collage modal
+2. Click outside the card","Modal closes; collage resumes",Medium,
+Auth Collage,Modal closes on Escape key,"1. Open collage modal
+2. Press Escape","Modal closes",Low,
+Login,Page loads with correct heading,"1. Navigate to /login","'Welcome back' heading visible; sub-copy includes '3000+ churches'",High,
+Login,Google Sign-In button visible and clickable (non-Tauri),"1. Open /login in browser (not desktop app)
+2. Observe and click Google button","Button 'Continue with Google' visible; Google OAuth flow initiates",High,Button hidden in Tauri
+Login,Google button hidden in Tauri,"1. Open /login in desktop app","Google button not rendered",Medium,Uses isTauri flag
+Login,Email and password fields accept input,"1. Type in Email address field
+2. Type in Your password field","Fields update; no console errors",High,
+Login,Continue button disabled until valid credentials,"1. Enter invalid email and short password","Button remains disabled",High,Requires valid email + password >= 8 chars
+Login,Continue button enabled with valid credentials,"1. Enter a valid email
+2. Enter a password ≥ 8 chars","Button becomes enabled",High,
+Login,Inline error shown on failed login,"1. Enter wrong password for a real account
+2. Submit","Error message appears inline below password field (not a toast)",High,Changed from toast to inline errorMsg
+Login,Error clears when user retypes,"1. Trigger an inline error
+2. Change either email or password field","Error message disappears",Medium,watch([email password]) clears errorMsg
+Login,Successful login redirects to / when church exists,"1. Log in with an account that has a churchId","Redirected to /",High,
+Login,Successful login redirects to /signup?registerChurch=1 when no church,"1. Log in with an account that has no churchId","Redirected to /signup?registerChurch=1",High,New post-login routing logic
+Login,Unverified user redirected to /verify?newUser=1,"1. Log in with an account whose emailVerified is false","Redirected to /verify?newUser=1",High,
+Login,Forgot password link visible,"1. Open /login","'Forgot password?' link shown inside password field hint slot",Medium,
+Forgot Password,Page loads with correct heading,"1. Navigate to /forgot-password","'Forgot password?' heading; description text visible; centered layout",High,
+Forgot Password,Success message is vague (no email enumeration),"1. Submit a non-existent email","Toast says 'If an account exists for <email>, a password reset email will be sent...'",High,Security: avoids confirming email exists
+Forgot Password,Success message shown for valid email too,"1. Submit a real account email","Same vague toast message (identical wording)",High,
+Forgot Password,Error toast shows generic message on failure,"1. Simulate network error (offline)
+2. Submit email","Toast says 'Something went wrong. Please try again.' (not the raw API error)",Medium,Changed from raw API error
+Forgot Password,Back to login link works,"1. Click 'Log in' link","Navigated to /login",Low,
+Reset Password,Page detects missing URL params,"1. Navigate to /reset-password with no token or email query params","'Missing required information' message shown with 'Request new link' button",High,New hasResetParams guard
+Reset Password,Request new link button navigates to forgot-password,"1. Land on reset-password with bad/missing params
+2. Click 'Request new link'","Navigated to /forgot-password",Medium,
+Reset Password,Form shown when params are valid,"1. Navigate to /reset-password?email=x@x.com&token=abc","Password and confirm password fields rendered",High,
+Reset Password,Confirm password error shown on mismatch,"1. Enter a password
+2. Enter a different confirm password","'Passwords do not match' error appears below confirm field",High,
+Reset Password,Confirm error clears when passwords match,"1. Trigger mismatch error
+2. Correct the confirm field","Error disappears",Medium,
+Reset Password,Submit disabled until password valid and matching,"1. Enter valid password
+2. Leave confirm field empty or mismatched","Continue button disabled",High,
+Reset Password,Successful reset shows toast and redirects to login,"1. Submit valid matching password with correct token","Success toast; navigated to /login",High,
+Reset Password,Password rule requires letter + number,"1. Enter a password like '12345678' (all numbers)","Button stays disabled; no letter present",Medium,Regex changed from strict uppercase requirement to just letter+digit
+Signup (New Account),Full name required for Continue,"1. Go to /signup
+2. Leave full name blank
+3. Fill email and password","Continue button remains disabled",High,fullName.trim() now required
+Signup (New Account),All fields required before submit enabled,"1. Fill name + valid email + valid password","Continue button becomes enabled",High,
+Signup (New Account),Google signup button visible,"1. Open /signup","'Sign up with Google' or similar button visible",High,
+Signup (New Account),Promotional toast removed,"1. Complete signup","No 'Still not convinced?' toast appears",Medium,Was removed from the code
+Signup (New Account),Successful signup + verified email → / with newUser param,"1. Sign up with a pre-verified email","Navigated to /?newUser=1",High,
+Signup (New Account),Successful signup + unverified email → /verify?newUser=1,"1. Sign up normally","Navigated to /verify?newUser=1",High,
+Signup (Church ID),church_id param handled for array type,"1. Open /signup/[church_id] where church_id could be an array","No JS error; getChurchId() returns first element",Medium,Edge case from router
+Signup (Church ID),Missing church_id exits early,"1. Open /signup/ with no ID","Loading stops; no API call made",Medium,
+Signup (Church ID),Verified user after church signup → /?newUser=1,"1. Sign up via church invite link with pre-verified account","Navigated to /?newUser=1",High,
+Logout,/logout page shows signing out message,"1. Navigate to /logout","'Signing out' heading visible briefly",High,New dedicated page
+Logout,/logout calls authStore.signOut on mount,"1. Navigate to /logout","Session cleared; redirected to login (authStore.signOut handles nav)",High,
+Logout,/logout uses centered layout,"1. Open /logout","No collage panel; centered layout",Low,
+Verify,Verified user visiting /verify is redirected to /,"1. Log in with a verified account
+2. Navigate manually to /verify","Redirected to /",High,New guard in middleware
+Auth Middleware,Unauthenticated user redirected from protected route,"1. Clear cookies/token
+2. Navigate to /","Redirected to /login",High,
+Auth Middleware,Unauthenticated user can access /login /signup /forgot-password /reset-password,"1. Clear cookies/token
+2. Navigate to each auth path","Page loads without redirect",High,
+Auth Middleware,Unauthenticated user can access /live /offline /endofyear /logout,"1. Clear cookies/token
+2. Navigate to each public path","Page loads without redirect",High,
+Auth Middleware,Authenticated user redirected away from auth pages,"1. Log in
+2. Navigate to /login or /signup","Redirected to /",High,
+Auth Middleware,Authenticated user with registerChurch query stays on signup,"1. Log in with account that has no churchId
+2. Navigate to /signup?registerChurch=1","Page loads; no redirect",High,Exception carved out in middleware
+Auth Middleware,Authenticated user with no church redirected to register step,"1. Log in with account where churchId is null
+2. Navigate to /","Redirected to /signup?registerChurch=1",High,New middleware rule
+Auth Store,setUser persists user data,"1. Log in
+2. Reload page","User info still present from localStorage",High,

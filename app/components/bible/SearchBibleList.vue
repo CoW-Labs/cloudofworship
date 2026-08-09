@@ -1,118 +1,98 @@
 <template>
-  <div class="search-bible-main min-h-[80vh] h-[100%]" ref="quickActions">
-    <div class="flex gap-2">
-      <UInput
-        icon="i-bx-search"
-        :placeholder="getPlaceholderByFilter()"
-        v-model="searchInput"
-        class="w-[100%]"
-        @input="onSearchInput"
-        @input.capture="loading = true"
-        @keyup.enter="getVerses($event.target.value)"
-      />
-      <UButton icon="i-bx-x" color="primary" @click="$emit('close')"></UButton>
-    </div>
-
-    <!-- CHIP GROUP -->
+  <div
+    class="search-bible-main min-h-[80vh] h-[100%] flex flex-col"
+    ref="quickActions"
+  >
     <div
-      class="button-row flex flex-nowrap my-4 gap-1 pb-2"
-      v-if="!shouldUseOnlineSearch"
+      class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1.5 flex flex-col flex-1 min-h-0"
     >
-      <UButton
-        :variant="selectedFilter === 'old' ? 'solid' : 'outline'"
-        @click="selectedFilter = 'old'"
-      >
-        Old Test...
-      </UButton>
-      <UButton
-        :variant="selectedFilter === 'new' ? 'solid' : 'outline'"
-        @click="selectedFilter = 'new'"
-      >
-        New Test...
-      </UButton>
-      <USelectMenu
-        :variant="
-          selectedFilter === '' ||
-          selectedFilter === 'old' ||
-          selectedFilter === 'new'
-            ? 'outline'
-            : 'solid' as SelectVariant
-        "
-        color="black"
-        placeholder="Bible book"
-        v-model="selectedFilter"
-        searchable
-        :ui="{
-          variant: {
-            outline:
-              'focus:ring-0 ring-0 text-primary font-medium border border-primary shadow-none',
-            solid:
-              'focus:ring-0 ring-0 text-white font-medium border-0 shadow-none bg-primary-500',
-          },
-        }"
-        :options="bibleBooks"
-      >
-        <template #label>
-          <span
-            v-if="
-              selectedFilter?.length &&
-              !(
-                selectedFilter === '' ||
-                selectedFilter === 'old' ||
-                selectedFilter === 'new'
-              )
-            "
-            class="truncate w-12 lg:max-w-20"
-            >{{ selectedFilter }}</span
-          >
-          <span v-else>Book</span>
-        </template>
-      </USelectMenu>
-    </div>
+      <div class="flex gap-2">
+        <UInput
+          :placeholder="getPlaceholderByFilter()"
+          v-model="searchInput"
+          class="w-[100%] cow-search-input"
+          @input="onSearchInput"
+          @input.capture="loading = true"
+          @keyup.enter="getVerses($event.target.value)"
+        >
+          <template #leading>
+            <SearchIcon class="w-4 h-4 text-gray-400 dark:text-[#9aa3b2]" />
+          </template>
+        </UInput>
+        <CowButton
+          variant="secondary"
+          size="2xs"
+          class="!px-2.5 !py-0 max-h-[40px] rounded-lg"
+          @click="$emit('close')"
+        >
+          <CloseIcon class="w-4 h-4" />
+        </CowButton>
+      </div>
 
-    <div
-      v-if="loading"
-      class="actions-ctn mt-2 overflow-y-auto"
-      :class="
-        shouldUseOnlineSearch
-          ? 'max-h-[calc(100vh-200px)]'
-          : 'max-h-[calc(100vh-260px)]'
-      "
-    >
-      <USkeleton
-        v-for="i in 15"
-        :key="i"
-        class="w-[100%] h-[80px] mt-2"
-      ></USkeleton>
-    </div>
-    <template v-else>
-      <!-- SEARCHING BIBLE VERSES -->
+      <!-- CHIP GROUP -->
       <div
-        class="actions-ctn mt-2 overflow-y-auto"
+        class="button-row flex flex-nowrap items-center mt-2 gap-2 pb-1"
+        v-if="!shouldUseOnlineSearch"
+      >
+        <UTabs
+          :items="testamentTabs"
+          v-model:model-value="testamentTabIndex"
+          size="sm"
+        />
+        <!-- <CowDropdown
+          label="Bible book"
+          class="flex-1"
+          :model-value="isBookFilterSelected ? selectedFilter : ''"
+          @update:model-value="selectedFilter = $event"
+          :searchable="true"
+          :options="bibleBooks"
+        /> -->
+      </div>
+
+      <div
+        v-if="loading"
+        class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto"
         :class="
           shouldUseOnlineSearch
             ? 'max-h-[calc(100vh-200px)]'
             : 'max-h-[calc(100vh-260px)]'
         "
       >
-        <ActionCard
-          v-for="(verse, index) in verses"
-          :key="`verse ${index}`"
-          :action="turnToBibleTypeAction(verse)"
-          type="bible"
-          action-suffix="whole-search"
-          :class="{
-            'bg-primary-50 dark:bg-primary-800 rounded-md':
-              index === focusedActionIndex,
-          }"
-          @click="focusedActionIndex = index"
-        >
-          <template v-if="searchInput?.length >= 2" #desc>
-            <span v-html="highlightText(verse.scripture, searchInput)" />
-          </template>
-        </ActionCard>
+        <CowSkeleton variant="row" :count="15" />
       </div>
-    </template>
+      <template v-else>
+        <!-- SEARCHING BIBLE VERSES -->
+        <div
+          class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto"
+          :class="
+            shouldUseOnlineSearch
+              ? 'max-h-[calc(100vh-200px)]'
+              : 'max-h-[calc(100vh-260px)]'
+          "
+        >
+          <ActionCard
+            v-for="(verse, index) in verses"
+            :key="`verse ${index}`"
+            :ref="(el) => setItemRef(el, index)"
+            :action="turnToBibleTypeAction(verse)"
+            type="bible"
+            action-suffix="whole-search"
+            compact
+            show-subtext
+            :active="hasInteracted && index === focusedActionIndex"
+            :class="{
+              'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
+            }"
+            @click="focusedActionIndex = index"
+            @mouseenter="onRowMouseEnter(index)"
+          >
+            <template #desc>
+              <span v-html="highlightText(verse.scripture, searchInput)" />
+            </template>
+          </ActionCard>
+        </div>
+      </template>
+    </div>
   </div>
 </template>
 <script setup lang="ts">
@@ -120,7 +100,6 @@ import type { QuickAction, BibleVerse } from "~/types"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import fuzzysort from "fuzzysort"
-import type { SelectVariant } from "@nuxt/ui/dist/runtime/types"
 
 const db = useIndexedDB()
 const appStore = useAppStore()
@@ -138,10 +117,34 @@ const defaultBible = ref<BibleVerse[]>([])
 const searchInput = ref<string>("")
 const loading = ref<boolean>(false)
 const verses = ref<BibleVerse[]>()
-const searchedVerses = ref<BibleVerse[]>([])
 const focusedActionIndex = ref(0)
+// `active` is reserved for keyboard navigation. ActionCard owns hover preview
+// state so it closes when the pointer leaves both the card and its preview.
+const hasInteracted = ref(false)
+const onRowMouseEnter = (index: number) => {
+  focusedActionIndex.value = index
+  hasInteracted.value = false
+}
 const quickActions = ref<HTMLDivElement | null>(null)
-const selectedFilter = ref<string>("")
+const selectedFilter = ref<string>("old")
+const itemRefs = ref<(HTMLElement | null)[]>([])
+
+const testamentTabs = [
+  { label: "Old Testament", key: "old" },
+  { label: "New Testament", key: "new" },
+]
+
+// Two-way binding for UTabs (index ↔ selectedFilter string)
+const testamentTabIndex = computed({
+  get: () => (selectedFilter.value === "new" ? 1 : 0),
+  set: (i: number) => {
+    selectedFilter.value = i === 0 ? "old" : "new"
+  },
+})
+
+const setItemRef = (el: any, index: number) => {
+  itemRefs.value[index] = el?.$el || el || null
+}
 
 /**
  * Whether to use the online scripture search endpoint.
@@ -184,6 +187,10 @@ watch(
   }
 )
 
+const isBookFilterSelected = computed(() => {
+  return !["", "old", "new"].includes(selectedFilter.value)
+})
+
 const oldTestamentBible = computed(() => {
   return defaultBible.value.filter((b) => Number(b.book) <= 39)
 })
@@ -217,25 +224,41 @@ onMounted(() => {
     }
     switch (e.key) {
       case "ArrowDown":
-        focusedActionIndex.value < searchedVerses.value.length - 1
+        hasInteracted.value = true
+        focusedActionIndex.value < (verses.value?.length || 0) - 1
           ? (focusedActionIndex.value += 1)
           : null
         break
       case "ArrowUp":
+        hasInteracted.value = true
         focusedActionIndex.value > 0 ? (focusedActionIndex.value -= 1) : null
         break
-      case "Enter":
-        const action = searchedVerses.value?.[focusedActionIndex.value]
-        // useGlobalEmit(
-        //   action.action,
-        //   `${action.bibleBookIndex}:${bibleChapterAndVerse.value}`
-        // )
+      case "Enter": {
+        const verse = verses.value?.[focusedActionIndex.value]
+        if (!verse) return
+        const action = turnToBibleTypeAction(verse)
+        useGlobalEmit(
+          `${action.action}-whole-search`,
+          `${action.bibleBookIndex}:${action.bibleChapterAndVerse}`
+        )
         break
+      }
       default:
         return
     }
   })
   usePosthogCapture("SEARCH_BIBLE_PAGE_OPENED")
+})
+
+watch(verses, () => {
+  itemRefs.value = []
+  focusedActionIndex.value = 0
+  hasInteracted.value = false
+})
+
+watch(focusedActionIndex, async () => {
+  await nextTick()
+  itemRefs.value[focusedActionIndex.value]?.scrollIntoView({ block: "nearest" })
 })
 
 const getDefaultBible = async () => {

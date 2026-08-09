@@ -1,43 +1,39 @@
 <template>
   <div class="import-slides-main mb-4">
-    <h2 class="font-semibold text-md">Import Slides</h2>
+    <h2 class="font-semibold text-md">
+      {{
+        fileType === "ppt"
+          ? "Import Slides from PowerPoint"
+          : "Import Slides from PDF"
+      }}
+    </h2>
 
     <div class="flex flex-col gap-3 mt-3">
       <!-- Info banner -->
-      <div
-        class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
+      <Hint
+        :title="
+          fileType === 'ppt' ? 'Import PowerPoint slides' : 'Import PDF slides'
+        "
       >
-        <IconWrapper
-          name="i-bx-info-circle"
-          size="4"
-          class="text-primary-500 mt-0.5 shrink-0"
-        />
-        <div class="flex-1">
-          <h4 class="text-md font-semibold">Import PowerPoint or PDF slides</h4>
-          <p class="text-sm">
-            Each page is converted into an image and bundled into a single
-            presentation slide.
-          </p>
-          <p class="text-xs mt-2 text-gray-500 dark:text-gray-400">
-            Tip: You can export as PDF from Canva, PowerPoint, or Google Slides
-            for best results.
-          </p>
-        </div>
-      </div>
+        <p>
+          Each page is converted into an image and bundled into a single
+          presentation slide.
+        </p>
+        <p v-if="fileType === 'pdf'" class="mt-2">
+          Tip: Export as PDF from Canva, PowerPoint, or Google Slides for best
+          results.
+        </p>
+      </Hint>
 
-      <!-- PPT feature-flag notice (shown only when PPT flag is off) -->
+      <!-- PPT feature-flag notice -->
       <div
-        v-if="!isPptEnabled"
+        v-if="fileType === 'ppt' && !isPptEnabled"
         class="flex gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-sm text-amber-700 dark:text-amber-300"
       >
-        <IconWrapper
-          name="i-bx-info-circle"
-          size="4"
-          class="text-amber-500 shrink-0 mt-0.5"
-        />
+        <InfoIcon class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
         <span>
           PowerPoint upload is being refined and currently unavailable. Please
-          export your file as PDF first — it works great and is available to
+          export your file as PDF instead, it works great and is available to
           everyone.
         </span>
       </div>
@@ -63,7 +59,7 @@
         />
 
         <IconWrapper
-          name="i-ph-file-ppt"
+          :name="fileType === 'pdf' ? 'i-ph-file-pdf' : 'i-ph-file-ppt'"
           size="12"
           class="py-6 mb-4 w-full"
           rounded-bg
@@ -73,7 +69,7 @@
           <span>Drag &amp; Drop</span> or <span>Click to select</span>
         </p>
         <p class="text-sm mt-1 text-gray-500 dark:text-gray-400">
-          {{ isPptEnabled ? ".ppt, .pptx or .pdf" : ".pdf" }}
+          {{ fileType === "ppt" ? ".ppt, .pptx" : ".pdf" }}
           &nbsp;·&nbsp; max 5 MB
         </p>
       </label>
@@ -85,7 +81,7 @@
           class="flex items-center gap-2 px-3 py-2 rounded-md bg-primary-50 dark:bg-primary-900 border border-primary-200 dark:border-primary-700 text-sm"
         >
           <IconWrapper
-            :name="isPdf(selectedFile) ? 'i-ph-file-pdf' : 'i-ph-file-ppt'"
+            :name="fileType === 'pdf' ? 'i-ph-file-pdf' : 'i-ph-file-ppt'"
             size="4"
             class="text-primary-500 shrink-0"
           />
@@ -95,20 +91,20 @@
           <span class="text-gray-400 text-xs shrink-0">{{
             fileSizeLabel
           }}</span>
-          <UButton
-            icon="i-bx-x"
+          <CowButton
+            variant="secondary"
             size="2xs"
-            color="gray"
-            variant="ghost"
             class="shrink-0"
             :disabled="isConverting"
             @click.prevent="clearFile"
-          />
+          >
+            <template #leading><CloseIcon class="w-4 h-4" /></template>
+          </CowButton>
         </div>
       </Transition>
 
       <!-- Conversion progress -->
-      <Transition name="fade-sm">
+      <!-- <Transition name="fade-sm">
         <div
           v-if="isConverting"
           class="flex items-center gap-3 px-3 py-3 rounded-md bg-primary-50 dark:bg-primary-900 text-sm"
@@ -121,7 +117,7 @@
             statusMessage || "Processing…"
           }}</span>
         </div>
-      </Transition>
+      </Transition> -->
 
       <!-- Error -->
       <Transition name="fade-sm">
@@ -151,9 +147,9 @@
       </div>
 
       <!-- CTA -->
-      <UButton
+      <CowButton
+        variant="primary"
         block
-        trailing-icon="i-bx-chevron-right"
         size="lg"
         class="mt-2"
         :disabled="!selectedFile || isConverting"
@@ -161,32 +157,53 @@
         @click="handleImport"
       >
         Import presentation slide
-      </UButton>
+      </CowButton>
     </div>
 
     <!-- Feature Introduction Modal -->
     <FeatureIntroductionModal
       ref="featureIntroModal"
-      feature-key="presentation-import"
+      :feature-key="
+        fileType === 'ppt'
+          ? 'presentation-import-ppt'
+          : 'presentation-import-pdf'
+      "
       title="🎉 Import Slides"
     >
       <div
         class="flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed"
       >
-        <p>
-          You can now import presentation files directly into Cloud of Worship!
-          Each page becomes an image slide you can present right away.
+        <p v-if="fileType === 'pdf'">
+          Import PDF files directly into Cloud of Worship. Each page becomes an
+          image slide you can present right away, no uploads required, processed
+          instantly on your device.
+        </p>
+        <p v-else>
+          Import PowerPoint files directly into Cloud of Worship. Each slide
+          becomes an image you can present right away.
         </p>
 
-        <div class="bg-primary-50 dark:bg-primary-900 rounded-md p-3">
+        <div
+          v-if="fileType === 'pdf'"
+          class="bg-primary-50 dark:bg-primary-900 rounded-md p-3"
+        >
           <p class="font-semibold text-primary-700 dark:text-primary-300 mb-1">
-            We recommend the PDF route
+            Works with any presentation app
           </p>
           <p>
-            PDF imports are processed instantly on your device, meaning no
-            uploads necessary, and faster load times. You can export as PDF from
+            You can export as PDF from
             <span class="font-semibold">Canva, PowerPoint, Google Slides</span>,
             and most other presentation apps.
+          </p>
+        </div>
+
+        <div v-else class="bg-primary-50 dark:bg-primary-900 rounded-md p-3">
+          <p class="font-semibold text-primary-700 dark:text-primary-300 mb-1">
+            Best results with .pptx
+          </p>
+          <p>
+            Save your file as <span class="font-semibold">.pptx</span> from
+            PowerPoint or Google Slides for the smoothest import experience.
           </p>
         </div>
       </div>
@@ -195,14 +212,16 @@
 </template>
 
 <script setup lang="ts">
-import { useAppStore } from "~/store/app"
+import { appWideActions } from "~/utils/constants"
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
+const props = withDefaults(defineProps<{ fileType?: "ppt" | "pdf" }>(), {
+  fileType: "pdf",
+})
+
 const emit = defineEmits<{ close: [] }>()
 
-const appStore = useAppStore()
-const { createPresentationSlide } = useSlideCreation()
 const { checkFlag } = useFeatureFlags()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -216,18 +235,18 @@ const featureIntroModal = ref<{
   hasBeenSeen: () => boolean
 } | null>(null)
 
-/** Whether the PPT-conversion feature flag is enabled */
 const isPptEnabled = computed(() => checkFlag("ppt-conversion"))
 
-/** File types accepted by the file input */
 const acceptedFileTypes = computed(() => {
-  if (isPptEnabled.value) {
-    return ".ppt,.pptx,.pdf,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  if (props.fileType === "ppt" && isPptEnabled.value) {
+    return ".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  }
+  if (props.fileType === "ppt") {
+    // Flag off, accept nothing so the OS picker shows no valid files.
+    return ".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
   }
   return ".pdf,application/pdf"
 })
-
-const isPdf = (file: File) => file.type === "application/pdf"
 
 const isPpt = (file: File) =>
   file.type === "application/vnd.ms-powerpoint" ||
@@ -263,14 +282,12 @@ const setFile = (file: File) => {
   errorMessage.value = ""
   statusMessage.value = ""
 
-  // Block PPT files when the feature flag is off
   if (isPpt(file) && !isPptEnabled.value) {
     errorMessage.value =
       "PowerPoint upload is currently unavailable. Please export your file as PDF and try again."
     return
   }
 
-  // Enforce 5 MB limit
   if (file.size > MAX_FILE_SIZE) {
     errorMessage.value = "File size exceeds the 5 MB limit."
     return
@@ -286,19 +303,19 @@ const handleImport = async () => {
   errorMessage.value = ""
 
   try {
-    statusMessage.value = isPdf(selectedFile.value)
-      ? "Reading PDF…"
-      : "Converting PowerPoint to PDF…"
+    statusMessage.value =
+      props.fileType === "pdf"
+        ? "Reading PDF…"
+        : "Converting PowerPoint to PDF…"
 
     const presentationObjects = await usePowerpointToImage(selectedFile.value)
 
     statusMessage.value = `Rendered ${presentationObjects.length} page(s). Creating slide…`
-    const newSlide = createPresentationSlide(
-      selectedFile.value.name,
-      presentationObjects
-    )
-
-    appStore.appendActiveSlide(newSlide)
+    useGlobalEmit(appWideActions.newPresentation, {
+      fileName: selectedFile.value.name,
+      presentationObjects,
+      fromImport: true,
+    })
 
     emit("close")
   } catch (err: any) {
@@ -311,7 +328,6 @@ const handleImport = async () => {
   }
 }
 
-// Show feature introduction modal on first visit
 onMounted(() => {
   featureIntroModal.value?.show()
 })
