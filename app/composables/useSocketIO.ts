@@ -388,6 +388,12 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('lock-denied', { action: 'lock-denied', data })
       })
 
+      // Live slide feed — one-way, operator to the livestream viewers. This is
+      // the only way /livestream/:schedule_id learns which slide is on screen.
+      socket.on('live-slide', (data) => {
+        onMessage?.('live-slide', { action: 'live-slide', data })
+      })
+
       // Alert and overlay events
       socket.on('add-alert', (data) => {
         onMessage?.('add-alert', { action: 'add-alert', data })
@@ -513,6 +519,13 @@ export const useSocketIO = (options: SocketIOOptions) => {
   }
 
   /**
+   * Broadcast the slide currently on screen to livestream viewers
+   */
+  const sendLiveSlide = (slide: any) => {
+    return emit('live-slide', slide)
+  }
+
+  /**
    * Send batch slides created event
    */
   const sendBatchSlidesCreated = (slides: any[]) => {
@@ -599,6 +612,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
     sendSlideCreated,
     sendSlideUpdated,
     sendSlideDeleted,
+    sendLiveSlide,
     sendBatchSlidesCreated,
     sendBatchSlidesUpdated,
     sendBatchSlidesDeleted,
