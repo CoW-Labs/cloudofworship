@@ -270,6 +270,11 @@ onMounted(async () => {
 
   // APP-WIDE SHORTCUTS
   useCreateShortcut("/", () => useGlobalEmit(appWideActions.quickActionsFocus))
+  useCreateShortcut(
+    "k",
+    () => useGlobalEmit(appWideActions.quickActionsFocus),
+    { ctrlOrMeta: true, allowInEditable: true }
+  )
 
   // Prevent default action on specific keys
   document.addEventListener("keydown", function (event) {

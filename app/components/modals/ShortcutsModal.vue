@@ -67,6 +67,10 @@ const shortcuts = ref([
     name: "Quick actions tab - Search actions or anything else",
   },
   {
+    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + K`,
+    name: "Quick actions tab - Search actions or anything else",
+  },
+  {
     cmd: `Cmd + H`,
     name: "Open Shortcut & Hotkeys Modal",
   },

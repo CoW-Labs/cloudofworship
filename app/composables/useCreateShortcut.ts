@@ -1,7 +1,7 @@
 const useCreateShortcut = (
   commandKey: string,
   action: () => boolean | void | Promise<boolean | void>,
-  options?: { ctrlOrMeta?: boolean; shift?: boolean }
+  options?: { ctrlOrMeta?: boolean; shift?: boolean; allowInEditable?: boolean }
 ) => {
   const handleKeydown = (e: KeyboardEvent) => {
     const activeElement = document.activeElement
@@ -12,7 +12,10 @@ const useCreateShortcut = (
       activeElement?.tagName === "TEXTAREA" ||
       activeElement?.getAttribute("contenteditable") === "true"
 
-    if (isEditableElement) return
+    // Modifier chords (e.g. Cmd + K) can't be confused with typing, so a
+    // shortcut can opt out of the editable-element guard and stay reachable
+    // from inside the slide editor or a search box.
+    if (isEditableElement && !options?.allowInEditable) return
 
     if (options?.ctrlOrMeta) {
       if (isCommandKeyPressed && isCtrlOrMetaPressed) {

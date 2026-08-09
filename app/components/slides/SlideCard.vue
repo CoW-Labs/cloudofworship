@@ -204,7 +204,7 @@
       <UCheckbox
         name="select"
         :model-value="checkboxSelected"
-        :ui="{ base: 'h-8 w-8' }"
+        :ui="{ base: 'h-6 w-6' }"
         @change="$emit('bulk-selected', $event)"
       />
     </div>
