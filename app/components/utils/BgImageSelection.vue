@@ -8,7 +8,11 @@
         :key="image"
         type="button"
         class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-cover transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#E8D1F8]"
-        :aria-label="image === value ? 'Selected background image' : 'Select background image'"
+        :aria-label="
+          image === value
+            ? 'Selected background image'
+            : 'Select background image'
+        "
         :aria-pressed="image === value"
         @click="selectImage(image)"
       >
@@ -25,40 +29,42 @@
   </div>
 
   <template v-else>
-  <div>
-  <div class="bg-image-selection-ctn p-2">
-    <div
-      class="bg-image-selection grid gap-2 max-h-[190px] overflow-y-auto overflow-x-hidden"
-      :class="settingsPage ? 'gap-4 grid-cols-3 max-h-full pb-16' : 'grid-cols-3'"
-    >
-      <UButton
-        v-for="image in backgroundImages"
-        :key="image"
-        @click="selectImage(image)"
-        class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
-        :class="settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]'"
-      >
+    <div>
+      <div class="bg-image-selection-ctn p-2">
         <div
-          class="bg-image w-full h-full transition rounded-md opacity-100 hover:opacity-30 bg-cover"
-          :class="[
-            settingsPage ? 'min-w-[180px] h-[100px]' : '',
-            { 'opacity-30': image === value },
-          ]"
-          :style="`background-image: url(${image})`"
-        ></div>
-        <span
-          v-if="image === value"
-          class="pointer-events-none absolute inset-0 z-10 rounded-md border-2 border-[#E8D1F8]"
-        ></span>
-        <IconWrapper
-          v-if="image === value"
-          name="i-bx-check"
-          size="5"
-          :rounded-bg="true"
-          class="absolute text-primary-500 scale-50 bottom-2 right-2"
-        />
-        <!-- Delete button for custom images in settings page -->
-        <!-- <UButton
+          class="bg-image-selection grid gap-2 max-h-[190px] overflow-y-auto overflow-x-hidden"
+          :class="
+            settingsPage ? 'gap-4 grid-cols-3 max-h-full pb-16' : 'grid-cols-3'
+          "
+        >
+          <UButton
+            v-for="image in backgroundImages"
+            :key="image"
+            @click="selectImage(image)"
+            class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
+            :class="settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]'"
+          >
+            <div
+              class="bg-image w-full h-full transition rounded-md opacity-100 hover:opacity-30 bg-cover"
+              :class="[
+                settingsPage ? 'min-w-[180px] h-[100px]' : '',
+                { 'opacity-30': image === value },
+              ]"
+              :style="`background-image: url(${image})`"
+            ></div>
+            <span
+              v-if="image === value"
+              class="pointer-events-none absolute inset-0 z-10 rounded-md border-2 border-[#E8D1F8]"
+            ></span>
+            <IconWrapper
+              v-if="image === value"
+              name="i-bx-check"
+              size="5"
+              :rounded-bg="true"
+              class="absolute text-primary-500 scale-50 bottom-2 right-2"
+            />
+            <!-- Delete button for custom images in settings page -->
+            <!-- <UButton
           v-if="settingsPage && isCustomImage(image)"
           icon="i-tabler-trash"
           size="xs"
@@ -67,51 +73,51 @@
           :loading="deletingImageId === image"
           @click.stop.prevent="handleDeleteImage(image)"
         /> -->
-      </UButton>
+          </UButton>
+        </div>
+      </div>
+      <div v-if="!hideUpload && !settingsPage" class="button-ctn p-2 pt-0">
+        <FileDropzone
+          size="sm"
+          accept="image/*"
+          :maxFileSize="maxFileSize"
+          @change="saveAndSelectImages($event)"
+          class="max-w-[320px]"
+          :loading="imageCompressionLoading"
+        />
+      </div>
+      <Teleport to="#settings-modal-device-action">
+        <!-- Fixed to the settings modal, outside its scrolling content. -->
+        <div
+          v-if="!hideUpload && settingsPage"
+          class="pointer-events-auto w-[190px] shadow-xl transition-all"
+        >
+          <input
+            ref="imageFileInput"
+            type="file"
+            class="hidden"
+            accept="image/*"
+            multiple
+            @change="onImageFileSelect"
+          />
+          <CowButton
+            variant="primary"
+            size="lg"
+            block
+            :icon="imageCompressionLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
+            :loading="imageCompressionLoading"
+            :disabled="imageCompressionLoading"
+            @click="openImageFilePicker"
+          >
+            {{
+              imageCompressionLoading
+                ? `Adding ${currentImageIndex}/${totalImages}...`
+                : "Add from device"
+            }}
+          </CowButton>
+        </div>
+      </Teleport>
     </div>
-  </div>
-  <div v-if="!hideUpload && !settingsPage" class="button-ctn p-2 pt-0">
-    <FileDropzone
-      size="sm"
-      accept="image/*"
-      :maxFileSize="maxFileSize"
-      @change="saveAndSelectImages($event)"
-      class="max-w-[320px]"
-      :loading="imageCompressionLoading"
-    />
-  </div>
-  <Teleport to="#settings-modal-device-action">
-    <!-- Fixed to the settings modal, outside its scrolling content. -->
-    <div
-      v-if="!hideUpload && settingsPage"
-      class="pointer-events-auto w-[190px] shadow-xl transition-all"
-    >
-      <input
-        ref="imageFileInput"
-        type="file"
-        class="hidden"
-        accept="image/*"
-        multiple
-        @change="onImageFileSelect"
-      />
-      <CowButton
-        variant="primary"
-        size="lg"
-        block
-        :icon="imageCompressionLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
-        :loading="imageCompressionLoading"
-        :disabled="imageCompressionLoading"
-        @click="openImageFilePicker"
-      >
-        {{
-          imageCompressionLoading
-            ? `Adding ${currentImageIndex}/${totalImages}...`
-            : "Add from device"
-        }}
-      </CowButton>
-    </div>
-  </Teleport>
-  </div>
   </template>
 </template>
 
@@ -249,6 +255,8 @@ const getAllLocallySavedImages = async () => {
   revokeLocalImageObjectUrls()
   imageKeysByUrl.clear()
 
+  revokeLocalImageObjectUrls()
+
   // Create Object URLs from locally saved images - process in batches
   const imageURLs: string[] = []
 
@@ -294,7 +302,11 @@ const saveAndSelectImages = async (files: File[]) => {
   })
 
   backgroundImages.value = Array.from(
-    new Set([...defaultBackgroundImages, ...previewUrls, ...backgroundImages.value])
+    new Set([
+      ...defaultBackgroundImages,
+      ...previewUrls,
+      ...backgroundImages.value,
+    ])
   )
 
   const immediatePreviewUrl = previewUrls[previewUrls.length - 1]

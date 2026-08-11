@@ -59,8 +59,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue"
-import { check } from "@tauri-apps/plugin-updater"
-import { relaunch } from "@tauri-apps/plugin-process"
 import type { Emitter } from "mitt"
 
 const { isTauri } = useTauri()
@@ -91,6 +89,9 @@ onMounted(async () => {
 
 const checkForUpdate = async () => {
   try {
+    // Imported lazily so the updater plugin never ships in the web bundle —
+    // this component renders on the operator layout for web users too.
+    const { check } = await import("@tauri-apps/plugin-updater")
     const update = await check()
 
     if (update?.available) {
@@ -132,6 +133,7 @@ const installUpdate = async () => {
     })
 
     // Restart the application
+    const { relaunch } = await import("@tauri-apps/plugin-process")
     await relaunch()
   } catch (error) {
     console.error("Failed to install update:", error)

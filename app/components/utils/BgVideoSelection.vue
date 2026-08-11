@@ -8,7 +8,11 @@
         :key="video?.id"
         type="button"
         class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-black transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#E8D1F8]"
-        :aria-label="video?.url === value ? 'Selected background video' : 'Select background video'"
+        :aria-label="
+          video?.url === value
+            ? 'Selected background video'
+            : 'Select background video'
+        "
         :aria-pressed="video?.url === value"
         @click="$emit('select', { video: video?.url, key: video?.id })"
       >
@@ -199,7 +203,8 @@ const getAllLocallySavedVideos = async () => {
   for (let i = 0; i < videos.length; i += chunkSize) {
     const chunk = videos.slice(i, i + chunkSize)
     for (const video of chunk) {
-      if (!videoTypes.some((extension) => video.key.includes(extension))) continue
+      if (!videoTypes.some((extension) => video.key.includes(extension)))
+        continue
 
       const playbackUrl = await localMedia.getPlaybackUrl(video.key)
       if (!playbackUrl) continue
@@ -297,8 +302,7 @@ const saveAndSelectVideos = async (files: File[]) => {
     console.error("Failed to save custom video:", error)
     toast.add({
       title: "Local media storage is unavailable",
-      description:
-        "This browser cannot durably save the background video.",
+      description: "This browser cannot durably save the background video.",
       icon: "i-bx-error",
       color: "red",
     })

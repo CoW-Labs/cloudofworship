@@ -1036,10 +1036,14 @@ const bibleBookActions = computed(() =>
 
 const isBibleReferenceSearch = computed(() => {
   if (!bibleChapterAndVerse.value || !bibleBookQuery.value) return false
-  const bookMatches = fuzzysort.go(bibleBookQuery.value, bibleBookActions.value, {
-    keys: ["name"],
-    threshold: -1000,
-  })
+  const bookMatches = fuzzysort.go(
+    bibleBookQuery.value,
+    bibleBookActions.value,
+    {
+      keys: ["name"],
+      threshold: -1000,
+    }
+  )
   return bookMatches.length > 0
 })
 
