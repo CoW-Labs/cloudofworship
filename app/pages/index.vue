@@ -23,6 +23,13 @@
     >
       <LiveOutput />
     </div>
+    <!-- POSTHOG TEST - REMOVE AFTER TESTING -->
+    <button
+      class="fixed bottom-4 right-4 z-50 px-3 py-1.5 bg-red-500 text-white text-xs rounded shadow-lg hover:bg-red-600"
+      @click="testPosthogErrorTracking"
+    >
+      Test PostHog Error Tracking
+    </button>
   </div>
 </template>
 
@@ -392,4 +399,12 @@ emitter.on("refresh-slides", () => {
     connectSocket()
   }
 })
+
+// POSTHOG TEST - REMOVE AFTER TESTING
+const testPosthogErrorTracking = () => {
+  const { $posthog } = useNuxtApp()
+  if ($posthog) {
+    ($posthog as any).captureException(new Error('PostHog source maps test'))
+  }
+}
 </script>

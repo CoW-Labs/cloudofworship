@@ -100,7 +100,13 @@ const cachedVideosURLs = ref<BackgroundVideo[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const config = useRuntimeConfig()
 const { getToken } = useAuthToken()
-const windowRefs = ref<any[]>([])
+// shallowRef, not ref: a deep ref wraps every element in reactive(), and
+// building that proxy reads `__v_isReadonly`/`__v_skip` off the object. On a
+// cross-origin popup window those reads throw SecurityError — which is exactly
+// what the 250ms checkWindowClose poll below was hitting. Vue must never touch
+// these Window handles, so we keep the ref shallow and always assign a new
+// array (a shallowRef ignores in-place mutation of the same reference).
+const windowRefs = shallowRef<any[]>([])
 const db = useIndexedDB()
 const localMedia = useLocalMediaStorage()
 const appInfo = ref<AppSettings>()
@@ -844,6 +850,11 @@ async function openTauriLiveWindow() {
     const isFullscreen =
       appStore.currentState.settings.liveWindowFullscreen ?? true
 
+    // Window options are in logical units while monitors report physical
+    // pixels, so a Retina/scaled projector needs the scale factor divided out —
+    // otherwise the live window lands half-size and offset from the display.
+    const scale = targetMonitor.scaleFactor || 1
+
     // Create new window on the target monitor
     const liveWindow = new WebviewWindow("live-output", {
       url: "/live",
@@ -853,10 +864,10 @@ async function openTauriLiveWindow() {
       resizable: true,
       closable: true,
       fullscreen: isFullscreen,
-      x: targetMonitor.position.x,
-      y: targetMonitor.position.y,
-      width: targetMonitor.size.width,
-      height: targetMonitor.size.height,
+      x: targetMonitor.position.x / scale,
+      y: targetMonitor.position.y / scale,
+      width: targetMonitor.size.width / scale,
+      height: targetMonitor.size.height / scale,
     })
 
     // Wait for window to be ready
@@ -870,9 +881,7 @@ async function openTauriLiveWindow() {
     })
 
     // Add windowRef to track if live window is active
-    const tempWindowRefs = windowRefs.value
-    tempWindowRefs.push(liveWindow)
-    windowRefs.value = tempWindowRefs
+    windowRefs.value = [...windowRefs.value, liveWindow]
   } catch (error) {
     console.error("Error opening Tauri window:", error)
     useToast().add({
@@ -908,9 +917,7 @@ function openWindow(
     })
     closeAllWindows()
   } else {
-    const tempWindowRefs = windowRefs.value
-    tempWindowRefs.push(windowRef)
-    windowRefs.value = tempWindowRefs
+    windowRefs.value = [...windowRefs.value, windowRef]
   }
 }
 
@@ -964,7 +971,7 @@ async function openWindows() {
         screen1.availTop,
         screen1.availWidth,
         screen1.availHeight,
-        `http://${window.location.host}/live`
+        `${window.location.origin}/live`
       )
     } else {
       // Multiple screens — try saved label first, then auto-pick the non-primary
@@ -996,7 +1003,7 @@ async function openWindows() {
           targetScreen.availTop,
           targetScreen.availWidth,
           targetScreen.availHeight,
-          `http://${window.location.host}/live`
+          `${window.location.origin}/live`
         )
       } else {
         useToast().add({
@@ -1009,7 +1016,17 @@ async function openWindows() {
     const closeMonitor = setInterval(checkWindowClose, 250)
 
     function checkWindowClose() {
-      if (windowRefs.value.some((windowRef: any) => windowRef.closed)) {
+      const isClosed = (windowRef: any) => {
+        try {
+          return Boolean(windowRef?.closed)
+        } catch {
+          // A window we can no longer read (navigated cross-origin, or torn
+          // down mid-read) is one we can't manage either — treat it as gone.
+          return true
+        }
+      }
+
+      if (windowRefs.value.some(isClosed)) {
         closeAllWindows()
         clearInterval(closeMonitor)
       }
@@ -1033,13 +1050,34 @@ async function openWindows() {
       0,
       window.screen.availWidth,
       window.screen.availHeight,
-      `http://${window.location.host}/live`
+      `${window.location.origin}/live`
     )
+  }
+}
+// The web build ties the live popup's lifetime to the operator tab via
+// `beforeunload` inside openWindows(). Desktop windows never fire that, so the
+// projection window would outlive the control center it belongs to.
+async function bindTauriLiveWindowLifecycle() {
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window")
+
+    await getCurrentWindow().onCloseRequested(async () => {
+      if (appStore.currentState.settings.closeLiveWindowWithOperator) {
+        await closeAllWindows()
+      }
+    })
+  } catch (error) {
+    console.error("Failed to bind live window lifecycle:", error)
   }
 }
 // WINDOW MANAGEMENT CODE ENDS HERE
 
 onMounted(async () => {
+  const { isTauri } = useTauri()
+  if (isTauri) {
+    bindTauriLiveWindowLifecycle()
+  }
+
   useLocalMediaStorage()
     .reconcileOrphans()
     .catch((err) => console.warn("Local media reconciliation failed:", err))

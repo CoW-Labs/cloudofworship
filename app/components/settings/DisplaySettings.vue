@@ -31,7 +31,7 @@
           </div>
         </div>
         <CowButton
-          v-if="!currentScreen?.isPrimary && !isTauri"
+          v-if="!currentScreen?.isPrimary"
           variant="secondary"
           size="2xs"
           class="!px-3.5 !py-1.5 text-xs shrink-0"
@@ -70,21 +70,20 @@
       </SettingsRow>
 
       <SettingsRow
-        v-else
-        label="Close live window when this tab is closed"
-        description="When enabled, the live output window closes automatically if you close the control center tab."
+        :label="`Close live window when this ${operatorSurface} is closed`"
+        :description="`When enabled, the live output window closes automatically if you close the control center ${operatorSurface}.`"
       >
         <CowToggle
           bare
-          label="Close live window when this tab is closed"
+          :label="`Close live window when this ${operatorSurface} is closed`"
           :model-value="currentState.settings.closeLiveWindowWithOperator"
           @update:model-value="
             (value: boolean) => {
               appStore.setCloseLiveWindowWithOperator(value)
               useToast().add({
                 title: value
-                  ? 'Live window will close with this tab'
-                  : 'Live window will stay open when this tab is closed',
+                  ? `Live window will close with this ${operatorSurface}`
+                  : `Live window will stay open when this ${operatorSurface} is closed`,
                 icon: 'i-bx-check-circle',
               })
             }
@@ -198,6 +197,7 @@ import { useDebounceFn } from "@vueuse/core"
 
 const appStore = useAppStore()
 const { isTauri } = useTauri()
+const operatorSurface = isTauri ? "window" : "tab"
 const currentScreen = ref<any>({})
 const allScreens = ref<any>([])
 const { currentState } = storeToRefs(appStore)
@@ -320,13 +320,43 @@ onBeforeUnmount(() => {
 
 const moveCurrentScreenToNativeDisplay = async () => {
   if (isTauri) {
-    // In Tauri, we can't move windows between screens this way
-    // Instead, show a message
-    useToast().add({
-      title: "Window movement not supported",
-      description: "Please manually move the window to your primary display",
-      icon: "i-bx-info-circle",
-    })
+    // Desktop can move the control center outright, rather than asking the
+    // browser to go fullscreen on another screen the way the web build does.
+    try {
+      const { getCurrentWindow, PhysicalPosition, availableMonitors } =
+        await import("@tauri-apps/api/window")
+
+      const monitors = await availableMonitors()
+      const primary = monitors.find(
+        (monitor: any) => monitor.position.x === 0 && monitor.position.y === 0
+      )
+
+      if (!primary) {
+        useToast().add({
+          title: "Could not find your primary display",
+          icon: "i-bx-info-circle",
+          color: "amber",
+        })
+        return
+      }
+
+      // Monitor positions are reported in physical pixels, so they must be
+      // wrapped as such — a LogicalPosition would land wrong on scaled displays.
+      const appWindow = getCurrentWindow()
+      await appWindow.setPosition(
+        new PhysicalPosition(primary.position.x, primary.position.y)
+      )
+      await appWindow.setFocus()
+      await getDisplayDetails()
+    } catch (error) {
+      console.error("Failed to move window to primary display:", error)
+      useToast().add({
+        title: "Could not move the window",
+        description: "Please drag the window to your primary display manually",
+        icon: "i-bx-error-circle",
+        color: "red",
+      })
+    }
     return
   }
 

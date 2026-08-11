@@ -403,46 +403,54 @@ const previousSlide = computed(() => {
 })
 
 onMounted(() => {
-  shortcutCleanups.push(useCreateShortcut("ArrowDown", () => {
-    if (nextSlide.value) {
-      setLiveSlide(nextSlide.value.id)
-      return true
-    }
-    return false
-  }))
-  shortcutCleanups.push(useCreateShortcut("ArrowUp", () => {
-    if (previousSlide.value) {
-      setLiveSlide(previousSlide.value.id)
-      return true
-    }
-    return false
-  }))
-  shortcutCleanups.push(useCreateShortcut(
-    "0",
-    () => {
-      if (navigationSlides.value?.at(-1)?.id) {
-        setLiveSlide(navigationSlides.value?.at(-1)?.id!!)
+  shortcutCleanups.push(
+    useCreateShortcut("ArrowDown", () => {
+      if (nextSlide.value) {
+        setLiveSlide(nextSlide.value.id)
         return true
       }
       return false
-    },
-    { ctrlOrMeta: true, shift: false }
-  ))
-
-  // Create shortcuts for Slides 1-9
-  const oneDigitNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  oneDigitNumbers.forEach((digit) => {
-    shortcutCleanups.push(useCreateShortcut(
-      digit.toString(),
+    })
+  )
+  shortcutCleanups.push(
+    useCreateShortcut("ArrowUp", () => {
+      if (previousSlide.value) {
+        setLiveSlide(previousSlide.value.id)
+        return true
+      }
+      return false
+    })
+  )
+  shortcutCleanups.push(
+    useCreateShortcut(
+      "0",
       () => {
-        if (navigationSlides.value?.at(digit - 1)?.id) {
-          setLiveSlide(navigationSlides.value?.at(digit - 1)?.id!!)
+        if (navigationSlides.value?.at(-1)?.id) {
+          setLiveSlide(navigationSlides.value?.at(-1)?.id!!)
           return true
         }
         return false
       },
       { ctrlOrMeta: true, shift: false }
-    ))
+    )
+  )
+
+  // Create shortcuts for Slides 1-9
+  const oneDigitNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  oneDigitNumbers.forEach((digit) => {
+    shortcutCleanups.push(
+      useCreateShortcut(
+        digit.toString(),
+        () => {
+          if (navigationSlides.value?.at(digit - 1)?.id) {
+            setLiveSlide(navigationSlides.value?.at(digit - 1)?.id!!)
+            return true
+          }
+          return false
+        },
+        { ctrlOrMeta: true, shift: false }
+      )
+    )
   })
 
   // Add listener for ctrlOrMeta

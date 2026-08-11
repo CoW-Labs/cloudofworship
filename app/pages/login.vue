@@ -162,15 +162,22 @@ const login = async (event?: Event) => {
       },
     })
 
-    // If error occurred
+    // If error occurred. Not every endpoint answers with `message` — some reply
+    // `{ error: "..." }` — so read both rather than hiding a real reason behind
+    // the generic string. Only body fields are shown: the raw fetch message is
+    // a URL-bearing technical string, so it goes to telemetry alone.
     if (error.value) {
+      const reason =
+        error.value?.data?.message || error.value?.data?.error
+
       usePosthogCapture("LOGIN_FAILED", {
         method: "email_password",
         email: email.value,
-        error: error.value?.data?.message,
+        error: reason || error.value?.message,
+        status: error.value?.status || error.value?.statusCode,
       })
 
-      errorMsg.value = error.value?.data?.message || "Something went wrong"
+      errorMsg.value = reason || "Something went wrong"
     } else {
       if (
         !data.value?.data?.user?.emailVerified &&

@@ -3,9 +3,6 @@
  * Uses tauri-plugin-oauth for Tauri (localhost server), redirect for web
  */
 import { GoogleAuthProvider, signInWithPopup, signInWithCredential, type UserCredential } from "firebase/auth"
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
-import { open } from '@tauri-apps/plugin-shell'
 
 export default function useTauriGoogleAuth() {
   const { isTauri } = useTauri()
@@ -28,6 +25,14 @@ export default function useTauriGoogleAuth() {
         let oauthPort: number | null = null
 
         try {
+          // Imported lazily so none of the Tauri plugins reach the web bundle —
+          // this composable backs the Google button on the auth layout.
+          const [{ invoke }, { listen }, { open }] = await Promise.all([
+            import('@tauri-apps/api/core'),
+            import('@tauri-apps/api/event'),
+            import('@tauri-apps/plugin-shell'),
+          ])
+
           // Start the OAuth server
           oauthPort = await invoke<number>('start_oauth_server')
           console.log(`OAuth server started on port ${oauthPort}`)

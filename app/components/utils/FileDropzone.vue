@@ -51,9 +51,7 @@
       <IconWrapper
         :name="icon"
         :size="size === 'sm' ? '7' : '12'"
-        :class="[
-          size === 'sm' ? 'w-[100px] mb-4 py-4' : 'py-6 mb-8 w-full',
-        ]"
+        :class="[size === 'sm' ? 'w-[100px] mb-4 py-4' : 'py-6 mb-8 w-full']"
         rounded-bg
       ></IconWrapper>
       <div class="texts">

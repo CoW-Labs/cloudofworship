@@ -95,7 +95,8 @@ export interface LocalMediaAdapter {
     relativePath: string,
     stream: ReadableStream<Uint8Array>
   ): Promise<PhysicalFile>
-  getPlaybackUrl(relativePath: string): Promise<string>
+  /** Resolves to null when the bytes are no longer on disk. */
+  getPlaybackUrl(relativePath: string): Promise<string | null>
   delete(relativePath: string): Promise<void>
   clear(): Promise<void>
   listFiles(): Promise<string[]>
@@ -264,9 +265,20 @@ export class BrowserOPFSAdapter implements LocalMediaAdapter {
   }
 
   async getPlaybackUrl(relativePath: string) {
-    const directory = await this.directory(parentPath(relativePath))
-    const handle = await directory.getFileHandle(basename(relativePath))
-    return URL.createObjectURL(await handle.getFile())
+    // The Dexie row can outlive the bytes — the browser evicts OPFS under
+    // storage pressure, and an interrupted write leaves metadata behind. Both
+    // surface as NotFoundError from getDirectoryHandle/getFileHandle/getFile.
+    // Report "not on disk" the way this signature already allows instead of
+    // throwing a raw DOMException at every caller (`delete`, `clear` and
+    // `listFiles` below already swallow the same condition).
+    try {
+      const directory = await this.directory(parentPath(relativePath))
+      const handle = await directory.getFileHandle(basename(relativePath))
+      return URL.createObjectURL(await handle.getFile())
+    } catch (error: any) {
+      if (error?.name === "NotFoundError") return null
+      throw error
+    }
   }
 
   async delete(relativePath: string) {
@@ -797,6 +809,14 @@ export const createLocalMediaStorage = (
     if (cached) releasePlaybackUrl(cached.url)
 
     const url = await adapter.getPlaybackUrl(record.relativePath)
+    if (!url) {
+      // Metadata without bytes. Drop the row so the caller falls back to the
+      // cloud copy (or reports the media as unavailable on this device) instead
+      // of retrying a path that will never resolve.
+      await db.localMediaFiles.delete(key)
+      return null
+    }
+
     playbackUrls.set(key, {
       relativePath: record.relativePath,
       url,

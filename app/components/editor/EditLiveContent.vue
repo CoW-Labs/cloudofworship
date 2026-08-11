@@ -363,18 +363,21 @@
               class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto"
             >
               This image was added on another device. You've used all of your
-              {{ isTeamsPlan ? "Teams" : "free" }} cloud storage, so it
-              couldn't be synced here.
+              {{ isTeamsPlan ? "Teams" : "free" }} cloud storage, so it couldn't
+              be synced here.
               {{
                 isTeamsPlan
                   ? "Free up cloud storage to sync it."
                   : "Upgrade to Teams for 5GB of synced storage."
               }}
             </p>
-            <p v-else class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
-              This image was added on another device and hasn't finished
-              syncing to the cloud yet. Reconnect that device to the internet
-              to sync it here.
+            <p
+              v-else
+              class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto"
+            >
+              This image was added on another device and hasn't finished syncing
+              to the cloud yet. Reconnect that device to the internet to sync it
+              here.
             </p>
           </div>
           <CowButton
@@ -1407,6 +1410,10 @@ const onUpdateMediaSeek = (seekTime: number) => {
 }
 
 const onUpdateSongLyrics = (song: Song) => {
+  // Defensive: the toolbar already filters failed lookups, but this handler is
+  // wired to a template event and must not crash the editor on a null payload.
+  if (!song) return
+
   const tempSlide: Slide = {
     title: song.title,
     ...props.slide!!,
