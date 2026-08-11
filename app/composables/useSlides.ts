@@ -2,6 +2,7 @@ import { useDebounceFn, useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
+import { toTransportSafeSlide } from "~/utils/mediaTransport"
 import {
   getAPIErrorMessage,
   isForbiddenError,
@@ -36,15 +37,57 @@ export default function useSlides() {
   }
 
   const updateLiveOutput = (updatedSlide: Slide, options?: { forceGoLive: boolean }) => {
-    // Post to the live window first — before any Pinia/localStorage work —
-    // so the projector sees the new slide as early as possible.
-    if (updatedSlide.id === appStore.currentState.liveSlideId || options?.forceGoLive) {
-      appStore.setLiveSlide(updatedSlide.id)
-      useBroadcastPost(JSON.stringify(updatedSlide))
-    }
+    const shouldUpdateLiveSlide =
+      updatedSlide.id === appStore.currentState.liveSlideId ||
+      options?.forceGoLive
 
-    // Persist schedule state after broadcasting (non-critical path).
-    appStore.replaceScheduleActiveSlides(slides.value || [])
+    // Update only the changed slide. Replacing the full schedule array here
+    // made every verse navigation re-filter and re-render unrelated slides.
+    appStore.updateSlideInActiveSlides(updatedSlide)
+
+    if (shouldUpdateLiveSlide) {
+      // Same-slide verse changes already have the correct live id. Avoid a
+      // second Pinia mutation, persistence pass, and shared-state broadcast.
+      if (appStore.currentState.liveSlideId !== updatedSlide.id) {
+        appStore.setLiveSlide(updatedSlide.id)
+      }
+
+      // Send immediately after the targeted local update. The channel applies
+      // one serialization boundary so Vue reactive proxies remain clone-safe.
+      useBroadcastPost(updatedSlide)
+
+      // Local-first: if this slide's media is still a remote URL on this device
+      // (e.g. a teammate's slide received via socket that idle-prefetch hasn't
+      // localized yet), fetch+cache it once, then re-broadcast with the local
+      // object URL so the operator preview and projection play locally instead
+      // of streaming. Gated on a remote URL, so the creating device (already a
+      // blob: URL) and verse navigation never trigger it.
+      localizeLiveSlideMedia(updatedSlide)
+    }
+  }
+
+  const { rehydrateSlideMedia } = useSlideMediaCache()
+
+  const localizeLiveSlideMedia = (liveSlide: Slide) => {
+    const bg = liveSlide.background
+    const isRemote = !!bg && (bg.startsWith("http://") || bg.startsWith("https://"))
+    const bearsMedia =
+      liveSlide.type === slideTypes.media ||
+      liveSlide.type === slideTypes.presentation ||
+      !!liveSlide.backgroundImageKey ||
+      !!liveSlide.backgroundVideoKey
+    if (!isRemote || !bearsMedia) return
+
+    rehydrateSlideMedia({ ...liveSlide }, { allowDownload: true })
+      .then((rehydrated) => {
+        // Nothing was localized (no local/remote copy available) — leave as-is.
+        if (rehydrated.background === bg) return
+        appStore.updateSlideInActiveSlides(rehydrated)
+        if (appStore.currentState.liveSlideId === rehydrated.id) {
+          useBroadcastPost(rehydrated)
+        }
+      })
+      .catch((err) => console.warn("Go-live media localize failed:", err))
   }
 
   /**
@@ -168,13 +211,14 @@ export default function useSlides() {
       }
 
       loading.value = true
+      const transportSlide = await toTransportSafeSlide(slide)
       // appStore.setSlidesLoading(true)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides`,
         {
           method: 'POST',
-          body: slide,
+          body: transportSlide,
           key: 'create-slide',
         }
       )
@@ -227,12 +271,15 @@ export default function useSlides() {
       }
 
       loading.value = true
+      const transportSlides = await Promise.all(
+        slides.map((slide) => toTransportSafeSlide(slide))
+      )
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/batch`,
         {
           method: 'POST',
-          body: slides,
+          body: transportSlides,
           key: `batch-create-slides-${Date.now()}`,
         }
       )
@@ -296,12 +343,13 @@ export default function useSlides() {
       }
 
       loading.value = true
+      const transportSlide = await toTransportSafeSlide(slide)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/${slide._id}`,
         {
           method: 'PUT',
-          body: slide,
+          body: transportSlide,
           key: `update-slide-${slide._id}`,
         }
       )
@@ -350,13 +398,16 @@ export default function useSlides() {
       }
 
       loading.value = true
+      const transportSlides = await Promise.all(
+        slides.map((slide) => toTransportSafeSlide(slide))
+      )
       // appStore.setSlidesLoading(true)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/batch`,
         {
           method: 'PUT',
-          body: slides,
+          body: transportSlides,
           key: 'batch-update-slides',
           dedupe: 'defer',
         }
@@ -533,13 +584,14 @@ export default function useSlides() {
 
       loading.value = true
       appStore.setSlidesLoading(true)
+      const transportSlide = await toTransportSafeSlide(slide)
 
       await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/${slide._id}/save`,
         {
           method: 'PUT',
           // Send the full slide so the backend can recreate it if it was deleted
-          body: slide,
+          body: transportSlide,
           key: `save-slide-${slide._id}`,
         }
       )

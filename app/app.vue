@@ -1,6 +1,8 @@
 <template>
   <div class="dark:bg-gray-900">
-    <NuxtLoadingIndicator />
+    <NuxtLoadingIndicator
+      color="repeating-linear-gradient(to right, #A855F7 0%, #8946C9 50%, #A855F7 100%)"
+    />
     <NuxtLayout :app-version="appVersion">
       <NuxtPage />
       <UNotifications>
@@ -42,7 +44,7 @@ if (nuxtApp.$emitter) {
 }
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("v0.51.2-beta")
+const appVersion = ref<string>("v0.52.1-beta")
 
 const warmOfflineRoutes = async () => {
   await Promise.allSettled([
@@ -61,7 +63,10 @@ onMounted(() => {
 
   if ("serviceWorker" in navigator) {
     const { checkFlag } = useFeatureFlags()
-    if (checkFlag("force-sw-unregister")) {
+    // The desktop app already serves its assets from disk and updates itself
+    // through Tauri's updater. A service worker on top of that only adds a
+    // second cache that can keep serving the previous build after an update.
+    if (isTauri || checkFlag("force-sw-unregister")) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         for (const registration of registrations) {
           registration.unregister()

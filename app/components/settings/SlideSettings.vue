@@ -1,561 +1,379 @@
 <template>
-  <div class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] pb-[15%]">
+  <div
+    class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] p-1 pb-[15%] flex flex-col gap-8"
+  >
     <!-- LOOK AND FEEL OF SLIDES -->
-    <div class="settings-group">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">
-          Look and Feel
-          <div class="text-primary">Settings ONLY apply to new slides</div>
-        </h3>
-      </div>
-      <UForm :state="{}">
-        <UFormGroup
-          label="Set default font"
-          class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
+    <SettingsGroup
+      title="Look and Feel"
+      note="These settings ONLY apply to new slides."
+    >
+      <SettingsRow label="Default font">
+        <SettingsSelect
+          searchable
+          searchable-placeholder="Search fonts"
+          :options="appFonts"
+          :model-value="appStore.currentState.settings.defaultFont"
+          @change="appStore.setDefaultFont($event)"
         >
-          <USelectMenu
-            class="border-0 shadow-none w-[200px]"
-            searchable
-            searchable-placeholder="Search fonts"
-            select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
-            size="md"
-            :options="appFonts"
-            :model-value="appStore.currentState.settings.defaultFont"
-            variant="none"
-            color="primary"
-            clear-search-on-close
-            :ui="selectUI"
-            :ui-menu="selectMenuUI"
-            @change="appStore.setDefaultFont($event)"
-          >
-            <template #label>
-              <IconWrapper name="i-bx-font-family" size="4"> </IconWrapper>
-              <span
-                v-if="appStore.currentState.settings.defaultFont?.length"
-                class="truncate"
-                :class="
-                  useURLFriendlyString(
-                    appStore.currentState.settings.defaultFont
-                  )
-                "
-                >{{ appStore.currentState.settings.defaultFont }}</span
-              >
-              <span v-else>Select font</span>
-            </template>
-            <template #option="{ option: font }">
-              <span
-                v-if="font?.length"
-                class="truncate"
-                :class="useURLFriendlyString(font)"
-                >{{ font }}</span
-              >
-              <span v-else>Select font</span>
-            </template>
-          </USelectMenu>
-        </UFormGroup>
-
-        <UFormGroup
-          label="Set default font size"
-          class="flex items-center justify-between py-3 px-2 hover:bg-primary/10"
-        >
-          <div
-            class="flex px-0 items-center gap-2 font-semibold w-full min-w-[200px]"
-          >
-            <span class="text-sm">{{ MIN_FONT_SIZE }}%</span>
-            <URange
-              :model-value="
-                appStore.currentState.settings.slideStyles.fontSizePercent
+          <template #label>
+            <IconWrapper name="i-bx-font-family" size="4" />
+            <span
+              v-if="appStore.currentState.settings.defaultFont?.length"
+              class="truncate"
+              :class="
+                useURLFriendlyString(appStore.currentState.settings.defaultFont)
               "
-              :min="MIN_FONT_SIZE"
-              :max="MAX_FONT_SIZE"
-              :step="5"
-              @change="
-                appStore.setSlideStyles({
-                  ...appStore.currentState.settings.slideStyles,
-                  fontSizePercent: Number($event),
-                })
-              "
-            />
-            <span class="text-sm">{{ MAX_FONT_SIZE }}%</span>
-          </div>
-        </UFormGroup>
+              >{{ appStore.currentState.settings.defaultFont }}</span
+            >
+            <span v-else>Select font</span>
+          </template>
+          <template #option="{ option: font }">
+            <span
+              v-if="font?.length"
+              class="truncate"
+              :class="useURLFriendlyString(font)"
+              >{{ font }}</span
+            >
+            <span v-else>Select font</span>
+          </template>
+        </SettingsSelect>
+      </SettingsRow>
 
-        <UFormGroup
-          label="Set default slide alignment"
-          class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
-        >
-          <USelectMenu
-            class="border-0 shadow-none max-w-[200px] capitalize"
-            select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white capitalize"
-            size="md"
-            :options="['left', 'center', 'right']"
-            :model-value="appStore.currentState.settings.slideStyles.alignment"
-            variant="none"
-            color="primary"
-            clear-search-on-close
-            :ui="selectUI"
-            :ui-menu="selectMenuUI"
-            @change="
-              appStore.setSlideStyles({
-                ...appStore.currentState.settings.slideStyles,
-                alignment: $event,
-              })
-            "
-          />
-        </UFormGroup>
-        <UFormGroup
-          label="Uppercase Text"
-          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
-        >
-          <UToggle
-            size="lg"
-            :model-value="
-              appStore.currentState.settings.slideStyles.lettercase ===
-              'uppercase'
-            "
-            @change="
-              appStore.setSlideStyles({
-                ...appStore.currentState.settings.slideStyles,
-                lettercase: $event ? 'uppercase' : '',
-              })
-            "
-          />
-        </UFormGroup>
-        <UFormGroup
-          label="Outlined Text"
-          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
-        >
-          <UToggle
-            size="lg"
-            :model-value="
-              appStore.currentState.settings.slideStyles.textOutlined
-            "
-            @change="
-              appStore.setSlideStyles({
-                ...appStore.currentState.settings.slideStyles,
-                textOutlined: $event,
-              })
-            "
-          />
-        </UFormGroup>
-        <UFormGroup
-          label="Bold Text"
-          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
-        >
-          <UToggle
-            size="lg"
-            :model-value="appStore.currentState.settings.slideStyles.textBold"
-            @change="
-              appStore.setSlideStyles({
-                ...appStore.currentState.settings.slideStyles,
-                textBold: $event,
-              })
-            "
-          />
-        </UFormGroup>
-        <UFormGroup
-          label="Text Line Background"
-          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
-        >
-          <UToggle
-            size="lg"
-            :model-value="
-              appStore.currentState.settings.slideStyles.textLinesBackground
-            "
-            @change="
-              appStore.setSlideStyles({
-                ...appStore.currentState.settings.slideStyles,
-                textLinesBackground: $event,
-              })
-            "
-          />
-        </UFormGroup>
-        <UFormGroup
-          label="Set default background fill type"
-          class="flex items-center justify-between py-1 px-2 hover:bg-primary/10"
-        >
-          <USelectMenu
-            class="border-0 shadow-none max-w-[200px] capitalize"
-            select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white capitalize"
-            size="md"
-            :options="Object.values(backgroundFillTypes)"
-            :model-value="
-              appStore.currentState.settings.slideStyles.backgroundFillType ||
-              backgroundFillTypes.crop
-            "
-            variant="none"
-            color="primary"
-            clear-search-on-close
-            :ui="selectUI"
-            :ui-menu="selectMenuUI"
-            @change="
-              appStore.setSlideStyles({
-                ...appStore.currentState.settings.slideStyles,
-                backgroundFillType: $event,
-              })
-            "
-          />
-        </UFormGroup>
-        <!-- flex items-center justify-between -->
-      </UForm>
-    </div>
+      <SettingsSlider
+        label="Default font size"
+        :model-value="appStore.currentState.settings.slideStyles.fontSizePercent"
+        :min="MIN_FONT_SIZE"
+        :max="MAX_FONT_SIZE"
+        :step="5"
+        suffix="%"
+        @change="
+          appStore.setSlideStyles({
+            ...appStore.currentState.settings.slideStyles,
+            fontSizePercent: Number($event),
+          })
+        "
+      />
 
-    <UDivider class="mt-4" />
+      <SettingsRow label="Default slide alignment">
+        <SettingsSelect
+          class="capitalize"
+          :options="['left', 'center', 'right']"
+          :model-value="appStore.currentState.settings.slideStyles.alignment"
+          @change="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              alignment: $event,
+            })
+          "
+        />
+      </SettingsRow>
+
+      <SettingsRow label="Uppercase text">
+        <CowToggle
+          bare
+          label="Uppercase text"
+          :model-value="
+            appStore.currentState.settings.slideStyles.lettercase === 'uppercase'
+          "
+          @update:model-value="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              lettercase: $event ? 'uppercase' : '',
+            })
+          "
+        />
+      </SettingsRow>
+
+      <SettingsRow label="Outlined text">
+        <CowToggle
+          bare
+          label="Outlined text"
+          :model-value="appStore.currentState.settings.slideStyles.textOutlined"
+          @update:model-value="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              textOutlined: $event,
+            })
+          "
+        />
+      </SettingsRow>
+
+      <SettingsRow label="Bold text">
+        <CowToggle
+          bare
+          label="Bold text"
+          :model-value="appStore.currentState.settings.slideStyles.textBold"
+          @update:model-value="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              textBold: $event,
+            })
+          "
+        />
+      </SettingsRow>
+
+      <SettingsRow label="Text line background">
+        <CowToggle
+          bare
+          label="Text line background"
+          :model-value="
+            appStore.currentState.settings.slideStyles.textLinesBackground
+          "
+          @update:model-value="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              textLinesBackground: $event,
+            })
+          "
+        />
+      </SettingsRow>
+
+      <SettingsRow label="Default background fill type">
+        <SettingsSelect
+          class="capitalize"
+          :options="Object.values(backgroundFillTypes)"
+          :model-value="
+            appStore.currentState.settings.slideStyles.backgroundFillType ||
+            backgroundFillTypes.crop
+          "
+          @change="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              backgroundFillType: $event,
+            })
+          "
+        />
+      </SettingsRow>
+    </SettingsGroup>
 
     <!-- FOOTNOTES & CREDITS -->
-    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">
-          Footnotes & Credits
-          <div class="text-primary">Settings ONLY apply to new slides</div>
-        </h3>
-      </div>
-      <UForm :state="{}">
-        <UFormGroup
-          label="Toggle song/hymn title and artistes"
-          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
-        >
-          <UToggle
-            size="lg"
-            :model-value="
-              appStore.currentState.settings.songAndHymnLabelsVisibility
-            "
-            @change="appStore.setSongAndHymnLabelsVisibility($event)"
-          />
-        </UFormGroup>
-        <UFormGroup
-          label="Toggle footnotes and credits for Bible & Hymn Slides"
-          class="flex items-center justify-between py-2 px-2 hover:bg-primary/10"
-        >
-          <UToggle
-            size="lg"
-            :model-value="appStore.currentState.settings.footnotes"
-            @change="appStore.setFootnotes($event)"
-          />
-        </UFormGroup>
-      </UForm>
-    </div>
+    <SettingsGroup
+      title="Footnotes & Credits"
+      note="These settings ONLY apply to new slides."
+    >
+      <SettingsRow label="Song/hymn title and artistes">
+        <CowToggle
+          bare
+          label="Song/hymn title and artistes"
+          :model-value="
+            appStore.currentState.settings.songAndHymnLabelsVisibility
+          "
+          @update:model-value="appStore.setSongAndHymnLabelsVisibility($event)"
+        />
+      </SettingsRow>
 
-    <UDivider class="mt-4" />
+      <SettingsRow
+        label="Footnotes and credits"
+        description="Shown on Bible and Hymn slides."
+      >
+        <CowToggle
+          bare
+          label="Footnotes and credits"
+          :model-value="appStore.currentState.settings.footnotes"
+          @update:model-value="appStore.setFootnotes($event)"
+        />
+      </SettingsRow>
+    </SettingsGroup>
 
     <!-- SPACE MANAGEMENT OF SLIDES -->
-    <div
-      class="settings-group border-gray-200 dark:border-gray-800 mt-8 relative"
+    <SettingsGroup
+      title="Space Management"
+      note="Click any of the dashed edges to adjust that side's padding."
     >
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold relative">
-          Space Management
-          <IconWrapper
-            v-if="showTeamsBadge && !hasAccessToSpaceManagement"
-            name="i-bxs-award"
-            class="inline-flex w-6 h-6 text-xs ml-2 text-[#FF8980] absolute -top-1 cursor-pointer"
-            @click="handleUpgradeClick"
-          />
-        </h3>
-      </div>
-      <UForm :state="{}">
-        <div class="header flex items-center justify-between">
-          <h4 class="text-sm font-semibold opacity-70 whitespace-nowrap mr-6">
-            Set default padding between slides
-          </h4>
-          <div
-            v-if="activePadding"
-            class="flex px-0 items-center gap-2 font-semibold come-up-1 w-[200px]"
-          >
-            <span class="text-sm">24</span>
-            <URange
-              :model-value="(appStore.currentState.settings.slideStyles?.windowPadding?.[activePadding as 'top' | 'right' | 'bottom' | 'left'] as number)"
-              :min="24"
-              :max="
-                activePadding === 'right' || activePadding === 'left'
-                  ? 100
-                  : 120
-              "
-              :step="1"
-              :disabled="!hasAccessToSpaceManagement"
-              @change="
-                hasAccessToSpaceManagement
-                  ? appStore.setWindowPadding({ [activePadding]: $event })
-                  : handleUpgradeClick()
-              "
-            />
-            <span class="text-sm">
-              {{
-                activePadding === "right" || activePadding === "left"
-                  ? 100
-                  : 120
-              }}</span
-            >
-          </div>
-        </div>
-        <div
-          class="sample-monitor bg-gray-100 dark:bg-gray-800 dark:text-white rounded-lg my-4 relative grid place-items-center"
-          :style="`width: 400px; height: 220px`"
-        >
-          <div class="inner max-w-[60%] mx-auto text-center p-8">
-            <p class="text-sm opacity-50">
-              Click on any of the dashed corners to adjust the padding
-            </p>
-          </div>
-          <UButton
-            variant="ghost"
-            class="top-padding border-b border-dashed justify-center border-gray-500 dark:border-gray-500 absolute top-0 left-0 right-0 rounded-b-none"
-            :class="
-              activePadding === 'top'
-                ? 'bg-primary-200 dark:bg-primary-800'
-                : ''
-            "
-            :disabled="!hasAccessToSpaceManagement"
-            :style="`height: ${currentState.settings.slideStyles?.windowPadding?.top}px`"
-            @click="
-              hasAccessToSpaceManagement
-                ? (activePadding = 'top')
-                : handleUpgradeClick()
-            "
-          >
-            {{ currentState.settings.slideStyles?.windowPadding?.top }}</UButton
-          >
-          <UButton
-            variant="ghost"
-            class="bottom-padding border-t border-dashed justify-center border-gray-500 dark:border-gray-500 absolute bottom-0 left-0 right-0 rounded-t-none"
-            :class="
-              activePadding === 'bottom'
-                ? 'bg-primary-200 dark:bg-primary-800'
-                : ''
-            "
-            :disabled="!hasAccessToSpaceManagement"
-            :style="`height: ${currentState.settings.slideStyles?.windowPadding?.bottom}px`"
-            @click="
-              hasAccessToSpaceManagement
-                ? (activePadding = 'bottom')
-                : handleUpgradeClick()
-            "
-          >
-            {{
-              currentState.settings.slideStyles?.windowPadding?.bottom
-            }}</UButton
-          >
-          <UButton
-            variant="ghost"
-            class="right-padding opacity-50 p-0 pl-[3px] border-l border-dashed border-gray-500 dark:border-gray-500 absolute top-0 bottom-0 right-0 rounded-l-none"
-            :class="
-              activePadding === 'right'
-                ? 'bg-primary-200 dark:bg-primary-800'
-                : ''
-            "
-            :disabled="!hasAccessToSpaceManagement"
-            :style="`width: ${currentState.settings.slideStyles?.windowPadding?.right}px`"
-            @click="
-              hasAccessToSpaceManagement
-                ? (activePadding = 'right')
-                : handleUpgradeClick()
-            "
-          >
-            {{
-              currentState.settings.slideStyles?.windowPadding?.right
-            }}</UButton
-          >
-          <UButton
-            variant="ghost"
-            class="left-padding opacity-50 p-0 pl-[3px] border-r border-dashed border-gray-500 dark:border-gray-500 absolute top-0 bottom-0 left-0 rounded-r-none"
-            :class="
-              activePadding === 'left'
-                ? 'bg-primary-200 dark:bg-primary-800'
-                : ''
-            "
-            :disabled="!hasAccessToSpaceManagement"
-            :style="`width: ${currentState.settings.slideStyles?.windowPadding?.left}px`"
-            @click="
-              hasAccessToSpaceManagement
-                ? (activePadding = 'left')
-                : handleUpgradeClick()
-            "
-          >
-            {{ currentState.settings.slideStyles?.windowPadding?.left }}
-          </UButton>
-        </div>
-      </UForm>
-    </div>
+      <template #badge>
+        <IconWrapper
+          v-if="showTeamsBadge && !hasAccessToSpaceManagement"
+          name="i-bxs-award"
+          class="inline-flex w-5 h-5 text-[#FF8980] cursor-pointer"
+          @click="handleUpgradeClick"
+        />
+      </template>
 
-    <UDivider class="mt-4" />
+      <SettingsSlider
+        v-if="activePadding"
+        class="come-up-1"
+        :label="activePaddingLabel"
+        :model-value="paddingValue"
+        :min="24"
+        :max="paddingMax"
+        :step="1"
+        :disabled="!hasAccessToSpaceManagement"
+        @change="
+          hasAccessToSpaceManagement
+            ? appStore.setWindowPadding({ [activePadding]: $event })
+            : handleUpgradeClick()
+        "
+      />
+
+      <div
+        class="sample-monitor rounded-2xl bg-[#f1f3f6] dark:bg-[#1b212e] relative grid place-items-center overflow-hidden"
+        :style="`width: 400px; height: 220px`"
+      >
+        <div class="inner max-w-[60%] mx-auto text-center p-8">
+          <p class="text-xs text-gray-500 dark:text-[#9aa3b2]">
+            Click on any of the dashed edges to adjust the padding
+          </p>
+        </div>
+        <button
+          v-for="side in paddingSides"
+          :key="side.name"
+          class="padding-edge absolute grid place-items-center border-dashed border-gray-400 dark:border-[#3a4356] text-xs font-semibold text-gray-600 dark:text-[#a7afbd] transition-colors disabled:cursor-not-allowed"
+          :class="[
+            side.class,
+            activePadding === side.name
+              ? 'bg-primary-200 dark:bg-primary-800'
+              : 'hover:bg-white/70 dark:hover:bg-[#222938]',
+          ]"
+          :disabled="!hasAccessToSpaceManagement"
+          :style="side.style"
+          @click="
+            hasAccessToSpaceManagement
+              ? (activePadding = side.name)
+              : handleUpgradeClick()
+          "
+        >
+          {{ windowPadding?.[side.name] }}
+        </button>
+      </div>
+    </SettingsGroup>
 
     <!-- ANIMATION -->
-    <div
-      class="settings-group border-gray-200 dark:border-gray-800 mt-8 relative"
-    >
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold relative">
-          Animation & Transitions
-          <IconWrapper
-            v-if="showTeamsBadge && !hasAccessToAnimations"
-            name="i-bxs-award"
-            class="inline-flex w-6 h-6 text-xs ml-2 text-[#FF8980] absolute -top-1 cursor-pointer"
-            @click="handleUpgradeClick"
-          />
-        </h3>
-      </div>
-      <UForm :state="{}">
-        <UFormGroup
-          label="Transition between slides and micro animations"
-          class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
-        >
-          <UToggle
-            size="lg"
-            :model-value="appStore.currentState.settings.animations"
-            :disabled="!hasAccessToAnimations"
-            @change="
-              hasAccessToAnimations
-                ? appStore.setAnimations($event)
-                : handleUpgradeClick()
-            "
-          />
-        </UFormGroup>
-        <UFormGroup
-          v-if="appStore.currentState.settings.animations"
-          label="Transition interval in seconds"
-          class="flex items-center justify-between px-2 py-2 hover:bg-primary/10"
-        >
-          <div
-            class="flex px-0 items-center gap-2 font-semibold w-full min-w-[200px]"
-          >
-            <span class="text-sm">0s</span>
-            <URange
-              :model-value="appStore.currentState.settings.transitionInterval"
-              :min="0"
-              :max="5"
-              :step="0.1"
-              :disabled="!hasAccessToAnimations"
-              @change="
-                hasAccessToAnimations
-                  ? appStore.setTransitionInterval($event)
-                  : handleUpgradeClick()
-              "
-            />
-            <span class="text-sm"> 5s</span>
-          </div>
-        </UFormGroup>
-      </UForm>
-    </div>
+    <SettingsGroup title="Animation & Transitions">
+      <template #badge>
+        <IconWrapper
+          v-if="showTeamsBadge && !hasAccessToAnimations"
+          name="i-bxs-award"
+          class="inline-flex w-5 h-5 text-[#FF8980] cursor-pointer"
+          @click="handleUpgradeClick"
+        />
+      </template>
 
-    <UDivider class="mt-4" />
+      <SettingsRow
+        label="Transitions between slides"
+        :disabled="!hasAccessToAnimations"
+      >
+        <CowToggle
+          bare
+          label="Transitions between slides"
+          :model-value="appStore.currentState.settings.animations"
+          :disabled="!hasAccessToAnimations"
+          @update:model-value="
+            hasAccessToAnimations
+              ? appStore.setAnimations($event)
+              : handleUpgradeClick()
+          "
+        />
+      </SettingsRow>
 
-    <!-- OVERLAYS AND THEMES -->
-    <div
-      class="settings-group border-gray-200 dark:border-gray-800 mt-8 relative"
-    >
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold relative">
-          Overlays & Themes
-          <IconWrapper
-            v-if="showTeamsBadge && !hasAccessToOverlays"
-            name="i-bxs-award"
-            class="inline-flex w-6 h-6 text-xs ml-2 text-[#FF8980] absolute -top-1 cursor-pointer"
-            @click="handleUpgradeClick"
-          />
-        </h3>
-      </div>
-      <UForm :state="{}">
-        <div class="flex items-end gap-4">
-          <UFormGroup
-            label="Set slide overlay"
-            class="flex w-full items-center justify-between py-2 px-2 hover:bg-primary/10"
-          >
-            <USelectMenu
-              class="border-0 shadow-none max-w-[200px]"
-              select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
-              size="md"
-              :options="[
-                { key: 'falling-snow', label: 'Falling Snow' },
-                { key: 'none', label: 'None selected' },
-              ]"
-              :model-value="appStore.currentState.activeOverlay"
-              :disabled="!hasAccessToOverlays"
-              variant="none"
-              color="primary"
-              :ui="selectUI"
-              :ui-menu="selectMenuUI"
-              @change="
-                (event: any) => {
-                  if (!hasAccessToOverlays) {
-                    handleUpgradeClick()
-                    return
-                  }
-                  const overlay = event.key
-                  appStore.setActiveOverlay(overlay)
-                  sendOverlayToWebsocket(overlay)
-                }
-              "
-            >
-            </USelectMenu>
-          </UFormGroup>
-        </div>
-      </UForm>
-    </div>
+      <SettingsSlider
+        v-if="appStore.currentState.settings.animations"
+        label="Transition interval"
+        :model-value="appStore.currentState.settings.transitionInterval"
+        :min="MIN_TRANSITION_INTERVAL"
+        :max="MAX_TRANSITION_INTERVAL"
+        :step="0.1"
+        suffix="s"
+        :disabled="!hasAccessToAnimations"
+        @change="
+          hasAccessToAnimations
+            ? appStore.setTransitionInterval($event)
+            : handleUpgradeClick()
+        "
+      />
 
-    <UDivider class="mt-4" />
+      <SettingsRow
+        label="Micro animations"
+        description="Text and micro animations on slide content."
+        :disabled="!hasAccessToAnimations"
+      >
+        <CowToggle
+          bare
+          label="Micro animations"
+          :model-value="appStore.currentState.settings.microAnimations !== false"
+          :disabled="!hasAccessToAnimations"
+          @update:model-value="
+            hasAccessToAnimations
+              ? appStore.setMicroAnimations($event)
+              : handleUpgradeClick()
+          "
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Verse-to-verse transition"
+        :disabled="!hasAccessToAnimations"
+      >
+        <SettingsSelect
+          :options="verseTransitionStyleOptions"
+          value-attribute="key"
+          option-attribute="label"
+          :model-value="
+            appStore.currentState.settings.verseTransitionStyle || 'off'
+          "
+          :disabled="!hasAccessToAnimations"
+          @change="
+            (key: string) => {
+              if (!hasAccessToAnimations) {
+                handleUpgradeClick()
+                return
+              }
+              appStore.setVerseTransitionStyle(key)
+            }
+          "
+        />
+      </SettingsRow>
+
+      <SettingsSlider
+        v-if="
+          (appStore.currentState.settings.verseTransitionStyle || 'off') !==
+          'off'
+        "
+        label="Verse-to-verse interval"
+        :model-value="appStore.currentState.settings.verseTransitionInterval"
+        :min="0"
+        :max="1.5"
+        :step="0.1"
+        suffix="s"
+        :disabled="!hasAccessToAnimations"
+        @change="
+          hasAccessToAnimations
+            ? appStore.setVerseTransitionInterval($event)
+            : handleUpgradeClick()
+        "
+      />
+    </SettingsGroup>
 
     <!-- SONG SLIDES -->
-    <div class="settings-group border-gray-200 dark:border-gray-800 mt-8">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">
-          Song Slides
-          <div class="text-primary">Settings ONLY apply to new slides</div>
-        </h3>
-      </div>
-      <UForm :state="{}">
-        <UFormGroup label="Set default lines per slide">
-          <USelectMenu
-            class="absolute border-0 shadow-none top-[6px]"
-            select-class="border-3 shadow-none outline-none text-center w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
-            size="md"
-            :options="['1', '2', '3', '4', '5', '6']"
-            v-model.number="lines"
-            variant="none"
-            color="primary"
-            clear-search-on-close
-            :ui="{
-              base: 'bg-primary-500',
-              input: 'bg-primary-500',
-              color: {
-                primary: {
-                  outline: 'shadow-sm bg-primary-500 ',
-                },
-              },
-            }"
-            :ui-menu="{
-              width: 'w-[200px]',
-              input: 'text-xs',
-              empty: 'text-xs',
-              option: {
-                size: 'text-xs',
-              },
-            }"
-            @change="appStore.setLinesPerSlide($event)"
-          >
-            <template #label>
-              <IconWrapper name="i-tabler-list-numbers" size="4"> </IconWrapper>
-              <span v-if="lines" class="truncate"
-                >{{ lines }} {{ lines > 1 ? "lines" : "line" }}</span
-              >
-              <span v-else class="truncate whitespace-nowrap"
-                >Lines per slide</span
-              >
-            </template>
-            <template #option="{ option: lines }">
-              <span
-                v-if="lines"
-                class="truncate"
-                :class="useURLFriendlyString(lines)"
-                >{{ lines }} {{ lines > 1 ? "lines" : "line" }}</span
-              >
-              <span v-else class="truncate whitespace-nowrap"
-                >Lines per slide</span
-              >
-            </template>
-          </USelectMenu>
-        </UFormGroup>
-      </UForm>
-    </div>
+    <SettingsGroup
+      title="Song Slides"
+      note="These settings ONLY apply to new slides."
+    >
+      <SettingsRow label="Default lines per slide">
+        <SettingsSelect
+          :options="['1', '2', '3', '4', '5', '6']"
+          v-model.number="lines"
+          @change="appStore.setLinesPerSlide($event)"
+        >
+          <template #label>
+            <IconWrapper name="i-tabler-list-numbers" size="4" />
+            <span v-if="lines" class="truncate"
+              >{{ lines }} {{ lines > 1 ? "lines" : "line" }}</span
+            >
+            <span v-else class="truncate whitespace-nowrap">
+              Lines per slide
+            </span>
+          </template>
+          <template #option="{ option: option }">
+            <span v-if="option" class="truncate"
+              >{{ option }} {{ Number(option) > 1 ? "lines" : "line" }}</span
+            >
+            <span v-else class="truncate whitespace-nowrap">
+              Lines per slide
+            </span>
+          </template>
+        </SettingsSelect>
+      </SettingsRow>
+    </SettingsGroup>
   </div>
 </template>
 
@@ -563,12 +381,14 @@
 import { useAppStore } from "~/store/app"
 const appStore = useAppStore()
 
+type PaddingSide = "top" | "right" | "bottom" | "left"
+
 const MAX_FONT_SIZE = 150
 const MIN_FONT_SIZE = 50
 const lines = ref<number>(
   appStore.currentState.settings.slideStyles.linesPerSlide || 4
 )
-const activePadding = ref<string>("")
+const activePadding = ref<PaddingSide | "">("")
 const { currentState } = storeToRefs(appStore)
 
 // Teams subscription check
@@ -587,10 +407,11 @@ const hasAccessToAnimations = computed(() => {
   return hasAccessToFeature("animations-transitions")
 })
 
-const hasAccessToOverlays = computed(() => {
-  if (!isPremiumFeatureEnabled.value) return true
-  return hasAccessToFeature("overlays-themes")
-})
+const verseTransitionStyleOptions = [
+  { key: "off", label: "Off" },
+  { key: "fade", label: "Fade" },
+  { key: "slide-up", label: "Slide up" },
+]
 
 // Show teams badge if feature is locked
 const showTeamsBadge = computed(() => {
@@ -605,49 +426,52 @@ const handleUpgradeClick = () => {
   })
 }
 
-const getActivePaddingValue = (side: string) => {
-  side = side as "top" | "right" | "bottom" | "left"
-  return appStore.currentState.settings.slideStyles.windowPadding?.[
-    side as "top" | "right" | "bottom" | "left"
-  ]
-}
+const windowPadding = computed(
+  () => currentState.value.settings.slideStyles?.windowPadding
+)
 
-const removeOverlayFromWebsocket = () => {
-  const socket = useNuxtApp().$socketio as any
-  if (socket?.connected) {
-    socket.emit("remove-overlay", {})
-  }
-}
+// Left/right padding is capped lower than top/bottom — a 16:9 stage runs out
+// of horizontal room first.
+const paddingMax = computed(() =>
+  activePadding.value === "right" || activePadding.value === "left" ? 100 : 120
+)
 
-const sendOverlayToWebsocket = (overlay: string) => {
-  if (!overlay) {
-    return removeOverlayFromWebsocket()
-  }
-  const socket = useNuxtApp().$socketio as any
-  if (socket?.connected) {
-    socket.emit("add-overlay", overlay)
-  }
-}
+const activePaddingLabel = computed(() =>
+  activePadding.value
+    ? `${activePadding.value[0]?.toUpperCase()}${activePadding.value.slice(
+        1
+      )} padding`
+    : ""
+)
 
-const selectUI = {
-  base: "bg-primary-500",
-  input: "bg-primary-500",
-  color: {
-    primary: {
-      outline: "shadow-sm bg-primary-500 ",
-    },
+const paddingValue = computed(() =>
+  activePadding.value
+    ? (windowPadding.value?.[activePadding.value] as number)
+    : 0
+)
+
+// Each edge is a button sized to the padding it represents, so the preview
+// doubles as the control. Horizontal edges take a height, vertical ones a width.
+const paddingSides = computed(() => [
+  {
+    name: "top" as PaddingSide,
+    class: "top-0 left-0 right-0 border-b rounded-t-2xl",
+    style: { height: `${windowPadding.value?.top}px` },
   },
-}
-const selectMenuUI = {
-  width: "w-[200px]",
-  input: "text-xs",
-  empty: "text-xs",
-  option: {
-    size: "text-xs",
+  {
+    name: "bottom" as PaddingSide,
+    class: "bottom-0 left-0 right-0 border-t rounded-b-2xl",
+    style: { height: `${windowPadding.value?.bottom}px` },
   },
-}
-const libraryTabs = [
-  { label: "Still Background", icon: "i-bx-image" },
-  { label: "Motion Background", icon: "i-bx-film" },
-]
+  {
+    name: "right" as PaddingSide,
+    class: "top-0 bottom-0 right-0 border-l rounded-r-2xl",
+    style: { width: `${windowPadding.value?.right}px` },
+  },
+  {
+    name: "left" as PaddingSide,
+    class: "top-0 bottom-0 left-0 border-r rounded-l-2xl",
+    style: { width: `${windowPadding.value?.left}px` },
+  },
+])
 </script>

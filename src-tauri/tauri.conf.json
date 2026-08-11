@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cloud of Worship",
-  "version": "0.51.2",
+  "version": "0.52.1",
   "identifier": "com.cloudofworship.app",
   "build": {
     "frontendDist": "../dist",
@@ -21,15 +21,22 @@
         "resizable": true,
         "fullscreen": false,
         "center": true,
-        "label": "main"
+        "label": "main",
+        "dragDropEnabled": false
       }
     ],
     "security": {
       "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPLOCALDATA/cow-media/**/*"
+        ]
+      },
       "capabilities": [
         {
           "identifier": "main-capability",
-          "windows": ["main"],
+          "windows": ["main", "live-output"],
           "permissions": [
             "core:default",
             "core:webview:allow-create-webview-window",
@@ -38,9 +45,34 @@
             "core:webview:allow-webview-size",
             "core:window:allow-create",
             "core:window:allow-close",
+            "core:window:allow-set-focus",
+            "core:window:allow-set-fullscreen",
+            "core:window:allow-set-position",
+            "core:window:allow-set-size",
+            "core:window:allow-set-decorations",
+            "core:window:allow-set-always-on-top",
             "shell:allow-open",
             "updater:default",
-            "process:allow-restart"
+            "process:allow-restart",
+            "fs:allow-exists",
+            "fs:allow-mkdir",
+            "fs:allow-open",
+            "fs:allow-write",
+            "fs:allow-write-file",
+            "fs:allow-write-text-file",
+            "fs:allow-read-file",
+            "fs:allow-read-text-file",
+            "fs:allow-stat",
+            "fs:allow-read-dir",
+            "fs:allow-remove",
+            "fs:allow-rename",
+            {
+              "identifier": "fs:scope",
+              "allow": [
+                "$APPLOCALDATA/cow-media",
+                "$APPLOCALDATA/cow-media/**/*"
+              ]
+            }
           ]
         }
       ]
@@ -48,6 +80,9 @@
     "withGlobalTauri": true
   },
   "plugins": {
+    "shell": {
+      "open": "^https?://"
+    },
     "updater": {
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYxRDg0OTNGREE5OTExNTAKUldSUUVabmFQMG5ZWWF1ZDlRUVFxSi9OZ1BtZWthdXE3c2lESXVweXBUbjdkcWRwQ3JJNHR0RVUK",
@@ -63,6 +98,11 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "dmg", "deb", "appimage"],
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "entitlements": "entitlements.plist",
+      "minimumSystemVersion": "10.15"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

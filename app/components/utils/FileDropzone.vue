@@ -1,14 +1,27 @@
 <template>
   <label
-    class="dropzone text-center py-8 p-6 min-h-[200px] flex flex-col justify-center items-center rounded-lg border-dashed border-2 border-primary-200 cursor-pointer"
+    class="dropzone flex cursor-pointer flex-col items-center justify-center text-center"
     @dragover.prevent="onDragOver"
     @dragleave.prevent="onDragLeave"
     @drop.prevent="onDrop"
-    :class="{
-      'border-primary-500 bg-primary-50 dark:bg-primary-900': isDragOver,
-      'hover:border-primary-400 transition-colors': !isDragOver,
-      'p-2 min-h-[100px]': size === 'sm',
-    }"
+    :class="
+      backgroundPanel
+        ? [
+            'min-h-0 rounded-[8px] border border-dashed border-gray-300 bg-white p-0 text-gray-700 transition-colors dark:border-[#505866] dark:bg-transparent dark:text-[#F8F9FB]',
+            isDragOver
+              ? 'border-gray-500 bg-gray-100 dark:border-[#9BA3B2] dark:bg-white/[0.03]'
+              : 'hover:border-gray-500 dark:hover:border-[#9BA3B2]',
+          ]
+        : [
+            'min-h-[200px] rounded-lg border-2 border-dashed border-primary-200 p-6 py-8',
+            {
+              'border-primary-500 bg-primary-50 dark:bg-primary-900':
+                isDragOver,
+              'hover:border-primary-400 transition-colors': !isDragOver,
+              'min-h-[100px] p-2': size === 'sm',
+            },
+          ]
+    "
   >
     <input
       type="file"
@@ -18,30 +31,48 @@
       hidden
     />
 
-    <IconWrapper
-      :name="icon"
-      :size="size === 'sm' ? '7' : '12'"
-      :class="[size === 'sm' ? 'w-[100px] mb-4 py-4' : 'py-6 mb-8 w-full']"
-      rounded-bg
-    ></IconWrapper>
-    <div class="texts">
-      <p class="mb font-medium">
-        <span class="text-md">Drag &amp; Drop</span> or
-        <span class="text-md">Click to select</span>
+    <template v-if="backgroundPanel">
+      <UIcon
+        :name="icon"
+        class="mb-4 h-7 w-7 text-gray-400 dark:text-[#9BA3B2]"
+      />
+      <p class="max-w-[140px] text-[12px] font-normal leading-[17px]">
+        <span
+          v-for="line in backgroundDescriptionLines"
+          :key="line"
+          class="block"
+        >
+          {{ line }}
+        </span>
       </p>
-      <p
-        v-if="size !== 'sm'"
-        class="text-sm mb-6"
-        :class="{ 'text-xs': size === 'sm' }"
-      >
-        {{ description }}
-      </p>
-    </div>
+    </template>
+
+    <template v-else>
+      <IconWrapper
+        :name="icon"
+        :size="size === 'sm' ? '7' : '12'"
+        :class="[size === 'sm' ? 'w-[100px] mb-4 py-4' : 'py-6 mb-8 w-full']"
+        rounded-bg
+      ></IconWrapper>
+      <div class="texts">
+        <p class="mb font-medium">
+          <span class="text-md">Drag &amp; Drop</span> or
+          <span class="text-md">Click to select</span>
+        </p>
+        <p
+          v-if="size !== 'sm'"
+          class="text-sm mb-6"
+          :class="{ 'text-xs': size === 'sm' }"
+        >
+          {{ description }}
+        </p>
+      </div>
+    </template>
   </label>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue"
+import { computed, ref } from "vue"
 
 const props = defineProps({
   size: {
@@ -54,7 +85,7 @@ const props = defineProps({
   },
   maxVideoFileSize: {
     type: Number,
-    default: 250, // Videos only (MB); Infinity = no limit
+    default: Infinity,
   },
   icon: {
     type: String,
@@ -72,6 +103,14 @@ const props = defineProps({
     type: String,
     default: "image, video or audio files.",
   },
+  backgroundPanel: {
+    type: Boolean,
+    default: false,
+  },
+})
+const backgroundDescriptionLines = computed(() => {
+  const [firstLine, secondLine] = props.description.split(" or ")
+  return secondLine ? [`${firstLine} or`, secondLine] : [props.description]
 })
 const toast = useToast()
 const isDragOver = ref(false)
@@ -100,9 +139,9 @@ const handleFiles = (selectedFiles: FileList | File[]) => {
   // Holding state here caused removed files to reappear on the next drop, and
   // re-processing of already-handled files in single-shot consumers.
   const validFiles: File[] = []
-  for (let i = 0; i < selectedFiles.length; i++) {
-    if (isFileSizeExceeded(selectedFiles[i])) {
-      validFiles.push(selectedFiles[i])
+  for (const file of Array.from(selectedFiles)) {
+    if (isFileSizeExceeded(file)) {
+      validFiles.push(file)
     }
   }
   if (validFiles.length > 0) {
@@ -141,9 +180,9 @@ const handlePaste = (event: ClipboardEvent) => {
   const items = event.clipboardData?.items || []
   const filesFromClipboard = []
 
-  for (let i = 0; i < items.length; i++) {
-    if (items[i].kind === "file") {
-      const file = items[i].getAsFile()
+  for (const item of Array.from(items)) {
+    if (item.kind === "file") {
+      const file = item.getAsFile()
       if (file) {
         filesFromClipboard.push(file)
       }

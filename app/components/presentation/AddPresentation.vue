@@ -10,48 +10,30 @@
 
     <div class="flex flex-col gap-3 mt-3">
       <!-- Info banner -->
-      <div
-        class="alert flex gap-2 p-4 rounded-md bg-primary-100 dark:bg-primary-900"
+      <Hint
+        :title="
+          fileType === 'ppt' ? 'Import PowerPoint slides' : 'Import PDF slides'
+        "
       >
-        <IconWrapper
-          name="i-bx-info-circle"
-          size="4"
-          class="text-primary-500 mt-0.5 shrink-0"
-        />
-        <div class="flex-1">
-          <h4 class="text-md font-semibold">
-            {{
-              fileType === "ppt"
-                ? "Import PowerPoint slides"
-                : "Import PDF slides"
-            }}
-          </h4>
-          <p class="text-sm">
-            Each page is converted into an image and bundled into a single
-            presentation slide.
-          </p>
-          <p class="text-xs mt-2 text-gray-500 dark:text-gray-400">
-            <template v-if="fileType === 'pdf'">
-              Tip: Export as PDF from Canva, PowerPoint, or Google Slides for
-              best results.
-            </template>
-          </p>
-        </div>
-      </div>
+        <p>
+          Each page is converted into an image and bundled into a single
+          presentation slide.
+        </p>
+        <p v-if="fileType === 'pdf'" class="mt-2">
+          Tip: Export as PDF from Canva, PowerPoint, or Google Slides for best
+          results.
+        </p>
+      </Hint>
 
       <!-- PPT feature-flag notice -->
       <div
         v-if="fileType === 'ppt' && !isPptEnabled"
         class="flex gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-sm text-amber-700 dark:text-amber-300"
       >
-        <IconWrapper
-          name="i-bx-info-circle"
-          size="4"
-          class="text-amber-500 shrink-0 mt-0.5"
-        />
+        <InfoIcon class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
         <span>
           PowerPoint upload is being refined and currently unavailable. Please
-          export your file as PDF instead — it works great and is available to
+          export your file as PDF instead, it works great and is available to
           everyone.
         </span>
       </div>
@@ -109,20 +91,20 @@
           <span class="text-gray-400 text-xs shrink-0">{{
             fileSizeLabel
           }}</span>
-          <UButton
-            icon="i-bx-x"
+          <CowButton
+            variant="secondary"
             size="2xs"
-            color="gray"
-            variant="ghost"
             class="shrink-0"
             :disabled="isConverting"
             @click.prevent="clearFile"
-          />
+          >
+            <template #leading><CloseIcon class="w-4 h-4" /></template>
+          </CowButton>
         </div>
       </Transition>
 
       <!-- Conversion progress -->
-      <Transition name="fade-sm">
+      <!-- <Transition name="fade-sm">
         <div
           v-if="isConverting"
           class="flex items-center gap-3 px-3 py-3 rounded-md bg-primary-50 dark:bg-primary-900 text-sm"
@@ -135,7 +117,7 @@
             statusMessage || "Processing…"
           }}</span>
         </div>
-      </Transition>
+      </Transition> -->
 
       <!-- Error -->
       <Transition name="fade-sm">
@@ -165,9 +147,9 @@
       </div>
 
       <!-- CTA -->
-      <UButton
+      <CowButton
+        variant="primary"
         block
-        trailing-icon="i-bx-chevron-right"
         size="lg"
         class="mt-2"
         :disabled="!selectedFile || isConverting"
@@ -175,7 +157,7 @@
         @click="handleImport"
       >
         Import presentation slide
-      </UButton>
+      </CowButton>
     </div>
 
     <!-- Feature Introduction Modal -->
@@ -193,8 +175,8 @@
       >
         <p v-if="fileType === 'pdf'">
           Import PDF files directly into Cloud of Worship. Each page becomes an
-          image slide you can present right away — no uploads required,
-          processed instantly on your device.
+          image slide you can present right away, no uploads required, processed
+          instantly on your device.
         </p>
         <p v-else>
           Import PowerPoint files directly into Cloud of Worship. Each slide
@@ -260,7 +242,7 @@ const acceptedFileTypes = computed(() => {
     return ".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
   }
   if (props.fileType === "ppt") {
-    // flag off — accept nothing so the OS picker shows no valid files
+    // Flag off, accept nothing so the OS picker shows no valid files.
     return ".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
   }
   return ".pdf,application/pdf"

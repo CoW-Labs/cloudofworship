@@ -3,6 +3,11 @@ import { useAuthStore } from '~/store/auth'
 import { useAppStore } from '~/store/app'
 import type { Schedule, Slide } from '~/types'
 
+export type ScheduleUpdateResult =
+  | { status: 'saved'; schedule: Schedule }
+  | { status: 'queued' }
+  | { status: 'failed' }
+
 export default function useSchedules() {
   const authStore = useAuthStore()
   const appStore = useAppStore()
@@ -115,7 +120,7 @@ export default function useSchedules() {
   const updateSchedule = async (
     scheduleId: string,
     updateData: Partial<Schedule>
-  ): Promise<Schedule | null> => {
+  ): Promise<ScheduleUpdateResult> => {
     try {
       const churchId = getChurchId()
       if (!churchId) {
@@ -123,6 +128,7 @@ export default function useSchedules() {
       }
 
       loading.value = true
+      const queuedOffline = !online.value
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${scheduleId}`,
         {
@@ -132,6 +138,10 @@ export default function useSchedules() {
         }
       )
 
+      if (queuedOffline) {
+        return { status: 'queued' }
+      }
+
       if (error.value) {
         throw new Error(error.value?.message || 'Failed to update schedule')
       }
@@ -139,7 +149,7 @@ export default function useSchedules() {
       const updatedSchedule = data.value as Schedule
       appStore.setLastSynced(new Date().toISOString())
 
-      return updatedSchedule
+      return { status: 'saved', schedule: updatedSchedule }
     } catch (error: any) {
       console.error('Error updating schedule:', error)
       toast.add({
@@ -148,7 +158,7 @@ export default function useSchedules() {
         description: error.message,
         color: 'red',
       })
-      return null
+      return { status: 'failed' }
     } finally {
       loading.value = false
     }

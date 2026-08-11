@@ -1,25 +1,11 @@
 <template>
-  <div
-    class="transcripts-panel relative border border-primary-100 dark:border-primary-800 rounded-lg overflow-hidden bg-white dark:bg-primary-950 mb-4"
+  <AppSection
+    heading="Transcribe"
+    class="transcripts-panel min-h-0"
+    slot-ctn-styles="!px-0 !pb-0 overflow-hidden"
   >
-    <!-- Header -->
-    <div
-      class="flex items-center justify-between px-3 pt-2 bg-primary-100 dark:bg-primary-800 relative"
-    >
-      <!-- Left: title + AI badge -->
-      <div class="flex items-center gap-2">
-        <UIcon name="i-material-symbols-speech-to-text" class="text-lg" />
-        <span class="font-medium text-sm">Transcribe</span>
-        <!-- <UBadge
-          v-if="isTeamsPlan"
-          label="AI"
-          color="primary"
-          variant="solid"
-          size="xs"
-        /> -->
-      </div>
-
-      <!-- Right: mic trigger group + more menu -->
+    <!-- Inline header actions: mic trigger group + more menu -->
+    <template #actions>
       <div class="flex items-center gap-1">
         <!-- Mic trigger group — hover/click reveals the timer, then the mic button -->
         <div
@@ -87,65 +73,54 @@
           </Transition>
         </div>
 
-        <!-- More actions popover -->
-        <UPopover mode="click" :popper="{ placement: 'bottom-end' }">
+        <!-- More actions menu -->
+        <MoreActionsMenu v-slot="{ close }" flush>
           <UButton
-            icon="i-bx-dots-vertical-rounded"
             color="gray"
             variant="ghost"
-            size="xs"
-          />
-          <template #panel="{ close }">
-            <div class="p-1 flex flex-col gap-0.5 min-w-[160px]">
-              <UButton
-                icon="i-lucide-trash"
-                color="gray"
-                variant="ghost"
-                size="xs"
-                class="justify-start"
-                :disabled="segments.length === 0"
-                @click="
-                  () => {
-                    handleClear()
-                    close()
-                  }
-                "
-              >
-                Clear transcript
-              </UButton>
-              <UButton
-                icon="i-bx-x"
-                color="gray"
-                variant="ghost"
-                size="xs"
-                class="justify-start"
-                @click="
-                  () => {
-                    $emit('close')
-                    close()
-                  }
-                "
-              >
-                Close panel
-              </UButton>
-            </div>
-          </template>
-        </UPopover>
+            block
+            :disabled="segments.length === 0"
+            @click="
+              () => {
+                handleClear()
+                close()
+              }
+            "
+          >
+            <template #leading><DeleteIcon class="w-4 h-4" /></template>
+            Clear transcript
+          </UButton>
+          <UButton
+            color="gray"
+            variant="ghost"
+            block
+            @click="
+              () => {
+                $emit('close')
+                close()
+              }
+            "
+          >
+            <template #leading><CloseIcon class="w-4 h-4" /></template>
+            Close panel
+          </UButton>
+        </MoreActionsMenu>
       </div>
-    </div>
+    </template>
 
+    <div class="flex h-full min-h-0 flex-col overflow-hidden">
     <UTabs
       :items="panelTabs"
       :model-value="activeTabIndex"
-      class="px-1 bg-primary-100 dark:bg-primary-800"
+      class="px-1 bg-gray-100 dark:bg-[#222938] shrink-0"
       :ui="{
         list: {
           background: 'bg-transparent dark:bg-transparent',
           shadow: '',
           tab: {
             base: 'relative inline-flex items-center justify-center gap-1 flex-shrink-0 w-full font-medium text-xs h-7',
-            active: 'text-primary-600 dark:text-primary-400',
-            inactive: 'text-gray-500 dark:text-gray-400',
+            active: 'text-primary-600 dark:text-primary-300',
+            inactive: 'text-gray-500 dark:text-[#9aa3b2]',
           },
         },
       }"
@@ -155,17 +130,17 @@
         <span>Scriptures</span>
         <span
           v-if="scriptureResults.length > 0"
-          class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-primary-200 dark:bg-primary-700 text-primary-700 dark:text-primary-300"
+          class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-primary-200 dark:bg-[#384155] text-primary-700 dark:text-primary-300"
         >
           {{ scriptureResults.length > 99 ? "99+" : scriptureResults.length }}
         </span>
       </template>
     </UTabs>
-    <div class="relative">
+    <div class="relative shrink-0">
       <AudioWaveform
         :active="isTranscribing"
         :mic-level="micLevel"
-        class="px-3 pb-1.5 bg-primary-100 dark:bg-primary-800 w-full"
+        class="px-3 pb-1.5 bg-gray-100 dark:bg-[#222938] w-full"
       />
     </div>
 
@@ -173,12 +148,12 @@
     <div
       v-show="activeTabIndex === 0"
       ref="transcriptContainer"
-      class="transcript-content p-3 overflow-y-auto h-[160px] 2xl:h-[250px]"
+      class="transcript-content flex-1 min-h-0 p-3 overflow-y-auto"
     >
       <!-- Empty state -->
       <div
         v-if="segments.length === 0 && !currentTranscript"
-        class="text-center py-6 text-gray-500 dark:text-gray-400"
+        class="text-center py-6 text-gray-500 dark:text-[#9aa3b2]"
       >
         <UIcon
           name="i-material-symbols-speech-to-text"
@@ -243,7 +218,7 @@
         </div>
         <div
           v-if="currentTranscript"
-          class="segment text-sm leading-relaxed text-gray-600 dark:text-gray-400 italic"
+          class="segment text-sm leading-relaxed text-gray-600 dark:text-[#9aa3b2] italic"
         >
           {{ currentTranscript }}<span class="animate-pulse">▌</span>
         </div>
@@ -256,12 +231,12 @@
     <div
       v-show="activeTabIndex === 1"
       ref="scripturesContainer"
-      class="transcript-content overflow-y-auto h-[160px] 2xl:h-[250px]"
+      class="transcript-content flex-1 min-h-0 overflow-y-auto"
     >
       <!-- Empty state -->
       <div
         v-if="scriptureResults.length === 0"
-        class="text-center py-6 text-gray-500 dark:text-gray-400"
+        class="text-center py-6 text-gray-500 dark:text-[#9aa3b2]"
       >
         <UIcon name="i-bx-bible" class="text-3xl mb-2 opacity-50" />
         <p class="text-sm">
@@ -277,11 +252,11 @@
       </div>
 
       <!-- Results — newest first, 20 at a time -->
-      <div v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+      <div v-else class="divide-y divide-gray-100 dark:divide-[#171d2b]">
         <button
           v-for="result in visibleScriptureResults"
           :key="result._id"
-          class="w-full text-left py-3 px-3 hover:bg-primary-50 dark:hover:bg-primary-900 transition-colors cursor-pointer group"
+          class="w-full text-left py-3 px-3 hover:bg-white dark:hover:bg-[#2b3242] transition-colors cursor-pointer group"
           @click="handleScriptureClick(result)"
         >
           <div class="flex items-center gap-1.5 mb-0.5">
@@ -290,21 +265,21 @@
               class="text-primary-500 text-sm flex-shrink-0"
             />
             <span
-              class="text-xs font-semibold text-primary-600 dark:text-primary-400 group-hover:underline"
+              class="text-xs font-semibold text-primary-600 dark:text-primary-300 group-hover:underline"
               v-html="
                 highlightText(result.displayLabel, scriptureHighlightQuery)
               "
             />
           </div>
           <p
-            class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2"
+            class="text-xs text-gray-600 dark:text-[#9aa3b2] leading-relaxed line-clamp-2"
             v-html="highlightText(result.scripture, scriptureHighlightQuery)"
           />
         </button>
 
         <button
           v-if="scriptureResults.length > scriptureVisibleCount"
-          class="w-full text-xs text-center py-1.5 text-primary-500 dark:text-primary-400 hover:underline"
+          class="w-full text-xs text-center py-1.5 text-primary-500 dark:text-primary-300 hover:underline"
           @click="scriptureVisibleCount += 20"
         >
           See
@@ -366,7 +341,8 @@
         </p>
       </div>
     </FeatureIntroductionModal>
-  </div>
+    </div>
+  </AppSection>
 </template>
 
 <script setup lang="ts">

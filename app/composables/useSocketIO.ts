@@ -388,7 +388,8 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('lock-denied', { action: 'lock-denied', data })
       })
 
-      // Live slide sync
+      // Live slide feed — one-way, operator to the livestream viewers. This is
+      // the only way /livestream/:schedule_id learns which slide is on screen.
       socket.on('live-slide', (data) => {
         onMessage?.('live-slide', { action: 'live-slide', data })
       })
@@ -408,6 +409,14 @@ export const useSocketIO = (options: SocketIOOptions) => {
 
       socket.on('remove-overlay', (data) => {
         onMessage?.('remove-overlay', { action: 'remove-overlay', data })
+      })
+
+      socket.on('show-slide-overlay', (data) => {
+        onMessage?.('show-slide-overlay', { action: 'show-slide-overlay', data })
+      })
+
+      socket.on('remove-slide-overlay', (data) => {
+        onMessage?.('remove-slide-overlay', { action: 'remove-slide-overlay', data })
       })
 
       // Ping/pong
@@ -510,6 +519,13 @@ export const useSocketIO = (options: SocketIOOptions) => {
   }
 
   /**
+   * Broadcast the slide currently on screen to livestream viewers
+   */
+  const sendLiveSlide = (slide: any) => {
+    return emit('live-slide', slide)
+  }
+
+  /**
    * Send batch slides created event
    */
   const sendBatchSlidesCreated = (slides: any[]) => {
@@ -549,13 +565,6 @@ export const useSocketIO = (options: SocketIOOptions) => {
    */
   const refreshLock = (slideId: string) => {
     return emit('refresh-lock', { slideId })
-  }
-
-  /**
-   * Send live slide update
-   */
-  const sendLiveSlide = (slide: any) => {
-    return emit('live-slide', slide)
   }
 
   /**
@@ -603,6 +612,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
     sendSlideCreated,
     sendSlideUpdated,
     sendSlideDeleted,
+    sendLiveSlide,
     sendBatchSlidesCreated,
     sendBatchSlidesUpdated,
     sendBatchSlidesDeleted,
@@ -612,9 +622,6 @@ export const useSocketIO = (options: SocketIOOptions) => {
     lockSlide,
     unlockSlide,
     refreshLock,
-
-    // Live slide
-    sendLiveSlide,
 
     // Users
     getOnlineUsers,

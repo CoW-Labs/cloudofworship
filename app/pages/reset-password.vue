@@ -1,72 +1,61 @@
 <template>
-  <div class="login-main section">
-    <div class="header flex flex-col items-center text-center mb-12">
-      <Logo class="w-28 h-28" />
-      <p class="max-w-[200px] mx-auto">
-        Reset your password for
-        <span class="font-semibold">Cloud of Worship</span>
+  <div class="w-full flex flex-col items-center">
+    <div class="flex flex-col items-center text-center mb-8 come-up-1">
+      <Logo class="w-14 h-14 mb-7" />
+      <h1 class="text-[2.5rem] lg:text-[2rem] xl:text-[2.5rem] leading-none font-bold mb-3">Reset password</h1>
+      <p class="text-gray-500 dark:text-gray-400 text-[15px] lg:text-[13px] xl:text-[15px] max-w-[22rem]">
+        Kindly enter your new preferred password in the input fields below
       </p>
     </div>
-    <form
-      class="flex flex-col gap-3 max-w-[325px] mx-auto"
-      @submit.prevent="login"
-    >
-      <UFormGroup size="lg">
-        <UInput placeholder="Your email" v-model="email" />
-      </UFormGroup>
-      <!-- <UFormGroup size="lg">
-        <UInput placeholder="Your generated token" v-model="token" />
-      </UFormGroup> -->
-      <UFormGroup size="lg">
-        <div class="flex relative">
-          <UInput
-            placeholder="Your new password"
-            :type="passwordType"
-            class="w-[100%]"
-            v-model="password"
-            @update:model-value="passwordInputHover = true"
-            @blur="passwordInputHover = false"
-          />
-          <UButton
-            class="absolute right-0 top-0 bottom-0 dark:hover:bg-primary-300"
-            color="gray"
-            variant="ghost"
-            type="button"
-            size="sm"
-            @click="
-              passwordType === 'password'
-                ? (passwordType = 'text')
-                : (passwordType = 'password')
-            "
-          >
-            <IconWrapper
-              size="5"
-              :name="
-                passwordType === 'password'
-                  ? 'i-tabler-eye'
-                  : 'i-tabler-eye-off'
-              "
-              dark-text
-            />
-          </UButton>
-        </div>
-      </UFormGroup>
 
-      <UButton
+    <div
+      v-if="!hasResetParams"
+      class="w-full flex flex-col gap-4 come-up-2"
+    >
+      <p class="text-sm text-center text-gray-500 dark:text-gray-400">
+        This password reset link is missing required information. Please request
+        a new reset link.
+      </p>
+      <CowButton block type="button" @click="navigateTo('/forgot-password')">
+        Request new link
+      </CowButton>
+    </div>
+
+    <form
+      v-else
+      class="w-full flex flex-col gap-4 come-up-2"
+      @submit.prevent="resetPassword"
+    >
+      <div>
+        <CowInput label="New password" type="password" v-model="password" />
+        <div class="help text-gray-500 dark:text-gray-400 text-xs mt-2 flex gap-2">
+          <InfoIcon class="w-3 h-3" />
+          Password must be at least 8 characters and include a letter and a
+          number.
+        </div>
+      </div>
+
+      <CowInput
+        label="Confirm password"
+        type="password"
+        v-model="confirmPassword"
+        :error="confirmError"
+      />
+
+      <CowButton
         block
-        size="lg"
         type="submit"
-        class="mt-12"
-        :disabled="!(useValidEmail(email) && password.length >= 8)"
+        :disabled="!isValid"
         :loading="loading"
       >
-        Reset Password
-      </UButton>
-      <p class="text-sm flex items-center justify-center gap-0">
-        I don't have an account.
-        <UButton size="sm" class="p-1" variant="link" to="/signup"
-          >Create an account</UButton
-        >
+        Continue
+      </CowButton>
+
+      <p class="text-sm text-center text-gray-500 dark:text-gray-400">
+        Remember your password?
+        <NuxtLink to="/login" class="text-primary-500 dark:text-primary-400 font-medium hover:underline">
+          Log in
+        </NuxtLink>
       </p>
     </form>
   </div>
@@ -74,6 +63,7 @@
 <script setup lang="ts">
 definePageMeta({
   layout: "auth",
+  authVariant: "centered",
 })
 
 useHead({
@@ -107,22 +97,38 @@ useHead({
 })
 
 const toast = useToast()
-const email = ref("")
+const route = useRoute()
 const password = ref("")
-const passwordType = ref("password")
-const passwordInputHover = ref(false)
+const confirmPassword = ref("")
 const loading = ref(false)
-const thirtyDaysAhead = new Date()
-thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30)
 
-const login = async () => {
+const email = computed(() => (route.query.email as string) || "")
+const resetToken = computed(() => (route.query.token as string) || "")
+const hasResetParams = computed(() =>
+  Boolean(useValidEmail(email.value) && resetToken.value)
+)
+const passwordValid = computed(() => /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password.value))
+
+const confirmError = computed(() => {
+  if (!confirmPassword.value) return ""
+  return password.value === confirmPassword.value ? "" : "Passwords do not match"
+})
+
+const isValid = computed(
+  () =>
+    hasResetParams.value &&
+    passwordValid.value &&
+    password.value === confirmPassword.value
+)
+
+const resetPassword = async () => {
+  if (!isValid.value) return
   loading.value = true
-  const route = useRoute()
   const { error } = await useAPIFetch("/auth/reset-password", {
     method: "POST",
     body: {
       email: email.value,
-      token: route.query.token,
+      token: resetToken.value,
       password: password.value,
     },
   })
@@ -136,7 +142,7 @@ const login = async () => {
     })
   } else {
     toast.add({
-      title: `Successful reset password for ${email.value}. Back to login page.`,
+      title: `Successful reset password. Back to login page.`,
       color: "green",
       icon: "i-bx-check-circle",
     })

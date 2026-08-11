@@ -1,6 +1,15 @@
 <style>
   :root {
     color-scheme: light dark;
+    --boot-bg: #ffffff;
+    --boot-fg: #131724;
+    --boot-track: #e6e8ef;
+    /* The two tones swap between themes: on dark the mark is white and the
+       cross carries the brand purple; on light the mark is purple and the
+       cross takes the progress bar's unfilled track colour, so it reads as a
+       near-white cross cut into the mark. */
+    --boot-logo: #a855f7;
+    --boot-cross: var(--boot-track);
   }
 
   html,
@@ -14,119 +23,272 @@
   body {
     display: grid;
     place-items: center;
-    background: #ffffff;
-    color: #111827;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system,
-      BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--boot-bg);
+    color: var(--boot-fg);
   }
 
   .boot {
-    width: min(440px, calc(100vw - 48px));
-    text-align: center;
-  }
-
-  .brand {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 14px;
-    margin-bottom: 28px;
+    width: min(324px, calc(100vw - 48px));
   }
 
-  img {
-    width: 56px;
-    height: 56px;
-    animation: pulse 1.3s ease-in-out infinite;
+  /*
+   * The cross lives in the mark's negative space: a stem in the gap between
+   * the two halves, and a bar in the gap beneath the caps. It draws itself
+   * first, then the four pieces slide in on top and mask it down to exactly
+   * that gap, so the cross glows through the finished logo.
+   *
+   * The glow is a separate, statically blurred copy whose opacity animates —
+   * the blur radius never changes, so it rasterises once rather than
+   * repainting every frame.
+   *
+   * CoWSplashLogo.vue replays this same sequence once Nuxt mounts, picking up
+   * from window.__cowBootAt so the handoff between the two boot screens is
+   * seamless instead of restarting the draw.
+   */
+  .mark {
+    display: block;
+    width: 76px;
+    height: auto;
+    /* let the cross glow bleed past the viewBox */
+    overflow: visible;
+    color: var(--boot-logo);
   }
 
-  h1,
-  h2,
-  p {
-    margin: 0;
+  .mark .cross,
+  .mark .cross-glow {
+    stroke: var(--boot-cross);
+    stroke-linecap: butt;
   }
 
-  h1 {
-    font-size: 24px;
-    line-height: 1.2;
+  /* stroke widths match the gaps in the mark exactly */
+  .mark .stem {
+    stroke-width: 3.647;
+    stroke-dasharray: 45;
+    stroke-dashoffset: 45;
+    animation: cross-draw 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
 
-  .muted {
-    color: #6b7280;
+  .mark .arm {
+    stroke-width: 3.679;
+    stroke-dasharray: 13;
+    stroke-dashoffset: 13;
+    animation: cross-draw 0.28s cubic-bezier(0.4, 0, 0.2, 1) 0.26s forwards;
   }
 
-  .eyebrow {
-    margin-bottom: 6px;
-    font-size: 12px;
-    text-transform: uppercase;
+  .mark .cross-glow {
+    opacity: 0;
+    filter: blur(2px);
+    animation: glow-in 0.6s ease-out 1.05s forwards,
+      glow-pulse 2.6s ease-in-out 1.65s infinite;
   }
 
-  h2 {
-    font-size: 20px;
-    line-height: 1.3;
+  .mark .piece {
+    opacity: 0;
+    transform-box: view-box;
+    transform-origin: 50% 50%;
+    animation: piece-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.48s forwards;
+  }
+
+  .mark .body-left {
+    --tx: -10px;
+  }
+
+  .mark .body-right {
+    --tx: 10px;
+  }
+
+  .mark .cap-left {
+    --tx: -7px;
+    --ty: -7px;
+    animation-delay: 0.58s;
+  }
+
+  .mark .cap-right {
+    --tx: 7px;
+    --ty: -7px;
+    animation-delay: 0.64s;
   }
 
   .bar {
-    height: 10px;
+    width: 100%;
+    height: 4px;
+    margin-top: 34px;
     overflow: hidden;
     border-radius: 999px;
-    background: #e5e7eb;
-    margin: 18px 0 14px;
+    background: var(--boot-track);
   }
 
   .bar span {
     display: block;
-    width: 42%;
+    width: 3%;
     height: 100%;
     border-radius: inherit;
-    background: #8b5cf6;
-    animation: load 1.4s ease-in-out infinite;
+    background: var(--boot-fg);
+    animation: boot-fill 3.2s cubic-bezier(0.25, 0.8, 0.35, 1) 0.35s forwards;
   }
 
   @media (prefers-color-scheme: dark) {
-    body {
-      background: #030712;
-      color: #ffffff;
-    }
-
-    .muted {
-      color: #9ca3af;
-    }
-
-    .bar {
-      background: #1f2937;
+    :root {
+      --boot-bg: #131724;
+      --boot-fg: #ffffff;
+      --boot-track: #222838;
+      --boot-logo: #ffffff;
+      --boot-cross: #a855f7;
     }
   }
 
-  @keyframes pulse {
+  /* An explicit colour-mode choice beats the system preference, so the boot
+     screen never flashes the wrong theme before Nuxt hydrates. */
+  :root[data-boot-theme="light"] {
+    --boot-bg: #ffffff;
+    --boot-fg: #131724;
+    --boot-track: #e6e8ef;
+    --boot-logo: #a855f7;
+    --boot-cross: var(--boot-track);
+  }
+
+  :root[data-boot-theme="dark"] {
+    --boot-bg: #131724;
+    --boot-fg: #ffffff;
+    --boot-track: #222838;
+    --boot-logo: #ffffff;
+    --boot-cross: #a855f7;
+  }
+
+  @keyframes cross-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes piece-in {
+    0% {
+      opacity: 0;
+      transform: translate(var(--tx, 0px), var(--ty, 0px));
+    }
+    100% {
+      opacity: 1;
+      transform: translate(0px, 0px);
+    }
+  }
+
+  @keyframes glow-in {
+    to {
+      opacity: 0.55;
+    }
+  }
+
+  @keyframes glow-pulse {
     0%,
     100% {
-      transform: scale(1);
+      opacity: 0.55;
     }
     50% {
-      transform: scale(1.08);
+      opacity: 0.9;
     }
   }
 
-  @keyframes load {
+  @keyframes boot-fill {
     0% {
-      transform: translateX(-100%);
+      width: 3%;
+    }
+    30% {
+      width: 42%;
+    }
+    65% {
+      width: 68%;
     }
     100% {
-      transform: translateX(240%);
+      width: 92%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mark .stem,
+    .mark .arm,
+    .mark .cross-glow,
+    .mark .piece,
+    .bar span {
+      animation: none;
+    }
+
+    .mark .stem,
+    .mark .arm {
+      stroke-dashoffset: 0;
+    }
+
+    .mark .cross-glow {
+      opacity: 0.55;
+    }
+
+    .mark .piece {
+      opacity: 1;
+    }
+
+    .bar span {
+      width: 42%;
     }
   }
 </style>
 
-<main class="boot" aria-label="Cloud of Worship is loading">
-  <section>
-    <div class="brand">
-      <img src="/favicon.svg" alt="Cloud of Worship Logo" />
-      <div>
-        <h1>Cloud of Worship</h1>
-      </div>
-    </div>
+<script>
+  ;(function () {
+    // Stamped as early as possible so CoWSplashLogo.vue can resume the splash
+    // from the right frame once Nuxt takes over.
+    window.__cowBootAt = Date.now()
+    try {
+      var mode = localStorage.getItem("nuxt-color-mode")
+      if (mode === "dark" || mode === "light") {
+        document.documentElement.setAttribute("data-boot-theme", mode)
+      }
+    } catch (e) {}
+  })()
+</script>
 
-    <!-- <h2>Loading offline-ready resources</h2>
-    <div class="bar" aria-hidden="true"><span></span></div> -->
-  </section>
+<main class="boot" aria-label="Cloud of Worship is loading">
+  <svg
+    class="mark"
+    viewBox="682 356.75 76 60"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    role="img"
+    aria-label="Cloud of Worship"
+  >
+    <g class="cross-glow" aria-hidden="true">
+      <line class="stem" x1="719.855" y1="363" x2="719.855" y2="407.5" />
+      <line class="arm" x1="719.855" y1="370.185" x2="707.5" y2="370.185" />
+      <line class="arm" x1="719.855" y1="370.185" x2="732.5" y2="370.185" />
+    </g>
+    <g class="cross">
+      <line class="stem" x1="719.855" y1="363" x2="719.855" y2="407.5" />
+      <line class="arm arm-left" x1="719.855" y1="370.185" x2="707.5" y2="370.185" />
+      <line class="arm arm-right" x1="719.855" y1="370.185" x2="732.5" y2="370.185" />
+    </g>
+
+    <path
+      class="piece body-left"
+      d="M713.593 372.024C716.044 372.024 718.031 374.03 718.031 376.503V406.013C718.031 408.486 716.044 410.491 713.593 410.491H696.043C694.855 409.765 693.737 408.858 692.692 407.768C689.566 404.504 688.002 400.515 688 395.802C688 391.761 689.14 388.162 691.419 385.002C693.698 381.842 696.679 379.822 700.364 378.941C701.018 376.372 702.025 374.067 703.383 372.024H713.593Z"
+      fill="currentColor"
+    />
+    <path
+      class="piece body-right"
+      d="M736.647 372.024C739.126 375.671 740.366 379.893 740.364 384.69C743.71 385.105 746.486 386.647 748.693 389.315C750.9 391.984 752.003 395.105 752.001 398.677C752.001 402.562 750.728 405.865 748.184 408.585C747.496 409.32 746.768 409.955 746 410.491H726.116C723.665 410.491 721.678 408.486 721.678 406.013V376.503C721.678 374.03 723.665 372.024 726.116 372.024H736.647Z"
+      fill="currentColor"
+    />
+    <path
+      class="piece cap-left"
+      d="M718.031 363.866C718.031 366.34 716.044 368.345 713.593 368.345H706.512C706.873 368.008 707.247 367.68 707.637 367.364C710.747 364.839 714.212 363.395 718.031 363.029V363.866Z"
+      fill="currentColor"
+    />
+    <path
+      class="piece cap-right"
+      d="M721.678 363C726.21 363.348 730.157 365.13 733.521 368.345H726.116C723.665 368.345 721.678 366.34 721.678 363.866V363Z"
+      fill="currentColor"
+    />
+  </svg>
+
+  <div class="bar" aria-hidden="true"><span></span></div>
 </main>

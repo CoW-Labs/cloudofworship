@@ -1,23 +1,14 @@
 <template>
   <div class="select-menu-ctn w-[120px]">
-    <USelectMenu
+    <CowSelectMenu
       class="absolute border-0 shadow-none top-[6px]"
-      select-class="border-3 shadow-none outline-none text-center w-[120px] bg-primary-100 dark:bg-primary-800 dark:text-white"
+      select-class="border-0 shadow-none outline-none text-center w-[120px] rounded-full bg-gray-100 dark:bg-[#222938] dark:text-white"
       size="md"
       :options="['1', '2', '3', '4', '5', '6']"
       v-model.number="lines"
       variant="none"
-      color="primary"
+      color="gray"
       clear-search-on-close
-      :ui="{
-        base: 'bg-primary-500',
-        input: 'bg-primary-500',
-        color: {
-          primary: {
-            outline: 'shadow-sm bg-primary-500 ',
-          },
-        },
-      }"
       :ui-menu="{
         width: 'w-[120px]',
         input: 'text-xs',
@@ -44,7 +35,7 @@
         >
         <span v-else class="truncate whitespace-nowrap">Lines per slide</span>
       </template>
-    </USelectMenu>
+    </CowSelectMenu>
   </div>
 </template>
 

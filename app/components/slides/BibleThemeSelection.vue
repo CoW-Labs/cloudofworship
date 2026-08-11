@@ -1,42 +1,79 @@
 <template>
-  <div class="p-4 w-[350px] h-[300px] overflow-auto">
-    <div class="grid grid-cols-2 gap-2">
-      <button
-        v-for="theme in bibleThemes"
-        :key="theme.id"
-        class="theme-option flex flex-col items-center p-3 rounded-lg border transition-all hover:bg-primary-100 dark:hover:bg-primary-800"
-        :class="{
-          'border-primary-500 bg-primary-50 dark:bg-primary-900':
-            selectedTheme === theme.id,
-          'border-primary-200 dark:border-primary-700':
-            selectedTheme !== theme.id,
-        }"
-        @click="selectTheme(theme.id)"
+  <div
+    class="bible-theme-selection flex w-full flex-col text-gray-800 dark:text-[#F8F9FB]"
+    :class="
+      embedded
+        ? 'rounded-2xl bg-[#f1f3f6] p-2 dark:bg-[#1b212e]'
+        : 'h-full overflow-hidden bg-[#f1f3f6] dark:bg-[#131724]'
+    "
+  >
+    <div :class="embedded ? '' : 'min-h-0 flex-1 overflow-y-auto px-3 py-3'">
+      <div
+        class="grid gap-[8.5px]"
+        :class="embedded ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-3'"
       >
-        <!-- Theme Preview -->
-        <div
-          class="theme-preview w-full h-16 mb-2 rounded-md bg-primary-800 relative overflow-hidden flex items-center justify-center"
-          :class="theme.preview"
+        <button
+          v-for="theme in bibleThemes"
+          :key="theme.id"
+          type="button"
+          class="theme-option min-w-0 rounded-xl bg-white/70 p-2 text-left ring-2 transition-colors dark:bg-[#222838]"
+          :class="
+            selectedTheme === theme.id
+              ? 'bg-white ring-primary-300 dark:bg-[#2B3140] dark:ring-[#E8D1F8]'
+              : 'ring-transparent hover:bg-white dark:hover:bg-[#2B3140]'
+          "
+          :aria-pressed="selectedTheme === theme.id"
+          @click="selectTheme(theme.id)"
         >
-          <ThemePreview :theme="theme" />
-        </div>
-
-        <!-- Theme Info -->
-        <div class="text-left">
-          <div class="flex items-center justify-start gap-1.5">
-            <UIcon
-              :name="theme.icon"
-              class="w-4 h-4 text-primary-600 dark:text-primary-300"
-            />
-            <span class="text-xs font-medium">
-              {{ theme.name }}
-            </span>
-          </div>
-          <p class="text-[10px] opacity-60 mt-0.5 leading-tight">
+          <span class="block text-[12px] font-normal leading-4">
+            {{ theme.name }}
+          </span>
+          <p
+            class="truncate text-[10px] leading-4 text-gray-500 dark:text-[#9BA3B2]"
+          >
             {{ theme.description }}
           </p>
-        </div>
-      </button>
+
+          <div
+            class="theme-preview relative mt-1.5 h-[90px] w-full overflow-hidden rounded-lg bg-[#e4e8f0] dark:bg-[#171C29]"
+            :class="theme.preview"
+          >
+            <div
+              class="absolute inset-x-[9%] flex flex-col gap-2"
+              :class="theme.id === 'label-top' ? 'top-[39%]' : 'top-[12%]'"
+            >
+              <span
+                v-for="line in theme.id === 'label-background' ? 2 : 3"
+                :key="line"
+                class="h-2.5 rounded-full border border-black/[0.06] bg-[#d3d9e4] dark:border-white/[0.07] dark:bg-[#30394b]"
+              ></span>
+            </div>
+
+            <span
+              v-if="theme.id === 'label-top'"
+              class="absolute left-1/2 top-[12%] h-2.5 w-[43%] -translate-x-1/2 rounded-full border border-black/[0.06] bg-[#d3d9e4] dark:border-white/[0.07] dark:bg-[#30394b]"
+            ></span>
+
+            <span
+              v-else-if="theme.id === 'default' || theme.id === 'label-large'"
+              class="absolute bottom-[12%] left-1/2 -translate-x-1/2 rounded-full border border-black/[0.06] bg-[#d3d9e4] dark:border-white/[0.07] dark:bg-[#30394b]"
+              :class="
+                theme.id === 'label-large' ? 'h-5 w-[43%]' : 'h-2.5 w-[43%]'
+              "
+            ></span>
+
+            <div
+              v-else
+              class="absolute left-1/2 flex h-8 w-1/2 -translate-x-1/2 items-center justify-center rounded-full bg-[#cbd2df] dark:bg-[#0D0F1A]"
+              :class="theme.id === 'overlay' ? 'bottom-0' : 'bottom-[12%]'"
+            >
+              <span
+                class="h-2.5 w-[87%] rounded-full border border-black/[0.06] bg-[#d3d9e4] dark:border-white/[0.07] dark:bg-[#30394b]"
+              ></span>
+            </div>
+          </div>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -46,11 +83,19 @@ import useTheme from "~/composables/useTheme"
 
 const props = defineProps<{
   value?: string
+  /**
+   * Renders the grid inline (e.g. inside a settings panel) instead of as a
+   * popover panel: no panel chrome, no fixed height, no resize handshake.
+   */
+  embedded?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: "select", themeId: string): void
+  (e: "resize", size: { width: number; height: number }): void
 }>()
+
+const panelSize = { width: 753, height: 330 }
 
 const { bibleThemes } = useTheme()
 
@@ -59,14 +104,8 @@ const selectedTheme = computed(() => props.value || "default")
 const selectTheme = (themeId: string) => {
   emit("select", themeId)
 }
+
+onMounted(() => {
+  if (!props.embedded) emit("resize", panelSize)
+})
 </script>
-
-<style scoped>
-.theme-option:hover {
-  transform: scale(1.02);
-}
-
-.theme-preview {
-  background: linear-gradient(135deg, #1e3a5f 0%, #2d5a7b 100%);
-}
-</style>
