@@ -844,6 +844,11 @@ async function openTauriLiveWindow() {
     const isFullscreen =
       appStore.currentState.settings.liveWindowFullscreen ?? true
 
+    // Window options are in logical units while monitors report physical
+    // pixels, so a Retina/scaled projector needs the scale factor divided out —
+    // otherwise the live window lands half-size and offset from the display.
+    const scale = targetMonitor.scaleFactor || 1
+
     // Create new window on the target monitor
     const liveWindow = new WebviewWindow("live-output", {
       url: "/live",
@@ -853,10 +858,10 @@ async function openTauriLiveWindow() {
       resizable: true,
       closable: true,
       fullscreen: isFullscreen,
-      x: targetMonitor.position.x,
-      y: targetMonitor.position.y,
-      width: targetMonitor.size.width,
-      height: targetMonitor.size.height,
+      x: targetMonitor.position.x / scale,
+      y: targetMonitor.position.y / scale,
+      width: targetMonitor.size.width / scale,
+      height: targetMonitor.size.height / scale,
     })
 
     // Wait for window to be ready
@@ -1037,9 +1042,30 @@ async function openWindows() {
     )
   }
 }
+// The web build ties the live popup's lifetime to the operator tab via
+// `beforeunload` inside openWindows(). Desktop windows never fire that, so the
+// projection window would outlive the control center it belongs to.
+async function bindTauriLiveWindowLifecycle() {
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window")
+
+    await getCurrentWindow().onCloseRequested(async () => {
+      if (appStore.currentState.settings.closeLiveWindowWithOperator) {
+        await closeAllWindows()
+      }
+    })
+  } catch (error) {
+    console.error("Failed to bind live window lifecycle:", error)
+  }
+}
 // WINDOW MANAGEMENT CODE ENDS HERE
 
 onMounted(async () => {
+  const { isTauri } = useTauri()
+  if (isTauri) {
+    bindTauriLiveWindowLifecycle()
+  }
+
   useLocalMediaStorage()
     .reconcileOrphans()
     .catch((err) => console.warn("Local media reconciliation failed:", err))

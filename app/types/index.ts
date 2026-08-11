@@ -396,7 +396,7 @@ export interface AppSettings {
   footnotes?: boolean
   songAndHymnLabelsVisibility: boolean
   liveWindowFullscreen?: boolean // Whether live window opens in fullscreen mode
-  closeLiveWindowWithOperator?: boolean // Whether live window closes when operator tab closes (browser only)
+  closeLiveWindowWithOperator?: boolean // Whether live window closes when the operator tab/window closes
   transcriptionAutoActions?: boolean
   transcriptionVoiceBibleVersionCommands?: boolean
   uploadVideosToCloud?: boolean // Upload video media slides to cloud (S3). Defaults to true.
