@@ -1,23 +1,5 @@
 import posthog from "posthog-js"
-
-const ignoredErrorMessages = new Set([
-  "Permissions check failed",
-  "Script error.",
-])
-
-const ignoredErrorNames = new Set([
-  "AbortError",
-  "NotAllowedError",
-  "NotSupportedError",
-])
-
-const shouldSuppressError = (error: unknown) => {
-  const err = error as Error | undefined
-  return Boolean(
-    (err?.message && ignoredErrorMessages.has(err.message)) ||
-      (err?.name && ignoredErrorNames.has(err.name))
-  )
-}
+import { shouldSuppressError } from "~/utils/errorFilters"
 
 export default defineNuxtPlugin((nuxtApp) => {
   nuxtApp.vueApp.config.errorHandler = (error, _instance, info) => {

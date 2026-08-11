@@ -1,10 +1,14 @@
 # Upload source maps with CLI - Docs
 
+Copy page
+
+# Upload source maps with CLI - Docs
+
 ## AI wizard
 
 Set up source map uploading automatically with our wizard by running this command in your project directory with your terminal (it also works for [LLM coding agents](/blog/envoy-wizard-llm-agent.md) like Cursor and Bolt):
 
-`npx @posthog/wizard@latest upload-source-maps`
+`npx @posthog/wizard upload-source-maps`
 
 [Learn more](/wizard.md)
 

@@ -43,9 +43,41 @@ export interface SlideEditLock {
 // never points at a dead socket.
 let activeSocket: Socket | null = null
 
+// Methods callers reach for on `$socketio`. Without a live socket the proxy has
+// nothing to forward to, and returning `undefined` turned every one of these
+// into a "x is not a function" TypeError. Callers overwhelmingly guard with
+// `if (socket?.connected)` and then `await` something before emitting, so the
+// socket can disappear (schedule switch, manual reconnect, unmount) between the
+// guard and the call. Hand back a no-op instead of undefined so a dead socket
+// drops the message — which is what the guard intended — rather than throwing.
+const NO_SOCKET_METHODS = new Set([
+  "emit",
+  "emitWithAck",
+  "send",
+  "on",
+  "once",
+  "off",
+  "removeListener",
+  "removeAllListeners",
+  "connect",
+  "open",
+  "disconnect",
+  "close",
+  "compress",
+  "timeout",
+])
+
+const noop = () => undefined
+
 const liveSocketProxy = new Proxy({} as Socket, {
   get(_target, prop) {
-    if (!activeSocket) return undefined
+    if (!activeSocket) {
+      // Keep the connection flags falsy so `if (socket?.connected)` guards
+      // still short-circuit correctly when there is no socket at all.
+      if (prop === "connected" || prop === "active") return false
+      if (prop === "disconnected") return true
+      return NO_SOCKET_METHODS.has(prop as string) ? noop : undefined
+    }
     const value = (activeSocket as any)[prop]
     return typeof value === "function" ? value.bind(activeSocket) : value
   },

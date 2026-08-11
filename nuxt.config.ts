@@ -22,6 +22,16 @@ export default defineNuxtConfig({
   },
   devtools: { enabled: false },
 
+  experimental: {
+    // Nuxt fetches /_nuxt/builds/meta/<buildId>.json on every route navigation
+    // to check for a newer deployment. The service worker is network-first and
+    // this URL is never in its cache (it is only ever requested at navigation
+    // time), so every offline navigation threw an uncaught "Failed to fetch".
+    // We ship no route rules and run our own version check in public/sw.js, so
+    // the manifest buys us nothing but broken offline navigation.
+    appManifest: false,
+  },
+
   // Explicitly enable the pages system so Nuxt's dev-mode detection doesn't
   // raise a false-positive "NuxtPage not used" warning when <NuxtPage /> is
   // slotted inside <NuxtLayout> (a known static-analysis limitation in Nuxt 4).

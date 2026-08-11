@@ -100,7 +100,13 @@ const cachedVideosURLs = ref<BackgroundVideo[]>()
 const isOfflineToastOpen = ref<boolean>(false)
 const config = useRuntimeConfig()
 const { getToken } = useAuthToken()
-const windowRefs = ref<any[]>([])
+// shallowRef, not ref: a deep ref wraps every element in reactive(), and
+// building that proxy reads `__v_isReadonly`/`__v_skip` off the object. On a
+// cross-origin popup window those reads throw SecurityError — which is exactly
+// what the 250ms checkWindowClose poll below was hitting. Vue must never touch
+// these Window handles, so we keep the ref shallow and always assign a new
+// array (a shallowRef ignores in-place mutation of the same reference).
+const windowRefs = shallowRef<any[]>([])
 const db = useIndexedDB()
 const localMedia = useLocalMediaStorage()
 const appInfo = ref<AppSettings>()
@@ -875,9 +881,7 @@ async function openTauriLiveWindow() {
     })
 
     // Add windowRef to track if live window is active
-    const tempWindowRefs = windowRefs.value
-    tempWindowRefs.push(liveWindow)
-    windowRefs.value = tempWindowRefs
+    windowRefs.value = [...windowRefs.value, liveWindow]
   } catch (error) {
     console.error("Error opening Tauri window:", error)
     useToast().add({
@@ -913,9 +917,7 @@ function openWindow(
     })
     closeAllWindows()
   } else {
-    const tempWindowRefs = windowRefs.value
-    tempWindowRefs.push(windowRef)
-    windowRefs.value = tempWindowRefs
+    windowRefs.value = [...windowRefs.value, windowRef]
   }
 }
 
@@ -969,7 +971,7 @@ async function openWindows() {
         screen1.availTop,
         screen1.availWidth,
         screen1.availHeight,
-        `http://${window.location.host}/live`
+        `${window.location.origin}/live`
       )
     } else {
       // Multiple screens — try saved label first, then auto-pick the non-primary
@@ -1001,7 +1003,7 @@ async function openWindows() {
           targetScreen.availTop,
           targetScreen.availWidth,
           targetScreen.availHeight,
-          `http://${window.location.host}/live`
+          `${window.location.origin}/live`
         )
       } else {
         useToast().add({
@@ -1014,7 +1016,17 @@ async function openWindows() {
     const closeMonitor = setInterval(checkWindowClose, 250)
 
     function checkWindowClose() {
-      if (windowRefs.value.some((windowRef: any) => windowRef.closed)) {
+      const isClosed = (windowRef: any) => {
+        try {
+          return Boolean(windowRef?.closed)
+        } catch {
+          // A window we can no longer read (navigated cross-origin, or torn
+          // down mid-read) is one we can't manage either — treat it as gone.
+          return true
+        }
+      }
+
+      if (windowRefs.value.some(isClosed)) {
         closeAllWindows()
         clearInterval(closeMonitor)
       }
@@ -1038,7 +1050,7 @@ async function openWindows() {
       0,
       window.screen.availWidth,
       window.screen.availHeight,
-      `http://${window.location.host}/live`
+      `${window.location.origin}/live`
     )
   }
 }
