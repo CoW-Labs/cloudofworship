@@ -494,7 +494,13 @@ export default function useLibrary() {
         (slide) => slide.id === slideId || slide._id === slideId
       )
       if (!stillInSchedule) {
-        await deleteLocalMedia(slideId)
+        // Best-effort: deleteGroup refuses when another slide still points at
+        // the same media. The library row is already gone at this point, so
+        // letting that abort the flow would skip unsaveSlideOnline below and
+        // wrongly report the deletion as failed.
+        await deleteLocalMedia(slideId).catch((error) =>
+          console.warn('Local media kept — still referenced by another slide', error)
+        )
       }
 
       toast.add({ icon: 'i-tabler-trash', title: 'Slide has been deleted' })

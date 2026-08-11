@@ -544,10 +544,22 @@ watch(
 
 const refreshSongLyrics = async (songId: string) => {
   isLoading.value = true
+  // useSong resolves to null when the lookup fails (song deleted, or offline
+  // with nothing cached). Emitting that null crashed the listener downstream.
   const song = await useSong(songId)
-  emit("update-song-lyrics", song)
   isLoading.value = false
-  // console.log(song)
+
+  if (!song) {
+    useToast().add({
+      icon: "i-bx-error",
+      title: "Could not refresh lyrics",
+      description: "This song could not be found. Check your connection.",
+      color: "red",
+    })
+    return
+  }
+
+  emit("update-song-lyrics", song)
 }
 
 const handleSeek = () => {

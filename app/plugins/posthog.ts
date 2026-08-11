@@ -1,52 +1,7 @@
 import posthog from "posthog-js";
 import { useAuthStore } from "~/store/auth";
 import { useAppStore } from "~/store/app";
-
-const ignoredExceptionMessages = new Set([
-  "Permissions check failed",
-  "Script error.",
-]);
-
-const ignoredExceptionFragments = [
-  "play() request was interrupted",
-  "No internet connection",
-  "Failed to get browser displays",
-  "Auto-detect secondary display",
-  "Transient activation is required",
-  "Permission denied",
-  "MetaMask extension not found",
-  "Failed to fetch this Firebase app's measurement ID",
-];
-
-const getExceptionText = (event: any) => {
-  const properties = event?.properties || {};
-  const exceptionList = Array.isArray(properties.$exception_list)
-    ? properties.$exception_list
-    : [];
-  const exceptionListText = exceptionList.flatMap((exception: any) => [
-    exception?.type,
-    exception?.value,
-    exception?.message,
-  ]);
-
-  return [
-    properties.$exception_message,
-    properties.$exception_type,
-    ...exceptionListText,
-  ]
-    .filter(Boolean)
-    .join("\n");
-};
-
-const shouldSuppressExceptionEvent = (event: any) => {
-  const message = event?.properties?.$exception_message;
-  const exception = getExceptionText(event);
-  return Boolean(
-    (message && ignoredExceptionMessages.has(message)) ||
-      (exception &&
-        ignoredExceptionFragments.some((fragment) => exception.includes(fragment)))
-  );
-};
+import { shouldSuppressExceptionEvent } from "~/utils/errorFilters";
 
 export default defineNuxtPlugin(nuxtApp => {
   const auth = useAuthStore();

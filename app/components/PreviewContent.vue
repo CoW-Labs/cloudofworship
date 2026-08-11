@@ -161,7 +161,11 @@ import type {
 } from "~/types"
 import { toTransportSafePayload } from "~/utils/mediaTransport"
 import { appWideActions } from "~/utils/constants"
-import { isNotFoundError } from "~/utils/apiErrors"
+import {
+  getAPIErrorMessage,
+  isNetworkError,
+  isNotFoundError,
+} from "~/utils/apiErrors"
 
 // Incoming realtime slide events are handled once, centrally, in pages/index.vue
 // (via useRealtimeSlides wired to the live socket). That handler mutates the
@@ -298,11 +302,16 @@ const broadcastSlideUpdate = async (action: string, data: any) => {
   if (!online.value) return
 
   const nuxtApp = useNuxtApp()
+  if (!(nuxtApp.$socketio as any)?.connected) return
+
+  // Stripping device-only media URLs reads IndexedDB, so the socket can be torn
+  // down (schedule switch, reconnect, unmount) while we await. Re-read
+  // `$socketio` afterwards instead of holding the pre-await reference — the
+  // proxy behind it points at whichever socket is live *now*.
+  const safeData = await toTransportSafePayload(data)
   const socket = nuxtApp.$socketio as any
-  if (socket?.connected) {
-    const safeData = await toTransportSafePayload(data)
-    socket.emit(action, { ...safeData, tabId: tabSessionId })
-  }
+  if (!socket?.connected) return
+  socket.emit(action, { ...safeData, tabId: tabSessionId })
 }
 
 /**
@@ -588,16 +597,43 @@ const handleTakeLiveAction = async (slide: Slide) => {
 
   if (localKeys.length) {
     await prepareSlideMediaForProjection(slide, { allowDownload: true })
-    const verified = await Promise.all(
-      localKeys.map(async (key) =>
-        Boolean(await projectionMediaStorage.getPlaybackUrl(key))
-      )
+
+    // Rehydration rewrites the slide's URLs in place, so read the URL each key
+    // resolves to only after it has run.
+    const remoteFallbackFor = (key: string) => {
+      const pagePrefix = `${slide.id}-page-`
+      if (key.startsWith(pagePrefix)) {
+        const page = Number(key.slice(pagePrefix.length))
+        return slide.presentationObjects?.find((obj) => obj.page === page)
+          ?.imageUrl
+      }
+      if (key === slide.id) {
+        return (slide.data as ExtendedFileT)?.url || slide.background
+      }
+      return slide.background
+    }
+    const isRemoteUrl = (url?: string | null) =>
+      !!url && (url.startsWith("http://") || url.startsWith("https://"))
+
+    // A missing local copy is only fatal when there is nothing else to project.
+    // The live window rehydrates (and caches) media on arrival, so a remote URL
+    // still projects — it just streams the first time. Blocking on the local
+    // copy alone rejected ordinary slides: every song/bible/hymn slide inherits
+    // `backgroundImageKey` from the default background settings, so a key added
+    // on another device (or evicted here) stopped an otherwise fine slide from
+    // going live, while the same slide went live from the schedule list, which
+    // never ran this check.
+    const unprojectable = await Promise.all(
+      localKeys.map(async (key) => {
+        if (await projectionMediaStorage.getPlaybackUrl(key)) return null
+        return isRemoteUrl(remoteFallbackFor(key)) ? null : key
+      })
     )
-    if (verified.some((value) => !value)) {
+    if (unprojectable.some(Boolean)) {
       toast.add({
-        title: "Media is not ready for projection",
+        title: "Media is not available on this device",
         description:
-          "A verified local copy is required before this slide can go live.",
+          "This media hasn't synced here yet. Reconnect the device that added it, or re-add the file.",
         icon: "i-bx-error",
         color: "red",
       })
@@ -1441,17 +1477,33 @@ const persistSlideOnline = useThrottleFn(
       ))
     } catch (err) {
       console.error("Failed to update slide online:", err)
+      // A throw from the fetch wrapper itself leaves `error` unset — treat it as
+      // the failure it is rather than falling through to the success branch and
+      // stamping a sync that never happened.
+      error = { value: err }
     }
+
     if (!error?.value) {
       appStore.setLastSynced(new Date().toISOString())
       return data?.value
-    } else {
-      if (isNotFoundError(error.value)) {
-        appStore.removeActiveSlide(slide)
-        return null
-      }
-      throw new Error(error?.value?.message)
     }
+
+    if (isNotFoundError(error.value)) {
+      appStore.removeActiveSlide(slide)
+      return null
+    }
+
+    // The request never reached the server. Nothing here is recoverable by
+    // throwing: this runs detached inside a throttle, so the rejection is
+    // unhandled and only ever lands in error tracking. Slide PUTs are
+    // deliberately not offline-queued (they're high-frequency and reconciled by
+    // realtime), so the next edit re-sends the full slide anyway.
+    if (isNetworkError(error.value)) {
+      console.warn("Slide sync skipped — request did not reach the server")
+      return null
+    }
+
+    throw new Error(getAPIErrorMessage(error.value, "Failed to update slide"))
   },
   2000,
   true
@@ -1556,9 +1608,21 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   }
 
   // Delete local media bytes and metadata when no library item still owns it.
-  const itemSaved = await getLibraryItem(clientSlideId)
+  // Library rows are keyed `_id || id` (see useLibrary.cacheSlidesInLibrary), so
+  // a saved slide is filed under its server id — looking it up by client id
+  // alone missed it and sent us into deleteGroup for media that was still owned.
+  const itemSaved =
+    (await getLibraryItem(clientSlideId)) ||
+    (tempSlide._id ? await getLibraryItem(tempSlide._id) : undefined)
   if (!itemSaved) {
-    await useLocalMediaStorage().deleteGroup(clientSlideId)
+    try {
+      await useLocalMediaStorage().deleteGroup(clientSlideId)
+    } catch (error) {
+      // deleteGroup refuses to delete media another slide still points at.
+      // That's the correct outcome, not a failure of this deletion — keep the
+      // bytes and move on rather than aborting the rest of the flow.
+      console.warn("Local media kept — still referenced by another slide", error)
+    }
   }
 
   if (addToast) {

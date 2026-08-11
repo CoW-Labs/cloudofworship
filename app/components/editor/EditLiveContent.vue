@@ -1410,6 +1410,10 @@ const onUpdateMediaSeek = (seekTime: number) => {
 }
 
 const onUpdateSongLyrics = (song: Song) => {
+  // Defensive: the toolbar already filters failed lookups, but this handler is
+  // wired to a template event and must not crash the editor on a null payload.
+  if (!song) return
+
   const tempSlide: Slide = {
     title: song.title,
     ...props.slide!!,
