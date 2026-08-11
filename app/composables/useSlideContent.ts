@@ -1,5 +1,12 @@
 import { useAppStore } from "~/store/app"
-import type { Countdown, Hymn, Scripture, Slide, Song } from "~/types/index"
+import type {
+  Countdown,
+  Hymn,
+  Scripture,
+  Slide,
+  Song,
+  TimeSlideData,
+} from "~/types/index"
 
 /**
  *
@@ -10,7 +17,7 @@ import type { Countdown, Hymn, Scripture, Slide, Song } from "~/types/index"
  */
 const useSlideContent = (
   slide: Slide,
-  data: Scripture | Hymn | Song | Countdown,
+  data: Scripture | Hymn | Song | Countdown | TimeSlideData,
   nextVerse: string = ""
 ) => {
   const appStore = useAppStore()
@@ -88,6 +95,14 @@ const useSlideContent = (
           "00:",
           ""
         )}</>`,
+      ]
+    case slideTypes.time:
+      data = data as TimeSlideData
+      return [
+        "",
+        data?.label
+          ? `<p class="countdown-label" style="line-height: 1;">${data.label}</p>`
+          : "",
       ]
   }
 

@@ -1,10 +1,27 @@
 <template>
   <div
+    v-if="backgroundPanel"
+    class="grid h-[149.5px] w-[216.5px] grid-cols-6 gap-[8.5px] rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
+  >
+    <button
+      v-for="color in panelColors"
+      :key="color"
+      type="button"
+      class="h-[25px] w-[25px] rounded transition-transform duration-150 hover:scale-110 focus-visible:ring-2 focus-visible:ring-[#E8D1F8]"
+      :class="color === value ? 'ring-2 ring-[#E8D1F8]' : ''"
+      :style="{ backgroundColor: color }"
+      :aria-label="`Use ${color} as ${colorPurpose} colour`"
+      :aria-pressed="color === value"
+      @click="$emit('select', { color })"
+    ></button>
+  </div>
+  <div
+    v-else
     class="bg-image-selection p-2 gap-2 grid"
     :class="{
       'grid-cols-6': count === 6,
       'grid-cols-12': count === 12,
-      'grid-cols-4': !count,
+      'grid-cols-7': !count,
     }"
   >
     <UButton
@@ -37,10 +54,50 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
-  value?: string
-  count?: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    value?: string
+    count?: number
+    backgroundPanel?: boolean
+    colors?: string[]
+    colorPurpose?: string
+  }>(),
+  {
+    colorPurpose: "background",
+  }
+)
+
+const backgroundPanelColors = [
+  "#E8D1F8",
+  "#FCEFD4",
+  "#D1FADF",
+  "#FEE4E2",
+  "#D1E0FF",
+  "#DDE1E8",
+  "#818CF8",
+  "#F6D08E",
+  "#32D583",
+  "#F97066",
+  "#528BFF",
+  "#3B4252",
+  "#BD7AEA",
+  "#EFAD3E",
+  "#027A48",
+  "#B42318",
+  "#004EEB",
+  "#131724",
+  "#14B8A6",
+  "#F79009",
+  "#22D3EE",
+  "#7209B7",
+  "#2970FF",
+  "#0D0F1A",
+]
+
+const panelColors = computed(() =>
+  props.colors?.length ? props.colors : backgroundPanelColors
+)
+
 const backgroundColors = [
   "#a855f7", // Purple
   "#3498db", // Blue

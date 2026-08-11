@@ -35,17 +35,13 @@
     <!-- Using motionless slides to test bug with Bible Slides not moving to next slide in live view -->
     <!-- <Transition class="fade"> -->
     <LiveProjectionOnly
-      v-show="mostUpdatedLiveSlide?.id === currentState.liveSlideId"
       :content-visible="true"
       :id="currentState.liveSlideId"
       :full-screen="true"
-      :slide="mostUpdatedLiveSlide!!"
+      :slide="mostUpdatedLiveSlide"
       :slide-label="false"
       :slide-styles="currentState.settings.slideStyles"
-      :audio-muted="
-          mostUpdatedLiveSlide?.id !== currentState.liveSlideId ||
-          mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!
-        "
+      :audio-muted="mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!"
     />
     <!-- </Transition> -->
 
@@ -56,6 +52,10 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 import type { Slide } from "~/types"
+import type {
+  LiveBroadcastEnvelope,
+  SlideOverlayBroadcast,
+} from "~/composables/useBroadcastPost"
 import { useAuthStore } from "~/store/auth"
 import {
   exitFullscreenSafely,
@@ -75,6 +75,56 @@ const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
 const FPS = 10
 const mostUpdatedLiveSlide = ref<Slide | null>(null)
+const lastBroadcastTs = ref(0)
+const lastOverlayBroadcastTs = ref(0)
+
+// Local-first media for the projection window. blob: URLs are scoped to the
+// operator document that created them, so they die when that tab closes/reloads.
+// We rehydrate incoming media from THIS window's shared IndexedDB (downloading
+// once if needed) and cache the localized URLs per source signature so repeated
+// same-slide broadcasts (e.g. verse changes) don't re-download, re-create object
+// URLs, or reload the <video>.
+const { rehydrateSlideMedia } = useSlideMediaCache()
+const localMedia = useLocalMediaStorage()
+type LocalizedMedia = {
+  background?: string
+  dataUrl?: string
+  presentationObjects?: Slide["presentationObjects"]
+}
+const localizedLiveMedia = new Map<string, LocalizedMedia>()
+
+const slideNeedsLocalMedia = (slide: Slide) =>
+  slide.type === slideTypes.media ||
+  slide.type === slideTypes.presentation ||
+  !!slide.backgroundImageKey ||
+  !!slide.backgroundVideoKey
+
+// A presentation ships every page in one slide object; paging only changes
+// presentationPageIndex, and the broadcast blanks blob:/asset: URLs — so its
+// background is "" on the wire for every page. Keying on the background made
+// all pages share one cache entry and page 2+ kept re-applying page 1's URL.
+// Key presentations on the slide id and cache the whole localized page list.
+const mediaSignature = (slide: Slide) =>
+  slide.type === slideTypes.presentation
+    ? `presentation:${slide.id}`
+    : `${slide.id}|${slide.background ?? ""}`
+
+const applyLocalizedMedia = (slide: Slide, cached: LocalizedMedia) => {
+  // Presentations resolve their background from the cached page list so the
+  // page currently being projected wins. A presentation with no localized page
+  // list (nothing cached locally) falls through to the generic handling below.
+  if (slide.type === slideTypes.presentation && cached.presentationObjects?.length) {
+    slide.presentationObjects = cached.presentationObjects
+    slide.background =
+      cached.presentationObjects[slide.presentationPageIndex ?? 0]?.imageUrl ||
+      slide.background
+    return
+  }
+  if (cached.background) slide.background = cached.background
+  if (cached.dataUrl && slide.data) {
+    ;(slide.data as any).url = cached.dataUrl
+  }
+}
 
 useHead({
   title: "Live Projection - Cloud of Worship",
@@ -187,17 +237,63 @@ onMounted(() => {
   initializeLiveSlide()
 
   // Store cleanup function to properly dispose of BroadcastChannel
-  const cleanupBroadcast = useBroadcastMessage((data: string) => {
+  const cleanupBroadcast = useBroadcastMessage((data) => {
     try {
-      const parsed = JSON.parse(data)
+      // Accept the old JSON envelope during hot updates, but use the direct
+      // structured-clone object for all new messages.
+      const envelope = (typeof data === "string" ? JSON.parse(data) : data) as
+        | LiveBroadcastEnvelope<
+            Slide | null | string | SlideOverlayBroadcast
+          >
+        | undefined
+      if (!envelope || typeof envelope.ts !== "number") return
+
+      const payload =
+        typeof envelope.payload === "string"
+          ? JSON.parse(envelope.payload)
+          : envelope.payload
+
+      if (
+        payload?.action === appWideActions.showSlideOverlay ||
+        payload?.action === appWideActions.removeSlideOverlay
+      ) {
+        if (envelope.ts < lastOverlayBroadcastTs.value) return
+        lastOverlayBroadcastTs.value = envelope.ts
+        appStore.setActiveOverlaySlide(
+          payload.action === appWideActions.showSlideOverlay
+            ? payload.slide || null
+            : null
+        )
+        return
+      }
+
+      // Drop messages that arrive out of order (e.g. a background countdown
+      // tick from a tab that hasn't yet caught up to a newer local live output
+      // change) instead of always applying whatever lands last.
+      if (envelope.ts < lastBroadcastTs.value) return
+      lastBroadcastTs.value = envelope.ts
+
+      const parsed = payload as Slide | null
 
       // null broadcast means the live slide was deleted — blank the projection
       if (parsed === null) {
         mostUpdatedLiveSlide.value = null
+        // Keep the shared store in agreement so a reloading operator window
+        // doesn't adopt a stale liveSlideId from this tab via pinia-shared-state.
+        if (appStore.currentState.liveSlideId) appStore.setLiveSlide("")
         return
       }
 
       const updatedSlide = parsed as Slide
+
+      // Mirror the projected slide id into the shared store. The broadcast
+      // channel drives the projection, but the operator window derives its
+      // live output preview from currentState.liveSlideId — and on reload it
+      // re-adopts state from this /live tab. Without this, that value goes
+      // stale here and the operator shows "No Live Slide" after a reload.
+      if (updatedSlide?.id && appStore.currentState.liveSlideId !== updatedSlide.id) {
+        appStore.setLiveSlide(updatedSlide.id)
+      }
 
       // Track slide presentation
       usePosthogCapture("SLIDE_PRESENTED_LIVE", {
@@ -205,6 +301,21 @@ onMounted(() => {
         slideLayout: updatedSlide?.layout,
         slideId: updatedSlide?.id,
       })
+
+      // For media-bearing slides, swap in a local object URL so the projection
+      // never depends on the operator tab's blob: URL (which dies when that tab
+      // closes). Use the cached localized URL when we've already resolved this
+      // source; otherwise rehydrate asynchronously below.
+      let pendingRehydrateSig: string | null = null
+      if (slideNeedsLocalMedia(updatedSlide)) {
+        const sig = mediaSignature(updatedSlide)
+        const cached = localizedLiveMedia.get(sig)
+        if (cached) {
+          applyLocalizedMedia(updatedSlide, cached)
+        } else {
+          pendingRehydrateSig = sig
+        }
+      }
 
       // Check if this is just a content update within the same slide
       const isSameSlide = mostUpdatedLiveSlide.value?.id === updatedSlide.id
@@ -219,6 +330,33 @@ onMounted(() => {
           mostUpdatedLiveSlide.value = updatedSlide
         })
       }
+
+      // First time we've seen this media source: ensure a local copy exists in
+      // this window (download once if needed), then re-apply with the local URL.
+      if (pendingRehydrateSig) {
+        const sig = pendingRehydrateSig
+        rehydrateSlideMedia(updatedSlide, { allowDownload: true })
+          .then((rehydrated) => {
+            const localized: LocalizedMedia = {
+              background: rehydrated.background,
+              dataUrl: (rehydrated.data as any)?.url,
+              presentationObjects: rehydrated.presentationObjects,
+            }
+            localizedLiveMedia.set(sig, localized)
+            // Re-apply onto whatever is on screen now rather than adopting
+            // `rehydrated` wholesale — the operator may have paged ahead while
+            // the download ran, and that newer page index must win.
+            const current = mostUpdatedLiveSlide.value
+            if (current?.id === rehydrated.id) {
+              const next = { ...current }
+              applyLocalizedMedia(next, localized)
+              mostUpdatedLiveSlide.value = next
+            }
+          })
+          .catch((err) =>
+            console.warn("Live media rehydrate failed:", err)
+          )
+      }
     } catch (error) {
       console.error("Failed to parse broadcast message:", error)
     }
@@ -231,6 +369,16 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  const urls = new Set<string>()
+  localizedLiveMedia.forEach((media) => {
+    if (media.background) urls.add(media.background)
+    if (media.dataUrl) urls.add(media.dataUrl)
+    media.presentationObjects?.forEach((page) => {
+      if (page.imageUrl) urls.add(page.imageUrl)
+    })
+  })
+  urls.forEach((url) => localMedia.releasePlaybackUrl(url))
+  localizedLiveMedia.clear()
   window.removeEventListener("fullscreenchange", checkFullScreen)
   window.removeEventListener("webkitfullscreenchange", checkFullScreen)
   window.removeEventListener("mozfullscreenchange", checkFullScreen)

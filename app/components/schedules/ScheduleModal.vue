@@ -2,119 +2,102 @@
   <div class="flex">
     <UModal
       v-model="visible"
-      :ui="{
-        base: 'min-w-[700px]',
-      }"
       :prevent-close="true"
+      :ui="{
+        base: 'min-w-[570px] max-w-[570px]',
+        background: 'bg-transparent dark:bg-transparent',
+        ring: '',
+        rounded: 'rounded-2xl',
+        shadow: 'shadow-none',
+        overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
+      }"
       @close="activeSchedule ? emit('close') : null"
     >
-      <UCard
-        :ui="{
-          ring: '',
-          divide: 'divide-y divide-gray-100 dark:divide-gray-800',
-        }"
+      <AppSection
+        heading="Create a schedule"
+        heading-styles="text-lg font-semibold"
       >
-        <template #header>
-          <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-md truncate">
-              Projects and Schedule
-            </h2>
-            <div class="actions flex items-center gap-2">
-              <UButton
-                icon="i-bx-search"
-                v-if="currentState.schedules.length > 0"
-                color="primary"
-                :variant="searchVisible ? 'outline' : 'ghost'"
-                @click="
-                  () => {
-                    searchVisible = !searchVisible
-                    if (!searchVisible) {
-                      searchInput = ''
-                    }
-                  }
-                "
-                >Search</UButton
-              >
+        <template #actions>
+          <button
+            class="grid h-8 w-8 place-items-center rounded-md leading-none hover:bg-gray-100 dark:hover:bg-[#222938] transition-colors"
+            @click="closeScheduleModal"
+          >
+            <UIcon
+              name="i-lucide-x"
+              class="block h-5 w-5 -translate-y-px text-gray-600 dark:text-[#a7afbd]"
+            />
+          </button>
+        </template>
 
-              <UButton
-                icon="i-mdi-close"
-                variant="ghost"
-                @click="closeScheduleModal"
-              ></UButton>
+        <div
+          class="schedule-modal-body rounded-2xl bg-gray-50 dark:bg-[#1b212e] p-4"
+        >
+          <div class="starters-ctn">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm text-gray-400">Start with a template</p>
+            </div>
+            <div class="grid grid-cols-4 gap-4">
+              <div class="flex flex-col gap-2.5">
+                <button
+                  class="relative h-[80px] rounded-xl border-2 border-dashed border-gray-200 dark:border-[#2a3244] flex items-center justify-center transition-colors hover:border-primary-500 disabled:cursor-not-allowed"
+                  :disabled="!!creatingKey"
+                  @click="createBlankSchedule"
+                >
+                  <PlusIcon />
+                  <USkeleton
+                    v-if="creatingKey === 'blank'"
+                    class="rounded-xl schedule-skeleton"
+                    :ui="skeletonUi"
+                  />
+                </button>
+                <span
+                  class="text-sm text-center text-gray-500 dark:text-gray-400"
+                >
+                  Start from blank
+                </span>
+              </div>
+              <div
+                v-for="preset in starterPresets"
+                :key="preset.key"
+                class="flex flex-col gap-2.5"
+              >
+                <button
+                  class="starter-preset relative h-[80px] rounded-xl bg-cover bg-center ring-2 ring-transparent hover:ring-primary-500 transition-all disabled:cursor-not-allowed"
+                  :style="{ backgroundImage: `url(${preset.image})` }"
+                  :disabled="!!creatingKey"
+                  @click="createFromTemplate(preset)"
+                >
+                  <USkeleton
+                    v-if="creatingKey === preset.key"
+                    class="rounded-xl schedule-skeleton"
+                    :ui="skeletonUi"
+                  />
+                </button>
+                <span
+                  class="text-sm text-center text-gray-500 dark:text-gray-400 truncate"
+                >
+                  {{ preset.label }}
+                </span>
+              </div>
             </div>
           </div>
-        </template>
-        <div class="search-and-add-content">
-          <Transition name="fade-sm">
-            <div v-if="searchVisible" class="flex search-input gap-2 mb-4">
-              <UFormGroup size="lg" class="w-[100%]">
-                <UInput
-                  icon="i-bx-search"
-                  placeholder="Search for schedules"
-                  v-model="searchInput"
-                />
-              </UFormGroup>
-            </div>
-          </Transition>
-          <!-- <UButton
-            block
-            class="h-[170px] bg-primary-100 dark:bg-primary-300 border border-primary-100 dark:border-primary-500 hover:bg-primary-100 dark:hover:bg-primary-400 hover:border-primary-500 transition-all flex-col gap-4 text-primary-500"
-            @click="newScheduleVisible = !newScheduleVisible"
+
+          <div
+            v-if="recentSchedules.length > 0"
+            class="recent-schedules-ctn mt-6"
           >
-            <PlusIcon />
-            <div>New Schedule</div>
-          </UButton> -->
-
-          <Transition name="fade-sm">
-            <div v-if="newScheduleVisible" class="schedules-ctn mb-8">
-              <form
-                class="schedules flex items-end overflow-auto gap-2 bg-primary-100 dark:bg-primary-900 p-6 rounded-lg"
-                @submit.prevent="createNewSchedule()"
+            <div class="flex items-center justify-between mb-1">
+              <p class="text-sm text-gray-400">Recent Schedules</p>
+              <span
+                class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer transition-colors"
+                @click="openAllSchedules"
               >
-                <UFormGroup
-                  label="Create New Schedule"
-                  size="lg"
-                  class="flex-1"
-                >
-                  <UInput
-                    placeholder="Enter your schedule name"
-                    v-model="scheduleName"
-                    class="mt-3"
-                  />
-                  <div class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Leave field blank to create schedule with name "{{
-                      testScheduleName
-                    }}"
-                  </div>
-                </UFormGroup>
-                <UButton
-                  type="submit"
-                  class="h-[40px] mb-6"
-                  size="sm"
-                  icon="i-bx-save"
-                >
-                  Save Schedule
-                </UButton>
-              </form>
+                See all
+              </span>
             </div>
-          </Transition>
-
-          <div class="schedules-ctn mt-6">
-            <p class="text-sm text-gray-400">Recent schedules</p>
-
-            <div class="schedules flex-col flex mt-4 h-[40vh] overflow-auto">
-              <EmptyState
-                v-if="currentState.schedules.length === 0"
-                icon="i-bx-calendar"
-                sub="No schedules yet"
-                desc="Click the button above to create a new schedule and start using Cloud of Worship."
-                is-wider
-              />
+            <div class="max-h-[370px] overflow-auto">
               <ScheduleCard
-                v-else
-                v-for="schedule in searchedSchedules
-                  ?.filter((schedule: Schedule) => schedule?.name?.trim().length > 0)
-                  ?.slice(0, scheduleListLimit)"
+                v-for="schedule in recentSchedules.slice(0, scheduleListLimit)"
                 :key="schedule?._id"
                 :schedule="schedule"
                 @select="(schedule: Schedule) => {
@@ -127,21 +110,14 @@
                   $emit('close')
                 }"
                 @delete="deleteSchedule($event)"
+                @duplicate="duplicateSchedule($event)"
+                @rename="renameSchedule"
               />
-              <UButton
-                v-if="searchedSchedules?.length > scheduleListLimit"
-                variant="ghost"
-                trailing-icon="i-bx-chevron-down"
-                size="lg"
-                class="justify-center mt-4"
-                @click="scheduleListLimit += 5"
-              >
-                See more schedules
-              </UButton>
             </div>
           </div>
+
         </div>
-      </UCard>
+      </AppSection>
     </UModal>
   </div>
 </template>
@@ -149,18 +125,16 @@
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import type { Schedule } from "~/types"
+import type { Schedule, ScheduleTemplate } from "~/types"
 import { appWideActions } from "~/utils/constants"
+import { scheduleTemplates } from "~/utils/scheduleTemplates"
+import { escapePriority } from "~/composables/useEscapeKey"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["close"])
-const scheduleName = ref<string>("")
-const scheduleListLimit = ref<number>(6)
-const testScheduleName = ref<string>(
-  `CoW Schedule ${new Date().toLocaleDateString("en-GB")?.replaceAll("/", "-")}`
-)
+const scheduleListLimit = ref<number>(5)
 
 const props = defineProps<{
   visible: boolean
@@ -168,12 +142,20 @@ const props = defineProps<{
 }>()
 
 const visible = ref<boolean>(props.visible)
-const searchVisible = ref<boolean>(false)
-const newScheduleVisible = ref<boolean>(true)
-const searchInput = ref<string>("")
 const toast = useToast()
-const loading = ref<boolean>(false)
 const copied = ref<boolean>(false)
+
+// Key of the template currently being created ('blank' or a preset key), used to
+// show a per-tile loading state and block concurrent creations.
+const creatingKey = ref<string>("")
+const starterPresets = scheduleTemplates
+
+// Full-card skeleton overlay shown on the tile being created (matches CowSkeleton).
+const skeletonUi = {
+  base: "absolute inset-0 overflow-hidden animate-pulse",
+  background: "bg-gray-300 dark:bg-gray-600/80",
+  rounded: "rounded-xl",
+}
 
 watch(
   () => props.visible,
@@ -197,16 +179,30 @@ const closeScheduleModal = () => {
   }
 }
 
-const searchedSchedules = computed(() => {
-  if (searchInput.value.length === 0) {
-    return appStore.currentState.schedules
-  }
-  const tempSchedules = [...appStore.currentState.schedules]
-  return tempSchedules?.filter((schedule) => {
-    return schedule?.name
-      ?.toLowerCase()
-      .includes(searchInput.value.toLowerCase())
-  })
+// `prevent-close` keeps a stray click on the overlay from dismissing the modal,
+// which also opts it out of Headless UI's own Escape handling — so wire Escape
+// up explicitly. It goes through `closeScheduleModal`, which still refuses to
+// close (and says why) until a schedule has been selected or created.
+useEscapeKey(
+  () => {
+    if (!visible.value) return false
+    closeScheduleModal()
+    return true
+  },
+  { priority: escapePriority.modal }
+)
+
+const openAllSchedules = () => {
+  useGlobalEmit(appWideActions.newSchedulesList)
+  emit("close")
+}
+
+const recentSchedules = computed(() => {
+  return (
+    currentState.value.schedules?.filter(
+      (schedule) => schedule?.name?.trim().length > 0
+    ) || []
+  )
 })
 
 const createScheduleOnline = async (schedule: Schedule) => {
@@ -214,11 +210,11 @@ const createScheduleOnline = async (schedule: Schedule) => {
   return createSchedule(schedule)
 }
 
-const createNewSchedule = () => {
-  // Check subscription limits for free users
-  const { hasAccessToFeature, isFreePlan } = useSubscription()
+// Returns true (and surfaces the upgrade prompt) when the free-plan schedule
+// limit has been reached, so callers should abort.
+const isScheduleLimitReached = (): boolean => {
+  const { isFreePlan } = useSubscription()
   const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
-
   const scheduleCount = appStore.currentState.schedules.length
 
   if (isFreePlan.value && scheduleCount >= 5 && isPremiumFeatureEnabled.value) {
@@ -236,37 +232,127 @@ const createNewSchedule = () => {
         "Free plan allows up to 5 schedules. Upgrade to create unlimited schedules.",
       color: "orange",
     })
+    return true
+  }
+  return false
+}
+
+// Create an empty schedule and open it immediately.
+const createBlankSchedule = async () => {
+  if (creatingKey.value) return
+  if (isScheduleLimitReached()) return
+
+  creatingKey.value = "blank"
+  try {
+    const scheduleId = useObjectID()
+    const schedule: Schedule = {
+      _id: scheduleId,
+      name: "Untitled schedule",
+      authorId: authStore?.user?._id as string,
+      editorIds: [],
+      churchId: authStore?.user?.churchId as string,
+      createdAt: new Date().toISOString(),
+    }
+
+    // Find all slides without a scheduleId and add the new scheduleId
+    appStore.currentState.activeSlides.forEach((slide) => {
+      if (!slide.scheduleId) {
+        slide.scheduleId = scheduleId
+      }
+    })
+
+    appStore.setActiveSchedule(schedule)
+    useGlobalEmit(appWideActions.selectedSchedule, schedule)
+
+    usePosthogCapture("SCHEDULE_CREATED", {
+      scheduleName: schedule.name,
+      hasSlides: appStore.currentState.activeSlides.length > 0,
+    })
+  } finally {
+    creatingKey.value = ""
+  }
+
+  emit("close")
+}
+
+// Create a schedule from a starter template (with its themed slides) and open it.
+const createFromTemplate = async (template: ScheduleTemplate) => {
+  if (creatingKey.value) return
+  if (isScheduleLimitReached()) return
+
+  creatingKey.value = template.key
+  try {
+    const { createScheduleFromTemplate } = useScheduleTemplates()
+    await createScheduleFromTemplate(template)
+  } finally {
+    creatingKey.value = ""
+  }
+
+  emit("close")
+}
+
+// Same rename path as the navbar's schedule switcher: update local state first,
+// then persist (the API layer queues the request when offline).
+const replaceScheduleLocally = (schedule: Schedule) => {
+  if (schedule._id === appStore.currentState.activeSchedule?._id) {
+    // Also refreshes the entry in currentState.schedules
+    appStore.setActiveSchedule(schedule)
+    return true
+  }
+
+  const updatedScheduleList = [...appStore.currentState.schedules]
+  const index = updatedScheduleList.findIndex(
+    (item) => item?._id === schedule._id
+  )
+  if (index === -1) return false
+
+  updatedScheduleList.splice(index, 1, schedule)
+  appStore.setSchedules(updatedScheduleList)
+  return true
+}
+
+const renameSchedule = async (schedule: Schedule, name: string) => {
+  const updatedSchedule: Schedule = {
+    ...schedule,
+    name,
+    updatedAt: new Date().toISOString(),
+  }
+
+  if (!replaceScheduleLocally(updatedSchedule)) return
+
+  const { updateSchedule } = useSchedules()
+  const result = await updateSchedule(schedule._id, { name })
+  if (result.status === "failed") {
+    const currentSchedule = appStore.currentState.schedules.find(
+      (item) => item?._id === schedule._id
+    )
+    // Do not overwrite a newer rename if this request resolves out of order.
+    if (currentSchedule?.name === name) {
+      replaceScheduleLocally(schedule)
+    }
     return
   }
 
-  const scheduleId = useObjectID()
-  const schedule: Schedule = {
-    _id: scheduleId,
-    name: scheduleName.value?.trim() || testScheduleName.value,
-    authorId: authStore?.user?._id as string,
-    editorIds: [],
-    churchId: authStore?.user?.churchId as string,
-    createdAt: new Date().toISOString(),
+  usePosthogCapture("SCHEDULE_RENAMED", {
+    scheduleId: schedule._id,
+    scheduleName: name,
+    persistence: result.status,
+  })
+}
+
+const duplicateSchedule = async (schedule: Schedule) => {
+  if (creatingKey.value) return
+  if (isScheduleLimitReached()) return
+
+  creatingKey.value = `duplicate-${schedule._id}`
+  try {
+    const { duplicateSchedule } = useScheduleTemplates()
+    await duplicateSchedule(schedule)
+  } finally {
+    creatingKey.value = ""
   }
 
-  // Find all slides without a scheduleId and add the new scheduleId
-  appStore.currentState.activeSlides.forEach((slide) => {
-    if (!slide.scheduleId) {
-      slide.scheduleId = scheduleId
-    }
-  })
-
-  appStore.setActiveSchedule(schedule)
-  useGlobalEmit(appWideActions.selectedSchedule, schedule)
-  scheduleName.value = ""
-
   emit("close")
-
-  // Track schedule creation
-  usePosthogCapture("SCHEDULE_CREATED", {
-    scheduleName: schedule.name,
-    hasSlides: appStore.currentState.activeSlides.length > 0,
-  })
 }
 
 const uploadBatchSchedules = async () => {
@@ -305,3 +391,34 @@ const deleteSchedule = (scheduleId: string) => {
 
 retrieveSchedules()
 </script>
+
+<style scoped>
+.schedule-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.6),
+    transparent
+  );
+  animation: schedule-skeleton-shimmer 1.3s ease-in-out infinite;
+}
+
+html.dark .schedule-skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.22),
+    transparent
+  );
+}
+
+@keyframes schedule-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+</style>

@@ -1,30 +1,70 @@
 <template>
-  <div class="bg-image-selection-ctn p-2">
+  <div v-if="backgroundPanel" class="h-full w-full p-3">
     <div
-      :class="{ 'gap-4 grid-cols-3 max-h-full': settingsPage }"
-      class="bg-image-selection grid gap-2 grid-cols-3 max-h-[190px] overflow-y-auto overflow-x-hidden"
+      class="grid h-full grid-cols-3 gap-[8.5px] overflow-y-auto overflow-x-hidden"
     >
-      <UButton
+      <button
         v-for="image in backgroundImages"
         :key="image"
-        @click="$emit('select', { image })"
-        class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
-        :class="[settingsPage ? 'w-[180px] h-[100px]' : 'w-[90px] h-[50px]']"
+        type="button"
+        class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-cover transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#E8D1F8]"
+        :aria-label="
+          image === value
+            ? 'Selected background image'
+            : 'Select background image'
+        "
+        :aria-pressed="image === value"
+        @click="selectImage(image)"
       >
-        <div
-          class="bg-image min-w-[180px] h-[100px] transition rounded-md opacity-100 hover:opacity-30 bg-cover"
-          :class="{ 'opacity-30': image === value }"
-          :style="`background-image: url(${image})`"
-        ></div>
-        <IconWrapper
+        <span
+          class="block h-full w-full bg-cover bg-center"
+          :style="{ backgroundImage: `url(${image})` }"
+        ></span>
+        <span
           v-if="image === value"
-          name="i-bx-check"
-          size="5"
-          :rounded-bg="true"
-          class="absolute text-primary-500 scale-50 bottom-2 right-2"
-        />
-        <!-- Delete button for custom images in settings page -->
-        <!-- <UButton
+          class="pointer-events-none absolute inset-0 z-10 rounded-[4px] border-2 border-[#E8D1F8]"
+        ></span>
+      </button>
+    </div>
+  </div>
+
+  <template v-else>
+    <div>
+      <div class="bg-image-selection-ctn p-2">
+        <div
+          class="bg-image-selection grid gap-2 max-h-[190px] overflow-y-auto overflow-x-hidden"
+          :class="
+            settingsPage ? 'gap-4 grid-cols-3 max-h-full pb-16' : 'grid-cols-3'
+          "
+        >
+          <UButton
+            v-for="image in backgroundImages"
+            :key="image"
+            @click="selectImage(image)"
+            class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
+            :class="settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]'"
+          >
+            <div
+              class="bg-image w-full h-full transition rounded-md opacity-100 hover:opacity-30 bg-cover"
+              :class="[
+                settingsPage ? 'min-w-[180px] h-[100px]' : '',
+                { 'opacity-30': image === value },
+              ]"
+              :style="`background-image: url(${image})`"
+            ></div>
+            <span
+              v-if="image === value"
+              class="pointer-events-none absolute inset-0 z-10 rounded-md border-2 border-[#E8D1F8]"
+            ></span>
+            <IconWrapper
+              v-if="image === value"
+              name="i-bx-check"
+              size="5"
+              :rounded-bg="true"
+              class="absolute text-primary-500 scale-50 bottom-2 right-2"
+            />
+            <!-- Delete button for custom images in settings page -->
+            <!-- <UButton
           v-if="settingsPage && isCustomImage(image)"
           icon="i-tabler-trash"
           size="xs"
@@ -33,69 +73,73 @@
           :loading="deletingImageId === image"
           @click.stop.prevent="handleDeleteImage(image)"
         /> -->
-      </UButton>
+          </UButton>
+        </div>
+      </div>
+      <div v-if="!hideUpload && !settingsPage" class="button-ctn p-2 pt-0">
+        <FileDropzone
+          size="sm"
+          accept="image/*"
+          :maxFileSize="maxFileSize"
+          @change="saveAndSelectImages($event)"
+          class="max-w-[320px]"
+          :loading="imageCompressionLoading"
+        />
+      </div>
+      <Teleport to="#settings-modal-device-action">
+        <!-- Fixed to the settings modal, outside its scrolling content. -->
+        <div
+          v-if="!hideUpload && settingsPage"
+          class="pointer-events-auto w-[190px] shadow-xl transition-all"
+        >
+          <input
+            ref="imageFileInput"
+            type="file"
+            class="hidden"
+            accept="image/*"
+            multiple
+            @change="onImageFileSelect"
+          />
+          <CowButton
+            variant="primary"
+            size="lg"
+            block
+            :icon="imageCompressionLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
+            :loading="imageCompressionLoading"
+            :disabled="imageCompressionLoading"
+            @click="openImageFilePicker"
+          >
+            {{
+              imageCompressionLoading
+                ? `Adding ${currentImageIndex}/${totalImages}...`
+                : "Add from device"
+            }}
+          </CowButton>
+        </div>
+      </Teleport>
     </div>
-  </div>
-  <div class="button-ctn p-2 pt-0">
-    <FileDropzone
-      v-if="!settingsPage"
-      size="sm"
-      accept="image/*"
-      :maxFileSize="maxFileSize"
-      @change="saveAndSelectImages($event)"
-      class="max-w-[300px]"
-      :class="{ 'max-w-full': settingsPage }"
-      :loading="imageCompressionLoading"
-    />
-    <label v-else class="relative">
-      <input
-        type="file"
-        name=""
-        id=""
-        class="absolute inset-0 opacity-0 cursor-pointer"
-        accept="image/*"
-        multiple
-        @change="
-          saveAndSelectImages(
-            Array.from(($event.target as HTMLInputElement)?.files || [])
-          )
-        "
-      />
-      <UButton
-        class="z-1 mt-2"
-        block
-        variant="outline"
-        :icon="imageCompressionLoading ? 'i-bx-loader-alt' : 'i-bx-plus'"
-        :loading="imageCompressionLoading"
-        size="sm"
-        >{{
-          imageCompressionLoading
-            ? `Adding ${currentImageIndex}/${totalImages}...`
-            : "Add from device"
-        }}</UButton
-      >
-    </label>
-  </div>
+  </template>
 </template>
 
 <script setup lang="ts">
 import { useOnline } from "@vueuse/core"
-import { useAuthStore } from "~/store/auth"
-import type { Media } from "~/types"
+import { useAppStore } from "~/store/app"
 
 defineProps<{
   value?: string
   settingsPage?: boolean
+  hideUpload?: boolean
+  backgroundPanel?: boolean
 }>()
 
 const emit = defineEmits(["select", "loading-change"])
-const authStore = useAuthStore()
-const { isFreePlan } = useSubscription()
+const appStore = useAppStore()
 
-const maxFileSize = computed(() => (isFreePlan ? 3 : 10))
+const maxFileSize = computed(() => Infinity)
 const toast = useToast()
-const db = useIndexedDB()
+const localMedia = useLocalMediaStorage()
 const imageCompressionLoading = ref(false)
+const imageFileInput = ref<HTMLInputElement | null>(null)
 const currentImageIndex = ref(0)
 const totalImages = ref(0)
 const deletingImageId = ref<string | null>(null)
@@ -103,6 +147,7 @@ const deletingImageId = ref<string | null>(null)
 const bgImageToBeSelected = ref<string | null>(null)
 const localImageObjectUrls = new Set<string>()
 const transientPreviewUrls = new Set<string>()
+const imageKeysByUrl = new Map<string, string>()
 const defaultBackgroundImages = [
   "https://images.unsplash.com/photo-1553901753-215db344677a?q=80&w=1740",
   "https://images.unsplash.com/photo-1506056820413-f8fa4de15de6?q=80&w=1740",
@@ -136,8 +181,62 @@ const defaultBackgroundImages = [
 ]
 const backgroundImages = ref<string[]>([...defaultBackgroundImages])
 
+const openImageFilePicker = () => {
+  imageFileInput.value?.click()
+}
+
+const selectImage = async (image: string) => {
+  const existingKey = imageKeysByUrl.get(image)
+  if (existingKey) {
+    emit("select", { image, key: existingKey })
+    return
+  }
+
+  const presetIndex = defaultBackgroundImages.indexOf(image)
+  if (presetIndex < 0) {
+    emit("select", { image })
+    return
+  }
+
+  const key = `/preset-image-bg-${presetIndex + 1}`
+  try {
+    const localUrl = await localMedia.ensureLocal(key, {
+      url: image,
+      category: "preset",
+      kind: "image",
+      groupId: key,
+      recoverable: true,
+    })
+    if (!localUrl) throw new Error("The preset image could not be saved.")
+    imageKeysByUrl.set(localUrl, key)
+    emit("select", { image: localUrl, key })
+  } catch (error) {
+    console.error("Failed to prepare preset image:", error)
+    toast.add({
+      title: "Background is not available offline yet",
+      description: "Connect to the internet and try selecting it again.",
+      icon: "i-bx-error",
+      color: "red",
+    })
+  }
+}
+
+const onImageFileSelect = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ""
+  void saveAndSelectImages(files)
+}
+
 const revokeLocalImageObjectUrls = () => {
-  localImageObjectUrls.forEach((url) => URL.revokeObjectURL(url))
+  const usedBackgrounds = new Set(
+    appStore.currentState.activeSlides.map((slide) => slide.background)
+  )
+  localImageObjectUrls.forEach((url) => {
+    if (!usedBackgrounds.has(url)) {
+      localMedia.releasePlaybackUrl(url)
+    }
+  })
   localImageObjectUrls.clear()
 }
 
@@ -147,8 +246,14 @@ const revokeTransientPreviewUrls = () => {
 }
 
 const getAllLocallySavedImages = async () => {
-  const db = useIndexedDB()
-  const images = await db.cached.where({ content: "image" }).toArray()
+  const images = (await localMedia.listRecords()).filter(
+    (record) =>
+      record.kind === "image" &&
+      (record.category === "background" || record.category === "preset")
+  )
+
+  revokeLocalImageObjectUrls()
+  imageKeysByUrl.clear()
 
   revokeLocalImageObjectUrls()
 
@@ -159,22 +264,17 @@ const getAllLocallySavedImages = async () => {
   const chunkSize = 20
   for (let i = 0; i < images.length; i += chunkSize) {
     const chunk = images.slice(i, i + chunkSize)
-    chunk.forEach((image) => {
-      const blobURL =
-        typeof image.data === "string"
-          ? image.data
-          : URL.createObjectURL(image.data as unknown as Blob)
+    for (const image of chunk) {
+      const localUrl = await localMedia.getPlaybackUrl(image.key)
+      if (!localUrl) continue
+      if (localUrl.startsWith("blob:")) localImageObjectUrls.add(localUrl)
+      imageKeysByUrl.set(localUrl, image.key)
+      imageURLs.push(localUrl)
 
-      if (typeof image.data !== "string") {
-        localImageObjectUrls.add(blobURL)
+      if (image.key === bgImageToBeSelected.value) {
+        bgImageToBeSelected.value = localUrl
       }
-
-      imageURLs.push(blobURL)
-
-      if (image.id === bgImageToBeSelected.value) {
-        bgImageToBeSelected.value = blobURL
-      }
-    })
+    }
 
     // Allow UI to breathe between chunks
     if (i + chunkSize < images.length) {
@@ -191,8 +291,6 @@ const saveAndSelectImages = async (files: File[]) => {
   if (!files || files.length === 0) return
 
   const online = useOnline()
-  const db = useIndexedDB()
-
   imageCompressionLoading.value = true
   emit("loading-change", true)
   totalImages.value = files.length
@@ -204,7 +302,11 @@ const saveAndSelectImages = async (files: File[]) => {
   })
 
   backgroundImages.value = Array.from(
-    new Set([...defaultBackgroundImages, ...previewUrls, ...backgroundImages.value])
+    new Set([
+      ...defaultBackgroundImages,
+      ...previewUrls,
+      ...backgroundImages.value,
+    ])
   )
 
   const immediatePreviewUrl = previewUrls[previewUrls.length - 1]
@@ -213,7 +315,7 @@ const saveAndSelectImages = async (files: File[]) => {
   }
 
   // Keep the UI responsive by persisting and uploading in the background.
-  // The final selection is re-emitted once IndexedDB has the stable asset URL.
+  // The final selection is re-emitted once durable local storage has the asset.
   ;(async () => {
     let savedSuccessfully = false
     try {
@@ -228,40 +330,60 @@ const saveAndSelectImages = async (files: File[]) => {
                 type: compressedBlob.type || file.type,
                 lastModified: file.lastModified,
               })
-        let uploadedFile = null
         const randomId = useID(6)
 
-        // Save to S3 when available, but never block the initial preview.
+        const mediaKey = `/custom-image-bg-${randomId}.${
+          file.type?.split("/")?.[1]
+        }`
+        await localMedia.saveBlob({
+          key: mediaKey,
+          groupId: mediaKey,
+          category: "background",
+          kind: "image",
+          blob: compressedFile,
+          mimeType: compressedFile.type,
+          originalName: file.name,
+          recoverable: false,
+          userInitiated: true,
+        })
+
+        // Cloud recovery starts only after the local copy has been verified.
         if (online.value) {
-          uploadedFile = await useUploadImage(compressedFile)
+          try {
+            const uploadedFile = await useUploadImage(compressedFile)
+            await useIndexedDB().localMediaFiles.update(mediaKey, {
+              remoteUrl: uploadedFile.file.url,
+              recoverable: true,
+              updatedAt: new Date().toISOString(),
+            })
+          } catch (error) {
+            console.warn("Background image cloud upload failed:", error)
+          }
         }
-
-        // Save to IndexedDB so the background survives reloads.
-        const tempMedia: Media = {
-          id: `/custom-image-bg-${randomId}.${file.type?.split("/")?.[1]}`,
-          data: uploadedFile ? uploadedFile?.file?.url : compressedFile,
-          content: "image",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-
-        await db.cached
-          .add(tempMedia)
-          .catch((err) => console.error("Failed to save custom image:", err))
 
         // Select the last added image once the stable asset is available.
         if (i === files.length - 1) {
-          bgImageToBeSelected.value = tempMedia.id
+          bgImageToBeSelected.value = mediaKey
         }
       }
 
       await getAllLocallySavedImages()
       if (bgImageToBeSelected.value) {
-        emit("select", { image: bgImageToBeSelected.value })
+        emit("select", {
+          image: bgImageToBeSelected.value,
+          key: imageKeysByUrl.get(bgImageToBeSelected.value),
+        })
       }
       savedSuccessfully = true
     } catch (error) {
       console.error("Failed to save custom image:", error)
+      toast.add({
+        title: "Local media storage is unavailable",
+        description:
+          "This browser cannot durably save the background. The preview will only last for this session.",
+        icon: "i-bx-error",
+        color: "red",
+      })
     } finally {
       imageCompressionLoading.value = false
       emit("loading-change", false)

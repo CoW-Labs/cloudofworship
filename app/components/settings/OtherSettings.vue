@@ -1,84 +1,52 @@
 <template>
-  <div class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] pb-[15%]">
+  <div
+    class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] p-1 pb-[15%] flex flex-col gap-8"
+  >
     <!-- ALERT SETTINGS -->
-    <div class="settings-group">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Alert Settings</h3>
-      </div>
-      <UFormGroup
-        label="Set default alert limit"
-        class="flex items-center justify-between px-2 py-1 hover:bg-primary/10"
-      >
-        <div
-          class="flex px-0 items-center gap-2 font-semibold max-w-[200px] mt-2"
-        >
-          <span class="text-sm whitespace-nowrap">5</span>
-          <URange
-            :model-value="currentState.settings.alertLimit ?? 5"
-            :min="5"
-            :max="30"
-            :step="1"
-            @change="updateSetting('alertLimit', Number($event))"
-          />
-          <span class="text-sm whitespace-nowrap"> 30</span>
-        </div>
-        <div class="text-xs mt-2 text-gray-500">
-          Current Alert Limit:
-          {{ currentState.settings.alertLimit }} alerts
-        </div>
-      </UFormGroup>
-    </div>
-
-    <UDivider class="my-6" />
+    <SettingsGroup title="Alert Settings">
+      <SettingsSlider
+        label="Default alert limit"
+        :description="`Currently ${currentState.settings.alertLimit ?? 5} alerts.`"
+        :model-value="currentState.settings.alertLimit ?? 5"
+        :min="5"
+        :max="30"
+        :step="1"
+        @change="updateSetting('alertLimit', Number($event))"
+      />
+    </SettingsGroup>
 
     <!-- TRANSCRIPTION SETTINGS -->
-    <div class="settings-group">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-md font-semibold">Transcription Settings</h3>
-      </div>
-      <UFormGroup
-        label="Allow automatic transcription actions"
-        class="flex flex-col justify-between px-2 py-2 hover:bg-primary/10"
+    <SettingsGroup title="Transcription Settings">
+      <SettingsRow
+        label="Automatic transcription actions"
+        description="Automatically open detected Bible references and respond to sermon voice navigation commands while transcribing."
       >
-        <div class="flex justify-between w-full">
-          <div class="text-xs mt-0 text-gray-500 max-w-[420px]">
-            Automatically open detected Bible references and respond to sermon
-            voice navigation commands while transcribing.
-          </div>
-          <UToggle
-            size="lg"
-            :model-value="
-              currentState.settings.transcriptionAutoActions ?? true
-            "
-            @change="updateSetting('transcriptionAutoActions', $event)"
-          />
-        </div>
-      </UFormGroup>
-      <UFormGroup
-        label="Allow voice Bible version changes"
-        class="flex flex-col justify-between px-2 py-2 hover:bg-primary/10 mt-4"
+        <CowToggle
+          bare
+          label="Automatic transcription actions"
+          :model-value="currentState.settings.transcriptionAutoActions ?? true"
+          @update:model-value="updateSetting('transcriptionAutoActions', $event)"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Voice Bible version changes"
+        description="Let commands like “switch to NIV” change the active Bible slide to a downloaded Bible version."
+        :disabled="!(currentState.settings.transcriptionAutoActions ?? true)"
       >
-        <div class="flex justify-between w-full">
-          <div class="text-xs mt-0 text-gray-500 max-w-[420px]">
-            Let commands like “switch to NIV” change the active Bible slide to a
-            downloaded Bible version.
-          </div>
-          <UToggle
-            size="lg"
-            :disabled="
-              !(currentState.settings.transcriptionAutoActions ?? true)
-            "
-            :model-value="
-              currentState.settings.transcriptionVoiceBibleVersionCommands ??
-              true
-            "
-            @change="
-              updateSetting('transcriptionVoiceBibleVersionCommands', $event)
-            "
-          />
-        </div>
-      </UFormGroup>
-    </div>
+        <CowToggle
+          bare
+          label="Voice Bible version changes"
+          :disabled="!(currentState.settings.transcriptionAutoActions ?? true)"
+          :model-value="
+            currentState.settings.transcriptionVoiceBibleVersionCommands ?? true
+          "
+          @update:model-value="
+            updateSetting('transcriptionVoiceBibleVersionCommands', $event)
+          "
+        />
+      </SettingsRow>
+    </SettingsGroup>
   </div>
 </template>
 

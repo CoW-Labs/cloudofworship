@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="!loadingResources"
-    class="app-ctn max-h-[100vh] overflow-hidden text"
+    class="app-ctn min-h-[100vh] max-h-[100vh] overflow-hidden bg-gray-100 text dark:bg-[#111722]"
   >
     <Navbar :app-version="appVersion" :online="isAppOnline" />
     <SubscriptionExpiryBanner />
@@ -28,57 +28,37 @@
       <Transition name="fade-sm">
         <UpdateNotification />
       </Transition>
-      <AdvertModal :active-advert="currentState.activeAdvert" />
+      <AdvertModal
+        v-model="showAdvertModal"
+        :active-advert="currentState.activeAdvert"
+      />
       <UpgradePlanModal />
     </ClientOnly>
   </div>
-  <div
-    v-else
-    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center bg-white px-6 text-gray-900 dark:bg-gray-950 dark:text-white"
-  >
-    <div class="wrapper w-full max-w-md text-center">
-      <section class="min-w-0">
-        <div class="logo mb-8 flex items-center justify-center gap-3">
-          <Logo class="w-[56px] shrink-0" />
-          <div class="min-w-0">
-            <h1 class="truncate text-2xl font-semibold">Cloud of Worship</h1>
-          </div>
-        </div>
+  <Transition name="fade-sm">
+    <div
+      v-if="loadingResources"
+      class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 z-50 grid place-items-center bg-white px-6 text-[#131724] dark:bg-[#131724] dark:text-white"
+    >
+      <div class="wrapper flex w-full max-w-[324px] flex-col items-center">
+        <CoWSplashLogo class="w-[76px] shrink-0" />
 
-        <div class="space-y-4">
-          <div class="space-y-2 flex items-center justify-between">
-            <div class="min-w-0 text-center">
-              <h2 class="truncate text-sm font-semibold">
-                {{ loadingDetail || currentLoadingTask.description }}
-              </h2>
-            </div>
-            <span class="block text-sm font-semibold tabular-nums">
-              {{ overallLoadingProgress }}%
-            </span>
-          </div>
-
-          <UProgress size="2xl" :value="overallLoadingProgress || undefined" :max="100" />
-
+        <div
+          class="bar mt-[34px] h-1 w-full overflow-hidden rounded-full bg-[#e6e8ef] dark:bg-[#222838]"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="overallLoadingProgress"
+          :aria-label="loadingDetail || currentLoadingTask.description"
+        >
           <div
-            class="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-400"
-          >
-            <UIcon
-              :name="isAppOnline ? 'i-lucide-wifi' : 'i-lucide-wifi-off'"
-              class="h-4 w-4 shrink-0"
-              dynamic
-            />
-            <span>
-              {{
-                isAppOnline
-                  ? "Online refresh enabled. Cached data remains available."
-                  : "Offline mode. Using resources already saved on this device."
-              }}
-            </span>
-          </div>
+            class="h-full rounded-full bg-current transition-[width] duration-500 ease-out"
+            :style="{ width: `${Math.max(overallLoadingProgress, 3)}%` }"
+          />
         </div>
-      </section>
+      </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -88,21 +68,17 @@ import type { Church } from "~/store/auth"
 import type { Emitter } from "mitt"
 import type { User } from "~/store/auth"
 import type {
-  LibraryItem,
-  Media,
   BackgroundVideo,
   Schedule,
-  Song,
   SlideStyle,
   Advert,
-  ExtendedFileT,
   Slide,
   Hymn,
   AppSettings,
 } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { appWideActions } from "~/utils/constants"
-import { safeDBGet, safeDBOperation } from "~/composables/useIndexedDB"
+import { safeDBOperation } from "~/composables/useIndexedDB"
 
 useHead({
   title: "Cloud of Worship",
@@ -126,6 +102,7 @@ const config = useRuntimeConfig()
 const { getToken } = useAuthToken()
 const windowRefs = ref<any[]>([])
 const db = useIndexedDB()
+const localMedia = useLocalMediaStorage()
 const appInfo = ref<AppSettings>()
 const { refreshLibrary } = useLibrary()
 const { fetchPlans } = useSubscriptionPlans()
@@ -247,46 +224,9 @@ const fetchUser = async () => {
   if (data.value) {
     const user = data.value as unknown as User
     authStore.setUser(user)
+    return user
   }
-}
-
-const fetchChurchSongs = async () => {
-  try {
-    const { data } = await useAPIFetch(
-      `/church/${authStore.user?.churchId}/songs/all/count?churchId=${authStore.user?.churchId}`
-    )
-    const onlineCount = data.value ? (data.value as unknown as number) : 0
-    const offlineCount = await db.library.where("type").equals("song").count()
-    if (onlineCount > offlineCount) {
-      // Delete songs that are not in the online database
-      await db.library.where("type").equals("song").delete()
-
-      // Add online songs
-      const promise = await useAPIFetch(
-        `/church/${authStore.user?.churchId}/songs/all?churchId=${authStore.user?.churchId}`
-      )
-      const data: Song[] = (await promise.data.value) as unknown as Song[]
-      const libraryData: LibraryItem[] = data?.map((song) => ({
-        id: song.id,
-        type: "song",
-        content: JSON.parse(JSON.stringify(song)),
-        createdAt: song.createdAt,
-        updatedAt: song.updatedAt,
-      }))
-
-      // Use bulkPut instead of bulkAdd to avoid blocking on duplicates
-      // Process in chunks to avoid blocking
-      const chunkSize = 50
-      for (let i = 0; i < libraryData.length; i += chunkSize) {
-        const chunk = libraryData.slice(i, i + chunkSize)
-        await db.library.bulkPut(chunk).catch((err) => {
-          console.error("Failed to save song chunk:", err)
-        })
-      }
-    }
-  } catch (err: any) {
-    console.log(err)
-  }
+  return null
 }
 
 // Get Church Info and see if registered
@@ -299,7 +239,8 @@ const fetchChurch = async () => {
     if (data.value) {
       const church = data.value as unknown as Church
       authStore.setChurch(church)
-      fetchChurchSongs()
+      // Song catalog syncs (non-destructively) via refreshLibrary() in the
+      // Phase 2 background init — no separate fetch needed here.
     }
     if (error.value) {
       console.warn("Unable to refresh church information:", error.value)
@@ -416,28 +357,12 @@ emitter.on("close-live-window", async () => {
 
 const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
   const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
-  const savedVideos = await Promise.all(
-    videoIds.map((id) => db.cached.get(`/video-bg-${id}.mp4`))
+  const savedKeys = new Set(
+    (await localMedia.listRecords()).map((record) => record.key)
   )
-
-  const savedBgVideoMap = new Map(
-    videoIds.map((id, index) => [id, savedVideos[index]])
+  const missingVideoIds = videoIds.filter(
+    (id) => !savedKeys.has(`/video-bg-${id}.mp4`)
   )
-
-  const saveBackground = (blob: any, index: number) => {
-    const tempMedia: Media = {
-      id: `/video-bg-${index}.mp4`,
-      data: blob,
-      content: "video",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    db.cached
-      .put(tempMedia)
-      .catch((err) => console.error(`Failed to save video-bg-${index}:`, err))
-  }
-
-  const missingVideoIds = videoIds.filter((id) => !savedBgVideoMap.get(id))
 
   if (missingVideoIds.length === 0) {
     setLoadingTask("videos", "Background videos are already cached.", 100)
@@ -450,25 +375,32 @@ const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
     100
   )
 
-  const progressRef = options?.wait ? downloadProgress : ref("0")
   const downloadMissingVideos = async () => {
-    const videoDownloadPromises = missingVideoIds.map(async (id) => {
+    const downloadVideo = async (id: number) => {
       try {
-        const bgVideoPromise = await useDetailedFetch(
-          `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`,
-          progressRef
-        )
-        const bgVideoBlob = await bgVideoPromise.blob()
-        saveBackground(bgVideoBlob, id)
+        const url = `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`
+        await localMedia.downloadToLocal({
+          key: `/video-bg-${id}.mp4`,
+          groupId: `/video-bg-${id}.mp4`,
+          category: "preset",
+          kind: "video",
+          url,
+          mimeType: "video/mp4",
+          recoverable: true,
+          onProgress: (fraction) => {
+            if (options?.wait && Number.isFinite(fraction)) {
+              downloadProgress.value = (fraction * 100).toFixed(2)
+            }
+          },
+        })
       } catch (err) {
         console.warn(`Failed to download video-bg-${id} (offline?):`, err)
       }
-    })
+    }
 
     const batchSize = 2
-    for (let i = 0; i < videoDownloadPromises.length; i += batchSize) {
-      const batch = videoDownloadPromises.slice(i, i + batchSize)
-      await Promise.all(batch)
+    for (let i = 0; i < missingVideoIds.length; i += batchSize) {
+      await Promise.all(missingVideoIds.slice(i, i + batchSize).map(downloadVideo))
     }
   }
 
@@ -488,9 +420,31 @@ const tempBibleVersion = (version: string, data: any) => ({
   updatedAt: new Date().toISOString(),
 })
 
+const showAdvertModal = ref(false)
+const SHOWN_ADVERTS_KEY = "cow-shown-advert-ids"
+
+const hasAdvertBeenShown = (id: string) => {
+  const shownIds: string[] = JSON.parse(
+    localStorage.getItem(SHOWN_ADVERTS_KEY) || "[]"
+  )
+  return shownIds.includes(id)
+}
+
+const markAdvertAsShown = (id: string) => {
+  const shownIds: string[] = JSON.parse(
+    localStorage.getItem(SHOWN_ADVERTS_KEY) || "[]"
+  )
+  if (!shownIds.includes(id)) {
+    shownIds.push(id)
+    localStorage.setItem(SHOWN_ADVERTS_KEY, JSON.stringify(shownIds))
+  }
+}
+
 const fetchActiveAdvert = async () => {
-  const { data, error } = await useAPIFetch(`/advert/active`)
-  appStore.setActiveAdvert(data.value as Advert)
+  const { data } = await useAPIFetch(`/advert/active`)
+  const advert = data.value as Advert | null
+  appStore.setActiveAdvert(advert)
+  return advert
 }
 
 const downloadEssentialResources = async () => {
@@ -503,10 +457,21 @@ const downloadEssentialResources = async () => {
   setLoadingTask("startup", "Refreshing account, church, and schedules.", 5)
 
   if (online.value) {
-    // retrieveSchedules only needs authStore.churchId, which Pinia already
-    // has from the persisted session, so it's safe to run in parallel.
+    const user = await fetchUser()
+
+    if (!user && !authStore.user?._id) {
+      loadingResources.value = false
+      navigateTo("/login")
+      return
+    }
+
+    if (authStore.user?.emailVerified === false) {
+      loadingResources.value = false
+      navigateTo("/verify")
+      return
+    }
+
     await Promise.allSettled([
-      fetchUser(),
       fetchChurch(),
       retrieveSchedules(),
     ])
@@ -680,9 +645,43 @@ const retrieveSchedules = async () => {
 
 const retrieveAllMediaFilesFromDB = async () => {
   const db = useIndexedDB()
+  const mediaStorage = useLocalMediaStorage()
+
+  const defaultBackground =
+    appStore.currentState.settings.defaultBackground.default
+  if (defaultBackground?.backgroundImageKey) {
+    const url = await mediaStorage.ensureLocal(
+      defaultBackground.backgroundImageKey,
+      {
+        url: defaultBackground.background,
+        category: "background",
+        kind: "image",
+        groupId: defaultBackground.backgroundImageKey,
+      }
+    )
+    if (url) defaultBackground.background = url
+  }
+
+  const intermission = appStore.currentState.settings.intermission
+  if (intermission?.backgroundImageKey) {
+    const url = await mediaStorage.ensureLocal(intermission.backgroundImageKey, {
+      url: intermission.background,
+      category: "background",
+      kind: "image",
+      groupId: intermission.backgroundImageKey,
+    })
+    if (url) intermission.background = url
+  }
 
   // For active slides - use Promise.all instead of forEach
   const slides = [...appStore.currentState.activeSlides]
+
+  // Rehydrate each slide through the active platform media backend.
+  // Local-only here (allowDownload: false) so startup stays cheap; missing
+  // copies are pulled later by the non-blocking prefetch below. The helper is
+  // Local-first, so a slide whose durable `background` is now a hosted
+  // https URL still plays from its local copy instead of streaming.
+  const { rehydrateSlideMedia, prefetchScheduleMedia } = useSlideMediaCache()
 
   // Process slides in parallel but in small batches to avoid blocking
   const processSlidesInBatches = async (
@@ -692,67 +691,9 @@ const retrieveAllMediaFilesFromDB = async () => {
     for (let i = 0; i < slidesToProcess.length; i += batchSize) {
       const batch = slidesToProcess.slice(i, i + batchSize)
       await Promise.all(
-        batch.map(async (slide: Slide) => {
-          if (
-            slide.type === slideTypes.media &&
-            slide.background?.startsWith("blob:")
-          ) {
-            const mediaObj = await db.media.where({ id: slide.id }).toArray()
-            if (mediaObj[0]) {
-              // Convert ArrayBuffer object stored in [Slide.content.data] to Blob and b64 url
-              const arrayBuffer = mediaObj[0]?.data as ArrayBuffer
-              const blob = new Blob([arrayBuffer], {
-                type: mediaObj[0]?.content?.type,
-              })
-              const fileUrl = URL.createObjectURL(blob)
-              if (slide.data) {
-                slide.data = slide.data as ExtendedFileT
-                slide.data.url = fileUrl
-              }
-              if (!(slide.data as ExtendedFileT)?.type?.includes("audio")) {
-                slide.background = fileUrl
-              }
-            }
-          } else if (
-            slide.type === slideTypes.presentation &&
-            slide.presentationObjects?.length
-          ) {
-            // Restore blob URLs for each presentation page from IndexedDB
-            const restored: typeof slide.presentationObjects = []
-            for (const obj of slide.presentationObjects) {
-              const key = `${slide.id}-page-${obj.page}`
-              const mediaObj = await safeDBGet(db.media, key)
-              if (mediaObj?.data) {
-                const blob = new Blob([mediaObj.data as ArrayBuffer], {
-                  type: "image/png",
-                })
-                restored.push({
-                  page: obj.page,
-                  imageUrl: URL.createObjectURL(blob),
-                })
-              } else {
-                restored.push(obj)
-              }
-            }
-            slide.presentationObjects = restored
-            slide.background =
-              restored[slide.presentationPageIndex ?? 0]?.imageUrl ||
-              slide.background
-          } else if (slide?.backgroundVideoKey) {
-            const cachedBackgroundVideo = await safeDBGet(
-              db.cached,
-              slide?.backgroundVideoKey
-            )
-            if (cachedBackgroundVideo) {
-              const arrayBuffer = cachedBackgroundVideo?.data as ArrayBuffer
-              const blob = new Blob([arrayBuffer], {
-                type: cachedBackgroundVideo?.content?.type,
-              })
-              const fileUrl = URL.createObjectURL(blob)
-              slide.background = fileUrl
-            }
-          }
-        })
+        batch.map((slide: Slide) =>
+          rehydrateSlideMedia(slide, { allowDownload: false })
+        )
       )
     }
   }
@@ -761,6 +702,12 @@ const retrieveAllMediaFilesFromDB = async () => {
   appStore.setActiveSlides(slides)
   appStore.setSlidesLoading(false)
 
+  // Idle prefetch: prepare all downloadable schedule media without blocking
+  // startup.
+  prefetchScheduleMedia(slides, appStore.currentState.liveSlideId).catch((err) =>
+    console.warn("Background media prefetch failed:", err)
+  )
+
   // For saved slides - process asynchronously without blocking
   db.library
     .where("type")
@@ -768,34 +715,12 @@ const retrieveAllMediaFilesFromDB = async () => {
     .toArray()
     .then((savedSlides) => {
       // Process saved slides in background
-      savedSlides?.forEach((slide) => {
-        if ((slide.content as Slide)?.background?.startsWith("blob:")) {
-          safeDBGet(db.media, slide.id)
-            .then((resp) => {
-              if (!resp) return
-              const media = resp
-
-              const arrayBuffer: ArrayBuffer = media?.data as ArrayBuffer
-              const blob = new Blob([arrayBuffer], {
-                type: media?.content?.type,
-              })
-              const fileUrl = URL.createObjectURL(blob)
-              const updatedLibraryItem: LibraryItem = {
-                ...slide,
-                content: {
-                  ...slide.content,
-                  background: fileUrl,
-                  data: { ...(slide.content as Slide).data, url: fileUrl },
-                } as Slide,
-              }
-              db.library
-                .update(slide.id, updatedLibraryItem)
-                .catch((err) =>
-                  console.error("Failed to update library item:", err)
-                )
-            })
-            .catch((err) => console.error("Failed to get media:", err))
-        }
+      savedSlides?.forEach(async (item) => {
+        const content = item.content as Slide
+        const rehydrated = await rehydrateSlideMedia(content, {
+          allowDownload: false,
+        })
+        await db.library.update(item.id, { ...item, content: rehydrated })
       })
     })
     .catch((err) => console.error("Failed to get saved slides:", err))
@@ -805,14 +730,8 @@ const retrieveAllMediaFilesFromDB = async () => {
 
 const setCachedVideosURL = async () => {
   const cachedVideos = await useBackgroundVideos()
-  const tempCachedVideos: BackgroundVideo[] = cachedVideos?.map(
-    (cached: Media) => ({
-      id: cached?.id,
-      url: URL.createObjectURL(cached?.data as Blob),
-    })
-  )
-  cachedVideosURLs.value = tempCachedVideos
-  appStore.setBackgroundVideos(tempCachedVideos)
+  cachedVideosURLs.value = cachedVideos
+  appStore.setBackgroundVideos(cachedVideos)
 }
 
 // WINDOW MANAGEMENT CODE STARTS HERE
@@ -925,6 +844,11 @@ async function openTauriLiveWindow() {
     const isFullscreen =
       appStore.currentState.settings.liveWindowFullscreen ?? true
 
+    // Window options are in logical units while monitors report physical
+    // pixels, so a Retina/scaled projector needs the scale factor divided out —
+    // otherwise the live window lands half-size and offset from the display.
+    const scale = targetMonitor.scaleFactor || 1
+
     // Create new window on the target monitor
     const liveWindow = new WebviewWindow("live-output", {
       url: "/live",
@@ -934,10 +858,10 @@ async function openTauriLiveWindow() {
       resizable: true,
       closable: true,
       fullscreen: isFullscreen,
-      x: targetMonitor.position.x,
-      y: targetMonitor.position.y,
-      width: targetMonitor.size.width,
-      height: targetMonitor.size.height,
+      x: targetMonitor.position.x / scale,
+      y: targetMonitor.position.y / scale,
+      width: targetMonitor.size.width / scale,
+      height: targetMonitor.size.height / scale,
     })
 
     // Wait for window to be ready
@@ -1118,14 +1042,50 @@ async function openWindows() {
     )
   }
 }
+// The web build ties the live popup's lifetime to the operator tab via
+// `beforeunload` inside openWindows(). Desktop windows never fire that, so the
+// projection window would outlive the control center it belongs to.
+async function bindTauriLiveWindowLifecycle() {
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window")
+
+    await getCurrentWindow().onCloseRequested(async () => {
+      if (appStore.currentState.settings.closeLiveWindowWithOperator) {
+        await closeAllWindows()
+      }
+    })
+  } catch (error) {
+    console.error("Failed to bind live window lifecycle:", error)
+  }
+}
 // WINDOW MANAGEMENT CODE ENDS HERE
 
 onMounted(async () => {
-  downloadEssentialResources().catch((err) => {
-    console.error("Failed to finish loading resources:", err)
-    loadingResources.value = false
-  })
-  fetchActiveAdvert()
+  const { isTauri } = useTauri()
+  if (isTauri) {
+    bindTauriLiveWindowLifecycle()
+  }
+
+  useLocalMediaStorage()
+    .reconcileOrphans()
+    .catch((err) => console.warn("Local media reconciliation failed:", err))
+  const [, advertResult] = await Promise.allSettled([
+    downloadEssentialResources().catch((err) => {
+      console.error("Failed to finish loading resources:", err)
+      loadingResources.value = false
+    }),
+    fetchActiveAdvert(),
+  ])
+
+  const advert = advertResult.status === "fulfilled" ? advertResult.value : null
+  if (advert && !hasAdvertBeenShown(advert._id)) {
+    setTimeout(() => {
+      showAdvertModal.value = true
+      markAdvertAsShown(advert._id)
+      usePosthogCapture("ADVERT_MODAL_OPENED")
+    }, 10000)
+  }
+
   if (location.hostname !== "localhost") {
     useGtag()
   }

@@ -114,6 +114,10 @@ export const useTauriWindows = () => {
       // Get fullscreen setting from store
       const isFullscreen = appStore.currentState.settings.liveWindowFullscreen ?? true
 
+      // Monitors report physical pixels but window options are logical, so the
+      // scale factor has to be divided out for HiDPI/scaled displays.
+      const scale = targetMonitor.scaleFactor || 1
+
       // Create the window
       const liveWindow = new WebviewWindow(liveWindowLabel, {
         url: '/live',
@@ -123,10 +127,10 @@ export const useTauriWindows = () => {
         decorations: !isFullscreen, // Show decorations only when not fullscreen
         resizable: true,
         skipTaskbar: false,
-        x: targetMonitor.position.x,
-        y: targetMonitor.position.y,
-        width: targetMonitor.size.width,
-        height: targetMonitor.size.height,
+        x: targetMonitor.position.x / scale,
+        y: targetMonitor.position.y / scale,
+        width: targetMonitor.size.width / scale,
+        height: targetMonitor.size.height / scale,
       })
 
       return new Promise((resolve, reject) => {

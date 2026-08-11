@@ -1,75 +1,79 @@
 <template>
-  <div class="h-[100%] overflow-y-auto mb-[2.5%]">
-    <div class="mb-4">
-      <p class="text-xs opacity-50">
-        Cloud of Worship does not own any Bible versions. All translations are
-        graciously provided by open source repositories and are free to use
-        without a Teams subscription.
-      </p>
-    </div>
-    <!-- BIBLE SLIDES -->
-    <div class="settings-group border-gray-200 dark:border-gray-800 mb-6">
-      <UForm :state="{}">
-        <UFormGroup
-          label="Set default Bible Version"
-          class="flex items-center w-full justify-between py-1 px-0 hover:bg-primary/10"
-        >
-          <USelectMenu
-            class="border-0 shadow-none max-w-[200px]"
-            searchable
-            searchable-placeholder="Search version"
-            select-class="w-[200px] bg-gray-100 dark:bg-gray-800 dark:text-white"
-            size="md"
-            :options="
-              bibleVersionOptions
-                ?.filter((version) => version.isDownloaded)
-                .map((version) => version.id)
-            "
-            :model-value="appStore.currentState.settings.defaultBibleVersion"
-            variant="none"
-            color="primary"
-            clear-search-on-close
-            :ui="selectUI"
-            :ui-menu="selectMenuUI"
-            @focus="populateBibleVersionOptions()"
-            @change="appStore.setDefaultBibleVersion($event)"
-          />
-        </UFormGroup>
-      </UForm>
-    </div>
-    <UDivider class="mb-6" />
-    <div
-      v-for="bibleVersion in bibleVersionOptions"
-      :key="bibleVersion"
-      class="bible-version-card relative pb-4 mb-4 border-b border-gray-200 last:border-0 dark:border-gray-700 flex items-center justify-between gap-4"
+  <div class="h-[100%] overflow-y-auto mb-[2.5%] p-1 flex flex-col gap-8">
+    <SettingsGroup
+      title="Default Bible Version"
+      note="Cloud of Worship does not own any Bible versions. All translations are graciously provided by open source repositories and are free to use without a Teams subscription."
     >
-      <UProgress
-        class="absolute inset-0 top-auto rounded-none opacity-0"
-        :class="{
-          'opacity-1': bibleVersionLoading === bibleVersion?.id,
-        }"
-        :value="parseInt(bibleDownloadProgress)"
-        :max="100"
-        size="xs"
-      />
-      <div class="col">
-        <div class="text-md">{{ bibleVersion?.id }}</div>
-        <div class="text-sm text-gray-400">
-          {{ bibleVersion?.name }}
+      <SettingsRow label="Default Bible version">
+        <SettingsSelect
+          searchable
+          searchable-placeholder="Search version"
+          :options="
+            bibleVersionOptions
+              ?.filter((version) => version.isDownloaded)
+              .map((version) => version.id)
+          "
+          :model-value="appStore.currentState.settings.defaultBibleVersion"
+          @focus="populateBibleVersionOptions()"
+          @change="appStore.setDefaultBibleVersion($event)"
+        />
+      </SettingsRow>
+    </SettingsGroup>
+
+    <SettingsGroup
+      title="Available Versions"
+      note="Saved versions work offline on this device."
+    >
+      <div
+        v-for="bibleVersion in bibleVersionOptions"
+        :key="bibleVersion?.id"
+        class="bible-version-card relative overflow-hidden rounded-2xl bg-white dark:bg-[#131a27] px-4 py-3 flex items-center justify-between gap-4"
+      >
+        <UProgress
+          class="absolute inset-0 top-auto rounded-none opacity-0"
+          :class="{
+            'opacity-1': bibleVersionLoading === bibleVersion?.id,
+          }"
+          :value="parseInt(bibleDownloadProgress)"
+          :max="100"
+          size="xs"
+        />
+        <div class="col min-w-0">
+          <div class="text-sm font-semibold text-gray-800 dark:text-white">
+            {{ bibleVersion?.id }}
+          </div>
+          <div class="text-xs text-gray-500 dark:text-[#9aa3b2] truncate">
+            {{ bibleVersion?.name }}
+          </div>
         </div>
-      </div>
-      <div class="col">
-        <UButton
-          :icon="bibleVersion?.isDownloaded ? 'i-bx-check' : 'i-bx-download'"
-          color="primary"
-          :variant="bibleVersion?.isDownloaded ? 'ghost' : 'outline'"
+        <CowButton
+          :variant="bibleVersion?.isDownloaded ? 'secondary' : 'primary'"
+          size="2xs"
+          class="!px-3.5 !py-1.5 text-xs shrink-0"
           :disabled="bibleVersion?.isDownloaded"
+          :loading="bibleVersionLoading === bibleVersion?.id"
           @click="downloadBibleVersion(bibleVersion?.id)"
         >
           {{ bibleVersion?.isDownloaded ? "Saved" : "Save" }}
-        </UButton>
+        </CowButton>
       </div>
-    </div>
+    </SettingsGroup>
+
+    <SettingsGroup
+      title="Default Bible Theme"
+      note="Every new Bible slide is created with this theme. Slides already in a schedule keep the theme they were made with — change those from the slide's theme menu."
+    >
+      <BibleThemeSelection
+        embedded
+        :value="appStore.currentState.settings.slideStyles.theme"
+        @select="
+          appStore.setSlideStyles({
+            ...appStore.currentState.settings.slideStyles,
+            theme: $event,
+          })
+        "
+      />
+    </SettingsGroup>
   </div>
 </template>
 
@@ -84,24 +88,6 @@ const {
   downloadBibleVersion,
   populateBibleVersionOptions,
 } = useBibleVersionManager()
-
-const selectUI = {
-  base: "bg-primary-500",
-  input: "bg-primary-500",
-  color: {
-    primary: {
-      outline: "shadow-sm bg-primary-500 ",
-    },
-  },
-}
-const selectMenuUI = {
-  width: "w-[200px]",
-  input: "text-xs",
-  empty: "text-xs",
-  option: {
-    size: "text-xs",
-  },
-}
 
 populateBibleVersionOptions()
 </script>

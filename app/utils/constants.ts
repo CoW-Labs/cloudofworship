@@ -8,6 +8,7 @@ export const slideTypes = {
   text: 'text',
   media: 'media',
   countdown: 'countdown',
+  time: 'time',
   presentation: 'presentation',
   // sermon: 'sermon',
   // carousel: 'carousel',
@@ -36,6 +37,9 @@ export const appWideActions = {
   addSongSlideToSetlist: 'add-song-slide-to-setlist',
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
+  newTimeSlide: 'new-time-slide',
+  showSlideOverlay: 'show-slide-overlay',
+  removeSlideOverlay: 'remove-slide-overlay',
   newSearchBible: 'new-search-bible',
   newTranscribe: 'new-transcribe',
   goLive: 'go-live',
@@ -58,21 +62,24 @@ export const appWideActions = {
   deleteScheduleSlides: 'delete-schedule-slides',
   selectedSchedule: 'selected-schedule',
   openScheduleModal: 'open-schedule-modal',
+  newSchedulesList: 'new-schedules-list',
   toggleDarkMode: 'toggle-dark-mode',
   joinCommunity: 'join-community',
   openInviteModal: 'open-invite-modal',
-  liveSlideIdTransfer: 'live-slide-id-transfer',
   liveActiveSlidesTransfer: 'live-active-slides-transfer',
   liveSettingsTransfer: 'live-settings-transfer',
   quickActionsFocus: 'quick-actions-focus',
   uploadOfflineSlides: 'upload-offline-slides',
   batchUpdateSlides: 'batch-update-slides',
   openShortcutsModal: 'open-shortcuts',
-  // newPresentation: 'new-presentation',
+  newPresentation: 'new-presentation',
   newPresentationFromPdf: 'new-presentation-from-pdf',
   promoteActiveSlide: 'promote-active-slide-live',
   selectSlides: 'select-slides',
+  selectAllSlides: 'select-all-slides',
+  cancelSelectSlides: 'cancel-select-slides',
   showUpgradeModal: 'show-upgrade-modal',
+  upgradeModalClosed: 'upgrade-modal-closed',
   signOut: 'sign-out',
 }
 
@@ -112,7 +119,7 @@ export const quickActionsArr: QuickAction[] = [
     name: "Transcribe Sermon",
     desc: "Transcribe sermon and auto-suggest Bible slides",
     action: appWideActions.newTranscribe,
-    meta: "transcribe sermon speech text bible audio microphone",
+    meta: "transcribe sermon speech text bible audio microphone speech to text, audio to text transcripts",
     tier: 'teams',
     // unreleased: true,
     featureFlag: 'transcripts-feature',
@@ -144,7 +151,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newSong,
     meta: "",
     type: slideTypes.song,
-    tier: "teams",
+    tier: "free",
   },
   {
     icon: "i-lucide-list-music",
@@ -215,6 +222,15 @@ export const quickActionsArr: QuickAction[] = [
     // unreleased: true,
   },
   {
+    icon: "i-bx-clock",
+    name: "Add Time Slide",
+    desc: "Display the current time on a slide",
+    action: appWideActions.newTimeSlide,
+    meta: "time clock live clock current time",
+    type: slideTypes.time,
+    tier: "free",
+  },
+  {
     icon: "i-mdi-youtube",
     name: "Add YouTube Video",
     desc: "Embed YouTube videos in your schedule",
@@ -253,6 +269,15 @@ export const quickActionsArr: QuickAction[] = [
     // type: slideTypes.text
   },
   {
+    icon: "i-bx-calendar",
+    name: "Recent schedule",
+    desc: "Browse and switch between all your schedules",
+    action: appWideActions.newSchedulesList,
+    meta: "recent schedules list all switch service",
+    searchableOnly: true,
+    tier: "free",
+  },
+  {
     icon: "i-bx-moon",
     name: "Toggle Dark Mode",
     desc: "Switch between light and dark theme",
@@ -285,13 +310,13 @@ export const quickActionsArr: QuickAction[] = [
     // unreleased: true,
     // type: slideTypes.text
   },
-  {
-    icon: "i-ph-file-ppt",
-    name: "Import Slides from PowerPoint",
-    desc: "Import slides from a PowerPoint file",
-    action: appWideActions.newPresentation,
-    meta: "power point pptx ppt Google slides presentation canva import",
-  },
+  // {
+  //   icon: "i-ph-file-ppt",
+  //   name: "Import Slides from PowerPoint",
+  //   desc: "Import slides from a PowerPoint file",
+  //   action: appWideActions.newPresentation,
+  //   meta: "power point pptx ppt Google slides presentation canva import",
+  // },
   {
     icon: "i-ph-file-pdf",
     name: "Import Slides from PDF",
@@ -416,11 +441,11 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-ph-book-open",
-    name: "Bible Version Settings",
-    desc: "Download or change your preferred Bible version",
+    name: "Bible Slide Settings",
+    desc: "Change your preferred Bible version and slide theme",
     action: appWideActions.openSettings,
-    actionArg: "Bible Version Settings",
-    meta: "bible kjv niv nlt amp version download translation language",
+    actionArg: "Bible Slide Settings",
+    meta: "bible kjv niv nlt amp version download translation language theme layout reference label",
     searchableOnly: true,
     tier: "free",
   },
@@ -502,6 +527,7 @@ export const slideLayoutTypes = {
   two_column: 'two-column',
   bible: 'bible',
   countdown: 'countdown',
+  time: 'time',
   empty: 'empty',
 }
 
@@ -525,6 +551,22 @@ export const lineSpacingTypes = {
   single: 'single',
   normal: 'normal', // default
   double: 'double',
+}
+
+// Bounds for the slide-to-slide transition duration, in seconds. Shared by the
+// settings slider and the live projection so a stored value from an older,
+// wider range can never drive a longer transition than the UI can express.
+export const MIN_TRANSITION_INTERVAL = 0
+export const MAX_TRANSITION_INTERVAL = 3
+export const DEFAULT_TRANSITION_INTERVAL = 0.7
+
+// Slide-to-slide transition types for the live projection.
+// `fade` is the only implemented type today; extend with slide/zoom/cut later.
+export const transitionTypes = {
+  fade: 'fade', // default
+  // slide: 'slide',
+  // zoom: 'zoom',
+  // cut: 'cut',
 }
 
 export const bibleBooks = [
@@ -667,6 +709,7 @@ export const bibleVersionObjects: BibleVersion[] = [
 
 export const appFonts = [
   'Inter',
+  'Geist',
   'Roboto',
   'Raleway',
   'Bebas Neue',
@@ -696,20 +739,35 @@ export const churchesArr = [
   "Christ Embassy (CE)",
   "Mountain of Fire and Miracles Ministries (MFM)",
   "Catholic Church",
+  "Eastern Orthodox Church",
+  "Oriental Orthodox Churches",
   "Anglican Church",
+  "Church of Nigeria (Anglican Communion)",
+  "Lutheran Church",
+  "Light Nation Church",
+  "Baptist Church",
+  "Nigerian Baptist Convention",
+  "Seventh-day Adventist Church",
+  "Church of Christ in Nations (COCIN)",
+  "Lutheran Church of Christ in Nigeria (LCCN)",
+  "Qua Iboe Church (United Evangelical Church)",
   "House on the Rock (HOTR)",
   "Daystar Christian Centre (DCC)",
   "The Apostolic Church (TAC)",
   "The Salvation Army Nigeria",
+  "Evangelical Church Winning All (ECWA)",
   "Mountain of Salvation Prayer Ministry",
   "Christ Apostolic Church (CAC)",
   "Methodist Church",
   "Presbyterian Church",
+  "Presbyterian Church of Nigeria",
   "The Church of Jesus Christ of Latter-day Saints",
   "Christian Reformed Church",
   "The Foursquare Gospel Church (FGC)",
   "Cherubim and Seraphim Movement Church",
   "Celestial Church of Christ",
+  "The Church of the Lord (Aladura)",
+  "Watchman Catholic Charismatic Renewal Movement",
   "Mountain of Glory Ministry",
   "Christ Apostolic Church (Worldwide)",
   "The Lord's Chosen Charismatic Revival Movement",
@@ -731,11 +789,13 @@ export const churchesArr = [
   "Rhema Chapel International Churches",
   "Jesus Embassy International",
   "Dominion City Church",
+  "Church of God Mission International",
   "House of Grace",
   "Liberty Christian Centre",
   "The Redeemed Evangelical Mission (TREM)",
   "Royal House of Grace",
   "Lighthouse Chapel International",
+  "Kingsway International Christian Centre (KICC)",
   "Jesus Dominion International",
   "Green Pastures Christian Centre",
   "Holy Ghost Christian Centre",
@@ -766,9 +826,10 @@ export const churchesArr = [
   "St. Andrews Anglican Church",
   "St. Joseph Catholic Church",
   "Covenant Cathedral International Church",
-  "Word of Life Bible Church",
   "Latter Rain Assembly",
   "Celebration Church International (CCI)",
+  "Streams of Joy International",
+  "Koinonia (Eternity Network International)",
   "Praise Chapel International (PCI)",
   "Christ International Church (CIC)",
   "Grace Family Chapel International",
@@ -782,4 +843,14 @@ export const churchesArr = [
   "Believers Loveworld",
   "Pentecostal Fellowship of Nigeria (PFN)",
   "Life Foundation Church",
+  "The Church of Pentecost",
+  "International Central Gospel Church (ICGC)",
+  "Action Chapel International",
+  "Hillsong Church",
+  "Life.Church",
+  "Lakewood Church",
+  "Saddleback Church",
+  "Bethel Church",
+  "Calvary Chapel",
+  "Vineyard Churches",
 ]

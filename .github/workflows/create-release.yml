@@ -1,4 +1,10 @@
 name: Release Pipeline
+# PostHog source map upload: source maps are injected and uploaded during
+# `npm run build` (nuxt generate). Wherever that command runs (Netlify, Vercel,
+# a separate deploy pipeline, or locally), it needs these environment variables:
+#   POSTHOG_CLI_API_KEY  — personal API key (error_tracking:write + organization:read)
+#   POSTHOG_CLI_PROJECT_ID — 99168
+#   POSTHOG_CLI_HOST     — https://us.i.posthog.com
 
 on:
   pull_request:
@@ -139,31 +145,31 @@ jobs:
           echo "next_version=$next_version" >> $GITHUB_OUTPUT
           echo "skip_release=0" >> $GITHUB_OUTPUT
 
-      - name: Update appVersion in app/app.vue and tauri.conf.json
+      - name: Update appVersion in useAppVersion.ts and tauri.conf.json
         if: env.SKIP_RELEASE != '1'
         run: |
           # Remove 'v' prefix and '-beta' suffix for tauri.conf.json
           tauri_version=$(echo "${{ env.next_version }}" | sed 's/^v//' | sed 's/-beta//')
 
-          # Replace the version string in app/app.vue
-          sed -i 's/const appVersion = ref<string>("[^"]*")/const appVersion = ref<string>("${{ env.next_version }}")/' app/app.vue
+          # Replace the version string in the single source of truth
+          sed -i 's/const APP_VERSION = "[^"]*"/const APP_VERSION = "${{ env.next_version }}"/' app/composables/useAppVersion.ts
 
           # Replace the version in tauri.conf.json
           sed -i 's/"version": "[^"]*"/"version": "'"$tauri_version"'"/' src-tauri/tauri.conf.json
 
           # Check if there are actually changes to commit
-          if git diff --quiet app/app.vue src-tauri/tauri.conf.json; then
+          if git diff --quiet app/composables/useAppVersion.ts src-tauri/tauri.conf.json; then
             echo "No changes detected - versions might already be ${{ env.next_version }}"
             echo "Skipping commit step"
           else
             echo "Changes detected, committing..."
-            
+
             # Configure Git to commit the changes
             git config user.name "github-actions"
             git config user.email "actions@github.com"
 
             # Commit and push the updated files
-            git add app/app.vue src-tauri/tauri.conf.json
+            git add app/composables/useAppVersion.ts src-tauri/tauri.conf.json
             git commit -m "Update appVersion to ${{ env.next_version }}"
             git push
           fi

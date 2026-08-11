@@ -1,7 +1,7 @@
 <template>
   <Transition>
     <div
-      class="navbar-ctn relative h-[50px] w-[100%] border-b border-gray-100 dark:border-primary-950 flex justify-between items-center px-4 dark:border-primary-900"
+      class="navbar-ctn relative h-[50px] w-[100%] flex justify-between items-center px-4 short:h-[42px] short:px-3"
       v-if="route.name !== 'live'"
     >
       <UProgress
@@ -9,27 +9,69 @@
         :class="{ 'opacity-1': currentState.slidesLoading && online }"
         size="xs"
       />
-      <div class="logo flex items-center gap-2 w-[310px]">
-        <Logo class="w-[38px]" />
-        <h1 class="text-md font-semibold">Cloud of Worship</h1>
-        <UButton
-          class="version-chip flex text-xs font-semibold bg-primary-200 p-2 py-1 rounded-full border border-transparent hover:bg-primary-300 hover:border-primary-900 transition-all text-primary-900"
-          @click="useGlobalEmit(appWideActions.showChangelog)"
+      <div class="logo flex items-center gap-2 w-[310px] short:w-[240px]">
+        <Logo class="w-[38px] short:w-[30px]" />
+        <h1 class="text-md font-semibold short:text-sm">Cloud of Worship</h1>
+        <!-- TEST-ONLY: trigger the upgrade/plan modal -->
+        <!-- <UButton
+          variant="soft"
+          color="primary"
+          size="2xs"
+          class="ml-1"
+          @click="useGlobalEmit('show-upgrade-modal')"
         >
-          {{ appVersion }}
-        </UButton>
+          Test modal
+        </UButton> -->
       </div>
       <div class="projects-ctn">
-        <!-- <IconWrapper name="i-bx-spinner-dots" v-if="slidesAndScheduleLoading" /> -->
-        <UButton
-          variant="ghost"
-          color="gray"
-          size="xs"
-          trailing-icon="i-bx-chevron-down"
-          @click="scheduleModalVisible = true"
+        <!-- SCHEDULE SWITCHER — left half renames the active schedule inline,
+             right half (chevron) opens the schedule modal. -->
+        <div
+          class="schedule-switcher relative flex items-stretch h-9 short:h-8 rounded-full bg-white dark:bg-[#171d2b] overflow-hidden"
         >
-          {{ currentState.activeSchedule?.name || "Untitled" }}
-        </UButton>
+          <input
+            v-if="isEditingName"
+            ref="scheduleNameInput"
+            v-model="scheduleNameDraft"
+            class="schedule-switcher__input bg-transparent px-4 text-sm font-normal outline-none"
+            :style="{ width: scheduleNameWidth }"
+            type="text"
+            @keydown.enter.prevent="commitScheduleName"
+            @keydown.esc.prevent="cancelScheduleNameEdit"
+            @blur="commitScheduleName"
+          />
+          <button
+            v-else
+            ref="scheduleNameButton"
+            type="button"
+            class="schedule-switcher__name max-w-[280px] truncate px-4 text-sm font-normal hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
+            title="Click to rename schedule"
+            @click="startScheduleNameEdit"
+          >
+            {{ currentState.activeSchedule?.name || "Untitled" }}
+          </button>
+          <!-- Off-layout twin of the input text, used to measure the width the
+               input should animate to as the draft name changes. -->
+          <span
+            v-if="isEditingName"
+            ref="scheduleNameSizer"
+            class="schedule-switcher__sizer px-4 text-sm font-normal"
+            aria-hidden="true"
+            >{{ scheduleNameDraft }}</span
+          >
+          <span
+            class="w-px my-2 bg-gray-200 dark:bg-[#2a3244] shrink-0"
+            aria-hidden="true"
+          />
+          <button
+            type="button"
+            class="schedule-switcher__trigger grid w-9 place-items-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
+            aria-label="Open schedules"
+            @click="scheduleModalVisible = true"
+          >
+            <UIcon name="i-bx-chevron-down" class="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <div
         class="actions text-sm flex gap-2 items-center justify-end w-[310px]"
@@ -59,9 +101,73 @@
         />
 
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
+        <UTooltip
+          v-if="!online && onlineUsersExcludingSelf.length === 0"
+          text="You are offline"
+        >
+          <UButton
+            variant="ghost"
+            class="h-10 w-48 opacity-65 transition-all"
+            :class="{ 'w-12': !online }"
+          >
+            <IconWrapper
+              v-show="!online"
+              name="i-tabler-cloud-off"
+            ></IconWrapper>
+          </UButton>
+        </UTooltip>
+
+        <!-- INVITE PEOPLE BUTTON -->
+        <UTooltip text="Invite church media team">
+          <CowButton
+            variant="primary"
+            size="sm"
+            class="!px-4 gap-1.5"
+            @click="handleInviteClick"
+          >
+            <UserIcon class="w-4 h-4" />
+            Invite
+          </CowButton>
+        </UTooltip>
+
+        <!-- DARK / LIGHT MODE TOGGLE (sliding switch) -->
+        <ClientOnly>
+          <button
+            type="button"
+            class="theme-toggle relative flex items-center w-[60px] h-8 rounded-full bg-gray-100 dark:bg-[#171d2b] transition-colors"
+            role="switch"
+            :aria-checked="isDark"
+            aria-label="Toggle dark mode"
+            @click="setDark(!isDark)"
+          >
+            <span
+              class="theme-toggle__thumb absolute top-[3px] left-[3px] w-[26px] h-[26px] rounded-full grid place-items-center transition-transform duration-300 ease-out"
+              :class="
+                isDark
+                  ? 'translate-x-[28px] bg-white'
+                  : 'translate-x-0 bg-gray-900'
+              "
+            >
+              <LightModeIcon v-if="!isDark" class="w-3.5 h-3.5 text-white" />
+              <DarkModeIcon v-else class="w-3.5 h-3.5 text-gray-900" />
+            </span>
+            <LightModeIcon
+              class="absolute left-[8px] w-3.5 h-3.5 transition-opacity duration-200"
+              :class="isDark ? 'opacity-40 text-gray-400' : 'opacity-0'"
+            />
+            <DarkModeIcon
+              class="absolute right-[8px] w-3.5 h-3.5 transition-opacity duration-200"
+              :class="isDark ? 'opacity-0' : 'opacity-40 text-gray-400'"
+            />
+          </button>
+          <template #fallback>
+            <div class="w-[60px] h-8" />
+          </template>
+        </ClientOnly>
+
         <div
           v-if="onlineUsersExcludingSelf.length > 0"
-          class="online-users-ctn flex items-center relative left-6"
+          class="online-users-ctn relative z-10 -mr-6 flex items-center"
         >
           <UTooltip>
             <template #text>
@@ -75,7 +181,7 @@
                 </div>
               </div>
             </template>
-            <div class="flex items-center gap-1 mr-2">
+            <div class="flex items-center gap-1">
               <div class="flex -space-x-2">
                 <div
                   class="relative h-8 w-8 grid place-items-center transition-all duration-200 ease-out hover:z-50 hover:translate-x-1"
@@ -119,31 +225,21 @@
             </div>
           </UTooltip>
         </div>
-        <UTooltip v-else-if="!online" text="You are offline">
-          <UButton
-            variant="ghost"
-            class="h-10 w-48 opacity-65 transition-all"
-            :class="{ 'w-12': !online }"
-          >
-            <IconWrapper
-              v-show="!online"
-              name="i-tabler-cloud-off"
-            ></IconWrapper>
-          </UButton>
-        </UTooltip>
 
-        <!-- ACCOUNT PROFILE BUTTON -->
+        <!-- ACCOUNT PROFILE + MENU -->
         <UPopover
           mode="click"
+          class="relative z-30"
           :ui="{
             ring: 'ring-0',
-            background: 'bg-white dark-bg-gray-900 border-0',
+            rounded: 'rounded-xl',
+            shadow:
+              'shadow-xl shadow-gray-900/10 dark:shadow-2xl dark:shadow-black/60',
+            background: 'bg-white dark:bg-[#222838] border-0',
           }"
         >
-          <UButton
-            variant="ghost"
-            trailing-icon="i-bx-chevron-down"
-            class="p-1"
+          <button
+            class="relative z-30 flex items-center gap-1.5 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#171d2b] transition-colors"
           >
             <UAvatar
               :src="user?.avatar"
@@ -152,9 +248,10 @@
               :ui="{
                 text: `text-[${user?.theme}] dark:text-[${user?.theme}] font-semibold`,
               }"
-              :class="`border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
+              :class="`relative z-30 border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
             />
-          </UButton>
+            <MenuIcon class="text-gray-500 dark:text-gray-400" />
+          </button>
           <template #panel>
             <ProfileMiniModal
               :user="user"
@@ -163,34 +260,6 @@
             />
           </template>
         </UPopover>
-
-        <!-- INVITE PEOPLE BUTTON -->
-        <UTooltip text="Invite church media team">
-          <UButton
-            variant="outline"
-            class="h-8"
-            icon="i-bx-user-plus"
-            @click="handleInviteClick"
-          >
-            Invite
-          </UButton>
-        </UTooltip>
-
-        <!-- DARK / LIGHT MODE TOGGLE -->
-        <ClientOnly>
-          <UButton
-            :icon="isDark ? 'i-tabler-moon-filled' : 'i-tabler-sun-filled'"
-            color="primary"
-            variant="ghost"
-            aria-label="Theme"
-            class="h-10"
-            @click="isDark = !isDark"
-            >{{ isDark ? "Light" : "Dark" }}</UButton
-          >
-          <template #fallback>
-            <div class="w-8 h-8" />
-          </template>
-        </ClientOnly>
       </div>
     </div>
   </Transition>
@@ -200,7 +269,6 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import { appWideActions } from "~/utils/constants"
 
 const route = useRoute()
 const settingsModalOpen = ref(false)
@@ -246,6 +314,114 @@ const displayOnlineUsers = computed(() =>
     .slice(0, 5)
 )
 
+// Inline rename of the active schedule (left half of the schedule switcher)
+const isEditingName = ref(false)
+const isNameEditClosing = ref(false)
+const scheduleNameDraft = ref("")
+const scheduleNameWidth = ref("")
+const scheduleNameInput = ref<HTMLInputElement | null>(null)
+const scheduleNameButton = ref<HTMLButtonElement | null>(null)
+const scheduleNameSizer = ref<HTMLSpanElement | null>(null)
+
+// Keep the collapse in sync with the CSS transition on .schedule-switcher__input
+const NAME_TRANSITION_MS = 320
+// Extra room the field gains on open, so the expansion is visible even when the
+// name already fits.
+const NAME_EDIT_PADDING = 56
+const NAME_MIN_WIDTH = 160
+const NAME_MAX_WIDTH = 320
+
+const clampNameWidth = (width: number) =>
+  Math.min(Math.max(width, NAME_MIN_WIDTH), NAME_MAX_WIDTH)
+
+// Width the input should animate to for the current draft text.
+const measureNameWidth = () =>
+  clampNameWidth(
+    (scheduleNameSizer.value?.offsetWidth || 0) + NAME_EDIT_PADDING
+  )
+
+const startScheduleNameEdit = async () => {
+  if (!currentState.value.activeSchedule) {
+    scheduleModalVisible.value = true
+    return
+  }
+  // Start the input at the exact width of the label it replaces, then grow.
+  scheduleNameWidth.value = `${scheduleNameButton.value?.offsetWidth || 0}px`
+  scheduleNameDraft.value = currentState.value.activeSchedule?.name || ""
+  isEditingName.value = true
+
+  await nextTick()
+  scheduleNameInput.value?.focus()
+  scheduleNameInput.value?.select()
+  requestAnimationFrame(() => {
+    scheduleNameWidth.value = `${measureNameWidth()}px`
+  })
+}
+
+// Grow/shrink with the text while typing.
+watch(scheduleNameDraft, async () => {
+  if (!isEditingName.value || isNameEditClosing.value) return
+  await nextTick()
+  scheduleNameWidth.value = `${measureNameWidth()}px`
+})
+
+// Shrink back to label width before swapping the input out, so the field
+// collapses instead of snapping.
+const closeScheduleNameEdit = () => {
+  // Closing flag flips right away so a trailing blur can't re-enter while the
+  // collapse animation is still running.
+  isNameEditClosing.value = true
+  // Collapse to the label's own width — capped at the label's max-width so a
+  // long name lands exactly where the truncated button will sit.
+  scheduleNameWidth.value = `${Math.min(
+    (scheduleNameSizer.value?.offsetWidth || 0) + 1,
+    280
+  )}px`
+  setTimeout(() => {
+    isEditingName.value = false
+    isNameEditClosing.value = false
+  }, NAME_TRANSITION_MS)
+}
+
+const cancelScheduleNameEdit = () => {
+  if (isNameEditClosing.value) return
+  closeScheduleNameEdit()
+}
+
+const commitScheduleName = async () => {
+  if (!isEditingName.value || isNameEditClosing.value) return
+  closeScheduleNameEdit()
+
+  const schedule = currentState.value.activeSchedule
+  const name = scheduleNameDraft.value.trim()
+  if (!schedule || !name || name === schedule.name) return
+
+  appStore.setActiveSchedule({
+    ...schedule,
+    name,
+    updatedAt: new Date().toISOString(),
+  })
+
+  const { updateSchedule } = useSchedules()
+  const result = await updateSchedule(schedule._id, { name })
+  if (result.status === "failed") {
+    // Do not overwrite a newer rename if this request resolves out of order.
+    if (
+      currentState.value.activeSchedule?._id === schedule._id &&
+      currentState.value.activeSchedule?.name === name
+    ) {
+      appStore.setActiveSchedule(schedule)
+    }
+    return
+  }
+
+  usePosthogCapture("SCHEDULE_RENAMED", {
+    scheduleId: schedule._id,
+    scheduleName: name,
+    persistence: result.status,
+  })
+}
+
 const handleInviteClick = () => {
   if (isPremiumFeatureEnabled.value) {
     if (hasAccessToFeature("open-invite-modal")) {
@@ -277,6 +453,11 @@ const isDark = computed({
     colorMode.preference = colorMode.value === "dark" ? "light" : "dark"
   },
 })
+
+// Explicit theme setter for the segmented toggle (each half targets one mode)
+const setDark = (dark: boolean) => {
+  colorMode.preference = dark ? "dark" : "light"
+}
 
 onMounted(() => {
   if (!currentState.value?.activeSchedule) {
@@ -329,6 +510,29 @@ emitter?.on("sign-out", () => {
 </script>
 
 <style scoped>
+/* Schedule name field grows/shrinks fluidly instead of snapping to size.
+   Duration must stay in sync with NAME_TRANSITION_MS in the script. */
+.schedule-switcher__input {
+  transition: width 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: width;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedule-switcher__input {
+    transition: none;
+  }
+}
+
+/* Off-layout twin of the input text — measured, never seen. */
+.schedule-switcher__sizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre;
+}
+
 /* User joined popup zoom-in animation */
 .user-joined-enter-active {
   animation: zoom-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -358,6 +562,31 @@ emitter?.on("sign-out", () => {
     opacity: 0;
     transform: scale(0.8) translateY(-10px);
   }
+}
+
+/* Dark/light toggle — CowButton-style solid ledge that compresses on press.
+   Ledge depth (5px) and press travel (4px) match CowButton's primary/sm
+   variant (the Invite button) so the two feel like the same height. */
+.theme-toggle {
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12), 0 5px 0 0 #cbd5e1,
+    0 10px 16px -10px rgba(15, 23, 42, 0.35);
+  transition: transform 0.08s ease, box-shadow 0.08s ease,
+    background-color 0.2s ease;
+  will-change: transform;
+}
+
+.theme-toggle:active {
+  transform: translateY(4px);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12), 0 1px 0 0 #cbd5e1;
+}
+
+html.dark .theme-toggle {
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2), 0 5px 0 0 #0d1320,
+    0 10px 16px -10px rgba(0, 0, 0, 0.6);
+}
+
+html.dark .theme-toggle:active {
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2), 0 1px 0 0 #0d1320;
 }
 
 /* Avatar zoom-in animation for the avatar list */

@@ -1,106 +1,131 @@
 <template>
-  <div class="hymn-main min-h-[80vh] h-[100%]" ref="quickActions">
-    <div class="flex gap-2">
-      <UInput
-        icon="i-bx-search"
-        placeholder="Search hymns"
-        v-model="searchInput"
-        class="w-[100%]"
-        @input="onSearchInput"
-        @input.capture="loading = true"
-        @keyup.enter="getHymns($event.target.value)"
-      />
-      <UButton icon="i-bx-x" color="primary" @click="$emit('close')"></UButton>
-    </div>
-
-    <Transition name="fade-sm">
-      <NotFoundBanner
-        v-if="!isHymnAvailable"
-        icon="i-tabler-cloud-search"
-        sub="Can't find the Hymn you are looking for?"
-        action="new-song-search"
-        :query="searchInput"
-        action-text="Search in songs"
-        class="max-h-[140px]"
-      />
-    </Transition>
-
+  <div class="hymn-main min-h-[80vh] h-[100%] flex flex-col" ref="quickActions">
     <div
-      v-if="loading"
-      class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
+      class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1.5 flex flex-col flex-1 min-h-0"
     >
-      <USkeleton
-        v-for="i in 15"
-        :key="i"
-        class="w-[100%] h-[80px] mt-2"
-      ></USkeleton>
+      <div class="flex gap-2">
+        <UInput
+          placeholder="Search hymns"
+          v-model="searchInput"
+          class="w-[100%] cow-search-input"
+          @input="onSearchInput"
+          @input.capture="loading = true"
+          @keyup.enter="getHymns($event.target.value)"
+        >
+          <template #leading>
+            <SearchIcon class="w-4 h-4 text-gray-400 dark:text-[#9aa3b2]" />
+          </template>
+        </UInput>
+        <CowButton
+          variant="secondary"
+          size="2xs"
+          class="!px-2.5 !py-0 max-h-[40px] rounded-lg"
+          @click="$emit('close')"
+        >
+          <CloseIcon class="w-4 h-4" />
+        </CowButton>
+      </div>
+
+      <Transition name="fade-sm">
+        <NotFoundBanner
+          v-if="!isHymnAvailable"
+          icon="i-tabler-cloud-search"
+          sub="Can't find the Hymn you are looking for?"
+          action="new-song-search"
+          :query="searchInput"
+          action-text="Search in songs"
+          class="max-h-[140px]"
+        />
+      </Transition>
+
+      <div
+        v-if="loading"
+        class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
+      >
+        <CowSkeleton variant="row" :count="15" />
+      </div>
+      <template v-else>
+        <!-- BASIC SONGS -->
+        <div
+          v-if="searchInput.length < 2"
+          class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
+        >
+          <ActionCard
+            v-for="(hymn, index) in hymns"
+            :key="hymn?.number"
+            :ref="(el) => setItemRef(el, index)"
+            :action="turnToHymnAction(hymn)"
+            :icon-override="SongsIcon"
+            compact
+            show-subtext
+            :active="hasInteracted && index === focusedActionIndex"
+            :class="{
+              'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
+            }"
+            @click="focusedActionIndex = index"
+            @mouseenter="onRowMouseEnter(index)"
+          />
+        </div>
+
+        <!-- SEARCHING SONGS -->
+        <div
+          v-else
+          class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
+          :class="
+            searchInput.length >= 4
+              ? 'max-h-[calc(100vh-350px)]'
+              : 'max-h-[calc(100vh-190px)]'
+          "
+        >
+          <ActionCard
+            v-for="(hymn, index) in hymns"
+            :key="hymn?.number"
+            :ref="(el) => setItemRef(el, index)"
+            :action="turnToHymnAction(hymn)"
+            :icon-override="SongsIcon"
+            compact
+            show-subtext
+            :active="hasInteracted && index === focusedActionIndex"
+            :class="{
+              'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
+            }"
+            @click="focusedActionIndex = index"
+            @mouseenter="onRowMouseEnter(index)"
+          />
+        </div>
+
+        <EmptyState
+          v-if="!loading && hymns?.length === 0"
+          icon="i-tabler-cloud-search"
+          sub="We couldn't find that hymn"
+        />
+      </template>
     </div>
-    <template v-else>
-      <!-- BASIC SONGS -->
-      <div
-        v-if="searchInput.length < 2"
-        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
-      >
-        <SongCard
-          v-for="(hymn, index) in hymns"
-          :key="hymn?.number"
-          :song="hymn"
-          type="hymn"
-          :class="{
-            'bg-primary-50 dark:bg-primary-800 rounded-md':
-              index === focusedActionIndex,
-          }"
-          @click="focusedActionIndex = index"
-        />
-      </div>
-
-      <!-- SEARCHING SONGS -->
-      <div
-        v-else
-        class="actions-ctn mt-2 overflow-y-auto max-h-[calc(100vh-190px)]"
-        :class="
-          searchInput.length >= 4
-            ? 'max-h-[calc(100vh-350px)]'
-            : 'max-h-[calc(100vh-190px)]'
-        "
-        :items="hymns"
-        :item-size="80"
-        key-field="number"
-      >
-        <SongCard
-          v-for="(hymn, index) in hymns"
-          :key="hymn?.number"
-          :song="hymn"
-          type="hymn"
-          :class="{
-            'bg-primary-50 dark:bg-primary-800 rounded-md':
-              index === focusedActionIndex,
-          }"
-          @click="focusedActionIndex = index"
-        />
-      </div>
-
-      <EmptyState
-        v-if="!loading && hymns?.length === 0"
-        icon="i-tabler-cloud-search"
-        sub="We couldn't find that hymn"
-      />
-    </template>
   </div>
 </template>
 <script setup lang="ts">
-import type { Hymn, Song } from "~/types"
+import type { Hymn, QuickAction } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
+import SongsIcon from "~/components/svgs/SongsIcon.vue"
 const db = useIndexedDB()
 
 const allHymns = ref<Hymn[]>([])
 const searchInput = ref<string>("")
 const loading = ref<boolean>(true)
 const hymns = ref<Hymn[]>()
-const searchedHymns = ref<Song[]>([])
 const focusedActionIndex = ref(0)
+const hasInteracted = ref(false)
+const onRowMouseEnter = (index: number) => {
+  focusedActionIndex.value = index
+  hasInteracted.value = false
+}
 const quickActions = ref<HTMLDivElement | null>(null)
+const itemRefs = ref<(HTMLElement | null)[]>([])
+
+const setItemRef = (el: any, index: number) => {
+  itemRefs.value[index] = el?.$el || el || null
+}
 
 onMounted(() => {
   quickActions.value?.addEventListener("keydown", (e) => {
@@ -110,25 +135,48 @@ onMounted(() => {
     }
     switch (e.key) {
       case "ArrowDown":
-        focusedActionIndex.value < searchedHymns.value.length - 1
+        hasInteracted.value = true
+        focusedActionIndex.value < (hymns.value?.length || 0) - 1
           ? (focusedActionIndex.value += 1)
           : null
         break
       case "ArrowUp":
+        hasInteracted.value = true
         focusedActionIndex.value > 0 ? (focusedActionIndex.value -= 1) : null
         break
-      case "Enter":
-        const action = searchedHymns.value?.[focusedActionIndex.value]
-        // useGlobalEmit(
-        //   action.action,
-        //   `${action.bibleBookIndex}:${bibleChapterAndVerse.value}`
-        // )
+      case "Enter": {
+        const hymn = hymns.value?.[focusedActionIndex.value]
+        if (!hymn) return
+        useGlobalEmit("new-hymn", hymn.number)
         break
+      }
       default:
         return
     }
   })
 })
+
+watch(hymns, () => {
+  itemRefs.value = []
+  focusedActionIndex.value = 0
+  hasInteracted.value = false
+})
+
+watch(focusedActionIndex, async () => {
+  await nextTick()
+  itemRefs.value[focusedActionIndex.value]?.scrollIntoView({ block: "nearest" })
+})
+
+const turnToHymnAction = (hymn: Hymn): QuickAction => {
+  return {
+    icon: "i-bx-church",
+    name: hymn?.title || "",
+    desc: hymn?.author || "",
+    action: "new-hymn",
+    hymnIndex: hymn?.number,
+    type: slideTypes.hymn,
+  }
+}
 
 const getAllHymns = async () => {
   const hymns = await db.bibleAndHymns.get("hymns")
