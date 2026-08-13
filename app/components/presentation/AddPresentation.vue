@@ -1,163 +1,140 @@
 <template>
-  <div class="import-slides-main mb-4">
-    <h2 class="font-semibold text-md">
-      {{
-        fileType === "ppt"
-          ? "Import Slides from PowerPoint"
-          : "Import Slides from PDF"
-      }}
-    </h2>
+  <div class="import-slides-main flex h-full min-h-0 flex-col">
+    <div
+      class="relative flex min-h-0 flex-1 flex-col rounded-xl bg-white p-1.5 dark:bg-[#222938]"
+    >
+      <!-- Scrolls under the floating CTA below. -->
+      <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-24">
+        <div class="flex flex-col gap-3">
+          <!-- PPT feature-flag notice -->
+          <div
+            v-if="fileType === 'ppt' && !isPptEnabled"
+            class="flex gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-sm text-amber-700 dark:text-amber-300"
+          >
+            <InfoIcon class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <span>
+              PowerPoint upload is being refined and currently unavailable.
+              Please export your file as PDF instead, it works great and is
+              available to everyone.
+            </span>
+          </div>
 
-    <div class="flex flex-col gap-3 mt-3">
-      <!-- Info banner -->
-      <Hint
-        :title="
-          fileType === 'ppt' ? 'Import PowerPoint slides' : 'Import PDF slides'
-        "
-      >
-        <p>
-          Each page is converted into an image and bundled into a single
-          presentation slide.
-        </p>
-        <p v-if="fileType === 'pdf'" class="mt-2">
-          Tip: Export as PDF from Canva, PowerPoint, or Google Slides for best
-          results.
-        </p>
-      </Hint>
+          <!-- Drop zone / file picker -->
+          <FileDropzone
+            upload-layout="column"
+            title="Upload a File or Drag & Drop here"
+            :caption="dropzoneCaption"
+            :accept="acceptedFileTypes"
+            :multiple="false"
+            @change="onDropzoneChange"
+          />
 
-      <!-- PPT feature-flag notice -->
-      <div
-        v-if="fileType === 'ppt' && !isPptEnabled"
-        class="flex gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-sm text-amber-700 dark:text-amber-300"
-      >
-        <InfoIcon class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-        <span>
-          PowerPoint upload is being refined and currently unavailable. Please
-          export your file as PDF instead, it works great and is available to
-          everyone.
-        </span>
+          <!-- Selected file chip -->
+          <Transition name="fade-sm">
+            <div
+              v-if="selectedFile"
+              class="flex items-center gap-2 px-3 py-2 rounded-md bg-primary-50 dark:bg-primary-900 border border-primary-200 dark:border-primary-700 text-sm"
+            >
+              <IconWrapper
+                :name="fileType === 'pdf' ? 'i-ph-file-pdf' : 'i-ph-file-ppt'"
+                size="4"
+                class="text-primary-500 shrink-0"
+              />
+              <span class="truncate flex-1 font-medium">{{
+                selectedFile.name
+              }}</span>
+              <span class="text-gray-400 text-xs shrink-0">{{
+                fileSizeLabel
+              }}</span>
+              <CowButton
+                variant="secondary"
+                size="2xs"
+                class="shrink-0"
+                :disabled="isConverting"
+                @click.prevent="clearFile"
+              >
+                <template #leading><CloseIcon class="w-4 h-4" /></template>
+              </CowButton>
+            </div>
+          </Transition>
+
+          <!-- Error -->
+          <Transition name="fade-sm">
+            <div
+              v-if="errorMessage"
+              class="flex gap-2 p-3 rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-sm text-red-700 dark:text-red-300"
+            >
+              <IconWrapper
+                name="i-bx-error"
+                size="4"
+                class="text-red-500 shrink-0 mt-0.5"
+              />
+              <span>{{ errorMessage }}</span>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- RECENT SLIDES — decks imported on this device -->
+        <div v-if="recentPresentations.length" class="recent-ctn mt-6">
+          <p class="text-[13px] text-gray-500 dark:text-[#9BA3B2]">
+            Recent Slides
+          </p>
+          <!-- Negative margin cancels the panel padding so the rule is full-bleed -->
+          <div
+            class="-mx-1.5 mt-3 border-b border-gray-200 dark:border-white/5"
+          ></div>
+
+          <button
+            v-for="presentation in recentPresentations"
+            :key="presentation.groupId"
+            type="button"
+            class="-mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-3 border-b border-gray-200 px-1.5 py-3 text-left transition-colors hover:bg-black/[0.03] disabled:opacity-60 dark:border-white/5 dark:hover:bg-white/[0.03]"
+            :disabled="reimportingId === presentation.groupId"
+            @click="reimportPresentation(presentation)"
+          >
+            <span
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e5edfb] text-[15px] font-semibold uppercase text-[#4C87FF] dark:bg-[#253558]"
+            >
+              <UIcon
+                v-if="reimportingId === presentation.groupId"
+                name="i-bx-loader-alt"
+                class="animate-spin text-lg"
+              />
+              <template v-else>{{ presentation.name.charAt(0) }}</template>
+            </span>
+            <span class="min-w-0 flex-1">
+              <span
+                class="block truncate text-[13px] text-gray-900 dark:text-[#F8F9FB]"
+                >{{ presentation.name }}</span
+              >
+              <span
+                class="block text-[12px] text-gray-500 dark:text-[#9BA3B2]"
+                >{{ addedLabel(presentation.createdAt) }}</span
+              >
+            </span>
+          </button>
+        </div>
       </div>
 
-      <!-- Drop zone / file picker -->
-      <label
-        class="dropzone text-center py-8 px-6 min-h-[160px] flex flex-col justify-center items-center rounded-lg border-dashed border-2 cursor-pointer transition-colors"
-        :class="
-          isDragging
-            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900'
-            : 'border-primary-200 dark:border-primary-700 hover:border-primary-400'
-        "
-        @dragover.prevent="isDragging = true"
-        @dragleave.prevent="isDragging = false"
-        @drop.prevent="onFileDrop"
-      >
-        <input
-          ref="fileInput"
-          type="file"
-          :accept="acceptedFileTypes"
-          class="hidden"
-          @change="onFileChange"
-        />
-
-        <IconWrapper
-          :name="fileType === 'pdf' ? 'i-ph-file-pdf' : 'i-ph-file-ppt'"
-          size="12"
-          class="py-6 mb-4 w-full"
-          rounded-bg
-        />
-
-        <p class="font-medium text-md">
-          <span>Drag &amp; Drop</span> or <span>Click to select</span>
-        </p>
-        <p class="text-sm mt-1 text-gray-500 dark:text-gray-400">
-          {{ fileType === "ppt" ? ".ppt, .pptx" : ".pdf" }}
-          &nbsp;·&nbsp; max 5 MB
-        </p>
-      </label>
-
-      <!-- Selected file chip -->
+      <!-- FLOATING CTA — content scrolls underneath it -->
       <Transition name="fade-sm">
         <div
           v-if="selectedFile"
-          class="flex items-center gap-2 px-3 py-2 rounded-md bg-primary-50 dark:bg-primary-900 border border-primary-200 dark:border-primary-700 text-sm"
+          class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-white via-white to-transparent p-3 pt-10 dark:from-[#222938] dark:via-[#222938]"
         >
-          <IconWrapper
-            :name="fileType === 'pdf' ? 'i-ph-file-pdf' : 'i-ph-file-ppt'"
-            size="4"
-            class="text-primary-500 shrink-0"
-          />
-          <span class="truncate flex-1 font-medium">{{
-            selectedFile.name
-          }}</span>
-          <span class="text-gray-400 text-xs shrink-0">{{
-            fileSizeLabel
-          }}</span>
           <CowButton
-            variant="secondary"
-            size="2xs"
-            class="shrink-0"
+            variant="primary"
+            class="pointer-events-auto"
+            block
+            size="lg"
             :disabled="isConverting"
-            @click.prevent="clearFile"
+            :loading="isConverting"
+            @click="handleImport"
           >
-            <template #leading><CloseIcon class="w-4 h-4" /></template>
+            Create slides
           </CowButton>
         </div>
       </Transition>
-
-      <!-- Conversion progress -->
-      <!-- <Transition name="fade-sm">
-        <div
-          v-if="isConverting"
-          class="flex items-center gap-3 px-3 py-3 rounded-md bg-primary-50 dark:bg-primary-900 text-sm"
-        >
-          <UIcon
-            name="i-bx-loader-alt"
-            class="animate-spin text-primary-500 text-lg shrink-0"
-          />
-          <span class="text-gray-600 dark:text-gray-300">{{
-            statusMessage || "Processing…"
-          }}</span>
-        </div>
-      </Transition> -->
-
-      <!-- Error -->
-      <Transition name="fade-sm">
-        <div
-          v-if="errorMessage"
-          class="flex gap-2 p-3 rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-sm text-red-700 dark:text-red-300"
-        >
-          <IconWrapper
-            name="i-bx-error"
-            size="4"
-            class="text-red-500 shrink-0 mt-0.5"
-          />
-          <span>{{ errorMessage }}</span>
-        </div>
-      </Transition>
-
-      <!-- Cloud sync note -->
-      <div
-        v-if="!isConverting && !errorMessage"
-        class="flex gap-2 items-center text-xs text-gray-400 dark:text-gray-500 px-1"
-      >
-        <UIcon name="i-bx-cloud-upload" class="text-sm shrink-0" />
-        <span
-          >Presentation files are automatically saved to your church's
-          cloud.</span
-        >
-      </div>
-
-      <!-- CTA -->
-      <CowButton
-        variant="primary"
-        block
-        size="lg"
-        class="mt-2"
-        :disabled="!selectedFile || isConverting"
-        :loading="isConverting"
-        @click="handleImport"
-      >
-        Import presentation slide
-      </CowButton>
     </div>
 
     <!-- Feature Introduction Modal -->
@@ -213,6 +190,8 @@
 
 <script setup lang="ts">
 import { appWideActions } from "~/utils/constants"
+import { useTimeAgo } from "@vueuse/core"
+import type { RecentPresentation } from "~/composables/useRecentPresentations"
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
@@ -224,10 +203,9 @@ const emit = defineEmits<{ close: [] }>()
 
 const { checkFlag } = useFeatureFlags()
 
-const fileInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
-const isDragging = ref(false)
 const isConverting = ref(false)
+const reimportingId = ref<string | null>(null)
 const statusMessage = ref("")
 const errorMessage = ref("")
 const featureIntroModal = ref<{
@@ -248,10 +226,23 @@ const acceptedFileTypes = computed(() => {
   return ".pdf,application/pdf"
 })
 
+const dropzoneCaption = computed(() =>
+  props.fileType === "ppt" ? "ppt, pptx · Max 5MB" : "pdf · Max 5MB"
+)
+
 const isPpt = (file: File) =>
   file.type === "application/vnd.ms-powerpoint" ||
   file.type ===
     "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+/** Does the file match this screen's `accept` list, by MIME or by extension? */
+const isAcceptedType = (file: File) => {
+  const patterns = acceptedFileTypes.value.split(",")
+  const name = file.name.toLowerCase()
+  return patterns.some((pattern) =>
+    pattern.startsWith(".") ? name.endsWith(pattern) : file.type === pattern
+  )
+}
 
 const fileSizeLabel = computed(() => {
   if (!selectedFile.value) return ""
@@ -263,24 +254,26 @@ const clearFile = () => {
   selectedFile.value = null
   errorMessage.value = ""
   statusMessage.value = ""
-  if (fileInput.value) fileInput.value.value = ""
 }
 
-const onFileChange = (e: Event) => {
-  const target = e.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (file) setFile(file)
-}
-
-const onFileDrop = (e: DragEvent) => {
-  isDragging.value = false
-  const file = e.dataTransfer?.files?.[0]
+// FileDropzone only size-gates images and videos, and its paste listener is
+// window-wide, so every acceptance rule for presentations lives here.
+const onDropzoneChange = (files: FileList | File[]) => {
+  const file = Array.from(files || [])[0]
   if (file) setFile(file)
 }
 
 const setFile = (file: File) => {
   errorMessage.value = ""
   statusMessage.value = ""
+
+  if (!isAcceptedType(file)) {
+    errorMessage.value =
+      props.fileType === "ppt"
+        ? "That file isn't a PowerPoint presentation. Choose a .ppt or .pptx file."
+        : "That file isn't a PDF. Choose a .pdf file."
+    return
+  }
 
   if (isPpt(file) && !isPptEnabled.value) {
     errorMessage.value =
@@ -328,7 +321,47 @@ const handleImport = async () => {
   }
 }
 
+// ── Recent slides — decks already imported on this device ──────────────────
+const {
+  presentations: recentPresentations,
+  load: loadRecentPresentations,
+  toPresentationObjects,
+} = useRecentPresentations()
+
+const addedLabel = (createdAt: string) =>
+  `Added ${useTimeAgo(new Date(createdAt)).value}`
+
+const reimportPresentation = async (presentation: RecentPresentation) => {
+  if (reimportingId.value) return
+  reimportingId.value = presentation.groupId
+  errorMessage.value = ""
+
+  try {
+    const presentationObjects = await toPresentationObjects(presentation)
+    if (!presentationObjects) {
+      errorMessage.value =
+        "This presentation is no longer stored on this device. Import the file again."
+      // Drop the dead entry so it can't be tapped a second time.
+      await loadRecentPresentations()
+      return
+    }
+
+    useGlobalEmit(appWideActions.newPresentation, {
+      fileName: presentation.name,
+      presentationObjects,
+      fromImport: true,
+    })
+    emit("close")
+  } catch (err: any) {
+    console.error("Re-import presentation error:", err)
+    errorMessage.value = err?.message || "Could not reopen this presentation."
+  } finally {
+    reimportingId.value = null
+  }
+}
+
 onMounted(() => {
   featureIntroModal.value?.show()
+  void loadRecentPresentations()
 })
 </script>

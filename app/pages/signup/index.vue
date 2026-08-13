@@ -121,18 +121,25 @@
         label="Are you creating this account for a church?"
         v-model="creatingForChurch"
       />
-      <CowDropdown
+      <!-- The suggestion list holds denominations, not individual churches, so
+           most people's church will never be in it. Typing is therefore the
+           primary path and the list is only a shortcut for the big ones. -->
+      <CowInputMenu
         v-if="creatingForChurch"
         label="Church name"
-        v-model="church"
+        v-model="churchName"
         :options="churchesArr"
-        searchable
-      />
+        placeholder="Start typing your church's name"
+      >
+        <template #option-empty="{ query }">
+          We'll use &ldquo;{{ query }}&rdquo;
+        </template>
+      </CowInputMenu>
       <CowInput
-        v-if="!creatingForChurch || church === OTHER_CHURCH_OPTION"
+        v-else
         class="come-up-1"
         :label="entityNameInputLabel"
-        v-model="otherChurch"
+        v-model="churchName"
       />
       <CowDropdown
         :label="entityTypeLabel"
@@ -306,8 +313,6 @@ const headingClass =
 const subtitleClass =
   "text-gray-500 dark:text-gray-400 text-[15px] lg:text-[13px] xl:text-[15px] max-w-[22rem]"
 
-const OTHER_CHURCH_OPTION = "Other Church (not included)"
-
 const churchTypes = [
   "Headquarters",
   "Provincial Headquarters",
@@ -355,8 +360,7 @@ const password = ref("")
 const fullName = ref("")
 
 // Step 3
-const church = ref("")
-const otherChurch = ref("")
+const churchName = ref("")
 const churchType = ref("")
 const churchPastor = ref("")
 const creatingForChurch = ref(true)
@@ -400,13 +404,11 @@ const entityTypes = computed(() =>
 const entityHeadLabel = computed(() =>
   creatingForChurch.value ? "Head of ministry" : "Head of organization"
 )
-const churchName = computed(() =>
-  church.value === OTHER_CHURCH_OPTION ? otherChurch.value.trim() : church.value
-)
 const ministryHead = computed(() => churchPastor.value.trim())
+const entityName = computed(() => churchName.value.trim())
 
 const step3Disabled = computed(
-  () => !(churchName.value && churchType.value && ministryHead.value)
+  () => !(entityName.value && churchType.value && ministryHead.value)
 )
 
 const step4Disabled = computed(
@@ -440,11 +442,8 @@ watch(
 const getErrorMessage = (error: ApiErrorT | null | undefined) =>
   error?.data?.message || "Something went wrong"
 
-watch(creatingForChurch, (isCreatingForChurch) => {
-  if (!isCreatingForChurch) {
-    church.value = OTHER_CHURCH_OPTION
-  }
-
+watch(creatingForChurch, () => {
+  // The name the user already typed carries over — only the type lists differ.
   // The two lists share no options, so anything already picked is now stale.
   if (!entityTypes.value.includes(churchType.value)) {
     churchType.value = ""
@@ -659,7 +658,7 @@ const handleStep3 = async () => {
   loading.value = true
   usePosthogCapture("SIGNUP_ADD_CHURCH_ATTEMPTED", {
     userId: authStore.user?._id,
-    churchName: churchName.value,
+    churchName: entityName.value,
     churchType: churchType.value,
     hasChurchPastor: !!ministryHead.value,
     isNotAChurch: !creatingForChurch.value,
@@ -668,7 +667,7 @@ const handleStep3 = async () => {
   const { data, error } = await useAPIFetch("/church", {
     method: "POST",
     body: {
-      name: churchName.value,
+      name: entityName.value,
       type: churchType.value,
       address: "",
       pastor: ministryHead.value,

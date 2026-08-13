@@ -731,8 +731,10 @@ export const appFonts = [
   'Lato'
 ]
 
+// Denominations and large church brands, offered as autocomplete suggestions on
+// signup. It can never cover individual churches, so the field it feeds accepts
+// free text — there is deliberately no "other" sentinel entry here.
 export const churchesArr = [
-  "Other Church (not included)",
   "Redeemed Christian Church of God (RCCG)",
   "Living Faith Church Worldwide (Winners' Chapel)",
   "Deeper Christian Life Ministry (DCLM)",

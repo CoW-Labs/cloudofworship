@@ -16,6 +16,7 @@ import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
 import { useThrottleFn } from "@vueuse/core"
 import posthog from "posthog-js"
+import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
 
 // Absolute floors/ceilings for every resizable panel. These are hard usability
 // stops only — the effective bounds a user drags against are derived from the
@@ -146,6 +147,7 @@ export const useAppStore = defineStore("app", {
           songAndHymnLabelsVisibility: false,
           liveWindowFullscreen: true, // Default to fullscreen mode
           closeLiveWindowWithOperator: false, // Default: live window stays open when operator tab closes
+          ndiEnabled: false,
           transcriptionAutoActions: true,
           transcriptionVoiceBibleVersionCommands: true,
           uploadVideosToCloud: true,
@@ -364,7 +366,9 @@ export const useAppStore = defineStore("app", {
     },
     setAppSettings(settings: AppSettings) {
       this.currentState.settings = {
-        ...settings,
+        ...preserveDeviceNdiSetting(this.currentState.settings, settings),
+        // NDI is a device capability, not an account preference. Preserve the
+        // local value when server-backed settings or sign-out defaults omit it.
         transcriptionAutoActions: settings.transcriptionAutoActions ?? true,
         transcriptionVoiceBibleVersionCommands:
           settings.transcriptionVoiceBibleVersionCommands ?? true,
@@ -511,6 +515,12 @@ export const useAppStore = defineStore("app", {
       this.currentState.settings = {
         ...this.currentState.settings,
         closeLiveWindowWithOperator: value,
+      }
+    },
+    setNdiEnabled(value: boolean) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        ndiEnabled: value,
       }
     },
     setLinesPerSlide(lines: number) {

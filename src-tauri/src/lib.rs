@@ -1,6 +1,8 @@
 use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
-use tauri::{Emitter, Manager, Window};
+use tauri::{Emitter, Manager, Window, WindowEvent};
+
+mod ndi;
 
 #[tauri::command]
 async fn start_oauth_server(window: Window) -> Result<u16, String> {
@@ -138,6 +140,7 @@ pub fn run() {
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_oauth::init())
     .setup(|app| {
+      app.manage(ndi::NdiBridge::new(app.handle().clone()));
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
@@ -147,9 +150,23 @@ pub fn run() {
       }
       Ok(())
     })
+    .on_window_event(|window, event| {
+      if window.label() == "live-output" && matches!(event, WindowEvent::Destroyed) {
+        let bridge = window.state::<ndi::NdiBridge>().inner().clone();
+        tauri::async_runtime::spawn_blocking(move || {
+          if let Err(error) = bridge.stop_blocking() {
+            log::warn!("failed to stop NDI after the live window closed: {error}");
+          }
+        });
+      }
+    })
     .invoke_handler(tauri::generate_handler![
       start_oauth_server,
-      media_storage_stats
+      media_storage_stats,
+      ndi::ndi_start,
+      ndi::ndi_stop,
+      ndi::ndi_status,
+      ndi::ndi_open_capture_settings
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

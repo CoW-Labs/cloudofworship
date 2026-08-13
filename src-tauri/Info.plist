@@ -4,5 +4,13 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Cloud of Worship needs access to your microphone for sermon transcription features.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Cloud of Worship captures the Live Output window so it can be shared with NDI production systems.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Cloud of Worship uses the local network to broadcast the Live Output as an NDI source.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_ndi._tcp</string>
+	</array>
 </dict>
 </plist>
