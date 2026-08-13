@@ -1,18 +1,30 @@
 <template>
   <label
-    class="dropzone flex cursor-pointer flex-col items-center justify-center text-center"
+    class="dropzone flex cursor-pointer"
     @dragover.prevent="onDragOver"
     @dragleave.prevent="onDragLeave"
     @drop.prevent="onDrop"
     :class="
-      backgroundPanel
+      uploadLayout
         ? [
+            'rounded-lg border border-dashed p-4 transition-colors',
+            uploadLayout === 'row'
+              ? 'items-center gap-4 text-left'
+              : 'flex-col items-center justify-center gap-3 py-8 text-center',
+            isDragOver
+              ? 'border-gray-500 bg-gray-100 dark:border-[#9BA3B2] dark:bg-white/[0.03]'
+              : 'border-gray-300 hover:border-gray-500 dark:border-[#505866] dark:hover:border-[#9BA3B2]',
+          ]
+        : backgroundPanel
+        ? [
+            'flex-col items-center justify-center text-center',
             'min-h-0 rounded-[8px] border border-dashed border-gray-300 bg-white p-0 text-gray-700 transition-colors dark:border-[#505866] dark:bg-transparent dark:text-[#F8F9FB]',
             isDragOver
               ? 'border-gray-500 bg-gray-100 dark:border-[#9BA3B2] dark:bg-white/[0.03]'
               : 'hover:border-gray-500 dark:hover:border-[#9BA3B2]',
           ]
         : [
+            'flex-col items-center justify-center text-center',
             'min-h-[200px] rounded-lg border-2 border-dashed border-primary-200 p-6 py-8',
             {
               'border-primary-500 bg-primary-50 dark:bg-primary-900':
@@ -31,7 +43,26 @@
       hidden
     />
 
-    <template v-if="backgroundPanel">
+    <template v-if="uploadLayout">
+      <CloudUploadIcon
+        class="h-8 w-8 shrink-0 text-gray-400 dark:text-[#9BA3B2]"
+      />
+      <div :class="uploadLayout === 'row' ? 'min-w-0' : ''">
+        <p
+          class="text-[15px] font-semibold leading-[21px] text-gray-900 dark:text-[#F8F9FB]"
+        >
+          {{ title }}
+        </p>
+        <p
+          v-if="caption"
+          class="mt-1 text-[13px] leading-[19px] text-gray-500 dark:text-[#9BA3B2]"
+        >
+          {{ caption }}
+        </p>
+      </div>
+    </template>
+
+    <template v-else-if="backgroundPanel">
       <UIcon
         :name="icon"
         class="mb-4 h-7 w-7 text-gray-400 dark:text-[#9BA3B2]"
@@ -73,6 +104,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue"
+import CloudUploadIcon from "~/components/svgs/CloudUploadIcon.vue"
 
 const props = defineProps({
   size: {
@@ -106,6 +138,22 @@ const props = defineProps({
   backgroundPanel: {
     type: Boolean,
     default: false,
+  },
+  // When set, renders the "Upload a File" design: a dashed box with the cloud
+  // icon beside ("row") or above ("column") the title and caption.
+  uploadLayout: {
+    type: String as PropType<"row" | "column" | undefined>,
+    default: undefined,
+  },
+  title: {
+    type: String,
+    default: "Upload a File or Drag & Drop here",
+  },
+  // The "types · Max N" line. Display text — size limits are enforced by
+  // maxFileSize/maxVideoFileSize (images and videos only) and by the parent.
+  caption: {
+    type: String,
+    default: "",
   },
 })
 const backgroundDescriptionLines = computed(() => {

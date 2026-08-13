@@ -119,7 +119,7 @@ export type ScheduleTemplateSeed =
   | { type: 'hymn'; number: string }
   | { type: 'song'; song: Song }
   | { type: 'song-setlist'; songs: Song[] }
-  | { type: 'countdown'; time: string; label: string } // time like "05:00"
+  | { type: 'countdown'; time: string; label: string } // "HH:MM:SS", e.g. "00:05:00"
   | { type: 'media'; mediaType: 'image' | 'youtube'; url: string; name?: string }
 
 export interface ScheduleTemplate {
