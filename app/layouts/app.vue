@@ -447,6 +447,22 @@ const markAdvertAsShown = (id: string) => {
   }
 }
 
+// Fresh signups are still finding their way around the workspace — an advert
+// modal on top of that is the wrong first impression. They start seeing adverts
+// once the account is past this grace period.
+const NEW_ACCOUNT_ADVERT_GRACE_DAYS = 7
+
+const isNewlySignedUpUser = () => {
+  const createdAt = authStore.user?.createdAt
+  if (!createdAt) return false
+
+  const createdAtMs = new Date(createdAt).getTime()
+  if (Number.isNaN(createdAtMs)) return false
+
+  const graceMs = NEW_ACCOUNT_ADVERT_GRACE_DAYS * 24 * 60 * 60 * 1000
+  return Date.now() - createdAtMs < graceMs
+}
+
 const fetchActiveAdvert = async () => {
   const { data } = await useAPIFetch(`/advert/active`)
   const advert = data.value as Advert | null
@@ -1115,7 +1131,7 @@ onMounted(async () => {
   ])
 
   const advert = advertResult.status === "fulfilled" ? advertResult.value : null
-  if (advert && !hasAdvertBeenShown(advert._id)) {
+  if (advert && !hasAdvertBeenShown(advert._id) && !isNewlySignedUpUser()) {
     setTimeout(() => {
       showAdvertModal.value = true
       markAdvertAsShown(advert._id)
