@@ -113,6 +113,7 @@ const appInfo = ref<AppSettings>()
 const { refreshLibrary } = useLibrary()
 const { fetchPlans } = useSubscriptionPlans()
 const { fetchUserSettings } = useUserSettings()
+const ndiBroadcast = useNdiBroadcast()
 
 const { currentState } = storeToRefs(appStore)
 
@@ -446,6 +447,22 @@ const markAdvertAsShown = (id: string) => {
   }
 }
 
+// Fresh signups are still finding their way around the workspace — an advert
+// modal on top of that is the wrong first impression. They start seeing adverts
+// once the account is past this grace period.
+const NEW_ACCOUNT_ADVERT_GRACE_DAYS = 7
+
+const isNewlySignedUpUser = () => {
+  const createdAt = authStore.user?.createdAt
+  if (!createdAt) return false
+
+  const createdAtMs = new Date(createdAt).getTime()
+  if (Number.isNaN(createdAtMs)) return false
+
+  const graceMs = NEW_ACCOUNT_ADVERT_GRACE_DAYS * 24 * 60 * 60 * 1000
+  return Date.now() - createdAtMs < graceMs
+}
+
 const fetchActiveAdvert = async () => {
   const { data } = await useAPIFetch(`/advert/active`)
   const advert = data.value as Advert | null
@@ -743,6 +760,22 @@ const setCachedVideosURL = async () => {
 // WINDOW MANAGEMENT CODE STARTS HERE
 
 // Tauri window management for desktop app
+async function startNdiForLiveWindow() {
+  if (!appStore.currentState.settings.ndiEnabled) return
+  try {
+    await ndiBroadcast.start()
+  } catch (error: any) {
+    console.warn("NDI live output could not start:", error)
+    useToast().add({
+      title: "The live window opened without NDI",
+      description:
+        error?.message || "Open Display Settings for details and retry options.",
+      icon: "i-bx-info-circle",
+      color: "amber",
+    })
+  }
+}
+
 async function openTauriLiveWindow() {
   try {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
@@ -772,6 +805,7 @@ async function openTauriLiveWindow() {
 
     if (existingLiveWindow) {
       await existingLiveWindow.setFocus()
+      await startNdiForLiveWindow()
       return
     }
 
@@ -870,18 +904,23 @@ async function openTauriLiveWindow() {
       height: targetMonitor.size.height / scale,
     })
 
-    // Wait for window to be ready
-    await liveWindow.once("tauri://created", () => {})
+    // Capture can only resolve the native window after Tauri confirms creation.
+    await liveWindow.once("tauri://created", async () => {
+      windowRefs.value = [...windowRefs.value, liveWindow]
+      await startNdiForLiveWindow()
+    })
 
     // Listen for window close
     await liveWindow.once("tauri://close-requested", async () => {
       console.log("Live window closed")
+      try {
+        await ndiBroadcast.stop()
+      } catch (error) {
+        console.warn("NDI cleanup after live window close failed:", error)
+      }
       // Clean up windowRefs when window is closed
       windowRefs.value = []
     })
-
-    // Add windowRef to track if live window is active
-    windowRefs.value = [...windowRefs.value, liveWindow]
   } catch (error) {
     console.error("Error opening Tauri window:", error)
     useToast().add({
@@ -934,6 +973,7 @@ async function closeAllWindows() {
     )
     if (existingLiveWindow) {
       try {
+        await ndiBroadcast.stop()
         await existingLiveWindow.close()
       } catch (error) {
         console.log("Window already closed or error closing:", error)
@@ -1075,6 +1115,7 @@ async function bindTauriLiveWindowLifecycle() {
 onMounted(async () => {
   const { isTauri } = useTauri()
   if (isTauri) {
+    await ndiBroadcast.initialize()
     bindTauriLiveWindowLifecycle()
   }
 
@@ -1090,7 +1131,7 @@ onMounted(async () => {
   ])
 
   const advert = advertResult.status === "fulfilled" ? advertResult.value : null
-  if (advert && !hasAdvertBeenShown(advert._id)) {
+  if (advert && !hasAdvertBeenShown(advert._id) && !isNewlySignedUpUser()) {
     setTimeout(() => {
       showAdvertModal.value = true
       markAdvertAsShown(advert._id)

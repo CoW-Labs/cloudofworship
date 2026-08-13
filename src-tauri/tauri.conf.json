@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cloud of Worship",
-  "version": "0.52.2",
+  "version": "0.53.0",
   "identifier": "com.cloudofworship.app",
   "build": {
     "frontendDist": "../dist",
@@ -101,7 +101,7 @@
     "createUpdaterArtifacts": true,
     "macOS": {
       "entitlements": "entitlements.plist",
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "13.0"
     },
     "icon": [
       "icons/32x32.png",

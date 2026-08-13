@@ -1,181 +1,211 @@
 <template>
-  <div
-    class="media-main min-h-[75vh] lg:min-h-[75vh] xl:min-h-[80vh] 2xl:min-h-[82.5vh]"
-  >
-    <UTabs v-model="activeTab" :items="mediaTabs" />
+  <div class="media-main flex h-full min-h-0 flex-col">
+    <div
+      class="relative flex min-h-0 flex-1 flex-col rounded-xl bg-white p-1.5 dark:bg-[#222938]"
+    >
+      <!-- Scrolls under the floating CTA below. -->
+      <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-24">
+        <UTabs v-model="activeTab" :items="mediaTabs" />
 
-    <!-- FILES TAB -->
-    <div v-if="activeTab === 0" class="collector-ctn flex flex-col gap-3 mt-4">
-      <Hint title="Add image, video or audio slides">
-        You can now add files by dragging and dropping them here or by copying
-        and pasting them from your file explorer.
-      </Hint>
-
-      <FileDropzone
-        :maxFileSize="maxFileSize"
-        :maxVideoFileSize="maxVideoFileSize"
-        accept="video/*,image/*,audio/*"
-        description="image, video or audio files."
-        @change="onDropzoneChange"
-      />
-    </div>
-
-    <!-- YOUTUBE/VIMEO TAB -->
-    <div v-if="activeTab === 1" class="collector-ctn flex flex-col gap-3 mt-4">
-      <Hint title="Add YouTube or Vimeo videos">
-        Paste a YouTube or Vimeo URL below to add external videos to your
-        schedule.
-      </Hint>
-
-      <!-- YouTube/Vimeo URL Input -->
-      <div class="flex flex-col gap-2">
-        <CowInput v-model="externalVideoUrl" label="YouTube or Vimeo URL" />
-        <CowButton
-          variant="primary"
-          @click="addExternalVideo"
-          :disabled="!externalVideoUrl"
-          size="lg"
-          class="justify-center mt-1"
+        <!-- FILES TAB -->
+        <div
+          v-if="activeTab === 0"
+          class="collector-ctn flex flex-col gap-3 mt-4"
         >
-          Add external video
-        </CowButton>
+          <Hint dismissible dismiss-key="add-media-drag-drop">
+            You can now add files by dragging and dropping them here or by
+            copying and pasting them from your file explorer.
+          </Hint>
+
+          <FileDropzone
+            upload-layout="row"
+            title="Upload a File or Drag and Drop here"
+            caption="jpg, jpeg, png, mp4, mov · Max 15MB"
+            :maxFileSize="maxFileSize"
+            :maxVideoFileSize="maxVideoFileSize"
+            accept="video/*,image/*,audio/*"
+            @change="onDropzoneChange"
+          />
+        </div>
+
+        <!-- YOUTUBE/VIMEO TAB -->
+        <div
+          v-if="activeTab === 1"
+          class="collector-ctn flex flex-col gap-3 mt-4"
+        >
+          <Hint dismissible dismiss-key="add-media-external-video">
+            Paste a YouTube or Vimeo link below and we'll fetch the video for
+            you.
+          </Hint>
+
+          <CowInput
+            v-model="externalVideoUrl"
+            label="YouTube or Vimeo URL"
+            @paste="onExternalUrlPaste"
+          />
+          <div
+            v-if="isFetchingExternalVideo"
+            class="flex items-center gap-2 px-1 text-[12px] text-gray-500 dark:text-[#9BA3B2]"
+          >
+            <UIcon name="i-bx-loader-alt" class="animate-spin text-base" />
+            <span>Fetching video&hellip;</span>
+          </div>
+        </div>
+
+        <!-- PICKED FILES -->
+        <div v-if="fileObjs?.length > 0" class="preview-ctn mt-6">
+          <p class="text-[13px] text-gray-500 dark:text-[#9BA3B2]">
+            {{ pickedFilesLabel }}
+          </p>
+          <!-- Negative margin cancels the panel padding so the rule is full-bleed -->
+          <div
+            class="-mx-1.5 mt-3 border-b border-gray-200 dark:border-white/5"
+          ></div>
+
+          <Transition name="fade-sm">
+            <div
+              class="mt-3 grid gap-2"
+              :class="isAnyFileExternal ? 'grid-cols-1' : 'grid-cols-3'"
+            >
+              <div
+                v-for="(fileObj, index) in fileObjs"
+                :key="fileObj.url"
+                v-show="fileObj"
+                class="file-preview group relative flex cursor-pointer overflow-hidden rounded-lg transition-all"
+                :class="
+                  fileObj.isExternal
+                    ? ''
+                    : 'aspect-square bg-black/5 dark:bg-black/20'
+                "
+                @click="removeFile(index)"
+              >
+                <!-- External Videos (YouTube/Vimeo) -->
+                <div
+                  v-if="fileObj.isExternal"
+                  class="w-full flex items-center gap-3 p-3 rounded-lg bg-black/5 dark:bg-white/5"
+                >
+                  <!-- Thumbnail -->
+                  <div
+                    class="relative w-32 h-20 flex-shrink-0 rounded-md overflow-hidden bg-primary-100 dark:bg-primary-800"
+                  >
+                    <img
+                      v-if="fileObj.thumbnail"
+                      :src="fileObj.thumbnail"
+                      :alt="fileObj.name"
+                      class="w-full h-full object-cover"
+                      @error="onThumbnailError"
+                    />
+                    <div
+                      v-else
+                      class="w-full h-full flex items-center justify-center"
+                    >
+                      <IconWrapper
+                        :name="
+                          fileObj.type === 'youtube'
+                            ? 'i-bxl-youtube'
+                            : 'i-bxl-vimeo'
+                        "
+                        size="8"
+                        :class="
+                          fileObj.type === 'youtube'
+                            ? 'text-red-500'
+                            : 'text-blue-500'
+                        "
+                      />
+                    </div>
+                    <!-- Play overlay -->
+                    <div
+                      class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30"
+                    >
+                      <IconWrapper
+                        :name="
+                          fileObj.type === 'youtube'
+                            ? 'i-bxl-youtube'
+                            : 'i-bxl-vimeo'
+                        "
+                        size="8"
+                        class="text-white opacity-90"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Video Info -->
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium line-clamp-2">
+                      {{ fileObj.name }}
+                    </p>
+                    <p class="text-xs text-gray-500 truncate mt-1">
+                      {{ fileObj.url }}
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Regular Files -->
+                <template v-else>
+                  <img
+                    v-if="fileObj?.type === 'image'"
+                    :src="fileObj.url"
+                    alt="previewed slide image"
+                    class="h-full w-full object-cover"
+                  />
+                  <audio
+                    v-if="fileObj?.type === 'audio'"
+                    alt="previewed slide audio"
+                    controls
+                    class="w-[100%] self-center px-1"
+                  >
+                    <source :src="fileObj.url" type="audio/mp3" />
+                  </audio>
+                  <video
+                    v-else-if="fileObj?.type === 'video'"
+                    :src="fileObj.url"
+                    autoplay
+                    muted
+                    alt="previewed slide video"
+                    class="h-full w-full object-cover"
+                  />
+                  <div class="absolute top-1 left-1">
+                    <IconWrapper
+                      v-if="fileObj.type?.includes('image')"
+                      name="i-bx-image"
+                      size="4"
+                      class="text-white"
+                    />
+                    <IconWrapper
+                      v-if="fileObj.type?.includes('video')"
+                      name="i-bx-movie"
+                      size="4"
+                      class="text-white"
+                    />
+                  </div>
+                </template>
+
+                <div
+                  class="bg-primary-800 opacity-0 absolute inset-0 flex items-center justify-center rounded-lg group-hover:opacity-90 transition-all"
+                >
+                  <DeleteIcon class="w-8 h-8 text-white" />
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </div>
       </div>
-    </div>
-    <!-- PREVIEW AND CREATE BUTTON -->
-    <div v-if="fileObjs?.length > 0" class="preview-ctn flex flex-col mt-8">
-      <CowButton
-        variant="primary"
-        class="mb-2"
-        block
-        @click="addMediaEmitter"
-        size="lg"
-        >Create {{ fileObjs?.length }} Slide{{
-          fileObjs?.length > 1 ? "s" : ""
-        }}</CowButton
-      >
+
+      <!-- FLOATING CTA — content scrolls underneath it -->
       <Transition name="fade-sm">
         <div
-          class="grid gap-2 max-h-[250px] overflow-auto rounded-md overflow-x-hidden"
-          :class="
-            fileObjs?.length === 1 || isAnyFileExternal
-              ? 'grid-cols-1'
-              : 'grid-cols-3'
-          "
+          v-if="fileObjs?.length > 0"
+          class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-white via-white to-transparent p-3 pt-10 dark:from-[#222938] dark:via-[#222938]"
         >
-          <div
-            v-for="(fileObj, index) in fileObjs"
-            :key="fileObj.url"
-            v-show="fileObj"
-            class="file-preview relative border-2 border-primary-100 dark:border-primary-800 rounded-md flex min-h-[100px] cursor-pointer group hover:border-primary-500 transition-all"
-            @click="removeFile(index)"
+          <CowButton
+            variant="primary"
+            class="pointer-events-auto"
+            block
+            size="lg"
+            @click="addMediaEmitter"
           >
-            <!-- External Videos (YouTube/Vimeo) -->
-            <div
-              v-if="fileObj.isExternal"
-              class="w-full flex items-center gap-3 p-3 rounded-md bg-primary-50 dark:bg-primary-900"
-            >
-              <!-- Thumbnail -->
-              <div
-                class="relative w-32 h-20 flex-shrink-0 rounded-md overflow-hidden bg-primary-100 dark:bg-primary-800"
-              >
-                <img
-                  v-if="fileObj.thumbnail"
-                  :src="fileObj.thumbnail"
-                  :alt="fileObj.name"
-                  class="w-full h-full object-cover"
-                  @error="onThumbnailError"
-                />
-                <div
-                  v-else
-                  class="w-full h-full flex items-center justify-center"
-                >
-                  <IconWrapper
-                    :name="
-                      fileObj.type === 'youtube'
-                        ? 'i-bxl-youtube'
-                        : 'i-bxl-vimeo'
-                    "
-                    size="8"
-                    :class="
-                      fileObj.type === 'youtube'
-                        ? 'text-red-500'
-                        : 'text-blue-500'
-                    "
-                  />
-                </div>
-                <!-- Play overlay -->
-                <div
-                  class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30"
-                >
-                  <IconWrapper
-                    :name="
-                      fileObj.type === 'youtube'
-                        ? 'i-bxl-youtube'
-                        : 'i-bxl-vimeo'
-                    "
-                    size="8"
-                    class="text-white opacity-90"
-                  />
-                </div>
-              </div>
-
-              <!-- Video Info -->
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium line-clamp-2">
-                  {{ fileObj.name }}
-                </p>
-                <p class="text-xs text-gray-500 truncate mt-1">
-                  {{ fileObj.url }}
-                </p>
-              </div>
-            </div>
-
-            <!-- Regular Files -->
-            <template v-else>
-              <img
-                v-if="fileObj?.type === 'image'"
-                :src="fileObj.url"
-                alt="previewed slide image"
-                class="rounded-md max-h-[40vh] 2xl:max-h-[100%] bg-primary-950 object-contain"
-              />
-              <audio
-                v-if="fileObj?.type === 'audio'"
-                alt="previewed slide image"
-                controls
-                class="max-h-[40vh] 2xl:max-h-[100%] w-[100%]"
-              >
-                <source :src="fileObj.url" type="audio/mp3" />
-              </audio>
-              <video
-                v-else-if="fileObj?.type === 'video'"
-                :src="fileObj.url"
-                autoplay
-                muted
-                alt="previewed slide image"
-                class="rounded-md max-h-[40vh] 2xl:max-h-[100%]"
-              />
-              <div class="absolute top-0 left-1">
-                <IconWrapper
-                  v-if="fileObj.type?.includes('image')"
-                  name="i-bx-image"
-                  size="4"
-                  class="text-white"
-                />
-                <IconWrapper
-                  v-if="fileObj.type?.includes('video')"
-                  name="i-bx-movie"
-                  size="4"
-                  class="text-white"
-                />
-              </div>
-            </template>
-
-            <div
-              class="bg-primary-800 opacity-0 absolute inset-0 flex items-center justify-center rounded-md group-hover:opacity-90 transition-all"
-            >
-              <DeleteIcon class="w-8 h-8 text-white" />
-            </div>
-          </div>
+            Create slides
+          </CowButton>
         </div>
       </Transition>
     </div>
@@ -184,6 +214,7 @@
 <script setup lang="ts">
 import { appWideActions } from "~/utils/constants"
 import { useAuthStore } from "~/store/auth"
+import { useDebounceFn } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import type { ExtendedFileT, ExternalVideo } from "~/types"
 
@@ -202,6 +233,7 @@ const files = ref()
 const emit = defineEmits(["close"])
 const externalVideoUrl = ref("")
 const externalVideos = ref<ExternalVideo[]>([])
+const isFetchingExternalVideo = ref(false)
 const toast = useToast()
 const activeTab = ref(props.initialTab || 0)
 const urlCache = new Map<File, string>()
@@ -236,7 +268,7 @@ const mediaTabs = [
     icon: "i-bx-image",
   },
   {
-    label: "YouTube/Vimeo",
+    label: "Youtube/Vimeo Links",
     icon: "i-bx-link",
   },
 ]
@@ -324,20 +356,15 @@ const fetchVideoMetadata = async (
 }
 
 const addExternalVideo = async () => {
-  if (!externalVideoUrl.value) return
+  const url = externalVideoUrl.value?.trim()
+  if (!url || isFetchingExternalVideo.value) return
 
-  const type = detectVideoType(externalVideoUrl.value)
-  if (type === "other") {
-    toast.add({
-      title: "Invalid URL",
-      description: "Please enter a valid YouTube or Vimeo URL",
-      icon: "i-bx-error",
-      color: "red",
-    })
-    return
-  }
+  const type = detectVideoType(url)
+  // Typing a URL fires this on every keystroke, so an incomplete link is not an
+  // error yet — stay quiet and wait for a recognisable host.
+  if (type === "other") return
 
-  const videoId = extractVideoId(externalVideoUrl.value, type)
+  const videoId = extractVideoId(url, type)
   if (!videoId) {
     toast.add({
       title: "Invalid URL",
@@ -348,22 +375,40 @@ const addExternalVideo = async () => {
     return
   }
 
-  // Fetch metadata
-  const metadata = await fetchVideoMetadata(
-    externalVideoUrl.value,
-    type,
-    videoId
-  )
-
-  const video: ExternalVideo = {
-    url: externalVideoUrl.value,
-    type: type,
-    name: metadata.title,
-    thumbnail: metadata.thumbnail,
+  if (externalVideos.value.some((video) => video.url === url)) {
+    externalVideoUrl.value = ""
+    return
   }
 
-  externalVideos.value.push(video)
-  externalVideoUrl.value = ""
+  isFetchingExternalVideo.value = true
+  try {
+    const metadata = await fetchVideoMetadata(url, type, videoId)
+
+    const video: ExternalVideo = {
+      url,
+      type: type,
+      name: metadata.title,
+      thumbnail: metadata.thumbnail,
+    }
+
+    externalVideos.value.push(video)
+    externalVideoUrl.value = ""
+  } finally {
+    isFetchingExternalVideo.value = false
+  }
+}
+
+// Pasting is the primary path, but a typed/autofilled URL should work too, so
+// both funnel through the same debounced fetch.
+const debouncedAddExternalVideo = useDebounceFn(addExternalVideo, 500)
+
+watch(externalVideoUrl, (url) => {
+  if (url?.trim()) debouncedAddExternalVideo()
+})
+
+const onExternalUrlPaste = () => {
+  // The bound value updates after the paste event, so let it settle first.
+  nextTick(() => debouncedAddExternalVideo())
 }
 
 const removeExternalVideo = (index: number) => {
@@ -415,6 +460,18 @@ const fileObjs = computed(() => {
 
 const isAnyFileExternal = computed(() => {
   return fileObjs.value?.find((file) => file.isExternal)
+})
+
+// The design labels this section "Uploaded Images"; widen it when the picks
+// aren't all images so the header never mislabels what's on screen.
+const pickedFilesLabel = computed(() => {
+  const types = new Set(
+    fileObjs.value.map((file) => (file.isExternal ? "video" : file.type))
+  )
+  if (types.size === 1 && types.has("image")) return "Uploaded Images"
+  if (types.size === 1 && types.has("video")) return "Uploaded Videos"
+  if (types.size === 1 && types.has("audio")) return "Uploaded Audio"
+  return "Uploaded Files"
 })
 
 const addMediaEmitter = () => {

@@ -119,7 +119,7 @@ export type ScheduleTemplateSeed =
   | { type: 'hymn'; number: string }
   | { type: 'song'; song: Song }
   | { type: 'song-setlist'; songs: Song[] }
-  | { type: 'countdown'; time: string; label: string } // time like "05:00"
+  | { type: 'countdown'; time: string; label: string } // "HH:MM:SS", e.g. "00:05:00"
   | { type: 'media'; mediaType: 'image' | 'youtube'; url: string; name?: string }
 
 export interface ScheduleTemplate {
@@ -397,6 +397,7 @@ export interface AppSettings {
   songAndHymnLabelsVisibility: boolean
   liveWindowFullscreen?: boolean // Whether live window opens in fullscreen mode
   closeLiveWindowWithOperator?: boolean // Whether live window closes when the operator tab/window closes
+  ndiEnabled?: boolean // Device-local desktop NDI preference. Never synced to the backend.
   transcriptionAutoActions?: boolean
   transcriptionVoiceBibleVersionCommands?: boolean
   uploadVideosToCloud?: boolean // Upload video media slides to cloud (S3). Defaults to true.
