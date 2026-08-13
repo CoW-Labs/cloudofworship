@@ -397,6 +397,7 @@ export interface AppSettings {
   songAndHymnLabelsVisibility: boolean
   liveWindowFullscreen?: boolean // Whether live window opens in fullscreen mode
   closeLiveWindowWithOperator?: boolean // Whether live window closes when the operator tab/window closes
+  ndiEnabled?: boolean // Device-local desktop NDI preference. Never synced to the backend.
   transcriptionAutoActions?: boolean
   transcriptionVoiceBibleVersionCommands?: boolean
   uploadVideosToCloud?: boolean // Upload video media slides to cloud (S3). Defaults to true.

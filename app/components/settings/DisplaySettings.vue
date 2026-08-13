@@ -92,6 +92,132 @@
       </SettingsRow>
     </SettingsGroup>
 
+    <SettingsGroup
+      v-if="isTauri"
+      title="NDI Live Output"
+      note="Publish the live window to NDI receivers on your local network. NDI 5 or 6 must be installed separately."
+    >
+      <SettingsRow
+        label="Broadcast live output over NDI"
+        description="When enabled, broadcasting starts after the desktop live window opens. This preference is stored on this device only."
+      >
+        <CowToggle
+          bare
+          label="Broadcast live output over NDI"
+          :model-value="currentState.settings.ndiEnabled ?? false"
+          @update:model-value="handleNdiToggle"
+        />
+      </SettingsRow>
+
+      <div
+        class="rounded-2xl bg-white dark:bg-[#131a27] ring-1 ring-gray-200 dark:ring-white/10 p-4"
+      >
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <div class="flex items-center gap-2 min-w-0">
+            <span
+              class="w-2.5 h-2.5 rounded-full shrink-0"
+              :class="ndiPhaseDotClass"
+            />
+            <span class="text-sm font-semibold">{{ ndiPhaseLabel }}</span>
+            <span
+              v-if="ndiStatus.stalled"
+              class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+            >
+              Stalled
+            </span>
+          </div>
+          <Icon
+            v-if="ndiBusy"
+            name="i-lucide-loader-2"
+            class="w-4 h-4 animate-spin text-primary-500"
+          />
+        </div>
+
+        <dl class="grid grid-cols-2 gap-x-5 gap-y-3 text-xs">
+          <div class="min-w-0">
+            <dt class="text-gray-500 dark:text-[#9aa3b2]">Source</dt>
+            <dd class="mt-0.5 font-semibold truncate">
+              {{ ndiStatus.sourceName }}
+            </dd>
+          </div>
+          <div class="min-w-0">
+            <dt class="text-gray-500 dark:text-[#9aa3b2]">Resolution</dt>
+            <dd class="mt-0.5 font-semibold">
+              {{ ndiResolution }}
+            </dd>
+          </div>
+          <div class="min-w-0">
+            <dt class="text-gray-500 dark:text-[#9aa3b2]">NDI runtime</dt>
+            <dd
+              class="mt-0.5 font-semibold truncate"
+              :title="ndiStatus.runtimePath || undefined"
+            >
+              {{ ndiStatus.runtimeVersion || "Not detected" }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-gray-500 dark:text-[#9aa3b2]">Receivers</dt>
+            <dd class="mt-0.5 font-semibold">
+              {{ ndiStatus.connectionCount }}
+            </dd>
+          </div>
+        </dl>
+
+        <div
+          v-if="ndiStatus.error"
+          class="mt-4 rounded-xl bg-red-50 dark:bg-red-900/20 p-3 text-xs text-red-800 dark:text-red-200"
+        >
+          <p class="font-semibold">{{ ndiStatus.error.message }}</p>
+          <p v-if="ndiStatus.error.hint" class="mt-1 leading-relaxed">
+            {{ ndiStatus.error.hint }}
+          </p>
+        </div>
+
+        <div
+          v-else-if="showWindowsNetworkHint"
+          class="mt-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 p-3 text-xs leading-relaxed text-amber-800 dark:text-amber-200"
+        >
+          No receiver is connected. If your NDI receiver cannot find this
+          source, allow Cloud of Worship on Windows Firewall and confirm the
+          network is marked Private.
+        </div>
+
+        <div
+          v-if="showNdiActions"
+          class="mt-4 flex flex-wrap items-center gap-2"
+        >
+          <CowButton
+            v-if="ndiStatus.error?.recoverable && currentState.settings.ndiEnabled"
+            variant="secondary"
+            size="2xs"
+            class="!px-3.5 !py-1.5 text-xs"
+            :loading="ndiBusy"
+            @click="retryNdi"
+          >
+            Retry
+          </CowButton>
+          <CowButton
+            v-if="runtimeMissing"
+            variant="secondary"
+            size="2xs"
+            class="!px-3.5 !py-1.5 text-xs"
+            @click="useOpenExternal('https://ndi.video/tools/')"
+          >
+            Install NDI runtime
+          </CowButton>
+          <CowButton
+            v-if="capturePermissionNeeded"
+            variant="secondary"
+            size="2xs"
+            class="!px-3.5 !py-1.5 text-xs"
+            @click="openNdiCaptureSettings"
+          >
+            Open Screen Recording settings
+          </CowButton>
+        </div>
+      </div>
+    </SettingsGroup>
+
     <SettingsGroup v-if="allScreens?.length" title="Secondary Screens">
       <template #actions>
         <CowButton
@@ -136,7 +262,7 @@
           <div class="name-and-dimensions min-w-0">
             <div class="name text-sm font-semibold flex items-center gap-2">
               <span class="truncate">
-                {{ screen?.label || `Unlabeled Screen ${index + 1}` }}
+                {{ screen?.label || `Unlabeled Screen ${Number(index) + 1}` }}
               </span>
               <span
                 v-if="screen?.isPrimary"
@@ -202,6 +328,133 @@ const currentScreen = ref<any>({})
 const allScreens = ref<any>([])
 const { currentState } = storeToRefs(appStore)
 const isLoading = ref(false)
+const {
+  status: ndiStatus,
+  isInvoking: ndiBusy,
+  initialize: initializeNdi,
+  start: startNdi,
+  stop: stopNdi,
+  retry: retryNdiCommand,
+  openCaptureSettings: openCaptureSettings,
+} = useNdiBroadcast()
+
+const ndiPhaseLabel = computed(() => {
+  if (ndiStatus.value.stalled) return "Broadcasting last frame"
+  return {
+    idle: "Not broadcasting",
+    starting: "Starting",
+    broadcasting: "Broadcasting",
+    error: "Needs attention",
+    unsupported: "Unsupported on this system",
+  }[ndiStatus.value.phase]
+})
+
+const ndiPhaseDotClass = computed(() => ({
+  "bg-gray-400": ndiStatus.value.phase === "idle",
+  "bg-amber-500 animate-pulse": ndiStatus.value.phase === "starting",
+  "bg-green-500": ndiStatus.value.phase === "broadcasting" && !ndiStatus.value.stalled,
+  "bg-amber-500": ndiStatus.value.phase === "broadcasting" && ndiStatus.value.stalled,
+  "bg-red-500": ndiStatus.value.phase === "error",
+  "bg-gray-500": ndiStatus.value.phase === "unsupported",
+}))
+
+const ndiResolution = computed(() =>
+  ndiStatus.value.width && ndiStatus.value.height
+    ? `${ndiStatus.value.width} x ${ndiStatus.value.height} at ${ndiStatus.value.fps} fps`
+    : `Waiting for live output at ${ndiStatus.value.fps} fps`
+)
+const runtimeMissing = computed(
+  () => ndiStatus.value.error?.code === "runtimeNotInstalled"
+)
+const capturePermissionNeeded = computed(() =>
+  ["required", "denied"].includes(ndiStatus.value.capturePermission)
+)
+const showWindowsNetworkHint = computed(
+  () =>
+    import.meta.client &&
+    navigator.userAgent.includes("Windows") &&
+    ndiStatus.value.phase === "broadcasting" &&
+    ndiStatus.value.connectionCount === 0
+)
+const showNdiActions = computed(
+  () =>
+    Boolean(ndiStatus.value.error?.recoverable) ||
+    runtimeMissing.value ||
+    capturePermissionNeeded.value
+)
+
+const liveWindowIsOpen = async () => {
+  const { getAllWebviewWindows } = await import(
+    "@tauri-apps/api/webviewWindow"
+  )
+  return (await getAllWebviewWindows()).some(
+    (window) => window.label === "live-output"
+  )
+}
+
+const handleNdiToggle = async (enabled: boolean) => {
+  appStore.setNdiEnabled(enabled)
+  if (!enabled) {
+    try {
+      await stopNdi()
+    } catch (error) {
+      console.warn("Could not stop NDI cleanly:", error)
+    }
+    return
+  }
+
+  if (!(await liveWindowIsOpen())) {
+    useToast().add({
+      title: "NDI will start with the live window",
+      icon: "i-bx-check-circle",
+    })
+    return
+  }
+  try {
+    await startNdi()
+  } catch (error: any) {
+    useToast().add({
+      title: "NDI could not start",
+      description: error?.message,
+      icon: "i-bx-error-circle",
+      color: "red",
+    })
+  }
+}
+
+const retryNdi = async () => {
+  if (!(await liveWindowIsOpen())) {
+    useToast().add({
+      title: "Open the live window before retrying NDI",
+      icon: "i-bx-info-circle",
+      color: "amber",
+    })
+    return
+  }
+  try {
+    await retryNdiCommand()
+  } catch (error: any) {
+    useToast().add({
+      title: "NDI retry failed",
+      description: error?.message,
+      icon: "i-bx-error-circle",
+      color: "red",
+    })
+  }
+}
+
+const openNdiCaptureSettings = async () => {
+  try {
+    await openCaptureSettings()
+  } catch (error: any) {
+    useToast().add({
+      title: "Could not open Screen Recording settings",
+      description: error?.message,
+      icon: "i-bx-error-circle",
+      color: "red",
+    })
+  }
+}
 
 let screenDetails: any
 
@@ -307,6 +560,7 @@ const getBrowserDisplays = async () => {
 const debouncedGetDisplayDetails = useDebounceFn(getDisplayDetails, 500)
 
 onMounted(async () => {
+  if (isTauri) await initializeNdi()
   await getDisplayDetails()
 
   addEventListener("resize", async () => {
