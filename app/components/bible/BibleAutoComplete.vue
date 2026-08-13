@@ -1,41 +1,33 @@
 <template>
   <div
     ref="booksPreview"
-    class="books-preview behavior-smooth absolute bg-primary-100 dark:bg-primary-800 right-0 left-0 top-12 z-20 py-2 overflow-auto shadow-lg rounded-b-md"
+    class="books-preview behavior-smooth absolute bg-white dark:bg-[#222938] right-0 left-0 top-[46px] z-40 overflow-auto shadow-lg rounded-b-2xl"
   >
-    <div class="info px-4 py-3 bg-primary-300 dark:bg-primary-500">
-      <div
-        class="rounded-lg p-3 bg-primary-100 dark:bg-primary-900 flex items-center gap-2"
-      >
-        <IconWrapper name="i-bx-bulb" size="6" color="red" />
-        <div class="info flex items-center">
-          Use
-          <div class="hotkey">Tab</div>
-          or
-          <div class="hotkey">
-            <UIcon name="i-mdi-arrow-right" size="xl" />
-          </div>
-          select books and add colon (:) separator for verses.
+    <div class="flex flex-col gap-2 px-4 py-3">
+      <Hint>
+        <div class="flex items-center">
+          Use <span class="hotkey">Tab</span> or
+          <span class="hotkey">
+            <UIcon name="i-mdi-arrow-right" class="h-3 w-3" />
+          </span>
+          to select books, and add a colon (:) separator for verses.
         </div>
-      </div>
-      <div
-        v-if="!verse"
-        class="rounded-lg p-3 bg-primary-100 dark:bg-primary-900 flex items-center gap-2 mt-2"
-      >
-        <InfoIcon class="w-6 h-6" />
-        <div class="info flex items-center">
-          Start typing to search for books.
-        </div>
-      </div>
+      </Hint>
+      <Hint v-if="!verse">
+        <template #icon>
+          <InfoIcon class="h-8 w-8 text-gray-900 dark:text-[#F8F9FB]" />
+        </template>
+        Start typing to search for books.
+      </Hint>
     </div>
     <UButton
       block
       variant="ghost"
       v-for="book in bookOptions"
       :key="book"
-      class="item rounded-none flex px-4 py-3 justify-start border-t border-primary-200 dark:border-primary-950 hover:bg-primary-200 dark:hover:bg-primary-600 cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
+      class="item rounded-none flex px-5 py-3 justify-start border-t border-gray-100 dark:border-[#2b3344] hover:bg-gray-100 dark:hover:bg-[#2b3344] cursor-pointer w-[100%] text-left items-start font-normal text-black dark:text-white"
       :class="{
-        'bg-primary-300 dark:bg-primary-900': activeBook === book,
+        'bg-gray-100 dark:bg-[#2b3344]': activeBook === book,
       }"
       @click="$emit('goto-book', book)"
     >

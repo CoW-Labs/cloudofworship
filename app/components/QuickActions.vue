@@ -187,9 +187,11 @@
     />
 
     <!-- MEDIA(IMAGE/VIDEO) SECTION-->
+    <!-- AddMedia/AddPresentation own their scroll container so their CTA can
+    stay pinned to the panel — do not add overflow here. -->
     <AddMedia
       v-else-if="page === 'media' || page === 'youtube' || page === 'vimeo'"
-      class="fade-in-right h-full min-h-0 overflow-auto"
+      class="fade-in-right h-full min-h-0"
       :initial-tab="page === 'youtube' || page === 'vimeo' ? 1 : 0"
       @close="page = ''"
     />
@@ -240,13 +242,13 @@
     <!-- IMPORT SLIDES (PRESENTATION) SECTION-->
     <AddPresentation
       v-else-if="page === 'presentation'"
-      class="fade-in-right h-full min-h-0 overflow-auto"
+      class="fade-in-right h-full min-h-0"
       file-type="ppt"
       @close="page = ''"
     />
     <AddPresentation
       v-else-if="page === 'presentation-pdf'"
-      class="fade-in-right h-full min-h-0 overflow-auto"
+      class="fade-in-right h-full min-h-0"
       file-type="pdf"
       @close="page = ''"
     />
@@ -854,8 +856,9 @@ emitter.on("new-countdown", (data) => {
   }
 })
 
-emitter.on("new-presentation", () => {
-  page.value = "presentation"
+// A payload means a deck is being imported, not that the panel should open.
+emitter.on("new-presentation", (data) => {
+  if (!data) page.value = "presentation"
 })
 
 emitter.on("new-presentation-from-pdf", () => {

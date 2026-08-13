@@ -75,7 +75,7 @@ export const scheduleTemplates: ScheduleTemplate[] = [
         heading: "Welcome",
         subtitle: "We're glad you're here — let's worship together",
       },
-      { type: "countdown", time: "05:00", label: "Service starts in" },
+      { type: "countdown", time: "00:05:00", label: "Service starts in" },
       {
         type: "bible",
         ref: bibleRef("Psalms", 100, "1-2"),
@@ -162,7 +162,7 @@ export const scheduleTemplates: ScheduleTemplate[] = [
         heading: "Merry Christmas",
         subtitle: "Unto us a Child is born",
       },
-      { type: "countdown", time: "10:00", label: "Celebration begins in" },
+      { type: "countdown", time: "00:10:00", label: "Celebration begins in" },
       { type: "bible", ref: bibleRef("Luke", 2, "8-14") },
       { type: "hymn", number: "120" }, // Hark! the Herald Angels Sing
       {

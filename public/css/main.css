@@ -8,8 +8,8 @@ body {
 } */
 .hotkey {
   font-size: 0.6rem;
-  color: #000000;
-  background-color: #cecece;
+  color: #374151;
+  background-color: #e5e7eb;
   font-weight: bold;
   padding: 0 0.5rem;
   height: 20px;
@@ -19,6 +19,11 @@ body {
   justify-content: center;
   align-items: center;
   margin: 0 0.2rem;
+  vertical-align: middle;
+}
+html.dark .hotkey {
+  color: #d5dae3;
+  background-color: #3a4254;
 }
 
 /* Shared QuickActions-style search input chrome, reused across list panels */
