@@ -6,7 +6,7 @@ authors = ["you"]
 license = ""
 repository = ""
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.85"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -29,3 +29,28 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-fs = "2"
 fs2 = "0.4"
+
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+libloading = "=0.8.9"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+screencapturekit = { version = "=8.0.1", features = ["macos_14_4"] }
+core-graphics = "0.25.0"
+objc2 = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-capture = "=2.0.1"
+windows = { version = "0.62.2", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
+  "Win32_System_Com",
+] }
+
+[patch.crates-io]
+# windows-capture 2.0.1 uses five let-chain expressions that require Rust
+# newer than its declared edition baseline. This exact vendored version only
+# rewrites those expressions so the requested Rust 1.85 MSRV remains honest.
+windows-capture = { path = "vendor/windows-capture-2.0.1" }

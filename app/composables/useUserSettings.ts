@@ -64,6 +64,8 @@ export const useUserSettings = () => {
 
         // Map backend settings to frontend AppSettings format
         const mappedSettings: Partial<AppSettings> = {
+          // ndiEnabled is deliberately omitted. It belongs to this desktop
+          // installation and is preserved by the merge below.
           defaultFont: userSettings.defaultFont,
           defaultBibleVersion: userSettings.defaultBibleVersion,
           // Deep merge defaultBackground to preserve all nested properties
@@ -173,6 +175,8 @@ export const useUserSettings = () => {
 
       // Extract only the fields that should be saved to the backend
       const backendSettings = {
+        // ndiEnabled is deliberately omitted so the preference never follows
+        // a user to another computer or into the web app.
         defaultFont: settingsToSave.defaultFont,
         defaultBibleVersion: settingsToSave.defaultBibleVersion,
         defaultBackground: safeDefaultBackground,
