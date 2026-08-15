@@ -282,50 +282,33 @@
           </div>
         </div>
 
-        <div
+        <SettingsSelect
           v-if="currentScreen.label !== screen.label"
-          class="shrink-0 flex flex-col items-end gap-2"
+          class="shrink-0"
+          width="w-[150px]"
+          :options="screenRoleOptions"
+          :model-value="getScreenRole(screen)"
+          @change="(role: string) => setScreenRole(screen, role)"
         >
-          <div class="flex items-center gap-2.5">
-            <span
-              class="text-xs font-semibold text-gray-600 dark:text-[#a7afbd]"
-            >
-              Live display
+          <template #label>
+            <span class="flex items-center gap-1.5 truncate">
+              <span
+                class="w-1.5 h-1.5 rounded-full shrink-0"
+                :class="roleDotClass(getScreenRole(screen))"
+              />
+              {{ getScreenRole(screen) }}
             </span>
-            <CowToggle
-              bare
-              label="Live display"
-              :model-value="currentState.mainDisplayLabel === screen.id"
-              @update:model-value="
-                ($event: boolean) => setLiveDisplay(screen, $event)
-              "
-            />
-          </div>
-
-          <!-- The live output owns its screen, so a screen can never be both.
-               Disabled rather than hidden so the option stays discoverable. -->
-          <div class="flex items-center gap-2.5">
-            <span
-              class="text-xs font-semibold"
-              :class="
-                currentState.mainDisplayLabel === screen.id
-                  ? 'text-gray-400 dark:text-[#6b7588]'
-                  : 'text-gray-600 dark:text-[#a7afbd]'
-              "
-            >
-              Stage display
+          </template>
+          <template #option="{ option }">
+            <span class="flex items-center gap-1.5 truncate">
+              <span
+                class="w-1.5 h-1.5 rounded-full shrink-0"
+                :class="roleDotClass(option)"
+              />
+              {{ option }}
             </span>
-            <CowToggle
-              bare
-              label="Stage display"
-              :disabled="currentState.mainDisplayLabel === screen.id"
-              :model-value="currentState.stageDisplayLabel === screen.id"
-              @update:model-value="
-                ($event: boolean) => setStageDisplay(screen, $event)
-              "
-            />
-          </div>
-        </div>
+          </template>
+        </SettingsSelect>
       </div>
     </SettingsGroup>
   </div>
@@ -502,35 +485,64 @@ const toStoredScreen = (screen: any): Screen | any => ({
   pixelDepth: screen.pixelDepth,
 })
 
-const setLiveDisplay = (screen: any, enabled: boolean) => {
-  appStore.setMainDisplayLabel(enabled ? screen.id : "")
-  appStore.setMainDisplayScreen(enabled ? toStoredScreen(screen) : null)
+const screenRoleOptions = ["Not assigned", "Live display", "Stage display"]
 
-  // Live output takes priority over the stage display: claiming a screen for
-  // live releases it from the stage display rather than leaving both pointed
-  // at the same monitor.
-  if (enabled && currentState.value.stageDisplayLabel === screen.id) {
-    appStore.setStageDisplayLabel("")
-    appStore.setStageDisplayScreen(null)
-    useToast().add({
-      title: `${screen.label || "This screen"} is now the live display`,
-      description: "It is no longer assigned to the stage display.",
-      icon: "i-bx-info-circle",
-    })
-  }
+// Mirrors the ring colours used to highlight a screen's card, so the role
+// select reads as the same signal in a different shape.
+const roleDotClass = (role: string) => {
+  if (role === "Live display") return "bg-primary-500"
+  if (role === "Stage display") return "bg-purple-300 dark:bg-purple-400/70"
+  return "bg-gray-300 dark:bg-[#3a4254]"
 }
 
-const setStageDisplay = (screen: any, enabled: boolean) => {
-  if (enabled && currentState.value.mainDisplayLabel === screen.id) return
+const getScreenRole = (screen: any) => {
+  if (currentState.value.mainDisplayLabel === screen.id) return "Live display"
+  if (currentState.value.stageDisplayLabel === screen.id) return "Stage display"
+  return "Not assigned"
+}
 
-  appStore.setStageDisplayLabel(enabled ? screen.id : "")
-  appStore.setStageDisplayScreen(enabled ? toStoredScreen(screen) : null)
-  useToast().add({
-    title: enabled
-      ? `Stage display will open on ${screen.label || "this screen"}`
-      : "Stage display will open in a new tab",
-    icon: "i-bx-check-circle",
-  })
+// A screen holds at most one role, so assigning a new one here clears
+// whichever role it previously held rather than needing a separate toggle
+// pair (and the disabled-state juggling that came with it).
+const setScreenRole = (screen: any, role: string) => {
+  const previousRole = getScreenRole(screen)
+  if (role === previousRole) return
+
+  if (role === "Live display") {
+    appStore.setMainDisplayLabel(screen.id)
+    appStore.setMainDisplayScreen(toStoredScreen(screen))
+    if (previousRole === "Stage display") {
+      appStore.setStageDisplayLabel("")
+      appStore.setStageDisplayScreen(null)
+    }
+    useToast().add({
+      title: `${screen.label || "This screen"} is now the live display`,
+      icon: "i-bx-check-circle",
+    })
+  } else if (role === "Stage display") {
+    appStore.setStageDisplayLabel(screen.id)
+    appStore.setStageDisplayScreen(toStoredScreen(screen))
+    if (previousRole === "Live display") {
+      appStore.setMainDisplayLabel("")
+      appStore.setMainDisplayScreen(null)
+    }
+    useToast().add({
+      title: `Stage display will open on ${screen.label || "this screen"}`,
+      icon: "i-bx-check-circle",
+    })
+  } else {
+    if (previousRole === "Live display") {
+      appStore.setMainDisplayLabel("")
+      appStore.setMainDisplayScreen(null)
+    } else {
+      appStore.setStageDisplayLabel("")
+      appStore.setStageDisplayScreen(null)
+    }
+    useToast().add({
+      title: `${screen.label || "This screen"} is no longer assigned`,
+      icon: "i-bx-check-circle",
+    })
+  }
 }
 
 const getDisplayDetails = async () => {
