@@ -36,7 +36,7 @@
       "capabilities": [
         {
           "identifier": "main-capability",
-          "windows": ["main", "live-output"],
+          "windows": ["main", "live-output", "stage-display"],
           "permissions": [
             "core:default",
             "core:webview:allow-create-webview-window",
@@ -45,6 +45,7 @@
             "core:webview:allow-webview-size",
             "core:window:allow-create",
             "core:window:allow-close",
+            "core:window:allow-destroy",
             "core:window:allow-set-focus",
             "core:window:allow-set-fullscreen",
             "core:window:allow-set-position",

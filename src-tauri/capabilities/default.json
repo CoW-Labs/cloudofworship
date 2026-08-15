@@ -4,9 +4,11 @@
   "description": "enables the default permissions",
   "windows": [
     "main",
-    "live-output"
+    "live-output",
+    "stage-display"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-destroy"
   ]
 }
