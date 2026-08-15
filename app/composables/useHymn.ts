@@ -1,15 +1,53 @@
 import type { Hymn } from '~/types'
 import { safeDBGet } from './useIndexedDB'
 
+// ── Module-level index cache ────────────────────────────────────────────────
+// The hymn library is a single ~1.6MB record. Read uncached, every navigation
+// within a hymn (each verse, each chunk) paid for a full IndexedDB read plus a
+// linear scan of ~1500 hymns. Built once per window, keyed by hymn number.
+let hymnIndexCache: Map<string, Hymn> | null = null
+let hymnIndexPromise: Promise<Map<string, Hymn> | null> | null = null
+
+/** Call after the hymn library is re-downloaded so the next lookup rebuilds. */
+export const invalidateHymnCache = () => {
+  hymnIndexCache = null
+  hymnIndexPromise = null
+}
+
+const getHymnIndex = async (): Promise<Map<string, Hymn> | null> => {
+  if (hymnIndexCache) return hymnIndexCache
+  if (hymnIndexPromise) return await hymnIndexPromise
+
+  hymnIndexPromise = (async () => {
+    const db = useIndexedDB()
+    const record = await safeDBGet(db.bibleAndHymns, 'hymns')
+    const hymns = record?.data as unknown as Hymn[]
+    if (!hymns?.length) return null
+
+    const index = new Map<string, Hymn>()
+    for (const hymn of hymns) {
+      if (hymn?.number !== undefined) index.set(String(hymn.number), hymn)
+    }
+    hymnIndexCache = index
+    return index
+  })()
+
+  try {
+    return await hymnIndexPromise
+  } finally {
+    hymnIndexPromise = null
+  }
+}
+
 const useHymn = async (number: string): Promise<Hymn | null> => {
-  const db = useIndexedDB()
-  let hymns: any = await safeDBGet(db.bibleAndHymns, 'hymns')
-  hymns = hymns?.data as unknown as Hymn[]
   const toast = useToast()
 
   try {
-    const hymn = hymns.find((hymn: Hymn) => hymn.number === number) as Hymn
-    return hymn
+    const index = await getHymnIndex()
+    // Only an unavailable library is worth a toast — an unmatched number
+    // returned quietly before this cache existed, and callers test for falsy.
+    if (!index) throw new Error('Hymn library is not available offline')
+    return index.get(String(number)) || null
   } catch (err) {
     toast.add({ title: 'Hymn not found', icon: 'i-bx-error', color: 'red' })
   }

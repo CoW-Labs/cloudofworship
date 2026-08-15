@@ -6,6 +6,7 @@ import { toTransportSafeSlide } from "~/utils/mediaTransport"
 import {
   getAPIErrorMessage,
   isForbiddenError,
+  isNetworkError,
   isNotFoundError,
 } from "~/utils/apiErrors"
 
@@ -361,6 +362,10 @@ export default function useSlides() {
         }
         if (isForbiddenError(error.value)) {
           showForbiddenToast()
+          return null
+        }
+        if (isNetworkError(error.value)) {
+          console.warn('Slide sync skipped — request did not reach the server')
           return null
         }
         throw new Error(getAPIErrorMessage(error.value, 'Failed to update slide'))

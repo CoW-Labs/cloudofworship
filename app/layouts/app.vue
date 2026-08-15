@@ -79,6 +79,7 @@ import type {
 import { useOnline } from "@vueuse/core"
 import { appWideActions } from "~/utils/constants"
 import { safeDBOperation } from "~/composables/useIndexedDB"
+import { invalidateHymnCache } from "~/composables/useHymn"
 
 useHead({
   title: "Cloud of Worship",
@@ -311,6 +312,8 @@ const fetchHymns = async () => {
       )
       hymns = await hymns.json()
       await safeDBOperation((d) => d.bibleAndHymns.put(tempBibleVersion("hymns", hymns)))
+      // The lookup index is built once per window from the old record
+      invalidateHymnCache()
     } else {
       setLoadingTask("hymns", "Hymns are already available offline.", 100)
     }
@@ -360,6 +363,18 @@ emitter.on("go-live", async () => {
 emitter.on("close-live-window", async () => {
   await closeAllWindows()
   usePosthogCapture("CLOSE_LIVE_WINDOW_BUTTON_CLICKED")
+})
+
+emitter.on(appWideActions.openStageDisplay, async () => {
+  const { isTauri } = useTauri()
+
+  if (isTauri) {
+    await openTauriStageWindow()
+  } else {
+    await openStageDisplayWindow()
+  }
+
+  usePosthogCapture("STAGE_DISPLAY_OPENED")
 })
 
 const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
@@ -1094,6 +1109,160 @@ async function openWindows() {
     )
   }
 }
+// ── STAGE DISPLAY ───────────────────────────────────────────────────────────
+// Kept out of `windowRefs` on purpose: that array drives closeAllWindows() and
+// the close-poller for the live output, so putting the stage window in it would
+// make closing one tear down the other.
+
+/**
+ * Picks the screen the stage display should open on.
+ *
+ * The live output owns its screen outright — that's the one the congregation
+ * sees — so the stage display never claims it, even when the live window isn't
+ * open yet. An explicit assignment from Display Settings wins; failing that it
+ * takes a spare screen (neither the control center's nor the live output's),
+ * which only exists once more than two displays are connected. With nothing
+ * spare it returns null and the caller opens a plain tab/window instead.
+ *
+ * Works for both browser screens and Tauri monitors — `id` is assigned by
+ * `useScreenId` in either case.
+ */
+const pickStageTarget = <T extends { id: string }>(
+  targets: T[],
+  currentId: string | null,
+  liveId: string
+): T | null => {
+  const savedId = appStore.currentState.stageDisplayLabel
+  if (savedId) {
+    const saved = targets.find((target) => target.id === savedId)
+    if (saved && saved.id !== liveId) return saved
+  }
+
+  return (
+    targets.find(
+      (target) => target.id !== currentId && target.id !== liveId
+    ) || null
+  )
+}
+
+async function openTauriStageWindow() {
+  try {
+    const { WebviewWindow, getAllWebviewWindows } = await import(
+      "@tauri-apps/api/webviewWindow"
+    )
+
+    // Already open — bring it forward rather than failing on a duplicate label
+    const existing = (await getAllWebviewWindows()).find(
+      (window: any) => window.label === "stage-display"
+    )
+    if (existing) {
+      await existing.setFocus()
+      return
+    }
+
+    const { availableMonitors, currentMonitor } = await import(
+      "@tauri-apps/api/window"
+    )
+    const monitors = await availableMonitors()
+    const current = await currentMonitor()
+
+    const identified = (monitors || []).map((monitor: any) => ({
+      id: useScreenId(monitor),
+      monitor,
+    }))
+    const target = pickStageTarget(
+      identified,
+      current ? useScreenId(current) : null,
+      appStore.currentState.mainDisplayLabel
+    )
+
+    // Positions are physical pixels while window options are logical units, so
+    // the scale factor has to be divided out (same as the live window).
+    const monitor = target?.monitor
+    const scale = monitor?.scaleFactor || 1
+
+    const stageWindow = new WebviewWindow("stage-display", {
+      url: "/stage",
+      title: "Cloud of Worship - Stage Display",
+      alwaysOnTop: false,
+      resizable: true,
+      closable: true,
+      // No screen of its own — open as an ordinary window the operator can
+      // move, which is the desktop equivalent of the web build's new tab.
+      ...(monitor
+        ? {
+            decorations: false,
+            fullscreen: true,
+            x: monitor.position.x / scale,
+            y: monitor.position.y / scale,
+            width: monitor.size.width / scale,
+            height: monitor.size.height / scale,
+          }
+        : { decorations: true, fullscreen: false, width: 1280, height: 720 }),
+    })
+
+    await stageWindow.once("tauri://error", (event: any) => {
+      console.error("Stage display window failed to open:", event)
+    })
+  } catch (error) {
+    console.error("Error opening stage display window:", error)
+    useToast().add({
+      title: "Failed to open the stage display",
+      description: "Please try again or check your display settings",
+      icon: "i-bx-error-circle",
+      color: "red",
+    })
+  }
+}
+
+async function openStageDisplayWindow() {
+  const url = `${window.location.origin}/stage`
+  const openInNewTab = () => window.open(url, "_blank")
+
+  if (!("getScreenDetails" in window)) {
+    openInNewTab()
+    return
+  }
+
+  try {
+    // prettier-ignore
+    const screenDetails = await (window as any).getScreenDetails()
+    const currentId = useScreenId(screenDetails?.currentScreen)
+    const screens: any[] = (screenDetails?.screens || []).map(
+      (screen: any) => {
+        screen.id = useScreenId(screen)
+        return screen
+      }
+    )
+
+    const target = pickStageTarget(
+      screens,
+      currentId,
+      appStore.currentState.mainDisplayLabel
+    )
+    if (!target) {
+      openInNewTab()
+      return
+    }
+
+    const features = `left=${target.availLeft},top=${target.availTop},width=${target.availWidth},height=${target.availHeight}`
+    const stageWindow = window.open(url, "_blank", features)
+    if (!stageWindow) {
+      useToast().add({
+        title:
+          "Popups are blocked. Ensure you are not blocking popups for this site.",
+        icon: "i-bx-info-circle",
+        color: "red",
+      })
+    }
+  } catch (error) {
+    // Permission for the Screen Details API was denied or it failed outright —
+    // a tab still gets the operator a stage display.
+    console.warn("Could not place the stage display on a screen:", error)
+    openInNewTab()
+  }
+}
+
 // The web build ties the live popup's lifetime to the operator tab via
 // `beforeunload` inside openWindows(). Desktop windows never fire that, so the
 // projection window would outlive the control center it belongs to.
