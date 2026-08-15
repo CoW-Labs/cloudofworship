@@ -230,8 +230,8 @@ const convertStringToSlug = (str: string) => {
     .replaceAll(":", "-")
 }
 
-const formatScripturePreview = (scripture = "") => {
-  return scripture
+const formatScripturePreview = (scripture: string | null = "") => {
+  return (scripture || "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
