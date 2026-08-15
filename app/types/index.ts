@@ -446,6 +446,10 @@ export interface AppState {
   activeSocket: WebSocket | null
   mainDisplayLabel: string
   mainDisplayScreen: Screen | null
+  // Screen the stage display (confidence monitor) opens on. Empty when the
+  // operator has not assigned one — the stage display then opens in a new tab.
+  stageDisplayLabel: string
+  stageDisplayScreen: Screen | null
   defaultMicrophoneId: string
   defaultCameraId: string
   // Realtime collaboration
