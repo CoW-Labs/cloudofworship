@@ -218,7 +218,11 @@
       </div>
     </SettingsGroup>
 
-    <SettingsGroup v-if="allScreens?.length" title="Secondary Screens">
+    <SettingsGroup
+      v-if="allScreens?.length"
+      title="Secondary Screens"
+      :note="secondaryScreensNote"
+    >
       <template #actions>
         <CowButton
           variant="secondary"
@@ -250,6 +254,8 @@
         :class="
           currentState.mainDisplayLabel === screen.id
             ? 'ring-2 ring-primary-500'
+            : currentState.stageDisplayLabel === screen.id
+            ? 'ring-2 ring-purple-300 dark:ring-purple-400/70'
             : 'ring-1 ring-gray-200 dark:ring-white/10'
         "
       >
@@ -278,39 +284,47 @@
 
         <div
           v-if="currentScreen.label !== screen.label"
-          class="shrink-0 flex items-center gap-2.5"
+          class="shrink-0 flex flex-col items-end gap-2"
         >
-          <span class="text-xs font-semibold text-gray-600 dark:text-[#a7afbd]">
-            Live display
-          </span>
-          <CowToggle
-            bare
-            label="Live display"
-            :model-value="currentState.mainDisplayLabel === screen.id"
-            @update:model-value="
-              ($event: boolean) => {
-                appStore.setMainDisplayLabel($event ? screen.id : '')
-                const tempScreen: (Screen | any) = ({
-                  // prettier-ignore
-                  id: screen.id,
-                  width: screen.width,
-                  height: screen.height,
-                  availWidth: screen.availWidth,
-                  availHeight: screen.availHeight,
-                  availLeft: screen.availLeft,
-                  availTop: screen.availTop,
-                  isExtended: screen.isExtended,
-                  isInternal: screen.isInternal,
-                  devicePixelRatio: screen.devicePixelRatio,
-                  label: screen.label,
-                  pixelDepth: screen.pixelDepth,
-                })
-                $event
-                  ? appStore.setMainDisplayScreen(tempScreen)
-                  : appStore.setMainDisplayScreen(null)
-              }
-            "
-          />
+          <div class="flex items-center gap-2.5">
+            <span
+              class="text-xs font-semibold text-gray-600 dark:text-[#a7afbd]"
+            >
+              Live display
+            </span>
+            <CowToggle
+              bare
+              label="Live display"
+              :model-value="currentState.mainDisplayLabel === screen.id"
+              @update:model-value="
+                ($event: boolean) => setLiveDisplay(screen, $event)
+              "
+            />
+          </div>
+
+          <!-- The live output owns its screen, so a screen can never be both.
+               Disabled rather than hidden so the option stays discoverable. -->
+          <div class="flex items-center gap-2.5">
+            <span
+              class="text-xs font-semibold"
+              :class="
+                currentState.mainDisplayLabel === screen.id
+                  ? 'text-gray-400 dark:text-[#6b7588]'
+                  : 'text-gray-600 dark:text-[#a7afbd]'
+              "
+            >
+              Stage display
+            </span>
+            <CowToggle
+              bare
+              label="Stage display"
+              :disabled="currentState.mainDisplayLabel === screen.id"
+              :model-value="currentState.stageDisplayLabel === screen.id"
+              @update:model-value="
+                ($event: boolean) => setStageDisplay(screen, $event)
+              "
+            />
+          </div>
         </div>
       </div>
     </SettingsGroup>
@@ -463,6 +477,61 @@ const externalScreens = computed(() => {
     (screen: any) => screen?.label !== currentScreen.value?.label
   )
 })
+
+const secondaryScreensNote = computed(() => {
+  if (externalScreens.value.length > 1) {
+    return "Pick the screen for the live output, and the screen for the stage display your musicians and speakers read from."
+  }
+  return "Pick the screen for the live output. Connect another screen to give the stage display one of its own — until then it opens in a new tab."
+})
+
+// The screen shape stored in app state. Screen objects from the browser API
+// are live host objects, so a plain copy is what gets persisted.
+const toStoredScreen = (screen: any): Screen | any => ({
+  id: screen.id,
+  width: screen.width,
+  height: screen.height,
+  availWidth: screen.availWidth,
+  availHeight: screen.availHeight,
+  availLeft: screen.availLeft,
+  availTop: screen.availTop,
+  isExtended: screen.isExtended,
+  isInternal: screen.isInternal,
+  devicePixelRatio: screen.devicePixelRatio,
+  label: screen.label,
+  pixelDepth: screen.pixelDepth,
+})
+
+const setLiveDisplay = (screen: any, enabled: boolean) => {
+  appStore.setMainDisplayLabel(enabled ? screen.id : "")
+  appStore.setMainDisplayScreen(enabled ? toStoredScreen(screen) : null)
+
+  // Live output takes priority over the stage display: claiming a screen for
+  // live releases it from the stage display rather than leaving both pointed
+  // at the same monitor.
+  if (enabled && currentState.value.stageDisplayLabel === screen.id) {
+    appStore.setStageDisplayLabel("")
+    appStore.setStageDisplayScreen(null)
+    useToast().add({
+      title: `${screen.label || "This screen"} is now the live display`,
+      description: "It is no longer assigned to the stage display.",
+      icon: "i-bx-info-circle",
+    })
+  }
+}
+
+const setStageDisplay = (screen: any, enabled: boolean) => {
+  if (enabled && currentState.value.mainDisplayLabel === screen.id) return
+
+  appStore.setStageDisplayLabel(enabled ? screen.id : "")
+  appStore.setStageDisplayScreen(enabled ? toStoredScreen(screen) : null)
+  useToast().add({
+    title: enabled
+      ? `Stage display will open on ${screen.label || "this screen"}`
+      : "Stage display will open in a new tab",
+    icon: "i-bx-check-circle",
+  })
+}
 
 const getDisplayDetails = async () => {
   isLoading.value = true

@@ -23,6 +23,7 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
 
   // Free tier features
   'new-slide': 'free',
+  'open-stage-display': 'free',
   'new-search-bible': 'free',
   'new-hymn': 'free',
   'new-media': 'free',

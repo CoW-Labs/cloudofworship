@@ -402,6 +402,8 @@ const quickSearchSuggestionsByAction = {
   ],
   liveControl: [
     "Go Live",
+    "Open Stage Display",
+    "confidence monitor",
     "Close Live Window",
     "Promote Slide to Live",
     "Select Slides",
