@@ -62,6 +62,25 @@ const clampPanelSize = (panel: PanelSizeKey, size: number) => {
   return Math.min(limits.max, Math.max(limits.min, safeSize))
 }
 
+/**
+ * Every write to `currentState.settings` replaces the object, which costs a
+ * full state serialization to localStorage (persist) plus a shared-state
+ * rebroadcast to the live/stage windows. Several callers write settings on a
+ * hot path with values that have not actually changed — `useSong` re-asserts
+ * `linesPerSlide` on every verse advance, `useScriptureChapter` re-asserts the
+ * Bible version on every chapter load — so setters compare before writing.
+ *
+ * Nested values are compared by reference: a caller that hands over a fresh
+ * inner object is treated as a change, which is the safe direction to err in.
+ */
+const shallowEqual = (a: Record<string, any>, b: Record<string, any>) => {
+  if (a === b) return true
+  if (!a || !b) return false
+  const aKeys = Object.keys(a)
+  if (aKeys.length !== Object.keys(b).length) return false
+  return aKeys.every((key) => Object.is(a[key], b[key]))
+}
+
 function ensureUniqueIds(arr: Slide[]): Slide[] {
   const seenIds = new Set()
   return arr.filter((obj) => {
@@ -183,6 +202,8 @@ export const useAppStore = defineStore("app", {
         activeSocket: null,
         mainDisplayLabel: "",
         mainDisplayScreen: null,
+        stageDisplayLabel: "",
+        stageDisplayScreen: null,
         defaultMicrophoneId: "",
         defaultCameraId: "",
         onlineUsers: [] as OnlineUser[],
@@ -376,6 +397,9 @@ export const useAppStore = defineStore("app", {
       }
     },
     setSlideStyles(styles: SlideStyle) {
+      if (shallowEqual(this.currentState.settings.slideStyles || {}, styles || {})) {
+        return
+      }
       this.currentState.settings = {
         ...this.currentState.settings,
         slideStyles: styles,
@@ -396,6 +420,7 @@ export const useAppStore = defineStore("app", {
       }
     },
     setDefaultBibleVersion(version: string) {
+      if (this.currentState.settings.defaultBibleVersion === version) return
       this.currentState.settings = {
         ...this.currentState.settings,
         defaultBibleVersion: version,
@@ -497,6 +522,12 @@ export const useAppStore = defineStore("app", {
     },
     setMainDisplayScreen(screen: Screen | null) {
       this.currentState.mainDisplayScreen = screen
+    },
+    setStageDisplayLabel(label: string) {
+      this.currentState.stageDisplayLabel = label
+    },
+    setStageDisplayScreen(screen: Screen | null) {
+      this.currentState.stageDisplayScreen = screen
     },
     setDefaultMicrophone(deviceId: string) {
       this.currentState.defaultMicrophoneId = deviceId
@@ -716,6 +747,8 @@ export const useAppStore = defineStore("app", {
       this.setLastSynced(new Date().toISOString())
       this.setMainDisplayLabel("")
       this.setMainDisplayScreen(null)
+      this.setStageDisplayLabel("")
+      this.setStageDisplayScreen(null)
       this.currentState.onlineUsers = []
       this.currentState.slidesBeingEdited = {}
       this.refreshAppActionsStack()
