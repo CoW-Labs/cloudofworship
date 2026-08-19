@@ -1,48 +1,60 @@
 <template>
   <div class="flex">
-    <UModal v-model="visible">
-      <UCard
-        :ui="{
-          ring: '',
-          divide: 'divide-y divide-gray-100 dark:divide-gray-800',
-        }"
+    <UModal
+      v-model="visible"
+      :ui="{
+        rounded: 'rounded-2xl',
+        background: 'bg-transparent dark:bg-transparent',
+        ring: '',
+        shadow: 'shadow-none',
+        width: 'w-[94vw] sm:max-w-[600px]',
+        overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
+      }"
+    >
+      <div
+        class="shortcuts-card rounded-2xl bg-white dark:bg-[#171d2b] border border-white/80 dark:border-[#202838] overflow-hidden"
       >
-        <template #header>
-          <div class="flex justify-between items-center">
-            <div class="text-and-link">
-              <h2 class="font-semibold text-md">Shortcuts & Hotkeys</h2>
-              <p class="text-sm text-gray-800 dark:text-gray-200">
-                Speed up your workflow, get full Ctrl.
-              </p>
-            </div>
-            <UButton
-              icon="i-mdi-close"
-              variant="ghost"
-              @click="visible = false"
-            ></UButton>
+        <!-- HEADER -->
+        <div class="flex items-center justify-between gap-3 px-5 py-4">
+          <div class="text-and-link">
+            <h2 class="font-semibold text-base text-gray-900 dark:text-white">
+              Shortcuts & Hotkeys
+            </h2>
+            <p class="text-sm text-gray-400 dark:text-[#9aa3b2] mt-0.5">
+              Speed up your workflow, get full Ctrl.
+            </p>
           </div>
-        </template>
-        <div class="changelog-content">
-          <ul class="px-4 leading-7">
+          <button
+            class="grid h-8 w-8 place-items-center rounded-lg leading-none transition-colors hover:bg-gray-100 dark:hover:bg-[#222938] shrink-0"
+            aria-label="Close shortcuts modal"
+            @click="visible = false"
+          >
+            <CloseIcon class="block h-4 w-4 text-gray-600 dark:text-[#a7afbd]" />
+          </button>
+        </div>
+
+        <!-- BODY -->
+        <div class="shortcuts-content px-5 pb-5">
+          <ul class="flex flex-col gap-2">
             <li
-              class="stuff py-3 border-b border-gray-100 dark:border-gray-800 flex"
+              class="stuff flex items-center gap-4 rounded-2xl px-4 py-3 bg-white dark:bg-[#131a27] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.07)] dark:shadow-[inset_0_0_0_1px_rgba(148,163,184,0.07)]"
               v-for="shortcut in shortcuts"
               :key="shortcut?.cmd"
             >
               <div class="col min-w-[110px] whitespace-nowrap">
                 <span
-                  class="text-sm mono font-bold bg-gray-200 text-gray-500 inline-grid place-items-center p-1 px-2 min-w-[30px] rounded-md"
+                  class="text-sm mono font-bold bg-gray-100 dark:bg-[#222938] text-gray-500 dark:text-[#9aa3b2] inline-grid place-items-center p-1 px-2 min-w-[30px] rounded-md"
                 >
                   {{ shortcut?.cmd }}
                 </span>
               </div>
-              <div class="col text-sm">
+              <div class="col text-sm text-gray-700 dark:text-[#c5cbd6]">
                 {{ shortcut?.name }}
               </div>
             </li>
           </ul>
         </div>
-      </UCard>
+      </div>
     </UModal>
   </div>
 </template>

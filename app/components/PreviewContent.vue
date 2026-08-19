@@ -41,6 +41,7 @@
     >
       <div
         ref="slidesScroll"
+        data-tour="preview-slides"
         class="slides-ctn relative overflow-y-scroll rounded-lg transition flex-1 min-h-0 bg-gray-100 dark:bg-[#222938] touch-pan-y"
         :class="[slides?.length === 0 ? '' : 'p-2']"
         @scroll.passive="onSlidesGridScroll"

@@ -36,7 +36,7 @@
         >
           <!-- LEFT — Plan chooser -->
           <div class="flex flex-col">
-            <!-- Billing toggle + currency -->
+            <!-- Billing toggle -->
             <div class="flex items-center gap-3 mb-6">
               <UTabs
                 v-model="billingTabIndex"
@@ -69,44 +69,6 @@
                   </span>
                 </template>
               </UTabs>
-
-              <UPopover
-                mode="click"
-                :popper="{ placement: 'bottom-end' }"
-                :ui="{ ring: 'ring-1 ring-gray-200 dark:ring-white/10' }"
-              >
-                <button
-                  class="flex items-center gap-2 h-12 text-sm font-medium px-4 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
-                >
-                  {{ selectedCurrency }} ({{ currencySymbol }})
-                  <IconWrapper
-                    name="i-heroicons-chevron-down-20-solid"
-                    class="w-4 h-4 text-gray-400"
-                  />
-                </button>
-                <template #panel="{ close }">
-                  <div class="p-1 min-w-[120px]">
-                    <button
-                      v-for="code in currencyCodes"
-                      :key="code"
-                      class="w-full flex items-center justify-between gap-3 text-sm py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-                      :class="
-                        selectedCurrency === code
-                          ? 'text-primary-600 dark:text-primary-400 font-semibold'
-                          : 'text-gray-700 dark:text-gray-200'
-                      "
-                      @click="selectCurrency(code), close()"
-                    >
-                      {{ code }} ({{ getCurrencySymbol(code) }})
-                      <IconWrapper
-                        v-if="selectedCurrency === code"
-                        name="i-heroicons-check-20-solid"
-                        class="w-4 h-4"
-                      />
-                    </button>
-                  </div>
-                </template>
-              </UPopover>
             </div>
 
             <!-- Starter (Free) -->
@@ -347,15 +309,7 @@ const {
   fetchPlans,
   getPlanByIntervalAndCurrency,
   getCurrencySymbol,
-  setTestCurrency,
 } = useSubscriptionPlans()
-
-const currencyCodes = ["NGN", "USD"] as const
-
-const selectCurrency = (code: "NGN" | "USD") => {
-  setTestCurrency(code)
-  selectedCurrency.value = code
-}
 
 // Pricing from API
 const yearlyPrice = computed(() => {
