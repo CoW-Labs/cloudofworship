@@ -33,6 +33,7 @@
         :active-advert="currentState.activeAdvert"
       />
       <UpgradePlanModal />
+      <OnboardingTour />
     </ClientOnly>
   </div>
   <Transition name="fade-sm">

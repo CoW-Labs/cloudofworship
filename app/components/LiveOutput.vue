@@ -3,6 +3,7 @@
     <!-- LIVE PREVIEW (headerless, video panel) -->
     <div
       :style="{ height: livePreviewHeight + 'px', flexShrink: 0 }"
+      data-tour="live-preview"
       class="min-h-0 overflow-hidden rounded-2xl bg-black shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
     >
       <div class="relative w-full h-full flex items-center justify-center">
@@ -84,6 +85,7 @@
           v-show="!(liveOutputSlides?.length === 0 || !liveOutputSlides)"
           v-model="liveOutputSlides"
           group="slides"
+          data-tour="schedule-slides"
           class="slides-ctn overflow-auto overflow-x-hidden flex-1 min-h-0 rounded-lg bg-gray-100 dark:bg-[#222938]"
           item-key="id"
           :animation="200"

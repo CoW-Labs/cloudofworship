@@ -30,7 +30,15 @@
         </span>
       </h2>
       <div class="actions flex flex-row-reverse items-center gap-1.5 shrink-0">
-        <div class="action-inner" v-for="secondaryButton in secondaryButtons">
+        <div
+          class="action-inner"
+          v-for="secondaryButton in secondaryButtons"
+          :data-tour="
+            secondaryButton.action === appWideActions.goLive
+              ? 'go-live'
+              : undefined
+          "
+        >
           <ConfirmDialog
             v-if="secondaryButton.visible && secondaryButton.confirmAction"
             :button-label="secondaryButton.label"
