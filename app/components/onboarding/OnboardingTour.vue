@@ -76,8 +76,8 @@ const {
 const colorMode = useColorMode()
 const tourVideoSrc = computed(() =>
   colorMode.value === "dark"
-    ? "/large_assets/new-demo-video-dark.mp4"
-    : "/large_assets/new-demo-video.mp4"
+    ? "https://d37gopmfkl2m2z.cloudfront.net/open/onboarding/new-demo-video-dark.mp4"
+    : "https://d37gopmfkl2m2z.cloudfront.net/open/onboarding/new-demo-video.mp4"
 )
 </script>
 
