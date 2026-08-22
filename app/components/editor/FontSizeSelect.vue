@@ -2,7 +2,10 @@
   <div
     class="button-group flex items-center gap-1 rounded-full bg-gray-100 p-1 dark:bg-[#222938]"
   >
-    <UTooltip text="Decrease font size">
+    <CowTooltip
+      text="Decrease font size"
+      :shortcut="shortcutIds.fontSizeDecrease"
+    >
       <UButton
         :disabled="fontSize <= MIN_FONT_SIZE"
         @click="decrease"
@@ -12,7 +15,7 @@
       >
         <MinusIcon class="h-4 w-4" />
       </UButton>
-    </UTooltip>
+    </CowTooltip>
     <div class="w-px h-4 bg-gray-200 dark:bg-white/10"></div>
     <UInput
       v-model="fontSize"
@@ -23,7 +26,10 @@
       inputClass="bg-transparent border-0 shadow-none outline-none px-0 text-center text-gray-800 dark:text-white font-medium tabular-nums"
     />
     <div class="w-px h-4 bg-gray-200 dark:bg-white/10"></div>
-    <UTooltip text="Increase font size">
+    <CowTooltip
+      text="Increase font size"
+      :shortcut="shortcutIds.fontSizeIncrease"
+    >
       <UButton
         :disabled="fontSize >= MAX_FONT_SIZE"
         @click="increase"
@@ -33,7 +39,7 @@
       >
         <PlusIcon class="h-4 w-4" />
       </UButton>
-    </UTooltip>
+    </CowTooltip>
   </div>
 </template>
 
@@ -86,4 +92,30 @@ const increase = () => {
     fontSizePercent: fontSize.value,
   })
 }
+
+// Cmd/Ctrl+Shift+> and +< are what Word and Google Docs train people on. This
+// control is only mounted for slide types that support text sizing, so the
+// binding is already scoped; the handlers just refuse at the clamp.
+const shortcutCleanups: Array<() => void> = []
+
+onMounted(() => {
+  shortcutCleanups.push(
+    useRegisteredShortcut(shortcutIds.fontSizeIncrease, () => {
+      if (fontSize.value >= MAX_FONT_SIZE) return false
+      increase()
+      return true
+    })
+  )
+  shortcutCleanups.push(
+    useRegisteredShortcut(shortcutIds.fontSizeDecrease, () => {
+      if (fontSize.value <= MIN_FONT_SIZE) return false
+      decrease()
+      return true
+    })
+  )
+})
+
+onBeforeUnmount(() => {
+  shortcutCleanups.splice(0).forEach((cleanup) => cleanup())
+})
 </script>
