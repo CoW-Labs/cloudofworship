@@ -102,6 +102,7 @@
                 "
                 v-model="verse"
                 :slide="slide"
+                data-tour="verse-switch"
                 @previous-verse="handlePreviousVerse"
                 @next-verse="handleNextVerse"
                 @goto-verse="$emit('goto-verse', verse, selectedBibleVersion)"
@@ -178,6 +179,7 @@
               <BibleVersionSelect
                 v-if="slide?.type === slideTypes?.bible"
                 class="h-[34px] shrink-0"
+                data-tour="bible-version"
                 :bibleVersionInherited="selectedBibleVersion"
                 @open="containerOverflow = ''"
                 @close="containerOverflow = 'overflow-x-auto'"
@@ -269,6 +271,7 @@
               <UButton
                 variant="ghost"
                 color="gray"
+                data-tour="editor-go-live"
                 class="go-live shrink-0 rounded-full px-4 h-[34px] gap-1.5 font-medium bg-gray-200/80 dark:bg-[#2b3242] text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-[#333c4e]"
                 :disabled="
                   currentLocalTransfer?.status === 'pending' ||

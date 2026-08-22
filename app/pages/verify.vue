@@ -168,7 +168,7 @@ const emitter = useNuxtApp().$emitter as any
 const handleUpgradeModalClosed = () => {
   if (!awaitingUpgradeChoice.value) return
   awaitingUpgradeChoice.value = false
-  router.push("/")
+  router.push("/?newUser=1")
 }
 
 const beginEmailEdit = () => {
@@ -371,7 +371,7 @@ const verifyEmail = async () => {
         planId ? { planId } : undefined
       )
     } else {
-      router.push("/")
+      router.push(isNewUserOnboarding ? "/?newUser=1" : "/")
     }
   }
 }

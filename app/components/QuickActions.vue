@@ -18,6 +18,7 @@
           <div
             class="quick-actions-search-wrap relative flex-1 min-w-0 mb-2"
             :class="{ 'quick-actions-search-wrap--focused': isSearchFocused }"
+            data-tour="quick-actions-search"
           >
             <UInput
               placeholder=" "
@@ -101,6 +102,7 @@
         v-if="searchInput.length < 2"
         class="actions-ctn -mx-1.5 mt-0 overflow-y-auto flex-1 min-h-0 bg-[#f1f3f6] dark:bg-[#222938]"
         ref="actionsContainer"
+        data-tour="quick-actions-list"
       >
         <!-- Skeleton loader while IndexedDB is hydrating -->
         <template v-if="loading">
@@ -128,6 +130,7 @@
         v-else
         class="actions-ctn -mx-1.5 mt-0 overflow-y-auto flex-1 min-h-0 bg-[#f1f3f6] dark:bg-[#222938]"
         ref="actionsContainer"
+        data-tour="quick-actions-list"
       >
         <div
           v-if="isSearchingRemote"
@@ -428,6 +431,9 @@ const quickSearchSuggestionsByAction = {
     "Slide Background Settings",
     "Microphone Settings",
     "Subscription Settings",
+    "Overlay Settings",
+    "Intermission Settings",
+    "Other Settings",
   ],
   account: [
     "Invite to Workspace",

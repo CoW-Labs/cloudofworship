@@ -193,6 +193,7 @@
           )
         "
         :slide="slide"
+        data-tour="format-font-size"
         @update-style="$emit('update-style', $event)"
       />
 
