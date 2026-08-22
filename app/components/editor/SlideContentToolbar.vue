@@ -7,10 +7,9 @@
     <div
       class="content-toolbar-pill mx-auto shrink-0 flex items-center gap-1 bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
     >
-      <UTooltip
+      <CowTooltip
         v-if="isMediaFileButNotExternalMedia"
         text="Background fill type"
-        :popper="toolbarTooltipPopper"
       >
         <CowSelectMenu
           v-model="backgroundFillType"
@@ -44,7 +43,7 @@
             <span v-else>Select fill type</span>
           </template>
         </CowSelectMenu>
-      </UTooltip>
+      </CowTooltip>
 
       <!-- VIDEO MEDIA SLIDE OPTIONS -->
       <template
@@ -56,7 +55,7 @@
           (slide?.data as any)?.type === 'vimeo')
       "
       >
-        <UTooltip text="Mute/Unmute media" :popper="toolbarTooltipPopper">
+        <CowTooltip text="Mute / unmute media" :shortcut="shortcutIds.muteMedia">
           <UButton
             @click="
               $emit('update-style', {
@@ -76,8 +75,8 @@
             color="gray"
             >{{ slide.slideStyle?.isMediaMuted ? "Unmute" : "Mute" }}</UButton
           >
-        </UTooltip>
-        <UTooltip text="Repeat media" :popper="toolbarTooltipPopper">
+        </CowTooltip>
+        <CowTooltip text="Repeat media">
           <UButton
             @click="
               $emit('update-style', {
@@ -97,8 +96,11 @@
             color="gray"
             >Loop</UButton
           >
-        </UTooltip>
-        <UTooltip text="Play/pause media" :popper="toolbarTooltipPopper">
+        </CowTooltip>
+        <CowTooltip
+          text="Play / pause media"
+          :shortcut="shortcutIds.playPauseMedia"
+        >
           <UButton
             @click="
               $emit('update-style', {
@@ -121,8 +123,8 @@
             </template>
             {{ slide.slideStyle?.isMediaPlaying ? "Pause" : "Play" }}</UButton
           >
-        </UTooltip>
-        <UTooltip text="Restart media" :popper="toolbarTooltipPopper">
+        </CowTooltip>
+        <CowTooltip text="Restart media">
           <UButton
             @click="
               () => {
@@ -139,11 +141,11 @@
             color="gray"
             >Restart</UButton
           >
-        </UTooltip>
+        </CowTooltip>
         <div
           class="flex items-center gap-1 bg-gray-100 dark:bg-[#171d2b] rounded-md px-2"
         >
-          <UTooltip text="Seek to specific time" :popper="toolbarTooltipPopper">
+          <CowTooltip text="Seek to specific time">
             <UInput
               v-model="seekTime"
               type="number"
@@ -158,8 +160,8 @@
               min="0"
               @keyup.enter="handleSeek"
             />
-          </UTooltip>
-          <UTooltip text="Go to time" :popper="toolbarTooltipPopper">
+          </CowTooltip>
+          <CowTooltip text="Go to time">
             <UButton
               @click="handleSeek"
               class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
@@ -168,7 +170,7 @@
               color="gray"
               size="xs"
             />
-          </UTooltip>
+          </CowTooltip>
         </div>
       </template>
       <FontSelect
@@ -212,7 +214,7 @@
       />
 
       <!-- SLIDE CONTENT LINE HEIGHT CONTROLS -->
-      <UTooltip
+      <CowTooltip
         v-if="
           !(
             slide?.type === slideTypes.text ||
@@ -221,7 +223,6 @@
           )
         "
         text="Set line spacing"
-        :popper="toolbarTooltipPopper"
       >
         <CowSelectMenu
           v-model="lineSpacing"
@@ -260,12 +261,12 @@
             }}</span>
           </template>
         </CowSelectMenu>
-      </UTooltip>
+      </CowTooltip>
 
       <!-- SLIDE CONTENT CASE CONTROLS -->
-      <UTooltip
+      <CowTooltip
         text="Uppercase"
-        :popper="toolbarTooltipPopper"
+        :shortcut="shortcutIds.slideUppercase"
         v-if="
           !(
             slide?.type === slideTypes.text ||
@@ -295,12 +296,12 @@
         >
           <LetterCaseIcon class="w-[18px] h-[18px]" />
         </UButton>
-      </UTooltip>
+      </CowTooltip>
 
       <!-- SLIDE CONTENT BOLD CONTROLS -->
-      <UTooltip
+      <CowTooltip
         text="Bold text"
-        :popper="toolbarTooltipPopper"
+        :shortcut="shortcutIds.slideBold"
         v-if="
           !(
             slide?.type === slideTypes.text ||
@@ -326,12 +327,12 @@
         >
           <BoldIcon class="w-[18px] h-[18px]" />
         </UButton>
-      </UTooltip>
+      </CowTooltip>
 
       <!-- SLIDE CONTENT LINE BACKGROUND CONTROLS -->
-      <UTooltip
+      <CowTooltip
         text="Line background"
-        :popper="toolbarTooltipPopper"
+        :shortcut="shortcutIds.slideLineBackground"
         v-if="
           !(
             slide?.type === slideTypes.media ||
@@ -356,16 +357,15 @@
         >
           <HighlightIcon class="w-5 h-5" />
         </UButton>
-      </UTooltip>
+      </CowTooltip>
 
       <!-- COUNTDOWN SLIDE CONTROLS -->
       <div
         v-if="slide?.type === slideTypes.countdown"
         class="button-group bg-gray-100 dark:bg-[#171d2b] rounded-md mx-1 p-1 h-[36px] mt-[2px] flex items-center gap-1"
       >
-        <UTooltip
+        <CowTooltip
           :text="countdownIsPlaying ? 'Pause countdown' : 'Start countdown'"
-          :popper="toolbarTooltipPopper"
         >
           <UButton
             @click="useGlobalEmit(appWideActions.startCountdown, slide)"
@@ -381,8 +381,8 @@
             <PauseIcon v-if="countdownIsPlaying" class="w-5 h-5" />
             <PlayIcon v-else class="w-5 h-5" />
           </UButton>
-        </UTooltip>
-        <UTooltip text="Restart countdown" :popper="toolbarTooltipPopper">
+        </CowTooltip>
+        <CowTooltip text="Restart countdown">
           <UButton
             @click="useGlobalEmit(appWideActions.restartCountdown, slide)"
             class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
@@ -390,7 +390,7 @@
             variant="ghost"
             color="gray"
           />
-        </UTooltip>
+        </CowTooltip>
       </div>
 
       <!-- SLIDE CONTENT ALIGNMENT -->
@@ -403,7 +403,7 @@
         "
         class="button-group rounded-md p-1 flex items-center gap-1"
       >
-        <UTooltip text="Align left" :popper="toolbarTooltipPopper">
+        <CowTooltip text="Align left" :shortcut="shortcutIds.slideAlignLeft">
           <UButton
             @click="
               $emit('update-style', { ...slide.slideStyle, alignment: 'left' })
@@ -418,8 +418,11 @@
           >
             <AlignLeftIcon class="w-5 h-5" />
           </UButton>
-        </UTooltip>
-        <UTooltip text="Align center" :popper="toolbarTooltipPopper">
+        </CowTooltip>
+        <CowTooltip
+          text="Align centre"
+          :shortcut="shortcutIds.slideAlignCenter"
+        >
           <UButton
             @click="
               $emit('update-style', {
@@ -438,8 +441,11 @@
           >
             <AlignCenterIcon class="w-5 h-5" />
           </UButton>
-        </UTooltip>
-        <UTooltip text="Align right" :popper="toolbarTooltipPopper">
+        </CowTooltip>
+        <CowTooltip
+          text="Align right"
+          :shortcut="shortcutIds.slideAlignRight"
+        >
           <UButton
             @click="
               $emit('update-style', { ...slide.slideStyle, alignment: 'right' })
@@ -454,7 +460,7 @@
           >
             <AlignRightIcon class="w-5 h-5" />
           </UButton>
-        </UTooltip>
+        </CowTooltip>
       </div>
 
       <!-- SONG CONTROLS -->
@@ -462,7 +468,7 @@
         v-if="slide?.type === slideTypes.song"
         class="button-group song-controls bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 px-0 h-[36px] mt-[2px] flex items-center gap-1"
       >
-        <UTooltip text="Refresh song lyrics" :popper="toolbarTooltipPopper">
+        <CowTooltip text="Refresh song lyrics">
           <UButton
             @click="refreshSongLyrics(slide?.songId || '')"
             :class="[
@@ -478,7 +484,7 @@
             />
             Song</UButton
           >
-        </UTooltip>
+        </CowTooltip>
       </div>
     </div>
   </div>
@@ -499,10 +505,6 @@ const lineSpacing = ref<string>(props.slide.slideStyle?.lineSpacing || "")
 const isLoading = ref<boolean>(false)
 const containerOverflow = ref<string>("overflow-x-auto")
 const seekTime = ref<number>(0)
-const toolbarTooltipPopper = {
-  placement: "top" as const,
-  strategy: "fixed" as const,
-}
 
 const countdownIsPlaying = computed(
   () =>
@@ -569,6 +571,139 @@ const handleSeek = () => {
     emit("update-media-seek", seekTime.value)
   }
 }
+
+// ─── SHORTCUTS ───────────────────────────────────────────────────────────────
+// This toolbar is only ever mounted for the slide open in the preview pane
+// (EditLiveContent renders it or TipTapToolbar, never both), so a shortcut
+// registered here is already scoped to the right slide. Each handler still
+// returns false when its control isn't on screen, which leaves the keypress
+// untouched for the browser.
+
+const hasPlayableMedia = computed(() => {
+  const data = props.slide?.data as any
+  return (
+    props.slide?.type === slideTypes.media &&
+    (data?.type?.includes("video") ||
+      data?.type?.includes("audio") ||
+      data?.type === "youtube" ||
+      data?.type === "vimeo")
+  )
+})
+
+const supportsTextStyling = computed(
+  () =>
+    !(
+      props.slide?.type === slideTypes.text ||
+      props.slide?.type === slideTypes.media ||
+      props.slide?.type === slideTypes.presentation
+    )
+)
+
+const supportsLineBackground = computed(
+  () =>
+    !(
+      props.slide?.type === slideTypes.media ||
+      props.slide?.type === slideTypes.presentation
+    )
+)
+
+const supportsAlignment = computed(
+  () =>
+    !(
+      props.slide?.type === slideTypes?.media ||
+      props.slide?.type === slideTypes?.presentation
+    )
+)
+
+// Space activates whatever button or link currently has focus. Yield to that
+// rather than hijacking the key, or the toolbar's own buttons stop working.
+const isFocusOnActivatableControl = () => {
+  const active = document.activeElement
+  if (!active) return false
+  return Boolean(
+    active.closest('button, a, [role="button"], [role="checkbox"], summary')
+  )
+}
+
+const shortcutCleanups: Array<() => void> = []
+
+onMounted(() => {
+  shortcutCleanups.push(
+    useRegisteredShortcut(shortcutIds.slideBold, () => {
+      if (!supportsTextStyling.value) return false
+      emit("update-style", {
+        ...props.slide.slideStyle,
+        textBold: !props.slide?.slideStyle?.textBold,
+      })
+      return true
+    })
+  )
+
+  shortcutCleanups.push(
+    useRegisteredShortcut(shortcutIds.slideUppercase, () => {
+      if (!supportsTextStyling.value) return false
+      emit("update-style", {
+        ...props.slide.slideStyle,
+        lettercase:
+          props.slide?.slideStyle?.lettercase === "uppercase" ? "" : "uppercase",
+      })
+      return true
+    })
+  )
+
+  shortcutCleanups.push(
+    useRegisteredShortcut(shortcutIds.slideLineBackground, () => {
+      if (!supportsLineBackground.value) return false
+      emit("update-style", {
+        ...props.slide.slideStyle,
+        textLinesBackground: !props.slide?.slideStyle?.textLinesBackground,
+      })
+      return true
+    })
+  )
+
+  const alignments = [
+    [shortcutIds.slideAlignLeft, "left"],
+    [shortcutIds.slideAlignCenter, "center"],
+    [shortcutIds.slideAlignRight, "right"],
+  ] as const
+  alignments.forEach(([id, alignment]) => {
+    shortcutCleanups.push(
+      useRegisteredShortcut(id, () => {
+        if (!supportsAlignment.value) return false
+        emit("update-style", { ...props.slide.slideStyle, alignment })
+        return true
+      })
+    )
+  })
+
+  shortcutCleanups.push(
+    useRegisteredShortcut(shortcutIds.muteMedia, () => {
+      if (!hasPlayableMedia.value) return false
+      emit("update-style", {
+        ...props.slide.slideStyle,
+        isMediaMuted: !props.slide.slideStyle?.isMediaMuted,
+      })
+      return true
+    })
+  )
+
+  shortcutCleanups.push(
+    useRegisteredShortcut(shortcutIds.playPauseMedia, () => {
+      if (!hasPlayableMedia.value) return false
+      if (isFocusOnActivatableControl()) return false
+      emit("update-style", {
+        ...props.slide.slideStyle,
+        isMediaPlaying: !props.slide.slideStyle?.isMediaPlaying,
+      })
+      return true
+    })
+  )
+})
+
+onBeforeUnmount(() => {
+  shortcutCleanups.splice(0).forEach((cleanup) => cleanup())
+})
 </script>
 
 <style scoped>

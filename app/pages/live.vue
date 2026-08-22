@@ -198,7 +198,7 @@ onMounted(() => {
   })
 
   // Shortcut to go full screen
-  useCreateShortcut("f", () => {
+  useRegisteredShortcut(shortcutIds.fullscreen, () => {
     if (document.fullscreenElement) {
       exitFullscreenSafely()
     } else {

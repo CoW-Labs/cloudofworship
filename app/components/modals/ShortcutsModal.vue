@@ -34,25 +34,38 @@
         </div>
 
         <!-- BODY -->
-        <div class="shortcuts-content px-5 pb-5">
-          <ul class="flex flex-col gap-2">
-            <li
-              class="stuff flex items-center gap-4 rounded-2xl px-4 py-3 bg-white dark:bg-[#131a27] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.07)] dark:shadow-[inset_0_0_0_1px_rgba(148,163,184,0.07)]"
-              v-for="shortcut in shortcuts"
-              :key="shortcut?.cmd"
+        <div class="shortcuts-content px-5 pb-5 max-h-[70vh] overflow-y-auto">
+          <div
+            v-for="group in groupedShortcuts"
+            :key="group.scope"
+            class="mb-4 last:mb-0"
+          >
+            <h3
+              class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-[#6b7386] px-1 pb-2"
             >
-              <div class="col min-w-[110px] whitespace-nowrap">
-                <span
-                  class="text-sm mono font-bold bg-gray-100 dark:bg-[#222938] text-gray-500 dark:text-[#9aa3b2] inline-grid place-items-center p-1 px-2 min-w-[30px] rounded-md"
-                >
-                  {{ shortcut?.cmd }}
-                </span>
-              </div>
-              <div class="col text-sm text-gray-700 dark:text-[#c5cbd6]">
-                {{ shortcut?.name }}
-              </div>
-            </li>
-          </ul>
+              {{ group.heading }}
+            </h3>
+            <ul class="flex flex-col gap-2">
+              <li
+                class="stuff flex items-center gap-4 rounded-2xl px-4 py-3 bg-white dark:bg-[#131a27] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.07)] dark:shadow-[inset_0_0_0_1px_rgba(148,163,184,0.07)]"
+                v-for="shortcut in group.items"
+                :key="shortcut.id"
+              >
+                <div class="col min-w-[110px] whitespace-nowrap flex gap-1">
+                  <span
+                    v-for="(key, index) in shortcut.keys"
+                    :key="`${shortcut.id}-${index}`"
+                    class="text-sm mono font-bold bg-gray-100 dark:bg-[#222938] text-gray-500 dark:text-[#9aa3b2] inline-grid place-items-center p-1 px-2 min-w-[30px] rounded-md"
+                  >
+                    {{ key }}
+                  </span>
+                </div>
+                <div class="col text-sm text-gray-700 dark:text-[#c5cbd6]">
+                  {{ shortcut.label }}
+                </div>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </UModal>
@@ -61,9 +74,12 @@
 
 <script setup lang="ts">
 import type { Emitter } from "mitt"
-import { useAppStore } from "~/store/app"
-import type { Church, User } from "~/store/auth"
-import { useAuthStore } from "~/store/auth"
+import {
+  scopeHeadings,
+  shortcuts as shortcutRegistry,
+  type ShortcutScope,
+} from "~/utils/shortcuts"
+
 const visible = ref<boolean>(false)
 
 defineProps<{
@@ -71,74 +87,32 @@ defineProps<{
 }>()
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
-const appStore = useAppStore()
 
-const shortcuts = ref([
-  {
-    cmd: `/`,
-    name: "Quick actions tab - Search actions or anything else",
-  },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + K`,
-    name: "Quick actions tab - Search actions or anything else",
-  },
-  {
-    cmd: `Cmd + H`,
-    name: "Open Shortcut & Hotkeys Modal",
-  },
-  {
-    cmd: "→",
-    name: "Go to next verse (scriptures, songs, hymns)",
-  },
-  {
-    cmd: "←",
-    name: "Go to previous verse (scriptures, songs, hymns)",
-  },
-  {
-    cmd: "↑",
-    name: "Promote slide before current slide in schedule to LIVE display",
-  },
-  {
-    cmd: "↓",
-    name: "Promote slide before current slide in schedule to LIVE display",
-  },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + 0`,
-    name: "Promote last slide to LIVE display",
-  },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Num`,
-    name: "Promote slide based on number to LIVE display",
-  },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + P`,
-    name: "Promote active slide (in preview and edit content) to LIVE display",
-  },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + F`,
-    name: "[Works only on live display] Use to take display fullscreen",
-  },
-  // {
-  //   cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Z`,
-  //   name: "Undo previous action",
-  // },
-  // {
-  //   cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + Y`,
-  //   name: "Redo previous action",
-  // },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + ,`,
-    name: "Open App Settings",
-  },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + +`,
-    name: "Zoom in / Increase display size",
-  },
-  {
-    cmd: `${useClientOS() === "macOS" ? "Cmd" : "Ctrl"} + -`,
-    name: "Zoom out / Decrease display size",
-  },
-])
+// Rendered straight off the registry in ~/utils/shortcuts, so this sheet can't
+// fall out of step with the keys that are actually bound.
+const scopeOrder: ShortcutScope[] = [
+  "global",
+  "schedule",
+  "slide",
+  "editor",
+  "live",
+]
+
+const groupedShortcuts = computed(() =>
+  scopeOrder
+    .map((scope) => ({
+      scope,
+      heading: scopeHeadings[scope],
+      items: shortcutRegistry
+        .filter((shortcut) => shortcut.scope === scope && !shortcut.hidden)
+        .map((shortcut) => ({
+          id: shortcut.id,
+          label: shortcut.label,
+          keys: useShortcutLabel(shortcut.combo),
+        })),
+    }))
+    .filter((group) => group.items.length > 0)
+)
 
 emitter.on("open-shortcuts", () => {
   visible.value = true

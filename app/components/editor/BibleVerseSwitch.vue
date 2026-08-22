@@ -2,7 +2,7 @@
   <div
     class="verse-switch button-group ml-2 bg-white dark:bg-[#171d2b] rounded-full flex items-center gap-1 h-[34px] px-1 relative text-gray-700 dark:text-[#d5dae3]"
   >
-    <UTooltip text="Previous verse" :popper="{ arrow: true }">
+    <CowTooltip text="Previous verse" :shortcut="shortcutIds.previousVerse">
       <UButton
         variant="ghost"
         color="gray"
@@ -10,7 +10,7 @@
         icon="i-bx-chevron-left"
         @click="$emit('previous-verse')"
       />
-    </UTooltip>
+    </CowTooltip>
     <div class="w-px h-4 bg-gray-200 dark:bg-white/10"></div>
     <UInput
       placeholder="Verse"
@@ -45,7 +45,7 @@
       "
     />
     <div class="w-px h-4 bg-gray-200 dark:bg-white/10"></div>
-    <UTooltip text="Next verse" :popper="{ arrow: true }">
+    <CowTooltip text="Next verse" :shortcut="shortcutIds.nextVerse">
       <UButton
         variant="ghost"
         color="gray"
@@ -53,7 +53,7 @@
         icon="i-bx-chevron-right"
         @click="$emit('next-verse')"
       />
-    </UTooltip>
+    </CowTooltip>
   </div>
 </template>
 

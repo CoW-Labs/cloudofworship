@@ -131,7 +131,7 @@ onUnmounted(() => {
   stopListeningForScroll()
 })
 
-defineExpose({ close })
+defineExpose({ close, open: openMenu })
 </script>
 
 <!-- Not scoped: the panel is teleported and its rows come from the parent's slot -->

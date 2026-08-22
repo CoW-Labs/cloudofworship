@@ -63,10 +63,10 @@
               dark-mode
             />
             <!-- Editing by indicator -->
-            <UTooltip
+            <CowTooltip
               v-if="editingBy"
               :text="`${editingBy.userName} is on this slide`"
-              :popper="{ placement: 'bottom' }"
+              placement="bottom"
             >
               <div
                 class="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow animate-pulse ml-1"
@@ -82,7 +82,7 @@
                   editingBy.userName?.charAt(0)?.toUpperCase() || "?"
                 }}</span>
               </div>
-            </UTooltip>
+            </CowTooltip>
           </div>
           <div
             class="right-group flex items-center gap-1 flex-1 justify-end min-w-0"
@@ -140,7 +140,7 @@
                 v-if="slide?.type === slideTypes.presentation"
                 class="page-switch button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
               >
-                <UTooltip text="Previous page" :popper="{ arrow: true }">
+                <CowTooltip text="Previous page" :shortcut="shortcutIds.previousVerse">
                   <UButton
                     variant="ghost"
                     color="gray"
@@ -149,14 +149,14 @@
                     :disabled="(slide.presentationPageIndex ?? 0) <= 0"
                     @click="handlePreviousPage"
                   />
-                </UTooltip>
+                </CowTooltip>
                 <span
                   class="text-xs font-medium px-1 text-gray-900 dark:text-[#d5dae3] min-w-[5ch] text-center"
                 >
                   {{ (slide.presentationPageIndex ?? 0) + 1 }} /
                   {{ slide.presentationObjects?.length ?? 1 }}
                 </span>
-                <UTooltip text="Next page" :popper="{ arrow: true }">
+                <CowTooltip text="Next page" :shortcut="shortcutIds.nextVerse">
                   <UButton
                     variant="ghost"
                     color="gray"
@@ -168,7 +168,7 @@
                     "
                     @click="handleNextPage"
                   />
-                </UTooltip>
+                </CowTooltip>
               </div>
               <PreviewPages
                 v-if="slide?.type === slideTypes.presentation"
@@ -213,17 +213,22 @@
                     panel-class="!rounded-[18px] !bg-[#f1f3f6] !shadow-none !ring-0 dark:!bg-[#131724]"
                     @update:open="onPanelOpenChange(tab.key, $event)"
                   >
-                    <button
-                      type="button"
-                      class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
-                      :class="
-                        activePanel === tab.key
-                          ? 'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white'
-                          : 'text-gray-500 dark:text-[#a7afbd] hover:text-gray-900 dark:hover:text-white'
-                      "
+                    <CowTooltip
+                      :text="tab.hint"
+                      :prevent="activePanel === tab.key"
                     >
-                      {{ tab.label }}
-                    </button>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
+                        :class="
+                          activePanel === tab.key
+                            ? 'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white'
+                            : 'text-gray-500 dark:text-[#a7afbd] hover:text-gray-900 dark:hover:text-white'
+                        "
+                      >
+                        {{ tab.label }}
+                      </button>
+                    </CowTooltip>
 
                     <template #panel>
                       <div class="h-full w-full bg-[#f1f3f6] dark:bg-[#131724]">
@@ -258,7 +263,7 @@
             </div>
 
             <!-- GO LIVE -->
-            <UTooltip
+            <CowTooltip
               :text="
                 slide.slideMode === 'overlay'
                   ? isActiveOverlay
@@ -266,7 +271,7 @@
                     : 'Show overlay'
                   : 'Take slide live'
               "
-              :popper="{ arrow: true }"
+              :shortcut="shortcutIds.promoteActiveSlide"
             >
               <UButton
                 variant="ghost"
@@ -296,7 +301,7 @@
                     : "Go Live"
                 }} -->
               </UButton>
-            </UTooltip>
+            </CowTooltip>
           </div>
         </template>
       </div>
@@ -653,10 +658,25 @@ const visibleTabs = computed(() => {
   const showBackground =
     props.slide?.type !== slideTypes.presentation &&
     (props.slide?.type !== slideTypes.media || isAudio)
-  const tabs: { key: PanelKey; label: string }[] = []
-  if (isBible) tabs.push({ key: "scripture", label: "Scripture" })
-  if (showBackground) tabs.push({ key: "background", label: "Background" })
-  if (isBible) tabs.push({ key: "layout", label: "Layout" })
+  const tabs: { key: PanelKey; label: string; hint: string }[] = []
+  if (isBible)
+    tabs.push({
+      key: "scripture",
+      label: "Scripture",
+      hint: "Browse and jump to any verse",
+    })
+  if (showBackground)
+    tabs.push({
+      key: "background",
+      label: "Background",
+      hint: "Set an image, video or colour behind this slide",
+    })
+  if (isBible)
+    tabs.push({
+      key: "layout",
+      label: "Layout",
+      hint: "Change how the verse and reference are arranged",
+    })
   return tabs
 })
 
@@ -955,7 +975,7 @@ const handleVoiceBibleVersionChange = (version: string) => {
 
 onMounted(() => {
   shortcutCleanups.push(
-    useCreateShortcut("ArrowRight", () => {
+    useRegisteredShortcut(shortcutIds.nextVerse, () => {
       if (props.slide?.type === slideTypes.presentation) {
         handleNextPage()
         return true
@@ -970,7 +990,7 @@ onMounted(() => {
     })
   )
   shortcutCleanups.push(
-    useCreateShortcut("ArrowLeft", () => {
+    useRegisteredShortcut(shortcutIds.previousVerse, () => {
       if (props.slide?.type === slideTypes.presentation) {
         handlePreviousPage()
         return true

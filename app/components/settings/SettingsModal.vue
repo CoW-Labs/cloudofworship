@@ -87,9 +87,9 @@
                 <BackgroundSettings
                   v-else-if="activeTab === 'Slide Background Settings'"
                 />
-                <!-- INTERMISSION SETTINGS -->
+                <!-- BLANK SETTINGS -->
                 <IntermissionSettings
-                  v-else-if="activeTab === 'Intermission Settings'"
+                  v-else-if="activeTab === 'Blank Settings'"
                 />
                 <!-- BIBLE SLIDE SETTINGS -->
                 <BibleVersionSettings
@@ -129,7 +129,7 @@ const tabs = [
   { name: "Slide Settings", active: false },
   { name: "Overlay Settings", active: false },
   { name: "Slide Background Settings", active: false },
-  { name: "Intermission Settings", active: false },
+  { name: "Blank Settings", active: false },
   { name: "Bible Slide Settings", active: false },
   { name: "Storage Settings", active: false },
   { name: "Other Settings", active: false },

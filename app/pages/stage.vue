@@ -284,7 +284,7 @@ onMounted(() => {
   window.addEventListener("MSFullscreenChange", checkFullScreen)
   checkFullScreen()
 
-  cleanupShortcut = useCreateShortcut("f", toggleFullScreen)
+  cleanupShortcut = useRegisteredShortcut(shortcutIds.fullscreen, toggleFullScreen)
 })
 
 onBeforeUnmount(() => {
