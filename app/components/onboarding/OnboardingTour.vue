@@ -41,7 +41,7 @@
         <div class="cow-tour-body">
           <video
             class="cow-tour-video"
-            src="/large_assets/new-demo-video.mp4"
+            :src="tourVideoSrc"
             autoplay
             loop
             muted
@@ -72,6 +72,13 @@ const {
   acceptWelcome,
   dismissWelcome,
 } = useOnboardingTour()
+
+const colorMode = useColorMode()
+const tourVideoSrc = computed(() =>
+  colorMode.value === "dark"
+    ? "/large_assets/new-demo-video-dark.mp4"
+    : "/large_assets/new-demo-video.mp4"
+)
 </script>
 
 <!--

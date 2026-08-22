@@ -68,7 +68,7 @@
           Intermission
         </CowButton>
       </template>
-      <div class="main flex flex-col flex-1 min-h-0">
+      <div class="main flex flex-col flex-1 min-h-0" data-tour="schedule-slides">
         <div
           v-if="liveOutputSlides?.length === 0 || !liveOutputSlides"
           class="ctn overflow-auto overflow-x-hidden flex-1 min-h-0"
@@ -85,7 +85,6 @@
           v-show="!(liveOutputSlides?.length === 0 || !liveOutputSlides)"
           v-model="liveOutputSlides"
           group="slides"
-          data-tour="schedule-slides"
           class="slides-ctn overflow-auto overflow-x-hidden flex-1 min-h-0 rounded-lg bg-gray-100 dark:bg-[#222938]"
           item-key="id"
           :animation="200"

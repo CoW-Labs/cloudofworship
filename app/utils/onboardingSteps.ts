@@ -38,11 +38,11 @@ export interface TourStep {
  */
 export const onboardingWelcome = {
   /** Small label in the card's header bar. */
-  eyebrow: "Check out what's new",
-  title: "Running your church media just got way smoother",
+  eyebrow: "Welcome to Cloud of Worship",
+  title: "Let's make you a pro in no time",
   description:
-    "Everything you need to prepare, manage, and run your service even more seamless",
-  cta: "Let's get started",
+    "A quick, 2-minute tour of everything you need to prepare, manage, and run your service: from lyrics and scripture to the live screen. Don't skip",
+  cta: "Show me around",
 }
 
 /** Anchor that only renders while a Bible slide is being edited. */

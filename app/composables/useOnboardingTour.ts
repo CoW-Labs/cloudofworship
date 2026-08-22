@@ -1,6 +1,8 @@
 import type { Config, Driver, DriveStep, Popover, PopoverDOM } from "driver.js"
+import type { PostHog } from "posthog-js"
 import { onboardingSteps, type TourStep } from "~/utils/onboardingSteps"
 import { useAuthStore } from "~/store/auth"
+import { useAppStore } from "~/store/app"
 
 /** driver.js doesn't export its hook-options type, so borrow it from the hook. */
 type PopoverHookOpts = Parameters<NonNullable<Popover["onPopoverRender"]>>[1]
@@ -10,6 +12,8 @@ const STORAGE_KEY = "cow_onboarding_tour"
 interface TourProgress {
   completedAt?: string
   lastStepId?: string
+  /** Set when a fresh signup is waiting on a schedule to show the tour against. */
+  pendingSince?: string
 }
 
 type StoredProgress = Record<string, TourProgress>
@@ -34,6 +38,19 @@ const writeProgress = (userId: string, patch: TourProgress) => {
 }
 
 /**
+ * Called from the signup flow once a new user reaches the workspace. The tour
+ * itself doesn't start yet — `useOnboardingTour` picks this flag up and opens
+ * the welcome card once the operator actually has an active schedule (created
+ * blank or from a template), rather than firing against an empty workspace.
+ */
+export const markOnboardingTourPending = () => {
+  const authStore = useAuthStore()
+  const userId = authStore.user?._id || "anonymous"
+  if (readProgress()[userId]?.completedAt) return
+  writeProgress(userId, { pendingSince: new Date().toISOString() })
+}
+
+/**
  * Drives the operator-window product tour.
  *
  * driver.js owns the overlay, spotlight and positioning; the popover's markup
@@ -46,6 +63,9 @@ const writeProgress = (userId: string, patch: TourProgress) => {
  */
 export const useOnboardingTour = () => {
   const authStore = useAuthStore()
+  const appStore = useAppStore()
+  const { $posthog } = useNuxtApp()
+  const posthog = $posthog as PostHog
 
   const isWelcomeOpen = ref(false)
   const isRunning = ref(false)
@@ -226,6 +246,7 @@ export const useOnboardingTour = () => {
     window.removeEventListener("keydown", onEscape, true)
     if (completed) {
       writeProgress(userKey(), { completedAt: new Date().toISOString() })
+      posthog?.capture("onboarding_tour_completed")
     }
   }
 
@@ -289,6 +310,7 @@ export const useOnboardingTour = () => {
 
     driverObj = driver(config)
     isRunning.value = true
+    posthog?.capture("onboarding_tour_started")
     mountRing()
     window.addEventListener("keydown", onEscape, true)
     driverObj.drive()
@@ -312,6 +334,23 @@ export const useOnboardingTour = () => {
   const dismissWelcome = () => {
     isWelcomeOpen.value = false
   }
+
+  /* ------------------------------------------------- pending-signup watch -- */
+
+  /** True once the operator has an active schedule — created blank or from a template. */
+  const hasActiveSchedule = computed(() => !!appStore.currentState.activeSchedule?._id)
+
+  watch(
+    hasActiveSchedule,
+    (ready) => {
+      if (!ready) return
+      const progress = readProgress()[userKey()]
+      if (!progress?.pendingSince || progress.completedAt) return
+      writeProgress(userKey(), { pendingSince: undefined })
+      openWelcome()
+    },
+    { immediate: true }
+  )
 
   const stopTour = () => {
     driverObj?.destroy()
