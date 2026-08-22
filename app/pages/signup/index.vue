@@ -802,7 +802,7 @@ const finishOnboarding = async () => {
 const handleUpgradeModalClosed = () => {
   if (!awaitingUpgradeChoice.value) return
   awaitingUpgradeChoice.value = false
-  navigateTo("/")
+  navigateTo("/?newUser=1")
 }
 
 const goToVerify = () => {

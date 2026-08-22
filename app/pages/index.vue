@@ -272,6 +272,14 @@ onMounted(async () => {
     }, 1000)
   }
 
+  // Fresh signups land here (directly, or via /verify) with `newUser=1` still
+  // on the URL. The welcome card doesn't open yet — useOnboardingTour holds it
+  // until the operator's active schedule actually has a slide on it, so the
+  // walkthrough isn't pointed at an empty/hidden workspace.
+  if (useRoute().query.newUser) {
+    markOnboardingTourPending()
+  }
+
   // Check for pending plan_id from signup flow
   try {
     const pendingPlanId = localStorage.getItem("pending_plan_id")

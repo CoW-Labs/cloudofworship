@@ -3,6 +3,7 @@
     <!-- LIVE PREVIEW (headerless, video panel) -->
     <div
       :style="{ height: livePreviewHeight + 'px', flexShrink: 0 }"
+      data-tour="live-preview"
       class="min-h-0 overflow-hidden rounded-2xl bg-black shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
     >
       <div class="relative w-full h-full flex items-center justify-center">
@@ -67,7 +68,7 @@
           Intermission
         </CowButton>
       </template>
-      <div class="main flex flex-col flex-1 min-h-0">
+      <div class="main flex flex-col flex-1 min-h-0" data-tour="schedule-slides">
         <div
           v-if="liveOutputSlides?.length === 0 || !liveOutputSlides"
           class="ctn overflow-auto overflow-x-hidden flex-1 min-h-0"
