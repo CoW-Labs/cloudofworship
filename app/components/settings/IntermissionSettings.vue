@@ -3,12 +3,12 @@
     class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] p-1 pb-[15%] flex flex-col gap-8"
   >
     <SettingsGroup
-      title="Intermission Screen"
-      note="Shown on the live output whenever no slide is live. Choose your church branding, or a custom video/image background."
+      title="Blank Screen"
+      note="Shown on the live output whenever no slide is live. Leave it completely blank, or project a custom video/image background."
     >
       <SettingsRow
         label="Use a video / image background"
-        description="Turn off to show the default church branding (logo and name). Turn on to project a custom video or image while idle."
+        description="Turn off to leave the screen completely blank. Turn on to project a custom video or image while idle."
       >
         <CowToggle
           bare

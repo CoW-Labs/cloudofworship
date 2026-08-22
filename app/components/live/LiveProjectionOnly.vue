@@ -266,41 +266,7 @@
             class="h-full w-full object-cover absolute inset-0"
             alt=""
           />
-          <!-- DEFAULT CHURCH BRANDING (also the fallback while media resolves) -->
-          <div
-            v-else
-            class="intermission-content flex flex-col items-center"
-            :class="fullScreen ? 'gap-8' : 'gap-3'"
-          >
-            <div class="intermission-logo-wrap">
-              <img
-                v-if="churchLogoUrl"
-                :src="churchLogoUrl"
-                :alt="churchName || 'Church logo'"
-                class="intermission-logo object-contain rounded-2xl"
-                :class="fullScreen ? 'w-64 h-64' : 'w-20 h-20'"
-              />
-              <Logo
-                v-else
-                class="intermission-logo"
-                :class="fullScreen ? 'w-56 h-56' : 'w-16 h-16'"
-              />
-            </div>
-            <h2
-              v-if="churchName"
-              class="intermission-text text-white font-semibold tracking-wide text-center px-6"
-              :class="fullScreen ? 'text-6xl' : 'text-lg'"
-            >
-              {{ churchName }}
-            </h2>
-            <p
-              v-if="churchBranch"
-              class="intermission-text intermission-text--delayed text-white/60 text-center px-6"
-              :class="fullScreen ? 'text-4xl' : 'text-base'"
-            >
-              {{ churchBranch }}
-            </p>
-          </div>
+          <!-- Otherwise the screen stays completely blank (black). -->
         </div>
       </Transition>
       <!-- End of SLIDE FACE -->
@@ -370,7 +336,6 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
-import { useAuthStore } from "~/store/auth"
 import type { ExtendedFileT, Slide, SlideStyle, ExternalVideo } from "~/types"
 import {
   exitFullscreenSafely,
@@ -387,10 +352,8 @@ const iframe = ref<HTMLIFrameElement | null>(null)
 const isLargePreviewOpen = ref<boolean>(false)
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
-const authStore = useAuthStore()
 const route = useRoute()
 const { currentState } = storeToRefs(appStore)
-const { church } = storeToRefs(authStore)
 const emit = defineEmits(["activate-fullscreen"])
 
 const props = defineProps<{
@@ -417,16 +380,9 @@ const transitionDuration = computed(() => {
   )
 })
 
-// Intermission state (shown when no slide is live) — church branding, with a
-// CoW logo fallback when the church hasn't uploaded one.
-const churchLogoUrl = computed(() => church.value?.logo || null)
-const churchName = computed(() => church.value?.name || "")
-const churchBranch = computed(
-  () => church.value?.type || church.value?.branch || ""
-)
-
-// Custom media intermission (operator-chosen video/image, shown with no
-// branding). Settings sync into the live window via pinia-shared-state.
+// Blank/idle state (shown when no slide is live). Defaults to a completely
+// blank screen; the operator can optionally set a video/image background.
+// Settings sync into the live window via pinia-shared-state.
 const { rehydrateSlideMedia } = useSlideMediaCache()
 const intermissionSettings = computed(
   () => currentState.value.settings.intermission
@@ -846,44 +802,3 @@ const activateFullScreen = () => {
   }
 }
 </script>
-
-<style>
-.intermission-logo-wrap {
-  animation: intermission-pulse 4s ease-in-out infinite;
-}
-
-.intermission-text {
-  animation: intermission-fade 4s ease-in-out infinite;
-}
-
-.intermission-text--delayed {
-  animation-delay: 0.4s;
-}
-
-@keyframes intermission-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.88;
-  }
-  50% {
-    transform: scale(1.06);
-    opacity: 1;
-  }
-}
-
-@keyframes intermission-fade {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.no-animations .intermission-logo-wrap,
-.no-animations .intermission-text {
-  animation: none;
-}
-</style>

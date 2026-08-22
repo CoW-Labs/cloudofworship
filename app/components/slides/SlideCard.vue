@@ -8,6 +8,7 @@
       selected ? 'border-black' : 'border-transparent',
       { selectable: selectable },
     ]"
+    @contextmenu.prevent="moreActionsMenuRef?.open()"
   >
     <button
       :class="['transition-all text-left', { 'opacity-70 ': selectable }]"
@@ -76,6 +77,7 @@
       :class="{ 'menu-open': actionsMenuOpen }"
     >
       <MoreActionsMenu
+        ref="moreActionsMenuRef"
         v-slot="{ close }"
         flush
         trigger-class="rounded-full hover:!bg-white/10"
@@ -293,6 +295,9 @@ const emit = defineEmits([
 ])
 
 const actionsMenuOpen = ref(false)
+const moreActionsMenuRef = ref<{ open: () => void; close: () => void } | null>(
+  null
+)
 
 const isActiveOverlay = computed(
   () => currentState.value.activeOverlaySlide?.id === props.slide.id

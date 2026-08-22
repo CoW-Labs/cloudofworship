@@ -140,6 +140,27 @@ const inheritsGlobalTextStyles = computed(
   () => props.slide.type !== slideTypes.text
 )
 
+// TipTap v3 moved strikethrough to Mod-Shift-S. Google Docs, Slack and TipTap
+// v2 all use Mod-Shift-X, which is what our toolbar advertises and what people
+// actually reach for — so bind it here.
+//
+// TipTap sorts extensions by priority descending and gives each its own keymap
+// plugin, so this one (1000) is consulted before StarterKit's Strike (100).
+// That also lets us hand Mod-Shift-S back to the app: returning true marks it
+// handled, which stops Strike from toggling, while the event still bubbles to
+// the window listener that opens the schedules list.
+const EditorKeymap = TiptapExtension.create({
+  name: "cowEditorKeymap",
+  priority: 1000,
+  addKeyboardShortcuts() {
+    return {
+      "Mod-Shift-x": () => this.editor.commands.toggleStrike(),
+      // Reserved app-wide for "open schedules" — see ~/utils/shortcuts.
+      "Mod-Shift-s": () => true,
+    }
+  },
+})
+
 // Common extensions configuration for better code reusability
 const getCommonExtensions = (placeholder: string, includeHeading = true) => {
   const extensions = [
@@ -166,6 +187,7 @@ const getCommonExtensions = (placeholder: string, includeHeading = true) => {
     Color.configure({
       types: ["textStyle"],
     }),
+    EditorKeymap,
   ]
   return extensions
 }
