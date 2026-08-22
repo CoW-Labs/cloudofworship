@@ -65,7 +65,7 @@
           <template #leading>
             <IconWrapper name="i-bx-coffee" size="3.5" />
           </template>
-          Intermission
+          Blank
         </CowButton>
       </template>
       <div class="main flex flex-col flex-1 min-h-0" data-tour="schedule-slides">

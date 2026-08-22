@@ -432,7 +432,7 @@ const quickSearchSuggestionsByAction = {
     "Microphone Settings",
     "Subscription Settings",
     "Overlay Settings",
-    "Intermission Settings",
+    "Blank Settings",
     "Other Settings",
   ],
   account: [
