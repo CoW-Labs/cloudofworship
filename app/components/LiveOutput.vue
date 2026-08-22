@@ -55,18 +55,20 @@
       :is-live-window-active="windowRefs?.length > 0"
     >
       <template #actions>
-        <CowButton
-          variant="primary"
-          size="2xs"
-          class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
-          :disabled="!liveSlide"
-          @click="goIntermission"
-        >
-          <template #leading>
-            <IconWrapper name="i-bx-coffee" size="3.5" />
-          </template>
-          Blank
-        </CowButton>
+        <CowTooltip text="Blank the live output" shortcut="blank-output">
+          <CowButton
+            variant="primary"
+            size="2xs"
+            class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
+            :disabled="!liveSlide"
+            @click="goIntermission"
+          >
+            <template #leading>
+              <IconWrapper name="i-bx-hide" size="3.5" />
+            </template>
+            Blank
+          </CowButton>
+        </CowTooltip>
       </template>
       <div class="main flex flex-col flex-1 min-h-0" data-tour="schedule-slides">
         <div
@@ -149,10 +151,7 @@
               />
               <!-- DELETE SLIDE BUTTON -->
               <div class="actions absolute bottom-2 right-2 flex gap-1">
-                <UTooltip
-                  text="Preview/Edit Slide"
-                  :popper="{ placement: 'top' }"
-                >
+                <CowTooltip text="Preview / edit slide">
                   <UButton
                     size="xs"
                     variant="ghost"
@@ -165,7 +164,7 @@
                       <EditIcon class="w-4 h-4" />
                     </template>
                   </UButton>
-                </UTooltip>
+                </CowTooltip>
 
                 <ConfirmDialog
                   button-icon="i-tabler-trash"
@@ -203,6 +202,7 @@ import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
 import type { Slide } from "~/types"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
+import { shortcutIds } from "~/utils/shortcuts"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -405,7 +405,7 @@ const previousSlide = computed(() => {
 
 onMounted(() => {
   shortcutCleanups.push(
-    useCreateShortcut("ArrowDown", () => {
+    useRegisteredShortcut(shortcutIds.nextSlide, () => {
       if (nextSlide.value) {
         setLiveSlide(nextSlide.value.id)
         return true
@@ -414,7 +414,7 @@ onMounted(() => {
     })
   )
   shortcutCleanups.push(
-    useCreateShortcut("ArrowUp", () => {
+    useRegisteredShortcut(shortcutIds.previousSlide, () => {
       if (previousSlide.value) {
         setLiveSlide(previousSlide.value.id)
         return true
@@ -423,17 +423,25 @@ onMounted(() => {
     })
   )
   shortcutCleanups.push(
-    useCreateShortcut(
-      "0",
-      () => {
-        if (navigationSlides.value?.at(-1)?.id) {
-          setLiveSlide(navigationSlides.value?.at(-1)?.id!!)
-          return true
-        }
-        return false
-      },
-      { ctrlOrMeta: true, shift: false }
-    )
+    useRegisteredShortcut(shortcutIds.lastSlide, () => {
+      if (navigationSlides.value?.at(-1)?.id) {
+        setLiveSlide(navigationSlides.value?.at(-1)?.id!!)
+        return true
+      }
+      return false
+    })
+  )
+
+  // "B" for black/blank is the muscle memory operators bring from PowerPoint,
+  // Keynote and ProPresenter. Escape is deliberately NOT bound to this —
+  // Headless UI listens for it on the same window target to close modals, and
+  // this handler registers first, so it would swallow every dismiss keypress.
+  shortcutCleanups.push(
+    useRegisteredShortcut(shortcutIds.blankOutput, () => {
+      if (!liveSlide.value) return false
+      goIntermission()
+      return true
+    })
   )
 
   // Create shortcuts for Slides 1-9

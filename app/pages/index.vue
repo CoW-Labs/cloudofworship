@@ -299,73 +299,48 @@ onMounted(async () => {
     // localStorage unavailable (private mode / SecurityError)
   }
 
-  // APP-WIDE SHORTCUTS
-  useCreateShortcut("/", () => useGlobalEmit(appWideActions.quickActionsFocus))
-  useCreateShortcut(
-    "k",
-    () => useGlobalEmit(appWideActions.quickActionsFocus),
-    { ctrlOrMeta: true, allowInEditable: true }
+  // APP-WIDE SHORTCUTS — every combo comes from the registry in
+  // ~/utils/shortcuts, so the keys bound here and the keycaps rendered in
+  // tooltips and the shortcuts modal can never drift apart.
+  useRegisteredShortcut(shortcutIds.quickActionsSlash, () =>
+    useGlobalEmit(appWideActions.quickActionsFocus)
+  )
+  useRegisteredShortcut(shortcutIds.quickActions, () =>
+    useGlobalEmit(appWideActions.quickActionsFocus)
   )
 
   // Prevent default action on specific keys
   document.addEventListener("keydown", function (event) {
     if (
       (event.ctrlKey || event.metaKey) &&
-      (event.key === "y" || event.key === "Y" || event.key === "?")
+      event.key === "?"
     ) {
       event.preventDefault()
     }
   })
 
-  useCreateShortcut(
-    "z",
-    () => {
-      appStore.undo()
-      uploadOfflineSlides()
-    },
-    { ctrlOrMeta: true }
-  )
+  useRegisteredShortcut(shortcutIds.promoteActiveSlide, () => {
+    useGlobalEmit(appWideActions.promoteActiveSlide)
+  })
 
-  useCreateShortcut(
-    "y",
-    () => {
-      appStore.redo()
-      uploadOfflineSlides()
-    },
-    {
-      ctrlOrMeta: true,
-    }
-  )
+  // "?" is the near-universal "show me the shortcuts" key (GitHub, Slack,
+  // Linear, Gmail). Cmd+H stays as a Windows/Linux alias — macOS swallows it
+  // for "Hide Application", so it never reaches the app on desktop.
+  useRegisteredShortcut(shortcutIds.shortcutsModal, () => {
+    useGlobalEmit(appWideActions.openShortcutsModal)
+  })
+  useRegisteredShortcut(shortcutIds.shortcutsModalAlt, () => {
+    useGlobalEmit(appWideActions.openShortcutsModal)
+  })
 
-  useCreateShortcut(
-    "p",
-    () => {
-      useGlobalEmit("promote-active-slide-live")
-    },
-    {
-      ctrlOrMeta: true,
-    }
-  )
+  useRegisteredShortcut(shortcutIds.openSchedules, () => {
+    useGlobalEmit(appWideActions.openScheduleModal)
+  })
 
-  useCreateShortcut(
-    "h",
-    () => {
-      useGlobalEmit("open-shortcuts")
-    },
-    {
-      ctrlOrMeta: true,
-    }
-  )
+  useRegisteredShortcut(shortcutIds.settings, () => {
+    useGlobalEmit(appWideActions.openSettings)
+  })
 
-  useCreateShortcut(
-    ",",
-    () => {
-      useGlobalEmit("open-settings")
-    },
-    {
-      ctrlOrMeta: true,
-    }
-  )
 
   // Connect to Socket.IO
   if (appStore.currentState.activeSchedule) {

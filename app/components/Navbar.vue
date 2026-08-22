@@ -40,16 +40,16 @@
             @keydown.esc.prevent="cancelScheduleNameEdit"
             @blur="commitScheduleName"
           />
-          <button
-            v-else
-            ref="scheduleNameButton"
-            type="button"
-            class="schedule-switcher__name max-w-[280px] truncate px-4 text-sm font-normal hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
-            title="Click to rename schedule"
-            @click="startScheduleNameEdit"
-          >
-            {{ currentState.activeSchedule?.name || "Untitled" }}
-          </button>
+          <CowTooltip v-else text="Rename this schedule" placement="bottom">
+            <button
+              ref="scheduleNameButton"
+              type="button"
+              class="schedule-switcher__name max-w-[280px] truncate px-4 text-sm font-normal hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
+              @click="startScheduleNameEdit"
+            >
+              {{ currentState.activeSchedule?.name || "Untitled" }}
+            </button>
+          </CowTooltip>
           <!-- Off-layout twin of the input text, used to measure the width the
                input should animate to as the draft name changes. -->
           <span
@@ -63,14 +63,20 @@
             class="w-px my-2 bg-gray-200 dark:bg-[#2a3244] shrink-0"
             aria-hidden="true"
           />
-          <button
-            type="button"
-            class="schedule-switcher__trigger grid w-9 place-items-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
-            aria-label="Open schedules"
-            @click="scheduleModalVisible = true"
+          <CowTooltip
+            text="Switch schedule"
+            :shortcut="shortcutIds.openSchedules"
+            placement="bottom"
           >
-            <UIcon name="i-bx-chevron-down" class="h-4 w-4" />
-          </button>
+            <button
+              type="button"
+              class="schedule-switcher__trigger grid w-9 place-items-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
+              aria-label="Open schedules"
+              @click="scheduleModalVisible = true"
+            >
+              <UIcon name="i-bx-chevron-down" class="h-4 w-4" />
+            </button>
+          </CowTooltip>
         </div>
       </div>
       <div
@@ -101,9 +107,10 @@
         />
 
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
-        <UTooltip
+        <CowTooltip
           v-if="!online && onlineUsersExcludingSelf.length === 0"
           text="You are offline"
+          placement="bottom"
         >
           <UButton
             variant="ghost"
@@ -115,10 +122,10 @@
               name="i-tabler-cloud-off"
             ></IconWrapper>
           </UButton>
-        </UTooltip>
+        </CowTooltip>
 
         <!-- INVITE PEOPLE BUTTON -->
-        <UTooltip text="Invite church media team">
+        <CowTooltip text="Invite your church media team" placement="bottom">
           <CowButton
             variant="primary"
             size="sm"
@@ -128,38 +135,43 @@
             <UserIcon class="w-4 h-4" />
             Invite
           </CowButton>
-        </UTooltip>
+        </CowTooltip>
 
         <!-- DARK / LIGHT MODE TOGGLE (sliding switch) -->
         <ClientOnly>
-          <button
-            type="button"
-            class="theme-toggle relative flex items-center w-[60px] h-8 rounded-full bg-gray-100 dark:bg-[#171d2b] transition-colors"
-            role="switch"
-            :aria-checked="isDark"
-            aria-label="Toggle dark mode"
-            @click="setDark(!isDark)"
+          <CowTooltip
+            :text="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+            placement="bottom"
           >
-            <span
-              class="theme-toggle__thumb absolute top-[3px] left-[3px] w-[26px] h-[26px] rounded-full grid place-items-center transition-transform duration-300 ease-out"
-              :class="
-                isDark
-                  ? 'translate-x-[28px] bg-white'
-                  : 'translate-x-0 bg-gray-900'
-              "
+            <button
+              type="button"
+              class="theme-toggle relative flex items-center w-[60px] h-8 rounded-full bg-gray-100 dark:bg-[#171d2b] transition-colors"
+              role="switch"
+              :aria-checked="isDark"
+              aria-label="Toggle dark mode"
+              @click="setDark(!isDark)"
             >
-              <LightModeIcon v-if="!isDark" class="w-3.5 h-3.5 text-white" />
-              <DarkModeIcon v-else class="w-3.5 h-3.5 text-gray-900" />
-            </span>
-            <LightModeIcon
-              class="absolute left-[8px] w-3.5 h-3.5 transition-opacity duration-200"
-              :class="isDark ? 'opacity-40 text-gray-400' : 'opacity-0'"
-            />
-            <DarkModeIcon
-              class="absolute right-[8px] w-3.5 h-3.5 transition-opacity duration-200"
-              :class="isDark ? 'opacity-0' : 'opacity-40 text-gray-400'"
-            />
-          </button>
+              <span
+                class="theme-toggle__thumb absolute top-[3px] left-[3px] w-[26px] h-[26px] rounded-full grid place-items-center transition-transform duration-300 ease-out"
+                :class="
+                  isDark
+                    ? 'translate-x-[28px] bg-white'
+                    : 'translate-x-0 bg-gray-900'
+                "
+              >
+                <LightModeIcon v-if="!isDark" class="w-3.5 h-3.5 text-white" />
+                <DarkModeIcon v-else class="w-3.5 h-3.5 text-gray-900" />
+              </span>
+              <LightModeIcon
+                class="absolute left-[8px] w-3.5 h-3.5 transition-opacity duration-200"
+                :class="isDark ? 'opacity-40 text-gray-400' : 'opacity-0'"
+              />
+              <DarkModeIcon
+                class="absolute right-[8px] w-3.5 h-3.5 transition-opacity duration-200"
+                :class="isDark ? 'opacity-0' : 'opacity-40 text-gray-400'"
+              />
+            </button>
+          </CowTooltip>
           <template #fallback>
             <div class="w-[60px] h-8" />
           </template>
@@ -169,7 +181,7 @@
           v-if="onlineUsersExcludingSelf.length > 0"
           class="online-users-ctn relative z-10 -mr-6 flex items-center"
         >
-          <UTooltip>
+          <CowTooltip placement="bottom">
             <template #text>
               <div class="text-sm">
                 <div
@@ -223,7 +235,7 @@
                 +{{ onlineUsersExcludingSelf.length - 3 }}
               </span>
             </div>
-          </UTooltip>
+          </CowTooltip>
         </div>
 
         <!-- ACCOUNT PROFILE + MENU -->
@@ -238,20 +250,22 @@
             background: 'bg-white dark:bg-[#222838] border-0',
           }"
         >
-          <button
-            class="relative z-30 flex items-center gap-1.5 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#171d2b] transition-colors"
-          >
-            <UAvatar
-              :src="user?.avatar"
-              :text="user?.fullname?.split(' ')?.[0]?.[0]"
-              size="sm"
-              :ui="{
-                text: `text-[${user?.theme}] dark:text-[${user?.theme}] font-semibold`,
-              }"
-              :class="`relative z-30 border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
-            />
-            <MenuIcon class="text-gray-500 dark:text-gray-400" />
-          </button>
+          <CowTooltip text="Account & settings" placement="bottom">
+            <button
+              class="relative z-30 flex items-center gap-1.5 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#171d2b] transition-colors"
+            >
+              <UAvatar
+                :src="user?.avatar"
+                :text="user?.fullname?.split(' ')?.[0]?.[0]"
+                size="sm"
+                :ui="{
+                  text: `text-[${user?.theme}] dark:text-[${user?.theme}] font-semibold`,
+                }"
+                :class="`relative z-30 border-[${user?.theme}] bg-[${user?.theme}20] dark:bg-[${user?.theme}20]`"
+              />
+              <MenuIcon class="text-gray-500 dark:text-gray-400" />
+            </button>
+          </CowTooltip>
           <template #panel>
             <ProfileMiniModal
               :user="user"
@@ -269,6 +283,7 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
+import { shortcutIds } from "~/utils/shortcuts"
 
 const route = useRoute()
 const settingsModalOpen = ref(false)
