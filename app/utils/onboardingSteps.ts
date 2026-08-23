@@ -56,7 +56,7 @@ const BIBLE_SLIDE_ACTIVE = '[data-tour="bible-version"]'
   {
     id: "magic-search",
     anchor: "quick-actions-search",
-    title: "Magic Search Bar",
+    title: "Quick Search Bar",
     body: "Search for anything you want to do — a Bible passage, a Bible reference, a hymn, a song lyric, an app setting or anything you need. Just start typing.",
     side: "right",
     align: "start",
@@ -105,7 +105,7 @@ const BIBLE_SLIDE_ACTIVE = '[data-tour="bible-version"]'
     id: "select-bible-slide",
     anchor: "preview-slides",
     title: "Open a Bible slide",
-    body: "The rest of the tour walks through the slide editor, so pick a Bible slide to work with. Click one here, or search a passage like “John 3 16” in the Magic Search Bar to create one.",
+    body: "The rest of the tour walks through the slide editor, so pick a Bible slide to work with. Click one here, or search a passage like “John 3 16” in the Quick Search Bar to create one.",
     side: "bottom",
     align: "start",
     interactive: true,

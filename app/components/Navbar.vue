@@ -179,7 +179,7 @@
 
         <div
           v-if="onlineUsersExcludingSelf.length > 0"
-          class="online-users-ctn relative z-10 -mr-6 flex items-center"
+          class="online-users-ctn relative z-0 -mr-5 flex items-center"
         >
           <CowTooltip placement="bottom">
             <template #text>
@@ -252,7 +252,7 @@
         >
           <CowTooltip text="Account & settings" placement="bottom">
             <button
-              class="relative z-30 flex items-center gap-1.5 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#171d2b] transition-colors"
+              class="relative z-30 flex items-center gap-1.5 p-1 rounded-full bg-gray-100 dark:bg-[#111722] hover:bg-gray-200 dark:hover:bg-[#171d2b] transition-colors"
             >
               <UAvatar
                 :src="user?.avatar"

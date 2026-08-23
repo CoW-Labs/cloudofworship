@@ -10,61 +10,68 @@
     ]"
     @contextmenu.prevent="moreActionsMenuRef?.open()"
   >
-    <button
-      :class="['transition-all text-left', { 'opacity-70 ': selectable }]"
-      @click="$emit('click')"
-      @dblclick.prevent="$emit('take-live')"
+    <CowTooltip
+      :text="gridCardHint"
+      :prevent="selectable"
+      :open-delay="700"
+      class="w-full h-full"
     >
-      <DeferredSlidePreview
-        preview-class="slide-preview text-white overflow-hidden md-preview"
-        :slide="slide"
-        :slide-label="slide?.name"
-        :slide-styles="currentState.settings.slideStyles"
-        :eager="selected"
-      />
-      <div
-        class="overlay-gradient absolute inset-0"
-        :class="{ 'border-4 border-primary': selected }"
-      ></div>
-      <div
-        class="texts flex items-start gap-2 text-white absolute top-1 right-2 left-2"
+      <button
+        :class="[
+          'w-full h-full transition-all text-left',
+          { 'opacity-70 ': selectable },
+        ]"
+        @click="$emit('click')"
+        @dblclick.prevent="$emit('take-live')"
       >
-        <h4 class="font-medium ws-nowrap mt-2 text-left text-xs">
-          {{ useShortSlideName(slide) }}
-        </h4>
-        <SlideChip
-          :slide-type="slide?.type"
-          :slide-mode="slide?.slideMode"
-          class="mt-1"
-          dark-mode
+        <DeferredSlidePreview
+          preview-class="slide-preview text-white overflow-hidden md-preview"
+          :slide="slide"
+          :slide-label="slide?.name"
+          :slide-styles="currentState.settings.slideStyles"
+          :eager="selected"
         />
-      </div>
-
-      <!-- Editing indicator - avatar circle -->
-      <div v-if="editingBy" class="absolute bottom-2 left-2 group/editing">
-        <UTooltip
-          :text="`${editingBy.userName} is on this slide`"
-          :popper="{ placement: 'top' }"
+        <div
+          class="overlay-gradient absolute inset-0"
+          :class="{ 'border-4 border-primary': selected }"
+        ></div>
+        <div
+          class="texts flex items-start gap-2 text-white absolute top-1 right-2 left-2"
         >
-          <div
-            class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow-lg animate-pulse"
-            :style="{
-              backgroundColor: editingBy.theme || '#f59e0b',
-            }"
-          >
-            <img
-              v-if="editingBy.avatar"
-              :src="editingBy.avatar"
-              :alt="editingBy.userName"
-              class="w-full h-full rounded-full object-cover"
-            />
-            <span v-else>{{
-              editingBy.userName?.charAt(0)?.toUpperCase() || "?"
-            }}</span>
-          </div>
-        </UTooltip>
-      </div>
-    </button>
+          <h4 class="font-medium ws-nowrap mt-2 text-left text-xs">
+            {{ useShortSlideName(slide) }}
+          </h4>
+          <SlideChip
+            :slide-type="slide?.type"
+            :slide-mode="slide?.slideMode"
+            class="mt-1"
+            dark-mode
+          />
+        </div>
+
+        <!-- Editing indicator - avatar circle -->
+        <div v-if="editingBy" class="absolute bottom-2 left-2 group/editing">
+          <CowTooltip :text="`${editingBy.userName} is on this slide`">
+            <div
+              class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-white shadow-lg animate-pulse"
+              :style="{
+                backgroundColor: editingBy.theme || '#f59e0b',
+              }"
+            >
+              <img
+                v-if="editingBy.avatar"
+                :src="editingBy.avatar"
+                :alt="editingBy.userName"
+                class="w-full h-full rounded-full object-cover"
+              />
+              <span v-else>{{
+                editingBy.userName?.charAt(0)?.toUpperCase() || "?"
+              }}</span>
+            </div>
+          </CowTooltip>
+        </div>
+      </button>
+    </CowTooltip>
 
     <!-- Bottom gradient for action icon contrast -->
     <div
@@ -237,7 +244,7 @@
     </div>
     <!-- DELETE SLIDE BUTTON -->
     <div class="actions absolute bottom-2 right-2 flex gap-1">
-      <UTooltip text="Preview/Edit Slide" :popper="{ placement: 'top' }">
+      <CowTooltip text="Preview / edit slide">
         <UButton
           size="xs"
           variant="ghost"
@@ -248,7 +255,7 @@
         >
           <template #leading><EditIcon class="w-4 h-4" /></template>
         </UButton>
-      </UTooltip>
+      </CowTooltip>
     </div>
   </button>
 </template>
@@ -293,6 +300,14 @@ const emit = defineEmits([
   "click",
   "take-live",
 ])
+
+// The preview grid and the schedule list both use double-click, but for
+// opposite actions — spell out which is which so nobody has to discover it.
+const gridCardHint = computed(() =>
+  props.slide?.slideMode === "overlay"
+    ? "Click to preview · Double-click to show overlay"
+    : "Click to preview · Double-click to take live"
+)
 
 const actionsMenuOpen = ref(false)
 const moreActionsMenuRef = ref<{ open: () => void; close: () => void } | null>(
