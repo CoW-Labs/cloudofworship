@@ -81,7 +81,7 @@
         header="Sign out"
         :button-styles="signOutStyles"
         label="Are you sure you want to sign out of your account?"
-        @confirm="navigateTo('/logout')"
+        @confirm="handleSignOut"
       >
         <template #icon>
           <SignOutIcon class="h-5 w-5 shrink-0" />
@@ -100,6 +100,13 @@ defineProps<{
 }>()
 
 defineEmits<{ (e: "open-settings"): void }>()
+
+// A hard document navigation rather than a router push: the popover this menu
+// lives in swallows the in-app transition, and /logout tears the session down
+// on mount, so a fresh page load is what we want anyway.
+const handleSignOut = () => {
+  window.location.href = "/logout"
+}
 
 // Every menu row is a 37px tall icon + label pair, so keep the styling in one
 // place — the sign-out row reuses it through ConfirmDialog's `button-styles`.
