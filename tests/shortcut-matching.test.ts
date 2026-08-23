@@ -235,3 +235,34 @@ describe("editor chords match what TipTap actually binds", () => {
     expect(fn).toHaveBeenCalledOnce()
   })
 })
+
+describe("CowTooltip attribute forwarding", () => {
+  // Regression guard. CowTooltip sets `inheritAttrs: false`, so anything a
+  // parent puts on <CowTooltip> is dropped unless it is explicitly forwarded.
+  // vuedraggable marks each item root with `data-draggable` and configures
+  // Sortable with `draggable: "[data-draggable]"` — swallowing that attribute
+  // silently disables drag-reordering of the slide schedule with no error
+  // anywhere. This is a source-level check (there is no DOM environment in this
+  // suite), but it fails loudly if the forwarding is ever removed.
+  const source = () =>
+    require("node:fs").readFileSync(
+      "app/components/cow/CowTooltip.vue",
+      "utf8"
+    ) as string
+
+  it("forwards non-class attrs to the trigger wrapper", () => {
+    const src = source()
+    expect(src).toContain('v-bind="forwardedAttrs"')
+    expect(src).toContain("const attrs = useAttrs()")
+    // class is bound separately, so it must be stripped from the passthrough.
+    expect(src).toMatch(/const \{ class: _class, \.\.\.rest \} = attrs/)
+  })
+
+  it("still wraps the schedule card, which is the draggable item root", () => {
+    const liveOutput = require("node:fs").readFileSync(
+      "app/components/LiveOutput.vue",
+      "utf8"
+    ) as string
+    expect(liveOutput).toContain(':text="scheduleCardHint(slide)"')
+  })
+})

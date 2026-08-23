@@ -81,7 +81,7 @@
         header="Sign out"
         :button-styles="signOutStyles"
         label="Are you sure you want to sign out of your account?"
-        @confirm="authStore.signOut()"
+        @confirm="navigateTo('/logout')"
       >
         <template #icon>
           <SignOutIcon class="h-5 w-5 shrink-0" />
@@ -93,7 +93,6 @@
 
 <script setup lang="ts">
 import type { Church, User } from "~/store/auth"
-import { useAuthStore } from "~/store/auth"
 
 defineProps<{
   user: User
@@ -101,8 +100,6 @@ defineProps<{
 }>()
 
 defineEmits<{ (e: "open-settings"): void }>()
-
-const authStore = useAuthStore()
 
 // Every menu row is a 37px tall icon + label pair, so keep the styling in one
 // place — the sign-out row reuses it through ConfirmDialog's `button-styles`.

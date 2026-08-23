@@ -1,5 +1,6 @@
 <template>
   <UTooltip
+    v-bind="forwardedAttrs"
     :text="text"
     :shortcuts="keys"
     :prevent="prevent"
@@ -56,6 +57,17 @@ const props = withDefaults(
     closeDelay: 0,
   }
 )
+
+// Everything except `class` (bound separately above) is handed to UTooltip,
+// which puts it on the element that actually wraps the trigger. Without this,
+// attributes a parent sets on <CowTooltip> vanish — vuedraggable marks each
+// item root with `data-draggable` and drives Sortable off that selector, so
+// swallowing it silently disables drag-reordering of a wrapped list.
+const attrs = useAttrs()
+const forwardedAttrs = computed(() => {
+  const { class: _class, ...rest } = attrs
+  return rest
+})
 
 const keys = computed(() =>
   props.shortcut ? useShortcutLabel(props.shortcut) : []
