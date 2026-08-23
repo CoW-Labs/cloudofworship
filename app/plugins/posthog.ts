@@ -28,6 +28,9 @@ export default defineNuxtPlugin(nuxtApp => {
       role: auth.user?.role,
       church: auth.church?.name,
       church_id: auth.church?._id,
+      signup_date: auth.user?.createdAt,
+      subscription_plan: auth.church?.subscriptionPlan,
+      is_teams: auth.church?.subscriptionPlan === "teams",
       appVersion: appStore.currentState.settings.appVersion,
     });
     nuxtApp.provide("posthog", posthog);

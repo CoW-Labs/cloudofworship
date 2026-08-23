@@ -106,23 +106,16 @@ export const useSubscriptionPlans = () => {
       // Try multiple detection services for reliability
       let currency: 'NGN' | 'USD' = 'USD' // Default fallback
 
-      // African countries (excluding South Africa) that should use NGN
-      const africanCountriesForNGN = [
-        'NG', 'GH', 'KE',
-        // 'TZ', 'UG', 'RW', 'ET', 'EG', 'DZ', 'MA',
-        // 'TN', 'LY', 'SD', 'SS', 'SO', 'DJ', 'ER', 'SN', 'ML', 'BF',
-        // 'NE', 'TD', 'MR', 'GM', 'GW', 'SL', 'LR', 'CI', 'BJ', 'TG',
-        // 'CM', 'CF', 'GQ', 'GA', 'CG', 'CD', 'AO', 'ZM', 'ZW', 'MW',
-        // 'MZ', 'MG', 'MU', 'SC', 'KM', 'BW', 'NA', 'LS', 'SZ', 'BI'
-      ]
+      // Only Nigeria is billed in NGN (Paystack). Everywhere else pays in USD via Dodo,
+      // whose checkout accepts international cards.
+      const countriesForNGN = ['NG']
 
       try {
         // Try ipapi.co first (free, reliable)
         const response = await fetch('https://ipapi.co/json/')
         const data = await response.json()
 
-        // Check if user is in African countries (except South Africa)
-        if (africanCountriesForNGN.includes(data.country_code)) {
+        if (countriesForNGN.includes(data.country_code)) {
           currency = 'NGN'
         } else {
           currency = 'USD'
@@ -135,7 +128,7 @@ export const useSubscriptionPlans = () => {
           const response = await fetch('https://ip-api.com/json/')
           const data = await response.json()
 
-          if (africanCountriesForNGN.includes(data.countryCode)) {
+          if (countriesForNGN.includes(data.countryCode)) {
             currency = 'NGN'
           } else {
             currency = 'USD'
