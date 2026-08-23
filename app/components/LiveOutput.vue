@@ -98,72 +98,77 @@
         >
           <!-- SLIDE CARD (DUPLICATED FROM THE SLIDECARD.VUE, TO MAKE DRAGGABLE WORK AS IT COULD NOT WORK IN COMPONENT) -->
           <template #item="{ element: slide, index }">
-            <button
-              class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-[#171d2b] rounded-lg hover:bg-white dark:hover:bg-[#2b3242] transition-all cursor-pointer relative"
-              :id="slide?.id"
-              v-memo="[
-                slide?.id,
-                slide?.updatedAt,
-                slide?.name,
-                liveSlide?.id === slide?.id,
-                currentState.activeOverlaySlide?.id === slide?.id,
-                ctrlOrMetaActive,
-              ]"
-              :class="{
-                'bg-red-100 dark:bg-red-900': liveSlide?.id === slide?.id,
-                'bg-cyan-100 dark:bg-cyan-950':
-                  currentState.activeOverlaySlide?.id === slide?.id,
-              }"
-              @click="handleScheduleSlideAction(slide)"
-              @dblclick="useGlobalEmit(appWideActions.newActiveSlide, slide)"
-              @dragstart="draggingSlide = slide"
-              @dragover.prevent="
-                slide?.type === slideTypes.songSetlist &&
-                  draggingSlide?.type === slideTypes.song
-              "
-              @drop.stop.prevent="handleDropOnSetlist(slide)"
+            <CowTooltip
+              :text="scheduleCardHint(slide)"
+              :open-delay="700"
+              class="w-full"
             >
-              <DeferredSlidePreview
-                preview-class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
-                :slide="slide"
-                :slide-label="slide?.name"
-                :slide-styles="currentState.settings.slideStyles"
-                :eager="liveSlide?.id === slide?.id"
-              />
-              <div class="texts flex-col justify-between">
-                <h4
-                  class="font-medium mt-2 overflow-hidden truncate w-40 2xl:w-56"
-                >
-                  {{ slide?.name }}
-                </h4>
-                <SlideChip
-                  :slide-type="slide?.type"
-                  :slide-mode="slide?.slideMode"
-                  class="mt-1"
-                />
-              </div>
-              <LiveSlideIndicator
-                :visible="
-                  slide.slideMode !== 'overlay' && liveSlide?.id === slide?.id
+              <button
+                class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-[#171d2b] rounded-lg hover:bg-white dark:hover:bg-[#2b3242] transition-all cursor-pointer relative"
+                :id="slide?.id"
+                v-memo="[
+                  slide?.id,
+                  slide?.updatedAt,
+                  slide?.name,
+                  liveSlide?.id === slide?.id,
+                  currentState.activeOverlaySlide?.id === slide?.id,
+                  ctrlOrMetaActive,
+                ]"
+                :class="{
+                  'bg-red-100 dark:bg-red-900': liveSlide?.id === slide?.id,
+                  'bg-cyan-100 dark:bg-cyan-950':
+                    currentState.activeOverlaySlide?.id === slide?.id,
+                }"
+                @click="handleScheduleSlideAction(slide)"
+                @dblclick="useGlobalEmit(appWideActions.newActiveSlide, slide)"
+                @dragstart="draggingSlide = slide"
+                @dragover.prevent="
+                  slide?.type === slideTypes.songSetlist &&
+                    draggingSlide?.type === slideTypes.song
                 "
-                hide-text
-                class="mt-3 left-20 right-auto"
-              />
-              <!-- DELETE SLIDE BUTTON -->
-              <div class="actions absolute bottom-2 right-2 flex gap-1">
-                <CowTooltip text="Preview / edit slide">
-                  <UButton
-                    size="xs"
-                    variant="ghost"
-                    class="px-1 text-primary-500 hover:bg-primary-white"
-                    @click.stop.prevent="
-                      useGlobalEmit(appWideActions.newActiveSlide, slide)
-                    "
+                @drop.stop.prevent="handleDropOnSetlist(slide)"
+              >
+                <DeferredSlidePreview
+                  preview-class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
+                  :slide="slide"
+                  :slide-label="slide?.name"
+                  :slide-styles="currentState.settings.slideStyles"
+                  :eager="liveSlide?.id === slide?.id"
+                />
+                <div class="texts flex-col justify-between">
+                  <h4
+                    class="font-medium mt-2 overflow-hidden truncate w-40 2xl:w-56"
                   >
-                    <template #leading>
-                      <EditIcon class="w-4 h-4" />
-                    </template>
-                  </UButton>
+                    {{ slide?.name }}
+                  </h4>
+                  <SlideChip
+                    :slide-type="slide?.type"
+                    :slide-mode="slide?.slideMode"
+                    class="mt-1"
+                  />
+                </div>
+                <LiveSlideIndicator
+                  :visible="
+                    slide.slideMode !== 'overlay' && liveSlide?.id === slide?.id
+                  "
+                  hide-text
+                  class="mt-3 left-20 right-auto"
+                />
+                <!-- DELETE SLIDE BUTTON -->
+                <div class="actions absolute bottom-2 right-2 flex gap-1">
+                  <CowTooltip text="Preview / edit slide">
+                    <UButton
+                      size="xs"
+                      variant="ghost"
+                      class="px-1 text-primary-500 hover:bg-primary-white"
+                      @click.stop.prevent="
+                        useGlobalEmit(appWideActions.newActiveSlide, slide)
+                      "
+                    >
+                      <template #leading>
+                        <EditIcon class="w-4 h-4" />
+                      </template>
+                    </UButton>
                 </CowTooltip>
 
                 <ConfirmDialog
@@ -186,7 +191,8 @@
               >
                 {{ index === liveOutputSlides.length - 1 ? 0 : index + 1 }}
               </div>
-            </button>
+              </button>
+            </CowTooltip>
           </template>
         </draggable>
       </div>
@@ -523,6 +529,18 @@ const goIntermission = () => {
   if (!liveSlide.value) return
   useBroadcastPost(null)
   appStore.setLiveSlide("")
+}
+
+// Clicking a schedule card sends it live; double-clicking opens it in the
+// editor. That is the reverse of the preview grid, where a click previews and a
+// double-click goes live — so both places spell the pair out.
+const scheduleCardHint = (slide: Slide) => {
+  if (slide?.slideMode === "overlay") {
+    return currentState.value.activeOverlaySlide?.id === slide.id
+      ? "Click to clear overlay · Double-click to edit"
+      : "Click to show overlay · Double-click to edit"
+  }
+  return "Click to take live · Double-click to edit"
 }
 
 const handleScheduleSlideAction = (slide: Slide) => {
