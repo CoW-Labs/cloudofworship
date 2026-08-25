@@ -3,6 +3,10 @@ import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
 import type { OnlineUser, SlideEditLock } from "./useSocketIO"
 import type { Socket } from "socket.io-client"
+import {
+  enqueueCoalescedSlideShadowPut,
+  enqueueSlideShadowWrite,
+} from "~/composables/useSlideRepository"
 
 interface RealtimeSlidesOptions {
   onSlideCreated?: (slide: Slide, createdByName: string) => void
@@ -162,6 +166,9 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             const nextSlides = [...appStore.currentState.activeSlides]
             nextSlides.splice(slideIndex, 1, mergedSlide)
             appStore.setActiveSlides(nextSlides)
+            enqueueCoalescedSlideShadowPut(mergedSlide, {
+              syncState: "synced",
+            })
             options.onSlideUpdated?.(mergedSlide, data.updatedByName)
 
             // If slide is live, update the live output
@@ -248,7 +255,14 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
               changed = true
             }
           })
-          if (changed) appStore.setActiveSlides(nextSlides)
+          if (changed) {
+            appStore.setActiveSlides(nextSlides)
+            enqueueSlideShadowWrite(
+              "realtime batch slide update",
+              (repository) =>
+                repository.putSlides(data.slides, { syncState: "synced" })
+            )
+          }
           options.onBatchSlidesUpdated?.(data.slides, data.updatedByName)
         }
         break

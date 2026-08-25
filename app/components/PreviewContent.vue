@@ -148,6 +148,10 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
+import {
+  enqueueCoalescedSlideShadowPut,
+  enqueueSlideShadowWrite,
+} from "~/composables/useSlideRepository"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
@@ -1235,6 +1239,9 @@ const uploadOfflineSlides = async () => {
         reconciledMap.has(slide.id) ? reconciledMap.get(slide.id)! : slide
       )
       appStore.setActiveSlides(updatedSlides)
+      enqueueSlideShadowWrite("reconcile uploaded slides", (repository) =>
+        repository.putSlides(reconciledSlides, { syncState: "synced" })
+      )
 
       // Broadcast newly created slides via WebSocket after successful upload
       if (inserted.length > 0) {
@@ -1317,8 +1324,18 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
       // Sort slides by index
       tempSlides = [...tempSlides].sort((a, b) => a.index - b.index)
 
-      appStore.setActiveSlides(
-        useMergeObjectArray(tempSlides, [...appStore.currentState.activeSlides])
+      const mergedSlides = useMergeObjectArray(tempSlides, [
+        ...appStore.currentState.activeSlides,
+      ])
+      appStore.setActiveSlides(mergedSlides)
+      const scheduleSnapshot = mergedSlides.filter(
+        (slide) => slide.scheduleId === scheduleId
+      )
+      enqueueSlideShadowWrite("refresh schedule snapshot", (repository) =>
+        repository.replaceScheduleSlides(scheduleId, scheduleSnapshot, {
+          removeMissing: true,
+          syncState: (slide) => (slide._id ? "synced" : "pending"),
+        })
       )
       appStore.setLastSynced(new Date().toISOString())
     } else {
@@ -1486,7 +1503,13 @@ const persistSlideOnline = useThrottleFn(
 
 // Public entry point for "an edit happened": announce presence (once per
 // slide), broadcast fast, persist slow.
-const updateSlideOnline = (slide: Slide) => {
+const updateSlideOnline = (
+  slide: Slide,
+  options: { durable?: boolean } = { durable: true }
+) => {
+  if (options.durable !== false) {
+    enqueueCoalescedSlideShadowPut(slide, { syncState: "pending" })
+  }
   announceEditing(slide?.id)
   broadcastSlideEdit(slide)
   persistSlideOnline(slide)
@@ -1529,11 +1552,15 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
       })
     }
 
-    appStore.setActiveSlides(
-      appStore.currentState.activeSlides.filter(
-        (slide) => !slideMatchesId(slide)
+    if (activeStoreSlide) {
+      appStore.removeActiveSlide(activeStoreSlide)
+    } else {
+      appStore.setActiveSlides(
+        appStore.currentState.activeSlides.filter(
+          (slide) => !slideMatchesId(slide)
+        )
       )
-    )
+    }
     return
   }
 
@@ -1807,7 +1834,9 @@ const gotoAction = async (title: string, version: string) => {
     activeSlide.value = updatedSlide
     appStore.updateSlideInActiveSlides(updatedSlide)
     updateLiveOutput(activeSlide.value)
-    updateSlideOnline(activeSlide.value)
+    // Verse navigation is live runtime state. Broadcasting it keeps every
+    // output current, but it must not create an IndexedDB write on each cue.
+    updateSlideOnline(activeSlide.value, { durable: false })
   }
 }
 
