@@ -95,6 +95,12 @@ function ensureUniqueIds(arr: Slide[]): Slide[] {
 }
 
 /**
+ * Upper bound on the undo/redo stack. Depth beyond this is never reached in
+ * practice, and each retained entry holds a full activeSlides snapshot.
+ */
+const MAX_UNDO_HISTORY = 50
+
+/**
  * This function is used to throttle the amount of times the app state is updated
  * in relation to the past states (undo/redo stack)
  * The key/value approach for updating is used to ensure reactivity of the app state
@@ -116,6 +122,11 @@ const onAppStateChange = useThrottleFn(
       tempCurrentState[key] = value
     }
     pastStates.push({ ...tempCurrentState })
+    // Every entry expands its full activeSlides array when serialized, so an
+    // uncapped stack grows without bound over a long session.
+    if (pastStates.length > MAX_UNDO_HISTORY) {
+      pastStates.splice(0, pastStates.length - MAX_UNDO_HISTORY)
+    }
   },
   1500
 )
@@ -830,8 +841,17 @@ export const useAppStore = defineStore("app", {
   },
   persist: {
     storage: piniaPluginPersistedstate.localStorage(),
+    // Without `pick` the undo/redo stacks are persisted too. Each of their
+    // entries serializes its own full copy of activeSlides, which pushes the
+    // payload past the ~5MB localStorage quota on a large schedule. Once the
+    // quota is exceeded every write fails, so an offline reload loses data.
+    pick: ["currentState", "panelSizes", "panelSizesTouched"],
   },
   share: {
     enable: true,
+    // Undo history is per-window. Sharing it lets one window's stack overwrite
+    // the other's. Note this only filters what a receiving window applies --
+    // pinia-shared-state still serializes the whole state when sending.
+    omit: ["pastStates", "futureStates"],
   },
 })
