@@ -487,7 +487,7 @@ onMounted(() => {
 // }
 
 const setLiveSlide = (slideId: string) => {
-  const slide = appStore.currentState.activeSlides.find(
+  const slide = (appStore.currentState.activeSlides || []).find(
     (s) => s.id === slideId || s._id === slideId
   )
   if (!slide) return
