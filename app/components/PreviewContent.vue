@@ -1207,9 +1207,6 @@ emitter.on("promote-active-slide-live", () => {
 })
 
 emitter.on("selected-schedule", (data: Schedule | string | null) => {
-  // Clear Edit Content pane
-  // activeSlide.value = undefined
-
   const incomingId = typeof data === "string" ? data : data?._id ?? null
   const isReselectingSameSchedule =
     incomingId != null && incomingId === lastSelectedScheduleId.value
@@ -1218,6 +1215,11 @@ emitter.on("selected-schedule", (data: Schedule | string | null) => {
   // App boot re-emits this for the already-active schedule (e.g. on reload) —
   // only clear the live slide when the schedule actually changes.
   if (isReselectingSameSchedule) return
+
+  // Clear the Edit Content pane — the selection belongs to the schedule we
+  // just left, so keeping it would leave the editor on a slide that isn't in
+  // the grid any more.
+  activeSlide.value = undefined
 
   // Clear live projection
   appStore.setLiveSlide("")
@@ -1475,7 +1477,25 @@ watch(
     )
     if (updatedActiveSlide) {
       activeSlide.value = updatedActiveSlide
+      return
     }
+
+    // The selected slide is gone from the schedule — deleted here, by a
+    // teammate over the socket, or in another window. Drop the editor back to
+    // its empty state instead of leaving a slide on screen that no longer
+    // exists. Skipped while the schedule is still hydrating (the list is
+    // briefly empty) and when the selection belongs to another schedule, which
+    // is how switching schedules keeps the current selection.
+    if (isLoadingSlides.value) return
+    const activeScheduleId = appStore.currentState.activeSchedule?._id
+    if (
+      activeSlide.value.scheduleId &&
+      activeScheduleId &&
+      activeSlide.value.scheduleId !== activeScheduleId
+    ) {
+      return
+    }
+    activeSlide.value = undefined
   },
   { immediate: true }
 )
@@ -1695,11 +1715,6 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   // Clear countdown animation if slide is a countdown slide before deleting
   if (tempSlide?.type === slideTypes.countdown) {
     stopCountdown()
-  }
-
-  // Clear Edit Content pane if the deleted slide is currently selected
-  if (activeSlide.value?.id === slideId) {
-    // activeSlide.value = undefined
   }
 
   // Clear live projection if the deleted slide is currently live
