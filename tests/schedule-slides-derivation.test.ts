@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 import { createApp } from "vue"
 import type { Slide } from "~/types"
+import useIndexedDB from "~/composables/useIndexedDB"
+import { flushSlideShadowWrites } from "~/composables/useSlideRepository"
 
 // `persist` reads this Nuxt auto-import global when the store module evaluates.
 vi.stubGlobal("piniaPluginPersistedstate", {
@@ -43,6 +45,20 @@ describe("active schedule slide derivation", () => {
     expect(store.activeScheduleSlides?.map((s) => s.id)).toEqual(["b"])
   })
 
+  it("builds one schedule-scoped compatibility index", () => {
+    store.setActiveSlides([
+      slide("a", "sch1"),
+      slide("b", "sch2"),
+      slide("c", "sch1"),
+    ])
+
+    expect(Object.keys(store.slidesBySchedule).sort()).toEqual(["sch1", "sch2"])
+    expect(store.slidesBySchedule.sch1.map((item) => item.id)).toEqual([
+      "a",
+      "c",
+    ])
+  })
+
   // Regression: PreviewContent synced a local mirror behind an
   // `if (tempSlides.length > 0)` guard, so an emptied schedule kept rendering
   // the previous schedule's slides and the empty state never appeared.
@@ -62,6 +78,31 @@ describe("active schedule slide derivation", () => {
 
     store.removeActiveSlide(only)
     expect(store.activeScheduleSlides).toEqual([])
+  })
+
+  it("does not write durable storage when only the live slide changes", async () => {
+    await flushSlideShadowWrites()
+    await useIndexedDB().slides.clear()
+    store.setActiveSlides([slide("a", "sch1")])
+
+    store.setLiveSlide("a")
+    await flushSlideShadowWrites()
+
+    expect(await useIndexedDB().slides.count()).toBe(0)
+  })
+
+  it("shadow-writes durable slide creation without blocking the action", async () => {
+    await flushSlideShadowWrites()
+    await useIndexedDB().slides.clear()
+    const created = slide("new", "sch1")
+
+    store.appendActiveSlide(created)
+    expect(store.currentState.activeSlides.map((item) => item.id)).toContain(
+      created.id
+    )
+    await flushSlideShadowWrites()
+
+    expect(await useIndexedDB().slides.get(["sch1", "new"])).toBeDefined()
   })
 })
 

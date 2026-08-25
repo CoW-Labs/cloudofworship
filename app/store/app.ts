@@ -17,6 +17,12 @@ import { bibleVersionObjects } from "~/utils/constants"
 import { useThrottleFn } from "@vueuse/core"
 import posthog from "posthog-js"
 import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
+import {
+  cancelAllPendingSlideShadowPuts,
+  cancelPendingScheduleShadowPuts,
+  cancelPendingSlideShadowPut,
+  enqueueSlideShadowWrite,
+} from "~/composables/useSlideRepository"
 
 // Absolute floors/ceilings for every resizable panel. These are hard usability
 // stops only — the effective bounds a user drags against are derived from the
@@ -232,10 +238,20 @@ export const useAppStore = defineStore("app", {
     }
   },
   getters: {
-    activeScheduleSlides: (state) =>
-      state.currentState.activeSlides?.filter(
-        (slide) => slide.scheduleId === state.currentState.activeSchedule?._id
-      ),
+    // Compatibility index for the repository transition. It is derived and
+    // cached by Pinia, so it does not duplicate slides in persisted state.
+    slidesBySchedule: (state) => {
+      const grouped: Record<string, Slide[]> = {}
+      state.currentState.activeSlides?.forEach((slide) => {
+        if (!slide?.scheduleId) return
+        ;(grouped[slide.scheduleId] ||= []).push(slide)
+      })
+      return grouped
+    },
+    activeScheduleSlides(): Slide[] {
+      const scheduleId = this.currentState.activeSchedule?._id
+      return scheduleId ? this.slidesBySchedule[scheduleId] || [] : []
+    },
     bibleVersions: (state) => state.currentState.settings.bibleVersions,
     panelSize: (state) => (panel: PanelSizeKey) =>
       clampPanelSize(panel, state.panelSizes?.[panel]),
@@ -303,6 +319,9 @@ export const useAppStore = defineStore("app", {
         this.currentState.liveOutputSlidesId = Array.from(
           new Set(this.currentState.activeSlides.map((slide) => slide?.id))
         )
+        enqueueSlideShadowWrite("append slide", (repository) =>
+          repository.putSlide(slide)
+        )
       }
       this.futureStates = []
     },
@@ -314,6 +333,9 @@ export const useAppStore = defineStore("app", {
       this.currentState.activeSlides = ensureUniqueIds(tempSlides)
       this.currentState.liveOutputSlidesId = Array.from(
         new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
+      )
+      enqueueSlideShadowWrite("append slides", (repository) =>
+        repository.putSlides(slides)
       )
       this.futureStates = []
     },
@@ -347,6 +369,10 @@ export const useAppStore = defineStore("app", {
       this.currentState.liveOutputSlidesId = Array.from(
         new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
+      cancelPendingSlideShadowPut(slide.scheduleId, slide.id)
+      enqueueSlideShadowWrite("remove slide", (repository) =>
+        repository.deleteSlide(slide.scheduleId, slide.id)
+      )
       this.futureStates = []
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
@@ -362,6 +388,16 @@ export const useAppStore = defineStore("app", {
       this.currentState.liveOutputSlidesId = Array.from(
         new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
+      const scheduleId =
+        slides[0]?.scheduleId || this.currentState.activeSchedule?._id
+      if (scheduleId) {
+        cancelPendingScheduleShadowPuts(scheduleId)
+        enqueueSlideShadowWrite("replace schedule slides", (repository) =>
+          repository.replaceScheduleSlides(scheduleId, slides, {
+            removeMissing: true,
+          })
+        )
+      }
       this.futureStates = []
     },
     setActiveSlides(slides: Array<Slide>) {
@@ -703,6 +739,12 @@ export const useAppStore = defineStore("app", {
     //   this.activeLiveWindows = JSON.stringify(windows)
     // },
     signOut() {
+      // Match the legacy sign-out behaviour, which removed all persisted
+      // activeSlides, so another account on this device cannot inherit them.
+      cancelAllPendingSlideShadowPuts()
+      enqueueSlideShadowWrite("sign out", (repository) =>
+        repository.clearAllSlides()
+      )
       this.setSchedules([])
       this.setActiveSchedule(null)
       this.setActiveSlides([])
@@ -768,6 +810,20 @@ export const useAppStore = defineStore("app", {
     // Undo/Redo Actions
     setCurrentState(state: any) {
       this.currentState = { ...state }
+      const scheduleId = this.currentState.activeSchedule?._id
+      if (scheduleId) {
+        cancelPendingScheduleShadowPuts(scheduleId)
+        const scheduleSlides = this.currentState.activeSlides.filter(
+          (slide) => slide.scheduleId === scheduleId
+        )
+        enqueueSlideShadowWrite("restore undo state", (repository) =>
+          repository.replaceScheduleSlides(scheduleId, scheduleSlides, {
+            removeMissing: true,
+            preservePending: false,
+            syncState: "pending",
+          })
+        )
+      }
       // console.log("updated current state", this.currentState)
     },
     undo() {
