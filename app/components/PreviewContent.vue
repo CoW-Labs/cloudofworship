@@ -185,13 +185,20 @@ const lastSelectedScheduleId = ref(
 
 // Composables
 const {
-  slides,
   updateLiveOutput,
   batchCreateSlides,
   updateSlide: updateSlideAPI,
   deleteSlide: deleteSlideAPI,
   batchUpdateSlides,
 } = useSlides()
+
+// Derived from the store rather than mirrored into a local ref. A ref captures
+// the array reference at setup time, and every store action that touches slides
+// reassigns `activeSlides`, so the mirror detaches and has to be re-synced by
+// hand. Deriving it means it can never go stale, and every write has to go
+// through a store action.
+const slides = computed<readonly Slide[]>(() => appStore.activeScheduleSlides ?? [])
+
 const { getLibraryItem } = useLibrary()
 const { createSchedule } = useSchedules()
 const {
@@ -510,7 +517,6 @@ const duplicatePreviewSlide = (slide: Slide) => {
   const newSlide = duplicateSlide(slide)
   if (!newSlide) return
 
-  slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   uploadOfflineSlides()
 }
@@ -519,7 +525,6 @@ const duplicatePreviewSlideAsOverlay = (slide: Slide) => {
   const newSlide = duplicateSlideAsOverlay(slide)
   if (!newSlide) return
 
-  slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
@@ -807,14 +812,12 @@ const scrollToSlide = (slideId?: string) => {
 const emitter = useNuxtApp().$emitter as Emitter<any>
 emitter.on("new-slide", () => {
   const newSlide = createTextSlide()
-  slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   uploadOfflineSlides()
 })
 
 emitter.on(appWideActions.newTimeSlide, () => {
   const newSlide = createTimeSlide()
-  slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
@@ -830,7 +833,6 @@ emitter.on("new-text", (slide: Slide[] | Slide) => {
   }
   if (!newSlide) return
 
-  slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   // Broadcast slide creation immediately for real-time sync
   broadcastSlideCreated(newSlide)
@@ -842,7 +844,6 @@ emitter.on("new-bible", async (data: string) => {
     const scripture = await useScripture(data)
     if (scripture) {
       const newSlide = createBibleSlide(scripture)
-      slides.value?.push(newSlide)
       makeSlideActive(newSlide, {
         goLive: true,
         newlyCreated: true,
@@ -879,12 +880,11 @@ emitter.on("update-or-create-bible", async (data: string) => {
       (s: Slide) => s.id === updatedSlide.id
     )
     if (slideIndex < 0) return
-    slides.value.splice(slideIndex, 1, updatedSlide)
+    appStore.updateSlideInActiveSlides(updatedSlide)
     makeSlideActive(updatedSlide, { goLive: true, newlyCreated: false })
     updateSlideOnline(updatedSlide)
   } else {
     const newSlide = createBibleSlide(scripture)
-    slides.value?.push(newSlide)
     makeSlideActive(newSlide, { goLive: true, newlyCreated: true })
     broadcastSlideCreated(newSlide)
     uploadOfflineSlides()
@@ -896,7 +896,6 @@ emitter.on("new-bible-whole-search", async (data: string) => {
   const scripture = await useScripture(data)
   if (scripture) {
     const newSlide = createBibleSlide(scripture, { fromWholeBibleSearch: true })
-    slides.value?.push(newSlide)
     makeSlideActive(newSlide, {
       goLive: false,
       newlyCreated: true,
@@ -912,7 +911,6 @@ emitter.on("new-hymn", async (data: string) => {
   const hymn = await useHymn(data)
   if (hymn) {
     const newSlide = createHymnSlide(hymn)
-    slides.value?.push(newSlide)
     makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
     // Broadcast slide creation immediately for real-time sync
     broadcastSlideCreated(newSlide)
@@ -923,7 +921,6 @@ emitter.on("new-hymn", async (data: string) => {
 emitter.on(appWideActions.newSongSetlist, async (song?: Song) => {
   const resolvedSong = song ? await useSong(song) : undefined
   const newSlide = await createSongSetlistSlide(resolvedSong || undefined)
-  slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
@@ -938,7 +935,6 @@ const getRelevantSongSetlist = () => {
 
 const addSongAsSeparateSlide = (song: Song) => {
   const newSlide = createSongSlide(song)
-  slides.value?.push(newSlide)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
   saveSlide(newSlide)
   broadcastSlideCreated(newSlide)
@@ -949,10 +945,7 @@ const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
   const updatedSlide = await appendSongToSetlist(setlistSlide, song)
   if (!updatedSlide) return
 
-  const slideIndex = slides.value.findIndex((s) => s.id === updatedSlide.id)
-  if (slideIndex >= 0) {
-    slides.value.splice(slideIndex, 1, updatedSlide)
-  }
+  appStore.updateSlideInActiveSlides(updatedSlide)
   makeSlideActive(updatedSlide, { goLive: false, newlyCreated: false })
   updateLiveOutput(updatedSlide)
   updateSlideOnline(updatedSlide)
@@ -999,7 +992,6 @@ emitter.on("new-media", async (data: ExtendedFileT[]) => {
 
     // Append new slides immediately so the current user sees them right away
     newSlides.forEach((slide) => {
-      slides.value?.push(slide)
       appStore.appendActiveSlide(slide)
     })
 
@@ -1025,7 +1017,6 @@ emitter.on(
       data.presentationObjects
     )
 
-    slides.value?.push(newSlide)
     appStore.appendActiveSlide(newSlide)
   }
 )
@@ -1038,16 +1029,18 @@ emitter.on("new-active-slide", (data: Slide) => {
 
 emitter.on("new-countdown", (data: Countdown) => {
   if (data) {
-    // Remove existing countdown slides
-    const tempSlides = slides.value?.filter(
-      (slide) =>
-        slide.type !== slideTypes.countdown || slide.slideMode === "overlay"
-    )
-    slides.value = tempSlides
+    // Remove existing countdown slides. This has to go through the store:
+    // filtering a local copy left them in `activeSlides`, so appending the new
+    // slide re-derived the grid from the store and brought them back.
+    slides.value
+      .filter(
+        (slide) =>
+          slide.type === slideTypes.countdown && slide.slideMode !== "overlay"
+      )
+      .forEach((slide) => appStore.removeActiveSlide(slide))
     stopCountdown()
 
     const newSlide = createCountdownSlide(data)
-    slides.value?.push(newSlide)
 
     // Take slide live if current active slide is a countdown
     if (
@@ -1105,10 +1098,7 @@ emitter.on(
     const updatedSlide = await appendSongToSetlist(setlistSlide, song)
     if (!updatedSlide) return
 
-    const slideIndex = slides.value.findIndex((s) => s.id === updatedSlide.id)
-    if (slideIndex >= 0) {
-      slides.value.splice(slideIndex, 1, updatedSlide)
-    }
+    appStore.updateSlideInActiveSlides(updatedSlide)
     makeSlideActive(updatedSlide, { goLive: false, newlyCreated: false })
     updateLiveOutput(updatedSlide)
     updateSlideOnline(updatedSlide)
@@ -1370,28 +1360,17 @@ watch(
   }
 )
 
-// Update Slides order when they are updated in Slide schedule
+// Keep the selection pointing at the latest copy of itself when the schedule's
+// slides change.
 watch(
-  () => currentState.value.activeSlides,
-  (newSlides) => {
-    const scheduleId = appStore.currentState.activeSchedule?._id
-    const tempSlides = newSlides?.filter(
-      (slide) => slide.scheduleId === scheduleId
+  slides,
+  (scheduleSlides) => {
+    if (!activeSlide.value?.id) return
+    const updatedActiveSlide = scheduleSlides.find(
+      (slide) => slide.id === activeSlide.value?.id
     )
-
-    if (tempSlides.length > 0) {
-      slides.value = tempSlides
-
-      // Only update activeSlide if it exists in the filtered slides
-      if (activeSlide.value?.id) {
-        const updatedActiveSlide = tempSlides.find(
-          (slide) => slide.id === activeSlide.value?.id
-        )
-        if (updatedActiveSlide) {
-          activeSlide.value = updatedActiveSlide
-          // sendNewSlideToWebsocket(updatedActiveSlide)
-        }
-      }
+    if (updatedActiveSlide) {
+      activeSlide.value = updatedActiveSlide
     }
   },
   { immediate: true }
@@ -1402,11 +1381,6 @@ watch(
   () => currentState.value.activeSchedule,
   (oldVal, newVal) => {
     if (oldVal?._id !== newVal?._id) {
-      slides.value = currentState.value.activeSlides?.filter(
-        (slide) =>
-          slide.scheduleId === appStore.currentState.activeSchedule?._id
-      )
-
       // Check if activeSchedule is remote object
       if (!currentState.value.activeSchedule?.updatedAt) {
         createSchedule(currentState.value.activeSchedule as Schedule)
@@ -1591,10 +1565,6 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     clearSlideOverlay()
   }
 
-  const slideIndex = slides.value.findIndex(slideMatchesId)
-  if (slideIndex >= 0) {
-    slides.value.splice(slideIndex, 1)
-  }
   appStore.removeActiveSlide(tempSlide)
 
   // Broadcast deletion via WebSocket for realtime collaboration
@@ -1655,10 +1625,7 @@ const onUpdateSlide = (slide: Slide) => {
   const updatedSlide: Slide = { ...slide, updatedAt: new Date().toISOString() }
 
   makeSlideActive(updatedSlide)
-  const slideIndex = slides.value?.findIndex(
-    (slideInner: Slide) => updatedSlide.id === slideInner.id
-  )
-  slides.value?.splice(slideIndex || 0, 1, updatedSlide)
+  appStore.updateSlideInActiveSlides(updatedSlide)
 
   updateSlideOnline(updatedSlide)
   updateLiveOutput(updatedSlide)
@@ -1680,10 +1647,7 @@ const onUpdateSlide = (slide: Slide) => {
 const onUpdateInactiveSlide = (slide: Slide) => {
   const updatedSlide: Slide = { ...slide, updatedAt: new Date().toISOString() }
 
-  const slideIndex = slides.value?.findIndex(
-    (slideInner: Slide) => updatedSlide.id === slideInner.id
-  )
-  slides.value?.splice(slideIndex || 0, 1, updatedSlide)
+  appStore.updateSlideInActiveSlides(updatedSlide)
 
   // Toolbar actions use the selected slide as their source of truth. Keep that
   // reference in sync even when the edit intentionally uses the inactive-slide
@@ -1708,7 +1672,6 @@ const updateCountdownSlide = (
   options: { remainingMs?: number; syncOverlay?: boolean } = {}
 ) => {
   const tempSlide = { ...slide }
-  const slideIndex = slides.value.findIndex((s) => s.id === tempSlide.id)
   tempSlide.data = {
     ...tempSlide.data,
     timeLeft: useMilliToTimeString(timeRemaining),
@@ -1719,7 +1682,7 @@ const updateCountdownSlide = (
     isMediaPlaying: isPlaying,
   }
   tempSlide.contents = useSlideContent(tempSlide, tempSlide?.data!!)
-  slides.value.splice(slideIndex, 1, tempSlide)
+  appStore.updateSlideInActiveSlides(tempSlide)
 
   // Countdown controls are rendered from activeSlide, while timer ticks update
   // the slides collection. Synchronize both so play/pause state is immediate.
@@ -1841,9 +1804,8 @@ const gotoAction = async (title: string, version: string) => {
 
   const updatedSlide = await gotoVerse(activeSlide.value, title, version)
   if (updatedSlide) {
-    const slideIndex = slides.value.findIndex((s) => s.id === updatedSlide.id)
     activeSlide.value = updatedSlide
-    slides.value.splice(slideIndex, 1, updatedSlide)
+    appStore.updateSlideInActiveSlides(updatedSlide)
     updateLiveOutput(activeSlide.value)
     updateSlideOnline(activeSlide.value)
   }
