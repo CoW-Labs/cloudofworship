@@ -103,17 +103,45 @@ describe("SlideRepository", () => {
     })
   })
 
+  it("detects stale slide content even when all expected IDs exist", async () => {
+    const repository = createSlideRepository()
+    await repository.putSlide(
+      slide("one", "sunday", 0, { contents: ["stale"] })
+    )
+
+    expect(
+      await repository.verifySchedule("sunday", [
+        slide("one", "sunday", 0, { contents: ["fresh"] }),
+      ])
+    ).toMatchObject({
+      complete: false,
+      missingIds: [],
+      unexpectedIds: [],
+      mismatchedIds: ["one"],
+    })
+  })
+
   it("clears durable slide state for account sign-out", async () => {
     const repository = createSlideRepository()
     await repository.putSlides([
       slide("one", "sunday", 0),
       slide("two", "midweek", 0),
     ])
+    await useIndexedDB().liveProjection.put({
+      id: "current",
+      revision: "old-account",
+      slideId: "one",
+      scheduleId: "sunday",
+      churchId: "church-1",
+      updatedAt: 1,
+      slide: slide("one", "sunday", 0),
+    })
 
     await repository.clearAllSlides()
 
     expect(await useIndexedDB().slides.count()).toBe(0)
     expect(await useIndexedDB().slideOutbox.count()).toBe(0)
+    expect(await useIndexedDB().liveProjection.count()).toBe(0)
   })
 
   it("removes session-only media from the durable record", async () => {

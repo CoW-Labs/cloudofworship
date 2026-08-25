@@ -31,7 +31,8 @@ export interface StageNextContent {
  * and never fires analytics.
  */
 export default function useStageNextContent(
-  liveSlide: Ref<Slide | null | undefined>
+  liveSlide: Ref<Slide | null | undefined>,
+  indexedScheduleSlides: Ref<readonly Slide[]>
 ) {
   const appStore = useAppStore()
   const { currentState } = storeToRefs(appStore)
@@ -51,12 +52,7 @@ export default function useStageNextContent(
    * Filtered once here and shared with the page, so the per-broadcast lookups
    * scan the smaller array instead of paying for a filter of their own.
    */
-  const scheduleSlides = computed(() => {
-    const scheduleId = currentState.value.activeSchedule?._id
-    return (currentState.value.activeSlides || []).filter(
-      (slide) => slide.scheduleId === scheduleId
-    )
-  })
+  const scheduleSlides = computed(() => indexedScheduleSlides.value)
 
   const bibleVersionFor = (slide: Slide) =>
     slide.slideStyle?.bibleVersion ||

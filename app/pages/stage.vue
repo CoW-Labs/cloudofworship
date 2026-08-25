@@ -78,11 +78,14 @@
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
 import type {
   LiveBroadcastEnvelope,
+  LiveSlideChangedNotification,
   SlideOverlayBroadcast,
 } from "~/composables/useBroadcastPost"
+import { resolveLiveSlideBroadcast } from "~/composables/useBroadcastPost"
 import {
   exitFullscreenSafely,
   requestFullscreenSafely,
@@ -94,6 +97,7 @@ definePageMeta({
 })
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 const { isTauri } = useTauri()
 
@@ -130,7 +134,44 @@ const placeholderIcon = computed(() => {
 // `scheduleSlides` is the open schedule's slides only — `activeSlides` spans
 // every schedule loaded this session. Shared from the composable so the filter
 // runs once for the whole page.
-const { nextContent, scheduleSlides } = useStageNextContent(liveSlide)
+const indexedScheduleSlides = ref<Slide[]>([])
+let scheduleReadGeneration = 0
+
+const hydrateStageSchedule = async (scheduleId?: string) => {
+  const requestGeneration = ++scheduleReadGeneration
+  if (!scheduleId) {
+    indexedScheduleSlides.value = []
+    return
+  }
+  try {
+    const storedSlides = await useSlideRepository().getScheduleSlides(scheduleId)
+    if (
+      requestGeneration === scheduleReadGeneration &&
+      currentState.value.activeSchedule?._id === scheduleId
+    ) {
+      indexedScheduleSlides.value = storedSlides
+    }
+  } catch (error) {
+    if (requestGeneration === scheduleReadGeneration) {
+      indexedScheduleSlides.value = []
+      console.warn("Unable to hydrate the stage schedule from IndexedDB:", error)
+    }
+  }
+}
+
+watch(
+  () => currentState.value.activeSchedule?._id,
+  (scheduleId) => void hydrateStageSchedule(scheduleId),
+  { immediate: true }
+)
+const cleanupSlideDatabaseNotifications = useSlideDatabaseNotifications(() =>
+  void hydrateStageSchedule(currentState.value.activeSchedule?._id)
+)
+
+const { nextContent, scheduleSlides } = useStageNextContent(
+  liveSlide,
+  indexedScheduleSlides
+)
 
 const nextText = computed(() => nextContent.value?.text || "")
 
@@ -197,39 +238,49 @@ useHead({
 })
 
 // ── Live slide feed ────────────────────────────────────────────────────────
-// Adopt whatever is already live when this window opens, and keep following
-// the shared store — pinia-shared-state mirrors `liveSlideId` from the
-// operator window, which covers slide changes made before this page loaded.
-const adoptFromStore = () => {
-  const liveId = currentState.value.liveSlideId
+// Restore the projected snapshot by its lightweight shared live slide id.
+let restoreGeneration = 0
+const restoreProjectedSlide = async (liveId: string | null) => {
+  const requestGeneration = ++restoreGeneration
   if (!liveId) {
     liveSlide.value = null
     return
   }
-  if (liveSlide.value?.id === liveId) return
-  // Deliberately searches every loaded slide rather than the open schedule:
-  // going live from one service and then opening another to prepare is normal,
-  // and the projector still shows the first one. Scoping this would blank the
-  // stage while something is genuinely on screen. Only the schedule-derived
-  // panels (NEXT, slide position) are filtered.
-  liveSlide.value =
-    (currentState.value.activeSlides || []).find(
-      (slide) => slide.id === liveId
-    ) || null
+  const record = await useLiveProjectionRepository().getCurrent()
+  if (
+    requestGeneration === restoreGeneration &&
+    isRestorableLiveProjection(record, {
+      expectedSlideId: liveId,
+      churchId: authStore.user?.churchId,
+    })
+  ) {
+    lastBroadcastTs.value = Math.max(lastBroadcastTs.value, record!.updatedAt)
+    liveSlide.value = record!.slide
+  }
 }
 
 watch(
-  [() => currentState.value.liveSlideId, () => currentState.value.activeSlides],
-  adoptFromStore,
+  () => currentState.value.liveSlideId,
+  (liveId) => {
+    void restoreProjectedSlide(liveId).catch((error) =>
+      console.warn("Unable to restore the stage projection from IndexedDB:", error)
+    )
+  },
   { immediate: true }
 )
 
 // The broadcast carries the *projected* version of the slide (current verse,
 // current hymn chunk, ticking countdown), so it wins over the stored copy.
-const cleanupBroadcast = useBroadcastMessage((data) => {
+const cleanupBroadcast = useBroadcastMessage(async (data) => {
   try {
     const envelope = (typeof data === "string" ? JSON.parse(data) : data) as
-      | LiveBroadcastEnvelope<Slide | null | string | SlideOverlayBroadcast>
+      | LiveBroadcastEnvelope<
+          | Slide
+          | null
+          | string
+          | SlideOverlayBroadcast
+          | LiveSlideChangedNotification
+        >
       | undefined
     if (!envelope || typeof envelope.ts !== "number") return
 
@@ -248,9 +299,11 @@ const cleanupBroadcast = useBroadcastMessage((data) => {
 
     // Drop messages that arrive out of order
     if (envelope.ts < lastBroadcastTs.value) return
-    lastBroadcastTs.value = envelope.ts
 
-    liveSlide.value = (payload as Slide | null) ?? null
+    const resolved = await resolveLiveSlideBroadcast(payload)
+    if (!resolved.matched || envelope.ts < lastBroadcastTs.value) return
+    lastBroadcastTs.value = envelope.ts
+    liveSlide.value = resolved.slide
   } catch (error) {
     console.error("Stage display failed to parse broadcast message:", error)
   }
@@ -289,6 +342,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cleanupBroadcast()
+  cleanupSlideDatabaseNotifications()
   cleanupShortcut?.()
   window.removeEventListener("resize", onResize)
   window.removeEventListener("fullscreenchange", checkFullScreen)

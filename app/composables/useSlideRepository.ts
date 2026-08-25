@@ -4,7 +4,8 @@ import useIndexedDB, {
   type StoredSlideRecord,
   type WorshipCloudDatabase,
 } from "~/composables/useIndexedDB"
-import { toTransportSafeSlide } from "~/utils/mediaTransport"
+import { cloneDurableSlide } from "~/utils/durableSlide"
+import { notifySlideDatabaseChanged } from "~/composables/useSlideDatabaseNotifications"
 
 export type SlideWriteOptions = {
   syncState?: SlideSyncState | ((slide: Slide) => SlideSyncState)
@@ -21,6 +22,7 @@ export type ScheduleVerification = {
   actualCount: number
   missingIds: string[]
   unexpectedIds: string[]
+  mismatchedIds: string[]
 }
 
 export interface SlideRepository {
@@ -53,12 +55,6 @@ type SlideSanitizer = (slide: Slide) => Promise<Slide>
 
 const isValidSlide = (slide: Slide | undefined | null): slide is Slide =>
   !!slide?.id && !!slide?.scheduleId
-
-const cloneDurableSlide: SlideSanitizer = async (slide) => {
-  const safe = await toTransportSafeSlide(slide)
-  // Reactive Pinia proxies cannot cross IndexedDB's structured-clone boundary.
-  return JSON.parse(JSON.stringify(safe)) as Slide
-}
 
 const resolveSyncState = (slide: Slide, options?: SlideWriteOptions) => {
   if (typeof options?.syncState === "function") {
@@ -202,18 +198,25 @@ export const createSlideRepository = (
     },
 
     async clearAllSlides() {
-      await db.transaction("rw", db.slides, db.slideOutbox, async () => {
-        await db.slides.clear()
-        await db.slideOutbox.clear()
-      })
+      await db.transaction(
+        "rw",
+        db.slides,
+        db.slideOutbox,
+        db.liveProjection,
+        async () => {
+          await db.slides.clear()
+          await db.slideOutbox.clear()
+          await db.liveProjection.clear()
+        }
+      )
     },
 
     async verifySchedule(scheduleId, expectedSlides) {
-      const expectedIds = new Set(
-        expectedSlides
-          .filter((slide) => slide.scheduleId === scheduleId)
-          .map((slide) => slide.id)
+      const expected = (await prepareSlides(expectedSlides)).filter(
+        (slide) => slide.scheduleId === scheduleId
       )
+      const expectedById = new Map(expected.map((slide) => [slide.id, slide]))
+      const expectedIds = new Set(expectedById.keys())
       const actual = await db.slides
         .where("scheduleId")
         .equals(scheduleId)
@@ -223,13 +226,26 @@ export const createSlideRepository = (
       )
       const missingIds = [...expectedIds].filter((id) => !actualIds.has(id))
       const unexpectedIds = [...actualIds].filter((id) => !expectedIds.has(id))
+      const mismatchedIds = actual
+        .filter((record) => {
+          const expectedSlide = expectedById.get(record.id)
+          return (
+            expectedSlide &&
+            JSON.stringify(record.slide) !== JSON.stringify(expectedSlide)
+          )
+        })
+        .map((record) => record.id)
 
       return {
-        complete: missingIds.length === 0 && unexpectedIds.length === 0,
+        complete:
+          missingIds.length === 0 &&
+          unexpectedIds.length === 0 &&
+          mismatchedIds.length === 0,
         expectedCount: expectedIds.size,
         actualCount: actualIds.size,
         missingIds,
         unexpectedIds,
+        mismatchedIds,
       }
     },
   }
@@ -258,7 +274,10 @@ export const enqueueSlideShadowWrite = (
   operation: (repository: SlideRepository) => Promise<void>
 ) => {
   shadowWriteTail = shadowWriteTail
-    .then(() => operation(useSlideRepository()))
+    .then(async () => {
+      await operation(useSlideRepository())
+      notifySlideDatabaseChanged()
+    })
     .catch((error) => {
       console.error(`Slide shadow write failed (${label}):`, error)
     })

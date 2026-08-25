@@ -43,11 +43,13 @@ describe("sharedStateSerializer", () => {
     expect(out.futureStates).toBeUndefined()
   })
 
-  it("preserves every field a receiving window applies", () => {
+  it("preserves lightweight shared state and omits the slide corpus", () => {
     const state = makeState(20, 10)
     const out = roundTrip(state)
-    expect(out.currentState).toEqual(state.currentState)
-    expect(out.currentState.activeSlides).toHaveLength(20)
+    expect(out.currentState.activeSlides).toBeUndefined()
+    expect(out.currentState.liveSlideId).toBe(state.currentState.liveSlideId)
+    expect(out.currentState.settings).toEqual(state.currentState.settings)
+    expect(out.currentState.schedules).toEqual(state.currentState.schedules)
     expect(out.panelSizes).toEqual({ left: 20 })
     expect(out.panelSizesTouched).toEqual({})
   })
@@ -57,12 +59,12 @@ describe("sharedStateSerializer", () => {
     expect(roundTrip(auth)).toEqual(auth)
   })
 
-  it("keeps the payload proportional to the corpus, not to undo depth", () => {
+  it("keeps the payload independent of the corpus and undo depth", () => {
     const state = makeState(200, 50)
     const before = JSON.stringify(state).length
     const after = sharedStateSerializer.serialize(state).length
     // 50 undo entries each carrying the full corpus means the naive payload is
     // an order of magnitude larger than the data anyone actually reads.
-    expect(before / after).toBeGreaterThan(20)
+    expect(before / after).toBeGreaterThan(100)
   })
 })

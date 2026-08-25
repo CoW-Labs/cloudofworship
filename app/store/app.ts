@@ -17,6 +17,7 @@ import { bibleVersionObjects } from "~/utils/constants"
 import { useThrottleFn } from "@vueuse/core"
 import posthog from "posthog-js"
 import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
+import { appStateSerializer } from "~/utils/appStateSerializer"
 import {
   cancelAllPendingSlideShadowPuts,
   cancelPendingScheduleShadowPuts,
@@ -897,17 +898,15 @@ export const useAppStore = defineStore("app", {
   },
   persist: {
     storage: piniaPluginPersistedstate.localStorage(),
-    // Without `pick` the undo/redo stacks are persisted too. Each of their
-    // entries serializes its own full copy of activeSlides, which pushes the
-    // payload past the ~5MB localStorage quota on a large schedule. Once the
-    // quota is exceeded every write fails, so an offline reload loses data.
+    serializer: appStateSerializer,
+    // Undo history remains memory-only. appStateSerializer also removes
+    // activeSlides because SlideRepository is now its durable store.
     pick: ["currentState", "panelSizes", "panelSizesTouched"],
   },
   share: {
     enable: true,
-    // Undo history is per-window. Sharing it lets one window's stack overwrite
-    // the other's. Note this only filters what a receiving window applies --
-    // pinia-shared-state still serializes the whole state when sending.
+    // Undo history is per-window. The outgoing serializer also removes it and
+    // activeSlides before pinia-shared-state sends the snapshot.
     omit: ["pastStates", "futureStates"],
   },
 })
