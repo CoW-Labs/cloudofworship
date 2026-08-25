@@ -126,7 +126,10 @@ import { Color } from "@tiptap/extension-color"
 import { Highlight as TiptapHighlight } from "@tiptap/extension-highlight"
 import { TextAlign as TiptapTextAlign } from "@tiptap/extension-text-align"
 import { Placeholder as TiptapPlaceholder } from "@tiptap/extension-placeholder"
-import { TextStyle as TipTapTextStyle } from "@tiptap/extension-text-style"
+import {
+  TextStyle as TipTapTextStyle,
+  FontSize as TipTapFontSize,
+} from "@tiptap/extension-text-style"
 import { FontFamily as TipTapFontFamily } from "@tiptap/extension-font-family"
 
 const props = defineProps<{
@@ -181,6 +184,12 @@ const getCommonExtensions = (placeholder: string, includeHeading = true) => {
       emptyEditorClass: "is-editor-empty",
     }),
     TipTapTextStyle,
+    // Toolbar font sizes are written as `em` on a textStyle mark, so they stay
+    // relative to whatever base size the surrounding context sets (rem in the
+    // editor, cqw on the projector, vw in the thumbnails).
+    TipTapFontSize.configure({
+      types: ["textStyle"],
+    }),
     TipTapFontFamily.configure({
       types: ["textStyle"],
     }),

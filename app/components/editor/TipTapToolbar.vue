@@ -59,29 +59,11 @@
       icon="i-bx-code"
       variant="ghost"
     /> -->
-      <div
-        class="button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 flex items-center gap-1"
-      >
-        <CowTooltip
-          v-for="headingSize in 3"
-          :key="`heading-size-${headingSize}`"
-          :text="`Heading ${headingSize}`"
-          :shortcut="`heading-${headingSize}`"
-        >
-          <UButton
-            @click="toggleHeading(headingSize)"
-            class="rounded-full gap-0 items-end text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
-            :class="{
-              'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                editor.isActive('heading', { level: headingSize }),
-            }"
-            variant="ghost"
-            color="gray"
-          >
-            H<span class="text-xs">{{ headingSize }}</span>
-          </UButton>
-        </CowTooltip>
-      </div>
+      <TipTapFontSizeSelect
+        class="mx-1"
+        :editor="editor"
+        @change="onFontSizeChange"
+      />
       <CowTooltip text="Normal text" shortcut="paragraph">
         <UButton
           @click="setParagraph()"
@@ -432,9 +414,42 @@ const onColorChange = (color: string) => {
   colorPaletteOpen.value = false
 }
 
-const toggleHeading = (level: number) => {
-  // Use toggleHeading which is the correct TipTap command
-  runCommand((chain) => chain.toggleHeading({ level }))
+const DEFAULT_FONT_SIZE = 100
+
+// Percent from the stepper, stored as `em` on the textStyle mark. 100% is the
+// context's own size, so it unsets the mark rather than writing "1em".
+//
+// With nothing selected a size would only land on the *next* character typed,
+// which reads as the button doing nothing. Applying it across the block the
+// caret sits in matches what people expect from a slide editor; the caret is
+// put back where it was so the collapse isn't visible.
+const onFontSizeChange = (percent: number) => {
+  const editor = props.editor
+  if (!editor || !isEditorReady.value) return
+
+  const size = percent === DEFAULT_FONT_SIZE ? null : `${percent / 100}em`
+  const selection = savedSelection.value ?? editor.state.selection
+  const collapsed = selection.from === selection.to
+
+  runCommand((chain) => {
+    let blockRange: { from: number; to: number } | null = null
+
+    if (collapsed) {
+      const $pos = editor.state.doc.resolve(
+        Math.min(Math.max(selection.from, 0), editor.state.doc.content.size)
+      )
+      // Depth 0 means the caret isn't inside a text block; expanding there
+      // would restyle the whole document.
+      if ($pos.depth > 0) {
+        blockRange = { from: $pos.start(), to: $pos.end() }
+        chain = chain.setTextSelection(blockRange)
+      }
+    }
+
+    chain = size ? chain.setFontSize(size) : chain.unsetFontSize()
+
+    return blockRange ? chain.setTextSelection(selection.from) : chain
+  })
 }
 
 const setParagraph = () => {
