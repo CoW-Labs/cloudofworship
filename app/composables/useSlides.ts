@@ -16,7 +16,6 @@ export default function useSlides() {
   const toast = useToast()
   const online = useOnline()
   const getChurchId = () => authStore.church?._id || authStore.user?.churchId
-  const slides = ref<Array<Slide>>(appStore.currentState.activeSlides || [])
   const loading = ref<boolean>(false)
   const removeStaleSlide = (slideId?: string) => {
     if (!slideId) return
@@ -654,7 +653,6 @@ export default function useSlides() {
   }
 
   return {
-    slides,
     loading,
     updateLiveOutput,
     fetchScheduleSlides,
