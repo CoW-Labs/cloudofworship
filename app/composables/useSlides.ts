@@ -3,6 +3,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
 import { toTransportSafeSlide } from "~/utils/mediaTransport"
+import { enqueueSlideShadowWrite } from "~/composables/useSlideRepository"
 import {
   getAPIErrorMessage,
   isForbiddenError,
@@ -130,7 +131,14 @@ export default function useSlides() {
         throw new Error(error.value?.message || 'Unable to refresh slides')
       }
 
-      return data.value as Slide[]
+      const fetchedSlides = (data.value as Slide[]) || []
+      enqueueSlideShadowWrite("fetch schedule slides", (repository) =>
+        repository.replaceScheduleSlides(targetScheduleId, fetchedSlides, {
+          removeMissing: true,
+          syncState: "synced",
+        })
+      )
+      return fetchedSlides
     } catch (error: any) {
       console.error('Error fetching schedule slides:', error)
       return []

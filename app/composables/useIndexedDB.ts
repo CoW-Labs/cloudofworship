@@ -7,7 +7,60 @@ import type {
   Scripture,
   Hymn,
   LocalMediaFileRecord,
+  Slide,
 } from '~/types'
+
+export type SlideSyncState = "synced" | "pending"
+
+/**
+ * Durable slide representation. Query fields live beside the slide so Dexie
+ * can index them without coupling the application Slide type to persistence
+ * metadata.
+ */
+export interface StoredSlideRecord {
+  scheduleId: string
+  id: string
+  index: number
+  serverId?: string
+  updatedAt?: string
+  localRevision: number
+  syncState: SlideSyncState
+  storedAt: string
+  deletedAt?: string | null
+  slide: Slide
+}
+
+export interface DataMigrationRecord {
+  id: string
+  version: number
+  status: "completed"
+  completedAt: string
+  sourceCount: number
+  eligibleCount: number
+  insertedCount: number
+  skippedCount: number
+  sourceFingerprint: string
+}
+
+export interface SlideOutboxRecord {
+  id: string
+  scheduleId: string
+  slideId: string
+  operation: "create" | "update" | "delete" | "reorder"
+  localRevision: number
+  createdAt: string
+  attempts: number
+}
+
+export interface LiveProjectionRecord {
+  id: "current"
+  revision: string
+  slideId: string | null
+  scheduleId: string | null
+  churchId: string | null
+  updatedAt: number
+  slide: Slide | null
+}
 
 
 export class WorshipCloudDatabase extends Dexie {
@@ -16,6 +69,10 @@ export class WorshipCloudDatabase extends Dexie {
   public library!: Table<LibraryItem, string>
   public cached!: Table<Media>
   public localMediaFiles!: Table<LocalMediaFileRecord, string>
+  public slides!: Table<StoredSlideRecord, [string, string]>
+  public migrationMeta!: Table<DataMigrationRecord, string>
+  public slideOutbox!: Table<SlideOutboxRecord, string>
+  public liveProjection!: Table<LiveProjectionRecord, "current">
   public bibleAndHymns!: Table<{
     id: string
     data: Array<Scripture | Hymn>
@@ -40,6 +97,35 @@ export class WorshipCloudDatabase extends Dexie {
       localMediaFiles:
         "key,groupId,backend,category,kind,lastAccessedAt,createdAt,updatedAt",
       bibleAndHymns: "id,data,createdAt,updatedAt",
+    })
+    this.version(4).stores({
+      songs: "id,lyrics,title,album,cover,artist,verses,createdAt,updatedAt",
+      media: "id,content,data,createdAt,updatedAt",
+      library: "id,type,content,createdAt,updatedAt",
+      cached: "id,content,data,createdAt,updatedAt",
+      localMediaFiles:
+        "key,groupId,backend,category,kind,lastAccessedAt,createdAt,updatedAt",
+      bibleAndHymns: "id,data,createdAt,updatedAt",
+      slides:
+        "[scheduleId+id],scheduleId,id,serverId,[scheduleId+index],updatedAt,localRevision,syncState,deletedAt",
+      migrationMeta: "id,version,status,completedAt",
+      slideOutbox:
+        "id,scheduleId,slideId,[scheduleId+createdAt],operation,localRevision,createdAt,attempts",
+    })
+    this.version(5).stores({
+      songs: "id,lyrics,title,album,cover,artist,verses,createdAt,updatedAt",
+      media: "id,content,data,createdAt,updatedAt",
+      library: "id,type,content,createdAt,updatedAt",
+      cached: "id,content,data,createdAt,updatedAt",
+      localMediaFiles:
+        "key,groupId,backend,category,kind,lastAccessedAt,createdAt,updatedAt",
+      bibleAndHymns: "id,data,createdAt,updatedAt",
+      slides:
+        "[scheduleId+id],scheduleId,id,serverId,[scheduleId+index],updatedAt,localRevision,syncState,deletedAt",
+      migrationMeta: "id,version,status,completedAt",
+      slideOutbox:
+        "id,scheduleId,slideId,[scheduleId+createdAt],operation,localRevision,createdAt,attempts",
+      liveProjection: "id,revision,slideId,scheduleId,updatedAt",
     })
   }
 

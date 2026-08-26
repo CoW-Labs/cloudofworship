@@ -148,6 +148,17 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
+import {
+  enqueueCoalescedSlideShadowPut,
+  enqueueSlideShadowWrite,
+  flushSlideShadowWrites,
+  useSlideRepository,
+} from "~/composables/useSlideRepository"
+import {
+  createScheduleSlideHydrator,
+  mergeServerAndPendingScheduleSlides,
+  replaceScheduleSlidesInCorpus,
+} from "~/composables/useScheduleSlideHydration"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
@@ -461,6 +472,56 @@ const { currentState } = storeToRefs(appStore)
 // the local `slides` ref sync + grid render that happens after the fetch
 // resolves, not just the fetch itself.
 const isLoadingSlides = ref(false)
+const slideRepository = useSlideRepository()
+const scheduleSlideHydrator = createScheduleSlideHydrator({
+  repository: slideRepository,
+  getActiveScheduleId: () => appStore.currentState.activeSchedule?._id,
+  getLegacySlides: (scheduleId) =>
+    appStore.slidesBySchedule[scheduleId] || [],
+  applyScheduleSlides: (scheduleId, hydratedSlides) => {
+    appStore.setActiveSlides(
+      replaceScheduleSlidesInCorpus(
+        appStore.currentState.activeSlides,
+        scheduleId,
+        hydratedSlides
+      )
+    )
+  },
+  onError: (error, scheduleId) => {
+    console.warn(
+      `Unable to hydrate schedule ${scheduleId} from IndexedDB, using legacy slides:`,
+      error
+    )
+  },
+})
+let externalSlideReadGeneration = 0
+const cleanupSlideDatabaseNotifications = useSlideDatabaseNotifications(() => {
+  const scheduleId = appStore.currentState.activeSchedule?._id
+  if (!scheduleId) return
+  const requestGeneration = ++externalSlideReadGeneration
+  void (async () => {
+    // Commit this window's coalesced edits before adopting another window's
+    // snapshot, otherwise the external read can overwrite newer local typing.
+    await flushSlideShadowWrites()
+    if (requestGeneration !== externalSlideReadGeneration) return
+    const storedSlides = await slideRepository.getScheduleSlides(scheduleId)
+    if (
+      requestGeneration !== externalSlideReadGeneration ||
+      appStore.currentState.activeSchedule?._id !== scheduleId
+    ) {
+      return
+    }
+    appStore.setActiveSlides(
+      replaceScheduleSlidesInCorpus(
+        appStore.currentState.activeSlides || [],
+        scheduleId,
+        storedSlides
+      )
+    )
+  })().catch((error) =>
+    console.warn("Unable to apply an external slide database update:", error)
+  )
+})
 const slidesGrid = ref<HTMLDivElement | null>(null)
 const slidesScroll = ref<HTMLDivElement | null>(null)
 const bulkSelectSlides = ref<boolean>(false)
@@ -681,6 +742,7 @@ onBeforeUnmount(() => {
   // would mark a viewport-derived height as user-chosen.
   slidesResizeObserver?.disconnect()
   slidesResizeObserver = null
+  cleanupSlideDatabaseNotifications()
   stopEditing()
   document.removeEventListener("mousemove", onVResizeMove)
   document.removeEventListener("mouseup", onVResizeEnd)
@@ -1145,9 +1207,6 @@ emitter.on("promote-active-slide-live", () => {
 })
 
 emitter.on("selected-schedule", (data: Schedule | string | null) => {
-  // Clear Edit Content pane
-  // activeSlide.value = undefined
-
   const incomingId = typeof data === "string" ? data : data?._id ?? null
   const isReselectingSameSchedule =
     incomingId != null && incomingId === lastSelectedScheduleId.value
@@ -1156,6 +1215,11 @@ emitter.on("selected-schedule", (data: Schedule | string | null) => {
   // App boot re-emits this for the already-active schedule (e.g. on reload) —
   // only clear the live slide when the schedule actually changes.
   if (isReselectingSameSchedule) return
+
+  // Clear the Edit Content pane — the selection belongs to the schedule we
+  // just left, so keeping it would leave the editor on a slide that isn't in
+  // the grid any more.
+  activeSlide.value = undefined
 
   // Clear live projection
   appStore.setLiveSlide("")
@@ -1235,6 +1299,9 @@ const uploadOfflineSlides = async () => {
         reconciledMap.has(slide.id) ? reconciledMap.get(slide.id)! : slide
       )
       appStore.setActiveSlides(updatedSlides)
+      enqueueSlideShadowWrite("reconcile uploaded slides", (repository) =>
+        repository.putSlides(reconciledSlides, { syncState: "synced" })
+      )
 
       // Broadcast newly created slides via WebSocket after successful upload
       if (inserted.length > 0) {
@@ -1253,10 +1320,14 @@ const uploadOfflineSlides = async () => {
   }
 }
 
+let networkRefreshGeneration = 0
+
 const retrieveSlidesOnline = async (scheduleId: string) => {
   if (!online.value || !scheduleId || !authStore.user?.churchId) {
     return
   }
+
+  const requestGeneration = ++networkRefreshGeneration
 
   // Only block the grid with a skeleton when there's nothing on screen yet —
   // background refreshes (e.g. "refresh-slides") shouldn't blank out
@@ -1269,6 +1340,9 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
     const { data, error } = await useAPIFetch(
       `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
     )
+    // A newer schedule selection or refresh owns the visible state now.
+    if (requestGeneration !== networkRefreshGeneration) return
+
     if (!error.value) {
       let tempSlides = (data.value as Slide[]) || []
       if (!Array.isArray(tempSlides)) {
@@ -1317,22 +1391,54 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
       // Sort slides by index
       tempSlides = [...tempSlides].sort((a, b) => a.index - b.index)
 
+      const scheduleSnapshot = mergeServerAndPendingScheduleSlides(
+        tempSlides,
+        appStore.slidesBySchedule[scheduleId] || []
+      )
       appStore.setActiveSlides(
-        useMergeObjectArray(tempSlides, [...appStore.currentState.activeSlides])
+        replaceScheduleSlidesInCorpus(
+          appStore.currentState.activeSlides,
+          scheduleId,
+          scheduleSnapshot
+        )
+      )
+      void enqueueSlideShadowWrite(
+        "refresh schedule snapshot",
+        (repository) =>
+          repository.replaceScheduleSlides(scheduleId, scheduleSnapshot, {
+            removeMissing: true,
+            syncState: (slide) => (slide._id ? "synced" : "pending"),
+          })
+      ).then(async () => {
+        const verification = await slideRepository.verifySchedule(
+          scheduleId,
+          scheduleSnapshot
+        )
+        if (!verification.complete) {
+          console.warn("IndexedDB schedule verification failed:", {
+            scheduleId,
+            ...verification,
+          })
+        }
+      }).catch((error) =>
+        console.warn("Unable to verify IndexedDB schedule snapshot:", error)
       )
       appStore.setLastSynced(new Date().toISOString())
     } else {
       console.warn("Unable to refresh schedule slides:", error.value)
     }
   } finally {
-    appStore.setSlidesLoading(false)
-    if (showSkeletonWhileLoading) {
-      // Wait for the activeSlides watcher to sync the local `slides` ref and
-      // for Vue to flush that update (including mounting the slide cards)
-      // before dropping the skeleton, so the grid never shows an empty/half
-      // -rendered frame between "fetch done" and "slides actually painted".
-      await nextTick()
-      isLoadingSlides.value = false
+    if (requestGeneration === networkRefreshGeneration) {
+      appStore.setSlidesLoading(false)
+      if (
+        showSkeletonWhileLoading &&
+        appStore.currentState.activeSchedule?._id === scheduleId
+      ) {
+        // Wait for Vue to flush the hydrated/fetched slide cards before
+        // dropping the skeleton, so the grid never paints a half-empty frame.
+        await nextTick()
+        isLoadingSlides.value = false
+      }
     }
   }
 }
@@ -1371,26 +1477,86 @@ watch(
     )
     if (updatedActiveSlide) {
       activeSlide.value = updatedActiveSlide
+      return
     }
+
+    // The selected slide is gone from the schedule — deleted here, by a
+    // teammate over the socket, or in another window. Drop the editor back to
+    // its empty state instead of leaving a slide on screen that no longer
+    // exists. Skipped while the schedule is still hydrating (the list is
+    // briefly empty) and when the selection belongs to another schedule, which
+    // is how switching schedules keeps the current selection.
+    if (isLoadingSlides.value) return
+    const activeScheduleId = appStore.currentState.activeSchedule?._id
+    if (
+      activeSlide.value.scheduleId &&
+      activeScheduleId &&
+      activeSlide.value.scheduleId !== activeScheduleId
+    ) {
+      return
+    }
+    activeSlide.value = undefined
   },
   { immediate: true }
 )
 
-// Set slides to slides based on scheduler
+const loadSelectedScheduleSlides = async (schedule: Schedule | null) => {
+  const scheduleId = schedule?._id
+  if (!scheduleId) {
+    scheduleSlideHydrator.invalidate()
+    networkRefreshGeneration += 1
+    isLoadingSlides.value = false
+    appStore.setSlidesLoading(false)
+    return
+  }
+
+  // Invalidate any server response belonging to the previously selected
+  // schedule before waiting on this schedule's IndexedDB read.
+  networkRefreshGeneration += 1
+
+  const hadLocalSlides = !!appStore.slidesBySchedule[scheduleId]?.length
+  if (!hadLocalSlides) isLoadingSlides.value = true
+
+  const hydration = await scheduleSlideHydrator.hydrate(scheduleId)
+  if (
+    hydration.source === "stale" ||
+    appStore.currentState.activeSchedule?._id !== scheduleId
+  ) {
+    return
+  }
+
+  if (hydration.slides.length) {
+    await nextTick()
+    if (appStore.currentState.activeSchedule?._id === scheduleId) {
+      isLoadingSlides.value = false
+    }
+  }
+
+  // A schedule without updatedAt has not reached the server yet.
+  if (!schedule.updatedAt) {
+    isLoadingSlides.value = false
+    await createSchedule(schedule)
+    return
+  }
+
+  if (!online.value) {
+    isLoadingSlides.value = false
+    appStore.setSlidesLoading(false)
+    return
+  }
+
+  // The cache is already visible. Reconcile with the server in the background.
+  void retrieveSlidesOnline(scheduleId).catch((error) =>
+    console.warn("Unable to refresh schedule slides:", error)
+  )
+}
+
+// Hydrate the selected schedule locally before refreshing it from the server.
 watch(
   () => currentState.value.activeSchedule,
-  (oldVal, newVal) => {
-    if (oldVal?._id !== newVal?._id) {
-      // Check if activeSchedule is remote object
-      if (!currentState.value.activeSchedule?.updatedAt) {
-        createSchedule(currentState.value.activeSchedule as Schedule)
-      } else {
-        // retrieve all slides online
-        retrieveSlidesOnline(currentState.value.activeSchedule?._id).catch(
-          (error) => console.warn("Unable to refresh schedule slides:", error)
-        )
-      }
-    }
+  (schedule, previousSchedule) => {
+    if (schedule?._id === previousSchedule?._id) return
+    void loadSelectedScheduleSlides(schedule)
   },
   { immediate: true }
 )
@@ -1401,12 +1567,9 @@ const isMediaVideoSlide = (slide: Slide) =>
   slide.type === slideTypes.media &&
   slide.backgroundType === backgroundTypes.video
 
-// Realtime broadcast cadence (~250ms): fast enough to feel live as a
-// collaborator types, but still coalesced so a burst of keystrokes is a few
-// socket frames, not dozens. This is the main performance lever on low-end
-// machines — every broadcast makes each peer swap the activeSlides array
-// reference AND triggers a pinia-shared-state localStorage write, so do NOT
-// push this toward per-keystroke.
+// Realtime collaborator cadence (~250ms): fast enough to feel live while still
+// coalescing a burst of keystrokes into a few socket frames. IndexedDB writes
+// use their own slower coalescing window below.
 const broadcastSlideEdit = useThrottleFn(
   (slide: Slide) => {
     if (!online.value || isMediaVideoSlide(slide)) return
@@ -1486,7 +1649,13 @@ const persistSlideOnline = useThrottleFn(
 
 // Public entry point for "an edit happened": announce presence (once per
 // slide), broadcast fast, persist slow.
-const updateSlideOnline = (slide: Slide) => {
+const updateSlideOnline = (
+  slide: Slide,
+  options: { durable?: boolean } = { durable: true }
+) => {
+  if (options.durable !== false) {
+    enqueueCoalescedSlideShadowPut(slide, { syncState: "pending" })
+  }
   announceEditing(slide?.id)
   broadcastSlideEdit(slide)
   persistSlideOnline(slide)
@@ -1529,11 +1698,15 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
       })
     }
 
-    appStore.setActiveSlides(
-      appStore.currentState.activeSlides.filter(
-        (slide) => !slideMatchesId(slide)
+    if (activeStoreSlide) {
+      appStore.removeActiveSlide(activeStoreSlide)
+    } else {
+      appStore.setActiveSlides(
+        appStore.currentState.activeSlides.filter(
+          (slide) => !slideMatchesId(slide)
+        )
       )
-    )
+    }
     return
   }
 
@@ -1542,11 +1715,6 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   // Clear countdown animation if slide is a countdown slide before deleting
   if (tempSlide?.type === slideTypes.countdown) {
     stopCountdown()
-  }
-
-  // Clear Edit Content pane if the deleted slide is currently selected
-  if (activeSlide.value?.id === slideId) {
-    // activeSlide.value = undefined
   }
 
   // Clear live projection if the deleted slide is currently live
@@ -1807,7 +1975,9 @@ const gotoAction = async (title: string, version: string) => {
     activeSlide.value = updatedSlide
     appStore.updateSlideInActiveSlides(updatedSlide)
     updateLiveOutput(activeSlide.value)
-    updateSlideOnline(activeSlide.value)
+    // Verse navigation is live runtime state. Broadcasting it keeps every
+    // output current, but it must not create an IndexedDB write on each cue.
+    updateSlideOnline(activeSlide.value, { durable: false })
   }
 }
 

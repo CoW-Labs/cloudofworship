@@ -1283,6 +1283,19 @@ async function bindTauriLiveWindowLifecycle() {
 // WINDOW MANAGEMENT CODE ENDS HERE
 
 onMounted(async () => {
+  // Step 1 of the slide-storage migration: create a verified IndexedDB copy
+  // while Pinia remains the runtime source of truth. The legacy localStorage
+  // payload is deliberately retained for rollback until the repository cutover
+  // has shipped and proven stable.
+  try {
+    await runDataMigrations(appStore.currentState.activeSlides || [])
+  } catch (error) {
+    console.error(
+      "Unable to prepare durable slide storage; continuing with legacy storage:",
+      error
+    )
+  }
+
   const { isTauri } = useTauri()
   if (isTauri) {
     await ndiBroadcast.initialize()
