@@ -364,12 +364,12 @@ const liveOutputSlides = computed({
     )
   },
   set(newVal) {
-    appStore.replaceScheduleActiveSlides(newVal)
     // Set Index for each slide
-    const tempSlides = [...newVal].map((slide, index) => {
-      slide.index = index
-      return slide
-    })
+    const tempSlides = [...newVal].map((slide, index) => ({
+      ...slide,
+      index,
+    }))
+    appStore.replaceScheduleActiveSlides(tempSlides)
     useGlobalEmit(appWideActions.batchUpdateSlides, tempSlides)
 
     // Broadcast the reorder to other tabs/devices
@@ -487,7 +487,7 @@ onMounted(() => {
 // }
 
 const setLiveSlide = (slideId: string) => {
-  const slide = appStore.currentState.activeSlides.find(
+  const slide = (appStore.currentState.activeSlides || []).find(
     (s) => s.id === slideId || s._id === slideId
   )
   if (!slide) return

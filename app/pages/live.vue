@@ -54,8 +54,10 @@ import { useAppStore } from "@/store/app"
 import type { Slide } from "~/types"
 import type {
   LiveBroadcastEnvelope,
+  LiveSlideChangedNotification,
   SlideOverlayBroadcast,
 } from "~/composables/useBroadcastPost"
+import { resolveLiveSlideBroadcast } from "~/composables/useBroadcastPost"
 import { useAuthStore } from "~/store/auth"
 import {
   exitFullscreenSafely,
@@ -68,6 +70,7 @@ definePageMeta({
 })
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 const { isTauri } = useTauri()
 const isFullScreen = ref(false)
@@ -208,42 +211,58 @@ onMounted(() => {
 
   checkFullScreen()
 
-  // Show active slide or first slide when live window opens
-  const initializeLiveSlide = () => {
-    const activeSlides = currentState.value.activeSlides || []
-    const currentLiveSlideId = currentState.value.liveSlideId
-
-    // Check if there's an active slide selected
-    if (currentLiveSlideId) {
-      const activeSlide = activeSlides.find(
-        (slide) => slide.id === currentLiveSlideId
-      )
-      if (activeSlide) {
-        mostUpdatedLiveSlide.value = activeSlide
-        return
+  // Restore only the projection record that agrees with lightweight shared state.
+  const initializeLiveSlide = async () => {
+    const projected = await useLiveProjectionRepository().getCurrent()
+    const expectedSlideId = currentState.value.liveSlideId || null
+    if (
+      projected &&
+      isRestorableLiveProjection(projected, {
+        expectedSlideId,
+        churchId: authStore.user?.churchId,
+      })
+    ) {
+      mostUpdatedLiveSlide.value = projected.slide
+      if (
+        projected.slideId &&
+        appStore.currentState.liveSlideId !== projected.slideId
+      ) {
+        appStore.setLiveSlide(projected.slideId)
+      } else if (!projected.slideId && appStore.currentState.liveSlideId) {
+        appStore.setLiveSlide("")
       }
+      return
     }
-
-    // If no active slide, show the first slide
-    const firstSlide = activeSlides[0]
-    if (firstSlide) {
-      mostUpdatedLiveSlide.value = firstSlide
-      // Update the live slide ID in the store so it's reflected everywhere
-      appStore.setLiveSlide(firstSlide.id)
-    }
+    // Never resurrect a schedule slide when the projected record is missing,
+    // expired, from another church, or disagrees with the shared live slide id.
+    if (!expectedSlideId) mostUpdatedLiveSlide.value = null
   }
 
   // Initialize the slide display
-  initializeLiveSlide()
+  void initializeLiveSlide().catch((error) =>
+    console.warn("Unable to restore the live projection from IndexedDB:", error)
+  )
+  const stopRestoreWatch = watch(
+    () => currentState.value.liveSlideId,
+    () => {
+      void initializeLiveSlide().catch((error) =>
+        console.warn("Unable to reconcile the live projection:", error)
+      )
+    }
+  )
 
   // Store cleanup function to properly dispose of BroadcastChannel
-  const cleanupBroadcast = useBroadcastMessage((data) => {
+  const cleanupBroadcast = useBroadcastMessage(async (data) => {
     try {
       // Accept the old JSON envelope during hot updates, but use the direct
       // structured-clone object for all new messages.
       const envelope = (typeof data === "string" ? JSON.parse(data) : data) as
         | LiveBroadcastEnvelope<
-            Slide | null | string | SlideOverlayBroadcast
+            | Slide
+            | null
+            | string
+            | SlideOverlayBroadcast
+            | LiveSlideChangedNotification
           >
         | undefined
       if (!envelope || typeof envelope.ts !== "number") return
@@ -271,9 +290,14 @@ onMounted(() => {
       // tick from a tab that hasn't yet caught up to a newer local live output
       // change) instead of always applying whatever lands last.
       if (envelope.ts < lastBroadcastTs.value) return
-      lastBroadcastTs.value = envelope.ts
 
-      const parsed = payload as Slide | null
+      const resolved = await resolveLiveSlideBroadcast(payload)
+      if (!resolved.matched) return
+      // The IndexedDB read yielded. Re-check in case a newer notification was
+      // resolved and displayed while this one was waiting.
+      if (envelope.ts < lastBroadcastTs.value) return
+      lastBroadcastTs.value = envelope.ts
+      const parsed = resolved.slide
 
       // null broadcast means the live slide was deleted — blank the projection
       if (parsed === null) {
@@ -364,6 +388,7 @@ onMounted(() => {
 
   // Cleanup on unmount
   onBeforeUnmount(() => {
+    stopRestoreWatch()
     cleanupBroadcast()
   })
 })

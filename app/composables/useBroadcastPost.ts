@@ -1,5 +1,6 @@
 import type { Slide } from "~/types"
 import { isSessionMediaUrl } from "~/utils/mediaTransport"
+import { useLiveProjectionRepository } from "~/composables/useLiveProjectionRepository"
 
 export const LIVE_CHANNEL_NAME = "cow-live-channel"
 
@@ -15,6 +16,37 @@ export type LiveBroadcastEnvelope<T = unknown> = {
 export type SlideOverlayBroadcast = {
   action: "show-slide-overlay" | "remove-slide-overlay"
   slide: Slide | null
+}
+
+export type LiveSlideChangedNotification = {
+  kind: "live-slide-changed"
+  revision: string
+  slideId: string | null
+}
+
+export const isLiveSlideChangedNotification = (
+  payload: unknown
+): payload is LiveSlideChangedNotification =>
+  !!payload &&
+  typeof payload === "object" &&
+  (payload as LiveSlideChangedNotification).kind === "live-slide-changed" &&
+  typeof (payload as LiveSlideChangedNotification).revision === "string"
+
+export const resolveLiveSlideBroadcast = async (payload: unknown) => {
+  if (!isLiveSlideChangedNotification(payload)) {
+    return {
+      matched: payload === null || isSlidePayload(payload),
+      slide: (payload === null || isSlidePayload(payload)
+        ? payload
+        : null) as Slide | null,
+    }
+  }
+
+  const record = await useLiveProjectionRepository().getCurrent()
+  if (!record || record.revision !== payload.revision) {
+    return { matched: false, slide: null as Slide | null }
+  }
+  return { matched: true, slide: record.slide }
 }
 
 const messageId = () =>
@@ -34,14 +66,18 @@ const mirrorToTauriWindows = async (serialized: string) => {
   }
 }
 
-const useBroadcastPost = <T>(payload: T) => {
+const postEnvelope = <T>(
+  payload: T,
+  envelopeId = messageId(),
+  timestamp = Date.now()
+) => {
   if (!bcInstance) {
     bcInstance = new BroadcastChannel(LIVE_CHANNEL_NAME)
   }
 
   const message: LiveBroadcastEnvelope<T> = {
-    id: messageId(),
-    ts: Date.now(),
+    id: envelopeId,
+    ts: timestamp,
     payload,
   }
 
@@ -60,6 +96,69 @@ const useBroadcastPost = <T>(payload: T) => {
   if (isTauri) {
     mirrorToTauriWindows(serialized)
   }
+}
+
+/** Send a small non-slide message over the shared browser and Tauri transport. */
+export const postCrossWindowNotification = <T>(payload: T) => {
+  postEnvelope(payload)
+}
+
+const isSlidePayload = (payload: unknown): payload is Slide =>
+  !!payload &&
+  typeof payload === "object" &&
+  typeof (payload as Slide).id === "string" &&
+  typeof (payload as Slide).scheduleId === "string"
+
+let liveProjectionWriteTail: Promise<void> = Promise.resolve()
+
+const useBroadcastPost = <T>(payload: T) => {
+  // Overlay messages are already small and do not represent the primary live
+  // slide, so they stay on the direct channel.
+  if (payload !== null && !isSlidePayload(payload)) {
+    postCrossWindowNotification(payload)
+    return
+  }
+
+  const slide = (payload === null ? null : payload) as Slide | null
+  const revision = messageId()
+  const timestamp = Date.now()
+
+  // Writes and notifications are ordered. The notification is posted only
+  // after its record is committed, so a secondary window never wakes up before
+  // the projected state is readable. On an IndexedDB failure, send the legacy
+  // full payload so projection remains available during the cutover.
+  liveProjectionWriteTail = liveProjectionWriteTail
+    .catch((error) => {
+      console.warn("Previous live projection broadcast failed:", error)
+    })
+    .then(async () => {
+      try {
+        await useLiveProjectionRepository().putCurrent(
+          slide,
+          revision,
+          timestamp
+        )
+        postEnvelope<LiveSlideChangedNotification>(
+          {
+            kind: "live-slide-changed",
+            revision,
+            slideId: slide?.id || null,
+          },
+          revision,
+          timestamp
+        )
+      } catch (error) {
+        console.warn(
+          "Unable to persist live projection, sending legacy payload:",
+          error
+        )
+        postEnvelope(slide, revision, timestamp)
+      }
+    })
+}
+
+export const flushLiveProjectionBroadcasts = async () => {
+  await liveProjectionWriteTail
 }
 
 export const useBroadcastOverlayPost = (

@@ -4,7 +4,7 @@
  * src-tauri/tauri.conf.json, so nothing else should hardcode a version.
  */
 export default function useAppVersion() {
-  const APP_VERSION = "v0.55.2-beta"
+  const APP_VERSION = "v0.56.0-beta"
 
   return {
     appVersion: APP_VERSION,
