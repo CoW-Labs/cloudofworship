@@ -496,7 +496,23 @@ const downloadEssentialResources = async () => {
   setLoadingTask("startup", "Refreshing account, church, and schedules.", 5)
 
   if (online.value) {
-    const user = await fetchUser()
+    // fetchChurch() and retrieveSchedules() read churchId out of the store
+    // rather than taking it as an argument, so they can only run alongside
+    // fetchUser() once something has already put it there. After the first
+    // successful load it is in persisted state, and the three calls have no
+    // real ordering dependency — sharing one round trip instead of two.
+    //
+    // On a cold device they stay behind fetchUser(): fetchChurch() with no
+    // user in the store takes its no-churchId branch and redirects a
+    // perfectly valid session to /login.
+    const cachedChurchId = authStore.user?.churchId || authStore.church?._id
+
+    const userRequest = fetchUser()
+    const warmRequest = cachedChurchId
+      ? Promise.allSettled([fetchChurch(), retrieveSchedules()])
+      : null
+
+    const user = await userRequest
 
     if (!user && !authStore.user?._id) {
       loadingResources.value = false
@@ -510,10 +526,18 @@ const downloadEssentialResources = async () => {
       return
     }
 
-    await Promise.allSettled([
-      fetchChurch(),
-      retrieveSchedules(),
-    ])
+    if (warmRequest) {
+      await warmRequest
+
+      // The warm pass keyed off the cached church. If the account has since
+      // been moved to a different one, it fetched the wrong church's data and
+      // has to be redone against the identity the server just confirmed.
+      if (user?.churchId && user.churchId !== cachedChurchId) {
+        await Promise.allSettled([fetchChurch(), retrieveSchedules()])
+      }
+    } else {
+      await Promise.allSettled([fetchChurch(), retrieveSchedules()])
+    }
   } else {
     setLoadingTask("startup", "Offline: using saved account and app settings.", 100)
     await retrieveSchedules()
@@ -1305,22 +1329,29 @@ onMounted(async () => {
   useLocalMediaStorage()
     .reconcileOrphans()
     .catch((err) => console.warn("Local media reconciliation failed:", err))
-  const [, advertResult] = await Promise.allSettled([
-    downloadEssentialResources().catch((err) => {
-      console.error("Failed to finish loading resources:", err)
-      loadingResources.value = false
-    }),
-    fetchActiveAdvert(),
-  ])
+  await downloadEssentialResources().catch((err) => {
+    console.error("Failed to finish loading resources:", err)
+    loadingResources.value = false
+  })
 
-  const advert = advertResult.status === "fulfilled" ? advertResult.value : null
-  if (advert && !hasAdvertBeenShown(advert._id) && !isNewlySignedUpUser()) {
-    setTimeout(() => {
+  // The advert is not shown for another 10s, and is then usually discarded for
+  // new accounts or adverts already seen. Fetching it alongside the calls that
+  // gate the loading screen spent a connection on a payload nobody reads yet,
+  // so the request now happens only when the modal is about to open.
+  setTimeout(async () => {
+    if (!online.value || isNewlySignedUpUser()) return
+
+    try {
+      const advert = await fetchActiveAdvert()
+      if (!advert || hasAdvertBeenShown(advert._id)) return
+
       showAdvertModal.value = true
       markAdvertAsShown(advert._id)
       usePosthogCapture("ADVERT_MODAL_OPENED")
-    }, 10000)
-  }
+    } catch (error) {
+      console.warn("Unable to load the active advert:", error)
+    }
+  }, 10000)
 
   if (location.hostname !== "localhost") {
     useGtag()
