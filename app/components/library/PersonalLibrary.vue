@@ -286,6 +286,9 @@ import SongsIcon from "~/components/svgs/SongsIcon.vue"
 const props = defineProps<{
   page: string
   songToEdit?: Song
+  // Bumped by every request to open this panel, so a repeat request lands even
+  // when `page`/`songToEdit` are unchanged and the panel is already mounted.
+  openToken?: number
 }>()
 
 const turnToLibrarySongAction = (song: Song): QuickAction => {
@@ -387,14 +390,14 @@ watch(page, (newVal, oldVal) => {
   }
 })
 
-// The panel can already be open when a song slide asks to edit its song —
-// react to the incoming song rather than relying on a fresh mount.
+// The panel can already be open when something asks it to add or edit a song,
+// so re-apply the requested page on every request rather than relying on a
+// fresh mount or on the props themselves changing.
 watch(
-  () => props.songToEdit,
-  (song) => {
-    if (!song) return
-    songToEdit.value = song
-    page.value = "add-song"
+  () => props.openToken,
+  () => {
+    songToEdit.value = props.songToEdit
+    page.value = props.page || ""
   }
 )
 
