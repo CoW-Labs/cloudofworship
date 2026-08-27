@@ -127,11 +127,10 @@
         </UButton>
 
         <!-- A song slide is already backed by the library song it was created
-        from, so "save to library" is redundant here — edit the source instead. -->
+        from, so "save to library" is redundant here — edit the source instead.
+        A setlist edits whichever of its songs is currently showing. -->
         <UButton
-          v-if="
-            slide?.type === slideTypes.song && slide?.slideMode !== 'overlay'
-          "
+          v-if="canEditSong && slide?.slideMode !== 'overlay'"
           variant="ghost"
           color="gray"
           block
@@ -143,7 +142,11 @@
           "
         >
           <template #leading><EditIcon class="w-4 h-4" /></template>
-          Edit song in library
+          {{
+            slide?.type === slideTypes.songSetlist
+              ? "Edit active song in library"
+              : "Edit song in library"
+          }}
         </UButton>
 
         <ConfirmDialog
@@ -281,7 +284,7 @@
 
 <script setup lang="ts">
 import { appWideActions } from "~/utils/constants"
-import type { Slide, Song } from "~/types"
+import type { Slide, Song, SongSetlistData } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 
@@ -385,11 +388,48 @@ const handleSaveConfirm = () => {
 
 // Opens the library's song editor on the song this slide was created from,
 // preferring the saved library copy over the snapshot carried on the slide.
+// The song this slide edits: its own for a song slide, the active entry for a
+// setlist. Undefined for every other slide type, which hides the action.
+const editableSong = computed<Song | undefined>(() => {
+  if (props.slide?.type === slideTypes.songSetlist) {
+    const data = props.slide?.data as SongSetlistData | undefined
+    return data?.songs?.[data?.activeSongIndex || 0]?.song
+  }
+  if (props.slide?.type === slideTypes.song) {
+    return props.slide?.data as Song | undefined
+  }
+  return undefined
+})
+
+const editableSongId = computed(() => {
+  if (props.slide?.type === slideTypes.songSetlist) {
+    const data = props.slide?.data as SongSetlistData | undefined
+    const activeItem = data?.songs?.[data?.activeSongIndex || 0]
+    return (
+      activeItem?.songId || activeItem?.song?._id || activeItem?.song?.id || ""
+    )
+  }
+  return (
+    props.slide?.songId ||
+    editableSong.value?._id ||
+    editableSong.value?.id ||
+    ""
+  )
+})
+
+// A song slide always knows its song, by object or by id; a setlist needs at
+// least one song in it.
+const canEditSong = computed(
+  () =>
+    (props.slide?.type === slideTypes.song ||
+      props.slide?.type === slideTypes.songSetlist) &&
+    !!editableSongId.value
+)
+
 const handleEditSongClick = async () => {
-  const slideSong = props.slide?.data as Song | undefined
-  const songId = props.slide?.songId || slideSong?._id || slideSong?.id
+  const songId = editableSongId.value
   const libraryItem = songId ? await getLibraryItem(songId) : undefined
-  const song = (libraryItem?.content as Song) || slideSong
+  const song = (libraryItem?.content as Song) || editableSong.value
 
   if (!song) {
     useToast().add({
