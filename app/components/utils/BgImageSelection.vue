@@ -230,7 +230,7 @@ const onImageFileSelect = (event: Event) => {
 
 const revokeLocalImageObjectUrls = () => {
   const usedBackgrounds = new Set(
-    appStore.currentState.activeSlides.map((slide) => slide.background)
+    appStore.activeSlides.map((slide) => slide.background)
   )
   localImageObjectUrls.forEach((url) => {
     if (!usedBackgrounds.has(url)) {

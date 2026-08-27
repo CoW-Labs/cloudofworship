@@ -481,7 +481,7 @@ const scheduleSlideHydrator = createScheduleSlideHydrator({
   applyScheduleSlides: (scheduleId, hydratedSlides) => {
     appStore.setActiveSlides(
       replaceScheduleSlidesInCorpus(
-        appStore.currentState.activeSlides,
+        appStore.activeSlides,
         scheduleId,
         hydratedSlides
       )
@@ -513,7 +513,7 @@ const cleanupSlideDatabaseNotifications = useSlideDatabaseNotifications(() => {
     }
     appStore.setActiveSlides(
       replaceScheduleSlidesInCorpus(
-        appStore.currentState.activeSlides || [],
+        appStore.activeSlides,
         scheduleId,
         storedSlides
       )
@@ -1273,7 +1273,7 @@ const uploadOfflineSlides = async () => {
 
   // Snapshot offline slides at the moment the lock is acquired so that any
   // slides added while the request is in-flight are picked up on the next run.
-  const offlineSlides = appStore.currentState.activeSlides.filter(
+  const offlineSlides = appStore.activeSlides.filter(
     (slide) => slide._id === undefined && slide.scheduleId
   )
   if (offlineSlides.length === 0) return
@@ -1293,7 +1293,7 @@ const uploadOfflineSlides = async () => {
       )
 
       // Update the store: replace matching slides so they now carry _id
-      const currentSlides = [...appStore.currentState.activeSlides]
+      const currentSlides = [...appStore.activeSlides]
       const reconciledMap = new Map(reconciledSlides.map((s) => [s.id, s]))
       const updatedSlides = currentSlides.map((slide) =>
         reconciledMap.has(slide.id) ? reconciledMap.get(slide.id)! : slide
@@ -1380,7 +1380,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
           // a stale, session-dead blob: URL. Restore the still-valid locally
           // rehydrated background so the "server wins" merge can't clobber a
           // working slide with a broken URL.
-          const previousBackground = appStore.currentState.activeSlides.find(
+          const previousBackground = appStore.activeSlides.find(
             (s) => s.id === slide.id
           )?.background
           if (previousBackground) {
@@ -1397,7 +1397,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
       )
       appStore.setActiveSlides(
         replaceScheduleSlidesInCorpus(
-          appStore.currentState.activeSlides,
+          appStore.activeSlides,
           scheduleId,
           scheduleSnapshot
         )
@@ -1670,7 +1670,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
 
   if (!tempSlide) {
     const activeStoreSlide =
-      appStore.currentState.activeSlides.find(slideMatchesId)
+      appStore.activeSlides.find(slideMatchesId)
     const wasLive =
       appStore.currentState.liveSlideId === slideId ||
       (activeStoreSlide
@@ -1702,7 +1702,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
       appStore.removeActiveSlide(activeStoreSlide)
     } else {
       appStore.setActiveSlides(
-        appStore.currentState.activeSlides.filter(
+        appStore.activeSlides.filter(
           (slide) => !slideMatchesId(slide)
         )
       )

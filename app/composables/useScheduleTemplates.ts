@@ -196,7 +196,7 @@ export default function useScheduleTemplates() {
   }
 
   const getScheduleSlidesForCopy = async (scheduleId: string): Promise<Slide[]> => {
-    const localSlides = appStore.currentState.activeSlides.filter(
+    const localSlides = appStore.activeSlides.filter(
       (slide) => slide.scheduleId === scheduleId
     )
     const { fetchScheduleSlides } = useSchedules()

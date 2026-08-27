@@ -490,7 +490,7 @@ export default function useLibrary() {
       // slide deletion deliberately leaves the blob alone while the slide is
       // saved — so free it now. Unless the slide is still sitting in a schedule,
       // in which case that copy is still playing from it.
-      const stillInSchedule = appStore.currentState.activeSlides.some(
+      const stillInSchedule = appStore.activeSlides.some(
         (slide) => slide.id === slideId || slide._id === slideId
       )
       if (!stillInSchedule) {
