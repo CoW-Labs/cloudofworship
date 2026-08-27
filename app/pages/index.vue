@@ -253,7 +253,7 @@ watch(
       return
     }
 
-    const liveSlide = appStore.currentState.activeSlides.find(
+    const liveSlide = appStore.activeSlides.find(
       (slide) => slide.id === liveSlideId
     )
     if (liveSlide) {

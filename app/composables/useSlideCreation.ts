@@ -43,7 +43,7 @@ export default function useSlideCreation() {
   const preSlideCreation = (): Slide => {
     const tempSlide: Slide = {
       id: useObjectID(),
-      index: appStore.currentState.activeSlides.length,
+      index: appStore.activeSlides.length,
       name: "Untitled",
       type: slideTypes.text,
       layout: slideLayoutTypes.full_text,
@@ -137,7 +137,7 @@ export default function useSlideCreation() {
     const tempSlide: Slide = {
       ...slideToDuplicate,
       id: useObjectID(),
-      index: appStore.currentState.activeSlides.length,
+      index: appStore.activeSlides.length,
       name: `${slideToDuplicate.name || (isTimeSlide ? "Live Time" : "Text")}`,
       slideMode: "overlay",
       contents: [...slideToDuplicate.contents],

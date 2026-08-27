@@ -33,3 +33,5 @@ wrangler.toml.backup
 large_assets
 
 bible-json-converter.ts
+.vercel
+.env*

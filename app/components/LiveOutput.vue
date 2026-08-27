@@ -342,7 +342,7 @@ const broadcastSlideReorder = (slideOrder: string[]) => {
 const activeSlidesById = computed(
   () =>
     new Map(
-      currentState.value.activeSlides.map((slide) => [slide.id, slide] as const)
+      appStore.activeSlides.map((slide) => [slide.id, slide] as const)
     )
 )
 
@@ -487,7 +487,7 @@ onMounted(() => {
 // }
 
 const setLiveSlide = (slideId: string) => {
-  const slide = (appStore.currentState.activeSlides || []).find(
+  const slide = appStore.activeSlides.find(
     (s) => s.id === slideId || s._id === slideId
   )
   if (!slide) return
