@@ -465,12 +465,22 @@
 
       <!-- SONG CONTROLS -->
       <div
-        v-if="slide?.type === slideTypes.song"
+        v-if="
+          slide?.type === slideTypes.song ||
+          slide?.type === slideTypes.songSetlist
+        "
         class="button-group song-controls bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 px-0 h-[36px] mt-[2px] flex items-center gap-1"
       >
-        <CowTooltip text="Refresh song lyrics">
+        <CowTooltip
+          :text="
+            slide?.type === slideTypes.songSetlist
+              ? 'Refresh lyrics of the active song'
+              : 'Refresh song lyrics'
+          "
+        >
           <UButton
-            @click="refreshSongLyrics(slide?.songId || '')"
+            :disabled="!refreshableSongId"
+            @click="refreshSongLyrics()"
             :class="[
               'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
             ]"
@@ -491,7 +501,12 @@
 </template>
 
 <script setup lang="ts">
-import type { ExtendedFileT, ExternalVideo, Slide } from "~/types"
+import type {
+  ExtendedFileT,
+  ExternalVideo,
+  Slide,
+  SongSetlistData,
+} from "~/types"
 import { appWideActions } from "~/utils/constants"
 
 const props = defineProps<{
@@ -545,11 +560,27 @@ watch(
   { immediate: true }
 )
 
-const refreshSongLyrics = async (songId: string) => {
+// A setlist slide holds several songs — refreshing acts on the one currently
+// showing, which is also the song the rest of this toolbar is editing.
+const refreshableSongId = computed(() => {
+  if (props.slide?.type === slideTypes.songSetlist) {
+    const data = props.slide?.data as SongSetlistData | undefined
+    const activeItem = data?.songs?.[data?.activeSongIndex || 0]
+    return activeItem?.songId || activeItem?.song?._id || activeItem?.song?.id || ""
+  }
+  return props.slide?.songId || ""
+})
+
+const refreshSongLyrics = async () => {
+  const songId = refreshableSongId.value
+  if (!songId) return
+
   isLoading.value = true
   // useSong resolves to null when the lookup fails (song deleted, or offline
   // with nothing cached). Emitting that null crashed the listener downstream.
-  const song = await useSong(songId)
+  // The id (not the slide's own copy) is the source of truth here — passing the
+  // cached object would just re-chunk the stale lyrics.
+  const song = await useSong(songId, props.slide?.slideStyle?.linesPerSlide)
   isLoading.value = false
 
   if (!song) {

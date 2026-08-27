@@ -211,6 +211,7 @@
       v-else-if="page === 'library'"
       class="fade-in-right h-full min-h-0 overflow-auto"
       :page="libraryPage"
+      :song-to-edit="librarySongToEdit"
       @close="page = ''"
     />
 
@@ -500,6 +501,7 @@ const bibleSearchQuery = ref<string>("")
 const hymns = ref<Hymn[]>([])
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const libraryPage = ref<string>("")
+const librarySongToEdit = ref<Song | undefined>()
 
 // Active Bible version, used to validate parsed references against the right
 // verse index (see the reference filter in `searchedActions`).
@@ -853,7 +855,10 @@ emitter.on("remove-alert", () => {
   }
 })
 
-emitter.on("add-song", () => {
+// A payload means an existing song is being edited (e.g. from a song slide's
+// "Edit song in library"); no payload opens a blank add-song form.
+emitter.on("add-song", (song?: Song) => {
+  librarySongToEdit.value = song || undefined
   libraryPage.value = "add-song"
   page.value = "library"
 })
@@ -1388,6 +1393,7 @@ watch(page, () => {
   searchInput.value = ""
   if (page.value === "") {
     libraryPage.value = ""
+    librarySongToEdit.value = undefined
   }
 })
 

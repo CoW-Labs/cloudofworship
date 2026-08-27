@@ -1325,10 +1325,37 @@ const onUpdateMediaSeek = (seekTime: number) => {
   }, 5000)
 }
 
-const onUpdateSongLyrics = (song: Song) => {
+const onUpdateSongLyrics = async (song: Song) => {
   // Defensive: the toolbar already filters failed lookups, but this handler is
   // wired to a template event and must not crash the editor on a null payload.
   if (!song) return
+
+  // A setlist carries a song per entry — swap the refreshed lyrics into the
+  // active entry and let the setlist rebuild the slide around it.
+  if (props.slide?.type === slideTypes.songSetlist) {
+    const data = setlistData.value
+    const activeSongIndex = data.activeSongIndex
+    const activeItem = data.songs[activeSongIndex]
+    if (!activeItem) return
+
+    const songs = data.songs.map((item, index) =>
+      index === activeSongIndex
+        ? { ...item, song, songId: song._id || song.id }
+        : item
+    )
+    // refreshSongSetlistSlide clamps the verse index, so a refresh that dropped
+    // verses lands on the last one instead of blanking the slide.
+    const updatedSlide = await refreshSongSetlistSlide(
+      { ...props.slide, data: { ...data, songs } },
+      { activeSongIndex, verseIndex: activeItem.verseIndex }
+    )
+    emit("slide-update", updatedSlide)
+    useToast().add({
+      icon: "i-bx-music",
+      title: "Song lyrics updated",
+    })
+    return
+  }
 
   const tempSlide: Slide = {
     title: song.title,

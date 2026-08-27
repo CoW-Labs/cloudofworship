@@ -11,9 +11,13 @@
 
     <div
       v-if="page === 'add-song'"
-      class="come-up-1 flex-1 min-h-0 overflow-auto"
+      class="come-up-1 flex-1 min-h-0 overflow-auto pb-16"
     >
-      <AddSong :song="songToEdit" @go-home="page = ''" />
+      <AddSong
+        :key="songToEdit?._id || songToEdit?.id || 'new-song'"
+        :song="songToEdit"
+        @go-home="page = ''"
+      />
     </div>
 
     <div
@@ -281,6 +285,7 @@ import SongsIcon from "~/components/svgs/SongsIcon.vue"
 
 const props = defineProps<{
   page: string
+  songToEdit?: Song
 }>()
 
 const turnToLibrarySongAction = (song: Song): QuickAction => {
@@ -316,7 +321,7 @@ const libraryTabs = [
 const activeLibraryTab = ref<number>(0)
 const searchInput = ref<string>("")
 const page = ref<string>(props.page || "")
-const songToEdit = ref<Song>()
+const songToEdit = ref<Song | undefined>(props.songToEdit)
 const libraryEndIndex = ref<number>(15)
 const loadMoreSongs = () => {
   if (libraryEndIndex.value >= (savedSongs.value?.length || 0)) return
@@ -381,6 +386,17 @@ watch(page, (newVal, oldVal) => {
     songToEdit.value = undefined
   }
 })
+
+// The panel can already be open when a song slide asks to edit its song —
+// react to the incoming song rather than relying on a fresh mount.
+watch(
+  () => props.songToEdit,
+  (song) => {
+    if (!song) return
+    songToEdit.value = song
+    page.value = "add-song"
+  }
+)
 
 // Edit song handler
 const editSong = (song: Song) => {

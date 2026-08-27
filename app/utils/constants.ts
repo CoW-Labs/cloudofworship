@@ -34,6 +34,7 @@ export const appWideActions = {
   newTemplates: 'new-templates',
   newAlert: 'new-alert',
   addSong: 'add-song',
+  songUpdated: 'song-updated',
   addSongSlideToSetlist: 'add-song-slide-to-setlist',
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
