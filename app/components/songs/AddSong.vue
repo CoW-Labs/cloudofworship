@@ -1,6 +1,8 @@
 <template>
   <div class="add-song-main my-4 mt-0">
-    <h2 class="font-semibold text-md mb-4">Add a song</h2>
+    <h2 class="font-semibold text-md mb-4">
+      {{ song ? "Edit song" : "Add a song" }}
+    </h2>
     <form class="flex flex-col gap-3">
       <CowInput v-model="title" label="Title" />
       <CowInput v-model="artist" label="Artist" />
@@ -165,20 +167,28 @@ const addSong = async (force = false) => {
   const songId =
     props?.song?.id || useURLFriendlyString(`${title.value} ${artist.value}`)
   const song: Song = {
+    // Spread the source song so an edit keeps its server identity (_id) and
+    // any other fields the form doesn't cover.
+    ...(props.song || {}),
     id: songId,
     title: title.value,
     artist: artist.value,
     lyrics: lyrics.value,
-    createdBy: "me",
+    createdBy: props.song?.createdBy || "me",
     createdAt: props.song?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
+  // Verses are derived from lyrics on demand — a stale copy would outlive the edit.
+  delete song.verses
 
   loading.value = true
   try {
     // Editing an existing song updates the local copy only (current behaviour).
     if (props.song) {
       await saveSong(song)
+      // Slides in the open schedule hold a snapshot of the song — tell them to
+      // rebuild from the edited lyrics.
+      useGlobalEmit(appWideActions.songUpdated, song)
       emit("go-home")
       return
     }
