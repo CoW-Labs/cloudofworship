@@ -126,13 +126,32 @@
           Duplicate as Overlay
         </UButton>
 
+        <!-- A song slide is already backed by the library song it was created
+        from, so "save to library" is redundant here — edit the source instead. -->
+        <UButton
+          v-if="
+            slide?.type === slideTypes.song && slide?.slideMode !== 'overlay'
+          "
+          variant="ghost"
+          color="gray"
+          block
+          @click.stop.prevent="
+            () => {
+              close()
+              handleEditSongClick()
+            }
+          "
+        >
+          <template #leading><EditIcon class="w-4 h-4" /></template>
+          Edit song in library
+        </UButton>
+
         <ConfirmDialog
           v-if="
             slide?.slideMode !== 'overlay' &&
             (slide?.type === slideTypes.text ||
               slide?.type === slideTypes.media ||
-              slide?.type === slideTypes.hymn ||
-              slide?.type === slideTypes.song)
+              slide?.type === slideTypes.hymn)
           "
           button-icon="i-bx-save"
           no-tooltip
@@ -262,7 +281,7 @@
 
 <script setup lang="ts">
 import { appWideActions } from "~/utils/constants"
-import type { Slide } from "~/types"
+import type { Slide, Song } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 
@@ -272,6 +291,7 @@ const { currentState } = storeToRefs(appStore)
 
 // Subscription check
 const { hasAccessToFeature } = useSubscription()
+const { getLibraryItem } = useLibrary()
 
 const props = defineProps<{
   slide: Slide
@@ -361,6 +381,26 @@ const handleSaveConfirm = () => {
   } else {
     emit("save-slide", props.slide?.id)
   }
+}
+
+// Opens the library's song editor on the song this slide was created from,
+// preferring the saved library copy over the snapshot carried on the slide.
+const handleEditSongClick = async () => {
+  const slideSong = props.slide?.data as Song | undefined
+  const songId = props.slide?.songId || slideSong?._id || slideSong?.id
+  const libraryItem = songId ? await getLibraryItem(songId) : undefined
+  const song = (libraryItem?.content as Song) || slideSong
+
+  if (!song) {
+    useToast().add({
+      icon: "i-bx-error",
+      title: "This slide is not linked to a song yet",
+      color: "red",
+    })
+    return
+  }
+
+  useGlobalEmit(appWideActions.addSong, song)
 }
 
 const handleSaveAsTemplateClick = () => {
