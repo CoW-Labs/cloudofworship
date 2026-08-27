@@ -159,11 +159,16 @@ const skeletonUi = {
 
 watch(
   () => props.visible,
-  () => {
+  async () => {
     visible.value = props.visible
-    if (visible.value) {
-      uploadBatchSchedules()
-    }
+    if (!visible.value) return
+
+    // Push locally-created schedules first, then pull, so the refreshed list
+    // reflects what was just uploaded. The pull used to run at setup instead,
+    // which re-fetched a list the app layout had just fetched on every app
+    // load, and left the list stale on every subsequent open.
+    await uploadBatchSchedules()
+    await retrieveSchedules()
   }
 )
 
@@ -389,7 +394,6 @@ const deleteSchedule = (scheduleId: string) => {
   emit("close")
 }
 
-retrieveSchedules()
 </script>
 
 <style scoped>
