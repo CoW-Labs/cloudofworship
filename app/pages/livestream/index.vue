@@ -30,7 +30,7 @@
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
     <TransitionGroup name="fade-list">
       <LiveProjectionOnly
-        v-for="liveSlide in currentState.activeSlides"
+        v-for="liveSlide in appStore.activeSlides"
         :key="liveSlide.id"
         v-show="liveSlide?.id === currentState.liveSlideId"
         :content-visible="true"
@@ -73,7 +73,7 @@ useHead({
 const liveSlide = computed(() => {
   // console.log(activeSlides.value)
   // console.log(currentState.value.liveSlideId)
-  return currentState.value.activeSlides.find(
+  return appStore.activeSlides.find(
     (slide) => slide.id === currentState.value.liveSlideId
   )
 })

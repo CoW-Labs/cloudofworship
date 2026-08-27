@@ -506,8 +506,8 @@ const getStoreSize = async (store: any) => {
 
 const loadMediaFiles = async () => {
   const slideMap = new Map<string, Slide>(
-    appStore.currentState.activeSlides
-      ?.filter((slide) => slide?.id)
+    appStore.activeSlides
+      .filter((slide) => slide?.id)
       .map((slide) => [slide.id, slide])
   )
   const librarySlideIds = new Set(

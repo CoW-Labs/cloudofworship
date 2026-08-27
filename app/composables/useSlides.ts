@@ -21,10 +21,10 @@ export default function useSlides() {
   const removeStaleSlide = (slideId?: string) => {
     if (!slideId) return
 
-    const nextSlides = appStore.currentState.activeSlides.filter(
+    const nextSlides = appStore.activeSlides.filter(
       (activeSlide) => activeSlide?._id !== slideId && activeSlide?.id !== slideId
     )
-    if (nextSlides.length !== appStore.currentState.activeSlides.length) {
+    if (nextSlides.length !== appStore.activeSlides.length) {
       appStore.setActiveSlides(nextSlides)
     }
   }

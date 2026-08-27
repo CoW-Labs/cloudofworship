@@ -255,7 +255,7 @@ const createBlankSchedule = async () => {
     }
 
     // Find all slides without a scheduleId and add the new scheduleId
-    appStore.currentState.activeSlides.forEach((slide) => {
+    appStore.activeSlides.forEach((slide) => {
       if (!slide.scheduleId) {
         slide.scheduleId = scheduleId
       }
@@ -266,7 +266,7 @@ const createBlankSchedule = async () => {
 
     usePosthogCapture("SCHEDULE_CREATED", {
       scheduleName: schedule.name,
-      hasSlides: appStore.currentState.activeSlides.length > 0,
+      hasSlides: appStore.activeSlides.length > 0,
     })
   } finally {
     creatingKey.value = ""
