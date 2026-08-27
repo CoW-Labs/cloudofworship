@@ -166,7 +166,7 @@ const onVideoFileSelect = (event: Event) => {
 
 const revokeLocalVideoObjectUrls = () => {
   const usedBackgrounds = new Set(
-    appStore.currentState.activeSlides.map((s) => s.background).filter(Boolean)
+    appStore.activeSlides.map((s) => s.background).filter(Boolean)
   )
   localVideoObjectUrls.forEach((url) => {
     if (!usedBackgrounds.has(url)) {

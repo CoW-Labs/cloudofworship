@@ -713,7 +713,7 @@ const retrieveAllMediaFilesFromDB = async () => {
   }
 
   // For active slides - use Promise.all instead of forEach
-  const slides = [...appStore.currentState.activeSlides]
+  const slides = [...appStore.activeSlides]
 
   // Rehydrate each slide through the active platform media backend.
   // Local-only here (allowDownload: false) so startup stays cheap; missing
@@ -1288,7 +1288,7 @@ onMounted(async () => {
   // payload is deliberately retained for rollback until the repository cutover
   // has shipped and proven stable.
   try {
-    await runDataMigrations(appStore.currentState.activeSlides || [])
+    await runDataMigrations(appStore.activeSlides)
   } catch (error) {
     console.error(
       "Unable to prepare durable slide storage; continuing with legacy storage:",

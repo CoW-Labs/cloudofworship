@@ -88,9 +88,23 @@ const shallowEqual = (a: Record<string, any>, b: Record<string, any>) => {
   return aKeys.every((key) => Object.is(a[key], b[key]))
 }
 
-function ensureUniqueIds(arr: Slide[]): Slide[] {
+/**
+ * `activeSlides` is the one part of `currentState` that no longer round-trips
+ * through a snapshot: `appStateSerializer` and `sharedStateSerializer` both
+ * strip it because SlideRepository owns the durable copy. Any path that
+ * installs a whole `currentState` object (persist hydration, a shared-state
+ * patch, an undo/redo restore) can therefore hand back a state with the key
+ * missing, which left the store holding `undefined` and crashed the first
+ * reader — `[...activeSlides]`, `activeSlides.map`, `activeSlides.find`.
+ * Every read goes through this coercion so a missing key degrades to empty.
+ */
+export function toSlideArray(value: unknown): Slide[] {
+  return Array.isArray(value) ? (value as Slide[]) : []
+}
+
+function ensureUniqueIds(slides: unknown): Slide[] {
   const seenIds = new Set()
-  return arr.filter((obj) => {
+  return toSlideArray(slides).filter((obj) => {
     const id = obj?.id || obj?._id
     if (!id || seenIds.has(id)) {
       return false
@@ -243,12 +257,15 @@ export const useAppStore = defineStore("app", {
     // cached by Pinia, so it does not duplicate slides in persisted state.
     slidesBySchedule: (state) => {
       const grouped: Record<string, Slide[]> = {}
-      state.currentState.activeSlides?.forEach((slide) => {
+      toSlideArray(state.currentState.activeSlides).forEach((slide) => {
         if (!slide?.scheduleId) return
         ;(grouped[slide.scheduleId] ||= []).push(slide)
       })
       return grouped
     },
+    // Always an array, even if a restored snapshot arrived without the key.
+    // Prefer this over reading `currentState.activeSlides` directly.
+    activeSlides: (state) => toSlideArray(state.currentState.activeSlides),
     activeScheduleSlides(): Slide[] {
       const scheduleId = this.currentState.activeSchedule?._id
       return scheduleId ? this.slidesBySchedule[scheduleId] || [] : []
@@ -306,11 +323,11 @@ export const useAppStore = defineStore("app", {
     },
     appendActiveSlide(slide: Slide, position?: number) {
       onAppStateChange(this.pastStates, this.currentState, "activeSlides", [
-        ...this.currentState.activeSlides,
+        ...this.activeSlides,
       ])
-      // console.log('appending active slide', [...this.currentState.activeSlides])
-      if (!this.currentState.activeSlides.find((s) => s?.id === slide?.id)) {
-        const nextSlides = [...this.currentState.activeSlides]
+      // console.log('appending active slide', [...this.activeSlides])
+      if (!this.activeSlides.find((s) => s?.id === slide?.id)) {
+        const nextSlides = [...this.activeSlides]
         if (position !== undefined && position >= 0) {
           nextSlides.splice(position, 0, slide)
         } else {
@@ -329,8 +346,8 @@ export const useAppStore = defineStore("app", {
     appendActiveSlides(slides: Array<Slide>) {
       // console.log('appending active slides', this.currentState.activeSlides?.length)
       // onAppStateChange(this.pastStates, this.currentState)
-      let tempSlides = [...this.currentState.activeSlides]
-      tempSlides.push(...slides)
+      let tempSlides = [...this.activeSlides]
+      tempSlides.push(...toSlideArray(slides))
       this.currentState.activeSlides = ensureUniqueIds(tempSlides)
       this.currentState.liveOutputSlidesId = Array.from(
         new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
@@ -342,7 +359,7 @@ export const useAppStore = defineStore("app", {
     },
     removeActiveSlide(slide: Slide) {
       // console.log('removing active slides', this.currentState.activeSlides?.length)
-      const slideIndex = this.currentState.activeSlides.findIndex(
+      const slideIndex = this.activeSlides.findIndex(
         (s) => s?.id === slide?.id || s?._id === slide?._id
       )
       if (slideIndex < 0) {
@@ -357,14 +374,14 @@ export const useAppStore = defineStore("app", {
       }
 
       onAppStateChange(this.pastStates, this.currentState, "activeSlides", [
-        ...this.currentState.activeSlides,
+        ...this.activeSlides,
       ])
       // onAppStateChange(this.pastStates, this.currentState)
       // Reassign the array reference (not an in-place splice) so shallow
       // watchers re-fire. PreviewContent keeps a filtered copy synced via
       // `watch(() => activeSlides)`, which only triggers on reference change.
       // !! - IMPACTS PERFORMANCE SLIGHTLY
-      const nextSlides = [...this.currentState.activeSlides]
+      const nextSlides = [...this.activeSlides]
       nextSlides.splice(slideIndex, 1)
       this.currentState.activeSlides = nextSlides
       this.currentState.liveOutputSlidesId = Array.from(
@@ -378,12 +395,12 @@ export const useAppStore = defineStore("app", {
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
       // onAppStateChange(this.pastStates, this.currentState)
-      let tempSlides = [...this.currentState.activeSlides]
+      let tempSlides = [...this.activeSlides]
       tempSlides = tempSlides.filter(
         (slide) => slide.scheduleId !== this.currentState.activeSchedule?._id
       )
       // console.log("tempSlides", tempSlides)
-      tempSlides.push(...slides)
+      tempSlides.push(...toSlideArray(slides))
       this.currentState.activeSlides = ensureUniqueIds(tempSlides)
       // console.log("replacing schedule active slides - p2", this.currentState.activeSlides)
       this.currentState.liveOutputSlidesId = Array.from(
@@ -810,11 +827,17 @@ export const useAppStore = defineStore("app", {
     },
     // Undo/Redo Actions
     setCurrentState(state: any) {
-      this.currentState = { ...state }
+      // An undo/redo entry is a snapshot clone, and a snapshot that travelled
+      // through a serializer no longer carries activeSlides. Restore the key
+      // explicitly instead of letting `undefined` reach the readers.
+      this.currentState = {
+        ...state,
+        activeSlides: toSlideArray(state?.activeSlides),
+      }
       const scheduleId = this.currentState.activeSchedule?._id
       if (scheduleId) {
         cancelPendingScheduleShadowPuts(scheduleId)
-        const scheduleSlides = this.currentState.activeSlides.filter(
+        const scheduleSlides = this.activeSlides.filter(
           (slide) => slide.scheduleId === scheduleId
         )
         enqueueSlideShadowWrite("restore undo state", (repository) =>
@@ -882,7 +905,7 @@ export const useAppStore = defineStore("app", {
     },
     // Update a specific slide in the active slides array (for realtime updates)
     updateSlideInActiveSlides(updatedSlide: Slide) {
-      const slideIndex = this.currentState.activeSlides.findIndex(
+      const slideIndex = this.activeSlides.findIndex(
         (s) =>
           s.id === updatedSlide.id ||
           (!!updatedSlide._id && s._id === updatedSlide._id)
@@ -899,6 +922,14 @@ export const useAppStore = defineStore("app", {
   persist: {
     storage: piniaPluginPersistedstate.localStorage(),
     serializer: appStateSerializer,
+    // The persisted snapshot deliberately omits activeSlides, so a hydrated
+    // currentState can come back without the key. Re-assert the invariant
+    // before any component reads it.
+    afterHydrate: ({ store }) => {
+      if (!Array.isArray(store.currentState.activeSlides)) {
+        store.currentState.activeSlides = []
+      }
+    },
     // Undo history remains memory-only. appStateSerializer also removes
     // activeSlides because SlideRepository is now its durable store.
     pick: ["currentState", "panelSizes", "panelSizesTouched"],

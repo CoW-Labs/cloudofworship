@@ -143,7 +143,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         // Update slide in store
         if (data && (data.id || data._id || data.slideId)) {
           const slideId = data.slideId || data.id || data._id
-          const slideIndex = appStore.currentState.activeSlides.findIndex(
+          const slideIndex = appStore.activeSlides.findIndex(
             (s) => slideMatchesId(s, slideId, data._id)
           )
 
@@ -155,7 +155,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             delete (updatedSlide as any).tabId
 
             // Merge with existing slide to preserve local-only properties
-            const existingSlide = appStore.currentState.activeSlides[slideIndex]
+            const existingSlide = appStore.activeSlides[slideIndex]
             const mergedSlide = { ...existingSlide, ...updatedSlide }
 
             // Reassign the array reference (not an in-place splice) so shallow
@@ -163,7 +163,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             // slides synced via `watch(() => activeSlides)`, which only triggers
             // on reference change — an in-place splice would update LiveOutput
             // (a computed) but leave the preview grid and editor stale.
-            const nextSlides = [...appStore.currentState.activeSlides]
+            const nextSlides = [...appStore.activeSlides]
             nextSlides.splice(slideIndex, 1, mergedSlide)
             appStore.setActiveSlides(nextSlides)
             enqueueCoalescedSlideShadowPut(mergedSlide, {
@@ -191,7 +191,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
 
         if (data.slideId || data.id || data._id) {
           const slideId = data.slideId || data.id || data._id
-          const slideToRemove = appStore.currentState.activeSlides.find(
+          const slideToRemove = appStore.activeSlides.find(
             (s) => slideMatchesId(s, slideId, data._id)
           )
           if (slideToRemove) {
@@ -232,7 +232,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           // keeps a filtered copy synced via `watch(() => activeSlides)`)
           // re-fire. In-place splices update LiveOutput (a computed) but leave
           // the preview grid and editor stale.
-          const nextSlides = [...appStore.currentState.activeSlides]
+          const nextSlides = [...appStore.activeSlides]
           let changed = false
           data.slides.forEach((updatedSlide: Slide) => {
             const slideIndex = nextSlides.findIndex(
@@ -274,7 +274,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
 
         if (data.slideIds && Array.isArray(data.slideIds)) {
           data.slideIds.forEach((slideId: string) => {
-            const slideToRemove = appStore.currentState.activeSlides.find(
+            const slideToRemove = appStore.activeSlides.find(
               (s) => slideMatchesId(s, slideId)
             )
             if (slideToRemove) {
@@ -311,7 +311,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         if (data.slideOrder && Array.isArray(data.slideOrder)) {
           const reorderedSlides = data.slideOrder
             .map((slideId: string) =>
-              appStore.currentState.activeSlides.find((s) => s.id === slideId)
+              appStore.activeSlides.find((s) => s.id === slideId)
             )
             .filter((s: Slide | undefined): s is Slide => s !== undefined)
             .map((slide: Slide, index: number) => ({ ...slide, index }))

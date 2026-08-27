@@ -524,7 +524,7 @@ export const createLocalMediaStorage = (
     const db = useIndexedDB()
     const activeSlides = (() => {
       try {
-        return useAppStore().currentState.activeSlides || []
+        return useAppStore().activeSlides
       } catch {
         return []
       }
@@ -619,7 +619,7 @@ export const createLocalMediaStorage = (
     const protectedIds = new Set(protectedGroupIds)
     try {
       const appStore = useAppStore()
-      for (const slide of appStore.currentState.activeSlides || []) {
+      for (const slide of appStore.activeSlides) {
         protectedIds.add(slide.id)
         if (slide.backgroundVideoKey) {
           protectedIds.add(slide.backgroundVideoKey)
