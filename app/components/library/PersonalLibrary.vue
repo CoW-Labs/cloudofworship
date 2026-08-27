@@ -11,9 +11,13 @@
 
     <div
       v-if="page === 'add-song'"
-      class="come-up-1 flex-1 min-h-0 overflow-auto"
+      class="come-up-1 flex-1 min-h-0 overflow-auto pb-16"
     >
-      <AddSong :song="songToEdit" @go-home="page = ''" />
+      <AddSong
+        :key="songToEdit?._id || songToEdit?.id || 'new-song'"
+        :song="songToEdit"
+        @go-home="page = ''"
+      />
     </div>
 
     <div
@@ -281,6 +285,10 @@ import SongsIcon from "~/components/svgs/SongsIcon.vue"
 
 const props = defineProps<{
   page: string
+  songToEdit?: Song
+  // Bumped by every request to open this panel, so a repeat request lands even
+  // when `page`/`songToEdit` are unchanged and the panel is already mounted.
+  openToken?: number
 }>()
 
 const turnToLibrarySongAction = (song: Song): QuickAction => {
@@ -316,7 +324,7 @@ const libraryTabs = [
 const activeLibraryTab = ref<number>(0)
 const searchInput = ref<string>("")
 const page = ref<string>(props.page || "")
-const songToEdit = ref<Song>()
+const songToEdit = ref<Song | undefined>(props.songToEdit)
 const libraryEndIndex = ref<number>(15)
 const loadMoreSongs = () => {
   if (libraryEndIndex.value >= (savedSongs.value?.length || 0)) return
@@ -381,6 +389,17 @@ watch(page, (newVal, oldVal) => {
     songToEdit.value = undefined
   }
 })
+
+// The panel can already be open when something asks it to add or edit a song,
+// so re-apply the requested page on every request rather than relying on a
+// fresh mount or on the props themselves changing.
+watch(
+  () => props.openToken,
+  () => {
+    songToEdit.value = props.songToEdit
+    page.value = props.page || ""
+  }
+)
 
 // Edit song handler
 const editSong = (song: Song) => {

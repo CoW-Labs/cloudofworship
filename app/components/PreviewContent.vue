@@ -170,6 +170,7 @@ import type {
   Schedule,
   ExtendedFileT,
   PresentationObject,
+  SongSetlistItem,
 } from "~/types"
 import { toTransportSafePayload } from "~/utils/mediaTransport"
 import { appWideActions } from "~/utils/constants"
@@ -228,7 +229,8 @@ const {
   duplicateSlideAsOverlay,
 } = useSlideCreation()
 const { gotoVerse } = useSlideNavigation()
-const { appendSongToSetlist } = useSongSetlist()
+const { appendSongToSetlist, getSetlistData, refreshSongSetlistSlide } =
+  useSongSetlist()
 
 // Online status for conditional API/WS calls
 const online = useOnline()
@@ -1171,6 +1173,102 @@ emitter.on(
     })
   }
 )
+
+// Song slides carry their own snapshot of the song they were built from, so a
+// library edit has to be replayed onto every slide in the open schedule that
+// uses that song — plain song slides and setlist entries alike.
+const rebuildSongSlide = (slide: Slide, song: Song): Slide => {
+  const verses = song.verses || []
+  const requestedIndex = Number(slide.title?.split(" ")?.[1]) - 1
+  // The edit may have removed verses — clamp instead of blanking the slide.
+  const verseIndex = Math.min(
+    Math.max(Number.isFinite(requestedIndex) ? requestedIndex : 0, 0),
+    Math.max(verses.length - 1, 0)
+  )
+  const currentVerse = verses[verseIndex]?.trim() || ""
+
+  const tempSlide: Slide = {
+    ...slide,
+    songId: song._id || song.id,
+    title: `Verse ${verseIndex + 1}`,
+    data: song,
+  }
+  tempSlide.slideStyle = {
+    ...tempSlide.slideStyle,
+    fontSize: Number(useScreenFontSize(currentVerse)),
+  }
+  tempSlide.contents = useSlideContent(tempSlide, song, currentVerse)
+  tempSlide.layout = appStore.currentState.settings.songAndHymnLabelsVisibility
+    ? slideLayoutTypes.bible
+    : slideLayoutTypes.full_text
+  tempSlide.name = useSlideName(tempSlide)
+  return tempSlide
+}
+
+const refreshSlidesForSong = async (song: Song) => {
+  const songId = song?._id || song?.id
+  if (!songId) return
+
+  // Re-derive verses from the edited lyrics once, then reuse for every slide.
+  const resolvedSong = await useSong({ ...song })
+  if (!resolvedSong) return
+
+  const isSameSong = (candidate?: Song) =>
+    !!candidate && (candidate._id === songId || candidate.id === songId)
+
+  for (const slide of [...slides.value]) {
+    let updatedSlide: Slide | null = null
+
+    if (
+      slide.type === slideTypes.song &&
+      (slide.songId === songId || isSameSong(slide.data as Song))
+    ) {
+      updatedSlide = rebuildSongSlide(slide, resolvedSong)
+    } else if (slide.type === slideTypes.songSetlist) {
+      const data = getSetlistData(slide)
+      const itemMatches = (item: SongSetlistItem) =>
+        item.songId === songId || isSameSong(item.song)
+      if (!data.songs.some(itemMatches)) continue
+
+      const songs = data.songs.map((item) =>
+        itemMatches(item)
+          ? {
+              ...item,
+              songId,
+              song: resolvedSong,
+              verseIndex: Math.min(
+                Math.max(item.verseIndex || 0, 0),
+                Math.max((resolvedSong.verses?.length || 1) - 1, 0)
+              ),
+            }
+          : item
+      )
+      updatedSlide = await refreshSongSetlistSlide({
+        ...slide,
+        data: { ...data, songs },
+      })
+    }
+
+    if (!updatedSlide) continue
+
+    const stampedSlide: Slide = {
+      ...updatedSlide,
+      updatedAt: new Date().toISOString(),
+    }
+    appStore.updateSlideInActiveSlides(stampedSlide)
+    if (activeSlide.value?.id === stampedSlide.id) {
+      activeSlide.value = stampedSlide
+    }
+    updateSlideOnline(stampedSlide)
+    updateLiveOutput(stampedSlide)
+  }
+}
+
+emitter.on(appWideActions.songUpdated, (song: Song) => {
+  refreshSlidesForSong(song).catch((error) =>
+    console.warn("Unable to refresh slides after song edit:", error)
+  )
+})
 
 emitter.on("refresh-slides", () => {
   retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!).catch(

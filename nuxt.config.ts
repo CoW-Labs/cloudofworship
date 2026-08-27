@@ -1,5 +1,14 @@
 import { execSync } from 'child_process'
 
+// The API is on a separate origin, so the browser cannot start its DNS/TCP/TLS
+// handshake until the entry bundle has executed and fired the first request —
+// roughly a second into the load. Preconnecting moves that handshake to HTML
+// parse time. Derived from BASE_URL so non-production builds warm their own API
+// rather than opening an unused socket to production.
+const API_ORIGIN = new URL(
+  process.env.BASE_URL || "https://api.cloudofworship.com/api/v1"
+).origin
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2025-01-01",
@@ -84,6 +93,13 @@ export default defineNuxtConfig({
         },
       ],
       link: [
+        {
+          // Requests carry a Bearer header, not cookies, so they travel on the
+          // anonymous connection pool — this must match or the socket is unused.
+          rel: "preconnect",
+          href: API_ORIGIN,
+          crossorigin: "anonymous",
+        },
         {
           rel: "preload",
           href: "/css/fonts.css",
