@@ -18,14 +18,55 @@ export default defineNuxtConfig({
   },
 
   hooks: {
-    'nitro:build:public-assets': () => {
-      console.log('Running PostHog sourcemap injection and upload...')
+    // Stamp every client chunk with a chunkId and ship the matching .map to
+    // PostHog, so Error Tracking shows real source lines instead of minified
+    // bundle offsets. Runs straight after Nitro copies the public assets, which
+    // is the only moment the .js and its .js.map sit side by side in the output.
+    //
+    // The directory MUST come from Nitro rather than being hardcoded: the local
+    // build writes to `.output/public`, but the Vercel preset writes to
+    // `.vercel/output/static`, so a hardcoded `.output` silently injects nothing
+    // on the deploys that actually serve users.
+    'nitro:build:public-assets': (nitro: { options: { output: { publicDir: string } } }) => {
+      const publicDir = nitro.options.output.publicDir
+
+      // The CLI reads these from the process env. Without them it exits 1, and
+      // a build that "succeeded" would quietly ship unsymbolicated stack traces
+      // — the exact failure this check exists to make audible.
+      if (!process.env.POSTHOG_CLI_API_KEY || !process.env.POSTHOG_CLI_PROJECT_ID) {
+        console.warn(
+          '[posthog] Skipping sourcemap upload: POSTHOG_CLI_API_KEY / POSTHOG_CLI_PROJECT_ID are not set. ' +
+            'Stack traces from this build will NOT be symbolicated in PostHog Error Tracking.'
+        )
+        return
+      }
+
+      // Ties each symbol set to a release. Auto-derivation from git is unreliable
+      // on CI checkouts, so prefer the SHA the platform hands us.
+      const releaseVersion =
+        process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || ''
+      const release = releaseVersion
+        ? ` --release-name cloud-of-worship --release-version ${releaseVersion}`
+        : ''
+
+      console.log(`[posthog] Injecting and uploading sourcemaps from ${publicDir}`)
       try {
-        execSync("posthog-cli sourcemap inject --directory '.output'", { stdio: 'inherit' })
-        execSync("posthog-cli sourcemap upload --directory '.output' --delete-after", { stdio: 'inherit' })
-        console.log('PostHog sourcemap injection completed successfully')
+        execSync(`posthog-cli sourcemap inject --directory "${publicDir}"`, {
+          stdio: 'inherit',
+        })
+        execSync(
+          `posthog-cli sourcemap upload --directory "${publicDir}" --delete-after --skip-on-conflict${release}`,
+          { stdio: 'inherit' }
+        )
+        console.log('[posthog] Sourcemap upload completed successfully')
       } catch (error) {
-        console.error('PostHog sourcemap injection failed:', error)
+        // Deliberately non-fatal — a PostHog outage should not block a deploy —
+        // but loud enough to grep for in build logs.
+        console.error(
+          '\n[posthog] !!! SOURCEMAP UPLOAD FAILED !!! Stack traces from this build ' +
+            'will NOT be symbolicated in PostHog Error Tracking.\n',
+          error
+        )
       }
     },
   },
