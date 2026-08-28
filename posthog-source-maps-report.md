@@ -1,81 +1,97 @@
-# PostHog Source Map Upload — Setup Report
+# PostHog Source Maps — Diagnosis & Fix
 
-## What was configured
+## Symptom
 
-Source map injection and upload were already wired into the project. This run confirmed and refreshed the credentials.
+PostHog Error Tracking showed minified frames (`/_nuxt/DehTS3zn.js`) for errors from the
+web app, even though thousands of symbol sets had been uploaded. Errors originating from
+local/desktop builds *were* symbolicated (`app/composables/useURLFriendlyString.ts`), which
+narrowed the problem to the production web build.
 
-### Files changed
+## Root causes
+
+Three independent faults, all in the `nitro:build:public-assets` hook in `nuxt.config.ts`
+and its environment.
+
+### 1. `POSTHOG_CLI_API_KEY` was never set on Vercel
+
+`POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` had been added to the Vercel project, but
+the API key had not. Every production build failed at the first CLI step with:
+
+```
+Couldn't find POSTHOG_CLI_API_KEY and POSTHOG_CLI_PROJECT_ID in process env
+```
+
+### 2. The output directory was hardcoded to `.output`
+
+The local build writes to `.output/public`, but Vercel's Nitro preset writes to
+`.vercel/output/static`. `.output` does not exist on Vercel at all, so even with valid
+credentials the CLI would have found zero chunks to inject. The hook now takes the
+directory from `nitro.options.output.publicDir`, which is correct under every preset.
+
+### 3. The failure was swallowed
+
+`try/catch` logged the error and let the build succeed, so ~every production deploy since
+setup shipped unsymbolicated bundles with no signal that anything was wrong.
+
+## Why the symbol sets looked fine
+
+5,600+ symbol sets existed in PostHog — all uploaded from **local** `npm run build` runs,
+where `.output` happens to be the right path. Every one had `last_used: null`: the JS
+actually served from `cloudofworship.com` carried no `//# chunkId=` stamp, so nothing could
+ever match them.
+
+## Changes made
 
 | File | Change |
 |------|--------|
-| `.env` | Updated `POSTHOG_CLI_API_KEY`, `POSTHOG_CLI_PROJECT_ID`, `POSTHOG_CLI_HOST` |
+| `nuxt.config.ts` | Directory now read from `nitro.options.output.publicDir`; explicit skip-with-warning when credentials are absent; loud `SOURCEMAP UPLOAD FAILED` banner on error; symbol sets tagged with `--release-name`/`--release-version` from `VERCEL_GIT_COMMIT_SHA`/`GITHUB_SHA`; `--skip-on-conflict` so a repeated chunk hash cannot fail a deploy |
+| `.github/workflows/create-release.yml` | Corrected the documented `POSTHOG_CLI_HOST` (was the `us.i.posthog.com` ingestion host, which does not serve the symbol-set endpoints) and noted that Vercel — not this workflow — runs the web build |
 
-### Files already correctly configured (no changes needed)
+The hook stays non-fatal: a PostHog outage should not block a deploy. It is now just
+impossible for it to fail quietly.
 
-| File | Why |
-|------|-----|
-| `nuxt.config.ts` | Already has `sourcemap: { client: true }` and the `nitro:build:public-assets` hook that runs `posthog-cli sourcemap inject` + `posthog-cli sourcemap upload --delete-after` |
-| `package.json` | `@posthog/cli` already in `devDependencies` |
-| `.github/workflows/create-release.yml` | Already has a comment documenting the required env vars |
+## Verification
 
-## Credentials written to `.env`
+`NITRO_PRESET=vercel npm run build` reproduces the Vercel preset locally:
 
 ```
-POSTHOG_CLI_API_KEY     (personal API key — never commit this value)
-POSTHOG_CLI_PROJECT_ID  99168
-POSTHOG_CLI_HOST        https://us.posthog.com
+[posthog] Injecting and uploading sourcemaps from .../.vercel/output/static
+found 127 pairs
+Found 127 chunks to upload
+Server returned 50 / 50 / 27 upload keys
+[posthog] Sourcemap upload completed successfully
 ```
 
-## How source maps upload
+All 127 emitted chunks carry a `//# chunkId=` stamp and every `.map` is deleted from the
+output, so no source is served publicly.
 
-Source maps are injected and uploaded automatically as part of `npm run build` (`nuxt generate`). The `nitro:build:public-assets` hook in `nuxt.config.ts` runs two CLI steps after every build:
+## Remaining manual step
 
-1. `posthog-cli sourcemap inject --directory '.output'` — stamps each JS chunk with a `//# chunkId=…` comment so PostHog can match bundles to their maps
-2. `posthog-cli sourcemap upload --directory '.output' --delete-after` — uploads the `.map` files and deletes them so they aren't served publicly
-
-## Build command
+`POSTHOG_CLI_API_KEY` still has to be added to the Vercel project (Production scope) —
+without it the fix above changes nothing on real deploys:
 
 ```bash
-npm run build
+vercel env add POSTHOG_CLI_API_KEY production --sensitive
 ```
 
-## Run command (to serve the production build locally)
+Paste the `phx_…` personal API key from `.env` when prompted. It needs the
+`error_tracking:write` and `organization:read` scopes.
+
+Also re-set `POSTHOG_CLI_HOST` if you are not certain of its stored value — it must be
+`https://us.posthog.com`, the API host. Earlier documentation in this repo said
+`https://us.i.posthog.com`, which is the ingestion host and will fail the upload:
 
 ```bash
-npm run preview
+vercel env rm POSTHOG_CLI_HOST production && vercel env add POSTHOG_CLI_HOST production
 ```
 
-> Note: PostHog is disabled on `localhost:30xx` by the plugin at `app/plugins/posthog.ts`. To test locally with PostHog active, serve the build on a different port: `npx serve .output/public -l 5001`
+## Confirming it worked
 
-## CI / deploy — manual action required
+After the next production deploy:
 
-The GitHub Actions workflow (`create-release.yml`) does **not** run `npm run build` — it only creates release tags. The production web build runs on an external hosting platform (Netlify, Vercel, or similar) that could not be traced in this repository.
+```bash
+curl -s https://cloudofworship.com/_nuxt/<chunk>.js | tail -c 100
+```
 
-**You must add these secrets wherever your production build runs:**
-
-| Variable | Value |
-|----------|-------|
-| `POSTHOG_CLI_API_KEY` | Your personal API key (error_tracking:write + organization:read scopes) |
-| `POSTHOG_CLI_PROJECT_ID` | `99168` |
-| `POSTHOG_CLI_HOST` | `https://us.posthog.com` |
-
-- **Netlify**: Site settings → Environment variables
-- **Vercel**: Project settings → Environment variables
-- **GitHub Actions** (if a build job is added later): Settings → Secrets and variables → Actions
-
-Without these, source maps will only upload when you run `npm run build` locally.
-
-## Verify the upload
-
-After running `npm run build`, check the Symbol sets page in PostHog — a new symbol set should appear within a few seconds:
-
-https://us.posthog.com/project/99168/error_tracking/configuration
-
-To test manually:
-1. `npm run build`
-2. `npx serve .output/public -l 5001`
-3. Open `http://localhost:5001`, sign in, open DevTools Console and run:
-   ```js
-   posthog.captureException(new Error('PostHog source maps test'))
-   ```
-4. Check Error Tracking — the stack trace should point at real source file paths, not minified bundle paths.
+should end in `//# chunkId=…`. New Error Tracking issues will then show `.ts`/`.vue`
+sources instead of `/_nuxt/*.js`.
