@@ -65,6 +65,13 @@ Server returned 50 / 50 / 27 upload keys
 All 127 emitted chunks carry a `//# chunkId=` stamp and every `.map` is deleted from the
 output, so no source is served publicly.
 
+## Hosting topology (worth knowing)
+
+`cloudofworship.com` is the **marketing site** — a different Vercel project (`cow-website`,
+repo `felixfavour/cow-website`). The app this repo builds is served at
+**`app.cloudofworship.com`**. Verify sourcemap changes against that host; chunks from this
+build 404 on the apex domain.
+
 ## Remaining manual step
 
 `POSTHOG_CLI_API_KEY` still has to be added to the Vercel project (Production scope) —
@@ -90,7 +97,7 @@ vercel env rm POSTHOG_CLI_HOST production && vercel env add POSTHOG_CLI_HOST pro
 After the next production deploy:
 
 ```bash
-curl -s https://cloudofworship.com/_nuxt/<chunk>.js | tail -c 100
+curl -s https://app.cloudofworship.com/_nuxt/<chunk>.js | tail -c 100
 ```
 
 should end in `//# chunkId=…`. New Error Tracking issues will then show `.ts`/`.vue`
