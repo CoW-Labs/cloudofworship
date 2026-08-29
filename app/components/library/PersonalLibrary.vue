@@ -434,6 +434,14 @@ onMounted(async () => {
       e.preventDefault()
       return
     }
+    // The add-song form is nested inside this element, so its keystrokes bubble
+    // up here — Enter in the lyrics box would otherwise add the focused library
+    // song to the schedule, and the arrows would move the focused index. The
+    // search input deliberately isn't excluded: arrow/Enter navigation of the
+    // results list is driven from it.
+    if (page.value === "add-song") return
+    const target = e.target as HTMLElement | null
+    if (target?.closest("textarea, [contenteditable='true']")) return
     switch (e.key) {
       case "ArrowDown":
         hasInteracted.value = true
