@@ -762,7 +762,10 @@ const retrieveAllMediaFilesFromDB = async () => {
   }
 
   await processSlidesInBatches(slides)
-  appStore.setActiveSlides(slides)
+  // `slides` holds the store's own slide objects, and rehydration rewrites
+  // their URLs in place, so the store is already current. Writing the snapshot
+  // back would also undo anything that landed while this pass was awaiting —
+  // a schedule the server refreshed, or a slide another window added.
   appStore.setSlidesLoading(false)
 
   // Idle prefetch: prepare all downloadable schedule media without blocking

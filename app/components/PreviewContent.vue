@@ -172,7 +172,10 @@ import type {
   PresentationObject,
   SongSetlistItem,
 } from "~/types"
-import { toTransportSafePayload } from "~/utils/mediaTransport"
+import {
+  isSessionMediaUrl,
+  toTransportSafePayload,
+} from "~/utils/mediaTransport"
 import { appWideActions } from "~/utils/constants"
 import {
   getAPIErrorMessage,
@@ -488,6 +491,8 @@ const scheduleSlideHydrator = createScheduleSlideHydrator({
         hydratedSlides
       )
     )
+    // The cached copies carry no device URL (see resolveScheduleMedia).
+    void resolveScheduleMedia(scheduleId)
   },
   onError: (error, scheduleId) => {
     console.warn(
@@ -520,6 +525,7 @@ const cleanupSlideDatabaseNotifications = useSlideDatabaseNotifications(() => {
         storedSlides
       )
     )
+    void resolveScheduleMedia(scheduleId)
   })().catch((error) =>
     console.warn("Unable to apply an external slide database update:", error)
   )
@@ -555,6 +561,9 @@ const makeSlideActive = (
   if (options?.newlyCreated) {
     appStore.appendActiveSlide(slide)
   }
+  // Selecting a slide has to resolve its media the same way going live does,
+  // or the editor preview and the slide's card stay blank until it is on air.
+  void resolveSlideMedia(slide)
   if (options?.goLive) {
     updateLiveOutput(activeSlide.value, { forceGoLive: true })
   }
@@ -620,6 +629,90 @@ const { isLocalMediaReady, transferFor } = useMediaDownloadProgress()
 const projectionMediaStorage = useLocalMediaStorage()
 const { rehydrateSlideMedia: prepareSlideMediaForProjection } =
   useSlideMediaCache()
+
+// Media bytes are device-local. Every durable copy of a slide — the IndexedDB
+// cache and the server record — can only carry a hosted URL or an empty one,
+// never the session URL that actually renders, so a slide that arrives from
+// either source has nothing to paint until its playback URL is resolved
+// against local storage. Taking a slide live already ran that pass, which is
+// why a media slide used to appear only once it had been on screen.
+const isExternalVideoSlide = (slide?: Slide) => {
+  const type = (slide?.data as any)?.type
+  return type === "youtube" || type === "vimeo"
+}
+
+const bearsResolvableMedia = (slide?: Slide) =>
+  !!slide &&
+  !isExternalVideoSlide(slide) &&
+  (slide.type === slideTypes.media ||
+    slide.type === slideTypes.presentation ||
+    !!slide.backgroundImageKey ||
+    !!slide.backgroundVideoKey)
+
+// Audio keeps its playable URL on `data` — its background is only artwork.
+const slideMediaUrl = (slide: Slide) =>
+  slide.type === slideTypes.media &&
+  (slide.data as ExtendedFileT)?.type === "audio"
+    ? (slide.data as ExtendedFileT)?.url
+    : slide.background
+
+// Resolution writes into the store objects the grid and editor already render.
+// Splicing a replacement in would be skipped by the cards' `v-memo`, which only
+// watches id/name/updatedAt — an in-place URL change is what reaches the DOM.
+const resolveSlideMedia = async (slide: Slide) => {
+  if (!bearsResolvableMedia(slide)) return
+  // A local save still streaming to disk assigns the URL itself when it lands.
+  if (transferFor(slide.id)?.status === "pending") return
+
+  const target =
+    appStore.activeSlides.find((stored) => stored.id === slide.id) || slide
+  // Nothing paintable on this device: pull the cloud copy down rather than
+  // leave the operator looking at an empty preview. A slide that already holds
+  // a hosted URL renders while it streams, so it can wait for the idle
+  // prefetch instead of downloading on every selection.
+  const url = slideMediaUrl(target)
+  await prepareSlideMediaForProjection(target, {
+    allowDownload: online.value && (!url || isSessionMediaUrl(url)),
+  })
+
+  // `activeSlide` can hold its own copy of the slide (one just created, or one
+  // handed over by an event), so point the editor at the URL just resolved.
+  const editing = activeSlide.value
+  if (editing && editing !== target && editing.id === target.id) {
+    if (target.background) editing.background = target.background
+    const resolvedUrl = (target.data as ExtendedFileT)?.url
+    if (resolvedUrl && editing.data) {
+      ;(editing.data as ExtendedFileT).url = resolvedUrl
+    }
+    if (target.presentationObjects) {
+      editing.presentationObjects = target.presentationObjects
+    }
+  }
+}
+
+// A batch that just landed from IndexedDB or the server. Local copies only —
+// pulling missing media down stays the startup prefetch's job — and only for
+// slides with nothing paintable, so a schedule whose slides all inherit the
+// default hosted background doesn't re-read storage on every refresh.
+const resolveScheduleMedia = async (scheduleId: string) => {
+  const unresolved = appStore.activeSlides.filter((slide) => {
+    if (slide.scheduleId !== scheduleId) return false
+    if (!bearsResolvableMedia(slide)) return false
+    if (transferFor(slide.id)?.status === "pending") return false
+    const url = slideMediaUrl(slide)
+    return !url || isSessionMediaUrl(url)
+  })
+
+  for (let index = 0; index < unresolved.length; index += 5) {
+    await Promise.all(
+      unresolved
+        .slice(index, index + 5)
+        .map((slide) =>
+          prepareSlideMediaForProjection(slide, { allowDownload: false })
+        )
+    )
+  }
+}
 
 const handleTakeLiveAction = async (slide: Slide) => {
   const requiredKeys = [
@@ -1472,12 +1565,15 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
         } else if (
           (slide.backgroundType === backgroundTypes.image ||
             slide.backgroundType === backgroundTypes.video) &&
-          slide.background?.includes("blob:")
+          (!slide.background || isSessionMediaUrl(slide.background))
         ) {
-          // Custom (non-preset) image AND video backgrounds: the server may hold
-          // a stale, session-dead blob: URL. Restore the still-valid locally
-          // rehydrated background so the "server wins" merge can't clobber a
-          // working slide with a broken URL.
+          // Custom (non-preset) image AND video backgrounds: the server holds a
+          // cloud URL for this media or nothing at all — an empty string once
+          // the bytes never left this device (added offline, over quota, video
+          // uploads switched off), or a stale session-dead blob: URL from an
+          // older client. Restore the still-valid locally rehydrated background
+          // so the "server wins" merge can't clobber a working slide with a
+          // broken or empty URL.
           const previousBackground = appStore.activeSlides.find(
             (s) => s.id === slide.id
           )?.background
@@ -1500,6 +1596,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
           scheduleSnapshot
         )
       )
+      void resolveScheduleMedia(scheduleId)
       void enqueueSlideShadowWrite(
         "refresh schedule snapshot",
         (repository) =>
