@@ -754,39 +754,73 @@ const isEmptySongSetlist = computed(
  * lazily before we show the unavailable notice.
  */
 const imageNotAvailable = ref(false)
+let imageAvailabilityGeneration = 0
 
-watch(
-  () => props.slide?.id,
-  async (newSlideId) => {
-    // Reset immediately when slide changes so the notice doesn't stick
-    imageNotAvailable.value = false
+// Media this session is still holding is not missing media: an image the
+// operator just added keeps its source Blob until compression and the write to
+// local storage have both finished, and that whole window used to be reported
+// as "added on another device" — a sync failure the operator can do nothing
+// about, and the wrong story on a device that is simply offline.
+const hasSessionCopy = (slide?: Slide) =>
+  (slide?.data as ExtendedFileT)?.blob instanceof Blob
 
-    const newSlide = props.slide
-    if (!newSlide || !newSlideId) return
-    if (newSlide.type !== slideTypes.media) return
-    if (newSlide.backgroundType !== "image") return
+const checkImageAvailability = async () => {
+  const requestGeneration = ++imageAvailabilityGeneration
+  const slide = props.slide
+  const slideId = slide?.id
+  // Reset immediately when the slide changes so the notice doesn't stick
+  imageNotAvailable.value = false
 
-    const bg = newSlide.background
-    if (!bg) return
+  if (!slide || !slideId) return
+  if (slide.type !== slideTypes.media) return
+  if (slide.backgroundType !== "image") return
 
-    // If the background is already a remote URL, it's available everywhere
-    if (bg.startsWith("http://") || bg.startsWith("https://")) return
+  if (hasSessionCopy(slide)) return
+  // The write to local storage assigns the playback URL once it lands, and the
+  // status change re-runs this check.
+  if (transferFor(slideId)?.status === "pending") return
 
-    try {
-      const localUrl = await localMedia.ensureLocal(newSlideId, {
-        category: "slide",
-        kind: "image",
-        groupId: newSlideId,
-      })
-      if (!localUrl && props.slide?.id === newSlideId) {
-        imageNotAvailable.value = true
-      }
-    } catch (err) {
-      console.error("Error checking media availability:", err)
-      if (props.slide?.id === newSlideId) {
-        imageNotAvailable.value = true
-      }
+  const bg = slide.background
+  if (!bg) return
+
+  // If the background is already a remote URL, it's available everywhere
+  if (bg.startsWith("http://") || bg.startsWith("https://")) return
+
+  try {
+    const localUrl = await localMedia.ensureLocal(slideId, {
+      category: "slide",
+      kind: "image",
+      groupId: slideId,
+    })
+    if (
+      !localUrl &&
+      requestGeneration === imageAvailabilityGeneration &&
+      props.slide?.id === slideId
+    ) {
+      imageNotAvailable.value = true
     }
+  } catch (err) {
+    console.error("Error checking media availability:", err)
+    if (
+      requestGeneration === imageAvailabilityGeneration &&
+      props.slide?.id === slideId
+    ) {
+      imageNotAvailable.value = true
+    }
+  }
+}
+
+// Re-checked on the background and transfer status too, not just the slide id:
+// a save that finishes (or a resolve pass that fills the URL in) has to clear a
+// notice that was raised while the bytes were still on their way to disk.
+watch(
+  () => [
+    props.slide?.id,
+    props.slide?.background,
+    currentLocalTransfer.value?.status,
+  ],
+  () => {
+    void checkImageAvailability()
   },
   { immediate: true }
 )
