@@ -4,7 +4,22 @@
       {{ song ? "Edit song" : "Add a song" }}
     </h2>
     <form class="flex flex-col gap-3">
-      <CowInput v-model="title" label="Title" />
+      <div>
+        <CowInput v-model="title" label="Title" />
+        <Transition name="suggesting-title">
+          <p
+            v-if="suggestingTitle"
+            class="suggesting-title-hint flex items-center gap-1.5 mt-1.5 ml-1 text-xs text-gray-500 dark:text-gray-400"
+          >
+            <IconWrapper
+              name="i-bx-loader-alt"
+              size="4"
+              class="animate-spin shrink-0"
+            />
+            Suggesting title
+          </p>
+        </Transition>
+      </div>
       <CowInput v-model="artist" label="Artist" />
 
       <!-- Proactive duplicate check: existing matches surfaced as the user types -->
@@ -89,7 +104,13 @@
         Add an empty line if you wish to forcefully break your lyrics into
         verses. This feature is especially useful for adding a worship lineup.
       </Hint>
-      <CowTextarea v-model="lyrics" label="Lyrics" :rows="12" autoresize />
+      <CowTextarea
+        v-model="lyrics"
+        label="Lyrics"
+        :rows="12"
+        autoresize
+        @blur="suggestTitleFromLyrics"
+      />
       <CowToggle
         v-model="isSongPublic"
         label="Share this song with other users?"
@@ -112,6 +133,7 @@
 <script setup lang="ts">
 import { watchDebounced, useOnline } from "@vueuse/core"
 import { useAuthStore } from "~/store/auth"
+import { useSuggestedSongTitle } from "~/composables/useSong"
 import type { Song } from "~/types"
 
 const props = defineProps<{
@@ -150,6 +172,29 @@ watchDebounced(
   },
   { debounce: 400 }
 )
+
+// Leaving the lyrics box is the natural moment to fill an empty title: the
+// chorus hook is the best guess at what the song is called. The 1s "Suggesting
+// title" beat keeps the field from changing silently under the user.
+const suggestingTitle = ref<boolean>(false)
+let suggestTitleTimer: ReturnType<typeof setTimeout> | undefined
+
+const suggestTitleFromLyrics = () => {
+  if (title.value.trim() || !lyrics.value.trim()) return
+
+  const suggestion = useSuggestedSongTitle(lyrics.value)
+  if (!suggestion) return
+
+  clearTimeout(suggestTitleTimer)
+  suggestingTitle.value = true
+  suggestTitleTimer = setTimeout(() => {
+    suggestingTitle.value = false
+    // The user may have typed a title during the beat — never overwrite it.
+    if (!title.value.trim()) title.value = suggestion
+  }, 500)
+}
+
+onBeforeUnmount(() => clearTimeout(suggestTitleTimer))
 
 const togglePreview = (id: string) => {
   expandedId.value = expandedId.value === id ? "" : id
@@ -281,6 +326,17 @@ const uploadSongToAPI = async (
 </script>
 
 <style scoped>
+.suggesting-title-enter-active,
+.suggesting-title-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.suggesting-title-enter-from,
+.suggesting-title-leave-to {
+  opacity: 0;
+  transform: translateY(-0.25rem);
+}
+
 .duplicate-preview-enter-active,
 .duplicate-preview-leave-active {
   max-height: 10rem;
