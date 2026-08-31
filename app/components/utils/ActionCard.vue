@@ -150,6 +150,7 @@ const actionIconComponentMap: Record<string, Component> = {
   "add-song": AddSongIcon,
   "new-library": LibraryIcon,
   "new-song": SongsIcon,
+  "new-song-search": SongsIcon,
   "new-song-setlist": SongSetlistIcon,
   "new-slide": TextSlideIcon,
   "new-media": MediaIcon,

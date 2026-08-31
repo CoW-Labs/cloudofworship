@@ -20,6 +20,10 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'open-invite-modal': 'teams',
   'livestream-url': 'teams',
   'new-transcribe': 'teams',
+  // The online song/lyrics library search ("Search song lyrics" → SongsList).
+  // Only the *search* is gated: 'new-song' below stays free so a church can
+  // still play songs it saved itself (personal library, "Add Song").
+  'new-song-search': 'teams',
 
   // Free tier features
   'new-slide': 'free',
@@ -28,7 +32,7 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-hymn': 'free',
   'new-media': 'free',
   'new-bible': 'free',
-  'new-song': 'free',
+  'new-song': 'free', // creating a song slide from an already-owned song
   'new-song-setlist': 'free',
   'add-song': 'free',
   'new-library': 'free',
