@@ -550,6 +550,24 @@ const handleChipClick = (action: string) => {
   useGlobalEmit(action)
 }
 
+// The online lyrics library is Teams-only. Every route into the song search
+// page funnels through here (the "Search song lyrics" card, the "Search in
+// songs" banner in HymnList), so a free church gets the upgrade modal instead
+// of the search — while songs it already owns (personal library, "Add Song")
+// keep working, since those emit "new-song" with a payload.
+const canSearchSongLyrics = () =>
+  hasAccessToFeature(appWideActions.newSongSearch) ||
+  !isPremiumFeatureEnabled.value
+
+const ensureSongSearchAccess = () => {
+  if (canSearchSongLyrics()) return true
+  emitter.emit("show-upgrade-modal")
+  usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
+    feature: appWideActions.newSongSearch,
+  })
+  return false
+}
+
 const handleTranscribeClick = () => {
   handleChipClick(appWideActions.newTranscribe)
 }
@@ -579,8 +597,9 @@ const mapSongToAction = (song: Song, fromSaved: boolean): QuickAction => {
 // Remote (global) song search results — always fetched alongside the local
 // library match so both sources are represented; duplicates and the 3+3 cap
 // are resolved when the song group is built in searchedActions. Gated behind
-// the Teams subscription like the rest of "new-song" (only skipped when the
-// paywall flag is actually enabled, matching hasAccessToFeature usage elsewhere).
+// the Teams subscription like the rest of the online lyrics search (only
+// skipped when the paywall flag is actually enabled, matching hasAccessToFeature
+// usage elsewhere). Locally saved songs are unaffected — they stay free.
 const remoteSongActions = ref<QuickAction[]>([])
 const isSearchingRemoteSongs = ref(false)
 // Guards against out-of-order results when overlapping calls fire (e.g. fast
@@ -590,8 +609,7 @@ let remoteSongsRequestId = 0
 
 const fetchRemoteSongsIfNeeded = useDebounceFn(async (query: string) => {
   const requestId = ++remoteSongsRequestId
-  const songSearchAllowed =
-    hasAccessToFeature("new-song") || !isPremiumFeatureEnabled.value
+  const songSearchAllowed = canSearchSongLyrics()
 
   if (query.length < 2 || !songSearchAllowed) {
     remoteSongActions.value = []
@@ -794,12 +812,14 @@ emitter.on("bible-search-demo", () => {
 
 emitter.on("new-song", (data: any) => {
   if (!data && !isInSearchResults.value) {
+    if (!ensureSongSearchAccess()) return
     page.value = "song"
   }
 })
 
 emitter.on("new-song-search", (query) => {
-  songSearchQuery.value = query
+  if (!ensureSongSearchAccess()) return
+  songSearchQuery.value = query || ""
   page.value = "song"
 })
 
