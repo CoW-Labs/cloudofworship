@@ -124,6 +124,7 @@
 <script setup lang="ts">
 import { useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
+import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
 
 defineProps<{
   value?: string
@@ -351,12 +352,18 @@ const saveAndSelectImages = async (files: File[]) => {
         if (online.value) {
           try {
             const uploadedFile = await useUploadImage(compressedFile)
-            await useIndexedDB().localMediaFiles.update(mediaKey, {
+            await localMedia.setCloudSyncState(mediaKey, {
+              groupId: mediaKey,
+              status: "uploaded",
               remoteUrl: uploadedFile.file.url,
-              recoverable: true,
-              updatedAt: new Date().toISOString(),
             })
           } catch (error) {
+            await localMedia.setCloudSyncState(mediaKey, {
+              groupId: mediaKey,
+              status: "failed",
+              reason: mediaCloudFailureReason(error),
+              error,
+            })
             console.warn("Background image cloud upload failed:", error)
           }
         }

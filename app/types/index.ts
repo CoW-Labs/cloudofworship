@@ -94,6 +94,8 @@ export interface Slide {
   presentationObjects?: PresentationObject[] // only for presentation slides
   presentationPageIndex?: number // 0-based index of the currently displayed page
   slideMode?: "slide" | "overlay"
+  /** Per-asset upload history, safe to persist and share across devices. */
+  mediaCloudSync?: Record<string, MediaCloudSyncRecord>
 }
 
 export interface Template {
@@ -261,6 +263,29 @@ export type LocalMediaCategory =
   | "background"
   | "preset"
 export type LocalMediaKind = "image" | "audio" | "video"
+export type MediaCloudSyncStatus =
+  | "pending"
+  | "uploaded"
+  | "local-only"
+  | "failed"
+export type MediaCloudSyncReason =
+  | "offline"
+  | "quota"
+  | "disabled"
+  | "upload-error"
+
+/** Cloud history is kept separately from the physical-file record. */
+export interface MediaCloudSyncRecord {
+  key: string
+  groupId: string
+  status: MediaCloudSyncStatus
+  reason?: MediaCloudSyncReason
+  remoteUrl?: string
+  error?: string
+  createdAt: string
+  updatedAt: string
+  uploadedAt?: string
+}
 
 /**
  * Searchable, device-local metadata for a binary file whose bytes live outside

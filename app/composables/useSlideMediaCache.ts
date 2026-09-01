@@ -58,10 +58,10 @@ export default function useSlideMediaCache() {
     const kind = mediaKind(data?.type || slide.backgroundType)
     const candidateUrl =
       kind === "audio"
-        ? data?.url
+        ? data?.url || slide.mediaCloudSync?.[slide.id]?.remoteUrl
         : isRemoteUrl(slide.background)
         ? slide.background
-        : data?.url
+        : data?.url || slide.mediaCloudSync?.[slide.id]?.remoteUrl
     const fileUrl = await resolveLocalUrl(
       slide.id,
       {
@@ -90,7 +90,7 @@ export default function useSlideMediaCache() {
       const url = await resolveLocalUrl(
         key,
         {
-          url: obj.imageUrl,
+          url: obj.imageUrl || slide.mediaCloudSync?.[key]?.remoteUrl,
           category: "presentation-page",
           kind: "image",
           groupId: slide.id,
@@ -114,7 +114,8 @@ export default function useSlideMediaCache() {
     const fileUrl = await resolveLocalUrl(
       key,
       {
-        url: slide.background,
+        url:
+          slide.background || slide.mediaCloudSync?.[key]?.remoteUrl,
         category: key.startsWith("/video-bg-") ? "preset" : "background",
         kind: "video",
         groupId: key,
@@ -134,7 +135,8 @@ export default function useSlideMediaCache() {
     const fileUrl = await resolveLocalUrl(
       key,
       {
-        url: slide.background,
+        url:
+          slide.background || slide.mediaCloudSync?.[key]?.remoteUrl,
         category: key.startsWith("/preset-image-bg-")
           ? "preset"
           : "background",

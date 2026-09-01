@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import useIndexedDB from "~/composables/useIndexedDB"
 import {
   createLocalMediaStorage,
@@ -137,6 +137,8 @@ const resetDatabase = async () => {
   await Promise.all(db.tables.map((table) => table.clear()))
 }
 
+afterEach(() => vi.unstubAllGlobals())
+
 describe.each(["opfs", "tauri-fs"] as const)(
   "%s LocalMediaStorage adapter contract",
   (backend) => {
@@ -170,6 +172,110 @@ describe.each(["opfs", "tauri-fs"] as const)(
       expect(await useIndexedDB().localMediaFiles.get("slide-1")).toEqual(
         record
       )
+    })
+
+    it("keeps cloud sync history after the physical-file record is lost", async () => {
+      const storage = createLocalMediaStorage(adapter)
+      await storage.setCloudSyncState("offline-image", {
+        groupId: "offline-image",
+        status: "local-only",
+        reason: "offline",
+      })
+
+      await useIndexedDB().localMediaFiles.delete("offline-image")
+
+      expect(await storage.getCloudSyncState("offline-image")).toMatchObject({
+        status: "local-only",
+        reason: "offline",
+      })
+    })
+
+    it("records user-created media as pending online and local-only offline", async () => {
+      const storage = createLocalMediaStorage(adapter)
+      vi.stubGlobal("navigator", { onLine: true })
+
+      await storage.saveBlob({
+        key: "online-image",
+        groupId: "online-image",
+        category: "slide",
+        kind: "image",
+        blob: new Blob(["online"]),
+        userInitiated: true,
+      })
+      expect(await storage.getCloudSyncState("online-image")).toMatchObject({
+        status: "pending",
+      })
+
+      vi.stubGlobal("navigator", { onLine: false })
+      await storage.saveBlob({
+        key: "offline-image",
+        groupId: "offline-image",
+        category: "slide",
+        kind: "image",
+        blob: new Blob(["offline"]),
+        userInitiated: true,
+      })
+      expect(await storage.getCloudSyncState("offline-image")).toMatchObject({
+        status: "local-only",
+        reason: "offline",
+      })
+
+    })
+
+    it("marks uploaded media recoverable and clears the previous failure", async () => {
+      const storage = createLocalMediaStorage(adapter)
+      await storage.saveBlob({
+        key: "retry-image",
+        groupId: "retry-image",
+        category: "slide",
+        kind: "image",
+        blob: new Blob(["retry"]),
+      })
+      await storage.setCloudSyncState("retry-image", {
+        status: "failed",
+        reason: "upload-error",
+        error: new Error("Network request failed"),
+      })
+
+      const uploaded = await storage.setCloudSyncState("retry-image", {
+        status: "uploaded",
+        remoteUrl: "https://cdn.example.com/retry.png",
+      })
+
+      expect(uploaded).toMatchObject({
+        status: "uploaded",
+        remoteUrl: "https://cdn.example.com/retry.png",
+      })
+      expect(uploaded.reason).toBeUndefined()
+      expect(uploaded.error).toBeUndefined()
+      expect(
+        await useIndexedDB().localMediaFiles.get("retry-image")
+      ).toMatchObject({
+        remoteUrl: "https://cdn.example.com/retry.png",
+        recoverable: true,
+      })
+    })
+
+    it("removes cloud sync history when its media group is deleted", async () => {
+      const storage = createLocalMediaStorage(adapter)
+      await storage.saveBlob({
+        key: "presentation-1-page-1",
+        groupId: "presentation-1",
+        category: "presentation-page",
+        kind: "image",
+        blob: new Blob(["page"]),
+      })
+      await storage.setCloudSyncState("presentation-1-page-1", {
+        groupId: "presentation-1",
+        status: "uploaded",
+        remoteUrl: "https://cdn.example.com/page-1.png",
+      })
+
+      await storage.deleteGroup("presentation-1")
+
+      expect(
+        await storage.getCloudSyncState("presentation-1-page-1")
+      ).toBeUndefined()
     })
 
     it("atomically replaces a file and removes the previous path after commit", async () => {
@@ -446,6 +552,11 @@ describe("legacy migration, capacity, and cleanup", () => {
       remoteUrl: "https://cdn.example/video.mp4",
       recoverable: true,
     })
+    await storage.setCloudSyncState("transport-slide", {
+      groupId: "transport-slide",
+      status: "uploaded",
+      remoteUrl: "https://cdn.example/video.mp4",
+    })
 
     const safe = await toTransportSafeSlide({
       id: "transport-slide",
@@ -470,6 +581,45 @@ describe("legacy migration, capacity, and cleanup", () => {
     expect(safe.background).toBe("https://cdn.example/video.mp4")
     expect((safe.data as any).url).toBe("https://cdn.example/video.mp4")
     expect((safe.data as any).blob).toBeUndefined()
+    expect(safe.mediaCloudSync?.["transport-slide"]).toMatchObject({
+      status: "uploaded",
+      remoteUrl: "https://cdn.example/video.mp4",
+    })
+  })
+
+  it("transports cloud recovery history after local metadata is lost", async () => {
+    const storage = createLocalMediaStorage(adapter)
+    await storage.setCloudSyncState("remote-only-slide", {
+      groupId: "remote-only-slide",
+      status: "uploaded",
+      remoteUrl: "https://cdn.example.com/remote-only.mp4",
+    })
+
+    const safe = await toTransportSafeSlide({
+      id: "remote-only-slide",
+      index: 0,
+      name: "Remote-only video",
+      type: "media",
+      layout: "empty",
+      userId: "user",
+      churchId: "church",
+      scheduleId: "schedule",
+      contents: [],
+      backgroundType: "video",
+      background: "blob:missing-local-metadata",
+      data: {
+        name: "remote-only.mp4",
+        type: "video",
+        url: "blob:missing-local-metadata",
+      } as any,
+    })
+
+    expect(safe.background).toBe("")
+    expect((safe.data as any).url).toBe("")
+    expect(safe.mediaCloudSync?.["remote-only-slide"]).toMatchObject({
+      status: "uploaded",
+      remoteUrl: "https://cdn.example.com/remote-only.mp4",
+    })
   })
 })
 
