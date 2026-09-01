@@ -13,6 +13,7 @@ import type {
   TimeSlideData,
 } from "~/types"
 import { tabSessionId } from "./useRealtimeSlides"
+import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
 
 /**
  * Composable for creating different types of slides
@@ -548,6 +549,13 @@ export default function useSlideCreation() {
                 (blob.type?.includes("image") ||
                   (isVideo && uploadVideos) ||
                   blob.type?.includes("audio"))
+              if (isVideo && !uploadVideos) {
+                await localMedia.setCloudSyncState(newSlides[index]!.id, {
+                  groupId: newSlides[index]!.id,
+                  status: "local-only",
+                  reason: "disabled",
+                })
+              }
               if (!isUploadable || !blob) return null
               try {
                 // useUploadFile routes small images through the direct path and
@@ -557,6 +565,15 @@ export default function useSlideCreation() {
                 const uploaded = await useUploadFile(blob, { name: file.name })
                 return { uploaded, index }
               } catch (err) {
+                const storedSlide = newSlides[index]
+                if (storedSlide) {
+                  await localMedia.setCloudSyncState(storedSlide.id, {
+                    groupId: storedSlide.id,
+                    status: "failed",
+                    reason: mediaCloudFailureReason(err),
+                    error: err,
+                  })
+                }
                 if (/quota|storage limit|storage full/i.test(String(err))) {
                   quotaExceeded = true
                 } else {
@@ -576,10 +593,10 @@ export default function useSlideCreation() {
               remoteUrls.set(res.index, res.uploaded.file.url)
               const storedSlide = newSlides[res.index]
               if (storedSlide) {
-                await useIndexedDB().localMediaFiles.update(storedSlide.id, {
+                await localMedia.setCloudSyncState(storedSlide.id, {
+                  groupId: storedSlide.id,
+                  status: "uploaded",
                   remoteUrl: res.uploaded.file.url,
-                  recoverable: true,
-                  updatedAt: new Date().toISOString(),
                 })
               }
             }
@@ -734,15 +751,24 @@ export default function useSlideCreation() {
               try {
                 const uploaded = await useUploadImage(blob)
                 remotePageUrls.set(obj.page, uploaded.file.url)
-                await useIndexedDB().localMediaFiles.update(
+                await localMedia.setCloudSyncState(
                   `${tempSlide.id}-page-${obj.page}`,
                   {
+                    groupId: tempSlide.id,
+                    status: "uploaded",
                     remoteUrl: uploaded.file.url,
-                    recoverable: true,
-                    updatedAt: new Date().toISOString(),
                   }
                 )
               } catch (uploadErr) {
+                await localMedia.setCloudSyncState(
+                  `${tempSlide.id}-page-${obj.page}`,
+                  {
+                    groupId: tempSlide.id,
+                    status: "failed",
+                    reason: mediaCloudFailureReason(uploadErr),
+                    error: uploadErr,
+                  }
+                )
                 if (/quota|storage limit|storage full/i.test(String(uploadErr))) {
                   quotaExceeded = true
                 } else {

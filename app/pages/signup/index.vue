@@ -860,7 +860,43 @@ const handleGoogleSignUp = async () => {
         icon: "i-bx-error",
       })
     } else {
-      const newUser = data.value?.data.newUser
+      const newUser = data.value?.data?.newUser
+      const existingUser = data.value?.data?.user
+
+      // Google account already linked to an account: sign them in instead
+      if (!newUser && existingUser) {
+        token.value = data.value?.token || null
+        authStore.setUser(existingUser)
+        fullName.value = existingUser.fullname || gUser?.displayName || ""
+
+        usePosthogCapture("LOGIN_SUCCESSFUL", {
+          method: "google",
+          userId: existingUser._id,
+          email: gUser?.email,
+          emailVerified: existingUser.emailVerified,
+          source: "signup",
+        })
+
+        if (!existingUser.emailVerified) {
+          goToVerify()
+          return
+        }
+
+        if (existingUser.churchId) {
+          toast.add({
+            title: "Welcome back, you already have an account",
+            icon: "i-bx-check-circle",
+            color: "primary",
+          })
+          await getChurch()
+          return
+        }
+
+        // Existing account with no church yet: continue the setup flow
+        step.value = existingUser.fullname ? 3 : 2
+        return
+      }
+
       if (!newUser) return
 
       token.value = data.value?.token || null

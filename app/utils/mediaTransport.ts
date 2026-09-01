@@ -34,6 +34,23 @@ export const toTransportSafeSlide = async (slide: Slide): Promise<Slide> => {
   const remoteUrlFor = async (key?: string | null) =>
     key ? (await db.localMediaFiles.get(key))?.remoteUrl || "" : ""
 
+  const mediaKeys = [
+    ...(safe.type === slideTypes.media ? [safe.id] : []),
+    ...(safe.presentationObjects || []).map(
+      (page) => `${safe.id}-page-${page.page}`
+    ),
+    ...(safe.backgroundImageKey ? [safe.backgroundImageKey] : []),
+    ...(safe.backgroundVideoKey ? [safe.backgroundVideoKey] : []),
+  ]
+  if (mediaKeys.length) {
+    const syncRecords = await db.mediaCloudSync.bulkGet([...new Set(mediaKeys)])
+    const mediaCloudSync = { ...(safe.mediaCloudSync || {}) }
+    syncRecords.forEach((record) => {
+      if (record) mediaCloudSync[record.key] = record
+    })
+    if (Object.keys(mediaCloudSync).length) safe.mediaCloudSync = mediaCloudSync
+  }
+
   if (safe.data && typeof safe.data === "object") {
     delete (safe.data as any).blob
     if (isSessionMediaUrl((safe.data as any).url)) {

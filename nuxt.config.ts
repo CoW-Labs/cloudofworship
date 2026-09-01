@@ -73,6 +73,14 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
 
   experimental: {
+    // Nuxt's own chunk-error handling ('automatic', the default) only reloads
+    // from router.onError, so it fires when a dead chunk aborts a *navigation*.
+    // The operator console sits on one route for hours, so its chunk failures
+    // are lazy imports inside the page and never reach the router. 'manual'
+    // keeps the app:chunkError hook but installs no built-in reload plugin;
+    // app/plugins/chunk-error.client.ts owns the policy for both cases.
+    emitRouteChunkError: 'manual',
+
     // Nuxt fetches /_nuxt/builds/meta/<buildId>.json on every route navigation
     // to check for a newer deployment. The service worker is network-first and
     // this URL is never in its cache (it is only ever requested at navigation

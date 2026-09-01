@@ -32,6 +32,18 @@ export interface SlideRepository {
     slideId: string
   ): Promise<StoredSlideRecord | undefined>
   getScheduleSlides(scheduleId: string): Promise<Slide[]>
+  /**
+   * Records explicitly queued after an existing server slide PUT failed.
+   * Generic `pending` records are intentionally excluded: older app versions
+   * used that state for every local edit, including successful writes.
+   */
+  getPendingSlides(): Promise<StoredSlideRecord[]>
+  markSlideSyncState(
+    scheduleId: string,
+    slideId: string,
+    syncState: SlideSyncState,
+    expectedLocalRevision?: number
+  ): Promise<void>
   putSlide(slide: Slide, options?: SlideWriteOptions): Promise<void>
   putSlides(slides: readonly Slide[], options?: SlideWriteOptions): Promise<void>
   replaceScheduleSlides(
@@ -89,18 +101,27 @@ export const createSlideRepository = (
       )
       const existing = await db.slides.bulkGet(keys)
       const storedAt = new Date().toISOString()
-      const records: StoredSlideRecord[] = prepared.map((slide, index) => ({
-        scheduleId: slide.scheduleId,
-        id: slide.id,
-        index: Number.isFinite(slide.index) ? slide.index : 0,
-        serverId: slide._id,
-        updatedAt: slide.updatedAt,
-        localRevision: (existing[index]?.localRevision || 0) + 1,
-        syncState: resolveSyncState(slide, options),
-        storedAt,
-        deletedAt: null,
-        slide,
-      }))
+      const records: StoredSlideRecord[] = prepared.map((slide, index) => {
+        const syncState = resolveSyncState(slide, options)
+        return {
+          scheduleId: slide.scheduleId,
+          id: slide.id,
+          index: Number.isFinite(slide.index) ? slide.index : 0,
+          serverId: slide._id,
+          updatedAt: slide.updatedAt,
+          localRevision: (existing[index]?.localRevision || 0) + 1,
+          syncState,
+          // A newer local edit must not erase a retry marker left by an older
+          // failed request. A confirmed server/realtime write clears it.
+          resyncRequestedAt:
+            syncState === "pending"
+              ? existing[index]?.resyncRequestedAt || null
+              : null,
+          storedAt,
+          deletedAt: null,
+          slide,
+        }
+      })
       await db.slides.bulkPut(records)
     })
   }
@@ -127,6 +148,44 @@ export const createSlideRepository = (
         .map((record) => record.slide)
     },
 
+    async getPendingSlides() {
+      const records = await db.slides
+        .where("syncState")
+        .equals("pending")
+        .toArray()
+      return records.filter(
+        (record) => !record.deletedAt && !!record.resyncRequestedAt
+      )
+    },
+
+    async markSlideSyncState(
+      scheduleId,
+      slideId,
+      syncState,
+      expectedLocalRevision
+    ) {
+      if (!scheduleId || !slideId) return
+      await db.transaction("rw", db.slides, async () => {
+        const record = await db.slides.get([scheduleId, slideId])
+        if (!record) return
+        // The caller read `localRevision` before an await. A newer revision
+        // means the operator edited the slide while the request was in flight,
+        // so stamping "synced" here would mark unsent edits as delivered.
+        if (
+          expectedLocalRevision !== undefined &&
+          record.localRevision !== expectedLocalRevision
+        ) {
+          return
+        }
+        await db.slides.put({
+          ...record,
+          syncState,
+          resyncRequestedAt:
+            syncState === "pending" ? new Date().toISOString() : null,
+        })
+      })
+    },
+
     async putSlide(slide, options) {
       if (!isValidSlide(slide)) return
       await putPreparedSlides([await sanitize(slide)], options)
@@ -151,18 +210,35 @@ export const createSlideRepository = (
           existing.map((record) => [record.id, record] as const)
         )
         const storedAt = new Date().toISOString()
-        const records: StoredSlideRecord[] = prepared.map((slide) => ({
-          scheduleId,
-          id: slide.id,
-          index: Number.isFinite(slide.index) ? slide.index : 0,
-          serverId: slide._id,
-          updatedAt: slide.updatedAt,
-          localRevision: (existingById.get(slide.id)?.localRevision || 0) + 1,
-          syncState: resolveSyncState(slide, options),
-          storedAt,
-          deletedAt: null,
-          slide,
-        }))
+        const records: StoredSlideRecord[] = prepared.map((slide) => {
+          const previous = existingById.get(slide.id)
+          // A confirmed failed PUT is the only local server-backed record that
+          // may override a fetched snapshot. Preserve it until replay succeeds;
+          // generic legacy `pending` records do not get this protection.
+          if (
+            previous?.resyncRequestedAt &&
+            options.preservePending !== false
+          ) {
+            return previous
+          }
+          const syncState = resolveSyncState(slide, options)
+          return {
+            scheduleId,
+            id: slide.id,
+            index: Number.isFinite(slide.index) ? slide.index : 0,
+            serverId: slide._id,
+            updatedAt: slide.updatedAt,
+            localRevision: (previous?.localRevision || 0) + 1,
+            syncState,
+            resyncRequestedAt:
+              syncState === "pending"
+                ? previous?.resyncRequestedAt || null
+                : null,
+            storedAt,
+            deletedAt: null,
+            slide,
+          }
+        })
 
         if (records.length) await db.slides.bulkPut(records)
 
