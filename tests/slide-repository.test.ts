@@ -65,6 +65,73 @@ describe("SlideRepository", () => {
     })
   })
 
+  it("queues only records explicitly marked after a failed PUT", async () => {
+    const repository = createSlideRepository()
+    const edited = slide("one", "sunday", 0, { _id: "server-one" })
+
+    await repository.putSlide(edited, { syncState: "pending" })
+    expect(await repository.getPendingSlides()).toEqual([])
+
+    await repository.markSlideSyncState("sunday", "one", "pending")
+    expect(await repository.getPendingSlides()).toHaveLength(1)
+  })
+
+  it("preserves an explicit retry marker across newer pending edits", async () => {
+    const repository = createSlideRepository()
+    await repository.putSlide(
+      slide("one", "sunday", 0, { _id: "server-one" }),
+      { syncState: "pending" }
+    )
+    await repository.markSlideSyncState("sunday", "one", "pending")
+
+    await repository.putSlide(
+      slide("one", "sunday", 0, {
+        _id: "server-one",
+        contents: ["newer edit"],
+      }),
+      { syncState: "pending" }
+    )
+
+    expect(await repository.getPendingSlides()).toEqual([
+      expect.objectContaining({
+        localRevision: 2,
+        slide: expect.objectContaining({ contents: ["newer edit"] }),
+      }),
+    ])
+  })
+
+  it("does not clear a newer pending revision with an older response", async () => {
+    const repository = createSlideRepository()
+    const first = slide("one", "sunday", 0, { _id: "server-one" })
+    await repository.putSlide(first, { syncState: "pending" })
+    await repository.markSlideSyncState("sunday", "one", "pending")
+    const firstRevision = (
+      await repository.getStoredSlide("sunday", "one")
+    )!.localRevision
+
+    await repository.putSlide(
+      { ...first, contents: ["newer edit"] },
+      { syncState: "pending" }
+    )
+    await repository.markSlideSyncState(
+      "sunday",
+      "one",
+      "synced",
+      firstRevision
+    )
+
+    expect(await repository.getPendingSlides()).toHaveLength(1)
+
+    const latest = await repository.getStoredSlide("sunday", "one")
+    await repository.markSlideSyncState(
+      "sunday",
+      "one",
+      "synced",
+      latest!.localRevision
+    )
+    expect(await repository.getPendingSlides()).toEqual([])
+  })
+
   it("replaces only the target schedule and preserves pending local slides", async () => {
     const repository = createSlideRepository()
     await repository.putSlides([
@@ -83,6 +150,35 @@ describe("SlideRepository", () => {
       (await repository.getScheduleSlides("sunday")).map((item) => item.id)
     ).toEqual(["fresh", "offline"])
     expect(await repository.getSlide("midweek", "other")).toBeDefined()
+  })
+
+  it("does not let a fetched snapshot overwrite an explicitly queued update", async () => {
+    const repository = createSlideRepository()
+    await repository.putSlide(
+      slide("edited", "sunday", 0, {
+        _id: "server-edited",
+        contents: ["local failed edit"],
+      }),
+      { syncState: "pending" }
+    )
+    await repository.markSlideSyncState("sunday", "edited", "pending")
+
+    await repository.replaceScheduleSlides(
+      "sunday",
+      [
+        slide("edited", "sunday", 0, {
+          _id: "server-edited",
+          contents: ["older server content"],
+        }),
+      ],
+      { removeMissing: true, syncState: "synced" }
+    )
+
+    expect(await repository.getPendingSlides()).toEqual([
+      expect.objectContaining({
+        slide: expect.objectContaining({ contents: ["local failed edit"] }),
+      }),
+    ])
   })
 
   it("deletes records and verifies complete schedule snapshots", async () => {
