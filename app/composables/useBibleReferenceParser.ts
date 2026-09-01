@@ -196,6 +196,35 @@ bibleBooks.forEach((book, index) => {
 })
 
 /**
+ * Books whose name is a genuine English plural, so a dropped "s" is a plausible
+ * transcription slip ("1 King 4:7", "Roman 8:28") rather than a different word.
+ *
+ * Listed explicitly instead of stripping every trailing "s": that would produce
+ * nonsense ("Exodu", "Titu", "Jame") and — worse — everyday words that would
+ * false-positive on ordinary speech ("Numbers" -> "number 1 2", where a phrase
+ * like "point number 2 3 times" would resolve to a verse).
+ */
+const PLURAL_BOOK_NAMES = [
+  'kings', 'chronicles', 'judges', 'psalms', 'proverbs', 'lamentations',
+  'romans', 'corinthians', 'galatians', 'ephesians', 'philippians',
+  'colossians', 'thessalonians', 'hebrews',
+]
+
+// Register the singular of each, keeping any numeric prefix: "1 kings" -> "1 king".
+// Spoken prefixes need no separate entry — normalizeSpokenNumbers turns
+// "first king" into "1 king" before the lookup runs.
+bibleBooks.forEach((book, index) => {
+  const lower = book.toLowerCase()
+  const withoutPrefix = lower.replace(/^\d\s+/, '')
+  if (!PLURAL_BOOK_NAMES.includes(withoutPrefix)) return
+
+  const singular = lower.slice(0, -1)
+  if (!bookNameVariations[singular]) {
+    bookNameVariations[singular] = index + 1
+  }
+})
+
+/**
  * Normalize spoken number prefixes to digits
  * Converts "second corinthians" -> "2 corinthians", "third john" -> "3 john", etc.
  */
