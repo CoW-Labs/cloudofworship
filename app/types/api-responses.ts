@@ -10,7 +10,10 @@ export interface LoginResponseT {
 export interface SignupResponseT {
   token: string
   data: {
-    newUser: User
+    // Present when a brand new account was created
+    newUser?: User
+    // Present when the Google account is already linked to an existing user
+    user?: User
   }
 }
 
