@@ -26,6 +26,8 @@ export interface StoredSlideRecord {
   updatedAt?: string
   localRevision: number
   syncState: SlideSyncState
+  /** Set only after an existing server slide PUT definitely fails in transit. */
+  resyncRequestedAt?: string | null
   storedAt: string
   deletedAt?: string | null
   slide: Slide
