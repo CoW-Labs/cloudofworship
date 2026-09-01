@@ -7,6 +7,7 @@ import type {
   Scripture,
   Hymn,
   LocalMediaFileRecord,
+  MediaCloudSyncRecord,
   Slide,
 } from '~/types'
 
@@ -69,6 +70,7 @@ export class WorshipCloudDatabase extends Dexie {
   public library!: Table<LibraryItem, string>
   public cached!: Table<Media>
   public localMediaFiles!: Table<LocalMediaFileRecord, string>
+  public mediaCloudSync!: Table<MediaCloudSyncRecord, string>
   public slides!: Table<StoredSlideRecord, [string, string]>
   public migrationMeta!: Table<DataMigrationRecord, string>
   public slideOutbox!: Table<SlideOutboxRecord, string>
@@ -119,6 +121,22 @@ export class WorshipCloudDatabase extends Dexie {
       cached: "id,content,data,createdAt,updatedAt",
       localMediaFiles:
         "key,groupId,backend,category,kind,lastAccessedAt,createdAt,updatedAt",
+      bibleAndHymns: "id,data,createdAt,updatedAt",
+      slides:
+        "[scheduleId+id],scheduleId,id,serverId,[scheduleId+index],updatedAt,localRevision,syncState,deletedAt",
+      migrationMeta: "id,version,status,completedAt",
+      slideOutbox:
+        "id,scheduleId,slideId,[scheduleId+createdAt],operation,localRevision,createdAt,attempts",
+      liveProjection: "id,revision,slideId,scheduleId,updatedAt",
+    })
+    this.version(6).stores({
+      songs: "id,lyrics,title,album,cover,artist,verses,createdAt,updatedAt",
+      media: "id,content,data,createdAt,updatedAt",
+      library: "id,type,content,createdAt,updatedAt",
+      cached: "id,content,data,createdAt,updatedAt",
+      localMediaFiles:
+        "key,groupId,backend,category,kind,lastAccessedAt,createdAt,updatedAt",
+      mediaCloudSync: "key,groupId,status,reason,updatedAt",
       bibleAndHymns: "id,data,createdAt,updatedAt",
       slides:
         "[scheduleId+id],scheduleId,id,serverId,[scheduleId+index],updatedAt,localRevision,syncState,deletedAt",

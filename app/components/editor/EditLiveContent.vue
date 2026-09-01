@@ -364,32 +364,16 @@
           />
           <div>
             <h3 class="text-white font-semibold text-md">
-              Image not available on this device
+              {{ imageUnavailableCopy.title }}
             </h3>
             <p
-              v-if="cloudStorageOverQuota"
               class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto"
             >
-              This image was added on another device. You've used all of your
-              {{ isTeamsPlan ? "Teams" : "free" }} cloud storage, so it couldn't
-              be synced here.
-              {{
-                isTeamsPlan
-                  ? "Free up cloud storage to sync it."
-                  : "Upgrade to Teams for 5GB of synced storage."
-              }}
-            </p>
-            <p
-              v-else
-              class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto"
-            >
-              This image was added on another device and hasn't finished syncing
-              to the cloud yet. Reconnect that device to the internet to sync it
-              here.
+              {{ imageUnavailableCopy.description }}
             </p>
           </div>
           <CowButton
-            v-if="cloudStorageOverQuota"
+            v-if="imageUnavailableReason === 'quota'"
             size="sm"
             class="mt-1"
             @click="
@@ -470,8 +454,13 @@ import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
+import {
+  mediaCloudFailureReason,
+  unavailableMediaCopy,
+} from "~/utils/mediaCloudSync"
 import type {
   ExtendedFileT,
+  MediaCloudSyncReason,
   Slide,
   SlideStyle,
   Song,
@@ -754,6 +743,8 @@ const isEmptySongSetlist = computed(
  * lazily before we show the unavailable notice.
  */
 const imageNotAvailable = ref(false)
+const imageUnavailableReason = ref<MediaCloudSyncReason>()
+const imageUnavailableCopy = ref(unavailableMediaCopy(null, "Image"))
 let imageAvailabilityGeneration = 0
 
 // Media this session is still holding is not missing media: an image the
@@ -770,6 +761,8 @@ const checkImageAvailability = async () => {
   const slideId = slide?.id
   // Reset immediately when the slide changes so the notice doesn't stick
   imageNotAvailable.value = false
+  imageUnavailableReason.value = undefined
+  imageUnavailableCopy.value = unavailableMediaCopy(null, "Image")
 
   if (!slide || !slideId) return
   if (slide.type !== slideTypes.media) return
@@ -792,19 +785,30 @@ const checkImageAvailability = async () => {
       kind: "image",
       groupId: slideId,
     })
-    if (
-      !localUrl &&
-      requestGeneration === imageAvailabilityGeneration &&
-      props.slide?.id === slideId
-    ) {
-      imageNotAvailable.value = true
+    if (!localUrl) {
+      const syncState =
+        (await localMedia.getCloudSyncState(slideId)) ||
+        slide.mediaCloudSync?.[slideId]
+      if (
+        requestGeneration === imageAvailabilityGeneration &&
+        props.slide?.id === slideId
+      ) {
+        imageUnavailableReason.value = syncState?.reason
+        imageUnavailableCopy.value = unavailableMediaCopy(syncState, "Image")
+        imageNotAvailable.value = true
+      }
     }
   } catch (err) {
     console.error("Error checking media availability:", err)
+    const syncState =
+      (await localMedia.getCloudSyncState(slideId)) ||
+      slide.mediaCloudSync?.[slideId]
     if (
       requestGeneration === imageAvailabilityGeneration &&
       props.slide?.id === slideId
     ) {
+      imageUnavailableReason.value = syncState?.reason
+      imageUnavailableCopy.value = unavailableMediaCopy(syncState, "Image")
       imageNotAvailable.value = true
     }
   }
@@ -825,15 +829,7 @@ watch(
   { immediate: true }
 )
 
-// Every plan uploads media to the cloud up to its storage quota, so the most
-// likely reason a slide isn't available on this device is that the church is
-// over quota. Tailor the notice to that (fixable) case vs. an unrelated sync
-// gap (e.g. the other device was offline when the media was added).
-const { isTeamsPlan, getStorageLimit } = useSubscription()
-const cloudStorageOverQuota = computed(() => {
-  const usedMB = (authStore.church?.storageUsed || 0) / 1024 / 1024
-  return usedMB >= getStorageLimit()
-})
+const { isTeamsPlan } = useSubscription()
 
 // Track total verses in the current Bible chapter for sequential navigation
 const chapterVerseCount = ref<number>(0)
@@ -1184,12 +1180,18 @@ const addDroppedBackgroundImage = async (file: File) => {
     if (online.value) {
       try {
         const uploadedFile = await useUploadImage(compressedFile)
-        await useIndexedDB().localMediaFiles.update(id, {
+        await localMedia.setCloudSyncState(id, {
+          groupId: id,
+          status: "uploaded",
           remoteUrl: uploadedFile.file.url,
-          recoverable: true,
-          updatedAt: new Date().toISOString(),
         })
       } catch (error) {
+        await localMedia.setCloudSyncState(id, {
+          groupId: id,
+          status: "failed",
+          reason: mediaCloudFailureReason(error),
+          error,
+        })
         console.warn("Background image cloud upload failed:", error)
       }
     }
@@ -1222,12 +1224,18 @@ const addDroppedBackgroundVideo = async (file: File) => {
     if (navigator.onLine) {
       try {
         const uploaded = await useUploadFile(file, { name: file.name })
-        await useIndexedDB().localMediaFiles.update(id, {
+        await localMedia.setCloudSyncState(id, {
+          groupId: id,
+          status: "uploaded",
           remoteUrl: uploaded.file.url,
-          recoverable: true,
-          updatedAt: new Date().toISOString(),
         })
       } catch (error) {
+        await localMedia.setCloudSyncState(id, {
+          groupId: id,
+          status: "failed",
+          reason: mediaCloudFailureReason(error),
+          error,
+        })
         if (/quota|storage limit|storage full/i.test(String(error))) {
           useToast().add({
             title: isTeamsPlan.value

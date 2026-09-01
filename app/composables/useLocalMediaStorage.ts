@@ -4,6 +4,9 @@ import type {
   LocalMediaFileRecord,
   LocalMediaKind,
   Media,
+  MediaCloudSyncReason,
+  MediaCloudSyncRecord,
+  MediaCloudSyncStatus,
 } from "~/types"
 import useIndexedDB from "~/composables/useIndexedDB"
 import useMediaDownloadProgress from "~/composables/useMediaDownloadProgress"
@@ -86,6 +89,17 @@ export interface LocalMediaStorage {
   migrateLegacyRecord(key: string): Promise<LocalMediaFileRecord | null>
   reconcileOrphans(): Promise<void>
   listRecords(): Promise<LocalMediaFileRecord[]>
+  getCloudSyncState(key: string): Promise<MediaCloudSyncRecord | undefined>
+  setCloudSyncState(
+    key: string,
+    input: {
+      groupId?: string
+      status: MediaCloudSyncStatus
+      reason?: MediaCloudSyncReason
+      remoteUrl?: string
+      error?: unknown
+    }
+  ): Promise<MediaCloudSyncRecord>
 }
 
 export interface LocalMediaAdapter {
@@ -468,6 +482,46 @@ const getAdapter = (): LocalMediaAdapter => {
 export const createLocalMediaStorage = (
   adapter: LocalMediaAdapter
 ): LocalMediaStorage => {
+  const getCloudSyncState = async (key: string) =>
+    await useIndexedDB().mediaCloudSync.get(key)
+
+  const setCloudSyncState: LocalMediaStorage["setCloudSyncState"] = async (
+    key,
+    input
+  ) => {
+    const db = useIndexedDB()
+    const existing = await db.mediaCloudSync.get(key)
+    const timestamp = nowISO()
+    const record: MediaCloudSyncRecord = {
+      key,
+      groupId: input.groupId || existing?.groupId || groupIdFromKey(key),
+      status: input.status,
+      reason: input.reason,
+      remoteUrl: input.remoteUrl || existing?.remoteUrl,
+      error:
+        input.error == null
+          ? undefined
+          : input.error instanceof Error
+          ? input.error.message
+          : String(input.error),
+      createdAt: existing?.createdAt || timestamp,
+      updatedAt: timestamp,
+      uploadedAt:
+        input.status === "uploaded"
+          ? existing?.uploadedAt || timestamp
+          : existing?.uploadedAt,
+    }
+    await db.mediaCloudSync.put(record)
+    if (input.status === "uploaded" && record.remoteUrl) {
+      await db.localMediaFiles.update(key, {
+        remoteUrl: record.remoteUrl,
+        recoverable: true,
+        updatedAt: timestamp,
+      })
+    }
+    return record
+  }
+
   const requestPersistence = async () => {
     if (persistenceRequested) {
       return (await adapter.capacity()).persistent
@@ -557,6 +611,7 @@ export const createLocalMediaStorage = (
     }
     if (record) await deletePhysicalRecord(record)
     await db.localMediaFiles.delete(key)
+    await db.mediaCloudSync.delete(key)
     await Promise.all([db.media.delete(key), db.cached.delete(key)])
   }
 
@@ -575,6 +630,7 @@ export const createLocalMediaStorage = (
     }
     for (const record of records) await deletePhysicalRecord(record)
     await db.localMediaFiles.where("groupId").equals(groupId).delete()
+    await db.mediaCloudSync.where("groupId").equals(groupId).delete()
     const legacyKeys = new Set([groupId, ...records.map((record) => record.key)])
     await Promise.all([
       db.media.bulkDelete([...legacyKeys]),
@@ -747,6 +803,14 @@ export const createLocalMediaStorage = (
     if (input.userInitiated && !persistenceRequested) {
       await requestPersistence().catch(() => null)
     }
+    if (input.userInitiated) {
+      const offline = globalThis.navigator?.onLine === false
+      await setCloudSyncState(input.key, {
+        groupId: input.groupId,
+        status: offline ? "local-only" : "pending",
+        reason: offline ? "offline" : undefined,
+      })
+    }
     return record
   }
 
@@ -779,7 +843,7 @@ export const createLocalMediaStorage = (
       }
       return activeResponse.body as ReadableStream<Uint8Array>
     }
-    return await serializeLargeTransfer(size, () =>
+    const record = await serializeLargeTransfer(size, () =>
       commitStream({
         ...input,
         remoteUrl: input.url,
@@ -791,6 +855,12 @@ export const createLocalMediaStorage = (
         streamFactory,
       })
     )
+    await setCloudSyncState(input.key, {
+      groupId: input.groupId,
+      status: "uploaded",
+      remoteUrl: input.url,
+    })
+    return record
   }
 
   const getPlaybackUrl = async (key: string) => {
@@ -990,6 +1060,7 @@ export const createLocalMediaStorage = (
     playbackUrls.clear()
     await adapter.clear()
     await useIndexedDB().localMediaFiles.clear()
+    await useIndexedDB().mediaCloudSync.clear()
   }
 
   const reconcileOrphans = async () => {
@@ -1043,6 +1114,8 @@ export const createLocalMediaStorage = (
     migrateLegacyRecord,
     reconcileOrphans,
     listRecords,
+    getCloudSyncState,
+    setCloudSyncState,
   }
 }
 

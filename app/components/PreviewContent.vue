@@ -176,6 +176,7 @@ import {
   isSessionMediaUrl,
   toTransportSafePayload,
 } from "~/utils/mediaTransport"
+import { unavailableMediaCopy } from "~/utils/mediaCloudSync"
 import { appWideActions } from "~/utils/constants"
 import {
   getAPIErrorMessage,
@@ -788,14 +789,31 @@ const handleTakeLiveAction = async (slide: Slide) => {
     const unprojectable = await Promise.all(
       localKeys.map(async (key) => {
         if (await projectionMediaStorage.getPlaybackUrl(key)) return null
-        return isRemoteUrl(remoteFallbackFor(key)) ? null : key
+        if (isRemoteUrl(remoteFallbackFor(key))) return null
+        return {
+          key,
+          syncState:
+            (await projectionMediaStorage.getCloudSyncState(key)) ||
+            slide.mediaCloudSync?.[key],
+        }
       })
     )
-    if (unprojectable.some(Boolean)) {
+    const unavailable = unprojectable.find((item) => item !== null)
+    if (unavailable) {
+      const isPresentationPage = unavailable.key.startsWith(
+        `${slide.id}-page-`
+      )
+      const label =
+        isPresentationPage || unavailable.key === slide.backgroundImageKey
+          ? "Image"
+          : unavailable.key === slide.backgroundVideoKey ||
+            (slide.data as ExtendedFileT)?.type === "video"
+          ? "Video"
+          : "Media"
+      const copy = unavailableMediaCopy(unavailable.syncState, label)
       toast.add({
-        title: "Media is not available on this device",
-        description:
-          "This media hasn't synced here yet. Reconnect the device that added it, or re-add the file.",
+        title: copy.title,
+        description: copy.description,
         icon: "i-bx-error",
         color: "red",
       })
