@@ -138,6 +138,41 @@ const getChurch = async () => {
   }
 }
 
+// The Google signup endpoint returns `newUser` for a fresh account, and `user`
+// when the Google account is already linked to an existing one. Either way the
+// user is authenticated, so take them into the app instead of stalling.
+const applyGoogleSignupResult = (
+  payload: SignupResponseT | null | undefined,
+  churchId: string
+) => {
+  const newUser = payload?.data?.newUser
+  const existingUser = payload?.data?.user
+  const signedInUser = newUser || existingUser
+  if (!signedInUser) return
+
+  const userChurchId = signedInUser.churchId || churchId
+
+  token.value = payload?.token || null
+  authStore.setUser({ ...signedInUser, churchId: userChurchId })
+  if (church.value && userChurchId === churchId) {
+    authStore.setChurch(church.value)
+  }
+
+  if (!newUser) {
+    toast.add({
+      title: "Welcome back, you already have an account",
+      icon: "i-bx-check-circle",
+      color: "primary",
+    })
+  }
+
+  if (signedInUser.emailVerified) {
+    navigateTo(newUser ? "/?newUser=1" : "/")
+  } else {
+    navigateTo(newUser ? "/verify?newUser=1" : "/verify")
+  }
+}
+
 // Check for redirect result on mount (for Tauri)
 onMounted(async () => {
   // Initialize UTM tracking on page load
@@ -186,19 +221,7 @@ onMounted(async () => {
           icon: "i-bx-error",
         })
       } else {
-        const newUser = data.value?.data.newUser
-        if (newUser) {
-          token.value = data.value?.token || null
-          authStore.setUser({ ...newUser, churchId: churchIdParam })
-          if (church.value) {
-            authStore.setChurch(church.value)
-          }
-          if (newUser.emailVerified) {
-            navigateTo("/?newUser=1")
-          } else {
-            navigateTo("/verify?newUser=1")
-          }
-        }
+        applyGoogleSignupResult(data.value, churchIdParam)
       }
     }
     loading.value = false
@@ -299,19 +322,7 @@ const handleGoogleSignUp = async () => {
         icon: "i-bx-error",
       })
     } else {
-      const newUser = data.value?.data.newUser
-      if (!newUser) return
-
-      token.value = data.value?.token || null
-      authStore.setUser({ ...newUser, churchId })
-      if (church.value) {
-        authStore.setChurch(church.value)
-      }
-      if (newUser.emailVerified) {
-        navigateTo("/?newUser=1")
-      } else {
-        navigateTo("/verify?newUser=1")
-      }
+      applyGoogleSignupResult(data.value, churchId)
     }
   } catch (error: any) {
     toast.add({
