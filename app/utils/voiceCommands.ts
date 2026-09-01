@@ -110,16 +110,31 @@ const gotoVerseNumberPatterns: RegExp[] = [
   ),
 ]
 
-const bibleVersionCommandPatterns: RegExp[] = [
-  /\b(?:show|display|open)\s+(?:this|it|scripture|passage|verse)\s+(?:in|with|using)\s+(.+?)$/,
-  /\b(?:switch|change|set)\s+(?:the\s+)?(?:bible\s+)?(?:version|translation)\s+(?:to|into|over\s+to|as)\s+(.+?)$/,
-  /\b(?:switch|change|set|use|open|show|display)\s+(?:the\s+)?(?:bible\s+)?(?:to|into|over\s+to|in|with|using|as)\s+(.+?)$/,
-  /\b(?:use|open|show|display)\s+(?:the\s+)?(.+?)\s+(?:bible|version|translation)$/,
-  /\bgive\s+me\s+(?:the\s+)?(?:bible\s+)?(?:in|with|using)\s+(?:the\s+)?(.+?)\s+(?:bible|version|translation)$/,
-  /\bgive\s+me\s+(?:the\s+)?(?:bible\s+)?(?:in|with|using)\s+(.+?)$/,
-  /\bgive\s+me\s+(?:the\s+)?(.+?)\s+(?:bible|version|translation)$/,
-  /\b(?:use|switch\s+to|change\s+to|set\s+to)\s+(.+?)$/,
-  /\bgive\s+me\s+(?:the\s+)?(.+?)$/,
+/**
+ * Version patterns, most explicit first.
+ *
+ * `allowAmbiguous` says whether a pattern may resolve to an alias that is also
+ * an ordinary sermon word (see `ambiguousVersionAliases`). Patterns carrying an
+ * explicit command verb do; the loose trailing form does not.
+ */
+const bibleVersionCommandPatterns: Array<{
+  pattern: RegExp
+  allowAmbiguous: boolean
+}> = [
+  { pattern: /\b(?:show|display|open)\s+(?:this|it|scripture|passage|verse)\s+(?:in|with|using)\s+(.+?)$/, allowAmbiguous: true },
+  { pattern: /\b(?:switch|change|set)\s+(?:the\s+)?(?:bible\s+)?(?:version|translation)\s+(?:to|into|over\s+to|as)\s+(.+?)$/, allowAmbiguous: true },
+  { pattern: /\b(?:switch|change|set|use|open|show|display)\s+(?:the\s+)?(?:bible\s+)?(?:to|into|over\s+to|in|with|using|as)\s+(.+?)$/, allowAmbiguous: true },
+  { pattern: /\b(?:use|open|show|display)\s+(?:the\s+)?(.+?)\s+(?:bible|version|translation)$/, allowAmbiguous: true },
+  { pattern: /\bgive\s+me\s+(?:the\s+)?(?:bible\s+)?(?:in|with|using)\s+(?:the\s+)?(.+?)\s+(?:bible|version|translation)$/, allowAmbiguous: true },
+  { pattern: /\bgive\s+me\s+(?:the\s+)?(?:bible\s+)?(?:in|with|using)\s+(.+?)$/, allowAmbiguous: true },
+  { pattern: /\bgive\s+me\s+(?:the\s+)?(.+?)\s+(?:bible|version|translation)$/, allowAmbiguous: true },
+  { pattern: /\b(?:use|switch\s+to|change\s+to|set\s+to)\s+(.+?)$/, allowAmbiguous: true },
+  { pattern: /\bgive\s+me\s+(?:the\s+)?(.+?)$/, allowAmbiguous: true },
+
+  // Verb-less trailing form: "the next verse in amplified version",
+  // "read that one with the new king james". Strict aliases only — this is the
+  // pattern most likely to catch ordinary speech.
+  { pattern: /\b(?:in|with|using|from)\s+(?:the\s+)?(.+?)$/, allowAmbiguous: false },
 ]
 
 const bibleVersionAliases: Record<string, string[]> = {
@@ -137,6 +152,14 @@ const bibleVersionAliases: Record<string, string[]> = {
   TPT: ["tpt", "t p t", "passion", "passion translation", "the passion translation"],
   YBCV: ["ybcv", "y b c v", "yoruba", "yoruba bible", "yoruba ybcv"],
 }
+
+/**
+ * Aliases that are also ordinary sermon words. They still resolve from an
+ * explicit command ("switch to the message", "give me the passion translation"),
+ * but never from the verb-less trailing pattern or a bare utterance — otherwise
+ * quoting "it is written in the message" would swap the translation live.
+ */
+const ambiguousVersionAliases = new Set(["message", "passion", "web"])
 
 const parseVerseNumber = (rawValue: string): number | null => {
   const trimmed = rawValue.trim()
@@ -172,14 +195,16 @@ const getSpokenAcronym = (id: string) => id.toLowerCase().split("").join(" ")
 
 const cleanupVersionCandidate = (rawValue: string) =>
   rawValue
-    .replace(/\b(?:please|now|sir|ma)\b/g, "")
+    .replace(/\b(?:please|now|sir|ma|ok|okay|thanks|thank you|again|just)\b/g, "")
     .replace(/\s+/g, " ")
     .trim()
 
+type BibleVersionAliasEntry = { alias: string; id: string; ambiguous: boolean }
+
 const buildBibleVersionAliasEntries = (
   versions: BibleVersionVoiceOption[]
-): Array<{ alias: string; id: string }> => {
-  const entries: Array<{ alias: string; id: string }> = []
+): BibleVersionAliasEntry[] => {
+  const entries: BibleVersionAliasEntry[] = []
 
   for (const rawOption of versions) {
     const option = toBibleVersionOption(rawOption)
@@ -196,7 +221,12 @@ const buildBibleVersionAliasEntries = (
 
     for (const alias of aliases) {
       const normalizedAlias = normalizeVersionAlias(alias)
-      if (normalizedAlias) entries.push({ alias: normalizedAlias, id })
+      if (!normalizedAlias) continue
+      entries.push({
+        alias: normalizedAlias,
+        id,
+        ambiguous: ambiguousVersionAliases.has(normalizedAlias),
+      })
     }
   }
 
@@ -220,6 +250,48 @@ export const detectVerseVoiceCommand = (
   return null
 }
 
+/**
+ * Match an utterance that is *nothing but* version names — "amplified",
+ * "NKJV please", "amplified version please amplified".
+ *
+ * The whole utterance (minus filler and the words "bible"/"version"/
+ * "translation"/"the") must be consumable as a run of aliases that all resolve
+ * to the same version, so "the amplified bible says here" is left alone.
+ * Ambiguous aliases are excluded — a bare "the message" is far more likely to be
+ * a preacher's sentence than a command.
+ */
+const detectBareVersionUtterance = (
+  commandText: string,
+  aliasEntries: BibleVersionAliasEntry[]
+): string | null => {
+  const cleaned = normalizeVersionAlias(cleanupVersionCandidate(commandText))
+  if (!cleaned) return null
+
+  // Longest alias first so "new king james" wins over "king james".
+  const candidates = aliasEntries
+    .filter((entry) => !entry.ambiguous)
+    .map((entry) => ({ ...entry, words: entry.alias.split(" ") }))
+    .sort((a, b) => b.words.length - a.words.length)
+
+  const tokens = cleaned.split(" ")
+  let index = 0
+  let matchedId: string | null = null
+
+  while (index < tokens.length) {
+    const entry = candidates.find((candidate) =>
+      candidate.words.every((word, offset) => tokens[index + offset] === word)
+    )
+    // A single non-alias word means this is speech, not a command.
+    if (!entry) return null
+    if (matchedId && entry.id !== matchedId) return null
+
+    matchedId = entry.id
+    index += entry.words.length
+  }
+
+  return matchedId
+}
+
 export const detectBibleVersionVoiceCommand = (
   text: string,
   availableVersions: BibleVersionVoiceOption[] = []
@@ -230,18 +302,21 @@ export const detectBibleVersionVoiceCommand = (
   const aliasEntries = buildBibleVersionAliasEntries(availableVersions)
   if (!aliasEntries.length) return null
 
-  for (const pattern of bibleVersionCommandPatterns) {
+  for (const { pattern, allowAmbiguous } of bibleVersionCommandPatterns) {
     const match = commandText.match(pattern)
     if (!match?.[1]) continue
 
     const candidate = normalizeVersionAlias(cleanupVersionCandidate(match[1]))
     if (!candidate) continue
 
-    const matchedVersion = aliasEntries.find((entry) => entry.alias === candidate)
+    const matchedVersion = aliasEntries.find(
+      (entry) =>
+        entry.alias === candidate && (allowAmbiguous || !entry.ambiguous)
+    )
     if (matchedVersion) return matchedVersion.id
   }
 
-  return null
+  return detectBareVersionUtterance(commandText, aliasEntries)
 }
 
 export const detectVerseGotoCommand = (text: string): number | null => {
@@ -257,4 +332,74 @@ export const detectVerseGotoCommand = (text: string): number | null => {
   }
 
   return null
+}
+
+export type VoiceCommandAction =
+  | "goto-verse-number"
+  | "next-verse"
+  | "previous-verse"
+  | "change-bible-version"
+
+export interface VoiceCommandPlan {
+  /** Stable identity for the caller's fire-once latch. */
+  key: string
+  action: VoiceCommandAction
+  /**
+   * Identity of the navigation portion only. Streaming callers use this to
+   * avoid moving twice when a later interim result merely adds a version.
+   */
+  navigationKey?: string
+  /** Set for "goto-verse-number". */
+  verseNumber?: number
+  /**
+   * Set whenever the utterance named a translation. On a navigation action it
+   * rides along so the caller can move and switch in ONE update — two separate
+   * events race each other through the slide round-trip and the version loses.
+   */
+  version?: string
+}
+
+/**
+ * Resolve an utterance into the single action to fire.
+ *
+ * Navigation and version are detected independently, so "give me the next verse
+ * but give me in amplified version" yields next-verse *carrying* AMP rather than
+ * discarding one half. An explicit verse number outranks next/previous.
+ */
+export const planVoiceCommand = (
+  text: string,
+  options: {
+    availableVersions?: BibleVersionVoiceOption[]
+    versionCommandsEnabled?: boolean
+  } = {}
+): VoiceCommandPlan | null => {
+  const verseNumber = detectVerseGotoCommand(text)
+  const verse = verseNumber ? null : detectVerseVoiceCommand(text)
+  const version =
+    options.versionCommandsEnabled === false
+      ? null
+      : detectBibleVersionVoiceCommand(text, options.availableVersions ?? [])
+
+  const action: VoiceCommandAction | null = verseNumber
+    ? "goto-verse-number"
+    : verse ?? (version ? "change-bible-version" : null)
+  if (!action) return null
+
+  const navigationKey = verseNumber
+    ? `goto-verse-number:${verseNumber}`
+    : verse ?? undefined
+  const keyParts = [
+    navigationKey ?? "",
+    version ? `version:${version}` : "",
+  ].filter(Boolean)
+
+  return {
+    // Preserve the full identity for non-streaming consumers. Streaming callers
+    // use navigationKey to deduplicate the movement portion independently.
+    key: keyParts.join("+"),
+    action,
+    ...(navigationKey ? { navigationKey } : {}),
+    ...(verseNumber ? { verseNumber } : {}),
+    ...(version ? { version } : {}),
+  }
 }

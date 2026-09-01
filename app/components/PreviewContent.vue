@@ -131,7 +131,9 @@
         @slide-update="onUpdateSlide"
         @inactive-slide-update="onUpdateInactiveSlide"
         @goto-verse="gotoAction"
-        @update-bible-version="gotoAction(activeSlide?.title!!, $event)"
+        @update-bible-version="
+          gotoAction(activeSlide?.title!!, $event, { durable: true })
+        "
         @take-live="handleTakeLiveAction(activeSlide!!)"
       />
     </AppSection>
@@ -2180,7 +2182,11 @@ const stopCountdown = () => {
   countdownTimeLeft.value = 0
 }
 
-const gotoAction = async (title: string, version: string) => {
+const gotoAction = async (
+  title: string,
+  version: string,
+  options: { durable?: boolean } = {}
+) => {
   if (!activeSlide.value) return
 
   const updatedSlide = await gotoVerse(activeSlide.value, title, version)
@@ -2188,9 +2194,9 @@ const gotoAction = async (title: string, version: string) => {
     activeSlide.value = updatedSlide
     appStore.updateSlideInActiveSlides(updatedSlide)
     updateLiveOutput(activeSlide.value)
-    // Verse navigation is live runtime state. Broadcasting it keeps every
-    // output current, but it must not create an IndexedDB write on each cue.
-    updateSlideOnline(activeSlide.value, { durable: false })
+    // Regular verse navigation is live runtime state and skips IndexedDB.
+    // Explicit version changes opt into durability after their lookup succeeds.
+    updateSlideOnline(activeSlide.value, { durable: options.durable === true })
   }
 }
 
