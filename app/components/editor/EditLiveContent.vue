@@ -930,24 +930,74 @@ const handlePreviousPage = () => {
   handleGotoPage(idx + 1)
 }
 
-const handleVoiceNextVerse = async () => {
+/**
+ * A voice command may name a translation alongside the navigation
+ * ("the next verse in amplified version"). Returns the version to switch to, or
+ * null when there is nothing to change — unavailable, already selected, not a
+ * Bible slide, or version commands turned off.
+ */
+const resolveVoiceBibleVersion = (version?: string): string | null => {
+  if (!version) return null
+  if (
+    !(
+      appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ??
+      true
+    )
+  )
+    return null
+  if (props.slide?.type !== slideTypes.bible) return null
+
+  const defaultVersion = appStore.currentState.settings.defaultBibleVersion
+  const availableVersion = appStore.currentState.settings.bibleVersions?.find(
+    (bibleVersion) =>
+      bibleVersion?.id === version &&
+      (bibleVersion?.isDownloaded || bibleVersion?.id === defaultVersion)
+  )
+  if (!availableVersion && version !== defaultVersion) return null
+  if (selectedBibleVersion.value === version) return null
+
+  return version
+}
+
+/**
+ * Navigate, optionally switching translation in the same beat.
+ *
+ * The version travels with the navigation request. gotoScripture writes it to
+ * the returned slide only after the scripture lookup succeeds, keeping the
+ * rendered content and version metadata atomic.
+ */
+const gotoVerseWithVoiceVersion = (title: string, version: string | null) => {
+  emit("goto-verse", title, version ?? selectedBibleVersion.value)
+}
+
+const handleVoiceNextVerse = async (payload?: { version?: string }) => {
   if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
   if (nextVerse.value) {
+    const version = resolveVoiceBibleVersion(payload?.version)
     const resolvedVerse = await resolveLastVerse(nextVerse.value)
-    emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+    gotoVerseWithVoiceVersion(resolvedVerse, version)
   }
 }
 
-const handleVoicePreviousVerse = async () => {
+const handleVoicePreviousVerse = async (payload?: { version?: string }) => {
   if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
   if (previousVerse.value) {
+    const version = resolveVoiceBibleVersion(payload?.version)
     const resolvedVerse = await resolveLastVerse(previousVerse.value)
-    emit("goto-verse", resolvedVerse, selectedBibleVersion.value)
+    gotoVerseWithVoiceVersion(resolvedVerse, version)
   }
 }
 
-const handleVoiceGotoVerseNumber = (verseNumber: number) => {
+const handleVoiceGotoVerseNumber = (
+  payload: number | { verseNumber?: number; version?: string }
+) => {
   if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
+  // Older callers (and the shortcut path) pass a bare verse number
+  const verseNumber =
+    typeof payload === "number" ? payload : payload?.verseNumber
+  const version = resolveVoiceBibleVersion(
+    typeof payload === "number" ? undefined : payload?.version
+  )
   const supportedSlideTypes = [
     slideTypes.bible,
     slideTypes.hymn,
@@ -955,7 +1005,7 @@ const handleVoiceGotoVerseNumber = (verseNumber: number) => {
     slideTypes.songSetlist,
   ]
   if (!props.slide || !supportedSlideTypes.includes(props.slide.type)) return
-  if (!Number.isInteger(verseNumber) || verseNumber < 1) return
+  if (!Number.isInteger(verseNumber) || !verseNumber || verseNumber < 1) return
 
   if (props.slide.type === slideTypes.bible) {
     if (chapterVerseCount.value > 0 && verseNumber > chapterVerseCount.value)
@@ -965,42 +1015,20 @@ const handleVoiceGotoVerseNumber = (verseNumber: number) => {
     if (chapterSeparatorIndex === -1) return
 
     const chapterLabel = verse.value.slice(0, chapterSeparatorIndex)
-    emit(
-      "goto-verse",
-      `${chapterLabel}:${verseNumber}`,
-      selectedBibleVersion.value
-    )
+    gotoVerseWithVoiceVersion(`${chapterLabel}:${verseNumber}`, version)
     return
   }
 
-  emit("goto-verse", `Verse ${verseNumber}`, selectedBibleVersion.value)
+  gotoVerseWithVoiceVersion(`Verse ${verseNumber}`, version)
 }
 
 const handleVoiceBibleVersionChange = (version: string) => {
   if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
-  if (
-    !(
-      appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ??
-      true
-    )
-  )
-    return
-  if (props.slide?.type !== slideTypes.bible) return
 
-  const availableVersion = appStore.currentState.settings.bibleVersions?.find(
-    (bibleVersion) =>
-      bibleVersion?.id === version &&
-      (bibleVersion?.isDownloaded ||
-        bibleVersion?.id === appStore.currentState.settings.defaultBibleVersion)
-  )
-  if (
-    !availableVersion &&
-    version !== appStore.currentState.settings.defaultBibleVersion
-  )
-    return
-  if (selectedBibleVersion.value === version) return
+  const resolvedVersion = resolveVoiceBibleVersion(version)
+  if (!resolvedVersion) return
 
-  onUpdateBibleVersion(version)
+  onUpdateBibleVersion(resolvedVersion)
 }
 
 onMounted(() => {
@@ -1567,7 +1595,6 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
 
 const onUpdateBibleVersion = (version: string) => {
   if (!props.slide) return
-  onUpdateSlideStyle({ ...props.slide.slideStyle, bibleVersion: version })
   emit("update-bible-version", version)
 }
 

@@ -85,6 +85,7 @@ export default function useSlideNavigation() {
       tempSlide.slideStyle = {
         ...tempSlide.slideStyle,
         fontSize: Number(fontSize),
+        bibleVersion: version,
       }
 
       tempSlide.contents = useSlideContent(tempSlide, scripture)
