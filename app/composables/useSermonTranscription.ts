@@ -3,10 +3,8 @@ import { useAppStore } from '~/store/app'
 import type { TranscriptSegment, BibleReference } from '~/types/transcript'
 import { appWideActions } from '~/utils/constants'
 import {
-  detectBibleVersionVoiceCommand,
-  detectVerseGotoCommand,
-  detectVerseVoiceCommand,
-  type VerseVoiceCommand,
+  planVoiceCommand,
+  type VoiceCommandPlan,
 } from '~/utils/voiceCommands'
 
 interface TranscriptionState {
@@ -196,28 +194,24 @@ export default function useSermonTranscription() {
   }
 
   /**
-   * Execute a voice command
+   * Fire the planned command. A navigation action carries any named version
+   * with it, so "the next verse in amplified version" moves and switches
+   * translation in a single slide update instead of racing two events.
    */
-  const executeVoiceCommand = (command: VerseVoiceCommand) => {
-    if (command === 'next-verse') {
-      // Emit the next verse event
-      useGlobalEmit(appWideActions.nextVerse)
-      console.log('Voice command: next verse')
-    } else if (command === 'previous-verse') {
-      // Emit the previous verse event
-      useGlobalEmit(appWideActions.previousVerse)
-      console.log('Voice command: previous verse')
+  const executeVoiceCommand = (plan: VoiceCommandPlan) => {
+    if (plan.action === 'goto-verse-number') {
+      useGlobalEmit(appWideActions.gotoVerseNumber, {
+        verseNumber: plan.verseNumber,
+        version: plan.version,
+      })
+    } else if (plan.action === 'next-verse') {
+      useGlobalEmit(appWideActions.nextVerse, { version: plan.version })
+    } else if (plan.action === 'previous-verse') {
+      useGlobalEmit(appWideActions.previousVerse, { version: plan.version })
+    } else {
+      useGlobalEmit(appWideActions.changeBibleVersion, plan.version)
     }
-  }
-
-  const executeGotoVerseNumberCommand = (verseNumber: number) => {
-    useGlobalEmit(appWideActions.gotoVerseNumber, verseNumber)
-    console.log(`Voice command: go to verse ${verseNumber}`)
-  }
-
-  const executeBibleVersionCommand = (version: string) => {
-    useGlobalEmit(appWideActions.changeBibleVersion, version)
-    console.log(`Voice command: change Bible version to ${version}`)
+    console.log(`Voice command: ${plan.key}`)
   }
 
   const getAvailableBibleVersionsForVoice = () => {
@@ -425,29 +419,14 @@ export default function useSermonTranscription() {
 
     // Check for voice commands first
     if (appStore.currentState.settings.transcriptionAutoActions ?? true) {
-      const gotoVerseNumber = detectVerseGotoCommand(cleanedText)
-      const versionCommand =
-        !gotoVerseNumber &&
-        (appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ?? true)
-          ? detectBibleVersionVoiceCommand(
-              cleanedText,
-              getAvailableBibleVersionsForVoice()
-            )
-          : null
-      const voiceCommand = gotoVerseNumber || versionCommand
-        ? null
-        : detectVerseVoiceCommand(cleanedText)
+      const plan = planVoiceCommand(cleanedText, {
+        availableVersions: getAvailableBibleVersionsForVoice(),
+        versionCommandsEnabled:
+          appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ?? true,
+      })
 
-      if (gotoVerseNumber) {
-        executeGotoVerseNumberCommand(gotoVerseNumber)
-        // Still add to transcript so user can see what was said
-      } else if (versionCommand) {
-        executeBibleVersionCommand(versionCommand)
-        // Still add to transcript so user can see what was said
-      } else if (voiceCommand) {
-        executeVoiceCommand(voiceCommand)
-        // Still add to transcript so user can see what was said
-      }
+      // Still add to transcript either way so the user sees what was said
+      if (plan) executeVoiceCommand(plan)
     }
 
     const references = useBibleReferenceParser(cleanedText)

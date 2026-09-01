@@ -125,6 +125,7 @@
 import { useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import type { BackgroundVideo } from "~/types"
+import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
 
 const appStore = useAppStore()
 const online = useOnline()
@@ -261,12 +262,18 @@ const saveAndSelectVideos = async (files: File[]) => {
       if (online.value) {
         try {
           const uploaded = await useUploadFile(file, { name: file.name })
-          await useIndexedDB().localMediaFiles.update(mediaKey, {
+          await localMedia.setCloudSyncState(mediaKey, {
+            groupId: mediaKey,
+            status: "uploaded",
             remoteUrl: uploaded.file.url,
-            recoverable: true,
-            updatedAt: new Date().toISOString(),
           })
         } catch (error) {
+          await localMedia.setCloudSyncState(mediaKey, {
+            groupId: mediaKey,
+            status: "failed",
+            reason: mediaCloudFailureReason(error),
+            error,
+          })
           if (/quota|storage limit|storage full/i.test(String(error))) {
             toast.add({
               title: isTeamsPlan.value

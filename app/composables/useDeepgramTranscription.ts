@@ -4,11 +4,7 @@ import { useAuthStore } from '~/store/auth'
 import { prewarmScriptureVersion } from '~/composables/useScripture'
 import type { TranscriptSegment, BibleReference } from '~/types/transcript'
 import { appWideActions } from '~/utils/constants'
-import {
-  detectBibleVersionVoiceCommand,
-  detectVerseGotoCommand,
-  detectVerseVoiceCommand,
-} from '~/utils/voiceCommands'
+import { planVoiceCommand } from '~/utils/voiceCommands'
 
 interface TranscriptionState {
   isTranscribing: boolean
@@ -73,10 +69,13 @@ export default function useDeepgramTranscription() {
   let keepAliveTimer: ReturnType<typeof setInterval> | null = null
   let lastAudioSentAt = 0
 
-  // Voice-command latch — prevents firing the same command repeatedly while
-  // the interim transcript still contains the trigger phrase.
-  let lastFiredCommand: string | null = null
-  let lastCommandFiredAt = 0
+  // Track navigation and version independently. Deepgram sends cumulative
+  // interim text, so "next verse" may later become "next verse in NIV". The
+  // latter should add the version without navigating a second time.
+  let lastFiredNavigation: string | null = null
+  let lastNavigationFiredAt = 0
+  let lastFiredVersion: string | null = null
+  let lastVersionFiredAt = 0
   const COMMAND_COOLDOWN_MS = 1500
 
   // Auto-live cooldown — prevents rapid-fire slide switches when the preacher
@@ -113,46 +112,58 @@ export default function useDeepgramTranscription() {
   const maybeFireVoiceCommand = (text: string) => {
     if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
 
-    const gotoVerseNumber = detectVerseGotoCommand(text)
-    const versionCommand =
-      !gotoVerseNumber &&
-      (appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ?? true)
-        ? detectBibleVersionVoiceCommand(text, getAvailableBibleVersionsForVoice())
-        : null
-    const command = gotoVerseNumber || versionCommand
-      ? null
-      : detectVerseVoiceCommand(text)
-    const commandKey = gotoVerseNumber
-      ? `goto-verse-number:${gotoVerseNumber}`
-      : versionCommand
-        ? `change-bible-version:${versionCommand}`
-      : command
+    const plan = planVoiceCommand(text, {
+      availableVersions: getAvailableBibleVersionsForVoice(),
+      versionCommandsEnabled:
+        appStore.currentState.settings.transcriptionVoiceBibleVersionCommands ?? true,
+    })
 
-    if (!commandKey) {
-      lastFiredCommand = null
+    if (!plan) {
+      lastFiredNavigation = null
+      lastFiredVersion = null
       return
     }
 
     const now = Date.now()
-    if (
-      commandKey === lastFiredCommand &&
-      now - lastCommandFiredAt < COMMAND_COOLDOWN_MS
-    ) return
-    lastFiredCommand = commandKey
-    lastCommandFiredAt = now
+    const navigationAlreadyFired =
+      !!plan.navigationKey &&
+      plan.navigationKey === lastFiredNavigation &&
+      now - lastNavigationFiredAt < COMMAND_COOLDOWN_MS
+    const versionAlreadyFired =
+      !!plan.version &&
+      plan.version === lastFiredVersion &&
+      now - lastVersionFiredAt < COMMAND_COOLDOWN_MS
 
-    if (gotoVerseNumber) {
-      useGlobalEmit(appWideActions.gotoVerseNumber, gotoVerseNumber)
+    // A navigation action carries any named version with it so the operator
+    // window can move and switch translation in a single slide update.
+    if (plan.navigationKey && !navigationAlreadyFired) {
+      lastFiredNavigation = plan.navigationKey
+      lastNavigationFiredAt = now
+      if (plan.version) {
+        lastFiredVersion = plan.version
+        lastVersionFiredAt = now
+      }
+
+      if (plan.action === 'goto-verse-number') {
+        useGlobalEmit(appWideActions.gotoVerseNumber, {
+          verseNumber: plan.verseNumber,
+          version: plan.version,
+        })
+      } else if (plan.action === 'next-verse') {
+        useGlobalEmit(appWideActions.nextVerse, { version: plan.version })
+      } else if (plan.action === 'previous-verse') {
+        useGlobalEmit(appWideActions.previousVerse, { version: plan.version })
+      }
       return
     }
 
-    if (versionCommand) {
-      useGlobalEmit(appWideActions.changeBibleVersion, versionCommand)
-      return
+    // If an earlier interim already moved the slide, apply only the version
+    // newly discovered in the expanded transcript.
+    if (plan.version && !versionAlreadyFired) {
+      lastFiredVersion = plan.version
+      lastVersionFiredAt = now
+      useGlobalEmit(appWideActions.changeBibleVersion, plan.version)
     }
-
-    if (command === 'next-verse') useGlobalEmit(appWideActions.nextVerse)
-    else useGlobalEmit(appWideActions.previousVerse)
   }
 
   const createSegmentFromText = (text: string, refsFromServer?: BibleReference[]) => {
@@ -494,7 +505,8 @@ export default function useDeepgramTranscription() {
       ws = null
     }
     micLevel.value = 0
-    lastFiredCommand = null
+    lastFiredNavigation = null
+    lastFiredVersion = null
     lastAutoLiveAt = 0
     lastAutoLiveReference = null
   }
