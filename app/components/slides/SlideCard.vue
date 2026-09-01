@@ -187,6 +187,25 @@
         </ConfirmDialog>
 
         <UButton
+          v-if="canDownloadMedia(slide)"
+          variant="ghost"
+          color="gray"
+          block
+          :loading="downloadingMedia"
+          @click.stop.prevent="
+            () => {
+              handleDownloadMediaClick()
+              close()
+            }
+          "
+        >
+          <template v-if="!downloadingMedia" #leading>
+            <DownloadIcon class="w-4 h-4" />
+          </template>
+          Download Media
+        </UButton>
+
+        <UButton
           v-if="
             (slide?.type === slideTypes.text ||
               slide?.type === slideTypes.media ||
@@ -295,6 +314,7 @@ const { currentState } = storeToRefs(appStore)
 // Subscription check
 const { hasAccessToFeature } = useSubscription()
 const { getLibraryItem } = useLibrary()
+const { canDownloadMedia, downloadSlideMedia } = useSlideMediaDownload()
 
 const props = defineProps<{
   slide: Slide
@@ -441,6 +461,21 @@ const handleEditSongClick = async () => {
   }
 
   useGlobalEmit(appWideActions.addSong, song)
+}
+
+// Saves the slide's own media file to the user's computer, named after the
+// slide (e.g. "Sunday Promo.mp4" → "sunday_promo.mp4"). Cloud-only media is
+// pulled down first, so this can run for a while on a large video.
+const downloadingMedia = ref(false)
+
+const handleDownloadMediaClick = async () => {
+  if (downloadingMedia.value) return
+  downloadingMedia.value = true
+  try {
+    await downloadSlideMedia(props.slide)
+  } finally {
+    downloadingMedia.value = false
+  }
 }
 
 const handleSaveAsTemplateClick = () => {

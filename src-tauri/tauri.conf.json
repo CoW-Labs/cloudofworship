@@ -67,6 +67,8 @@
             "fs:allow-read-dir",
             "fs:allow-remove",
             "fs:allow-rename",
+            "fs:allow-download-write-recursive",
+            "fs:allow-download-read-recursive",
             {
               "identifier": "fs:scope",
               "allow": [
