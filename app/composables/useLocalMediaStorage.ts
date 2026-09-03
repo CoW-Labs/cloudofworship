@@ -12,6 +12,7 @@ import useIndexedDB from "~/composables/useIndexedDB"
 import useMediaDownloadProgress from "~/composables/useMediaDownloadProgress"
 import { useTauri } from "~/composables/useTauri"
 import { useAppStore } from "~/store/app"
+import { MediaDownloadHttpError } from "~/utils/mediaDownloadErrors"
 
 const MEDIA_ROOT = "cow-media/v1"
 const STORAGE_VERSION = 1 as const
@@ -819,7 +820,7 @@ export const createLocalMediaStorage = (
       signal: input.signal,
     })
     if (!response.ok || !response.body) {
-      throw new Error(`Media download failed with status ${response.status}.`)
+      throw new MediaDownloadHttpError(response.status)
     }
     const headerSize = Number(response.headers.get("content-length") || 0)
     const size = input.size || headerSize
@@ -837,9 +838,7 @@ export const createLocalMediaStorage = (
         }))
       response = null
       if (!activeResponse.ok || !activeResponse.body) {
-        throw new Error(
-          `Media download failed with status ${activeResponse.status}.`
-        )
+        throw new MediaDownloadHttpError(activeResponse.status)
       }
       return activeResponse.body as ReadableStream<Uint8Array>
     }

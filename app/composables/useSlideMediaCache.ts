@@ -4,6 +4,7 @@ import type {
   LocalMediaKind,
   Slide,
 } from "~/types"
+import { isRetryableMediaDownloadError } from "~/utils/mediaDownloadErrors"
 
 /**
  * Local-first media resolution for operator, projection, and livestream
@@ -37,9 +38,6 @@ export default function useSlideMediaCache() {
   // reading, so the first call marks the point where bytes started moving.
   const reportProgress = (key: string, fraction: number) =>
     setProgress(key, Number.isFinite(fraction) ? fraction * 100 : Number.NaN)
-
-  const isOutOfSpace = (error: unknown) =>
-    (error as DOMException)?.name === "QuotaExceededError"
 
   const isRemoteUrl = (url?: string | null): url is string =>
     !!url && (url.startsWith("http://") || url.startsWith("https://"))
@@ -100,7 +98,19 @@ export default function useSlideMediaCache() {
    * yet — the download was never attempted, or it failed. A key with no remote
    * source at all is never collected: no amount of retrying will find it.
    */
-  type PendingCollector = { keys: string[] }
+  type PendingCollector = {
+    keys: Set<string>
+    retryableKeys: Set<string>
+  }
+
+  const collectPending = (
+    pending: PendingCollector | undefined,
+    key: string,
+    retryable: boolean
+  ) => {
+    pending?.keys.add(key)
+    if (retryable) pending?.retryableKeys.add(key)
+  }
 
   const resolveLocalUrl = async (
     key: string,
@@ -112,7 +122,9 @@ export default function useSlideMediaCache() {
       mimeType?: string
     },
     allowDownload: boolean,
-    pending?: PendingCollector
+    pending?: PendingCollector,
+    signal?: AbortSignal,
+    heartbeat?: () => void
   ) => {
     const remoteUrl =
       allowDownload && isRemoteUrl(source.url) ? source.url : undefined
@@ -123,21 +135,24 @@ export default function useSlideMediaCache() {
     // watching `isDownloading` flickered for ~20ms instead of showing a loader.
     // The first progress chunk below only fires on a real network transfer.
     try {
+      heartbeat?.()
       const url = await localMedia.ensureLocal(key, {
         ...source,
         url: remoteUrl,
         recoverable: !!remoteUrl,
-        onProgress: (fraction) => reportProgress(key, fraction),
+        signal,
+        onProgress: (fraction) => {
+          heartbeat?.()
+          reportProgress(key, fraction)
+        },
       })
       // No local copy came back even though a cloud copy exists: the fetch was
       // refused or the connection dropped mid-stream. Worth another attempt.
-      if (!url && remoteUrl) pending?.keys.push(key)
+      if (!url && remoteUrl) collectPending(pending, key, true)
       return url
     } catch (error) {
       if (remoteUrl) {
-        // A full disk is not a connectivity problem — retrying it just burns
-        // bandwidth on a write that cannot land.
-        if (!isOutOfSpace(error)) pending?.keys.push(key)
+        collectPending(pending, key, isRetryableMediaDownloadError(error))
         console.warn(`Local media download failed for ${key}:`, error)
         return null
       }
@@ -150,7 +165,9 @@ export default function useSlideMediaCache() {
   const rehydrateMediaSlide = async (
     slide: Slide,
     allowDownload: boolean,
-    pending?: PendingCollector
+    pending?: PendingCollector,
+    signal?: AbortSignal,
+    heartbeat?: () => void
   ) => {
     const data = slide.data as ExtendedFileT | undefined
     const kind = mediaKind(data?.type || slide.backgroundType)
@@ -178,7 +195,9 @@ export default function useSlideMediaCache() {
         mimeType: data?.type,
       },
       allowDownload,
-      pending
+      pending,
+      signal,
+      heartbeat
     )
     if (!fileUrl) return slide
 
@@ -190,11 +209,18 @@ export default function useSlideMediaCache() {
   const rehydratePresentationSlide = async (
     slide: Slide,
     allowDownload: boolean,
-    pending?: PendingCollector
+    pending?: PendingCollector,
+    signal?: AbortSignal,
+    onlyKeys?: ReadonlySet<string>,
+    heartbeat?: () => void
   ) => {
     const restored: NonNullable<Slide["presentationObjects"]> = []
     for (const obj of slide.presentationObjects ?? []) {
       const key = `${slide.id}-page-${obj.page}`
+      if (onlyKeys && !onlyKeys.has(key)) {
+        restored.push(obj)
+        continue
+      }
       const remoteUrl = firstRemoteUrl(
         obj.imageUrl,
         slide.mediaCloudSync?.[key]?.remoteUrl
@@ -212,13 +238,17 @@ export default function useSlideMediaCache() {
             mimeType: "image/png",
           },
           allowDownload,
-          pending
+          pending,
+          signal,
+          heartbeat
         )
       } catch (error) {
         // One unreadable page must not cost the deck its other pages, which is
         // what an escaping throw did — the whole `restored` list was discarded.
         console.warn(`Presentation page ${key} could not be resolved:`, error)
-        if (isRemoteUrl(remoteUrl)) pending?.keys.push(key)
+        if (isRemoteUrl(remoteUrl)) {
+          collectPending(pending, key, isRetryableMediaDownloadError(error))
+        }
       }
       restored.push(url ? { page: obj.page, imageUrl: url } : obj)
     }
@@ -231,7 +261,9 @@ export default function useSlideMediaCache() {
   const rehydrateBackgroundVideoSlide = async (
     slide: Slide,
     allowDownload: boolean,
-    pending?: PendingCollector
+    pending?: PendingCollector,
+    signal?: AbortSignal,
+    heartbeat?: () => void
   ) => {
     const key = slide.backgroundVideoKey as string
     const remoteUrl = firstRemoteUrl(
@@ -249,7 +281,9 @@ export default function useSlideMediaCache() {
         mimeType: "video/mp4",
       },
       allowDownload,
-      pending
+      pending,
+      signal,
+      heartbeat
     )
     if (fileUrl) slide.background = fileUrl
     return slide
@@ -258,7 +292,9 @@ export default function useSlideMediaCache() {
   const rehydrateBackgroundImageSlide = async (
     slide: Slide,
     allowDownload: boolean,
-    pending?: PendingCollector
+    pending?: PendingCollector,
+    signal?: AbortSignal,
+    heartbeat?: () => void
   ) => {
     const key = slide.backgroundImageKey as string
     const remoteUrl = firstRemoteUrl(
@@ -277,7 +313,9 @@ export default function useSlideMediaCache() {
         groupId: key,
       },
       allowDownload,
-      pending
+      pending,
+      signal,
+      heartbeat
     )
     if (fileUrl) slide.background = fileUrl
     return slide
@@ -287,30 +325,109 @@ export default function useSlideMediaCache() {
   const rehydrateOnce = async (
     slide: Slide,
     allowDownload: boolean,
-    pending: PendingCollector
+    pending: PendingCollector,
+    options?: {
+      signal?: AbortSignal
+      onlyKeys?: ReadonlySet<string>
+      heartbeat?: () => void
+    }
   ) => {
     try {
       if (slide.type === slideTypes.media) {
         const fileType = (slide.data as any)?.type
         if (fileType === "youtube" || fileType === "vimeo") return slide
-        await rehydrateMediaSlide(slide, allowDownload, pending)
+        if (!options?.onlyKeys || options.onlyKeys.has(slide.id)) {
+          await rehydrateMediaSlide(
+            slide,
+            allowDownload,
+            pending,
+            options?.signal,
+            options?.heartbeat
+          )
+        }
       }
       if (
         slide.type === slideTypes.presentation &&
         slide.presentationObjects?.length
       ) {
-        await rehydratePresentationSlide(slide, allowDownload, pending)
+        await rehydratePresentationSlide(
+          slide,
+          allowDownload,
+          pending,
+          options?.signal,
+          options?.onlyKeys,
+          options?.heartbeat
+        )
       }
-      if (slide.backgroundImageKey) {
-        await rehydrateBackgroundImageSlide(slide, allowDownload, pending)
+      if (
+        slide.backgroundImageKey &&
+        (!options?.onlyKeys || options.onlyKeys.has(slide.backgroundImageKey))
+      ) {
+        await rehydrateBackgroundImageSlide(
+          slide,
+          allowDownload,
+          pending,
+          options?.signal,
+          options?.heartbeat
+        )
       }
-      if (slide.backgroundVideoKey) {
-        await rehydrateBackgroundVideoSlide(slide, allowDownload, pending)
+      if (
+        slide.backgroundVideoKey &&
+        (!options?.onlyKeys || options.onlyKeys.has(slide.backgroundVideoKey))
+      ) {
+        await rehydrateBackgroundVideoSlide(
+          slide,
+          allowDownload,
+          pending,
+          options?.signal,
+          options?.heartbeat
+        )
       }
     } catch (error) {
       console.error("rehydrateSlideMedia failed for slide", slide?.id, error)
     }
     return slide
+  }
+
+  const mediaSourceFingerprint = (slide: Slide) => {
+    const sources: string[] = [slide.id]
+    const add = (key: string, ...urls: (string | null | undefined)[]) => {
+      sources.push(`${key}:${firstRemoteUrl(...urls) || ""}`)
+    }
+
+    if (slide.type === slideTypes.media) {
+      const data = slide.data as ExtendedFileT | undefined
+      const kind = mediaKind(data?.type || slide.backgroundType)
+      if (kind === "audio") {
+        add(slide.id, data?.url, slide.mediaCloudSync?.[slide.id]?.remoteUrl)
+      } else {
+        add(
+          slide.id,
+          slide.background,
+          data?.url,
+          slide.mediaCloudSync?.[slide.id]?.remoteUrl
+        )
+      }
+    }
+    for (const page of slide.presentationObjects || []) {
+      const key = `${slide.id}-page-${page.page}`
+      add(key, page.imageUrl, slide.mediaCloudSync?.[key]?.remoteUrl)
+    }
+    if (slide.backgroundImageKey) {
+      add(
+        slide.backgroundImageKey,
+        slide.background,
+        slide.mediaCloudSync?.[slide.backgroundImageKey]?.remoteUrl
+      )
+    }
+    if (slide.backgroundVideoKey) {
+      add(
+        slide.backgroundVideoKey,
+        slide.background,
+        slide.mediaCloudSync?.[slide.backgroundVideoKey]?.remoteUrl
+      )
+    }
+    return sources.join("|")
   }
 
   /**
@@ -322,30 +439,60 @@ export default function useSlideMediaCache() {
     opts: RehydrateOptions = {}
   ): Promise<{ slide: Slide; pendingKeys: string[] }> => {
     const allowDownload = opts.allowDownload ?? false
-    const pending: PendingCollector = { keys: [] }
+    const fingerprint = mediaSourceFingerprint(slide)
+    const pending: PendingCollector = {
+      keys: new Set<string>(),
+      retryableKeys: new Set<string>(),
+    }
     await rehydrateOnce(slide, allowDownload, pending)
+    const pendingKeys = [...pending.keys]
 
     const shouldRetry = opts.retry ?? allowDownload
     if (!shouldRetry || !slide?.id) {
-      return { slide, pendingKeys: pending.keys }
+      return { slide, pendingKeys }
     }
 
-    if (!pending.keys.length) {
-      cancelMediaRetry(slide.id)
-      return { slide, pendingKeys: pending.keys }
+    if (!pending.retryableKeys.size) {
+      cancelMediaRetry(slide.id, fingerprint)
+      return { slide, pendingKeys }
     }
 
-    // Retry against the same slide object so an in-place URL swap reaches the
-    // DOM, and hand the result to `onRecovered` for callers holding a copy.
-    retryMediaUntilResolved(slide.id, async () => {
-      const retryPending: PendingCollector = { keys: [] }
-      await rehydrateOnce(slide, true, retryPending)
-      if (retryPending.keys.length) return false
-      opts.onRecovered?.(slide)
-      return true
-    })
+    // Keep only keys that still need work. Large presentations no longer scan
+    // every page again because one page failed to download.
+    let retryKeys = new Set(pending.retryableKeys)
+    const permanentKeys = new Set(
+      [...pending.keys].filter((key) => !pending.retryableKeys.has(key))
+    )
+    retryMediaUntilResolved(
+      slide.id,
+      async (signal, heartbeat) => {
+        const retryPending: PendingCollector = {
+          keys: new Set<string>(),
+          retryableKeys: new Set<string>(),
+        }
+        await rehydrateOnce(slide, true, retryPending, {
+          signal,
+          onlyKeys: retryKeys,
+          heartbeat,
+        })
+        if (signal.aborted) return false
 
-    return { slide, pendingKeys: pending.keys }
+        for (const key of retryPending.keys) {
+          if (!retryPending.retryableKeys.has(key)) permanentKeys.add(key)
+        }
+        retryKeys = new Set(retryPending.retryableKeys)
+        if (retryKeys.size) return false
+
+        // Stop once nothing retryable remains. Only report full recovery when
+        // every original key resolved, otherwise the live window would cache a
+        // partial presentation as complete.
+        if (!permanentKeys.size) opts.onRecovered?.(slide)
+        return true
+      },
+      fingerprint
+    )
+
+    return { slide, pendingKeys }
   }
 
   const rehydrateSlideMedia = async (
