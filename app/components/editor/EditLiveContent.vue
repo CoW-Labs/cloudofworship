@@ -413,9 +413,34 @@
           }"
           :style="useSlideBackground(slide)"
         >
+          <!-- EXTERNAL VIDEO (YOUTUBE/VIMEO) — the editor never embeds the
+               player, so show the video's thumbnail the way the live preview
+               does instead of a video element pointed at a link. -->
+          <div v-if="externalVideo" class="absolute inset-0 bg-primary-950">
+            <img
+              v-if="externalVideo.thumbnail"
+              :src="externalVideo.thumbnail"
+              :alt="externalVideo.name"
+              class="w-full h-full object-cover"
+            />
+            <div
+              v-else
+              class="h-full w-full flex flex-col items-center justify-center gap-2 text-white/70"
+            >
+              <IconWrapper
+                :name="
+                  externalVideo.type === 'vimeo'
+                    ? 'i-bxl-vimeo'
+                    : 'i-bxl-youtube'
+                "
+                size="10"
+              />
+              <span class="text-sm">{{ externalVideo.name }}</span>
+            </div>
+          </div>
           <!-- VIDEO BACKGROUND -->
           <video
-            v-if="slide?.backgroundType === backgroundTypes.video"
+            v-else-if="slide?.backgroundType === backgroundTypes.video"
             :src="slide?.background"
             class="h-[100%] w-[100%] object-cover absolute inset-0"
             crossorigin="anonymous"
@@ -460,6 +485,7 @@ import {
 } from "~/utils/mediaCloudSync"
 import type {
   ExtendedFileT,
+  ExternalVideo,
   MediaCloudSyncReason,
   Slide,
   SlideStyle,
@@ -729,6 +755,15 @@ watch(
   },
   { immediate: true }
 )
+
+// YouTube/Vimeo slides hold a link, not bytes: `background` is only a stand-in
+// image and `backgroundType` is "video", so the preview's <video> renders black.
+// The link's thumbnail is what the live output shows for these too.
+const externalVideo = computed<ExternalVideo | undefined>(() => {
+  const data = props.slide?.data as ExternalVideo | undefined
+  if (props.slide?.type !== slideTypes.media) return undefined
+  return data?.type === "youtube" || data?.type === "vimeo" ? data : undefined
+})
 
 const setlistData = computed<SongSetlistData>(() => getSetlistData(props.slide))
 const isEmptySongSetlist = computed(
