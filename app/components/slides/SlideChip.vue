@@ -10,7 +10,7 @@
     />
     {{
       slideType === slideTypes.presentation
-        ? "PPT/PDF"
+        ? "PDF"
         : slideType === slideTypes.songSetlist
           ? "setlist"
           : slideType

@@ -14,12 +14,21 @@ const addIdToReturnedSongs = (songs: Array<Song>) => {
 
 
 /**
- * 
- * @param song 
- * @param linesPerDisplay 
- * @returns 
+ * Resolves a song (object or id) and re-chunks its lyrics into verses.
+ *
+ * @param song
+ * @param linesPerDisplay how many lyric lines make up one verse. Falls back to
+ *   the app-wide default when omitted.
+ * @param options `persistLinesPerSlide: false` chunks at the given value
+ *   without promoting it to the app-wide default — for callers that chunk at a
+ *   slide-scoped value (a setlist) and must not stomp the global setting.
+ * @returns
  */
-const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<Song | null> => {
+const useSong = async (
+  song: Song | string,
+  linesPerDisplay?: number,
+  options?: { persistLinesPerSlide?: boolean }
+): Promise<Song | null> => {
   // console.log(linesPerDisplay)
   const toast = useToast()
   const authStore = useAuthStore()
@@ -29,7 +38,9 @@ const useSong = async (song: Song | string, linesPerDisplay?: number): Promise<S
     linesPerDisplay = appStore.currentState.settings.slideStyles.linesPerSlide
   }
   linesPerDisplay = Number(linesPerDisplay)
-  appStore.setSlideStyles({ ...appStore.currentState.settings.slideStyles, linesPerSlide: linesPerDisplay })
+  if (options?.persistLinesPerSlide !== false) {
+    appStore.setSlideStyles({ ...appStore.currentState.settings.slideStyles, linesPerSlide: linesPerDisplay })
+  }
 
   try {
     if (typeof song === 'string' && song?.includes('-')) {

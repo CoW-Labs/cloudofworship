@@ -1519,20 +1519,30 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
       ...appStore.currentState.settings.slideStyles,
       linesPerSlide,
     })
-    const slideStyle = {
-      ...props.slide.slideStyle,
-      linesPerSlide,
+    // The refresh chunks at the slide's own `linesPerSlide`, so the new value
+    // has to be on the slide going in — and the slideStyle it hands back is
+    // the one to emit, since it carries the re-measured font size too.
+    const slideWithNewLines: Slide = {
+      ...props.slide,
+      slideStyle: {
+        ...props.slide.slideStyle,
+        linesPerSlide,
+      },
     }
     const activeSongIndex = setlistData.value.activeSongIndex
     const activeItem = setlistData.value.songs[activeSongIndex]
     // useSong() re-chunks the song object in place, so snapshot the current
-    // arrangement before asking for the new one
+    // arrangement before asking for the new one — and hand it a copy, not the
+    // stored song
     const previousVerses = [...(activeItem?.song?.verses || [])]
     const previousVerseIndex = activeItem?.verseIndex || 0
     const rechunkedSong = activeItem
-      ? await useSong(activeItem.song || activeItem.songId, linesPerSlide)
+      ? await useSong(
+          activeItem.song ? { ...activeItem.song } : activeItem.songId,
+          linesPerSlide
+        )
       : null
-    const updatedSlide = await refreshSongSetlistSlide(props.slide, {
+    const updatedSlide = await refreshSongSetlistSlide(slideWithNewLines, {
       activeSongIndex,
       verseIndex: rechunkedSong?.verses?.length
         ? remapChunkIndex(
@@ -1542,7 +1552,11 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
           )
         : previousVerseIndex,
     })
-    emit("slide-update", { ...updatedSlide, slideStyle })
+    emit("slide-update", updatedSlide)
+    useToast().add({
+      icon: "i-tabler-list-numbers",
+      title: "Lines per slide updated",
+    })
     return
   }
 
