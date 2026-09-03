@@ -77,6 +77,71 @@ describe("useMediaRetryQueue", () => {
     expect(second).toHaveBeenCalledTimes(1)
   })
 
+  it("does not let an in-flight task clear a replacement source", async () => {
+    const { retryMediaUntilResolved, pendingMediaRetryCount } = await loadQueue()
+    let finishFirst!: (resolved: boolean) => void
+    const first = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishFirst = resolve
+        })
+    )
+    const second = vi.fn().mockResolvedValue(true)
+
+    retryMediaUntilResolved("slide-race", first, "source-a")
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(first).toHaveBeenCalledTimes(1)
+
+    retryMediaUntilResolved("slide-race", second, "source-b")
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(pendingMediaRetryCount()).toBe(0)
+
+    finishFirst(true)
+    await Promise.resolve()
+    expect(pendingMediaRetryCount()).toBe(0)
+  })
+
+  it("times out stalled attempts without blocking the rest of the queue", async () => {
+    const { retryMediaUntilResolved } = await loadQueue()
+    const stalled = () => new Promise<boolean>(() => {})
+    const first = vi.fn(stalled)
+    const second = vi.fn(stalled)
+    const third = vi.fn().mockResolvedValue(true)
+
+    retryMediaUntilResolved("stalled-1", first)
+    retryMediaUntilResolved("stalled-2", second)
+    retryMediaUntilResolved("ready-3", third)
+
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(third).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(third).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not time out a long download that continues making progress", async () => {
+    const { retryMediaUntilResolved, pendingMediaRetryCount } = await loadQueue()
+    const run = vi.fn(
+      (_signal: AbortSignal, heartbeat: () => void) =>
+        new Promise<boolean>((resolve) => {
+          const progress = setInterval(heartbeat, 20_000)
+          setTimeout(() => {
+            clearInterval(progress)
+            resolve(true)
+          }, 70_000)
+        })
+    )
+
+    retryMediaUntilResolved("large-video", run)
+    await vi.advanceTimersByTimeAsync(72_000)
+
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(pendingMediaRetryCount()).toBe(0)
+  })
+
   it("retries immediately when the browser reports the network is back", async () => {
     const { retryMediaUntilResolved } = await loadQueue()
     const run = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true)
