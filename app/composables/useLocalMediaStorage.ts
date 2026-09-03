@@ -12,6 +12,7 @@ import useIndexedDB from "~/composables/useIndexedDB"
 import useMediaDownloadProgress from "~/composables/useMediaDownloadProgress"
 import { useTauri } from "~/composables/useTauri"
 import { useAppStore } from "~/store/app"
+import { MediaDownloadHttpError } from "~/utils/mediaDownloadErrors"
 
 const MEDIA_ROOT = "cow-media/v1"
 const STORAGE_VERSION = 1 as const
@@ -819,7 +820,7 @@ export const createLocalMediaStorage = (
       signal: input.signal,
     })
     if (!response.ok || !response.body) {
-      throw new Error(`Media download failed with status ${response.status}.`)
+      throw new MediaDownloadHttpError(response.status)
     }
     const headerSize = Number(response.headers.get("content-length") || 0)
     const size = input.size || headerSize
@@ -837,9 +838,7 @@ export const createLocalMediaStorage = (
         }))
       response = null
       if (!activeResponse.ok || !activeResponse.body) {
-        throw new Error(
-          `Media download failed with status ${activeResponse.status}.`
-        )
+        throw new MediaDownloadHttpError(activeResponse.status)
       }
       return activeResponse.body as ReadableStream<Uint8Array>
     }
@@ -860,6 +859,12 @@ export const createLocalMediaStorage = (
       status: "uploaded",
       remoteUrl: input.url,
     })
+    // A device that only ever receives a teammate's media never reaches the
+    // request in `saveBlob` — no user-initiated save ever happens on it — so
+    // its bucket stayed evictable, and a projection machine that only
+    // downloads is exactly where losing the bytes mid-service hurts most.
+    // Persistence is per-origin and asked for once.
+    if (!persistenceRequested) await requestPersistence().catch(() => null)
     return record
   }
 

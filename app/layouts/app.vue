@@ -81,6 +81,7 @@ import { useOnline } from "@vueuse/core"
 import { appWideActions } from "~/utils/constants"
 import { safeDBOperation } from "~/composables/useIndexedDB"
 import { invalidateHymnCache } from "~/composables/useHymn"
+import { cloneDurableSlide } from "~/utils/durableSlide"
 
 useHead({
   title: "Cloud of Worship",
@@ -786,7 +787,14 @@ const retrieveAllMediaFilesFromDB = async () => {
         const rehydrated = await rehydrateSlideMedia(content, {
           allowDownload: false,
         })
-        await db.library.update(item.id, { ...item, content: rehydrated })
+        // Store the recoverable form, never the resolved one. Writing the
+        // rehydrated slide straight back baked this session's blob:/asset:
+        // URLs into the row, and those are dead on the next launch — the
+        // library kept a permanent pointer to nothing.
+        await db.library.update(item.id, {
+          ...item,
+          content: await cloneDurableSlide(rehydrated),
+        })
       })
     })
     .catch((err) => console.error("Failed to get saved slides:", err))
