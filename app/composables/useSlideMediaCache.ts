@@ -30,14 +30,64 @@ export type RehydrateOptions = {
 
 export default function useSlideMediaCache() {
   const localMedia = useLocalMediaStorage()
-  const { beginDownload, setProgress, endDownload } = useMediaDownloadProgress()
+  const { setProgress, endDownload } = useMediaDownloadProgress()
   const { retryMediaUntilResolved, cancelMediaRetry } = useMediaRetryQueue()
+
+  // `withProgress` in the storage layer only wraps a stream it is actually
+  // reading, so the first call marks the point where bytes started moving.
+  const reportProgress = (key: string, fraction: number) =>
+    setProgress(key, Number.isFinite(fraction) ? fraction * 100 : Number.NaN)
 
   const isOutOfSpace = (error: unknown) =>
     (error as DOMException)?.name === "QuotaExceededError"
 
   const isRemoteUrl = (url?: string | null): url is string =>
     !!url && (url.startsWith("http://") || url.startsWith("https://"))
+
+  /**
+   * The first candidate that can actually be fetched over the network.
+   *
+   * A slide rehydrated earlier in this session carries a blob:/asset: URL on
+   * `background` and `data.url`, and those used to shadow the cloud copy: the
+   * `||` chain stopped at the first truthy value, `isRemoteUrl` then rejected
+   * that session URL, and the download was never attempted — even though
+   * `mediaCloudSync` further down the chain knew exactly where the bytes were.
+   */
+  const firstRemoteUrl = (
+    ...candidates: (string | null | undefined)[]
+  ): string | undefined => candidates.find(isRemoteUrl)
+
+  /**
+   * Remember where a file was fetched from before its URL is overwritten.
+   *
+   * Rehydration replaces `background` and `data.url` with the device-local
+   * playback URL, and on slides that carry no `mediaCloudSync` entry that
+   * erased the only pointer to the cloud copy. A later pass in the same
+   * session — after the local bytes were evicted, or the blob revoked — then
+   * had nothing remote left to fall back on and left the slide aimed at a dead
+   * blob: URL, even though the durable row still knew the CDN address.
+   *
+   * `mediaCloudSync` is where a cloud location already belongs, it is already
+   * the last candidate `firstRemoteUrl` consults, and it survives transport.
+   */
+  const rememberRemoteUrl = (slide: Slide, key: string, url?: string) => {
+    if (!isRemoteUrl(url)) return
+    const existing = slide.mediaCloudSync?.[key]
+    if (existing?.remoteUrl) return
+    const now = new Date().toISOString()
+    slide.mediaCloudSync = {
+      ...(slide.mediaCloudSync || {}),
+      [key]: {
+        key,
+        groupId: existing?.groupId || slide.id,
+        status: existing?.status || "uploaded",
+        ...existing,
+        remoteUrl: url,
+        createdAt: existing?.createdAt || now,
+        updatedAt: now,
+      },
+    }
+  }
 
   const mediaKind = (type?: string): LocalMediaKind => {
     if (type?.includes("audio")) return "audio"
@@ -66,14 +116,18 @@ export default function useSlideMediaCache() {
   ) => {
     const remoteUrl =
       allowDownload && isRemoteUrl(source.url) ? source.url : undefined
-    if (remoteUrl) beginDownload(key)
+    // Deliberately not opened here. A remote URL only means the bytes *may*
+    // need fetching — `ensureLocal` returns straight from the local copy most
+    // of the time, and opening the entry up front bracketed that local hit too:
+    // the key appeared and vanished within a couple of frames, so every UI
+    // watching `isDownloading` flickered for ~20ms instead of showing a loader.
+    // The first progress chunk below only fires on a real network transfer.
     try {
       const url = await localMedia.ensureLocal(key, {
         ...source,
         url: remoteUrl,
         recoverable: !!remoteUrl,
-        onProgress: (fraction) =>
-          setProgress(key, Number.isFinite(fraction) ? fraction * 100 : Number.NaN),
+        onProgress: (fraction) => reportProgress(key, fraction),
       })
       // No local copy came back even though a cloud copy exists: the fetch was
       // refused or the connection dropped mid-stream. Worth another attempt.
@@ -100,12 +154,20 @@ export default function useSlideMediaCache() {
   ) => {
     const data = slide.data as ExtendedFileT | undefined
     const kind = mediaKind(data?.type || slide.backgroundType)
+    // Audio slides keep a decorative image on `background`, so their file is
+    // only ever on `data.url` — everything else prefers the background.
     const candidateUrl =
       kind === "audio"
-        ? data?.url || slide.mediaCloudSync?.[slide.id]?.remoteUrl
-        : isRemoteUrl(slide.background)
-        ? slide.background
-        : data?.url || slide.mediaCloudSync?.[slide.id]?.remoteUrl
+        ? firstRemoteUrl(
+            data?.url,
+            slide.mediaCloudSync?.[slide.id]?.remoteUrl
+          )
+        : firstRemoteUrl(
+            slide.background,
+            data?.url,
+            slide.mediaCloudSync?.[slide.id]?.remoteUrl
+          )
+    rememberRemoteUrl(slide, slide.id, candidateUrl)
     const fileUrl = await resolveLocalUrl(
       slide.id,
       {
@@ -133,7 +195,11 @@ export default function useSlideMediaCache() {
     const restored: NonNullable<Slide["presentationObjects"]> = []
     for (const obj of slide.presentationObjects ?? []) {
       const key = `${slide.id}-page-${obj.page}`
-      const remoteUrl = obj.imageUrl || slide.mediaCloudSync?.[key]?.remoteUrl
+      const remoteUrl = firstRemoteUrl(
+        obj.imageUrl,
+        slide.mediaCloudSync?.[key]?.remoteUrl
+      )
+      rememberRemoteUrl(slide, key, remoteUrl)
       let url: string | null = null
       try {
         url = await resolveLocalUrl(
@@ -168,11 +234,15 @@ export default function useSlideMediaCache() {
     pending?: PendingCollector
   ) => {
     const key = slide.backgroundVideoKey as string
+    const remoteUrl = firstRemoteUrl(
+      slide.background,
+      slide.mediaCloudSync?.[key]?.remoteUrl
+    )
+    rememberRemoteUrl(slide, key, remoteUrl)
     const fileUrl = await resolveLocalUrl(
       key,
       {
-        url:
-          slide.background || slide.mediaCloudSync?.[key]?.remoteUrl,
+        url: remoteUrl,
         category: key.startsWith("/video-bg-") ? "preset" : "background",
         kind: "video",
         groupId: key,
@@ -191,11 +261,15 @@ export default function useSlideMediaCache() {
     pending?: PendingCollector
   ) => {
     const key = slide.backgroundImageKey as string
+    const remoteUrl = firstRemoteUrl(
+      slide.background,
+      slide.mediaCloudSync?.[key]?.remoteUrl
+    )
+    rememberRemoteUrl(slide, key, remoteUrl)
     const fileUrl = await resolveLocalUrl(
       key,
       {
-        url:
-          slide.background || slide.mediaCloudSync?.[key]?.remoteUrl,
+        url: remoteUrl,
         category: key.startsWith("/preset-image-bg-")
           ? "preset"
           : "background",
