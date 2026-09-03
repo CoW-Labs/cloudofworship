@@ -413,9 +413,34 @@
           }"
           :style="useSlideBackground(slide)"
         >
+          <!-- EXTERNAL VIDEO (YOUTUBE/VIMEO) — the editor never embeds the
+               player, so show the video's thumbnail the way the live preview
+               does instead of a video element pointed at a link. -->
+          <div v-if="externalVideo" class="absolute inset-0 bg-primary-950">
+            <img
+              v-if="externalVideo.thumbnail"
+              :src="externalVideo.thumbnail"
+              :alt="externalVideo.name"
+              class="w-full h-full object-cover"
+            />
+            <div
+              v-else
+              class="h-full w-full flex flex-col items-center justify-center gap-2 text-white/70"
+            >
+              <IconWrapper
+                :name="
+                  externalVideo.type === 'vimeo'
+                    ? 'i-bxl-vimeo'
+                    : 'i-bxl-youtube'
+                "
+                size="10"
+              />
+              <span class="text-sm">{{ externalVideo.name }}</span>
+            </div>
+          </div>
           <!-- VIDEO BACKGROUND -->
           <video
-            v-if="slide?.backgroundType === backgroundTypes.video"
+            v-else-if="slide?.backgroundType === backgroundTypes.video"
             :src="slide?.background"
             class="h-[100%] w-[100%] object-cover absolute inset-0"
             crossorigin="anonymous"
@@ -460,6 +485,7 @@ import {
 } from "~/utils/mediaCloudSync"
 import type {
   ExtendedFileT,
+  ExternalVideo,
   MediaCloudSyncReason,
   Slide,
   SlideStyle,
@@ -729,6 +755,15 @@ watch(
   },
   { immediate: true }
 )
+
+// YouTube/Vimeo slides hold a link, not bytes: `background` is only a stand-in
+// image and `backgroundType` is "video", so the preview's <video> renders black.
+// The link's thumbnail is what the live output shows for these too.
+const externalVideo = computed<ExternalVideo | undefined>(() => {
+  const data = props.slide?.data as ExternalVideo | undefined
+  if (props.slide?.type !== slideTypes.media) return undefined
+  return data?.type === "youtube" || data?.type === "vimeo" ? data : undefined
+})
 
 const setlistData = computed<SongSetlistData>(() => getSetlistData(props.slide))
 const isEmptySongSetlist = computed(
@@ -1519,20 +1554,30 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
       ...appStore.currentState.settings.slideStyles,
       linesPerSlide,
     })
-    const slideStyle = {
-      ...props.slide.slideStyle,
-      linesPerSlide,
+    // The refresh chunks at the slide's own `linesPerSlide`, so the new value
+    // has to be on the slide going in — and the slideStyle it hands back is
+    // the one to emit, since it carries the re-measured font size too.
+    const slideWithNewLines: Slide = {
+      ...props.slide,
+      slideStyle: {
+        ...props.slide.slideStyle,
+        linesPerSlide,
+      },
     }
     const activeSongIndex = setlistData.value.activeSongIndex
     const activeItem = setlistData.value.songs[activeSongIndex]
     // useSong() re-chunks the song object in place, so snapshot the current
-    // arrangement before asking for the new one
+    // arrangement before asking for the new one — and hand it a copy, not the
+    // stored song
     const previousVerses = [...(activeItem?.song?.verses || [])]
     const previousVerseIndex = activeItem?.verseIndex || 0
     const rechunkedSong = activeItem
-      ? await useSong(activeItem.song || activeItem.songId, linesPerSlide)
+      ? await useSong(
+          activeItem.song ? { ...activeItem.song } : activeItem.songId,
+          linesPerSlide
+        )
       : null
-    const updatedSlide = await refreshSongSetlistSlide(props.slide, {
+    const updatedSlide = await refreshSongSetlistSlide(slideWithNewLines, {
       activeSongIndex,
       verseIndex: rechunkedSong?.verses?.length
         ? remapChunkIndex(
@@ -1542,7 +1587,11 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
           )
         : previousVerseIndex,
     })
-    emit("slide-update", { ...updatedSlide, slideStyle })
+    emit("slide-update", updatedSlide)
+    useToast().add({
+      icon: "i-tabler-list-numbers",
+      title: "Lines per slide updated",
+    })
     return
   }
 

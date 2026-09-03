@@ -9,6 +9,27 @@ export default function useSongSetlist() {
   const isSongSetlistSlide = (slide?: Slide | null) =>
     slide?.type === slideTypes.songSetlist
 
+  /**
+   * A setlist chunks its songs at the slide's own `linesPerSlide`, falling back
+   * to the app-wide default only for a slide that has never been given one.
+   * Every `useSong()` below has to be handed this value explicitly: called
+   * without it, `useSong()` silently chunks at the *global* setting, so any
+   * other slide that moved the default would re-split the setlist the next time
+   * a song was added or a verse advanced.
+   */
+  const resolveLinesPerSlide = (slide?: Slide | null) =>
+    slide?.slideStyle?.linesPerSlide ??
+    appStore.currentState.settings.slideStyles.linesPerSlide
+
+  /**
+   * `useSong()` writes the re-chunked verses back onto the object it is handed,
+   * and a setlist item's `song` is the very object held in the store (the
+   * copies on the way in are all shallow). Hand it a detached copy so a refresh
+   * cannot re-split the stored slide in place, ahead of the rebuilt one.
+   */
+  const detachSong = <T,>(song: T): T =>
+    song && typeof song === "object" ? ({ ...song } as T) : song
+
   const getSetlistData = (slide?: Slide | null): SongSetlistData => {
     const data = slide?.data as SongSetlistData | undefined
     return {
@@ -19,8 +40,13 @@ export default function useSongSetlist() {
     }
   }
 
-  const createSetlistItem = async (song: Song): Promise<SongSetlistItem | null> => {
-    const resolvedSong = await useSong(song)
+  const createSetlistItem = async (
+    song: Song,
+    linesPerSlide?: number
+  ): Promise<SongSetlistItem | null> => {
+    const resolvedSong = await useSong(detachSong(song), linesPerSlide, {
+      persistLinesPerSlide: false,
+    })
     if (!resolvedSong) return null
 
     return {
@@ -38,6 +64,7 @@ export default function useSongSetlist() {
     const tempSlide: Slide = { ...slide }
     const data = getSetlistData(tempSlide)
     const songs = [...data.songs]
+    const linesPerSlide = resolveLinesPerSlide(tempSlide)
 
     if (songs.length === 0) {
       tempSlide.data = { songs, activeSongIndex: 0 }
@@ -55,7 +82,11 @@ export default function useSongSetlist() {
     const activeItemSource = songs[activeSongIndex]
     if (!activeItemSource) return tempSlide
     const activeItem: SongSetlistItem = { ...activeItemSource }
-    const resolvedSong = await useSong(activeItem.song || activeItem.songId)
+    const resolvedSong = await useSong(
+      detachSong(activeItem.song || activeItem.songId),
+      linesPerSlide,
+      { persistLinesPerSlide: false }
+    )
     if (!resolvedSong) return tempSlide
 
     const verseIndex = Math.min(
@@ -77,6 +108,9 @@ export default function useSongSetlist() {
       : slideLayoutTypes.full_text
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
+      // Stamped explicitly: a slide left on the global default would otherwise
+      // report one value in the toolbar and be chunked at another.
+      ...(linesPerSlide !== undefined && { linesPerSlide }),
       fontSize: Number(useScreenFontSize(currentVerse)),
     }
     tempSlide.contents = useSlideContent(tempSlide, resolvedSong, currentVerse)
@@ -96,7 +130,7 @@ export default function useSongSetlist() {
     song: Song,
     options?: { position?: "start" | "end" }
   ): Promise<Slide | null> => {
-    const item = await createSetlistItem(song)
+    const item = await createSetlistItem(song, resolveLinesPerSlide(slide))
     if (!item) return null
 
     const data = getSetlistData(slide)
@@ -146,13 +180,18 @@ export default function useSongSetlist() {
     const data = getSetlistData(slide)
     if (!data.songs.length) return null
 
+    const linesPerSlide = resolveLinesPerSlide(slide)
     const activeSongIndex = Math.min(
       Math.max(data.activeSongIndex || 0, 0),
       data.songs.length - 1
     )
     const activeItem = data.songs[activeSongIndex]
     if (!activeItem) return null
-    const activeSong = await useSong(activeItem.song || activeItem.songId)
+    const activeSong = await useSong(
+      detachSong(activeItem.song || activeItem.songId),
+      linesPerSlide,
+      { persistLinesPerSlide: false }
+    )
     if (!activeSong) return null
 
     const lastVerseIndex = Math.max((activeSong.verses?.length || 1) - 1, 0)
@@ -188,7 +227,9 @@ export default function useSongSetlist() {
       const previousItem = data.songs[previousSongIndex]
       if (!previousItem) return null
       const previousSong = await useSong(
-        previousItem.song || previousItem.songId
+        detachSong(previousItem.song || previousItem.songId),
+        linesPerSlide,
+        { persistLinesPerSlide: false }
       )
       return await refreshSongSetlistSlide(slide, {
         activeSongIndex: previousSongIndex,

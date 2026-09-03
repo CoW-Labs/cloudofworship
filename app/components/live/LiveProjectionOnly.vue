@@ -562,6 +562,54 @@ watch(
   }
 )
 
+// The playable file for the current slide, or null when there is nothing this
+// element can play (a still background, or a YouTube/Vimeo link the iframe owns).
+const playableVideo = computed(() => {
+  const slide = props.slide
+  if (!slide || slide.backgroundType !== backgroundTypes.video) return null
+  const type = (slide.data as any)?.type
+  if (type === "youtube" || type === "vimeo") return null
+  return slide.background ? { id: slide.id, src: slide.background } : null
+})
+
+// The source often arrives well after the slide does. On a device that did not
+// upload the file, `background` is still the cloud URL — or blank — at the
+// moment the slide goes live, and the local URL is swapped in once the download
+// lands: a new object with the SAME id, so the watcher above never fires again.
+// That left the element relying on the bare `autoplay` attribute, which Chrome
+// refuses for unmuted media without user activation, and the video sat on its
+// first frame. Playing on the source itself covers both arrivals.
+watch(playableVideo, async (next, previous) => {
+  if (!next || !props.fullScreen) return
+  if (previous?.id === next.id && previous.src === next.src) return
+
+  // Same slide, new source: the local copy replaced the cloud URL it had been
+  // streaming. It is the same footage, so keep the position rather than
+  // restarting the clip mid-service. A different slide starts from the top.
+  const resumeAt =
+    previous?.id === next.id && video.value ? video.value.currentTime : 0
+
+  // Let Vue patch :src onto the element before asking it to play.
+  await nextTick()
+  const element = video.value
+  if (!element) return
+
+  if (resumeAt > 0) {
+    const seek = () => {
+      // Seeking past a shorter re-encode throws; the clip still plays.
+      try {
+        element.currentTime = resumeAt
+      } catch (error) {
+        console.warn("Could not restore video position after source swap:", error)
+      }
+    }
+    if (element.readyState >= 1) seek()
+    else element.addEventListener("loadedmetadata", seek, { once: true })
+  }
+
+  safePlayMedia(element)
+})
+
 const computeBackgroundStyles = (slide: Slide): string => {
   if (
     slide?.type === slideTypes.media ||

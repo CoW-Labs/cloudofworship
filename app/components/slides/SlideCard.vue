@@ -31,6 +31,27 @@
           :slide-styles="currentState.settings.slideStyles"
           :eager="selected"
         />
+        <!-- MEDIA STILL DOWNLOADING — the preview has nothing to draw until the
+             bytes land on this device, so an untouched card is indistinguishable
+             from an empty slide. Say which ones are still coming down. -->
+        <div
+          v-if="isMediaLoading"
+          class="media-loading absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/50 text-white"
+        >
+          <UIcon name="i-bx-loader-alt" class="w-5 h-5 animate-spin" />
+          <span
+            v-if="mediaProgressLabel"
+            class="text-[10px] font-medium tabular-nums"
+          >
+            {{ mediaProgressLabel }}
+          </span>
+          <UProgress
+            class="absolute inset-x-0 bottom-0 rounded-none"
+            :value="mediaProgressValue"
+            :max="100"
+            size="xs"
+          />
+        </div>
         <div
           class="overlay-gradient absolute inset-0"
           :class="{ 'border-4 border-primary': selected }"
@@ -275,6 +296,20 @@
       :slide-label="slide?.name"
       :slide-styles="currentState.settings.slideStyles"
     />
+    <!-- Sits exactly over the thumbnail: the row's padding is p-2 and the
+         preview is w-24 h-16, so no wrapper element is needed. -->
+    <div
+      v-if="isMediaLoading"
+      class="media-loading absolute left-2 top-2 flex h-16 w-24 items-center justify-center gap-1.5 bg-black/50 text-white"
+    >
+      <UIcon name="i-bx-loader-alt" class="w-4 h-4 animate-spin" />
+      <span
+        v-if="mediaProgressLabel"
+        class="text-[10px] font-medium tabular-nums"
+      >
+        {{ mediaProgressLabel }}
+      </span>
+    </div>
     <div class="texts flex-col justify-between">
       <h4 class="font-medium mt-2">{{ slide?.name }}</h4>
       <SlideChip
@@ -350,6 +385,57 @@ const gridCardHint = computed(() =>
   props.slide?.slideMode === "overlay"
     ? "Click to preview · Double-click to show overlay"
     : "Click to preview · Double-click to take live"
+)
+
+// Every cache key this card's preview depends on. A media slide's own file is
+// stored under the slide id, a deck stores one key per page, and backgrounds
+// store under their own key — which is usually the schedule-wide default, so a
+// shared background pulls the whole list into the loading state together.
+const { progressFor, transferFor } = useMediaDownloadProgress()
+
+const mediaKeys = computed<string[]>(() => {
+  const slide = props.slide
+  if (!slide) return []
+  const ownsFile =
+    slide.type === slideTypes.media || slide.type === slideTypes.presentation
+  return [
+    ownsFile ? slide.id : null,
+    ...(slide.presentationObjects || []).map(
+      (page) => `${slide.id}-page-${page.page}`
+    ),
+    slide.backgroundImageKey,
+    slide.backgroundVideoKey,
+  ].filter((key): key is string => !!key)
+})
+
+// Percent for whichever key is busy, or null when none is. Covers both
+// directions: a cloud download on this device, and a local save still writing
+// on the device that added the file. A `failed` transfer is deliberately not
+// loading — the editor owns that state, with its retry and remove actions.
+const mediaProgress = computed<number | null>(() => {
+  for (const key of mediaKeys.value) {
+    const transfer = transferFor(key)
+    if (transfer?.status === "pending") return transfer.progress * 100
+    const download = progressFor(key)
+    if (download !== null) return download
+  }
+  return null
+})
+
+const isMediaLoading = computed(() => mediaProgress.value !== null)
+
+// A download with no content-length reports NaN. UProgress renders the
+// indeterminate animation for `undefined`, which is what that should look like.
+const mediaProgressValue = computed<number | undefined>(() =>
+  Number.isFinite(mediaProgress.value)
+    ? (mediaProgress.value as number)
+    : undefined
+)
+
+const mediaProgressLabel = computed(() =>
+  Number.isFinite(mediaProgress.value)
+    ? `${Math.round(mediaProgress.value as number)}%`
+    : ""
 )
 
 const actionsMenuOpen = ref(false)

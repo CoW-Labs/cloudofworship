@@ -18,10 +18,11 @@ const useCreateShortcut = (
   const handleKeydown = (e: KeyboardEvent) => {
     const activeElement = document.activeElement
     // Single-character keys are compared case-insensitively — `event.key`
-    // reports "D" rather than "d" as soon as Shift is held.
+    // reports "D" rather than "d" as soon as Shift is held. `event.key` can
+    // itself be undefined for some synthetic/IME-composed events, so guard it.
     const matchesKey =
       commandKey.length === 1
-        ? e.key.toLowerCase() === commandKey.toLowerCase()
+        ? e.key?.toLowerCase() === commandKey.toLowerCase()
         : e.key === commandKey
     const isCommandKeyPressed =
       matchesKey || (options?.code ? e.code === options.code : false)

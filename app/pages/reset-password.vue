@@ -72,7 +72,7 @@ useHead({
     {
       name: "description",
       content:
-        "Create a new password for your Cloud of Worship account. Enter your email and new password to regain access to your church presentation tools.",
+        "Create a new password for your Cloud of Worship account and regain access to your church presentation tools.",
     },
     {
       name: "keywords",
@@ -102,11 +102,8 @@ const password = ref("")
 const confirmPassword = ref("")
 const loading = ref(false)
 
-const email = computed(() => (route.query.email as string) || "")
 const resetToken = computed(() => (route.query.token as string) || "")
-const hasResetParams = computed(() =>
-  Boolean(useValidEmail(email.value) && resetToken.value)
-)
+const hasResetParams = computed(() => Boolean(resetToken.value))
 const passwordValid = computed(() => /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password.value))
 
 const confirmError = computed(() => {
@@ -127,7 +124,6 @@ const resetPassword = async () => {
   const { error } = await useAPIFetch("/auth/reset-password", {
     method: "POST",
     body: {
-      email: email.value,
       token: resetToken.value,
       password: password.value,
     },
