@@ -860,6 +860,12 @@ export const createLocalMediaStorage = (
       status: "uploaded",
       remoteUrl: input.url,
     })
+    // A device that only ever receives a teammate's media never reaches the
+    // request in `saveBlob` — no user-initiated save ever happens on it — so
+    // its bucket stayed evictable, and a projection machine that only
+    // downloads is exactly where losing the bytes mid-service hurts most.
+    // Persistence is per-origin and asked for once.
+    if (!persistenceRequested) await requestPersistence().catch(() => null)
     return record
   }
 
