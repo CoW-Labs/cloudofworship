@@ -87,7 +87,7 @@ const lastOverlayBroadcastTs = ref(0)
 // once if needed) and cache the localized URLs per source signature so repeated
 // same-slide broadcasts (e.g. verse changes) don't re-download, re-create object
 // URLs, or reload the <video>.
-const { rehydrateSlideMedia } = useSlideMediaCache()
+const { rehydrateSlideMediaWithStatus } = useSlideMediaCache()
 const localMedia = useLocalMediaStorage()
 type LocalizedMedia = {
   background?: string
@@ -359,24 +359,38 @@ onMounted(() => {
       // this window (download once if needed), then re-apply with the local URL.
       if (pendingRehydrateSig) {
         const sig = pendingRehydrateSig
-        rehydrateSlideMedia(updatedSlide, { allowDownload: true })
-          .then((rehydrated) => {
-            const localized: LocalizedMedia = {
-              background: rehydrated.background,
-              dataUrl: (rehydrated.data as any)?.url,
-              presentationObjects: rehydrated.presentationObjects,
-            }
-            localizedLiveMedia.set(sig, localized)
-            // Re-apply onto whatever is on screen now rather than adopting
-            // `rehydrated` wholesale — the operator may have paged ahead while
-            // the download ran, and that newer page index must win.
-            const current = mostUpdatedLiveSlide.value
-            if (current?.id === rehydrated.id) {
-              const next = { ...current }
-              applyLocalizedMedia(next, localized)
-              mostUpdatedLiveSlide.value = next
-            }
-          })
+        // `cacheable` is false while any page/background is still only in the
+        // cloud. Caching a half-resolved slide — what a weak connection at
+        // service start produces — pinned the broken URLs for the rest of the
+        // session: every later broadcast for the same slide hit the cache and
+        // skipped the download that would have fixed it, so the operator had to
+        // reload the projection window. The retry inside useSlideMediaCache
+        // calls back through `onRecovered` once the bytes finally land.
+        const applyRehydrated = (rehydrated: Slide, cacheable: boolean) => {
+          const localized: LocalizedMedia = {
+            background: rehydrated.background,
+            dataUrl: (rehydrated.data as any)?.url,
+            presentationObjects: rehydrated.presentationObjects,
+          }
+          if (cacheable) localizedLiveMedia.set(sig, localized)
+          // Re-apply onto whatever is on screen now rather than adopting
+          // `rehydrated` wholesale — the operator may have paged ahead while
+          // the download ran, and that newer page index must win.
+          const current = mostUpdatedLiveSlide.value
+          if (current?.id === rehydrated.id) {
+            const next = { ...current }
+            applyLocalizedMedia(next, localized)
+            mostUpdatedLiveSlide.value = next
+          }
+        }
+
+        rehydrateSlideMediaWithStatus(updatedSlide, {
+          allowDownload: true,
+          onRecovered: (recovered) => applyRehydrated(recovered, true),
+        })
+          .then(({ slide: rehydrated, pendingKeys }) =>
+            applyRehydrated(rehydrated, !pendingKeys.length)
+          )
           .catch((err) =>
             console.warn("Live media rehydrate failed:", err)
           )

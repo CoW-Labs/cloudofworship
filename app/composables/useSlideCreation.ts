@@ -296,6 +296,14 @@ export default function useSlideCreation() {
       appStore.currentState.settings.defaultBackground.default?.backgroundType ||
       appStore.currentState.settings.defaultBackground.hymn?.backgroundType
     tempSlide.title = "Song Setlist"
+    // Stamped at creation, the way createHymnSlide does it: without it the
+    // setlist rides whatever the app-wide default happens to be at the moment
+    // a song is added, so a default changed elsewhere re-chunks the setlist.
+    const linesPerSlide = appStore.currentState.settings.slideStyles.linesPerSlide
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      ...(linesPerSlide !== undefined && { linesPerSlide }),
+    }
     tempSlide.data = {
       songs: [],
       activeSongIndex: 0,
