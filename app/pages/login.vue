@@ -82,6 +82,10 @@
 
 <script setup lang="ts">
 import type { UserCredential } from "firebase/auth"
+import {
+  isGoogleAuthCancelled,
+  isGoogleAuthRedirectPending,
+} from "~/composables/useTauriGoogleAuth"
 import { useAuthStore } from "~/store/auth"
 import type { GoogleAuthResponseT, LoginResponseT } from "~/types/api-responses"
 
@@ -127,6 +131,7 @@ const googleSignIn = inject("handleGoogleSignIn") as () => Promise<
   UserCredential | any
 >
 const { isTauri } = useTauri()
+const { checkRedirectResult } = useTauriGoogleAuth()
 // console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()
@@ -233,7 +238,7 @@ const goToVerify = () => {
   navigateTo("/verify")
 }
 
-const handleGoogleSignIn = async () => {
+const handleGoogleSignIn = async (redirectResult?: UserCredential) => {
   googleLoading.value = true
 
   usePosthogCapture("LOGIN_ATTEMPTED", {
@@ -241,7 +246,8 @@ const handleGoogleSignIn = async () => {
   })
 
   try {
-    const { user } = await googleSignIn()
+    // Coming back from the redirect flow we already hold the credential.
+    const { user } = redirectResult ?? (await googleSignIn())
 
     // Don't process if redirect was initiated (Tauri only)
     if (!user) {
@@ -292,6 +298,15 @@ const handleGoogleSignIn = async () => {
       }
     }
   } catch (error: any) {
+    // Handing off to the redirect flow: the page is unloading, not failing.
+    if (isGoogleAuthRedirectPending(error)) return
+
+    // The person closed the Google window themselves — no error to report.
+    if (isGoogleAuthCancelled(error)) {
+      usePosthogCapture("LOGIN_CANCELLED", { method: "google" })
+      return
+    }
+
     usePosthogCapture("LOGIN_FAILED", {
       method: "google",
       error: error?.message,
@@ -308,8 +323,13 @@ const handleGoogleSignIn = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   usePosthogCapture("LOGIN_PAGE_VIEWED")
+
+  const redirectResult = await checkRedirectResult()
+  if (redirectResult?.user) {
+    await handleGoogleSignIn(redirectResult)
+  }
 })
 </script>
 

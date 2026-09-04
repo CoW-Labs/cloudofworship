@@ -24,7 +24,7 @@
           <button
             type="button"
             class="attention-chip shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-semibold leading-none text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors"
-            @click="restoreModalVisible = true"
+            @click="handleAttentionChipClick"
           >
             <span class="w-1.5 h-1.5 rounded-full bg-red-500" />
             Requires attention
@@ -459,6 +459,13 @@ const commitScheduleName = async () => {
     scheduleId: schedule._id,
     scheduleName: name,
     persistence: result.status,
+  })
+}
+
+const handleAttentionChipClick = () => {
+  restoreModalVisible.value = true
+  usePosthogCapture("ACCOUNT_ATTENTION_CHIP_CLICKED", {
+    location: "navbar",
   })
 }
 
