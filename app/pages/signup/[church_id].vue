@@ -85,6 +85,11 @@
 </template>
 
 <script setup lang="ts">
+import type { UserCredential } from "firebase/auth"
+import {
+  isGoogleAuthCancelled,
+  isGoogleAuthRedirectPending,
+} from "~/composables/useTauriGoogleAuth"
 import { useAuthStore } from "~/store/auth"
 import type { SignupResponseT, ApiErrorT } from "~/types/api-responses"
 import type { Church } from "~/store/auth"
@@ -93,7 +98,6 @@ definePageMeta({
 })
 
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
-const { isTauri } = useTauri()
 const { checkRedirectResult } = useTauriGoogleAuth()
 
 const { token } = useAuthToken()
@@ -173,58 +177,17 @@ const applyGoogleSignupResult = (
   }
 }
 
-// Check for redirect result on mount (for Tauri)
 onMounted(async () => {
   // Initialize UTM tracking on page load
   initUTMTracking(route)
 
   await getChurch()
 
-  // Check for Google auth redirect result first (Tauri only)
-  if (isTauri) {
-    loading.value = true
-    const result = await checkRedirectResult()
-
-    if (result?.user) {
-      // Process the Google auth result
-      const { user } = result
-      const churchIdParam = getChurchId()
-      if (!churchIdParam) {
-        loading.value = false
-        return
-      }
-
-      // Get the ID token from Firebase user
-      const idToken = await user.getIdToken()
-
-      // Get UTM parameters
-      const utmParams = getUTMParams(route)
-
-      const { data, error } = await useAPIFetch<SignupResponseT, ApiErrorT>(
-        "/auth/signup/google",
-        {
-          method: "POST",
-          headers: { "x-access-token": `Bearer ${idToken}` },
-          body: {
-            churchId: churchIdParam,
-            utmParams,
-          },
-        }
-      )
-
-      if (error.value) {
-        toast.add({
-          title: error.value?.data?.error?.includes("E11000")
-            ? "Email linked to an account. Sign in instead."
-            : error.value?.data?.message,
-          color: "red",
-          icon: "i-bx-error",
-        })
-      } else {
-        applyGoogleSignupResult(data.value, churchIdParam)
-      }
-    }
-    loading.value = false
+  // The Google redirect flow (mobile, PWA, in-app browsers, Tauri) lands back
+  // here with the credential waiting to be picked up.
+  const result = await checkRedirectResult()
+  if (result?.user) {
+    await handleGoogleSignUp(result)
   }
 })
 
@@ -279,7 +242,7 @@ const signup = async () => {
   loading.value = false
 }
 
-const handleGoogleSignUp = async () => {
+const handleGoogleSignUp = async (redirectResult?: UserCredential) => {
   const churchId = getChurchId()
   if (!churchId) {
     navigateTo("/signup")
@@ -289,7 +252,8 @@ const handleGoogleSignUp = async () => {
   loading.value = true
 
   try {
-    const { user } = await googleSignIn()
+    // Coming back from the redirect flow we already hold the credential.
+    const { user } = redirectResult ?? (await googleSignIn())
 
     // Don't process if redirect was initiated
     if (!user) {
@@ -325,6 +289,12 @@ const handleGoogleSignUp = async () => {
       applyGoogleSignupResult(data.value, churchId)
     }
   } catch (error: any) {
+    // Handing off to the redirect flow: the page is unloading, not failing.
+    if (isGoogleAuthRedirectPending(error)) return
+
+    // The person closed the Google window themselves — no error to report.
+    if (isGoogleAuthCancelled(error)) return
+
     toast.add({
       title: "Google sign up failed",
       description: error?.message || "An error occurred",
