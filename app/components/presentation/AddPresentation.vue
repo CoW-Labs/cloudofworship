@@ -145,7 +145,7 @@
           ? 'presentation-import-ppt'
           : 'presentation-import-pdf'
       "
-      title="🎉 Import Slides"
+      title="Import Slides"
     >
       <div
         class="flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed"
@@ -162,9 +162,9 @@
 
         <div
           v-if="fileType === 'pdf'"
-          class="bg-primary-50 dark:bg-primary-900 rounded-md p-3"
+          class="bg-white dark:bg-[#1b2233] rounded-2xl p-3"
         >
-          <p class="font-semibold text-primary-700 dark:text-primary-300 mb-1">
+          <p class="font-semibold text-gray-900 dark:text-white mb-1">
             Works with any presentation app
           </p>
           <p>
@@ -174,8 +174,8 @@
           </p>
         </div>
 
-        <div v-else class="bg-primary-50 dark:bg-primary-900 rounded-md p-3">
-          <p class="font-semibold text-primary-700 dark:text-primary-300 mb-1">
+        <div v-else class="bg-white dark:bg-[#1b2233] rounded-2xl p-3">
+          <p class="font-semibold text-gray-900 dark:text-white mb-1">
             Best results with .pptx
           </p>
           <p>
