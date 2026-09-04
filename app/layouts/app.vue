@@ -34,6 +34,7 @@
       />
       <UpgradePlanModal />
       <OnboardingTour />
+      <SatisfactionPromptModal ref="satisfactionPrompt" />
     </ClientOnly>
   </div>
   <Transition name="fade-sm">
@@ -1317,6 +1318,93 @@ async function bindTauriLiveWindowLifecycle() {
 }
 // WINDOW MANAGEMENT CODE ENDS HERE
 
+const satisfactionPrompt = ref<{
+  show: () => boolean
+  isWithinCooldown: () => boolean
+} | null>(null)
+
+// Asking on the very first launch reads as noise; by the fifth open the
+// operator has run a service or two and has an opinion worth collecting.
+const APP_OPENS_BEFORE_FEEDBACK = 5
+const APP_OPENS_KEY = "cow_app_open_count"
+const feedbackPromptTimers = new Set<ReturnType<typeof setTimeout>>()
+
+const scheduleFeedbackPromptCheck = (callback: () => void, delay: number) => {
+  const timer = setTimeout(() => {
+    feedbackPromptTimers.delete(timer)
+    callback()
+  }, delay)
+  feedbackPromptTimers.add(timer)
+}
+
+const isAnotherDialogOpen = () =>
+  typeof document !== "undefined" &&
+  document.querySelector('[role="dialog"]') !== null
+
+/**
+ * Count this launch and, once the operator has been around long enough, ask how
+ * they're finding the app. The modal owns its own cadence from there.
+ */
+const maybeAskForFeedback = () => {
+  let opens = 0
+  try {
+    opens = Number(localStorage.getItem(APP_OPENS_KEY) || 0) + 1
+    localStorage.setItem(APP_OPENS_KEY, String(opens))
+  } catch {
+    // Ignore storage failures (e.g. private mode, quota, SecurityError).
+    return
+  }
+
+  if (opens < APP_OPENS_BEFORE_FEEDBACK) return
+
+  // Held back so it never lands on top of another dialog or the loading screen,
+  // and never interrupts the first 30 seconds of setup. If the interface is
+  // still busy when the timer fires, wait rather than stacking prompts.
+  const attempt = (retriesLeft: number) => {
+    if (
+      showAdvertModal.value ||
+      loadingResources.value ||
+      isAnotherDialogOpen()
+    ) {
+      if (retriesLeft > 0) {
+        scheduleFeedbackPromptCheck(() => attempt(retriesLeft - 1), 15000)
+      }
+      return
+    }
+
+    if (!satisfactionPrompt.value) {
+      // Almost always a stale component registration: the dev server has to
+      // rescan `app/components` before a newly added component resolves.
+      console.warn(
+        "[feedback prompt] SatisfactionPromptModal did not mount; restart the dev server if this persists."
+      )
+      return
+    }
+
+    satisfactionPrompt.value.show()
+  }
+
+  scheduleFeedbackPromptCheck(() => attempt(4), 30000)
+}
+
+if (import.meta.dev) {
+  // Escape hatch for testing the prompt without five reloads and a 30s wait:
+  // call `__cowAskFeedback()` from the console. `true` means it opened; `false`
+  // means its cadence is still holding it back.
+  onMounted(() => {
+    ;(window as any).__cowAskFeedback = () => {
+      if (!satisfactionPrompt.value) return "modal not mounted"
+      return satisfactionPrompt.value.show()
+    }
+  })
+}
+
+onBeforeUnmount(() => {
+  feedbackPromptTimers.forEach((timer) => clearTimeout(timer))
+  feedbackPromptTimers.clear()
+  if (import.meta.dev) delete (window as any).__cowAskFeedback
+})
+
 onMounted(async () => {
   // Step 1 of the slide-storage migration: create a verified IndexedDB copy
   // while Pinia remains the runtime source of truth. The legacy localStorage
@@ -1363,6 +1451,8 @@ onMounted(async () => {
       console.warn("Unable to load the active advert:", error)
     }
   }, 10000)
+
+  maybeAskForFeedback()
 
   if (location.hostname !== "localhost") {
     useGtag()

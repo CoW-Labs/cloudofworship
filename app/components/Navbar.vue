@@ -9,9 +9,27 @@
         :class="{ 'opacity-1': currentState.slidesLoading && online }"
         size="xs"
       />
-      <div class="logo flex items-center gap-2 w-[310px] short:w-[240px]">
+      <div class="logo flex items-center gap-2 w-[400px] short:w-[300px]">
         <Logo class="w-[38px] short:w-[30px]" />
-        <h1 class="text-md font-semibold short:text-sm">Cloud of Worship</h1>
+        <h1 class="text-md font-semibold short:text-sm truncate">
+          Cloud of Worship
+        </h1>
+
+        <!-- ACCOUNT ATTENTION CHIP — only for churches that had Teams and lost it -->
+        <CowTooltip
+          v-if="hasLapsedTeamsSubscription"
+          text="Your account needs attention"
+          placement="bottom"
+        >
+          <button
+            type="button"
+            class="attention-chip shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-semibold leading-none text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+            @click="restoreModalVisible = true"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500" />
+            Requires attention
+          </button>
+        </CowTooltip>
         <!-- TEST-ONLY: trigger the upgrade/plan modal -->
         <!-- <UButton
           variant="soft"
@@ -80,7 +98,7 @@
         </div>
       </div>
       <div
-        class="actions text-sm flex gap-2 items-center justify-end w-[310px]"
+        class="actions text-sm flex gap-2 items-center justify-end w-[400px]"
       >
         <SettingsModal
           :is-open="settingsModalOpen"
@@ -104,6 +122,12 @@
         <ShortcutsModal
           :visible="shortcutsModalVisible"
           @close="shortcutsModalVisible = false"
+        />
+
+        <RestoreAccountModal
+          :visible="restoreModalVisible"
+          @close="restoreModalVisible = false"
+          @restore="handleRestoreAccount"
         />
 
         <!-- ONLINE/OFFLINE NOTIFIER currently just based on network connected status -->
@@ -294,9 +318,10 @@ const appStore = useAppStore()
 const inviteModalVisible = ref(false)
 const scheduleModalVisible = ref(false)
 const shortcutsModalVisible = ref(false)
+const restoreModalVisible = ref(false)
 
 // Subscription check
-const { hasAccessToFeature } = useSubscription()
+const { hasAccessToFeature, hasLapsedTeamsSubscription } = useSubscription()
 const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 
 const { user, church } = storeToRefs(authStore)
@@ -434,6 +459,15 @@ const commitScheduleName = async () => {
     scheduleId: schedule._id,
     scheduleName: name,
     persistence: result.status,
+  })
+}
+
+// The restore path is the same upgrade/plan flow used elsewhere in the app.
+const handleRestoreAccount = () => {
+  useGlobalEmit("show-upgrade-modal")
+  usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+    feature: "Restore Account",
+    location: "navbar",
   })
 }
 
