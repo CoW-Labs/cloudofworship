@@ -293,7 +293,7 @@
     <FeatureIntroductionModal
       ref="featureIntroModal"
       feature-key="transcribe-sermon"
-      title="🎙️ Transcribe Sermon"
+      title="Transcribe Sermon"
     >
       <div
         class="flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed"
