@@ -118,6 +118,22 @@ export default function useSubscription() {
   }
 
   /**
+   * True when the church used to be on Teams but is not any more — the
+   * subscription lapsed, was canceled, or they paid for Teams at some point
+   * and have since dropped back to Free.
+   *
+   * hadTeamsBefore comes from GET /church/:churchId and is true only for real
+   * (non-trial) Teams subscriptions, so a church that only ever ran a trial
+   * does not count as lapsed.
+   */
+  const hasLapsedTeamsSubscription = computed(() => {
+    // Currently on Teams — nothing to restore.
+    if (isTeamsPlan.value) return false
+
+    return authStore.church?.hadTeamsBefore === true
+  })
+
+  /**
    * Get storage limit based on plan
    */
   const getStorageLimit = (): number => {
@@ -139,5 +155,6 @@ export default function useSubscription() {
     requiresTeams,
     hasAccessToFeature,
     getStorageLimit,
+    hasLapsedTeamsSubscription,
   }
 }

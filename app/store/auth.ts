@@ -40,6 +40,9 @@ export interface Church {
   storageUsed?: number
   subscriptionPlan: 'free' | 'teams'
   trialEligible: boolean
+  // True when the church has held a real (non-trial) Teams subscription at any
+  // point. Set by GET /church/:churchId.
+  hadTeamsBefore?: boolean
 }
 
 export const useAuthStore = defineStore('auth', {

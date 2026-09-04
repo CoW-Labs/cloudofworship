@@ -112,7 +112,7 @@
         <ActionCard
           v-else
           v-for="(action, index) in visibleActions"
-          :key="action?.name"
+          :key="getActionKey(action)"
           :action="action"
           compact
           :data-action-index="index"
@@ -144,7 +144,7 @@
 
         <ActionCard
           v-for="(action, index) in searchedActions"
-          :key="action?.name"
+          :key="getActionKey(action)"
           :action="{
             ...action,
             bibleChapterAndVerse:
@@ -283,6 +283,20 @@ const { searchSongs } = useSongs()
 let searchInputBeforeTwoDigitNumbers = ""
 const searchInputEl = ref<{ input: HTMLInputElement }>()
 const searchInput = ref<string>("")
+// Titles are not unique across sources. For example, the library, remote song
+// search, and hymn catalogue can all contain multiple entries named "Amazing
+// Grace". Give each action object a stable identity so Vue can move grouped
+// results without reusing the wrong row or reporting duplicate keys.
+const actionKeys = new WeakMap<QuickAction, number>()
+let nextActionKey = 0
+const getActionKey = (action: QuickAction) => {
+  let key = actionKeys.get(action)
+  if (key === undefined) {
+    key = ++nextActionKey
+    actionKeys.set(action, key)
+  }
+  return key
+}
 // Tracks whether the search box currently has focus — drives the quick-filter
 // chips + AI Transcription promo, which should only appear during an active
 // search session (focused), not on the idle home state.
@@ -739,8 +753,38 @@ const validActions = computed(() => {
   })
 })
 
+// Display order for the actions home list, ranked by how often churches
+// actually reach for each one (PostHog 30-day usage) rather than the order the
+// entries happen to be authored in `quickActionsArr` — which is grouped by
+// theme, so heavily used actions like "Create Text Slide" and "Add Media" sat
+// below ones barely anyone opens. Keyed on the action name, which is unique
+// per entry. Anything not listed here keeps its authored order and follows
+// behind the ranked ones.
+const visibleActionOrder: string[] = [
+  appWideActions.newBible,
+  appWideActions.newLibrary,
+  appWideActions.addSong,
+  appWideActions.newSongSearch,
+  appWideActions.newSlide,
+  appWideActions.newMedia,
+  appWideActions.newHymn,
+  appWideActions.newSearchBible,
+  appWideActions.newSongSetlist,
+  appWideActions.newTranscribe,
+]
+
+const visibleActionRank = (action: QuickAction) => {
+  const index = visibleActionOrder.indexOf(action.action)
+  return index === -1 ? visibleActionOrder.length : index
+}
+
 const visibleActions = computed(() => {
-  return validActions.value.filter((action) => !action.searchableOnly)
+  const visible = validActions.value.filter((action) => !action.searchableOnly)
+  // Sorted on a copy, and `Array.prototype.sort` is stable, so every unranked
+  // action keeps its `quickActionsArr` order behind the ranked block.
+  return [...visible].sort(
+    (a, b) => visibleActionRank(a) - visibleActionRank(b)
+  )
 })
 
 watch(page, () => {
@@ -1350,16 +1394,22 @@ const searchedActions = computed(() => {
     slideTypes.time,
     slideTypes.countdown,
   ]
-  const orderedGroups = [
+  const orderedGroups: [string, QuickAction[]][] = [
     ...priorityGroupOrder
       .filter((key) => groupedResults.has(key))
-      .map((key) => groupedResults.get(key) as QuickAction[]),
-    ...Array.from(groupedResults.entries())
-      .filter(([key]) => !priorityGroupOrder.includes(key))
-      .map(([, group]) => group),
+      .map(
+        (key) =>
+          [key, groupedResults.get(key) as QuickAction[]] as [
+            string,
+            QuickAction[]
+          ]
+      ),
+    ...Array.from(groupedResults.entries()).filter(
+      ([key]) => !priorityGroupOrder.includes(key)
+    ),
   ]
 
-  const ordered = orderedGroups.flat()
+  const ordered = orderedGroups.flatMap(([, group]) => group)
 
   // ── Float the best name matches to the very top ──────────────────────────
   // The grouping above enforces a fixed reading order by group (actions,
@@ -1378,6 +1428,9 @@ const searchedActions = computed(() => {
   // "Display Bible" vs a song titled "Bible Studies") the action still leads.
   // Capped at four. Skipped for confirmed Bible reference searches, whose
   // results are already exclusively the correct Bible books.
+  //
+  // The matches only decide WHICH GROUP leads — see the group promotion
+  // below — never get lifted out of their group on their own.
   const bestMatchQuery = searchInput.value?.replaceAll("/", "").trim() ?? ""
 
   if (isBibleReferenceSearch.value || bestMatchQuery.length < 2) {
@@ -1409,7 +1462,38 @@ const searchedActions = computed(() => {
 
   if (pinned.length === 0) return ordered
 
-  return [...pinned, ...ordered.filter((action) => !pinnedSet.has(action))]
+  // Promote the whole GROUP that owns a best match, not the matched row on its
+  // own. Lifting a single row to the top splits its group in two — one hymn
+  // (or saved-library song, or Bible verse) pinned above everything and the
+  // rest of that group stranded further down the list — which is exactly the
+  // scattering the grouping above exists to prevent. So the owning group moves
+  // up as a block, and within it the matched rows lead.
+  const promotedGroups: [string, QuickAction[]][] = []
+  const remainingGroups: [string, QuickAction[]][] = []
+  for (const entry of orderedGroups) {
+    if (entry[1].some((action) => pinnedSet.has(action))) {
+      promotedGroups.push(entry)
+    } else {
+      remainingGroups.push(entry)
+    }
+  }
+
+  // Rank promoted groups by their best match. `pinned` is built by walking
+  // `ordered`, so this preserves the existing grouped reading order among them
+  // (actions before content, etc.); the one thing that jumps the queue is an
+  // explicit instant-create timer command, pinned ahead of everything above.
+  const bestPinnedRank = (group: QuickAction[]) =>
+    Math.min(
+      ...group
+        .filter((action) => pinnedSet.has(action))
+        .map((action) => pinned.indexOf(action))
+    )
+  promotedGroups.sort((a, b) => bestPinnedRank(a[1]) - bestPinnedRank(b[1]))
+
+  return [...promotedGroups, ...remainingGroups].flatMap(([, group]) => [
+    ...group.filter((action) => pinnedSet.has(action)),
+    ...group.filter((action) => !pinnedSet.has(action)),
+  ])
 })
 
 watch(page, () => {
