@@ -24,7 +24,7 @@
         block
         type="button"
         :loading="googleLoading"
-        @click="handleGoogleSignIn"
+        @click="() => handleGoogleSignIn()"
       >
         <GoogleIcon class="w-5 h-5" />
         Continue with Google
