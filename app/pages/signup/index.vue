@@ -275,6 +275,11 @@
 </template>
 
 <script setup lang="ts">
+import type { UserCredential } from "firebase/auth"
+import {
+  isGoogleAuthCancelled,
+  isGoogleAuthRedirectPending,
+} from "~/composables/useTauriGoogleAuth"
 import { useAuthStore } from "~/store/auth"
 import type { User, Church } from "~/store/auth"
 import type { ApiErrorT, SignupResponseT } from "~/types/api-responses"
@@ -300,6 +305,7 @@ const { token } = useAuthToken()
 const { isTauri } = useTauri()
 const authStore = useAuthStore()
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
+const { checkRedirectResult } = useTauriGoogleAuth()
 const { user } = storeToRefs(authStore)
 const { sendEmailInvitations } = useUser()
 const { initUTMTracking, getUTMParams } = useUTMParams()
@@ -824,13 +830,14 @@ const getChurch = async () => {
   }
 }
 
-const handleGoogleSignUp = async () => {
+const handleGoogleSignUp = async (redirectResult?: UserCredential) => {
   googleLoading.value = true
   signupMethod.value = "google"
   usePosthogCapture("SIGNUP_CREATE_ACCOUNT_ATTEMPTED", { method: "google" })
 
   try {
-    const { user: gUser } = await googleSignIn()
+    // Coming back from the redirect flow we already hold the credential.
+    const { user: gUser } = redirectResult ?? (await googleSignIn())
     if (!gUser) return
 
     const idToken = await gUser.getIdToken()
@@ -912,6 +919,15 @@ const handleGoogleSignUp = async () => {
       step.value = 2
     }
   } catch (error: any) {
+    // Handing off to the redirect flow: the page is unloading, not failing.
+    if (isGoogleAuthRedirectPending(error)) return
+
+    // The person closed the Google window themselves — no error to report.
+    if (isGoogleAuthCancelled(error)) {
+      usePosthogCapture("SIGNUP_CREATE_ACCOUNT_CANCELLED", { method: "google" })
+      return
+    }
+
     usePosthogCapture("SIGNUP_CREATE_ACCOUNT_FAILED", {
       method: "google",
       error: error?.message,
@@ -927,7 +943,7 @@ const handleGoogleSignUp = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   initUTMTracking(route)
 
   emitter.on(appWideActions.upgradeModalClosed, handleUpgradeModalClosed)
@@ -947,6 +963,12 @@ onMounted(() => {
   }
   if (route.query.from_lyrics) {
     usePosthogCapture("OPENED_SIGNUP_FROM_LYRICS")
+  }
+
+  // Google redirect flow (mobile, PWA, in-app browsers) lands back here.
+  const redirectResult = await checkRedirectResult()
+  if (redirectResult?.user) {
+    await handleGoogleSignUp(redirectResult)
   }
 })
 

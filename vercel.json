@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/__/auth/:path*",
+      "destination": "https://cloud-of-worship.firebaseapp.com/__/auth/:path*"
+    }
+  ]
+}
