@@ -337,7 +337,7 @@ export default function useDeepgramTranscription() {
           } else if (msg.type === 'limit_reached') {
             toast.add({
               title: 'Weekly limit reached',
-              description: 'Your 60-minute weekly AI transcription limit has been reached. It resets on Monday.',
+              description: 'Your 60-minute weekly transcription limit has been reached. It resets on Monday.',
               icon: 'i-bx-time',
               color: 'amber',
               timeout: 8000,

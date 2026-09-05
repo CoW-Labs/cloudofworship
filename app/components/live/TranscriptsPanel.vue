@@ -109,238 +109,237 @@
     </template>
 
     <div class="flex h-full min-h-0 flex-col overflow-hidden">
-    <UTabs
-      :items="panelTabs"
-      :model-value="activeTabIndex"
-      class="px-1 bg-gray-100 dark:bg-[#222938] shrink-0"
-      :ui="{
-        list: {
-          background: 'bg-transparent dark:bg-transparent',
-          shadow: '',
-          tab: {
-            base: 'relative inline-flex items-center justify-center gap-1 flex-shrink-0 w-full font-medium text-xs h-7',
-            active: 'text-primary-600 dark:text-primary-300',
-            inactive: 'text-gray-500 dark:text-[#9aa3b2]',
+      <UTabs
+        :items="panelTabs"
+        :model-value="activeTabIndex"
+        class="px-1 bg-gray-100 dark:bg-[#222938] shrink-0"
+        :ui="{
+          list: {
+            background: 'bg-transparent dark:bg-transparent',
+            shadow: '',
+            tab: {
+              base: 'relative inline-flex items-center justify-center gap-1 flex-shrink-0 w-full font-medium text-xs h-7',
+              active: 'text-primary-600 dark:text-primary-300',
+              inactive: 'text-gray-500 dark:text-[#9aa3b2]',
+            },
           },
-        },
-      }"
-      @change="activeTabIndex = $event"
-    >
-      <template #scriptures-label>
-        <span>Scriptures</span>
-        <span
-          v-if="scriptureResults.length > 0"
-          class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-primary-200 dark:bg-[#384155] text-primary-700 dark:text-primary-300"
-        >
-          {{ scriptureResults.length > 99 ? "99+" : scriptureResults.length }}
-        </span>
-      </template>
-    </UTabs>
-    <div class="relative shrink-0">
-      <AudioWaveform
-        :active="isTranscribing"
-        :mic-level="micLevel"
-        class="px-3 pb-1.5 bg-gray-100 dark:bg-[#222938] w-full"
-      />
-    </div>
-
-    <!-- ── Transcripts pane ── -->
-    <div
-      v-show="activeTabIndex === 0"
-      ref="transcriptContainer"
-      class="transcript-content flex-1 min-h-0 p-3 overflow-y-auto"
-    >
-      <!-- Empty state -->
-      <div
-        v-if="segments.length === 0 && !currentTranscript"
-        class="text-center py-6 text-gray-500 dark:text-[#9aa3b2]"
+        }"
+        @change="activeTabIndex = $event"
       >
-        <UIcon
-          name="i-material-symbols-speech-to-text"
-          class="text-3xl mb-2 opacity-50"
+        <template #scriptures-label>
+          <span>Scriptures</span>
+          <span
+            v-if="scriptureResults.length > 0"
+            class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-primary-200 dark:bg-[#384155] text-primary-700 dark:text-primary-300"
+          >
+            {{ scriptureResults.length > 99 ? "99+" : scriptureResults.length }}
+          </span>
+        </template>
+      </UTabs>
+      <div class="relative shrink-0">
+        <AudioWaveform
+          :active="isTranscribing"
+          :mic-level="micLevel"
+          class="px-3 pb-1.5 bg-gray-100 dark:bg-[#222938] w-full"
         />
-        <div
-          v-if="
-            useDeepgramEngine &&
-            remainingSeconds !== null &&
-            remainingSeconds <= 0
-          "
-          class="mb-3"
-        >
-          <UAlert
-            color="amber"
-            variant="subtle"
-            title="Weekly limit reached"
-            description="Your 60-minute AI transcription limit resets every Monday."
-            icon="i-bx-time"
-          />
-        </div>
-        <div
-          v-else-if="!useDeepgramEngine && !isSpeechRecognitionSupported"
-          class="mb-3"
-        >
-          <UAlert
-            color="amber"
-            variant="subtle"
-            title="Browser not supported"
-            description="Speech recognition requires Chrome, Edge, or Safari"
-            icon="i-bx-error"
-          />
-        </div>
-        <p class="text-sm">
-          {{
-            isTranscribing
-              ? "Listening..."
-              : "Click the microphone to start transcribing"
-          }}
-        </p>
-        <p class="text-xs mt-1 opacity-70">
-          {{
-            useDeepgramEngine
-              ? "AI-powered · Bible references highlighted automatically"
-              : "Bible references will be highlighted automatically"
-          }}
-        </p>
       </div>
 
-      <!-- Segments — oldest first, newest at bottom -->
-      <div v-else class="space-y-3">
-        <div
-          v-for="segment in segments"
-          :key="segment.id"
-          class="segment text-sm leading-relaxed"
-        >
-          <TranscriptText
-            :text="segment.text"
-            :bible-references="segment.bibleReferences"
-            @reference-click="handleReferenceClick"
-          />
-        </div>
-        <div
-          v-if="currentTranscript"
-          class="segment text-sm leading-relaxed text-gray-600 dark:text-[#9aa3b2] italic"
-        >
-          {{ currentTranscript }}<span class="animate-pulse">▌</span>
-        </div>
-        <!-- Always-visible anchor so the cursor is always at the very bottom -->
-        <div ref="transcriptBottom" />
-      </div>
-    </div>
-
-    <!-- ── Scriptures pane ── -->
-    <div
-      v-show="activeTabIndex === 1"
-      ref="scripturesContainer"
-      class="transcript-content flex-1 min-h-0 overflow-y-auto"
-    >
-      <!-- Empty state -->
+      <!-- ── Transcripts pane ── -->
       <div
-        v-if="scriptureResults.length === 0"
-        class="text-center py-6 text-gray-500 dark:text-[#9aa3b2]"
+        v-show="activeTabIndex === 0"
+        ref="transcriptContainer"
+        class="transcript-content flex-1 min-h-0 p-3 overflow-y-auto"
       >
-        <UIcon name="i-bx-bible" class="text-3xl mb-2 opacity-50" />
-        <p class="text-sm">
-          {{
-            isTranscribing
-              ? "Listening for scriptures..."
-              : "No scriptures detected yet"
-          }}
-        </p>
-        <p class="text-xs mt-1 opacity-70">
-          Scriptures matching the sermon will appear here automatically
-        </p>
-      </div>
-
-      <!-- Results — newest first, 20 at a time -->
-      <div v-else class="divide-y divide-gray-100 dark:divide-[#171d2b]">
-        <button
-          v-for="result in visibleScriptureResults"
-          :key="result._id"
-          class="w-full text-left py-3 px-3 hover:bg-white dark:hover:bg-[#2b3242] transition-colors cursor-pointer group"
-          @click="handleScriptureClick(result)"
+        <!-- Empty state -->
+        <div
+          v-if="segments.length === 0 && !currentTranscript"
+          class="text-center py-6 text-gray-500 dark:text-[#9aa3b2]"
         >
-          <div class="flex items-center gap-1.5 mb-0.5">
-            <UIcon
-              name="i-bx-bible"
-              class="text-primary-500 text-sm flex-shrink-0"
-            />
-            <span
-              class="text-xs font-semibold text-primary-600 dark:text-primary-300 group-hover:underline"
-              v-html="
-                highlightText(result.displayLabel, scriptureHighlightQuery)
-              "
+          <UIcon
+            name="i-material-symbols-speech-to-text"
+            class="text-3xl mb-2 opacity-50"
+          />
+          <div
+            v-if="
+              useDeepgramEngine &&
+              remainingSeconds !== null &&
+              remainingSeconds <= 0
+            "
+            class="mb-3"
+          >
+            <UAlert
+              color="amber"
+              variant="subtle"
+              title="Weekly limit reached"
+              description="Your 60-minute transcription limit resets every Monday."
+              icon="i-bx-time"
             />
           </div>
-          <p
-            class="text-xs text-gray-600 dark:text-[#9aa3b2] leading-relaxed line-clamp-2"
-            v-html="highlightText(result.scripture, scriptureHighlightQuery)"
-          />
-        </button>
+          <div
+            v-else-if="!useDeepgramEngine && !isSpeechRecognitionSupported"
+            class="mb-3"
+          >
+            <UAlert
+              color="amber"
+              variant="subtle"
+              title="Browser not supported"
+              description="Speech recognition requires Chrome, Edge, or Safari"
+              icon="i-bx-error"
+            />
+          </div>
+          <p class="text-sm">
+            {{
+              isTranscribing
+                ? "Listening..."
+                : "Click the microphone to start transcribing"
+            }}
+          </p>
+          <p class="text-xs mt-1 opacity-70">
+            Bible references will be highlighted automatically
+          </p>
+        </div>
 
-        <button
-          v-if="scriptureResults.length > scriptureVisibleCount"
-          class="w-full text-xs text-center py-1.5 text-primary-500 dark:text-primary-300 hover:underline"
-          @click="scriptureVisibleCount += 20"
-        >
-          See
-          {{ Math.min(20, scriptureResults.length - scriptureVisibleCount) }}
-          more
-        </button>
+        <!-- Segments — oldest first, newest at bottom -->
+        <div v-else class="space-y-3">
+          <div
+            v-for="segment in segments"
+            :key="segment.id"
+            class="segment text-sm leading-relaxed"
+          >
+            <TranscriptText
+              :text="segment.text"
+              :bible-references="segment.bibleReferences"
+              @reference-click="handleReferenceClick"
+            />
+          </div>
+          <div
+            v-if="currentTranscript"
+            class="segment text-sm leading-relaxed text-gray-600 dark:text-[#9aa3b2] italic"
+          >
+            {{ currentTranscript }}<span class="animate-pulse">▌</span>
+          </div>
+          <!-- Always-visible anchor so the cursor is always at the very bottom -->
+          <div ref="transcriptBottom" />
+        </div>
       </div>
-    </div>
 
-    <!-- Feature Introduction Modal — shown once on first open -->
-    <FeatureIntroductionModal
-      ref="featureIntroModal"
-      feature-key="transcribe-sermon"
-      title="Transcribe Sermon"
-    >
+      <!-- ── Scriptures pane ── -->
       <div
-        class="flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed"
+        v-show="activeTabIndex === 1"
+        ref="scripturesContainer"
+        class="transcript-content flex-1 min-h-0 overflow-y-auto"
       >
-        <p>
-          Transcribe Sermon turns your microphone into a live note-taker;
-          capturing what's being said and surfacing relevant Bible passages
-          automatically as you preach.
-        </p>
-        <ul class="space-y-2">
-          <li class="flex items-start gap-2">
-            <UIcon
-              name="i-bx-microphone"
-              class="text-primary-500 mt-0.5 shrink-0"
+        <!-- Empty state -->
+        <div
+          v-if="scriptureResults.length === 0"
+          class="text-center py-6 text-gray-500 dark:text-[#9aa3b2]"
+        >
+          <UIcon name="i-bx-bible" class="text-3xl mb-2 opacity-50" />
+          <p class="text-sm">
+            {{
+              isTranscribing
+                ? "Listening for scriptures..."
+                : "No scriptures detected yet"
+            }}
+          </p>
+          <p class="text-xs mt-1 opacity-70">
+            Scriptures matching the sermon will appear here automatically
+          </p>
+        </div>
+
+        <!-- Results — newest first, 20 at a time -->
+        <div v-else class="divide-y divide-gray-100 dark:divide-[#171d2b]">
+          <button
+            v-for="result in visibleScriptureResults"
+            :key="result._id"
+            class="w-full text-left py-3 px-3 hover:bg-white dark:hover:bg-[#2b3242] transition-colors cursor-pointer group"
+            @click="handleScriptureClick(result)"
+          >
+            <div class="flex items-center gap-1.5 mb-0.5">
+              <UIcon
+                name="i-bx-bible"
+                class="text-primary-500 text-sm flex-shrink-0"
+              />
+              <span
+                class="text-xs font-semibold text-primary-600 dark:text-primary-300 group-hover:underline"
+                v-html="
+                  highlightText(result.displayLabel, scriptureHighlightQuery)
+                "
+              />
+            </div>
+            <p
+              class="text-xs text-gray-600 dark:text-[#9aa3b2] leading-relaxed line-clamp-2"
+              v-html="highlightText(result.scripture, scriptureHighlightQuery)"
             />
-            <span
-              ><span class="font-semibold">Live transcription</span> — words
-              appear in real-time as you speak, with Bible references
-              highlighted.</span
-            >
-          </li>
-          <li class="flex items-start gap-2">
-            <UIcon name="i-bx-bible" class="text-primary-500 mt-0.5 shrink-0" />
-            <span
-              ><span class="font-semibold">Auto-detect scriptures</span> — any
-              verse mentioned (e.g. "John 3:16") is instantly added to the
-              Scriptures tab. Click it to open the slide.</span
-            >
-          </li>
-          <li class="flex items-start gap-2">
-            <UIcon
-              name="i-bx-search-alt"
-              class="text-primary-500 mt-0.5 shrink-0"
-            />
-            <span
-              ><span class="font-semibold">AI scripture suggestions</span> —
-              related verses are surfaced even when you don't quote them
-              directly
-              <span class="text-xs text-gray-400">(Teams plan)</span>.</span
-            >
-          </li>
-        </ul>
-        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-          Tip: works best with a good microphone in a quiet environment.
-        </p>
+          </button>
+
+          <button
+            v-if="scriptureResults.length > scriptureVisibleCount"
+            class="w-full text-xs text-center py-1.5 text-primary-500 dark:text-primary-300 hover:underline"
+            @click="scriptureVisibleCount += 20"
+          >
+            See
+            {{ Math.min(20, scriptureResults.length - scriptureVisibleCount) }}
+            more
+          </button>
+        </div>
       </div>
-    </FeatureIntroductionModal>
+
+      <!-- Feature Introduction Modal — shown once on first open -->
+      <FeatureIntroductionModal
+        ref="featureIntroModal"
+        feature-key="transcribe-sermon"
+        title="Transcribe Sermon"
+      >
+        <div
+          class="flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed"
+        >
+          <p>
+            Transcribe Sermon turns your microphone into a live note-taker;
+            capturing what's being said and surfacing relevant Bible passages
+            automatically as you preach.
+          </p>
+          <ul class="space-y-2">
+            <li class="flex items-start gap-2">
+              <UIcon
+                name="i-bx-microphone"
+                class="text-primary-500 mt-0.5 shrink-0"
+              />
+              <span
+                ><span class="font-semibold">Live transcription</span> — words
+                appear in real-time as you speak, with Bible references
+                highlighted.</span
+              >
+            </li>
+            <li class="flex items-start gap-2">
+              <UIcon
+                name="i-bx-bible"
+                class="text-primary-500 mt-0.5 shrink-0"
+              />
+              <span
+                ><span class="font-semibold">Auto-detect scriptures</span> — any
+                verse mentioned (e.g. "John 3:16") is instantly added to the
+                Scriptures tab. Click it to open the slide.</span
+              >
+            </li>
+            <li class="flex items-start gap-2">
+              <UIcon
+                name="i-bx-search-alt"
+                class="text-primary-500 mt-0.5 shrink-0"
+              />
+              <span
+                ><span class="font-semibold">Scripture suggestions</span> —
+                related verses are surfaced even when you don't quote them
+                directly
+                <span class="text-xs text-gray-400">(Teams plan)</span>.</span
+              >
+            </li>
+          </ul>
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            Tip: works best with a good microphone in a quiet environment.
+          </p>
+        </div>
+      </FeatureIntroductionModal>
     </div>
   </AppSection>
 </template>
@@ -449,7 +448,11 @@ watch(
 
       if (segment.bibleReferences.length > 0) {
         const firstReference = segment.bibleReferences[0]
-        if (firstReference && isTranscribing.value && !useDeepgramEngine.value) {
+        if (
+          firstReference &&
+          isTranscribing.value &&
+          !useDeepgramEngine.value
+        ) {
           maybeAutoOpenLocalReference(firstReference)
         }
       }
