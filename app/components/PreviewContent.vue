@@ -182,9 +182,11 @@ import { unavailableMediaCopy } from "~/utils/mediaCloudSync"
 import { appWideActions } from "~/utils/constants"
 import {
   getAPIErrorMessage,
+  getAPIErrorStatus,
   isNetworkError,
   isNotFoundError,
 } from "~/utils/apiErrors"
+import posthog from "posthog-js"
 
 // Incoming realtime slide events are handled once, centrally, in pages/index.vue
 // (via useRealtimeSlides wired to the live socket). That handler mutates the
@@ -1822,6 +1824,45 @@ const broadcastSlideEdit = useThrottleFn(
   true
 )
 
+// A slide the API rejects outright keeps failing on every 2s tick for as long
+// as the operator keeps editing, so report it once and only report it again if
+// it starts saving and later breaks anew. Keyed by server id where we have one.
+const reportedSlideUpdateFailures = new Set<string>()
+
+const slideFailureKey = (slide: Slide) => slide._id || slide.id
+
+// Throwing from inside the throttled persist below could never reach a caller —
+// it only ever became an unhandled rejection that the operator never saw, while
+// their edit quietly failed to save. Report it with the server's own reason
+// attached (the API puts the underlying failure in `data.error`, which the
+// generic message drops) and tell the operator the change did not land.
+const reportSlideUpdateFailure = (slide: Slide, error: any, durable: boolean) => {
+  const key = slideFailureKey(slide)
+  if (!key || reportedSlideUpdateFailures.has(key)) return
+  reportedSlideUpdateFailures.add(key)
+
+  posthog.captureException?.(
+    new Error(getAPIErrorMessage(error, "Failed to update slide")),
+    {
+      source: "persistSlideOnline",
+      slide_id: slide._id,
+      slide_type: slide.type,
+      status: getAPIErrorStatus(error),
+      server_error: error?.data?.error,
+      durable,
+    }
+  )
+
+  toast.add({
+    icon: "i-bx-error",
+    title: "This slide didn't save",
+    description: durable
+      ? "Your change is still on this device and will retry automatically."
+      : "Your change is still on this device.",
+    color: "red",
+  })
+}
+
 // HTTP persistence cadence (2s): decoupled from the broadcast above so live
 // typing stays responsive without multiplying database writes.
 const persistSlideOnline = useThrottleFn(
@@ -1866,6 +1907,9 @@ const persistSlideOnline = useThrottleFn(
     }
 
     if (!error?.value) {
+      // Saving again clears the once-per-slide report guard, so a slide that
+      // recovers and later breaks for a different reason is reported afresh.
+      reportedSlideUpdateFailures.delete(slideFailureKey(slide))
       if (durable && localRevision !== undefined) {
         await slideRepository.markSlideSyncState(
           slide.scheduleId,
@@ -1902,7 +1946,16 @@ const persistSlideOnline = useThrottleFn(
     // stored durably and therefore has no safe snapshot to replay.
     if (isNetworkError(error.value)) return null
 
-    throw new Error(getAPIErrorMessage(error.value, "Failed to update slide"))
+    // Everything left reached the server and was rejected by it — a 500, or a
+    // payload the API would not accept. Retrying the identical body will not
+    // fix a rejected payload, but the edit is still only in this browser, so a
+    // durable slide is queued for replay exactly as a dropped request is: the
+    // resync sends it again once the operator (or a fix) changes something.
+    if (durable) {
+      await markSlideUnsynced(slide)
+    }
+    reportSlideUpdateFailure(slide, error.value, durable)
+    return null
   },
   2000,
   true

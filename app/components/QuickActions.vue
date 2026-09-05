@@ -57,10 +57,12 @@
         </div>
       </div>
 
-      <!-- QUICK FILTER CHIPS + AI TRANSCRIPTION PROMO (only while a search session is active) -->
+      <!-- QUICK FILTER CHIPS + PROMO CARD (only while a search session is
+      active). The chips are local; the promo card below them is server-driven
+      via /app-config/info. -->
       <div
         v-if="isSearchFocused && searchInput.length < 2"
-        class="quick-search-panel come-up-1 mt-3 rounded-2xl bg-white dark:bg-[#2b3242] p-4 pb-5"
+        class="quick-search-panel come-up-1 mt-3 rounded-2xl bg-white dark:bg-[#2b3242] p-3 mb-2"
       >
         <div class="quick-filters flex flex-wrap gap-2">
           <button
@@ -78,21 +80,24 @@
         </div>
 
         <button
-          class="ai-transcription-card group w-full text-center rounded-xl border border-dashed border-gray-600 dark:border-[#586277] p-6 mt-6 mb-0 hover:border-primary-400 dark:hover:border-[#6b7588] transition-colors"
-          @click="handleTranscribeClick"
+          v-if="quickSearchPromo"
+          class="promo-card group w-full text-center rounded-xl border border-dashed border-gray-600 dark:border-[#586277] p-6 mt-6 mb-0 hover:border-primary-400 dark:hover:border-[#6b7588] transition-colors"
+          @click="handlePromoClick"
         >
           <span
+            v-if="quickSearchPromo.badge"
             class="inline-block text-[10px] font-bold tracking-wide bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-md px-2 py-0.5 mb-2"
           >
-            NEW
+            {{ quickSearchPromo.badge }}
           </span>
           <h4 class="font-semibold text-base text-gray-900 dark:text-white">
-            AI Transcription
+            {{ quickSearchPromo.title }}
           </h4>
           <p
+            v-if="quickSearchPromo.description"
             class="text-xs text-gray-500 dark:text-[#9aa3b2] mt-1 max-w-[220px] mx-auto"
           >
-            Bible references highlighted automatically
+            {{ quickSearchPromo.description }}
           </p>
         </button>
       </div>
@@ -298,8 +303,8 @@ const getActionKey = (action: QuickAction) => {
   return key
 }
 // Tracks whether the search box currently has focus — drives the quick-filter
-// chips + AI Transcription promo, which should only appear during an active
-// search session (focused), not on the idle home state.
+// chips, which should only appear during an active search session (focused),
+// not on the idle home state.
 const isSearchFocused = ref(false)
 let searchBlurTimeout: ReturnType<typeof setTimeout> | null = null
 const quickSearchSuggestionsByAction = {
@@ -476,12 +481,12 @@ const handleSearchFocus = () => {
 }
 
 const handleSearchBlur = () => {
-  // Delay so a click on a chip/promo card (which blurs the input first)
-  // still registers before the chips disappear.
+  // The panel is tied purely to the input being active, so blurring always
+  // closes it — whatever has been typed. Delayed slightly so a click on a chip
+  // (which blurs the input first) still registers before the chips disappear;
+  // chips that refocus the input re-open it via handleSearchFocus.
   searchBlurTimeout = setTimeout(() => {
-    if (!searchInput.value?.trim()) {
-      isSearchFocused.value = false
-    }
+    isSearchFocused.value = false
   }, 150)
 }
 const focusedActionIndex = ref<number>(0)
@@ -555,6 +560,17 @@ const quickFilters: { label: string; action: string; removable?: boolean }[] = [
   { label: "More", action: appWideActions.quickActionsFocus },
 ]
 
+// The promo card under the chips is server-driven: its copy, the action it
+// triggers and whether it appears at all come from `/app-config/info`, so it can
+// be swapped or pulled without shipping a release. No config = no card.
+const { quickSearchPromo: promoConfig } = useAppInfo()
+
+const quickSearchPromo = computed(() => {
+  const promo = promoConfig.value
+  if (!promo?.enabled || !promo.title || !promo.action) return undefined
+  return promo
+})
+
 const handleChipClick = (action: string) => {
   if (!hasAccessToFeature(action) && isPremiumFeatureEnabled.value) {
     emitter.emit("show-upgrade-modal")
@@ -562,6 +578,11 @@ const handleChipClick = (action: string) => {
     return
   }
   useGlobalEmit(action)
+}
+
+const handlePromoClick = () => {
+  const action = quickSearchPromo.value?.action
+  if (action) handleChipClick(action)
 }
 
 // The online lyrics library is Teams-only. Every route into the song search
@@ -580,10 +601,6 @@ const ensureSongSearchAccess = () => {
     feature: appWideActions.newSongSearch,
   })
   return false
-}
-
-const handleTranscribeClick = () => {
-  handleChipClick(appWideActions.newTranscribe)
 }
 
 const getAllHymns = async () => {
