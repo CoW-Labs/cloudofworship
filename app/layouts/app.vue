@@ -113,7 +113,7 @@ const { getToken } = useAuthToken()
 const windowRefs = shallowRef<any[]>([])
 const db = useIndexedDB()
 const localMedia = useLocalMediaStorage()
-const appInfo = ref<AppSettings>()
+const { appInfo, fetchAppInfo } = useAppInfo()
 const { refreshLibrary } = useLibrary()
 const { fetchPlans } = useSubscriptionPlans()
 const { fetchUserSettings } = useUserSettings()
@@ -262,14 +262,6 @@ const fetchChurch = async () => {
       return
     }
     console.warn("No church ID available; keeping local app state.")
-  }
-}
-
-const fetchAppInfo = async () => {
-  // Download app info
-  const { data } = await useAPIFetch("/app-config/info")
-  if (data.value) {
-    appInfo.value = data.value as any
   }
 }
 
