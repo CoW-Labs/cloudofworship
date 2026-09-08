@@ -44,7 +44,8 @@ if (nuxtApp.$emitter) {
 }
 appStore.setEmitter(emitter)
 
-const appVersion = ref<string>("v0.52.1-beta")
+// Single source of truth — the release workflow rewrites useAppVersion.ts.
+const { appVersion } = useAppVersion()
 
 const warmOfflineRoutes = async () => {
   await Promise.allSettled([

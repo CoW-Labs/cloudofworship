@@ -93,6 +93,8 @@ jobs:
 
           last_tag=${{ env.last_tag }}
 
+          # Tags were vX.Y.Z-beta up to v0.57.4; strip the suffix so those
+          # still parse. Everything from v1.0.0 on is plain semver.
           base_tag=$(echo "$last_tag" | sed 's/-beta//')
 
           major=$(echo $base_tag | awk -F. '{print $1}' | tr -d 'v')
@@ -101,13 +103,13 @@ jobs:
 
           if [[ $hasMajor -eq 1 ]]; then
             next_major=$((major + 1))
-            next_version="v${next_major}.0.0-beta"
+            next_version="v${next_major}.0.0"
           elif [[ $hasMinor -eq 1 ]]; then
             next_minor=$((minor + 1))
-            next_version="v${major}.${next_minor}.0-beta"
+            next_version="v${major}.${next_minor}.0"
           elif [[ $hasPatch -eq 1 ]]; then
             next_patch=$((patch + 1))
-            next_version="v${major}.${minor}.${next_patch}-beta"
+            next_version="v${major}.${minor}.${next_patch}"
           else
             # No semver-affecting commits detected -> skip release steps
             echo "No semver changes detected; skipping release steps"
@@ -131,12 +133,12 @@ jobs:
             next_patch=$(echo $base_next | awk -F. '{print $3}')
             
             # Keep bumping patch version until we find an unused tag
-            while git tag -l | grep -q "^v${next_major}.${next_minor}.${next_patch}-beta$"; do
+            while git tag -l | grep -q "^v${next_major}.${next_minor}.${next_patch}$"; do
               next_patch=$((next_patch + 1))
-              echo "Checking v${next_major}.${next_minor}.${next_patch}-beta"
+              echo "Checking v${next_major}.${next_minor}.${next_patch}"
             done
             
-            next_version="v${next_major}.${next_minor}.${next_patch}-beta"
+            next_version="v${next_major}.${next_minor}.${next_patch}"
             echo "Bumped to available version: $next_version"
           fi
 
@@ -195,3 +197,121 @@ jobs:
             --title "Release ${{ env.next_version }}" \
             --notes-file release_notes.txt \
             --target ${{ github.event.pull_request.head.ref }}
+
+  # Builds the signed desktop bundles and uploads them, plus the updater
+  # manifest (latest.json), to the release the job above created. Without this
+  # job releases carry no assets and the in-app updater has nothing to fetch.
+  build-desktop:
+    needs: release
+    if: needs.release.outputs.skip_release != '1'
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: "--bundles nsis"
+            rust_targets: ""
+          # A single universal binary covers Apple Silicon and Intel. Linux
+          # targets from bundle.targets are skipped explicitly because the
+          # macOS bundler cannot produce deb/appimage.
+          - platform: macos-latest
+            args: "--target universal-apple-darwin --bundles app,dmg"
+            rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # The branch, not the tag — this picks up the version bump the
+          # release job just pushed to the PR head.
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and upload Tauri bundles
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # Must be set even when the key has no password, or the bundler
+          # blocks waiting on a prompt that never comes.
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        with:
+          tagName: ${{ needs.release.outputs.next_version }}
+          releaseName: "Release ${{ needs.release.outputs.next_version }}"
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}
+
+  # tauri-plugin-updater looks up the manifest key as exactly `{os}-{arch}`
+  # (get_updater_target + get_updater_arch) — there is no `darwin-universal`
+  # fallback — so the universal macOS entry has to be published under both
+  # concrete arch keys. This job also fails the release loudly if the manifest
+  # is unsigned or malformed, which is what let a broken latest.json sit
+  # unnoticed for months.
+  finalize-updater-manifest:
+    needs: [release, build-desktop]
+    if: needs.release.outputs.skip_release != '1'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Normalise and verify latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.next_version }}
+        run: |
+          set -euo pipefail
+
+          gh release download "$TAG" -p latest.json -O latest.json --clobber
+
+          jq 'if .platforms["darwin-universal"] then
+                  .platforms["darwin-aarch64"] = .platforms["darwin-universal"]
+                | .platforms["darwin-x86_64"]  = .platforms["darwin-universal"]
+              else . end' latest.json > normalised.json
+
+          cat normalised.json
+
+          expected=$(echo "$TAG" | sed 's/^v//' | sed 's/-beta$//')
+          actual=$(jq -r '.version' normalised.json)
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::latest.json version '$actual' does not match tag '$TAG' (expected '$expected')"
+            exit 1
+          fi
+
+          for target in windows-x86_64 darwin-aarch64 darwin-x86_64; do
+            sig=$(jq -r --arg t "$target" '.platforms[$t].signature // ""' normalised.json)
+            url=$(jq -r --arg t "$target" '.platforms[$t].url // ""' normalised.json)
+
+            if [[ -z "$sig" ]]; then
+              echo "::error::latest.json has no signature for $target"
+              exit 1
+            fi
+            if [[ ! "$url" =~ \.(exe|zip|gz)$ ]]; then
+              echo "::error::latest.json url for $target is not a file: '$url'"
+              exit 1
+            fi
+          done
+
+          gh release upload "$TAG" normalised.json#latest.json --clobber
