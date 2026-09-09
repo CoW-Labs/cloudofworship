@@ -237,6 +237,38 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install dependencies
+        run: npm ci
+
+      # The bundler only touches the signing key after ~10 minutes of Rust
+      # compilation, so a bad key or wrong password used to surface as a bare
+      # "incorrect updater private key password" at the very end of the job.
+      # Signing a throwaway file goes through the same code path in seconds.
+      - name: Verify updater signing key
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set. Add it under Settings > Secrets and variables > Actions, using the private key from 'npm run tauri signer generate'."
+            exit 1
+          fi
+
+          # Outside the workspace: the signer drops a .sig next to its input,
+          # and nothing here should reach the bundle or dirty the checkout.
+          probe_dir=$(mktemp -d)
+          echo "updater signing probe" > "$probe_dir/probe.txt"
+          if npm run --silent tauri -- signer sign "$probe_dir/probe.txt" > "$probe_dir/probe.log" 2>&1; then
+            echo "Updater signing key verified."
+          else
+            cat "$probe_dir/probe.log"
+            echo "::error::Cannot sign with TAURI_SIGNING_PRIVATE_KEY. If the error above is 'Wrong password for that key', the key is password-protected and the TAURI_SIGNING_PRIVATE_KEY_PASSWORD secret is missing or wrong; otherwise the key secret itself is malformed or truncated."
+            rm -rf "$probe_dir"
+            exit 1
+          fi
+          rm -rf "$probe_dir"
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -247,17 +279,18 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Build and upload Tauri bundles
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          # Must be set even when the key has no password, or the bundler
-          # blocks waiting on a prompt that never comes.
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          # Must always be set, or the bundler blocks on a password prompt that
+          # never comes. Tauri encrypts even "passwordless" keys (with an empty
+          # password), so this has to carry the real password when the key has
+          # one -- hardcoding "" here is what broke the v1.0.0/v1.0.1 builds.
+          # Resolves to "" when the secret is unset, which is correct for a key
+          # generated with an empty password.
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ needs.release.outputs.next_version }}
           releaseName: "Release ${{ needs.release.outputs.next_version }}"
