@@ -67,7 +67,7 @@
                 size="4"
                 class="text-primary-500 mt-0.5"
               />
-              <span>Access over 9,000+ songs in our global library</span>
+              <span>Access over 13,000+ songs in our global library</span>
             </li>
             <li class="flex items-start gap-2">
               <IconWrapper

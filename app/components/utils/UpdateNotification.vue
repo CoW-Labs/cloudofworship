@@ -1,56 +1,60 @@
 <template>
   <div
-    v-if="showUpdateAvailable && !downloading"
-    class="fixed bottom-4 right-4 z-50"
+    v-if="showBanner"
+    class="fixed bottom-4 right-4 z-50 w-[400px] max-w-[calc(100vw-2rem)]"
     role="alert"
     aria-labelledby="update-notification"
   >
-    <NotFoundBanner
-      icon="i-tabler-refresh"
-      :sub="
-        updateInfo?.version
-          ? `Version ${updateInfo?.version} is available`
-          : 'A new version is available!'
-      "
-      desc="We made the app a little better for you and your church."
-      action="install-update"
-      action-text="Install Now"
-      secondary-action="dismiss-update"
-      secondary-action-text="Later"
-      is-wider
-    />
-  </div>
-  <div
-    v-else-if="downloading"
-    class="fixed bottom-4 right-4 z-50"
-    role="alert"
-    aria-labelledby="update-downloading"
-  >
+    <!-- Same card shell as SatisfactionPromptModal, anchored bottom-right
+         instead of centred behind an overlay. -->
     <div
-      class="h-[88%] p-4 py-6 mt-4 flex justify-center gap-6 bg-primary-100 rounded-lg text-primary-900 relative overflow-hidden border shadow-xl"
+      class="rounded-2xl bg-white dark:bg-[#1b2233] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.35)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.6)]"
     >
-      <IconWrapper name="i-tabler-refresh" size="16" />
-      <IconWrapper
-        name="i-tabler-refresh"
-        size="20"
-        class="absolute opacity-10 -bottom-3 -left-3"
-      />
-      <div class="texts-action">
-        <div>
-          <h2 class="text-md font-semibold max-w-[220px]">
-            Downloading update...
-          </h2>
-          <div class="mt-2">
-            <div class="flex items-center gap-2">
-              <div class="flex-1 bg-primary-200 rounded-full h-2 w-[180px]">
-                <div
-                  class="bg-primary-900 h-2 rounded-full transition-all duration-300"
-                  :style="{ width: `${downloadProgress}%` }"
-                />
-              </div>
-              <span class="text-xs">{{ downloadProgress }}%</span>
-            </div>
-          </div>
+      <div class="flex items-center justify-between gap-4 pt-3.5 pb-3 pl-5 pr-4">
+        <span class="text-[15px] font-medium text-gray-700 dark:text-[#e8ebf2]">
+          Update ready
+        </span>
+        <button
+          type="button"
+          class="grid place-items-center w-7 h-7 rounded-lg text-gray-500 hover:bg-black/[0.06] hover:text-gray-900 dark:text-[#9aa3b2] dark:hover:bg-white/[0.08] dark:hover:text-white transition-colors"
+          aria-label="Dismiss"
+          @click="useGlobalEmit(appWideActions.dismissUpdate)"
+        >
+          <CloseIcon class="w-4 h-4" />
+        </button>
+      </div>
+
+      <div class="mx-3 mb-3 p-5 rounded-[14px] bg-[#f1f3f6] dark:bg-[#232b3d]">
+        <h2
+          id="update-notification"
+          class="text-[20px] font-bold leading-[1.25] tracking-[-0.01em] text-slate-900 dark:text-white"
+        >
+          {{
+            availableVersion
+              ? `Version ${availableVersion} is ready`
+              : "A new version is ready"
+          }}
+        </h2>
+        <p
+          class="mt-2 text-[14px] leading-[1.55] text-gray-600 dark:text-[#cfd5e1]"
+        >
+          {{ installHint }}
+        </p>
+
+        <div class="flex flex-wrap items-center justify-end gap-3 mt-6">
+          <CowButton
+            variant="secondary"
+            :disabled="status === 'installing'"
+            @click="useGlobalEmit(appWideActions.dismissUpdate)"
+          >
+            Later
+          </CowButton>
+          <CowButton
+            :loading="status === 'installing'"
+            @click="useGlobalEmit(appWideActions.installUpdate)"
+          >
+            {{ installLabel }}
+          </CowButton>
         </div>
       </div>
     </div>
@@ -58,91 +62,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue"
+import { onMounted, onUnmounted } from "vue"
 import type { Emitter } from "mitt"
+import CloseIcon from "~/components/svgs/CloseIcon.vue"
+import { appWideActions } from "~/utils/constants"
 
-const { isTauri } = useTauri()
+/**
+ * Renders only once an update is downloaded and staged — the check and the
+ * download itself are silent and live in useAppUpdater. If the operator picks
+ * "Later" the update still installs when they close the app.
+ */
+const {
+  status,
+  availableVersion,
+  showBanner,
+  installLabel,
+  installHint,
+  installNow,
+  dismissBanner,
+  revealBanner,
+} = useAppUpdater()
 
-const showUpdateAvailable = ref(false)
-const updateInfo = ref<any>(null)
-const downloading = ref(false)
-const downloadProgress = ref(0)
-
-// Listen to events
 const emitter = useNuxtApp().$emitter as Emitter<any>
 
-emitter.on("install-update", () => {
-  installUpdate()
+const onInstall = () => installNow()
+const onDismiss = () => dismissBanner()
+const onReveal = () => revealBanner()
+
+onMounted(() => {
+  emitter.on(appWideActions.installUpdate, onInstall)
+  emitter.on(appWideActions.dismissUpdate, onDismiss)
+  emitter.on(appWideActions.revealUpdate, onReveal)
 })
 
-emitter.on("dismiss-update", () => {
-  dismissUpdate()
+onUnmounted(() => {
+  emitter.off(appWideActions.installUpdate, onInstall)
+  emitter.off(appWideActions.dismissUpdate, onDismiss)
+  emitter.off(appWideActions.revealUpdate, onReveal)
 })
-
-onMounted(async () => {
-  // Check for updates on component mount (usually app startup)
-  if (isTauri) {
-    // Wait a bit before checking
-    setTimeout(checkForUpdate, 5000)
-  }
-})
-
-const checkForUpdate = async () => {
-  try {
-    // Imported lazily so the updater plugin never ships in the web bundle —
-    // this component renders on the operator layout for web users too.
-    const { check } = await import("@tauri-apps/plugin-updater")
-    const update = await check()
-
-    if (update?.available) {
-      updateInfo.value = update
-      showUpdateAvailable.value = true
-    }
-  } catch (error) {
-    console.error("Failed to check for updates:", error)
-  }
-}
-
-const installUpdate = async () => {
-  if (!updateInfo.value) return
-
-  try {
-    downloading.value = true
-    downloadProgress.value = 0
-
-    let downloaded = 0
-    let contentLength = 0
-
-    await updateInfo.value.downloadAndInstall((event: any) => {
-      switch (event.event) {
-        case "Started":
-          contentLength = event.data.contentLength || 0
-          break
-        case "Progress":
-          downloaded += event.data.chunkLength
-          if (contentLength > 0) {
-            downloadProgress.value = Math.round(
-              (downloaded / contentLength) * 100
-            )
-          }
-          break
-        case "Finished":
-          downloadProgress.value = 100
-          break
-      }
-    })
-
-    // Restart the application
-    const { relaunch } = await import("@tauri-apps/plugin-process")
-    await relaunch()
-  } catch (error) {
-    console.error("Failed to install update:", error)
-    downloading.value = false
-    alert("Failed to install update. Please try again later.")
-  }
-}
-
-const dismissUpdate = () => {
-  showUpdateAvailable.value = false
-}
 </script>

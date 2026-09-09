@@ -84,11 +84,17 @@ export const useTauri = () => {
 
       const { initializeZoom, registerZoomShortcuts } = useZoom()
 
+      const { startUpdateWatch, installOnQuit } = useAppUpdater()
+
       initializeZoom()
       registerZoomShortcuts()
       captureExternalLinks()
-      // Update checks live in UpdateNotification.vue, which renders the
-      // in-app prompt instead of a native confirm() dialog.
+
+      // Updates download silently in the background. UpdateNotification.vue
+      // renders the prompt once one is staged, and installOnQuit applies it
+      // when the operator closes the app if they never act on the prompt.
+      void startUpdateWatch()
+      void installOnQuit()
     }
   }
 

@@ -6,7 +6,7 @@
     >
       <UProgress
         class="absolute inset-0 top-auto rounded-none opacity-0"
-        :class="{ 'opacity-1': currentState.slidesLoading && online }"
+        :class="{ 'opacity-100': currentState.slidesLoading && online }"
         size="xs"
       />
       <div class="logo flex items-center gap-2 w-[400px] short:w-[300px]">
@@ -30,6 +30,22 @@
             Requires attention
           </button>
         </CowTooltip>
+        <!-- UPDATE READY CHIP — the staged update survives dismissing the card -->
+        <CowTooltip
+          v-if="isUpdateReady"
+          text="An update is ready to install"
+          placement="bottom"
+        >
+          <button
+            type="button"
+            class="update-chip shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-semibold leading-none text-primary-600 dark:text-primary-400 bg-primary-500/10 hover:bg-primary-500/20 transition-colors"
+            @click="useGlobalEmit(appWideActions.revealUpdate)"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-primary-500" />
+            Update ready
+          </button>
+        </CowTooltip>
+
         <!-- TEST-ONLY: trigger the upgrade/plan modal -->
         <!-- <UButton
           variant="soft"
@@ -322,6 +338,8 @@ const restoreModalVisible = ref(false)
 
 // Subscription check
 const { hasAccessToFeature, hasLapsedTeamsSubscription } = useSubscription()
+
+const { isUpdateReady } = useAppUpdater()
 const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 
 const { user, church } = storeToRefs(authStore)

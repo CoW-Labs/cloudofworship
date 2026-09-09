@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cloud of Worship",
-  "version": "0.57.4",
+  "version": "1.0.1",
   "identifier": "com.cloudofworship.app",
   "build": {
     "frontendDist": "../dist",
@@ -55,6 +55,7 @@
             "shell:allow-open",
             "updater:default",
             "process:allow-restart",
+            "process:allow-exit",
             "fs:allow-exists",
             "fs:allow-mkdir",
             "fs:allow-open",
@@ -90,9 +91,8 @@
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYxRDg0OTNGREE5OTExNTAKUldSUUVabmFQMG5ZWWF1ZDlRUVFxSi9OZ1BtZWthdXE3c2lESXVweXBUbjdkcWRwQ3JJNHR0RVUK",
       "endpoints": [
-        "https://felixfavour.github.io/minimalist-church-presentation-software/latest.json"
+        "https://github.com/CoW-Labs/cloudofworship/releases/latest/download/latest.json"
       ],
-      "dialog": true,
       "windows": {
         "installMode": "passive"
       }
@@ -116,7 +116,16 @@
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "",
+      "nsis": {
+        "template": "installer/installer.nsi",
+        "headerImage": "installer/header.bmp",
+        "sidebarImage": "installer/welcome.bmp",
+        "installerIcon": "icons/icon.ico",
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "compression": "lzma"
+      }
     }
   }
 }
