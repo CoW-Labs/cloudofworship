@@ -1,0 +1,10 @@
+# The screencapturekit crate links a Swift helper, so the binary references
+# @rpath/libswift_Concurrency.dylib and friends. Rust emits no LC_RPATH of its
+# own, which leaves those unresolvable at launch ("Library not loaded").
+# macOS ships the Swift concurrency runtime in the dyld shared cache under
+# /usr/lib/swift, so putting that on the rpath is all dyld needs.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]

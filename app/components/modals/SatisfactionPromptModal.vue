@@ -15,18 +15,10 @@
     <div
       class="rounded-2xl bg-white dark:bg-[#1b2233] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.35)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.6)]"
     >
-      <div class="flex items-center justify-between gap-4 pt-3.5 pb-3 pl-5 pr-4">
+      <div class="flex items-center gap-4 pt-3.5 pb-3 pl-5 pr-4">
         <span class="text-[15px] font-medium text-gray-700 dark:text-[#e8ebf2]">
           {{ eyebrow }}
         </span>
-        <button
-          type="button"
-          class="grid place-items-center w-7 h-7 rounded-lg text-gray-500 hover:bg-black/[0.06] hover:text-gray-900 dark:text-[#9aa3b2] dark:hover:bg-white/[0.08] dark:hover:text-white transition-colors"
-          aria-label="Close"
-          @click="snooze"
-        >
-          <CloseIcon class="w-4 h-4" />
-        </button>
       </div>
 
       <div class="mx-3 mb-3 p-5 rounded-[14px] bg-[#f1f3f6] dark:bg-[#232b3d]">
@@ -37,12 +29,6 @@
           >
             Are you enjoying Cloud of Worship?
           </h2>
-          <p
-            class="mt-2 text-[14px] leading-[1.55] text-gray-600 dark:text-[#cfd5e1]"
-          >
-            It takes a second, and it helps us make it better for your church.
-          </p>
-
           <div class="flex flex-wrap items-center justify-end gap-3 mt-6">
             <CowButton variant="secondary" @click="answerNo">No</CowButton>
             <CowButton @click="answerYes">Yes</CowButton>
@@ -104,8 +90,6 @@
 </template>
 
 <script setup lang="ts">
-import CloseIcon from "~/components/svgs/CloseIcon.vue"
-
 const STORAGE_KEY = "cow_satisfaction_prompt"
 
 /*
@@ -224,14 +208,6 @@ const show = (): boolean => {
 
 const close = () => {
   visible.value = false
-}
-
-/**
- * Closed via the X without answering — ask again after the snooze window.
- */
-const snooze = () => {
-  close()
-  usePosthogCapture("SATISFACTION_PROMPT_DISMISSED", { step: step.value })
 }
 
 /**

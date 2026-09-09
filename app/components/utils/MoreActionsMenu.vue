@@ -73,28 +73,49 @@ const startListeningForScroll = () => {
   window.addEventListener("scroll", handleScroll, true)
 }
 
+// The desktop app zooms the whole UI by setting `zoom` on <body> (see
+// useZoom), and the panel is teleported *into* that zoomed context — so the
+// `top`/`right` we write are multiplied by the zoom factor before they reach
+// the screen, while the trigger rect and window.innerWidth we measured are
+// already in real screen pixels. Divide through so the panel still lands on its
+// trigger at any zoom level; on the web this is a no-op with zoom = 1.
+const getPanelZoom = () => {
+  if (typeof document === "undefined") return 1
+  const body = document.body as HTMLElement & { currentCSSZoom?: number }
+  let zoom = body?.currentCSSZoom
+  if (typeof zoom !== "number") {
+    const computed = getComputedStyle(body).zoom || "1"
+    zoom = parseFloat(computed)
+    if (computed.trim().endsWith("%")) zoom /= 100
+  }
+  return Number.isFinite(zoom) && zoom > 0 ? zoom : 1
+}
+
 const openMenu = async () => {
   const rect = triggerRef.value?.getBoundingClientRect()
+  const zoom = getPanelZoom()
   // Anchored by its right edge so `transform` stays free for the open animation
   if (rect) {
     flipped.value = false
     panelStyle.value = {
-      top: `${rect.bottom + 4}px`,
-      right: `${window.innerWidth - rect.right}px`,
+      top: `${(rect.bottom + 4) / zoom}px`,
+      right: `${(window.innerWidth - rect.right) / zoom}px`,
     }
   }
   open.value = true
   startListeningForScroll()
   emit("update:open", true)
 
-  // Flip above the trigger when the panel would run past the viewport bottom
+  // Flip above the trigger when the panel would run past the viewport bottom.
+  // Measured from the rect rather than offsetHeight so both sides of the
+  // comparison are in real screen pixels.
   await nextTick()
-  const panelHeight = panelRef.value?.offsetHeight
+  const panelHeight = panelRef.value?.getBoundingClientRect().height
   if (rect && panelHeight && rect.bottom + 4 + panelHeight > window.innerHeight - 8) {
     flipped.value = true
     panelStyle.value = {
-      top: `${Math.max(8, rect.top - 4 - panelHeight)}px`,
-      right: `${window.innerWidth - rect.right}px`,
+      top: `${Math.max(8, rect.top - 4 - panelHeight) / zoom}px`,
+      right: `${(window.innerWidth - rect.right) / zoom}px`,
     }
   }
 }

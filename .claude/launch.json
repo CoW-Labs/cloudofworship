@@ -4,8 +4,21 @@
     {
       "name": "nuxt-dev",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-lc", "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && exec npx nuxt dev --port $PORT"],
+      "runtimeArgs": [
+        "-lc",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && exec npx nuxt dev --port $PORT"
+      ],
       "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "cow-website",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && cd ~/vueProjects/cow-labs-website && exec npx nuxt dev --port $PORT"
+      ],
+      "port": 3100,
       "autoPort": true
     }
   ]

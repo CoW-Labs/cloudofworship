@@ -1,8 +1,41 @@
 <template>
   <div
-    class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
+    class="main relative max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
     :id="currentState.liveSlideId?.toString()"
+    @contextmenu.prevent="windowMenuRef?.open()"
   >
+    <!-- WINDOW ACTIONS — kept out of sight until the mouse is on this screen,
+         so nothing of the app is ever projected over the live output. -->
+    <div
+      class="window-actions absolute right-3 top-3 z-50"
+      :class="{ 'menu-open': windowMenuOpen }"
+    >
+      <MoreActionsMenu
+        ref="windowMenuRef"
+        v-slot="{ close }"
+        flush
+        trigger-class="rounded-full bg-black/40 hover:!bg-black/60"
+        icon-class="text-white"
+        @update:open="windowMenuOpen = $event"
+      >
+        <UButton
+          variant="ghost"
+          color="red"
+          block
+          class="more-item-danger"
+          @click.stop.prevent="
+            () => {
+              close()
+              closeWindow()
+            }
+          "
+        >
+          <template #leading><CloseIcon class="w-4 h-4" /></template>
+          Close Window
+        </UButton>
+      </MoreActionsMenu>
+    </div>
+
     <div
       v-if="!isFullScreen && !isTauri"
       class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center bg-opacity-70"
@@ -74,6 +107,9 @@ const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 const { isTauri } = useTauri()
 const isFullScreen = ref(false)
+const windowMenuOpen = ref(false)
+const windowMenuRef = ref<{ open: () => void; close: () => void } | null>(null)
+const { closeWindow } = useCloseDisplayWindow("live output")
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
 const FPS = 10
@@ -428,5 +464,27 @@ onBeforeUnmount(() => {
 <style>
 body {
   overflow: hidden;
+}
+</style>
+
+<style scoped>
+.window-actions {
+  visibility: hidden;
+  opacity: 0;
+  transition: 0.3s;
+}
+
+.main:hover .window-actions,
+.window-actions.menu-open {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Touch screens have no hover state to reveal the menu */
+@media (hover: none) {
+  .window-actions {
+    visibility: visible;
+    opacity: 1;
+  }
 }
 </style>

@@ -195,6 +195,10 @@ Function CoWWelcomeShow
   System::Call "*$1(i, i, i .r4, i .r5)"
   System::Free $1
   System::Call "user32::MoveWindow(p $mui.WelcomePage.Image, i 0, i 0, i r4, i r5, i 1)"
+
+  ; There are no steps after this page, so the button says what it does.
+  GetDlgItem $0 $HWNDPARENT 1
+  SendMessage $0 0x000C 0 "STR:Install" ; WM_SETTEXT
 FunctionEnd
 
 ; 2. License Page (if defined)
@@ -428,21 +432,49 @@ Var AppStartMenuFolder
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW CoWInstFilesShow
 !insertmacro MUI_PAGE_INSTFILES
 
+; Win32 COLORREF is 0x00BBGGRR, so every literal below is the brand hex byte
+; swapped. #0B1120 -> 0x20110B, #F8FAFC -> 0xFCFAF8, #94A3B8 -> 0xB8A394,
+; #A855F7 -> 0xF755A8.
+!define /ifndef CoW_BG    0x20110B
+!define /ifndef CoW_TEXT  0xFCFAF8
+!define /ifndef CoW_MUTED 0xB8A394
+!define /ifndef CoW_PURPLE 0xF755A8
+
+!define /ifndef PBM_SETBARCOLOR 0x0409
+!define /ifndef PBM_SETBKCOLOR  0x2001
+
 Function CoWInstFilesShow
   ; Repaint the header strip and progress body in the app's dark palette.
   ; The button bar below is drawn by the outer dialog and stays native.
   GetDlgItem $0 $HWNDPARENT 1034 ; header background
-  SetCtlColors $0 0xF8FAFC 0x0B1120
+  SetCtlColors $0 ${CoW_TEXT} ${CoW_BG}
   GetDlgItem $0 $HWNDPARENT 1037 ; header title
-  SetCtlColors $0 0xF8FAFC 0x0B1120
+  SetCtlColors $0 ${CoW_TEXT} ${CoW_BG}
   GetDlgItem $0 $HWNDPARENT 1038 ; header subtitle
-  SetCtlColors $0 0x94A3B8 0x0B1120
+  SetCtlColors $0 ${CoW_MUTED} ${CoW_BG}
   GetDlgItem $0 $HWNDPARENT 1039 ; header rule
-  SetCtlColors $0 0x0B1120 0x0B1120
+  SetCtlColors $0 ${CoW_BG} ${CoW_BG}
 
-  SetCtlColors $mui.InstFilesPage 0xF8FAFC 0x0B1120
-  SetCtlColors $mui.InstFilesPage.Text 0xF8FAFC 0x0B1120
-  SetCtlColors $mui.InstFilesPage.LogWindow 0x94A3B8 0x0B1120
+  SetCtlColors $mui.InstFilesPage ${CoW_TEXT} ${CoW_BG}
+
+  ; Progress bar. The themed common control ignores PBM_SETBARCOLOR, so drop its
+  ; visual style first, then paint it purple on the dark page instead of the
+  ; default green on a light trough.
+  GetDlgItem $1 $mui.InstFilesPage 1004
+  System::Call "uxtheme::SetWindowTheme(p $1, w ' ', w ' ')"
+  SendMessage $1 ${PBM_SETBARCOLOR} 0 ${CoW_PURPLE}
+  SendMessage $1 ${PBM_SETBKCOLOR} 0 ${CoW_BG}
+
+  ; Status line above the bar, and the log list behind it.
+  GetDlgItem $1 $mui.InstFilesPage 1006
+  SetCtlColors $1 ${CoW_MUTED} ${CoW_BG}
+  GetDlgItem $1 $mui.InstFilesPage 1016
+  SetCtlColors $1 ${CoW_MUTED} ${CoW_BG}
+
+  ; No "Show details": it is a native light button stranded on a dark page, and
+  ; the install log is not something a church tech needs mid-service.
+  GetDlgItem $1 $mui.InstFilesPage 1027
+  ShowWindow $1 0 ; SW_HIDE
 FunctionEnd
 
 ; 8. Finish page

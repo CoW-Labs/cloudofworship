@@ -48,27 +48,25 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
       )
     })?;
 
-  let permission = if macos_at_least(14, 4) {
+  // macOS 14.4+ can capture a process's own windows without Screen Recording
+  // permission, via SCShareableContent::current_process(). Blocking on the grant
+  // up front would refuse that path for everyone who does not need it — and a
+  // build that is not Developer ID signed cannot rely on a TCC grant surviving a
+  // rebuild anyway, so the gate can be impossible to satisfy.
+  //
+  // So on 14.4+ the preflight is advisory: go ahead and try. If the exemption
+  // does not hold, ScreenCaptureKit hands back an empty window list, and the
+  // empty-list arm below reports the permission error with its hint. Older
+  // versions always need the grant, so they still fail fast here.
+  //
+  // preflight() does not prompt, so the granted path stays silent.
+  let access = ScreenCaptureAccess;
+  let permission = if access.preflight() {
+    CapturePermission::Granted
+  } else if macos_at_least(14, 4) {
     CapturePermission::NotRequired
   } else {
-    let access = ScreenCaptureAccess;
-    if access.preflight() {
-      CapturePermission::Granted
-    } else {
-      let requested = access.request();
-      return Err(
-        NdiErrorInfo::new(
-          if requested {
-            NdiErrorCode::CapturePermissionRequired
-          } else {
-            NdiErrorCode::CapturePermissionDenied
-          },
-          "Screen Recording permission is required to capture the live output on this macOS version.",
-          true,
-        )
-        .hint("Enable Cloud of Worship in Privacy & Security > Screen Recording, then restart the app."),
-      );
-    }
+    return Err(capture_permission_error(access.request()));
   };
 
   let native_number = appkit_window_number(&window)?;
@@ -88,7 +86,17 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
   } else {
     SCShareableContent::get()
   }
-  .map_err(|error| capture_error(format!("Could not enumerate capturable windows: {error}")))?;
+  .map_err(|error| {
+    // A refused capture surfaces here as an error rather than an empty list, and
+    // its text is ScreenCaptureKit's, not something an operator can act on. When
+    // it is TCC talking, say so in the terms the rest of this module uses.
+    let text = error.to_string();
+    if text.contains("TCC") || text.contains("declined") {
+      capture_permission_error(access.request())
+    } else {
+      capture_error(format!("Could not enumerate capturable windows: {error}"))
+    }
+  })?;
 
   let process_id = std::process::id() as i32;
   let mut process_windows: Vec<SCWindow> = content
@@ -125,7 +133,10 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
         .filter(|(_, candidate)| title_matches(candidate) && frame_matches(candidate))
         .map(|(index, _)| index)
         .collect();
-      (matches.len() == 1).then_some(matches[0])
+      match matches.as_slice() {
+        [only] => Some(*only),
+        _ => None,
+      }
     })
     .or_else(|| {
       let matches: Vec<_> = process_windows
@@ -134,23 +145,70 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
         .filter(|(_, candidate)| frame_matches(candidate))
         .map(|(index, _)| index)
         .collect();
-      (matches.len() == 1).then_some(matches[0])
+      match matches.as_slice() {
+        [only] => Some(*only),
+        _ => None,
+      }
+    })
+    // The frame comparison is the fragile signal: the window may not have settled
+    // at its final size when ScreenCaptureKit took its snapshot. The title is ours
+    // and unique, so fall back to it alone rather than giving up.
+    .or_else(|| {
+      let matches: Vec<_> = process_windows
+        .iter()
+        .enumerate()
+        .filter(|(_, candidate)| title_matches(candidate))
+        .map(|(index, _)| index)
+        .collect();
+      match matches.as_slice() {
+        [only] => Some(*only),
+        _ => None,
+      }
     });
 
   let sc_window = match selected_index {
     Some(index) => process_windows.swap_remove(index),
     None if process_windows.is_empty() => {
-      return Err(NdiErrorInfo::new(
-        NdiErrorCode::LiveWindowMissing,
-        "ScreenCaptureKit could not find the live output window.",
-        true,
-      ));
+      // ScreenCaptureKit hands back an empty list when it is refused access, so
+      // this is far more often a permission problem than a missing window.
+      if permission == CapturePermission::NotRequired {
+        // We let the preflight slide on the assumption that our own windows need
+        // no grant. An empty list is that assumption being proved wrong, so ask
+        // for the permission now and surface the hint.
+        return Err(capture_permission_error(access.request()));
+      }
+      return Err(
+        NdiErrorInfo::new(
+          NdiErrorCode::LiveWindowMissing,
+          "ScreenCaptureKit could not find the live output window.",
+          true,
+        )
+        .hint("If the live output window is open, check Cloud of Worship in Privacy & Security > Screen Recording, then restart the app."),
+      );
     }
     None => {
+      let seen = process_windows
+        .iter()
+        .map(|candidate| {
+          let frame = candidate.frame();
+          format!(
+            "{:?} {}x{}",
+            candidate.title().unwrap_or_default(),
+            frame.size.width.round(),
+            frame.size.height.round()
+          )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
       return Err(
         NdiErrorInfo::new(
           NdiErrorCode::AmbiguousLiveWindow,
-          "ScreenCaptureKit could not uniquely identify the live output window.",
+          format!(
+            "ScreenCaptureKit could not uniquely identify the live output window. \
+             Looking for {LIVE_WINDOW_TITLE:?} at {}x{}; saw: {seen}",
+            logical_width.round(),
+            logical_height.round()
+          ),
           true,
         )
         .hint("Close duplicate Cloud of Worship windows and try again."),
@@ -262,6 +320,19 @@ fn macos_at_least(major: u32, minor: u32) -> bool {
   let installed_major = parts.next().unwrap_or(0);
   let installed_minor = parts.next().unwrap_or(0);
   (installed_major, installed_minor) >= (major, minor)
+}
+
+fn capture_permission_error(requested: bool) -> NdiErrorInfo {
+  NdiErrorInfo::new(
+    if requested {
+      NdiErrorCode::CapturePermissionRequired
+    } else {
+      NdiErrorCode::CapturePermissionDenied
+    },
+    "Screen Recording permission is required to capture the live output.",
+    true,
+  )
+  .hint("Enable Cloud of Worship in Privacy & Security > Screen Recording, then restart the app.")
 }
 
 fn capture_error(message: impl Into<String>) -> NdiErrorInfo {
