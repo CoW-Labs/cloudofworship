@@ -6,6 +6,10 @@
       <button
         v-for="video in backgroundVideos"
         :key="video?.id"
+        @mouseenter="previewVideoId = video.id"
+        @mouseleave="previewVideoId = null"
+        @focus="previewVideoId = video.id"
+        @blur="previewVideoId = null"
         type="button"
         class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-black transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#E8D1F8]"
         :aria-label="
@@ -16,15 +20,11 @@
         :aria-pressed="video?.url === value"
         @click="$emit('select', { video: video?.url, key: video?.id })"
       >
-        <video
+        <VideoThumbnail
           class="h-full w-full object-cover"
           :src="video?.url"
-          muted
-          autoplay
-          playsinline
-          preload="metadata"
-          crossorigin="anonymous"
-        ></video>
+          :playing="previewVideoId === video.id"
+        />
         <span
           v-if="video?.url === value"
           class="pointer-events-none absolute inset-0 z-10 rounded-[4px] border-2 border-[#E8D1F8]"
@@ -41,18 +41,20 @@
       <UButton
         v-for="video in backgroundVideos"
         :key="video?.id"
+        @mouseenter="previewVideoId = video.id"
+        @mouseleave="previewVideoId = null"
+        @focus="previewVideoId = video.id"
+        @blur="previewVideoId = null"
         @click="$emit('select', { video: video?.url, key: video?.id })"
         class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
         :class="settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]'"
       >
-        <video
+        <VideoThumbnail
           class="bg-image w-[100%] h-[100%] transition rounded-md opacity-100 hover:opacity-30 object-cover"
           :class="{ 'opacity-30': video?.url === value }"
           :src="video?.url"
-          muted
-          autoplay
-          crossorigin="anonymous"
-        ></video>
+          :playing="previewVideoId === video.id"
+        />
         <span
           v-if="video?.url === value"
           class="pointer-events-none absolute inset-0 z-10 rounded-md border-2 border-[#E8D1F8]"
@@ -149,6 +151,7 @@ const currentVideoIndex = ref(0)
 const totalVideos = ref(0)
 const deletingVideoId = ref<string | null>(null)
 
+const previewVideoId = ref<string | null>(null)
 const bgVideoToBeSelected = ref<string | null>(null)
 const localVideoObjectUrls = new Set<string>()
 const defaultBackgroundVideos = [...appStore.currentState.backgroundVideos]

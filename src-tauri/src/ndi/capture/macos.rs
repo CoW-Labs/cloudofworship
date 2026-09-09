@@ -4,6 +4,7 @@ use std::sync::mpsc;
 
 use core_graphics::access::ScreenCaptureAccess;
 use objc2::runtime::AnyObject;
+use screencapturekit::cm::{CMSampleBufferSCExt, SCFrameStatus};
 use screencapturekit::cv::CVPixelBufferLockFlags;
 use screencapturekit::prelude::*;
 use screencapturekit::stream::delegate_trait::ErrorHandler;
@@ -120,29 +121,13 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
 
   let selected_index = process_windows
     .iter()
-    .position(|candidate| {
-        native_number > 0
-          && candidate.window_id() == native_number as u32
-          && title_matches(candidate)
-          && frame_matches(candidate)
-    })
+    // AppKit's window number is authoritative even during a resize or title update.
+    .position(|candidate| native_number > 0 && candidate.window_id() == native_number as u32)
     .or_else(|| {
       let matches: Vec<_> = process_windows
         .iter()
         .enumerate()
         .filter(|(_, candidate)| title_matches(candidate) && frame_matches(candidate))
-        .map(|(index, _)| index)
-        .collect();
-      match matches.as_slice() {
-        [only] => Some(*only),
-        _ => None,
-      }
-    })
-    .or_else(|| {
-      let matches: Vec<_> = process_windows
-        .iter()
-        .enumerate()
-        .filter(|(_, candidate)| frame_matches(candidate))
         .map(|(index, _)| index)
         .collect();
       match matches.as_slice() {
@@ -260,7 +245,9 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
   let mailbox = context.mailbox.clone();
   let handler_id = stream.add_output_handler(
     move |sample: CMSampleBuffer, output_type: SCStreamOutputType| {
-      if output_type != SCStreamOutputType::Screen {
+      if output_type != SCStreamOutputType::Screen
+        || sample.frame_status() != Some(SCFrameStatus::Complete)
+      {
         return;
       }
       let Some(buffer) = sample.image_buffer() else {

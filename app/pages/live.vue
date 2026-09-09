@@ -2,11 +2,12 @@
   <div
     class="main relative max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
     :id="currentState.liveSlideId?.toString()"
-    @contextmenu.prevent="windowMenuRef?.open()"
+    @contextmenu.prevent="!isTauri && windowMenuRef?.open()"
   >
-    <!-- WINDOW ACTIONS — kept out of sight until the mouse is on this screen,
-         so nothing of the app is ever projected over the live output. -->
+    <!-- Desktop window actions belong to the operator window. Native NDI
+         captures every rendered pixel here, including menus and transitions. -->
     <div
+      v-if="!isTauri"
       class="window-actions absolute right-3 top-3 z-50"
       :class="{ 'menu-open': windowMenuOpen }"
     >

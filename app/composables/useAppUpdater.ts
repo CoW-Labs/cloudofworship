@@ -1,4 +1,4 @@
-import { ref, computed } from "vue"
+import { ref, computed, watch, type WatchStopHandle } from "vue"
 import { useAppStore } from "~/store/app"
 
 /**
@@ -36,13 +36,14 @@ const availableVersion = ref<string | null>(null)
 const downloadProgress = ref(0)
 const bannerDismissed = ref(false)
 
-// Deliberately not a ref: the Tauri `Update` is a Resource handle and must not
-// be wrapped in a reactive proxy.
+// Only metadata and an install command live in JS. Verified package bytes are
+// staged in a native temporary file, not retained in a Tauri Resource buffer.
 let stagedUpdate: any = null
 let watchStarted = false
 let quitHandlerRegistered = false
 let checkTimer: ReturnType<typeof setTimeout> | null = null
 let checkInterval: ReturnType<typeof setInterval> | null = null
+let stopServiceWatch: WatchStopHandle | null = null
 
 /** Windows tears the app down to run its installer; macOS swaps in place. */
 const isWindows = () =>
@@ -64,13 +65,15 @@ const isMainWindow = async () => {
 
 export default function useAppUpdater() {
   const { isTauri } = useTauri()
+  const { status: ndiStatus, initialize: initializeNdi } = useNdiBroadcast()
 
   const isUpdateReady = computed(() => status.value === "ready")
 
   /** Suppress the prompt while anything is on the projector. */
   const isServiceLive = () => {
     try {
-      return Boolean(useAppStore().currentState.liveSlideId)
+      return Boolean(useAppStore().currentState.liveSlideId) ||
+        ndiStatus.value.phase === "starting" || ndiStatus.value.phase === "broadcasting"
     } catch {
       return false
     }
@@ -93,59 +96,30 @@ export default function useAppUpdater() {
   )
 
   const checkForUpdate = async () => {
-    if (!isTauri) return
-    // Already staged, or mid-flight — nothing to do.
+    if (!isTauri || isServiceLive()) return
     if (status.value !== "idle" && status.value !== "error") return
-
     try {
       status.value = "checking"
-      const { check } = await import("@tauri-apps/plugin-updater")
-      const update = await check()
-
-      if (!update?.available) {
-        status.value = "idle"
-        return
-      }
-
-      availableVersion.value = update.version
+      const { invoke } = await import("@tauri-apps/api/core")
+      // Dynamic import yields, so check again before starting network work.
+      if (isServiceLive()) { status.value = "idle"; return }
       status.value = "downloading"
-      downloadProgress.value = 0
-
-      let downloaded = 0
-      let contentLength = 0
-
-      // Silent: no UI is rendered for this phase.
-      await update.download((event: any) => {
-        switch (event.event) {
-          case "Started":
-            contentLength = event.data.contentLength || 0
-            break
-          case "Progress":
-            downloaded += event.data.chunkLength
-            if (contentLength > 0) {
-              downloadProgress.value = Math.round(
-                (downloaded / contentLength) * 100
-              )
-            }
-            break
-          case "Finished":
-            downloadProgress.value = 100
-            break
-        }
-      })
-
-      stagedUpdate = update
+      const version = await invoke<string | null>("desktop_stage_update")
+      if (!version) { status.value = "idle"; return }
+      stagedUpdate = {
+        version,
+        install: () => invoke<void>("desktop_install_update"),
+      }
+      availableVersion.value = version
+      downloadProgress.value = 100
       bannerDismissed.value = false
       status.value = "ready"
-      usePosthogCapture("desktop_update_staged", {
-        version: update.version,
-      })
+      usePosthogCapture("desktop_update_staged", { version })
     } catch (error) {
       console.error("Failed to stage update:", error)
       status.value = "error"
       usePosthogCapture("desktop_update_failed", {
-        stage: "download",
-        message: String(error),
+        stage: "download", message: String(error),
       })
     }
   }
@@ -200,7 +174,7 @@ export default function useAppUpdater() {
    */
   const installOnQuit = async () => {
     if (!isTauri || quitHandlerRegistered) return
-    if (!(await isMainWindow())) return
+    if (!(await isMainWindow()) || quitHandlerRegistered) return
     quitHandlerRegistered = true
 
     try {
@@ -239,14 +213,28 @@ export default function useAppUpdater() {
   /** Kick off the first check and the recurring one. Safe to call twice. */
   const startUpdateWatch = async () => {
     if (!isTauri || watchStarted) return
-    if (!(await isMainWindow())) return
+    if (!(await isMainWindow()) || watchStarted) return
     watchStarted = true
+    await initializeNdi()
+    if (!watchStarted) return
+    stopServiceWatch = watch(isServiceLive, (live) => {
+      if (checkTimer) clearTimeout(checkTimer)
+      if (live) {
+        void import("@tauri-apps/api/core").then(({ invoke }) =>
+          invoke("desktop_cancel_update")
+        ).catch((error) => console.warn("Could not defer the desktop update:", error))
+      } else {
+        checkTimer = setTimeout(checkForUpdate, CHECK_DELAY_MS)
+      }
+    })
 
     checkTimer = setTimeout(checkForUpdate, CHECK_DELAY_MS)
     checkInterval = setInterval(checkForUpdate, CHECK_INTERVAL_MS)
   }
 
   const stopUpdateWatch = () => {
+    stopServiceWatch?.()
+    stopServiceWatch = null
     if (checkTimer) clearTimeout(checkTimer)
     if (checkInterval) clearInterval(checkInterval)
     checkTimer = null

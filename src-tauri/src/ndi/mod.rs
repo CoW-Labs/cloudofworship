@@ -19,8 +19,8 @@ use tauri::{AppHandle, State};
 
 use capture::ActiveCapture;
 use pipeline::FrameMailbox;
-pub use status::{NdiErrorInfo, NdiStatus};
-use status::{CapturePermission, NdiErrorCode, NdiPhase, StatusSink};
+pub use status::{NdiErrorInfo, NdiStatus, NdiPhase};
+use status::{CapturePermission, NdiErrorCode, StatusSink};
 
 #[derive(Clone)]
 pub struct NdiBridge {
