@@ -213,12 +213,14 @@ jobs:
           - platform: windows-latest
             args: "--bundles nsis"
             rust_targets: ""
+          # macOS builds are disabled for now. Re-enable by uncommenting this
+          # entry (and the darwin targets in finalize-updater-manifest below).
           # A single universal binary covers Apple Silicon and Intel. Linux
           # targets from bundle.targets are skipped explicitly because the
           # macOS bundler cannot produce deb/appimage.
-          - platform: macos-latest
-            args: "--target universal-apple-darwin --bundles app,dmg"
-            rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+          # - platform: macos-latest
+          #   args: "--target universal-apple-darwin --bundles app,dmg"
+          #   rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
 
     runs-on: ${{ matrix.platform }}
 
@@ -300,7 +302,9 @@ jobs:
             exit 1
           fi
 
-          for target in windows-x86_64 darwin-aarch64 darwin-x86_64; do
+          # Only windows is built right now; add darwin-aarch64 darwin-x86_64
+          # back here when the macOS matrix entry above is re-enabled.
+          for target in windows-x86_64; do
             sig=$(jq -r --arg t "$target" '.platforms[$t].signature // ""' normalised.json)
             url=$(jq -r --arg t "$target" '.platforms[$t].url // ""' normalised.json)
 
