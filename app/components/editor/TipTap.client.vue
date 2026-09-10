@@ -131,6 +131,7 @@ import {
   FontSize as TipTapFontSize,
 } from "@tiptap/extension-text-style"
 import { FontFamily as TipTapFontFamily } from "@tiptap/extension-font-family"
+import { asFontFamily } from "~/utils/fontFamily"
 
 const props = defineProps<{
   slide: Slide
@@ -297,7 +298,8 @@ watch(
 watch(
   () => props.slide?.slideStyle?.font,
   (newFont) => {
-    if (!newFont || !inheritsGlobalTextStyles.value) return
+    const font = asFontFamily(newFont, "TipTap.slideStyle.font")
+    if (!font || !inheritsGlobalTextStyles.value) return
     const allEditors = [
       editorOne.value,
       editorTwo.value,
@@ -307,7 +309,7 @@ watch(
       uneditableEditorThree.value,
     ]
     allEditors.forEach((editor) => {
-      safeEditorCommand(editor, (e) => e.commands.setFontFamily(newFont))
+      safeEditorCommand(editor, (e) => e.commands.setFontFamily(font))
     })
   }
 )

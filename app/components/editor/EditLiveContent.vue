@@ -315,7 +315,7 @@
         :slide="slide"
         @update-style="onUpdateSlideStyle($event, false)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
-        @update-font="onUpdateSlideStyle({ ...slide.slideStyle, font: $event })"
+        @update-font="onUpdateFont($event)"
         @update-lines-per-slide="onUpdateSongLines($event)"
         @update-media-seek-position="
           onUpdateMediaSeekPosition({
@@ -477,6 +477,7 @@ import { remapChunkIndex, splitVerseByLines } from "~/composables/useHymn"
 import CoWPopover from "~/components/cow/CoWPopover.vue"
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
+import { asFontFamily } from "~/utils/fontFamily"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import {
@@ -1395,6 +1396,14 @@ const onUpdateSlideContent = (editorIndex: number, content: string) => {
 }
 
 // Function to update style of slide that is either active or inactive
+// `slideStyle.font` is persisted and replayed into every editor by the
+// TipTap watcher, so a bad value here would crash the editor on every load.
+const onUpdateFont = (value: unknown) => {
+  const font = asFontFamily(value, "EditLiveContent.update-font")
+  if (!font || !props.slide) return
+  onUpdateSlideStyle({ ...props.slide.slideStyle, font })
+}
+
 const onUpdateSlideStyle = (
   slideStyle: SlideStyle,
   isSlideActive: boolean = true
