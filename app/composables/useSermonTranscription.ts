@@ -130,6 +130,10 @@ export default function useSermonTranscription() {
   let recognition: SpeechRecognition | null = null
   let finalTranscriptBuffer = ''
 
+  // Paused sessions keep `isTranscribing` true so the transcript (and its
+  // summary) stays one continuous session; only the mic goes quiet.
+  const isPausedLocal = ref(false)
+
   // Mic level for the free (Web Speech) path — AnalyserNode driven
   const micLevel = ref(0)
   let analyserContext: AudioContext | null = null
@@ -335,8 +339,9 @@ export default function useSermonTranscription() {
 
       // Handle recognition end
       recognition.onend = () => {
-        // If still supposed to be transcribing, restart (for continuous mode)
-        if (state.value.isTranscribing) {
+        // If still supposed to be transcribing, restart (for continuous mode).
+        // A paused session deliberately leaves recognition stopped.
+        if (state.value.isTranscribing && !isPausedLocal.value) {
           try {
             recognition?.start()
           } catch (err) {
@@ -443,6 +448,60 @@ export default function useSermonTranscription() {
   }
 
   /**
+   * Pause the current session without ending it. Deepgram mutes the mic and
+   * freezes the countdown; the Web Speech path stops the recogniser (its
+   * auto-restart is suppressed) and releases the analyser.
+   */
+  const pauseTranscription = () => {
+    if (useDeepgramEngine.value) {
+      usePosthogCapture('TRANSCRIPTION_PAUSED', {
+        provider: 'deepgram',
+        plan: isTeamsPlan.value ? 'teams' : 'free',
+      })
+      return deepgram.pauseTranscription()
+    }
+
+    if (!state.value.isTranscribing || isPausedLocal.value) return
+
+    usePosthogCapture('TRANSCRIPTION_PAUSED', { provider: 'web-speech-api', plan: 'free' })
+
+    if ((state.value.currentTranscript ?? '').trim()) {
+      createSegmentFromText(state.value.currentTranscript)
+    }
+
+    isPausedLocal.value = true
+    try {
+      recognition?.stop()
+    } catch (err) {
+      console.log('Error pausing recognition:', err)
+    }
+    stopMicAnalyser()
+  }
+
+  const resumeTranscription = () => {
+    if (useDeepgramEngine.value) {
+      usePosthogCapture('TRANSCRIPTION_RESUMED', {
+        provider: 'deepgram',
+        plan: isTeamsPlan.value ? 'teams' : 'free',
+      })
+      return deepgram.resumeTranscription()
+    }
+
+    if (!state.value.isTranscribing || !isPausedLocal.value) return
+
+    usePosthogCapture('TRANSCRIPTION_RESUMED', { provider: 'web-speech-api', plan: 'free' })
+
+    isPausedLocal.value = false
+    try {
+      // `recognition.onstart` restarts the mic analyser, same as the initial
+      // start path — calling it here too would race for a second stream.
+      recognition?.start()
+    } catch (err) {
+      console.log('Error resuming recognition:', err)
+    }
+  }
+
+  /**
    * Stop transcription session
    */
   const stopTranscription = () => {
@@ -488,6 +547,7 @@ export default function useSermonTranscription() {
       recognition = null
     }
     finalTranscriptBuffer = ''
+    isPausedLocal.value = false
     stopMicAnalyser()
   }
 
@@ -530,6 +590,7 @@ export default function useSermonTranscription() {
     // State — delegate to Deepgram state when on Teams plan or transcripts-free flag
     isTranscribing: computed(() => useDeepgramEngine.value ? deepgram.isTranscribing.value : state.value.isTranscribing),
     isConnecting: computed(() => useDeepgramEngine.value ? deepgram.isConnecting.value : state.value.isConnecting),
+    isPaused: computed(() => useDeepgramEngine.value ? deepgram.isPaused.value : isPausedLocal.value),
     error: computed(() => useDeepgramEngine.value ? deepgram.error.value : state.value.error),
     segments: computed(() => useDeepgramEngine.value ? deepgram.segments.value : state.value.segments),
     currentTranscript: computed(() => useDeepgramEngine.value ? deepgram.currentTranscript.value : state.value.currentTranscript),
@@ -549,6 +610,8 @@ export default function useSermonTranscription() {
     // Actions
     startTranscription,
     stopTranscription,
+    pauseTranscription,
+    resumeTranscription,
     clearTranscript,
   }
 }

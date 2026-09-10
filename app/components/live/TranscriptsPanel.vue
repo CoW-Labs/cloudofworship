@@ -4,73 +4,115 @@
     class="transcripts-panel min-h-0"
     slot-ctn-styles="!px-0 !pb-0 overflow-hidden"
   >
-    <!-- Inline header actions: mic trigger group + more menu -->
+    <!-- Inline header actions: session controls + more menu -->
     <template #actions>
       <div class="flex items-center gap-1">
-        <!-- Mic trigger group — hover/click reveals the timer, then the mic button -->
+        <!-- Mic control — collapses to a single button when idle, expands into
+             a pill with pause/stop/timer once a session is running -->
         <div
-          class="flex items-center gap-0 cursor-pointer"
-          tabindex="0"
-          role="button"
-          :aria-label="
-            isTranscribing ? 'Stop transcription' : 'Start transcription'
-          "
-          :aria-pressed="isTranscribing"
-          :class="{
-            'bg-primary-500 rounded-lg text-white pr-2': isTranscribing,
-          }"
-          @click.stop="toggleTranscription"
-          @keydown.enter.stop.prevent="toggleTranscription"
-          @keydown.space.stop.prevent="toggleTranscription"
+          class="mic-control flex items-center rounded-full p-0.5"
+          :class="[sessionPillClasses, { 'is-running': isTranscribing }]"
         >
-          <!-- Remaining time slides in from the left -->
-
-          <UTooltip
-            :text="
-              isTranscribing ? 'Stop transcription' : 'Start transcription'
-            "
-          >
+          <UTooltip v-if="!isTranscribing" text="Start transcription">
             <UButton
-              :icon="isTranscribing ? 'i-bx-stop' : 'i-bx-microphone'"
-              :color="isTranscribing ? 'red' : showTimer ? 'black' : 'primary'"
+              icon="i-bx-microphone"
+              color="primary"
               variant="ghost"
-              size="xs"
+              class="session-button"
               :loading="isConnecting"
-              :disabled="
-                useDeepgramEngine &&
-                remainingSeconds !== null &&
-                remainingSeconds <= 0 &&
-                !isTranscribing
-              "
-              @click.stop="toggleTranscription"
+              :disabled="isOutOfTime"
+              @click.stop="startTranscription"
             />
           </UTooltip>
 
-          <!-- Scripture search in-progress indicator -->
-          <UIcon
-            v-if="isScriptureSearching"
-            name="i-bx-loader-alt"
-            class="text-xs text-primary-400 animate-spin"
-          />
-
-          <Transition
-            enter-active-class="transition-all duration-200 ease-out"
-            enter-from-class="opacity-0 -translate-x-2"
-            enter-to-class="opacity-100 translate-x-0"
-            leave-active-class="transition-all duration-150 ease-in"
-            leave-from-class="opacity-100 translate-x-0"
-            leave-to-class="opacity-0 -translate-x-2"
+          <!-- Session controls slide open/closed on a single width transition -->
+          <div
+            class="session-controls grid"
+            :class="
+              isTranscribing
+                ? 'grid-cols-[1fr] opacity-100'
+                : 'grid-cols-[0fr] opacity-0 pointer-events-none'
+            "
+            :aria-hidden="!isTranscribing"
           >
-            <span
-              v-if="
-                isTranscribing && useDeepgramEngine && remainingSeconds !== null
-              "
-              class="text-xs px-0.5 py-0.5 rounded select-none"
-              :class="remainingSeconds <= 300 ? 'text-red-500' : 'text-white  '"
-            >
-              {{ remainingMinutes }}m left
-            </span>
-          </Transition>
+            <div class="min-w-0 overflow-hidden">
+              <div class="flex items-center whitespace-nowrap pr-1.5">
+                <UTooltip
+                  :text="
+                    isPaused ? 'Resume transcription' : 'Pause transcription'
+                  "
+                >
+                  <UButton
+                    :icon="isPaused ? 'i-bx-play' : 'i-bx-pause'"
+                    :color="isPaused ? 'primary' : 'gray'"
+                    variant="ghost"
+                    class="session-button"
+                    :aria-label="
+                      isPaused ? 'Resume transcription' : 'Pause transcription'
+                    "
+                    @click.stop="
+                      isPaused ? resumeTranscription() : pauseTranscription()
+                    "
+                  />
+                </UTooltip>
+
+                <ConfirmDialog
+                  header="Stop transcription"
+                  label="Ending now summarises the transcript as it stands. Pause instead if this is just a short break."
+                  button-icon="i-bx-stop"
+                  button-color="red"
+                  button-variant="ghost"
+                  button-styles="session-button"
+                  destructive
+                  @confirm="stopTranscription"
+                />
+
+                <!-- Scripture search in-progress indicator -->
+                <UIcon
+                  v-if="isScriptureSearching"
+                  name="i-bx-loader-alt"
+                  class="ml-1 text-xs text-primary-400 animate-spin"
+                />
+
+                <!-- Timer / paused label — the two states cross-blur in place,
+                     stacked in one grid cell so the pill never jumps width -->
+                <span
+                  class="session-status ml-1.5 grid"
+                  :class="{
+                    'has-timer': useDeepgramEngine && remainingSeconds !== null,
+                  }"
+                >
+                  <Transition
+                    enter-active-class="transition-[opacity,filter] duration-300 ease-out"
+                    enter-from-class="opacity-0 blur-[3px]"
+                    enter-to-class="opacity-100 blur-none"
+                    leave-active-class="transition-[opacity,filter] duration-200 ease-in"
+                    leave-from-class="opacity-100 blur-none"
+                    leave-to-class="opacity-0 blur-[3px]"
+                  >
+                    <span
+                      v-if="isPaused"
+                      key="paused"
+                      class="text-gray-600 dark:text-gray-300"
+                    >
+                      Paused
+                    </span>
+                    <span
+                      v-else-if="useDeepgramEngine && remainingSeconds !== null"
+                      key="remaining"
+                      :class="
+                        isLowOnTime
+                          ? 'text-red-600 dark:text-red-400'
+                          : 'text-primary-700 dark:text-primary-300'
+                      "
+                    >
+                      {{ remainingMinutes }}m left
+                    </span>
+                  </Transition>
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- More actions menu -->
@@ -94,15 +136,17 @@
             color="gray"
             variant="ghost"
             block
+            :disabled="isTranscribing"
             @click="
               () => {
-                $emit('close')
+                if (isTranscribing) return
+                emit('close')
                 close()
               }
             "
           >
             <template #leading><CloseIcon class="w-4 h-4" /></template>
-            Close panel
+            {{ isTranscribing ? "Stop session to close" : "Close panel" }}
           </UButton>
         </MoreActionsMenu>
       </div>
@@ -138,7 +182,7 @@
       </UTabs>
       <div class="relative shrink-0">
         <AudioWaveform
-          :active="isTranscribing"
+          :active="isTranscribing && !isPaused"
           :mic-level="micLevel"
           class="px-3 pb-1.5 bg-gray-100 dark:bg-[#222938] w-full"
         />
@@ -189,7 +233,9 @@
           </div>
           <p class="text-sm">
             {{
-              isTranscribing
+              isPaused
+                ? "Paused. Press play to keep transcribing."
+                : isTranscribing
                 ? "Listening..."
                 : "Click the microphone to start transcribing"
             }}
@@ -237,7 +283,7 @@
           <UIcon name="i-bx-bible" class="text-3xl mb-2 opacity-50" />
           <p class="text-sm">
             {{
-              isTranscribing
+              isTranscribing && !isPaused
                 ? "Listening for scriptures..."
                 : "No scriptures detected yet"
             }}
@@ -352,7 +398,7 @@ import { highlightText } from "~/utils/highlightText"
 import { useAppStore } from "~/store/app"
 
 defineProps<{ visible: boolean }>()
-defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [] }>()
 const appStore = useAppStore()
 
 // ── Feature intro ──────────────────────────────────────────────────────────
@@ -369,11 +415,14 @@ onMounted(() => {
 const {
   isTranscribing,
   isConnecting,
+  isPaused,
   segments,
   currentTranscript,
   isSpeechRecognitionSupported,
   startTranscription,
   stopTranscription,
+  pauseTranscription,
+  resumeTranscription,
   clearTranscript,
   remainingMinutes,
   remainingSeconds,
@@ -382,18 +431,35 @@ const {
   micLevel,
 } = useSermonTranscription()
 
+// Below this threshold (5 mins) the session pill switches to a warning tint
+const isLowOnTime = computed(
+  () => remainingSeconds.value !== null && remainingSeconds.value <= 300
+)
+
+const isOutOfTime = computed(
+  () =>
+    useDeepgramEngine.value &&
+    remainingSeconds.value !== null &&
+    remainingSeconds.value <= 0
+)
+
+// Idle = bare button, running = tinted pill (muted while paused, red when the
+// weekly allowance is nearly spent).
+const sessionPillClasses = computed(() => {
+  if (!isTranscribing.value) return ""
+  if (isPaused.value)
+    return "bg-gray-500/10 ring-1 ring-gray-500/20 dark:bg-white/5 dark:ring-white/10"
+  if (isLowOnTime.value)
+    return "bg-red-500/10 ring-1 ring-red-500/20 dark:bg-red-400/10 dark:ring-red-400/20"
+  return "bg-primary-500/10 ring-1 ring-primary-500/20 dark:bg-primary-400/10 dark:ring-primary-400/25"
+})
+
 // ── Tabs ───────────────────────────────────────────────────────────────────
 const panelTabs = [
   { label: "Transcripts", key: "transcripts" },
   { label: "Scriptures", key: "scriptures" },
 ]
 const activeTabIndex = ref(0)
-
-// ── Timer reveal ───────────────────────────────────────────────────────────
-const showTimer = ref(false)
-watch(isTranscribing, (val) => {
-  if (!val) showTimer.value = false
-})
 
 // ── Scripture search ───────────────────────────────────────────────────────
 // Search the exact transcript segments rendered in the panel for both engines.
@@ -485,9 +551,6 @@ watch(() => segments.value.length, scrollTranscriptToBottom)
 watch(currentTranscript, scrollTranscriptToBottom)
 
 // ── Actions ────────────────────────────────────────────────────────────────
-const toggleTranscription = () =>
-  isTranscribing.value ? stopTranscription() : startTranscription()
-
 const handleClear = () => {
   // `clearTranscript()` from useSermonTranscription clears both segments AND
   // the Deepgram-path scripture results (handled inside the composable).
@@ -517,6 +580,73 @@ const handleScriptureClick = (result: ScriptureResult) => {
 </script>
 
 <style scoped>
+/* Session controls open/close on a single width transition. Animating
+   grid-template-columns from 0fr → 1fr lets the pill grow to whatever the
+   buttons and timer actually measure, with no hardcoded width. */
+.mic-control {
+  --ease-session: cubic-bezier(0.32, 0.72, 0, 1);
+  transition: background-color 320ms var(--ease-session),
+    box-shadow 320ms var(--ease-session);
+}
+
+.session-controls {
+  transition: grid-template-columns 380ms var(--ease-session),
+    opacity 180ms var(--ease-session);
+}
+
+/* One geometry for every button in the pill (mic, pause, stop) so their round
+   hover states are identical circles that sit inside the pill's ring. The stop
+   trigger is rendered by ConfirmDialog, hence :deep(). */
+.mic-control :deep(.session-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.5rem;
+  width: 1.5rem;
+  padding: 0;
+  border-radius: 9999px;
+}
+
+.mic-control :deep(.session-button > span) {
+  height: 0.875rem;
+  width: 0.875rem;
+}
+
+/* Timer and "Paused" share a single grid cell so they cross-blur in place
+   instead of shifting the pill as one replaces the other. */
+.session-status {
+  justify-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.session-status > span {
+  grid-area: 1 / 1;
+}
+
+/* Reserve the width of the widest countdown ("175m left") so the pill holds
+   its size when the shorter "Paused" label takes over. */
+.session-status.has-timer {
+  min-width: 3.5rem;
+}
+
+/* Opening: let the pill start widening before the controls fade in.
+   Closing: fade out first so nothing clips as the width collapses. */
+.mic-control.is-running .session-controls {
+  transition-delay: 0ms, 140ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mic-control,
+  .session-controls {
+    transition-duration: 0ms;
+    transition-delay: 0ms;
+  }
+}
+
 .transcript-content {
   scrollbar-width: thin;
 }
