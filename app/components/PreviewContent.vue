@@ -4,6 +4,14 @@
       heading="Preview and Edit Content"
       :secondary-buttons="[
         {
+          label: 'Edit slide',
+          action: appWideActions.editActiveSlide,
+          icon: 'i-bx-edit',
+          color: 'primary',
+          confirmAction: false,
+          visible: mobile && !!activeSlide && !bulkSelectSlides,
+        },
+        {
           label: 'Select Slides',
           action: appWideActions.selectSlides,
           icon: '',
@@ -35,8 +43,8 @@
           visible: bulkSelectedSlides.length > 0,
         },
       ]"
-      :style="{ height: previewHeight + 'px', flexShrink: 0 }"
-      class="min-h-0"
+      :style="mobile ? undefined : { height: previewHeight + 'px', flexShrink: 0 }"
+      :class="mobile ? 'flex-1 min-h-0' : 'min-h-0'"
       @delete-selected-slides="deleteMultipleSlides(bulkSelectedSlides)"
     >
       <div
@@ -117,26 +125,33 @@
       </div>
     </AppSection>
 
-    <div
-      class="v-resize-handle h-3 shrink-0 rounded cursor-ns-resize opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
-      @mousedown.prevent="startVResize($event)"
-    />
-
-    <AppSection class="flex-1 min-h-0" slot-ctn-styles="!p-0">
-      <EditLiveContent
-        :slide="activeSlide"
-        :editing-by="
-          activeSlide?.id ? getSlideEditor(activeSlide.id) : undefined
-        "
-        @slide-update="onUpdateSlide"
-        @inactive-slide-update="onUpdateInactiveSlide"
-        @goto-verse="gotoAction"
-        @update-bible-version="
-          gotoAction(activeSlide?.title!!, $event, { durable: true })
-        "
-        @take-live="handleTakeLiveAction(activeSlide!!)"
+    <!-- SLIDE EDITOR — the same panel in both layouts. On desktop it is the
+         bottom half of this column, under a drag handle. On mobile there is no
+         room to show the grid and the editor at once, so it moves into a
+         full-screen sheet opened from the "Edit slide" button (and
+         automatically for a slide that was just created). `editorBindings` /
+         `editorHandlers` keep it a single invocation so the two layouts cannot
+         drift apart. -->
+    <template v-if="!mobile">
+      <div
+        class="v-resize-handle h-3 shrink-0 rounded cursor-ns-resize opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
+        @mousedown.prevent="startVResize($event)"
       />
-    </AppSection>
+
+      <AppSection class="flex-1 min-h-0" slot-ctn-styles="!p-0">
+        <EditLiveContent v-bind="editorBindings" v-on="editorHandlers" />
+      </AppSection>
+    </template>
+
+    <MobileSheet
+      v-else
+      v-model="mobileEditorOpen"
+      :title="activeSlide?.name || 'Edit slide'"
+    >
+      <AppSection class="h-full min-h-0" slot-ctn-styles="!p-0">
+        <EditLiveContent v-bind="editorBindings" v-on="editorHandlers" />
+      </AppSection>
+    </MobileSheet>
 
     <SaveAsTemplateModal
       v-model="showSaveTemplateModal"
@@ -194,6 +209,32 @@ import posthog from "posthog-js"
 // shared Pinia store, which this component reads reactively — so there is no
 // separate socket subscription here. A local onAny() listener used to live here
 // but it double-processed every message and went stale after reconnects.
+
+const props = withDefaults(
+  defineProps<{
+    /**
+     * Renders for the mobile operator route (`/mobile`). The slide grid takes
+     * the full column and the editor moves into a full-screen sheet — every
+     * other behaviour in this component, slide creation included, is shared
+     * verbatim with the desktop console.
+     */
+    mobile?: boolean
+  }>(),
+  { mobile: false }
+)
+
+const emit = defineEmits<{
+  /**
+   * A slide was just created on this surface. The mobile route uses it to
+   * dismiss the Quick Actions sheet, which would otherwise stay stacked over
+   * the editor the new slide just opened.
+   */
+  (e: "slide-created"): void
+}>()
+
+// Drives the mobile editor sheet. Ignored entirely on desktop, where the editor
+// is always on screen under the grid.
+const mobileEditorOpen = ref<boolean>(false)
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -631,6 +672,13 @@ const makeSlideActive = (
   activeSlide.value = slide
   if (options?.newlyCreated) {
     appStore.appendActiveSlide(slide)
+    // A slide created from the mobile Quick Actions sheet lands behind that
+    // sheet with nothing to show for the tap. Opening the editor is the mobile
+    // equivalent of the desktop editor already sitting under the grid.
+    if (props.mobile) {
+      mobileEditorOpen.value = true
+      emit("slide-created")
+    }
   }
   // Selecting a slide has to resolve its media the same way going live does,
   // or the editor preview and the slide's card stay blank until it is on air.
@@ -2381,6 +2429,36 @@ const removeFromSelectedSlides = (slideId: string) => {
     bulkSelectedSlides.value.findIndex((id) => id === slideId),
     1
   )
+}
+
+// AppSection routes its secondary buttons through the global emitter rather
+// than a component event (see the `useGlobalEmit(secondaryButton.action)` call
+// in AppSection), so the "Edit slide" button has to be picked up here. Guarded
+// on `mobile` because the emitter is app-wide and the desktop console keeps the
+// editor permanently on screen.
+emitter.on(appWideActions.editActiveSlide, () => {
+  if (props.mobile) mobileEditorOpen.value = true
+})
+
+// Single source of truth for the editor's props and events. The desktop column
+// and the mobile sheet both spread these, so adding a handler in one layout
+// cannot silently miss the other.
+const editorBindings = computed(() => ({
+  slide: activeSlide.value,
+  editingBy: activeSlide.value?.id
+    ? getSlideEditor(activeSlide.value.id)
+    : undefined,
+}))
+
+const editorHandlers = {
+  "slide-update": (slide: Slide) => onUpdateSlide(slide),
+  "inactive-slide-update": (slide: Slide) => onUpdateInactiveSlide(slide),
+  // EditLiveContent emits `goto-verse` as (title, version) — forward both, or
+  // the Bible version silently falls back to the slide's current one.
+  "goto-verse": (...args: Parameters<typeof gotoAction>) => gotoAction(...args),
+  "update-bible-version": (version: string) =>
+    gotoAction(activeSlide.value?.title!!, version, { durable: true }),
+  "take-live": () => handleTakeLiveAction(activeSlide.value!!),
 }
 </script>
 

@@ -81,6 +81,7 @@ export const appWideActions = {
   newPresentation: 'new-presentation',
   newPresentationFromPdf: 'new-presentation-from-pdf',
   promoteActiveSlide: 'promote-active-slide-live',
+  editActiveSlide: 'edit-active-slide',
   selectSlides: 'select-slides',
   selectAllSlides: 'select-all-slides',
   cancelSelectSlides: 'cancel-select-slides',
@@ -564,6 +565,33 @@ export const quickActionsArr: QuickAction[] = [
   // tier: 'teams',
   //   // type: slideTypes.text
   // },
+]
+
+/**
+ * Quick actions the mobile operator route (`/mobile`) hides.
+ *
+ * Everything else in `quickActionsArr` is offered on a phone, so this list is
+ * the exception set rather than an allow-list: a new action shows up on mobile
+ * by default and only has to be named here when the phone genuinely cannot do
+ * it. Each entry needs a reason — "looks cramped" is not one, that is a layout
+ * problem to fix in the component.
+ */
+export const desktopOnlyActions: string[] = [
+  // Open/close a second OS window on a projector or external display. A phone
+  // has one screen and no window manager, so there is nothing to open.
+  appWideActions.goLive,
+  appWideActions.closeLiveWindow,
+  appWideActions.openStageDisplay,
+  // Keyboard shortcuts reference. There is no physical keyboard to bind.
+  appWideActions.openShortcutsModal,
+  // Continuous microphone capture streamed to Deepgram. Mobile browsers drop
+  // the audio track when the screen locks or the tab backgrounds, so the
+  // transcript silently stops mid-sermon — worse than not offering it.
+  appWideActions.newTranscribe,
+  // Legacy PowerPoint import (already commented out of quickActionsArr). PDF
+  // import stays available on mobile: it is the only way to create a
+  // `presentation` slide, and every other slide type is reachable there.
+  appWideActions.newPresentation,
 ]
 
 export const slideLayoutTypes = {

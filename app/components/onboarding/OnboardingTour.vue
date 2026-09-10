@@ -109,6 +109,16 @@ const tourVideoSrc = computed(() =>
     background-color 0.2s ease;
 }
 
+/* The mobile operator route (/mobile) puts its action bar exactly where this
+   sits, so the launcher would cover the Settings button. The tour itself walks
+   the three-panel desktop console via `data-tour` anchors that the mobile
+   layout does not present, so it is hidden rather than repositioned. */
+@media (max-width: 767px) {
+  .cow-tour-fab {
+    display: none;
+  }
+}
+
 .cow-tour-fab:hover {
   background-color: #9f4ff5;
 }

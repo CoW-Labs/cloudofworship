@@ -141,6 +141,24 @@ html.dark .cow-search-input input::placeholder {
 .slides-grid {
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 }
+
+/* MOBILE OPERATOR ROUTE (/mobile)
+   iOS Safari zooms the whole page when a focused input's text is under 16px,
+   and never zooms back out — which on a fixed-height app shell leaves the
+   operator scrolled into a corner mid-service. Nuxt UI inputs are 14px, so the
+   floor is raised here rather than by setting `maximum-scale=1` on the
+   viewport, which would take pinch-zoom away from the people who need it most.
+
+   Lives here rather than in a scoped block because the mobile sheets are
+   teleported to <body>, out of reach of any component's scoped styles. */
+.mobile-operator input,
+.mobile-operator textarea,
+.mobile-operator [contenteditable="true"],
+.mobile-sheet input,
+.mobile-sheet textarea,
+.mobile-sheet [contenteditable="true"] {
+  font-size: 16px;
+}
 /* Short viewports get less vertical room for the slide grid, so narrow the
    cards to keep the same number of thumbnails per row as a 1600x900 screen. */
 @media screen and (max-height: 760px) {
