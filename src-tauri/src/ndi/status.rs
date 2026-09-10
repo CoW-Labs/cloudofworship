@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::sync::{Arc, RwLock};
 use tauri::{AppHandle, Emitter};
 
-pub const SOURCE_NAME: &str = "Cow Live Center";
+pub const SOURCE_NAME: &str = "CoW Live Output";
 pub const FRAME_RATE: u32 = 30;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]

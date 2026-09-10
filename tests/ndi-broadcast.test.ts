@@ -11,7 +11,7 @@ import type { AppSettings } from "~/types"
 
 const status = (phase: NdiStatus["phase"]): NdiStatus => ({
   phase,
-  sourceName: "Cow Live Center",
+  sourceName: "CoW Live Output",
   runtimeAvailable: phase === "broadcasting",
   runtimeVersion: phase === "broadcasting" ? "NDI 6" : null,
   runtimePath: null,
@@ -52,7 +52,7 @@ describe("NDI desktop command lifecycle", () => {
     expect(calls).toEqual(["ndi://status", "ndi_status"])
     expect(received.at(-1)).toMatchObject({
       phase: "broadcasting",
-      sourceName: "Cow Live Center",
+      sourceName: "CoW Live Output",
       width: 1920,
       height: 1080,
       connectionCount: 2,

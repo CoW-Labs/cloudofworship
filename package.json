@@ -23,7 +23,7 @@
     "@nuxthub/core": "^0.10.7",
     "@paystack/inline-js": "^2.22.9",
     "@pinia/nuxt": "^0.11.0",
-    "@tauri-apps/api": "2.9.1",
+    "@tauri-apps/api": "2.10.1",
     "@tauri-apps/plugin-fs": "2.4.4",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.3",
