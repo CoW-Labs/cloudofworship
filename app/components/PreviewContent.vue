@@ -633,7 +633,7 @@ const clearSlideOverlay = () => {
   usePosthogCapture("SLIDE_OVERLAY_CLEARED")
 }
 
-const { isLocalMediaReady, transferFor } = useMediaDownloadProgress()
+const { transferFor } = useMediaDownloadProgress()
 const projectionMediaStorage = useLocalMediaStorage()
 const { rehydrateSlideMedia: prepareSlideMediaForProjection } =
   useSlideMediaCache()
@@ -723,32 +723,6 @@ const resolveScheduleMedia = async (scheduleId: string) => {
 }
 
 const handleTakeLiveAction = async (slide: Slide) => {
-  const requiredKeys = [
-    ...(slide.type === slideTypes.media ||
-    slide.type === slideTypes.presentation
-      ? [slide.id]
-      : []),
-    ...(slide.backgroundVideoKey ? [slide.backgroundVideoKey] : []),
-    ...(slide.backgroundImageKey ? [slide.backgroundImageKey] : []),
-  ]
-  const blockedKey = requiredKeys.find((key) => !isLocalMediaReady(key))
-  if (blockedKey) {
-    const transfer = transferFor(blockedKey)
-    toast.add({
-      title:
-        transfer?.status === "failed"
-          ? "Media is not saved locally"
-          : "Media is still being saved",
-      description:
-        transfer?.status === "failed"
-          ? "Retry or remove this media before taking it live."
-          : "Wait for local storage to finish before taking it live.",
-      icon: "i-bx-error",
-      color: "red",
-    })
-    return
-  }
-
   const externalType = (slide.data as any)?.type
   const localKeys = [
     ...(slide.type === slideTypes.media &&
@@ -817,7 +791,27 @@ const handleTakeLiveAction = async (slide: Slide) => {
             (slide.data as ExtendedFileT)?.type === "video"
           ? "Video"
           : "Media"
-      const copy = unavailableMediaCopy(unavailable.syncState, label)
+      // A local save that is still writing (or that failed) is the more
+      // useful explanation than the cloud-sync copy: the bytes are not on
+      // disk yet, so there is genuinely nothing to project. Presentation
+      // pages record their progress under the slide id, not the page key.
+      const transfer =
+        transferFor(unavailable.key) ||
+        (isPresentationPage ? transferFor(slide.id) : null)
+      const copy =
+        transfer && transfer.status !== "ready"
+          ? transfer.status === "failed"
+            ? {
+                title: `${label} is not saved locally`,
+                description:
+                  "Retry or remove this media before taking it live.",
+              }
+            : {
+                title: `${label} is still being saved`,
+                description:
+                  "Wait for local storage to finish before taking it live.",
+              }
+          : unavailableMediaCopy(unavailable.syncState, label)
       toast.add({
         title: copy.title,
         description: copy.description,
