@@ -35,6 +35,9 @@ interface ReferenceMessageMeta {
  *                  runs its own HTTP scripture search keyed to displayed segments)
  *   - limit_reached / error
  *
+ * Control frames sent upstream: KeepAlive (during silence), Pause and Resume
+ * (so the server stops metering audio seconds while a session is paused).
+ *
  * Performance/reliability features:
  *   - AudioWorklet capture (off the main thread, 32 ms chunks)
  *   - KeepAlive frames during silence to prevent Deepgram timeouts
@@ -57,6 +60,10 @@ export default function useDeepgramTranscription() {
   })
 
   const micLevel = ref(0)
+
+  // Pause keeps the socket (and therefore the session/summary) alive while the
+  // mic is muted, so a resumed session continues the same transcript.
+  const isPaused = ref(false)
 
   let ws: WebSocket | null = null
   let audioContext: AudioContext | null = null
@@ -297,13 +304,17 @@ export default function useDeepgramTranscription() {
             prewarmScriptureVersion().catch(() => { })
 
             sessionElapsedTimer = setInterval(() => {
+              if (isPaused.value) return
               if (state.value.remainingSeconds !== null && state.value.remainingSeconds > 0) {
                 state.value.remainingSeconds--
                 state.value.usedSeconds++
               }
             }, 1000)
 
-            usageSyncTimer = setInterval(fetchUsage, 60_000)
+            usageSyncTimer = setInterval(() => {
+              if (isPaused.value) return
+              fetchUsage()
+            }, 60_000)
 
             // KeepAlive — every 5s of true silence, send a frame so Deepgram
             // doesn't time out the upstream socket.
@@ -415,6 +426,10 @@ export default function useDeepgramTranscription() {
 
     workletNode.port.onmessage = (e) => {
       const { audio, rms } = e.data as { audio: ArrayBuffer; rms: number }
+      if (isPaused.value) {
+        micLevel.value = 0
+        return
+      }
       // RMS of speech peaks around 0.3 — clamp and scale to 0–100
       micLevel.value = Math.min(100, Math.round((rms / 0.3) * 100))
 
@@ -439,6 +454,10 @@ export default function useDeepgramTranscription() {
     const processor = audioContext.createScriptProcessor(2048, 1, 1)
 
     processor.onaudioprocess = (e) => {
+      if (isPaused.value) {
+        micLevel.value = 0
+        return
+      }
       const pcmData = e.inputBuffer.getChannelData(0)
       let sum = 0
       for (let i = 0; i < pcmData.length; i++) sum += (pcmData[i] ?? 0) ** 2
@@ -461,6 +480,41 @@ export default function useDeepgramTranscription() {
     // Store on the same slots used by the teardown path
     workletNode = processor
     sourceNode = source
+  }
+
+  /**
+   * Pause without tearing down the session — mutes the mic at source, stops
+   * forwarding audio and freezes the countdown. The socket stays open (the
+   * KeepAlive timer keeps it warm) so the transcript and its summary remain
+   * one continuous session.
+   */
+  const sendControlFrame = (type: 'Pause' | 'Resume') => {
+    if (ws?.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({ type }))
+  }
+
+  const pauseTranscription = () => {
+    if (!state.value.isTranscribing || isPaused.value) return
+
+    // Flush any in-flight interim text so it isn't lost across the pause
+    if ((state.value.currentTranscript ?? '')?.trim()) {
+      createSegmentFromText(state.value.currentTranscript)
+    }
+
+    isPaused.value = true
+    mediaStream?.getAudioTracks().forEach((track) => { track.enabled = false })
+    micLevel.value = 0
+    // Tell the server too — it stops counting audio seconds against the
+    // church's weekly allowance and holds the Deepgram connection open.
+    sendControlFrame('Pause')
+  }
+
+  const resumeTranscription = () => {
+    if (!state.value.isTranscribing || !isPaused.value) return
+
+    isPaused.value = false
+    sendControlFrame('Resume')
+    mediaStream?.getAudioTracks().forEach((track) => { track.enabled = true })
   }
 
   const stopTranscription = () => {
@@ -505,6 +559,7 @@ export default function useDeepgramTranscription() {
       ws = null
     }
     micLevel.value = 0
+    isPaused.value = false
     lastFiredNavigation = null
     lastFiredVersion = null
     lastAutoLiveAt = 0
@@ -539,6 +594,7 @@ export default function useDeepgramTranscription() {
   return {
     isTranscribing: computed(() => state.value.isTranscribing),
     isConnecting: computed(() => state.value.isConnecting),
+    isPaused: computed(() => isPaused.value),
     error: computed(() => state.value.error),
     segments: computed(() => state.value.segments),
     currentTranscript: computed(() => state.value.currentTranscript),
@@ -551,6 +607,8 @@ export default function useDeepgramTranscription() {
 
     startTranscription,
     stopTranscription,
+    pauseTranscription,
+    resumeTranscription,
     clearTranscript,
     fetchUsage,
   }

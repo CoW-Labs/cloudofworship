@@ -605,6 +605,14 @@ export const MIN_TRANSITION_INTERVAL = 0
 export const MAX_TRANSITION_INTERVAL = 3
 export const DEFAULT_TRANSITION_INTERVAL = 0.7
 
+// Ceilings for the two presentation-import paths. PPT/PPTX is posted to
+// /slide-convert/ppt-to-pdf, where multer hard-caps the body at 5MB, so that
+// number is fixed by the API. PDFs never leave the browser — usePowerpointToImage
+// reads them straight into PDF.js — so their ceiling is only about how much
+// canvas rendering the tab can absorb.
+export const MAX_PDF_FILE_SIZE = 50 * 1024 * 1024
+export const MAX_PPT_FILE_SIZE = 5 * 1024 * 1024
+
 // Slide-to-slide transition types for the live projection.
 // `fade` is the only implemented type today; extend with slide/zoom/cut later.
 export const transitionTypes = {

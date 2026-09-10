@@ -64,6 +64,7 @@
 </template>
 
 <script setup lang="ts">
+import posthog from "posthog-js"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Church } from "~/store/auth"
@@ -340,7 +341,11 @@ emitter.on("close-offline-toast", () => {
 
 emitter.on("selected-schedule", (schedule: Schedule) => {
   appStore.setSlidesLoading(true)
-  retrieveAllMediaFilesFromDB()
+  // Anything that still escapes must not leave the schedule stuck loading.
+  retrieveAllMediaFilesFromDB().catch((error) => {
+    console.error("Media rehydration failed:", error)
+    appStore.setSlidesLoading(false)
+  })
 })
 
 emitter.on("go-live", async () => {
@@ -700,33 +705,61 @@ const retrieveSchedules = async () => {
   setLoadingTask("schedules", "Schedules and slides are ready.", 100)
 }
 
+// The two settings backgrounds are fetched before any slide is rehydrated.
+// When the hosted file is gone (deleted from the media library while still
+// set as a background — S3 answers 403, not 404, for a missing key) the
+// download threw straight out of `retrieveAllMediaFilesFromDB`, so no slide
+// was rehydrated and the schedule stayed in its loading state for the whole
+// service. Keep the remote URL, report once, and move on.
+const ensureSettingsBackgroundLocal = async (
+  label: "default-background" | "intermission",
+  key: string,
+  url: string | undefined
+) => {
+  const mediaStorage = useLocalMediaStorage()
+  try {
+    return await mediaStorage.ensureLocal(key, {
+      url,
+      category: "background",
+      kind: "image",
+      groupId: key,
+    })
+  } catch (error) {
+    console.warn(`Settings ${label} could not be made local:`, error)
+    posthog.captureException?.(
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        source: "retrieveAllMediaFilesFromDB",
+        setting: label,
+        media_key: key,
+        status: (error as { status?: number })?.status,
+      }
+    )
+    return null
+  }
+}
+
 const retrieveAllMediaFilesFromDB = async () => {
   const db = useIndexedDB()
-  const mediaStorage = useLocalMediaStorage()
 
   const defaultBackground =
     appStore.currentState.settings.defaultBackground.default
   if (defaultBackground?.backgroundImageKey) {
-    const url = await mediaStorage.ensureLocal(
+    const url = await ensureSettingsBackgroundLocal(
+      "default-background",
       defaultBackground.backgroundImageKey,
-      {
-        url: defaultBackground.background,
-        category: "background",
-        kind: "image",
-        groupId: defaultBackground.backgroundImageKey,
-      }
+      defaultBackground.background
     )
     if (url) defaultBackground.background = url
   }
 
   const intermission = appStore.currentState.settings.intermission
   if (intermission?.backgroundImageKey) {
-    const url = await mediaStorage.ensureLocal(intermission.backgroundImageKey, {
-      url: intermission.background,
-      category: "background",
-      kind: "image",
-      groupId: intermission.backgroundImageKey,
-    })
+    const url = await ensureSettingsBackgroundLocal(
+      "intermission",
+      intermission.backgroundImageKey,
+      intermission.background
+    )
     if (url) intermission.background = url
   }
 

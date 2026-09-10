@@ -533,6 +533,17 @@ Var AppStartMenuFolder
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW CoWInstFilesShow
 !insertmacro MUI_PAGE_INSTFILES
 
+; Win32 COLORREF is 0x00BBGGRR, so every literal below is the brand hex byte
+; swapped. #0B1120 -> 0x20110B, #F8FAFC -> 0xFCFAF8, #94A3B8 -> 0xB8A394,
+; #A855F7 -> 0xF755A8.
+!define /ifndef CoW_BG    0x20110B
+!define /ifndef CoW_TEXT  0xFCFAF8
+!define /ifndef CoW_MUTED 0xB8A394
+!define /ifndef CoW_PURPLE 0xF755A8
+
+!define /ifndef PBM_SETBARCOLOR 0x0409
+!define /ifndef PBM_SETBKCOLOR  0x2001
+
 Function CoWInstFilesShow
   ; The header strip is handled once in CoWGUIInit; this is just the page body.
   SetCtlColors $mui.InstFilesPage ${COW_FG} ${COW_BG}

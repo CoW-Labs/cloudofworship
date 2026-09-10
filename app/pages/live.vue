@@ -1,36 +1,55 @@
 <template>
   <div
-    class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
+    class="main relative max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
     :id="currentState.liveSlideId?.toString()"
+    @contextmenu.prevent="!isTauri && windowMenuRef?.open()"
   >
+    <!-- Desktop window actions belong to the operator window. Native NDI
+         captures every rendered pixel here, including menus and transitions. -->
     <div
-      v-if="!isFullScreen && !isTauri"
-      class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center bg-opacity-70"
+      v-if="!isTauri"
+      class="window-actions absolute right-3 top-3 z-50"
+      :class="{ 'menu-open': windowMenuOpen }"
     >
-      <div class="banner-text text-lg flex items-center gap-6">
-        <span v-if="!mostUpdatedLiveSlide"
-          ><span class="font-bold">Select a slide</span> from the Slide Schedule
-          Pane to show here</span
-        >
-        <span v-else
-          ><span class="font-bold">Double click</span> the display below to
-          toggle full screen and remove this banner</span
-        >
-        •
-        <span class="flex items-center gap-2 font-bold"
-          ><Logo class="w-[34px] mb-2" /> Cloud of Worship</span
-        >
-        <!-- •
+      <MoreActionsMenu
+        ref="windowMenuRef"
+        v-slot="{ close }"
+        flush
+        trigger-class="rounded-full bg-black/40 hover:!bg-black/60"
+        icon-class="text-white"
+        @update:open="windowMenuOpen = $event"
+      >
         <UButton
-          size="lg"
-          color="black"
-          class="font-bold"
-          @click="transmitScreenCapture"
+          variant="ghost"
+          color="red"
+          block
+          class="more-item-danger"
+          @click.stop.prevent="
+            () => {
+              close()
+              closeWindow()
+            }
+          "
         >
-          Stream via NDI
-        </UButton> -->
-      </div>
+          <template #leading><CloseIcon class="w-4 h-4" /></template>
+          Close Window
+        </UButton>
+      </MoreActionsMenu>
     </div>
+
+    <DisplayWindowBanner
+      v-if="!isFullScreen && !isTauri"
+      floating
+      label="Live Output"
+      :active="!!mostUpdatedLiveSlide"
+      :shortcut="mostUpdatedLiveSlide ? 'Double click' : ''"
+      :hint="
+        mostUpdatedLiveSlide
+          ? 'the display to go full screen and hide this bar'
+          : 'Select a slide from the schedule to show it here'
+      "
+      @fullscreen="toggleFullScreen"
+    />
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
     <!-- Using motionless slides to test bug with Bible Slides not moving to next slide in live view -->
     <!-- <Transition class="fade"> -->
@@ -74,6 +93,9 @@ const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 const { isTauri } = useTauri()
 const isFullScreen = ref(false)
+const windowMenuOpen = ref(false)
+const windowMenuRef = ref<{ open: () => void; close: () => void } | null>(null)
+const { closeWindow } = useCloseDisplayWindow("live output")
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
 const FPS = 10
@@ -184,6 +206,14 @@ const checkFullScreen = () => {
   }
 }
 
+const toggleFullScreen = () => {
+  if (document.fullscreenElement) {
+    exitFullscreenSafely()
+  } else {
+    requestFullscreenSafely(document.documentElement)
+  }
+}
+
 onMounted(() => {
   window.addEventListener("fullscreenchange", checkFullScreen)
   window.addEventListener("webkitfullscreenchange", checkFullScreen)
@@ -201,13 +231,7 @@ onMounted(() => {
   })
 
   // Shortcut to go full screen
-  useRegisteredShortcut(shortcutIds.fullscreen, () => {
-    if (document.fullscreenElement) {
-      exitFullscreenSafely()
-    } else {
-      requestFullscreenSafely(document.documentElement)
-    }
-  })
+  useRegisteredShortcut(shortcutIds.fullscreen, toggleFullScreen)
 
   checkFullScreen()
 
@@ -428,5 +452,27 @@ onBeforeUnmount(() => {
 <style>
 body {
   overflow: hidden;
+}
+</style>
+
+<style scoped>
+.window-actions {
+  visibility: hidden;
+  opacity: 0;
+  transition: 0.3s;
+}
+
+.main:hover .window-actions,
+.window-actions.menu-open {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Touch screens have no hover state to reveal the menu */
+@media (hover: none) {
+  .window-actions {
+    visibility: visible;
+    opacity: 1;
+  }
 }
 </style>

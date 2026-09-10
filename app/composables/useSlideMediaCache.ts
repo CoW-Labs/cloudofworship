@@ -148,7 +148,14 @@ export default function useSlideMediaCache() {
       })
       // No local copy came back even though a cloud copy exists: the fetch was
       // refused or the connection dropped mid-stream. Worth another attempt.
-      if (!url && remoteUrl) collectPending(pending, key, true)
+      //
+      // With no cloud copy either, the key is still unresolved — just not by
+      // any means this pass controls. A local save that is still writing in
+      // the operator window is the common case: a slide taken live moments
+      // after import has bytes on neither disk nor CDN yet. Report it so
+      // callers never cache the gap as a finished result, but never retry it,
+      // because no network fetch can find bytes that do not exist remotely.
+      if (!url) collectPending(pending, key, !!remoteUrl)
       return url
     } catch (error) {
       if (remoteUrl) {
@@ -246,9 +253,11 @@ export default function useSlideMediaCache() {
         // One unreadable page must not cost the deck its other pages, which is
         // what an escaping throw did — the whole `restored` list was discarded.
         console.warn(`Presentation page ${key} could not be resolved:`, error)
-        if (isRemoteUrl(remoteUrl)) {
-          collectPending(pending, key, isRetryableMediaDownloadError(error))
-        }
+        collectPending(
+          pending,
+          key,
+          isRemoteUrl(remoteUrl) && isRetryableMediaDownloadError(error)
+        )
       }
       restored.push(url ? { page: obj.page, imageUrl: url } : obj)
     }

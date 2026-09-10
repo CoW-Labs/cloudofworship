@@ -6,7 +6,7 @@
     >
       <UProgress
         class="absolute inset-0 top-auto rounded-none opacity-0"
-        :class="{ 'opacity-1': currentState.slidesLoading && online }"
+        :class="{ 'opacity-100': currentState.slidesLoading && online }"
         size="xs"
       />
       <div class="logo flex items-center gap-2 w-[400px] short:w-[300px]">

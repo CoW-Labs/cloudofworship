@@ -9,6 +9,8 @@
  * drops an event, which is why these two lists must never drift apart again.
  */
 
+import { isHandledChunkLoadError } from "~/utils/chunkErrors"
+
 /** Exact `error.message` matches. */
 export const IGNORED_ERROR_MESSAGES = new Set([
   "Permissions check failed",
@@ -59,7 +61,10 @@ export const shouldSuppressError = (error: unknown) => {
   return Boolean(
     (err.message && IGNORED_ERROR_MESSAGES.has(err.message)) ||
       (err.name && IGNORED_ERROR_NAMES.has(err.name)) ||
-      (err.message && matchesFragment(err.message))
+      (err.message && matchesFragment(err.message)) ||
+      // A dead post-deploy chunk that the reload plugin is already healing.
+      // Not in the static lists: the unrecoverable case must still report.
+      isHandledChunkLoadError(err.message)
   )
 }
 
@@ -91,5 +96,5 @@ export const shouldSuppressExceptionEvent = (event: any) => {
     .filter(Boolean)
     .join("\n")
 
-  return Boolean(text && matchesFragment(text))
+  return Boolean(text && (matchesFragment(text) || isHandledChunkLoadError(text)))
 }

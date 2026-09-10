@@ -1,23 +1,48 @@
 <template>
   <div
-    class="stage-page flex h-[100vh] max-h-[100vh] flex-col overflow-hidden bg-black"
+    class="stage-page relative flex h-[100vh] max-h-[100vh] flex-col overflow-hidden bg-black"
     @dblclick="toggleFullScreen"
+    @contextmenu.prevent="windowMenuRef?.open()"
   >
+    <!-- WINDOW ACTIONS — hidden until the mouse is on this screen, so nothing
+         sits over the stage display while the band is reading it. -->
     <div
-      v-if="!isFullScreen && !isTauri"
-      class="banner flex h-[52px] shrink-0 items-center justify-center bg-primary-100 bg-opacity-70 text-center text-black"
+      class="window-actions absolute right-3 top-3 z-20"
+      :class="{ 'menu-open': windowMenuOpen }"
     >
-      <div class="banner-text flex items-center gap-6 text-base">
-        <span
-          ><span class="font-bold">Double click</span> anywhere to go full
-          screen — this is the stage display</span
+      <MoreActionsMenu
+        ref="windowMenuRef"
+        v-slot="{ close }"
+        flush
+        trigger-class="rounded-full bg-black/40 hover:!bg-black/60"
+        icon-class="text-white"
+        @update:open="windowMenuOpen = $event"
+      >
+        <UButton
+          variant="ghost"
+          color="red"
+          block
+          class="more-item-danger"
+          @click.stop.prevent="
+            () => {
+              close()
+              closeWindow()
+            }
+          "
         >
-        •
-        <span class="flex items-center gap-2 font-bold"
-          ><Logo class="mb-2 w-[34px]" /> Cloud of Worship</span
-        >
-      </div>
+          <template #leading><CloseIcon class="w-4 h-4" /></template>
+          Close Window
+        </UButton>
+      </MoreActionsMenu>
     </div>
+
+    <DisplayWindowBanner
+      v-if="!isFullScreen && !isTauri"
+      label="Stage Display"
+      :active="!!liveSlide"
+      hint="anywhere to go full screen and hide this bar"
+      @fullscreen="toggleFullScreen"
+    />
 
     <main
       class="grid min-h-0 flex-1 gap-4 p-4 sm:gap-6 sm:p-6"
@@ -102,6 +127,9 @@ const { currentState } = storeToRefs(appStore)
 const { isTauri } = useTauri()
 
 const liveSlide = ref<Slide | null>(null)
+const windowMenuOpen = ref(false)
+const windowMenuRef = ref<{ open: () => void; close: () => void } | null>(null)
+const { closeWindow } = useCloseDisplayWindow("stage display")
 const isFullScreen = ref(false)
 const lastBroadcastTs = ref(0)
 const viewportWidth = ref(1280)
@@ -351,3 +379,25 @@ onBeforeUnmount(() => {
   window.removeEventListener("MSFullscreenChange", checkFullScreen)
 })
 </script>
+
+<style scoped>
+.window-actions {
+  visibility: hidden;
+  opacity: 0;
+  transition: 0.3s;
+}
+
+.stage-page:hover .window-actions,
+.window-actions.menu-open {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Touch screens have no hover state to reveal the menu */
+@media (hover: none) {
+  .window-actions {
+    visibility: visible;
+    opacity: 1;
+  }
+}
+</style>

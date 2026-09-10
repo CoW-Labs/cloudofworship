@@ -3,6 +3,7 @@ use std::path::{Component, Path, PathBuf};
 use tauri::{Emitter, Manager, Window, WindowEvent};
 
 mod ndi;
+mod desktop_update;
 
 #[tauri::command]
 async fn start_oauth_server(window: Window) -> Result<u16, String> {
@@ -74,12 +75,29 @@ fn media_storage_stats_for(app_local_data: &Path) -> Result<MediaStorageStats, S
 /// media directory. The frontend cannot supply a path, so this command cannot
 /// be used to inspect arbitrary locations.
 #[tauri::command]
-fn media_storage_stats(app: tauri::AppHandle) -> Result<MediaStorageStats, String> {
+async fn media_storage_stats(app: tauri::AppHandle) -> Result<MediaStorageStats, String> {
   let app_local_data = app
     .path()
     .app_local_data_dir()
     .map_err(|error| error.to_string())?;
-  media_storage_stats_for(&app_local_data)
+  tauri::async_runtime::spawn_blocking(move || media_storage_stats_for(&app_local_data))
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Capacity checks run before every media write. They do not need a directory
+/// traversal, which is reserved for the storage settings usage report.
+#[tauri::command]
+async fn media_storage_capacity(app: tauri::AppHandle) -> Result<MediaStorageStats, String> {
+  let directory = app.path().app_local_data_dir().map_err(|error| error.to_string())?;
+  tauri::async_runtime::spawn_blocking(move || {
+    std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    Ok(MediaStorageStats {
+      free_bytes: fs2::available_space(&directory).map_err(|error| error.to_string())?,
+      total_bytes: fs2::total_space(&directory).map_err(|error| error.to_string())?,
+      media_bytes: 0,
+    })
+  }).await.map_err(|error| error.to_string())?
 }
 
 #[cfg(test)]
@@ -141,6 +159,7 @@ pub fn run() {
     .plugin(tauri_plugin_oauth::init())
     .setup(|app| {
       app.manage(ndi::NdiBridge::new(app.handle().clone()));
+      app.manage(desktop_update::DesktopUpdateState::default());
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
@@ -163,6 +182,10 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       start_oauth_server,
       media_storage_stats,
+      media_storage_capacity,
+      desktop_update::desktop_stage_update,
+      desktop_update::desktop_cancel_update,
+      desktop_update::desktop_install_update,
       ndi::ndi_start,
       ndi::ndi_stop,
       ndi::ndi_status,

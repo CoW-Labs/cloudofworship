@@ -87,11 +87,15 @@ const props = defineProps<{
   buttonSize?: string
   buttonVariant?: ButtonVariant
   noTooltip?: boolean
+  // Force the danger confirm button when the header doesn't start with a
+  // destructive verb (e.g. "Stop transcription").
+  destructive?: boolean
 }>()
 const emit = defineEmits(["confirm"])
 
 // Destructive actions (Delete/Sign out) use the danger button variant.
 const isDestructive = computed(() => {
+  if (props.destructive) return true
   const first = props.header?.split(" ")[0]
   return first === "Delete" || first === "Sign"
 })

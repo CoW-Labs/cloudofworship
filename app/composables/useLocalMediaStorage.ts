@@ -115,7 +115,7 @@ export interface LocalMediaAdapter {
   delete(relativePath: string): Promise<void>
   clear(): Promise<void>
   listFiles(): Promise<string[]>
-  capacity(): Promise<{
+  capacity(includeUsage?: boolean): Promise<{
     usage: number
     quota: number
     available: number
@@ -337,7 +337,7 @@ export class BrowserOPFSAdapter implements LocalMediaAdapter {
     return files
   }
 
-  async capacity() {
+  async capacity(_includeUsage = true) {
     const estimate = await navigator.storage.estimate()
     const usage = estimate.usage || 0
     const quota = estimate.quota || 0
@@ -455,13 +455,13 @@ export class TauriNativeMediaAdapter implements LocalMediaAdapter {
     return files
   }
 
-  async capacity() {
+  async capacity(includeUsage = true) {
     const { invoke } = await import("@tauri-apps/api/core")
     const stats = await invoke<{
       freeBytes: number
       totalBytes: number
       mediaBytes: number
-    }>("media_storage_stats")
+    }>(includeUsage ? "media_storage_stats" : "media_storage_capacity")
     return {
       usage: stats.mediaBytes,
       quota: stats.totalBytes,
@@ -525,16 +525,17 @@ export const createLocalMediaStorage = (
 
   const requestPersistence = async () => {
     if (persistenceRequested) {
-      return (await adapter.capacity()).persistent
+      return (await adapter.capacity(false)).persistent
     }
     persistenceRequested = true
     return await adapter.requestPersistence()
   }
 
   const estimateCapacity = async (
-    incomingBytes = 0
+    incomingBytes = 0,
+    includeUsage = true
   ): Promise<CapacityEstimate> => {
-    const capacity = await adapter.capacity()
+    const capacity = await adapter.capacity(includeUsage)
     const required =
       incomingBytes +
       Math.max(MIN_HEADROOM_BYTES, Math.ceil(incomingBytes * 0.1))
@@ -688,10 +689,10 @@ export const createLocalMediaStorage = (
     } catch {
       // The service can also be used before Pinia is mounted.
     }
-    let estimate = await estimateCapacity(incomingBytes)
+    let estimate = await estimateCapacity(incomingBytes, false)
     if (estimate.enough) return estimate
     await evictRecoverable(estimate.required - estimate.available, protectedIds)
-    estimate = await estimateCapacity(incomingBytes)
+    estimate = await estimateCapacity(incomingBytes, false)
     if (!estimate.enough) {
       throw new DOMException(
         "There is not enough local storage for this media file.",

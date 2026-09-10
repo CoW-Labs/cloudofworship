@@ -17,7 +17,6 @@ import { bibleVersionObjects } from "~/utils/constants"
 import { useThrottleFn } from "@vueuse/core"
 import posthog from "posthog-js"
 import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
-import { appStateSerializer } from "~/utils/appStateSerializer"
 import {
   cancelAllPendingSlideShadowPuts,
   cancelPendingScheduleShadowPuts,
@@ -919,21 +918,9 @@ export const useAppStore = defineStore("app", {
       }
     },
   },
-  persist: {
-    storage: piniaPluginPersistedstate.localStorage(),
-    serializer: appStateSerializer,
-    // The persisted snapshot deliberately omits activeSlides, so a hydrated
-    // currentState can come back without the key. Re-assert the invariant
-    // before any component reads it.
-    afterHydrate: ({ store }) => {
-      if (!Array.isArray(store.currentState.activeSlides)) {
-        store.currentState.activeSlides = []
-      }
-    },
-    // Undo history remains memory-only. appStateSerializer also removes
-    // activeSlides because SlideRepository is now its durable store.
-    pick: ["currentState", "panelSizes", "panelSizesTouched"],
-  },
+  // app-state-persistence watches only the serializable projection. The generic
+  // plugin's deep subscription would still traverse slides and undo history.
+  persist: false,
   share: {
     enable: true,
     // Undo history is per-window. The outgoing serializer also removes it and
