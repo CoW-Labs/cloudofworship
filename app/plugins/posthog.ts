@@ -2,6 +2,8 @@ import posthog from "posthog-js";
 import { useAuthStore } from "~/store/auth";
 import { useAppStore } from "~/store/app";
 import { shouldSuppressExceptionEvent } from "~/utils/errorFilters";
+import useAppVersion from "~/composables/useAppVersion";
+import { useTauri } from "~/composables/useTauri";
 
 export default defineNuxtPlugin(nuxtApp => {
   const auth = useAuthStore();
@@ -21,6 +23,12 @@ export default defineNuxtPlugin(nuxtApp => {
         }
         return event
       },
+    });
+    // Stamped on every event, so a failure can be traced to the build that
+    // produced it. `$app_version` is only populated by the mobile SDKs.
+    posthog.register({
+      app_version: useAppVersion().appVersion,
+      app_platform: useTauri().isTauri ? "desktop" : "web",
     });
     posthog.identify(auth.user?._id, {
       email: auth.user?.email,

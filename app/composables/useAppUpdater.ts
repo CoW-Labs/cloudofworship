@@ -28,6 +28,13 @@ export type UpdateStatus =
 
 const CHECK_DELAY_MS = 5_000
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
+// A failed check is usually transient — GitHub publishes a release before its
+// assets finish uploading, so the manifest 404s for the first ~15 minutes —
+// and waiting the full interval means a release lands hours late. Retries
+// back off from here and never exceed the regular interval.
+const RETRY_BASE_MS = 10 * 60 * 1000
+// Windows that put something on a screen the congregation can see.
+const PROJECTION_WINDOW_LABELS = ["live-output", "stage-display"]
 
 // Module-level so the banner, the navbar chip and the quit handler all read
 // one source of truth.
@@ -35,15 +42,21 @@ const status = ref<UpdateStatus>("idle")
 const availableVersion = ref<string | null>(null)
 const downloadProgress = ref(0)
 const bannerDismissed = ref(false)
+// Assume a projection exists until we have looked: never interrupt a service
+// because we were early.
+const projectionWindowOpen = ref(true)
 
 // Only metadata and an install command live in JS. Verified package bytes are
 // staged in a native temporary file, not retained in a Tauri Resource buffer.
-let stagedUpdate: any = null
+let stagedUpdate: { version: string; install: (relaunch: boolean) => Promise<void> } | null = null
 let watchStarted = false
 let quitHandlerRegistered = false
 let checkTimer: ReturnType<typeof setTimeout> | null = null
 let checkInterval: ReturnType<typeof setInterval> | null = null
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+let retryAttempt = 0
 let stopServiceWatch: WatchStopHandle | null = null
+let stopLiveSlideWatch: WatchStopHandle | null = null
 
 /** Windows tears the app down to run its installer; macOS swaps in place. */
 const isWindows = () =>
@@ -63,17 +76,40 @@ const isMainWindow = async () => {
   }
 }
 
+/**
+ * `liveSlideId` is persisted and restored on launch, so on its own it only
+ * says a slide *was* live when the app last closed. A service is in progress
+ * only if a projection window actually exists to show it — otherwise a stale
+ * id would silently disable updates on every launch until someone happened to
+ * clear the live output.
+ */
+const refreshProjectionWindow = async () => {
+  try {
+    const { getAllWebviewWindows } = await import("@tauri-apps/api/webviewWindow")
+    const windows = await getAllWebviewWindows()
+    projectionWindowOpen.value = windows.some((window) =>
+      PROJECTION_WINDOW_LABELS.includes(window.label)
+    )
+  } catch {
+    // If we cannot tell, assume the worst.
+    projectionWindowOpen.value = true
+  }
+}
+
 export default function useAppUpdater() {
   const { isTauri } = useTauri()
   const { status: ndiStatus, initialize: initializeNdi } = useNdiBroadcast()
 
   const isUpdateReady = computed(() => status.value === "ready")
 
+  const isNdiLive = () =>
+    ndiStatus.value.phase === "starting" || ndiStatus.value.phase === "broadcasting"
+
   /** Suppress the prompt while anything is on the projector. */
   const isServiceLive = () => {
     try {
-      return Boolean(useAppStore().currentState.liveSlideId) ||
-        ndiStatus.value.phase === "starting" || ndiStatus.value.phase === "broadcasting"
+      const slideLive = Boolean(useAppStore().currentState.liveSlideId)
+      return (slideLive && projectionWindowOpen.value) || isNdiLive()
     } catch {
       return false
     }
@@ -95,25 +131,58 @@ export default function useAppUpdater() {
       : "Restart now to get it straight away, or leave it and it installs when you close the app."
   )
 
+  const clearRetry = () => {
+    if (retryTimer) clearTimeout(retryTimer)
+    retryTimer = null
+  }
+
+  const scheduleRetry = () => {
+    clearRetry()
+    if (!watchStarted) return
+    retryAttempt += 1
+    const delay = Math.min(RETRY_BASE_MS * 2 ** (retryAttempt - 1), CHECK_INTERVAL_MS)
+    retryTimer = setTimeout(checkForUpdate, delay)
+  }
+
+  // Every check reports an outcome. Without this a check that never runs is
+  // indistinguishable from one that found nothing, which is how a stale live
+  // slide quietly blocked updates for weeks.
+  const captureCheck = (outcome: string, properties: Record<string, any> = {}) =>
+    usePosthogCapture("desktop_update_check", { outcome, ...properties })
+
   const checkForUpdate = async () => {
-    if (!isTauri || isServiceLive()) return
+    if (!isTauri) return
     if (status.value !== "idle" && status.value !== "error") return
+    clearRetry()
     try {
       status.value = "checking"
+      await refreshProjectionWindow()
+      if (isServiceLive()) {
+        status.value = "idle"
+        captureCheck("skipped_live", { reason: isNdiLive() ? "ndi" : "live_slide" })
+        return
+      }
       const { invoke } = await import("@tauri-apps/api/core")
       // Dynamic import yields, so check again before starting network work.
       if (isServiceLive()) { status.value = "idle"; return }
       status.value = "downloading"
       const version = await invoke<string | null>("desktop_stage_update")
-      if (!version) { status.value = "idle"; return }
+      if (!version) {
+        status.value = "idle"
+        retryAttempt = 0
+        // A null with a service live means the download was cancelled.
+        if (!isServiceLive()) captureCheck("up_to_date")
+        return
+      }
       stagedUpdate = {
         version,
-        install: () => invoke<void>("desktop_install_update"),
+        install: (relaunch) => invoke<void>("desktop_install_update", { relaunch }),
       }
       availableVersion.value = version
       downloadProgress.value = 100
       bannerDismissed.value = false
       status.value = "ready"
+      retryAttempt = 0
       usePosthogCapture("desktop_update_staged", { version })
     } catch (error) {
       console.error("Failed to stage update:", error)
@@ -121,6 +190,7 @@ export default function useAppUpdater() {
       usePosthogCapture("desktop_update_failed", {
         stage: "download", message: String(error),
       })
+      scheduleRetry()
     }
   }
 
@@ -128,10 +198,8 @@ export default function useAppUpdater() {
    * Install straight away at the user's request.
    *
    * On Windows `install()` hands off to the NSIS installer and exits the
-   * process, so `relaunch()` below is only ever reached on macOS — the custom
-   * NSIS template only restarts the app when `/R` is passed, which the updater
-   * does not do. That is intentional: it is what keeps the install-on-quit
-   * path from reopening an app the user just closed.
+   * process, and the installer reopens the app itself, so `relaunch()` below
+   * is only ever reached on macOS.
    */
   const installNow = async () => {
     if (!stagedUpdate) return
@@ -140,7 +208,7 @@ export default function useAppUpdater() {
 
     try {
       status.value = "installing"
-      await stagedUpdate.install()
+      await stagedUpdate.install(true)
 
       const { relaunch } = await import("@tauri-apps/plugin-process")
       await relaunch()
@@ -171,6 +239,10 @@ export default function useAppUpdater() {
   /**
    * Install a staged update when the operator closes the app, so reopening it
    * lands them on the new version with no download and no reinstall.
+   *
+   * The updater always asks the Windows installer to restart the app; passing
+   * `relaunch: false` tells our installer template not to, so an app the
+   * operator just closed stays closed.
    */
   const installOnQuit = async () => {
     if (!isTauri || quitHandlerRegistered) return
@@ -193,7 +265,7 @@ export default function useAppUpdater() {
           })
 
           // Windows exits inside install(); macOS returns and needs the quit.
-          await stagedUpdate.install()
+          await stagedUpdate.install(false)
 
           const { exit } = await import("@tauri-apps/plugin-process")
           await exit(0)
@@ -217,6 +289,14 @@ export default function useAppUpdater() {
     watchStarted = true
     await initializeNdi()
     if (!watchStarted) return
+    await refreshProjectionWindow()
+    if (!watchStarted) return
+    // Going live opens the projection window first, so re-probing on every
+    // live slide change keeps the gate honest in both directions.
+    stopLiveSlideWatch = watch(
+      () => useAppStore().currentState.liveSlideId,
+      () => { void refreshProjectionWindow() }
+    )
     stopServiceWatch = watch(isServiceLive, (live) => {
       if (checkTimer) clearTimeout(checkTimer)
       if (live) {
@@ -235,10 +315,14 @@ export default function useAppUpdater() {
   const stopUpdateWatch = () => {
     stopServiceWatch?.()
     stopServiceWatch = null
+    stopLiveSlideWatch?.()
+    stopLiveSlideWatch = null
     if (checkTimer) clearTimeout(checkTimer)
     if (checkInterval) clearInterval(checkInterval)
+    clearRetry()
     checkTimer = null
     checkInterval = null
+    retryAttempt = 0
     watchStarted = false
   }
 

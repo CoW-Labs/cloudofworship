@@ -886,8 +886,15 @@ Function .onInstSuccess
   ${OrIf} ${Silent}
     ${GetOptions} $CMDLINE "/R" $R0
     ${IfNot} ${Errors}
-      ${GetOptions} $CMDLINE "/ARGS" $R0
-      nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" "$R0"
+      ; CoW: the in-app updater always passes /R. When it installs as the
+      ; operator quits it sets COW_UPDATE_RELAUNCH=0 so the app stays closed
+      ; (see desktop_update.rs); the installer inherits that environment.
+      ReadEnvStr $R1 "COW_UPDATE_RELAUNCH"
+      ClearErrors
+      ${If} $R1 != "0"
+        ${GetOptions} $CMDLINE "/ARGS" $R0
+        nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" "$R0"
+      ${EndIf}
     ${EndIf}
   ${Else}
     ; CoW: interactive install has no finish page, so launch the app directly.
