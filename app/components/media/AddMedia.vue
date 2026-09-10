@@ -14,18 +14,34 @@
         >
           <Hint dismissible dismiss-key="add-media-drag-drop">
             You can now add files by dragging and dropping them here or by
-            copying and pasting them from your file explorer.
+            copying and pasting them from your file explorer. Drop a PDF and
+            each page becomes a slide.
           </Hint>
 
           <FileDropzone
             upload-layout="row"
             title="Upload a File or Drag and Drop here"
-            caption="jpg, jpeg, png, mp4, mov · Max 15MB"
+            caption="jpg, jpeg, png, mp4, mov, pdf"
             :maxFileSize="maxFileSize"
             :maxVideoFileSize="maxVideoFileSize"
-            accept="video/*,image/*,audio/*"
+            accept="video/*,image/*,audio/*,.pdf,application/pdf"
             @change="onDropzoneChange"
           />
+
+          <!-- Error (PDF conversion / rejected file) -->
+          <Transition name="fade-sm">
+            <div
+              v-if="errorMessage"
+              class="flex gap-2 p-3 rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-sm text-red-700 dark:text-red-300"
+            >
+              <IconWrapper
+                name="i-bx-error"
+                size="4"
+                class="text-red-500 shrink-0 mt-0.5"
+              />
+              <span>{{ errorMessage }}</span>
+            </div>
+          </Transition>
         </div>
 
         <!-- YOUTUBE/VIMEO TAB -->
@@ -140,6 +156,21 @@
                   </div>
                 </div>
 
+                <!-- PDFs — rendered client-side into one presentation slide -->
+                <div
+                  v-else-if="fileObj.type === 'pdf'"
+                  class="flex h-full w-full flex-col items-center justify-center gap-2 p-2 text-center"
+                >
+                  <IconWrapper
+                    name="i-ph-file-pdf"
+                    size="7"
+                    class="text-primary-500"
+                  />
+                  <p class="w-full truncate text-[11px] font-medium">
+                    {{ fileObj.name }}
+                  </p>
+                </div>
+
                 <!-- Regular Files -->
                 <template v-else>
                   <img
@@ -202,9 +233,11 @@
             class="pointer-events-auto"
             block
             size="lg"
+            :disabled="isConvertingPdf"
+            :loading="isConvertingPdf"
             @click="addMediaEmitter"
           >
-            Create slides
+            {{ isConvertingPdf ? "Reading PDF…" : "Create slides" }}
           </CowButton>
         </div>
       </Transition>
@@ -212,11 +245,12 @@
   </div>
 </template>
 <script setup lang="ts">
-import { appWideActions } from "~/utils/constants"
+import { appWideActions, MAX_PDF_FILE_SIZE } from "~/utils/constants"
 import { useAuthStore } from "~/store/auth"
 import { useDebounceFn } from "@vueuse/core"
 import type { Emitter } from "mitt"
 import type { ExtendedFileT, ExternalVideo } from "~/types"
+import { isPdfPresentationFile } from "~/utils/presentationFile"
 
 const props = defineProps<{
   initialTab?: number
@@ -237,6 +271,11 @@ const isFetchingExternalVideo = ref(false)
 const toast = useToast()
 const activeTab = ref(props.initialTab || 0)
 const urlCache = new Map<File, string>()
+const isConvertingPdf = ref(false)
+const errorMessage = ref("")
+
+const isPdfFile = (file: File) => isPdfPresentationFile(file)
+const maxPdfFileSizeMb = MAX_PDF_FILE_SIZE / (1024 * 1024)
 
 watch(
   () => files.value,
@@ -438,7 +477,7 @@ const fileObjs = computed(() => {
         blob: file,
         name: file?.name,
         size: file?.size,
-        type: file?.type?.split("/")?.[0],
+        type: isPdfFile(file) ? "pdf" : file?.type?.split("/")?.[0],
         url: urlCache.get(file) || URL.createObjectURL(file),
       })
     }
@@ -474,30 +513,67 @@ const pickedFilesLabel = computed(() => {
   return "Uploaded Files"
 })
 
-const addMediaEmitter = () => {
+const addMediaEmitter = async () => {
+  if (isConvertingPdf.value) return
+  errorMessage.value = ""
+
+  // PDFs don't become media slides — each one is rendered page-by-page into a
+  // single presentation slide, exactly as the Import Slides screen does.
+  const pdfObjs = fileObjs.value.filter((fileObj) => fileObj.type === "pdf")
+  if (pdfObjs.length > 0) {
+    isConvertingPdf.value = true
+    try {
+      for (const pdfObj of pdfObjs) {
+        const presentationObjects = await usePowerpointToImage(pdfObj.blob)
+        useGlobalEmit(appWideActions.newPresentation, {
+          fileName: pdfObj.name,
+          presentationObjects,
+          fromImport: true,
+        })
+        // The event is handled synchronously and owns the rendered page URLs
+        // from this point. Remove the source PDF immediately so a later file
+        // failure and retry cannot create this presentation a second time.
+        files.value = Array.from(files.value || []).filter(
+          (file) => file !== pdfObj.blob
+        )
+      }
+    } catch (err: any) {
+      console.error("PDF import error:", err)
+      errorMessage.value =
+        err?.message || "Something went wrong while reading the PDF."
+      return
+    } finally {
+      isConvertingPdf.value = false
+    }
+  }
+
   // Emit immediately with the original blobs so slides reach the schedule
   // instantly. Image compression now runs in the background just before upload
   // (see createMultipleMediaSlides), so the user no longer waits on the worker.
-  const mediaFiles = fileObjs.value.map((fileObj) => {
-    // Handle external videos
-    if (fileObj.isExternal) {
-      return {
-        name: fileObj.name,
-        type: fileObj.type,
-        url: fileObj.url,
-        thumbnail: fileObj.thumbnail,
-        isExternal: true,
-      } as unknown as ExtendedFileT & { isExternal: boolean }
-    }
+  const mediaFiles = fileObjs.value
+    .filter((fileObj) => fileObj.type !== "pdf")
+    .map((fileObj) => {
+      // Handle external videos
+      if (fileObj.isExternal) {
+        return {
+          name: fileObj.name,
+          type: fileObj.type,
+          url: fileObj.url,
+          thumbnail: fileObj.thumbnail,
+          isExternal: true,
+        } as unknown as ExtendedFileT & { isExternal: boolean }
+      }
 
-    // Fresh object URL from the original blob — the cached preview URL is
-    // revoked when `files` clears below, so the slide needs its own.
-    return {
-      ...fileObj,
-      url: URL.createObjectURL(fileObj.blob),
-    } as ExtendedFileT
-  })
-  useGlobalEmit(appWideActions.newMedia, mediaFiles)
+      // Fresh object URL from the original blob — the cached preview URL is
+      // revoked when `files` clears below, so the slide needs its own.
+      return {
+        ...fileObj,
+        url: URL.createObjectURL(fileObj.blob),
+      } as ExtendedFileT
+    })
+  if (mediaFiles.length > 0) {
+    useGlobalEmit(appWideActions.newMedia, mediaFiles)
+  }
   files.value = []
   externalVideos.value = []
   emit("close")
@@ -508,7 +584,20 @@ const onDropzoneChange = (incomingFiles: FileList | File[]) => {
   // FileDropzone pre-filters, but the Tauri input feeds raw files straight here,
   // so size limits must be enforced before files.value is updated.
   const validFiles: File[] = []
+  errorMessage.value = ""
   Array.from(incomingFiles || []).forEach((file) => {
+    if (isPdfFile(file)) {
+      if (file.size > MAX_PDF_FILE_SIZE) {
+        toast.add({
+          title: `PDF size exceeds the ${maxPdfFileSizeMb}MB limit`,
+          icon: "i-bx-info-circle",
+          color: "red",
+        })
+        return
+      }
+      validFiles.push(file)
+      return
+    }
     if (
       file.type.startsWith("image") &&
       file.size > maxFileSize.value * 1024 * 1024

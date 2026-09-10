@@ -36,21 +36,13 @@
       </MoreActionsMenu>
     </div>
 
-    <div
+    <DisplayWindowBanner
       v-if="!isFullScreen && !isTauri"
-      class="banner flex h-[52px] shrink-0 items-center justify-center bg-primary-100 bg-opacity-70 text-center text-black"
-    >
-      <div class="banner-text flex items-center gap-6 text-base">
-        <span
-          ><span class="font-bold">Double click</span> anywhere to go full
-          screen — this is the stage display</span
-        >
-        •
-        <span class="flex items-center gap-2 font-bold"
-          ><Logo class="mb-2 w-[34px]" /> Cloud of Worship</span
-        >
-      </div>
-    </div>
+      label="Stage Display"
+      :active="!!liveSlide"
+      hint="anywhere to go full screen and hide this bar"
+      @fullscreen="toggleFullScreen"
+    />
 
     <main
       class="grid min-h-0 flex-1 gap-4 p-4 sm:gap-6 sm:p-6"

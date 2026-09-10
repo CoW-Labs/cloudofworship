@@ -189,11 +189,13 @@
 </template>
 
 <script setup lang="ts">
-import { appWideActions } from "~/utils/constants"
+import {
+  appWideActions,
+  MAX_PDF_FILE_SIZE,
+  MAX_PPT_FILE_SIZE,
+} from "~/utils/constants"
 import { useTimeAgo } from "@vueuse/core"
 import type { RecentPresentation } from "~/composables/useRecentPresentations"
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
 const props = withDefaults(defineProps<{ fileType?: "ppt" | "pdf" }>(), {
   fileType: "pdf",
@@ -226,8 +228,18 @@ const acceptedFileTypes = computed(() => {
   return ".pdf,application/pdf"
 })
 
+// PPT/PPTX is converted server-side (5MB multer cap); PDFs are rendered in the
+// browser, so they get the larger ceiling.
+const maxFileSize = computed(() =>
+  props.fileType === "ppt" ? MAX_PPT_FILE_SIZE : MAX_PDF_FILE_SIZE
+)
+
+const maxFileSizeLabel = computed(() => `${maxFileSize.value / (1024 * 1024)}MB`)
+
 const dropzoneCaption = computed(() =>
-  props.fileType === "ppt" ? "ppt, pptx · Max 5MB" : "pdf · Max 5MB"
+  props.fileType === "ppt"
+    ? `ppt, pptx · Max ${maxFileSizeLabel.value}`
+    : `pdf · Max ${maxFileSizeLabel.value}`
 )
 
 const isPpt = (file: File) =>
@@ -281,8 +293,8 @@ const setFile = (file: File) => {
     return
   }
 
-  if (file.size > MAX_FILE_SIZE) {
-    errorMessage.value = "File size exceeds the 5 MB limit."
+  if (file.size > maxFileSize.value) {
+    errorMessage.value = `File size exceeds the ${maxFileSizeLabel.value} limit.`
     return
   }
 

@@ -154,11 +154,7 @@
           :editor="editor"
           size="md"
           :disabled="false"
-          @change="
-            runCommand((chain) => chain.setFontFamily($event), {
-              restoreFocus: true,
-            })
-          "
+          @change="onFontFamilyChange($event)"
           @open="onFontMenuOpen"
           @close="onFontMenuClose"
         />
@@ -229,6 +225,7 @@
 
 <script setup lang="ts">
 import type { Editor } from "@tiptap/core"
+import { asFontFamily } from "~/utils/fontFamily"
 
 const props = defineProps<{
   editor?: Editor
@@ -409,6 +406,15 @@ const runCommand = (
 }
 
 // Apply a palette color while preserving the selected editor range.
+// The select forwards its raw change payload. Only a string may reach
+// `setFontFamily` — see `asFontFamily` for what a stray object does to the
+// editor.
+const onFontFamilyChange = (value: unknown) => {
+  const font = asFontFamily(value, "TipTapToolbar.font-select")
+  if (!font) return
+  runCommand((chain) => chain.setFontFamily(font), { restoreFocus: true })
+}
+
 const onColorChange = (color: string) => {
   runCommand((chain) => chain.setColor(color), { restoreFocus: true })
   colorPaletteOpen.value = false

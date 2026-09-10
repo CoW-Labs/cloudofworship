@@ -69,6 +69,25 @@ export default function useSlides() {
 
   const { rehydrateSlideMedia } = useSlideMediaCache()
 
+  /**
+   * Re-send the live slide once its bytes finish landing on this device.
+   *
+   * A slide taken live while its local save is still writing reaches the
+   * projection window with nothing to resolve: no local copy yet, and no cloud
+   * copy either while the upload is still running (or never, when it failed or
+   * the device is offline). That window resolves media once per broadcast, and
+   * the retry queue deliberately ignores keys with no remote source, so
+   * without this nudge the projection stays blank until the operator selects
+   * the slide again.
+   */
+  const republishLiveSlide = (slideId: string) => {
+    if (!slideId || appStore.currentState.liveSlideId !== slideId) return
+    const slide = appStore.activeSlides.find(
+      (candidate) => candidate.id === slideId
+    )
+    if (slide) useBroadcastPost(slide)
+  }
+
   const localizeLiveSlideMedia = (liveSlide: Slide) => {
     const bg = liveSlide.background
     const isRemote = !!bg && (bg.startsWith("http://") || bg.startsWith("https://"))
@@ -663,6 +682,7 @@ export default function useSlides() {
   return {
     loading,
     updateLiveOutput,
+    republishLiveSlide,
     fetchScheduleSlides,
     fetchSavedSlides,
     createSlide,

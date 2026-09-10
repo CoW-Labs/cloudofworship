@@ -1,5 +1,6 @@
 import { useAuthStore } from "~/store/auth"
 import type { PresentationObject } from "~/types"
+import { isPdfPresentationFile } from "~/utils/presentationFile"
 
 /**
  * Converts a PPT/PPTX or PDF file to an array of PresentationObjects.
@@ -21,7 +22,7 @@ const usePowerpointToImage = async (file: File): Promise<PresentationObject[]> =
 
   let pdfArrayBuffer: ArrayBuffer
 
-  if (file.type === "application/pdf") {
+  if (isPdfPresentationFile(file)) {
     // PDF: read directly in the browser — no backend round-trip needed
     pdfArrayBuffer = await file.arrayBuffer()
   } else {

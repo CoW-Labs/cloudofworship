@@ -1,4 +1,8 @@
 import posthog from "posthog-js"
+import {
+  markChunkRecoveryClaimed,
+  registerChunkRecovery,
+} from "~/utils/chunkErrors"
 
 /**
  * Recovers a tab whose lazily-imported chunks no longer exist on the origin.
@@ -83,6 +87,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     if (!navigator.onLine) {
       if (waitingForOnline) return
       waitingForOnline = true
+      markChunkRecoveryClaimed()
       window.addEventListener(
         "online",
         () => {
@@ -131,14 +136,22 @@ export default defineNuxtPlugin((nuxtApp) => {
     }
 
     reloadScheduled = true
+    markChunkRecoveryClaimed()
 
     setTimeout(() => {
       writeAttempts([...attempts, Date.now()])
-      posthog.capture?.("chunk_load_recovered_by_reload", {
-        chunk_error: message,
-        attempt: attempts.length + 1,
-        path: window.location.pathname,
-      })
+      // Batched captures were being lost to the reload that follows: PostHog
+      // showed exceptions with no recovery event, and recovery events with no
+      // exception, for the same sessions. Send this one on its own request.
+      posthog.capture?.(
+        "chunk_load_recovered_by_reload",
+        {
+          chunk_error: message,
+          attempt: attempts.length + 1,
+          path: window.location.pathname,
+        },
+        { send_instantly: true }
+      )
       // Full document reload, not a router navigation: the point is to fetch
       // fresh HTML pointing at the chunks this build actually published.
       // Pinia persists to localStorage, so the schedule and settings survive.
@@ -146,8 +159,15 @@ export default defineNuxtPlugin((nuxtApp) => {
     }, COALESCE_MS)
   }
 
-  nuxtApp.hook("app:chunkError", ({ error }) => {
+  const onChunkError = (message: string) => {
     sawChunkError = true
-    recover((error as Error)?.message || "Unknown chunk load error")
+    recover(message)
+  }
+
+  nuxtApp.hook("app:chunkError", ({ error }) => {
+    onChunkError((error as Error)?.message || "Unknown chunk load error")
   })
+  // Chunk errors that surface through Vue's errorHandler or an unhandled
+  // rejection instead of Vite's preload event arrive via the error filters.
+  registerChunkRecovery(onChunkError)
 })

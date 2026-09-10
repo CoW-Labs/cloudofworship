@@ -37,34 +37,19 @@
       </MoreActionsMenu>
     </div>
 
-    <div
+    <DisplayWindowBanner
       v-if="!isFullScreen && !isTauri"
-      class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center bg-opacity-70"
-    >
-      <div class="banner-text text-lg flex items-center gap-6">
-        <span v-if="!mostUpdatedLiveSlide"
-          ><span class="font-bold">Select a slide</span> from the Slide Schedule
-          Pane to show here</span
-        >
-        <span v-else
-          ><span class="font-bold">Double click</span> the display below to
-          toggle full screen and remove this banner</span
-        >
-        •
-        <span class="flex items-center gap-2 font-bold"
-          ><Logo class="w-[34px] mb-2" /> Cloud of Worship</span
-        >
-        <!-- •
-        <UButton
-          size="lg"
-          color="black"
-          class="font-bold"
-          @click="transmitScreenCapture"
-        >
-          Stream via NDI
-        </UButton> -->
-      </div>
-    </div>
+      floating
+      label="Live Output"
+      :active="!!mostUpdatedLiveSlide"
+      :shortcut="mostUpdatedLiveSlide ? 'Double click' : ''"
+      :hint="
+        mostUpdatedLiveSlide
+          ? 'the display to go full screen and hide this bar'
+          : 'Select a slide from the schedule to show it here'
+      "
+      @fullscreen="toggleFullScreen"
+    />
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
     <!-- Using motionless slides to test bug with Bible Slides not moving to next slide in live view -->
     <!-- <Transition class="fade"> -->
@@ -221,6 +206,14 @@ const checkFullScreen = () => {
   }
 }
 
+const toggleFullScreen = () => {
+  if (document.fullscreenElement) {
+    exitFullscreenSafely()
+  } else {
+    requestFullscreenSafely(document.documentElement)
+  }
+}
+
 onMounted(() => {
   window.addEventListener("fullscreenchange", checkFullScreen)
   window.addEventListener("webkitfullscreenchange", checkFullScreen)
@@ -238,13 +231,7 @@ onMounted(() => {
   })
 
   // Shortcut to go full screen
-  useRegisteredShortcut(shortcutIds.fullscreen, () => {
-    if (document.fullscreenElement) {
-      exitFullscreenSafely()
-    } else {
-      requestFullscreenSafely(document.documentElement)
-    }
-  })
+  useRegisteredShortcut(shortcutIds.fullscreen, toggleFullScreen)
 
   checkFullScreen()
 

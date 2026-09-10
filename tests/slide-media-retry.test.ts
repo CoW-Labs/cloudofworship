@@ -101,4 +101,27 @@ describe("slide media retry policy", () => {
     expect(result.pendingKeys).toEqual(["missing-image"])
     expect(retryMediaUntilResolved).not.toHaveBeenCalled()
   })
+
+  it("reports unresolved local-only media without scheduling a network retry", async () => {
+    const ensureLocal = vi.fn().mockResolvedValue(null)
+    const retryMediaUntilResolved = vi.fn()
+    const { rehydrateSlideMediaWithStatus } = await setupMediaCache(
+      ensureLocal,
+      retryMediaUntilResolved
+    )
+    const slide = {
+      id: "local-image",
+      type: "media",
+      backgroundType: "image",
+      background: "blob:operator-preview",
+      data: { type: "image", url: "blob:operator-preview" },
+    } as any
+
+    const result = await rehydrateSlideMediaWithStatus(slide, {
+      allowDownload: true,
+    })
+
+    expect(result.pendingKeys).toEqual(["local-image"])
+    expect(retryMediaUntilResolved).not.toHaveBeenCalled()
+  })
 })
