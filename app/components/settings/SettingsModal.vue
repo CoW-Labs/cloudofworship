@@ -16,6 +16,13 @@
     }"
   >
     <AppSection heading="App Settings" heading-styles="text-lg font-semibold">
+      <template #heading-suffix>
+        <span
+          class="ml-2 shrink-0 text-xs font-normal text-gray-500 dark:text-[#7b8496]"
+        >
+          {{ appVersion }}
+        </span>
+      </template>
       <template #actions>
         <button
           class="grid h-8 w-8 place-items-center rounded-lg leading-none transition-colors hover:bg-gray-100 dark:hover:bg-[#222938]"
@@ -118,6 +125,7 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
+const { appVersion } = useAppVersion()
 const { fetchUserSettings, saveSettingsLocally, debouncedSaveSettings } =
   useUserSettings()
 const settingsModalOpen = ref(props.isOpen)

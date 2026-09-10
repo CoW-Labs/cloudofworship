@@ -28,6 +28,7 @@
         <span v-else class="whitespace-nowrap truncate">
           {{ heading }}
         </span>
+        <slot name="heading-suffix" />
       </h2>
       <div class="actions flex flex-row-reverse items-center gap-1.5 shrink-0">
         <div
