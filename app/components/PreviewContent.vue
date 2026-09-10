@@ -54,7 +54,7 @@
           v-if="isDraggingMediaFile"
           tinted
           icon="i-bx-cloud-upload"
-          sub="Drop to add as media slide"
+          sub="Drop to add as a slide"
           class="absolute inset-0 z-20 pointer-events-none"
         />
         <div v-if="isLoadingSlides" class="grid slides-grid gap-3">
@@ -179,7 +179,8 @@ import {
   toTransportSafePayload,
 } from "~/utils/mediaTransport"
 import { unavailableMediaCopy } from "~/utils/mediaCloudSync"
-import { appWideActions } from "~/utils/constants"
+import { isPdfPresentationFile } from "~/utils/presentationFile"
+import { appWideActions, MAX_PDF_FILE_SIZE } from "~/utils/constants"
 import {
   getAPIErrorMessage,
   getAPIErrorStatus,
@@ -269,6 +270,50 @@ const onMediaDragLeave = (event: DragEvent) => {
   if (mediaDragCounter === 0) isDraggingMediaFile.value = false
 }
 
+const isPdfFile = (file: File) => isPdfPresentationFile(file)
+const maxPdfFileSizeMb = MAX_PDF_FILE_SIZE / (1024 * 1024)
+
+const importDroppedPdf = async (file: File) => {
+  // Explicit id: useToast derives ids from Date.now(), so two PDFs dropped in
+  // the same tick would otherwise share one toast.
+  const loadingToastId = `pdf-import-${useObjectID()}`
+  toast.add({
+    id: loadingToastId,
+    title: `Reading ${file.name}…`,
+    icon: "i-bx-loader-alt",
+    timeout: 0,
+  })
+
+  try {
+    const presentationObjects = await usePowerpointToImage(file)
+    useGlobalEmit(appWideActions.newPresentation, {
+      fileName: file.name,
+      presentationObjects,
+      fromImport: true,
+    })
+  } catch (err: any) {
+    console.error("PDF import error:", err)
+    toast.add({
+      title: err?.message || "Something went wrong while reading the PDF.",
+      icon: "i-bx-error",
+      color: "red",
+    })
+  } finally {
+    toast.remove(loadingToastId)
+  }
+}
+
+// PDF.js decoding and canvas rendering are memory intensive. Keep one direct
+// drop import active at a time, including files added by later drop events.
+let droppedPdfImportTail: Promise<void> = Promise.resolve()
+const enqueueDroppedPdfImports = (files: File[]) => {
+  droppedPdfImportTail = droppedPdfImportTail
+    .catch(() => undefined)
+    .then(async () => {
+      for (const file of files) await importDroppedPdf(file)
+    })
+}
+
 const onMediaDrop = (event: DragEvent) => {
   if (!isFileDrag(event)) return
   event.preventDefault()
@@ -279,6 +324,7 @@ const onMediaDrop = (event: DragEvent) => {
   if (droppedFiles.length === 0) return
 
   const validFiles: File[] = []
+  const pdfFiles: File[] = []
   droppedFiles.forEach((file) => {
     if (
       file.type.startsWith("image") &&
@@ -302,9 +348,26 @@ const onMediaDrop = (event: DragEvent) => {
       })
       return
     }
+    if (isPdfFile(file)) {
+      if (file.size > MAX_PDF_FILE_SIZE) {
+        toast.add({
+          title: `PDF size exceeds the ${maxPdfFileSizeMb}MB limit`,
+          icon: "i-bx-info-circle",
+          color: "red",
+        })
+        return
+      }
+      pdfFiles.push(file)
+      return
+    }
     if (!/^(image|video|audio)/.test(file.type)) return
     validFiles.push(file)
   })
+
+  // A dropped PDF becomes a presentation slide (one slide, one page each),
+  // the same result as the Import Slides screen — no media slides involved.
+  if (pdfFiles.length > 0) enqueueDroppedPdfImports(pdfFiles)
+
   if (validFiles.length === 0) return
 
   // Same shape AddMedia.vue's addMediaEmitter builds for regular files.
@@ -649,6 +712,9 @@ const isExternalVideoSlide = (slide?: Slide) => {
   return type === "youtube" || type === "vimeo"
 }
 
+const firstRemoteMediaUrl = (...urls: (string | null | undefined)[]) =>
+  urls.find((url) => !!url && /^https?:\/\//.test(url))
+
 const bearsResolvableMedia = (slide?: Slide) =>
   !!slide &&
   !isExternalVideoSlide(slide) &&
@@ -723,95 +789,81 @@ const resolveScheduleMedia = async (scheduleId: string) => {
 }
 
 const handleTakeLiveAction = async (slide: Slide) => {
-  const externalType = (slide.data as any)?.type
-  const localKeys = [
-    ...(slide.type === slideTypes.media &&
-    externalType !== "youtube" &&
-    externalType !== "vimeo"
-      ? [slide.id]
-      : []),
-    ...(slide.type === slideTypes.presentation
-      ? (slide.presentationObjects || []).map(
-          (page) => `${slide.id}-page-${page.page}`
-        )
-      : []),
-    ...(slide.backgroundVideoKey ? [slide.backgroundVideoKey] : []),
-    ...(slide.backgroundImageKey ? [slide.backgroundImageKey] : []),
-  ]
-
-  if (localKeys.length) {
+  // Resolving before broadcast keeps projection local-first: a slide that
+  // arrived from a teammate still holds remote URLs until its bytes are pulled
+  // down here. Missing inherited backgrounds remain non-blocking; primary
+  // media is checked separately below so an unusable media slide cannot blank
+  // the live output.
+  if (bearsResolvableMedia(slide)) {
     await prepareSlideMediaForProjection(slide, { allowDownload: true })
+    appStore.updateSlideInActiveSlides(slide)
+  }
 
-    // Rehydration rewrites the slide's URLs in place, so read the URL each key
-    // resolves to only after it has run.
-    const remoteFallbackFor = (key: string) => {
-      const pagePrefix = `${slide.id}-page-`
-      if (key.startsWith(pagePrefix)) {
-        const page = Number(key.slice(pagePrefix.length))
-        return slide.presentationObjects?.find((obj) => obj.page === page)
-          ?.imageUrl
+  // Missing inherited backgrounds must not stop text-based slides from going
+  // live, but a media slide or the current presentation page has no usable
+  // output without its primary bytes. Session URLs cannot cross into the live
+  // window, so require either a durable local copy or a remote fallback.
+  const requiredMedia = (() => {
+    if (slide.type === slideTypes.media && !isExternalVideoSlide(slide)) {
+      return {
+        key: slide.id,
+        label:
+          (slide.data as ExtendedFileT)?.type === "video"
+            ? "Video"
+            : (slide.data as ExtendedFileT)?.type === "audio"
+            ? "Audio"
+            : "Image",
+        remoteUrl: firstRemoteMediaUrl(
+          (slide.data as ExtendedFileT)?.url,
+          slide.background,
+          slide.mediaCloudSync?.[slide.id]?.remoteUrl
+        ),
       }
-      if (key === slide.id) {
-        return (slide.data as ExtendedFileT)?.url || slide.background
-      }
-      return slide.background
     }
-    const isRemoteUrl = (url?: string | null) =>
-      !!url && (url.startsWith("http://") || url.startsWith("https://"))
+    if (slide.type === slideTypes.presentation) {
+      const page = slide.presentationObjects?.[slide.presentationPageIndex ?? 0]
+      if (!page) return null
+      const key = `${slide.id}-page-${page.page}`
+      return {
+        key,
+        label: "Image",
+        remoteUrl: firstRemoteMediaUrl(
+          page.imageUrl,
+          slide.mediaCloudSync?.[key]?.remoteUrl
+        ),
+      }
+    }
+    return null
+  })()
 
-    // A missing local copy is only fatal when there is nothing else to project.
-    // The live window rehydrates (and caches) media on arrival, so a remote URL
-    // still projects — it just streams the first time. Blocking on the local
-    // copy alone rejected ordinary slides: every song/bible/hymn slide inherits
-    // `backgroundImageKey` from the default background settings, so a key added
-    // on another device (or evicted here) stopped an otherwise fine slide from
-    // going live, while the same slide went live from the schedule list, which
-    // never ran this check.
-    const unprojectable = await Promise.all(
-      localKeys.map(async (key) => {
-        if (await projectionMediaStorage.getPlaybackUrl(key)) return null
-        if (isRemoteUrl(remoteFallbackFor(key))) return null
-        return {
-          key,
-          syncState:
-            (await projectionMediaStorage.getCloudSyncState(key)) ||
-            slide.mediaCloudSync?.[key],
-        }
-      })
+  if (requiredMedia) {
+    const hasLocalCopy = await projectionMediaStorage.getPlaybackUrl(
+      requiredMedia.key
     )
-    const unavailable = unprojectable.find((item) => item !== null)
-    if (unavailable) {
-      const isPresentationPage = unavailable.key.startsWith(
-        `${slide.id}-page-`
-      )
-      const label =
-        isPresentationPage || unavailable.key === slide.backgroundImageKey
-          ? "Image"
-          : unavailable.key === slide.backgroundVideoKey ||
-            (slide.data as ExtendedFileT)?.type === "video"
-          ? "Video"
-          : "Media"
-      // A local save that is still writing (or that failed) is the more
-      // useful explanation than the cloud-sync copy: the bytes are not on
-      // disk yet, so there is genuinely nothing to project. Presentation
-      // pages record their progress under the slide id, not the page key.
+    const hasRemoteFallback = /^https?:\/\//.test(requiredMedia.remoteUrl || "")
+    if (!hasLocalCopy && !hasRemoteFallback) {
       const transfer =
-        transferFor(unavailable.key) ||
-        (isPresentationPage ? transferFor(slide.id) : null)
+        transferFor(requiredMedia.key) ||
+        (slide.type === slideTypes.presentation
+          ? transferFor(slide.id)
+          : null)
       const copy =
-        transfer && transfer.status !== "ready"
-          ? transfer.status === "failed"
-            ? {
-                title: `${label} is not saved locally`,
-                description:
-                  "Retry or remove this media before taking it live.",
-              }
-            : {
-                title: `${label} is still being saved`,
-                description:
-                  "Wait for local storage to finish before taking it live.",
-              }
-          : unavailableMediaCopy(unavailable.syncState, label)
+        transfer?.status === "pending"
+          ? {
+              title: `${requiredMedia.label} is still being saved`,
+              description:
+                "Wait for local storage to finish before taking it live.",
+            }
+          : transfer?.status === "failed"
+          ? {
+              title: `${requiredMedia.label} is not saved locally`,
+              description:
+                "Retry or remove this media before taking it live.",
+            }
+          : unavailableMediaCopy(
+              slide.mediaCloudSync?.[requiredMedia.key],
+              requiredMedia.label
+            )
       toast.add({
         title: copy.title,
         description: copy.description,
@@ -820,7 +872,6 @@ const handleTakeLiveAction = async (slide: Slide) => {
       })
       return
     }
-    appStore.updateSlideInActiveSlides(slide)
   }
 
   if (slide.slideMode === "overlay") {

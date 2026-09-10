@@ -24,7 +24,7 @@ export default function useSlideCreation() {
   const authStore = useAuthStore()
   const toast = useToast()
   const { overlaySettings } = useOverlaySettings()
-  const { saveSlideOnline } = useSlides()
+  const { saveSlideOnline, republishLiveSlide } = useSlides()
   const { saveSong, saveSlide: saveSlideToLibrary, getLibraryItem } = useLibrary()
   const localMedia = useLocalMediaStorage()
   const {
@@ -410,6 +410,7 @@ export default function useSlideCreation() {
             if (file.type !== "audio") tempSlide.background = url
           }
           completeLocalSave(tempSlide.id)
+          republishLiveSlide(tempSlide.id)
           delete file.blob
         })()
           .catch((error) => {
@@ -524,6 +525,7 @@ export default function useSlideCreation() {
                 if (!blob.type.includes("audio")) slide.background = localUrl
               }
               completeLocalSave(slide.id)
+              republishLiveSlide(slide.id)
               delete file.blob
             } catch (error) {
               failLocalSave(slide.id, error)
@@ -797,6 +799,7 @@ export default function useSlideCreation() {
           return
         }
         completeLocalSave(tempSlide.id)
+        republishLiveSlide(tempSlide.id)
 
         if (quotaExceeded) {
           toast.add({
