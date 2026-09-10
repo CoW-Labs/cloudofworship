@@ -17,6 +17,21 @@ on:
     branches:
       - main
 
+# Two pushes to the same PR in quick succession must not race each other
+# through tagging, version bumps and asset uploads. Queue them instead.
+concurrency:
+  group: release-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+# The release is created as a DRAFT and only published by
+# finalize-updater-manifest once the desktop build has uploaded a verified
+# latest.json. The in-app updater reads
+# releases/latest/download/latest.json, and GitHub's "latest" ignores drafts,
+# so a release that fails to build (or is still building) can no longer become
+# the manifest every client fetches — which is what made v1.0.0/1/2/4 404 for
+# everyone. cleanup-failed-release removes the draft and its tag on failure so
+# the next attempt reuses the version number.
+
 jobs:
   release:
     permissions:
@@ -153,7 +168,7 @@ jobs:
           echo "next_version=$next_version" >> $GITHUB_OUTPUT
           echo "skip_release=0" >> $GITHUB_OUTPUT
 
-      - name: Update appVersion in useAppVersion.ts and tauri.conf.json
+      - name: Update appVersion in useAppVersion.ts, tauri.conf.json and Cargo.toml
         if: env.SKIP_RELEASE != '1'
         run: |
           # Remove 'v' prefix and '-beta' suffix for tauri.conf.json
@@ -165,8 +180,19 @@ jobs:
           # Replace the version in tauri.conf.json
           sed -i 's/"version": "[^"]*"/"version": "'"$tauri_version"'"/' src-tauri/tauri.conf.json
 
+          # The updater and bundler read tauri.conf.json, but the Windows exe's
+          # FileVersion/ProductVersion (Task Manager, file Properties, crash
+          # dumps) come from Cargo.toml, which otherwise sits at 0.1.0 forever.
+          # Only the first `version =` line is the [package] version.
+          sed -i '0,/^version = "[^"]*"/s//version = "'"$tauri_version"'"/' src-tauri/Cargo.toml
+          awk -v v="$tauri_version" '
+            /^name = "app"$/ { in_app = 1 }
+            in_app && /^version = / { sub(/"[^"]*"/, "\"" v "\""); in_app = 0 }
+            { print }
+          ' src-tauri/Cargo.lock > Cargo.lock.tmp && mv Cargo.lock.tmp src-tauri/Cargo.lock
+
           # Check if there are actually changes to commit
-          if git diff --quiet app/composables/useAppVersion.ts src-tauri/tauri.conf.json; then
+          if git diff --quiet app/composables/useAppVersion.ts src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock; then
             echo "No changes detected - versions might already be ${{ env.next_version }}"
             echo "Skipping commit step"
           else
@@ -177,7 +203,7 @@ jobs:
             git config user.email "actions@github.com"
 
             # Commit and push the updated files
-            git add app/composables/useAppVersion.ts src-tauri/tauri.conf.json
+            git add app/composables/useAppVersion.ts src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
             git commit -m "Update appVersion to ${{ env.next_version }}"
             git push
           fi
@@ -188,12 +214,15 @@ jobs:
           git tag -a ${{ env.next_version }} -m "Release version ${{ env.next_version }}"
           git push origin ${{ env.next_version }}
 
-      - name: Create Release
+      - name: Create Draft Release
         if: env.SKIP_RELEASE != '1'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Draft: invisible to releases/latest until finalize-updater-manifest
+          # publishes it with verified assets attached.
           gh release create ${{ env.next_version }} \
+            --draft \
             --title "Release ${{ env.next_version }}" \
             --notes-file release_notes.txt \
             --target ${{ github.event.pull_request.head.ref }}
@@ -294,6 +323,9 @@ jobs:
         with:
           tagName: ${{ needs.release.outputs.next_version }}
           releaseName: "Release ${{ needs.release.outputs.next_version }}"
+          # Uploads to the existing draft. If the lookup ever misses, this
+          # makes the action create a draft too rather than a public release.
+          releaseDraft: true
           includeUpdaterJson: true
           args: ${{ matrix.args }}
 
@@ -351,4 +383,56 @@ jobs:
             fi
           done
 
-          gh release upload "$TAG" normalised.json#latest.json --clobber
+          # `file#label` only sets the asset's display label — the asset keeps
+          # the local filename, which is how a stray normalised.json ended up
+          # beside an unverified latest.json on v1.0.3/v1.0.5. The file has to
+          # be named latest.json on disk for --clobber to replace the real one.
+          mv normalised.json latest.json
+          gh release upload "$TAG" latest.json --clobber
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.next_version }}
+        run: |
+          set -euo pipefail
+          # Everything above passed: the release now has a signed installer and
+          # a verified manifest. Only now does it become "latest" for clients.
+          gh release edit "$TAG" --draft=false --latest
+
+  # A draft that never got its assets must not linger: delete it and its tag
+  # so the next push recomputes the same version number instead of burning
+  # one per failed attempt (v1.0.4 was an `npm ci` failure — its version is
+  # gone for good). Never touches a release that was already published.
+  cleanup-failed-release:
+    needs: [release, build-desktop, finalize-updater-manifest]
+    if: >-
+      always()
+      && needs.release.outputs.skip_release != '1'
+      && needs.release.result == 'success'
+      && (needs.build-desktop.result != 'success' || needs.finalize-updater-manifest.result != 'success')
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete the draft release and its tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.next_version }}
+        run: |
+          set -euo pipefail
+
+          # Drafts are only visible in the list endpoint, not releases/tags/.
+          is_draft=$(gh api "repos/$GH_REPO/releases" --paginate \
+            --jq '.[] | select(.tag_name == "'"$TAG"'") | .draft' | head -n1)
+
+          if [[ "$is_draft" != "true" ]]; then
+            echo "Release $TAG is not a draft (got '${is_draft:-none}'); leaving it alone."
+            exit 0
+          fi
+
+          echo "::warning::Desktop build for $TAG failed; removing the draft release and tag so the version can be retried."
+          gh release delete "$TAG" --yes --cleanup-tag
