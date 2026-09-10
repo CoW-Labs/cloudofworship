@@ -27,7 +27,7 @@ impl NdiSender {
     if instance.is_null() {
       return Err(NdiErrorInfo::new(
         NdiErrorCode::SenderCreateFailed,
-        "The NDI runtime could not create the Cow Live Center source.",
+        "The NDI runtime could not create the CoW Live Output source.",
         true,
       ));
     }

@@ -39,7 +39,7 @@ export interface NdiStatus {
 
 const idleStatus = (): NdiStatus => ({
   phase: "idle",
-  sourceName: "Cow Live Center",
+  sourceName: "CoW Live Output",
   runtimeAvailable: false,
   runtimeVersion: null,
   runtimePath: null,

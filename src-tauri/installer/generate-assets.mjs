@@ -7,7 +7,7 @@
  * write the BMP container by hand rather than trusting a converter to drop alpha.
  */
 import sharp from "sharp"
-import { readFileSync, writeFileSync, readdirSync } from "node:fs"
+import { readFileSync, writeFileSync, readdirSync, copyFileSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -150,10 +150,16 @@ async function flatten(W, H, layers, out) {
 
 /* ---------- welcome page: the full 499x314 MUI inner dialog ---------- */
 
-async function welcome() {
-  const W = 499
-  const H = 314
-  const logoW = 208
+// The installer picks the bitmap whose scale matches the Windows display
+// scaling (see CoWSetScaledImage in installer.nsi), so every size is rendered
+// from the vector logo and full-res tiles rather than upscaled.
+const SCALES = [100, 125, 150, 200]
+
+async function welcome(scale) {
+  const s = scale / 100
+  const W = Math.round(499 * s)
+  const H = Math.round(314 * s)
+  const logoW = Math.round(208 * s)
   const logo = logoSvg(logoW)
   const logoH = Math.round((logoW * 63) / 295)
 
@@ -163,35 +169,41 @@ async function welcome() {
     [
       ...(await mosaic(W, H, {
         angle: -28,
-        tileW: 152,
-        tileH: 86,
-        gap: 10,
+        tileW: Math.round(152 * s),
+        tileH: Math.round(86 * s),
+        gap: Math.round(10 * s),
         coverTo: W * 0.58,
       })),
       scrim(W, H, { start: W * 0.16, end: W * 0.5 }),
-      { input: logo, left: W - logoW - 32, top: Math.round(H / 2 - logoH / 2) - 8 },
+      { input: logo, left: W - logoW - Math.round(32 * s), top: Math.round(H / 2 - logoH / 2 - 8 * s) },
     ],
-    "welcome.bmp"
+    `welcome-${scale}.bmp`
   )
 }
 
 /* ---------- header strip shown on the progress page ---------- */
 
-async function header() {
-  const W = 150
-  const H = 57
-  const logoW = 116
+async function header(scale) {
+  const s = scale / 100
+  const W = Math.round(150 * s)
+  const H = Math.round(57 * s)
+  const logoW = Math.round(116 * s)
   const logo = logoSvg(logoW)
   const logoH = Math.round((logoW * 63) / 295)
   await flatten(
     W,
     H,
     [{ input: logo, left: Math.round((W - logoW) / 2), top: Math.round((H - logoH) / 2) }],
-    "header.bmp"
+    `header-${scale}.bmp`
   )
 }
 
 console.log("Generating NSIS installer bitmaps...")
-await welcome()
-await header()
+for (const scale of SCALES) {
+  await welcome(scale)
+  await header(scale)
+}
+// tauri.conf.json points MUI at the 100% files under their plain names.
+copyFileSync(join(HERE, "welcome-100.bmp"), join(HERE, "welcome.bmp"))
+copyFileSync(join(HERE, "header-100.bmp"), join(HERE, "header.bmp"))
 console.log("Done.")

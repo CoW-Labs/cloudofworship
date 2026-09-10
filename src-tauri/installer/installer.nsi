@@ -86,7 +86,9 @@ Var WixMode
 Var OldMainBinaryName
 
 Name "${PRODUCTNAME}"
-BrandingText "${COPYRIGHT}"
+; CoW: the stock template binds this to the copyright string, which is empty
+; for us and makes NSIS fall back to "Nullsoft Install System vX.Y".
+BrandingText "${PRODUCTNAME} ${VERSION}"
 OutFile "${OUTFILE}"
 
 ; We don't actually use this value as default install path,
@@ -180,9 +182,59 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 ; 499x314 bitmap rather than the stock 164x314 sidebar, and CoWWelcomeShow
 ; stretches the image control over the entire page and hides the MUI title and
 ; body text that would otherwise print on top of it.
+;
+; MUI has already loaded the bitmap squashed into its stock 164px-wide control
+; by the time our SHOW callback runs, so after widening the control we reload
+; the image at the control's real size. generate-assets.mjs renders the
+; bitmaps at 100/125/150/200% so that reload is 1:1 (or a downscale) at every
+; common Windows scale factor instead of a nearest-neighbour blow-up.
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW CoWWelcomeShow
 !insertmacro MUI_PAGE_WELCOME
+
+; The scaled bitmaps sit next to welcome.bmp in the repo; derive that folder from
+; the absolute path Tauri hands us so the template works from any build dir.
+!searchreplace COW_ASSETS "${SIDEBARIMAGE}" "welcome.bmp" ""
+
+!define COW_BG 0x0B1120     ; matches the app's dark auth background
+!define COW_FG 0xF8FAFC
+!define COW_MUTED 0x94A3B8
+
+!macro CoWShipBitmap STEM SCALE
+  File "/oname=$PLUGINSDIR\cow-${STEM}-${SCALE}.bmp" "${COW_ASSETS}${STEM}-${SCALE}.bmp"
+!macroend
+
+; Loads "$PLUGINSDIR\cow-<stem>-<scale>.bmp" into a control, picking the
+; smallest shipped scale that is at least as large as the control on screen.
+;   Push <hwnd>  Push <stem>  Push <width of the control at 100% DPI>
+;   Call CoWSetScaledImage
+;   Pop <HBITMAP>
+Function CoWSetScaledImage
+  System::Store S
+  Pop $3 ; width at 100%
+  Pop $2 ; stem
+  Pop $1 ; hwnd
+
+  System::Call "*(i,i,i,i) p .r0"
+  System::Call "user32::GetClientRect(p r1, p r0)"
+  System::Call "*$0(i, i, i .r4, i)"
+  System::Free $0
+
+  IntOp $5 $4 * 100
+  IntOp $5 $5 / $3
+  ${If} $5 <= 100
+    StrCpy $5 100
+  ${ElseIf} $5 <= 125
+    StrCpy $5 125
+  ${ElseIf} $5 <= 150
+    StrCpy $5 150
+  ${Else}
+    StrCpy $5 200
+  ${EndIf}
+
+  ${NSD_SetStretchedImage} $1 "$PLUGINSDIR\cow-$2-$5.bmp" $6
+  System::Store "P6 L" ; push the handle, then restore every register
+FunctionEnd
 
 Function CoWWelcomeShow
   ShowWindow $mui.WelcomePage.Title 0 ; SW_HIDE
@@ -196,10 +248,59 @@ Function CoWWelcomeShow
   System::Free $1
   System::Call "user32::MoveWindow(p $mui.WelcomePage.Image, i 0, i 0, i r4, i r5, i 1)"
 
-  ; There are no steps after this page, so the button says what it does.
-  GetDlgItem $0 $HWNDPARENT 1
-  SendMessage $0 0x000C 0 "STR:Install" ; WM_SETTEXT
+  ; Swap the squashed bitmap MUI loaded for one rendered at this size.
+  ${NSD_FreeImage} $mui.WelcomePage.Image.Bitmap
+  Push $mui.WelcomePage.Image
+  Push "welcome"
+  Push 499
+  Call CoWSetScaledImage
+  Pop $mui.WelcomePage.Image.Bitmap
+
+  ; Every wizard step between here and the install is skipped, so the button
+  ; really does install. NSIS only labels the page before InstFiles "Install".
+  SendMessage $mui.Button.Next ${WM_SETTEXT} 0 "STR:$(^InstallBtn)"
 FunctionEnd
+
+; Paint the outer wizard dialog (header strip, branding line, the area around
+; the buttons) in the app's dark palette. The Back/Next/Cancel buttons are
+; native controls that ignore SetCtlColors, so they keep the Windows theme.
+!macro CoWDarkChrome
+  SetCtlColors $HWNDPARENT ${COW_FG} ${COW_BG}
+  SetCtlColors $mui.Header.Background ${COW_FG} ${COW_BG}
+  SetCtlColors $mui.Header.Text ${COW_FG} ${COW_BG}
+  SetCtlColors $mui.Header.SubText ${COW_MUTED} ${COW_BG}
+  SetCtlColors $mui.Header.Image ${COW_BG} ${COW_BG}
+  SetCtlColors $mui.Branding.Background ${COW_MUTED} ${COW_BG}
+  SetCtlColors $mui.Branding.Text ${COW_MUTED} ${COW_BG}
+!macroend
+
+Function CoWGUIInit
+  InitPluginsDir
+  !insertmacro CoWShipBitmap welcome 100
+  !insertmacro CoWShipBitmap welcome 125
+  !insertmacro CoWShipBitmap welcome 150
+  !insertmacro CoWShipBitmap welcome 200
+  !insertmacro CoWShipBitmap header 100
+  !insertmacro CoWShipBitmap header 125
+  !insertmacro CoWShipBitmap header 150
+  !insertmacro CoWShipBitmap header 200
+
+  !insertmacro CoWDarkChrome
+
+  ; MUI stretched the 150x57 header into the DPI-scaled control; reload it at
+  ; the matching size. MUI leaks its own handle by design, so we leak ours too.
+  Push $mui.Header.Image
+  Push "header"
+  Push 150
+  Call CoWSetScaledImage
+  Pop $0
+FunctionEnd
+!define MUI_CUSTOMFUNCTION_GUIINIT CoWGUIInit
+
+Function un.CoWGUIInit
+  !insertmacro CoWDarkChrome
+FunctionEnd
+!define MUI_CUSTOMFUNCTION_UNGUIINIT un.CoWGUIInit
 
 ; 2. License Page (if defined)
 !if "${LICENSE}" != ""
@@ -444,37 +545,10 @@ Var AppStartMenuFolder
 !define /ifndef PBM_SETBKCOLOR  0x2001
 
 Function CoWInstFilesShow
-  ; Repaint the header strip and progress body in the app's dark palette.
-  ; The button bar below is drawn by the outer dialog and stays native.
-  GetDlgItem $0 $HWNDPARENT 1034 ; header background
-  SetCtlColors $0 ${CoW_TEXT} ${CoW_BG}
-  GetDlgItem $0 $HWNDPARENT 1037 ; header title
-  SetCtlColors $0 ${CoW_TEXT} ${CoW_BG}
-  GetDlgItem $0 $HWNDPARENT 1038 ; header subtitle
-  SetCtlColors $0 ${CoW_MUTED} ${CoW_BG}
-  GetDlgItem $0 $HWNDPARENT 1039 ; header rule
-  SetCtlColors $0 ${CoW_BG} ${CoW_BG}
-
-  SetCtlColors $mui.InstFilesPage ${CoW_TEXT} ${CoW_BG}
-
-  ; Progress bar. The themed common control ignores PBM_SETBARCOLOR, so drop its
-  ; visual style first, then paint it purple on the dark page instead of the
-  ; default green on a light trough.
-  GetDlgItem $1 $mui.InstFilesPage 1004
-  System::Call "uxtheme::SetWindowTheme(p $1, w ' ', w ' ')"
-  SendMessage $1 ${PBM_SETBARCOLOR} 0 ${CoW_PURPLE}
-  SendMessage $1 ${PBM_SETBKCOLOR} 0 ${CoW_BG}
-
-  ; Status line above the bar, and the log list behind it.
-  GetDlgItem $1 $mui.InstFilesPage 1006
-  SetCtlColors $1 ${CoW_MUTED} ${CoW_BG}
-  GetDlgItem $1 $mui.InstFilesPage 1016
-  SetCtlColors $1 ${CoW_MUTED} ${CoW_BG}
-
-  ; No "Show details": it is a native light button stranded on a dark page, and
-  ; the install log is not something a church tech needs mid-service.
-  GetDlgItem $1 $mui.InstFilesPage 1027
-  ShowWindow $1 0 ; SW_HIDE
+  ; The header strip is handled once in CoWGUIInit; this is just the page body.
+  SetCtlColors $mui.InstFilesPage ${COW_FG} ${COW_BG}
+  SetCtlColors $mui.InstFilesPage.Text ${COW_FG} ${COW_BG}
+  SetCtlColors $mui.InstFilesPage.LogWindow ${COW_MUTED} ${COW_BG}
 FunctionEnd
 
 ; 8. Finish page
