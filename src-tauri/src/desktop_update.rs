@@ -10,6 +10,12 @@ use sha2::{Digest, Sha256};
 use tauri::{Manager, State, WebviewWindow};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
+/// Read by `installer.nsi` in `.onInstSuccess`. The updater always passes `/R`
+/// to the Windows installer in passive mode, which would reopen an app the
+/// operator has just closed; the installer inherits this environment and
+/// skips the relaunch when it is "0".
+const RELAUNCH_ENV: &str = "COW_UPDATE_RELAUNCH";
+
 #[derive(Clone, Default)]
 pub struct DesktopUpdateState {
   inner: Arc<Mutex<UpdateState>>,
@@ -189,10 +195,12 @@ pub fn desktop_cancel_update(
 pub async fn desktop_install_update(
   window: WebviewWindow,
   state: State<'_, DesktopUpdateState>,
+  relaunch: bool,
 ) -> Result<(), String> {
   main_window(&window)?;
   let state = state.inner().clone();
   tauri::async_runtime::spawn_blocking(move || {
+    std::env::set_var(RELAUNCH_ENV, if relaunch { "1" } else { "0" });
     let mut staged = {
       let mut inner = state.inner.lock().unwrap_or_else(|p| p.into_inner());
       if inner.installing {
