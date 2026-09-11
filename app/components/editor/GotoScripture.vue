@@ -7,7 +7,7 @@
       class="grid min-h-0 flex-1 grid-cols-2 md:grid-cols-[1.15fr_1fr_1fr] divide-y md:divide-y-0 md:divide-x divide-white/80 dark:divide-[#0D0F1A]"
     >
       <div
-        class="col-book col-span-2 md:col-span-1 flex min-h-0 max-h-[40%] md:max-h-none flex-col"
+        class="col-book col-span-2 md:col-span-1 flex min-h-0 max-h-[190px] md:max-h-none flex-col"
       >
         <div class="flex h-9 shrink-0 items-center px-3">
           <span class="text-[12px] font-normal leading-[17px]">Book</span>

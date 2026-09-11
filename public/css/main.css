@@ -142,6 +142,17 @@ html.dark .cow-search-input input::placeholder {
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 }
 
+/* A phone is not wide enough for two 170px columns (2x170 + the 12px gap needs
+   352px of a 375px screen, minus the panel's own padding), so the grid fell
+   back to one full-width card per row: a 317px-wide, 120px-tall thumbnail with
+   nothing beside it. Narrower columns restore two per row at roughly the same
+   proportions the desktop cards have. */
+@media (max-width: 767px) {
+  .slides-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+
 /* MOBILE OPERATOR ROUTE (/mobile)
    iOS Safari zooms the whole page when a focused input's text is under 16px,
    and never zooms back out — which on a fixed-height app shell leaves the

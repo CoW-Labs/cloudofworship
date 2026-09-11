@@ -47,19 +47,23 @@
     <div v-if="slide" class="editor-header z-20 shrink-0">
       <div
         v-if="slide"
-        class="toolbar w-[100%] px-3 py-1 min-h-[44px] bg-[#f1f3f6] dark:bg-[#222938] flex flex-wrap md:flex-nowrap items-center justify-between gap-1"
+        class="toolbar w-[100%] px-3 py-1 min-h-[44px] bg-[#f1f3f6] dark:bg-[#222938] flex items-center justify-between gap-1"
       >
         <template v-if="slide">
           <div
-            class="slide-name flex items-center gap-1 top-1 text-gray-700 dark:text-[#d5dae3] min-w-0 md:shrink-0"
+            class="slide-name flex items-center gap-1 top-1 text-gray-700 dark:text-[#d5dae3] shrink-0"
           >
-            <h4 class="font-medium truncate min-w-0">
+            <!-- Hidden on mobile: the editor is a full-screen sheet there and
+                 its header already carries the slide name, so repeating it here
+                 only squeezes the controls that have nowhere else to go. -->
+            <h4 class="font-medium text-nowrap hidden md:block">
               {{ useShortSlideName(slide, { longer: true }) }}
             </h4>
             <SlideChip
               :slide-type="slide?.type"
               :slide-sub-type="(slide?.data as ExtendedFileT)?.type"
               :slide-mode="slide?.slideMode"
+              class="hidden md:inline-flex"
               dark-mode
             />
             <!-- Editing by indicator -->
@@ -96,10 +100,16 @@
             />
           </div>
           <!-- The scrolling control strip. Flattened out of the old
-               `.right-group` wrapper so it can drop to its own row on mobile
-               (order-3 + w-full) while Go Live stays on the title row. -->
+               `.right-group` wrapper so it is a direct flex child: it takes the
+               space between the slide name and Go Live and scrolls inside it.
+
+               `justify-end` is desktop-only on purpose. A flex container that
+               overflows cannot scroll back past its start when its content is
+               end-justified, so on a phone — where this strip always overflows
+               — it would open scrolled into its own middle with the first
+               control unreachable. -->
           <div
-            class="actions order-3 w-full md:order-none md:w-auto md:flex-1 flex items-center gap-1 min-w-0 md:justify-end"
+            class="actions flex-1 flex items-center gap-1 min-w-0 md:justify-end"
             :class="containerOverflow"
           >
             <!-- VERSE SWITCH -->
@@ -680,6 +690,7 @@ const backgroundPopoverSize = ref<PopoverSize>(
 )
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+
 
 // Toolbar tabs that toggle the overlay panels. Scripture/Layout are Bible-only;
 // Background mirrors the old "add background" visibility (hidden for presentation
@@ -1752,49 +1763,25 @@ const predictVerseInput = (
 }
 
 /* ------------------------------------------------------------- MOBILE ---
-   The editor is a single full-screen sheet on /mobile, so everything the
-   desktop layout floats over the preview (the content toolbar, the verse and
-   book lists) has nowhere to float to — it would sit on top of the toolbar it
-   belongs to. Below 768px those pieces join the normal flow instead.
+   The toolbar keeps the desktop structure on a phone: one row, the control
+   strip scrolling between the slide's actions menu and Go Live, and the content
+   pill floating over the preview at the same offset.
 
-   768px is the same breakpoint the rest of the mobile work uses, and the
-   desktop console never goes below it (the Tauri window's minWidth is 1024). */
+   An earlier attempt wrapped the toolbar onto two rows and dropped the pill
+   into the flow below it. That produced three stacked strips of different
+   widths, each scrolled to its own offset, which read as three unrelated
+   toolbars rather than one. Hiding the slide name (the sheet header already
+   shows it) frees the room that wrapping was trying to find. */
 @media (max-width: 767px) {
-  /* The control strip drops to its own row, so the previews below it have to
-     measure from the bottom of the whole header, not a fixed 46px. Making the
-     header the positioning context is what lets `top: 100%` mean that. */
-  .editor-header {
-    position: relative;
-  }
-
-  .verse-preview,
-  .books-preview {
-    top: 100%;
-  }
-
-  /* The desktop cap is `calc(100% - 3rem)` of the editor; measured against the
-     header instead that collapses to a couple of rows, so cap on the viewport. */
-  .verse-switch:hover + .verse-preview,
-  .verse-preview:hover,
-  .books-preview:hover,
-  .actions:not(:has(.books-preview)) .verse-switch:focus-within + .verse-preview,
-  .verse-switch:focus-within ~ .books-preview {
-    max-height: 60vh;
-  }
-
-  /* Stacked under the toolbar rather than laid over the slide preview, and
-     left-aligned so a strip wider than the screen starts at its first control
-     instead of scrolled to the middle. */
-  .editor-floating-toolbar {
-    position: static;
-    margin-top: 0.25rem;
-  }
-
+  /* A strip wider than the screen should start at its first control. `mx-auto`
+     centres the pill, which on an overflowing row means it opens scrolled to
+     the middle of itself — the reason the font picker sat off to the left. */
   .editor-floating-toolbar :deep(.content-toolbar-pill) {
     margin-left: 0;
     margin-right: 0;
   }
 }
+
 .page-switch:hover + .preview-pages,
 .page-switch:focus-within + .preview-pages,
 .preview-pages:hover {
