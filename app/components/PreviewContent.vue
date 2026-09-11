@@ -740,6 +740,7 @@ const { transferFor } = useMediaDownloadProgress()
 const projectionMediaStorage = useLocalMediaStorage()
 const { rehydrateSlideMedia: prepareSlideMediaForProjection } =
   useSlideMediaCache()
+const slideMediaResolutionGenerations = new Map<string, number>()
 
 // Media bytes are device-local. Every durable copy of a slide — the IndexedDB
 // cache and the server record — can only carry a hosted URL or an empty one,
@@ -774,12 +775,22 @@ const slideMediaUrl = (slide: Slide) =>
 // Splicing a replacement in would be skipped by the cards' `v-memo`, which only
 // watches id/name/updatedAt — an in-place URL change is what reaches the DOM.
 const resolveSlideMedia = async (slide: Slide) => {
+  const resolutionGeneration =
+    (slideMediaResolutionGenerations.get(slide.id) || 0) + 1
+  slideMediaResolutionGenerations.set(slide.id, resolutionGeneration)
+
   if (!bearsResolvableMedia(slide)) return
   // A local save still streaming to disk assigns the URL itself when it lands.
   if (transferFor(slide.id)?.status === "pending") return
 
   const target =
     appStore.activeSlides.find((stored) => stored.id === slide.id) || slide
+  const selectedBackground = {
+    background: target.background,
+    backgroundType: target.backgroundType,
+    imageKey: target.backgroundImageKey,
+    videoKey: target.backgroundVideoKey,
+  }
   // Nothing paintable on this device: pull the cloud copy down rather than
   // leave the operator looking at an empty preview. A slide that already holds
   // a hosted URL renders while it streams, so it can wait for the idle
@@ -789,10 +800,30 @@ const resolveSlideMedia = async (slide: Slide) => {
     allowDownload: online.value && (!url || isSessionMediaUrl(url)),
   })
 
+  // A newer edit or selection owns the editor now. The older resolution may
+  // still warm the detached store object, but it must not write back over it.
+  if (
+    slideMediaResolutionGenerations.get(slide.id) !== resolutionGeneration
+  ) {
+    return
+  }
+
   // `activeSlide` can hold its own copy of the slide (one just created, or one
   // handed over by an event), so point the editor at the URL just resolved.
   const editing = activeSlide.value
-  if (editing && editing !== target && editing.id === target.id) {
+  // `target` was captured before the await, so the operator may have picked a
+  // different background while the bytes were being resolved. Adopting the
+  // result then reinstates the media they just replaced — only copy back while
+  // both slides still point at the same media.
+  const hasKeyedBackground =
+    !!selectedBackground.imageKey || !!selectedBackground.videoKey
+  const sameMedia =
+    editing?.backgroundImageKey === selectedBackground.imageKey &&
+    editing?.backgroundVideoKey === selectedBackground.videoKey &&
+    (hasKeyedBackground ||
+      (editing?.background === selectedBackground.background &&
+        editing?.backgroundType === selectedBackground.backgroundType))
+  if (editing && editing !== target && editing.id === target.id && sameMedia) {
     if (target.background) editing.background = target.background
     const resolvedUrl = (target.data as ExtendedFileT)?.url
     if (resolvedUrl && editing.data) {
@@ -2194,8 +2225,15 @@ const onUpdateSlide = (slide: Slide) => {
   // Stamp a client-side updatedAt so v-memo detects the change and re-renders the card
   const updatedSlide: Slide = { ...slide, updatedAt: new Date().toISOString() }
 
-  makeSlideActive(updatedSlide)
+  // The store copy has to be current *before* `makeSlideActive` runs. That call
+  // kicks off `resolveSlideMedia`, which looks the slide up in `activeSlides` to
+  // find the object the grid renders — and `updateSlideInActiveSlides` splices a
+  // replacement in, so a lookup made first returned the pre-edit slide. The
+  // copy-back at the end of resolution then wrote that slide's *old* background
+  // onto the one the operator had just re-styled: picking a cached background
+  // applied on the projector and silently reverted in the editor preview.
   appStore.updateSlideInActiveSlides(updatedSlide)
+  makeSlideActive(updatedSlide)
 
   updateSlideOnline(updatedSlide)
   updateLiveOutput(updatedSlide)

@@ -39,6 +39,7 @@
             background-panel
             hide-upload
             :value="slide?.background"
+            :value-key="slide?.backgroundImageKey"
             @select="$emit('select', backgroundTypes.image, $event)"
             @loading-change="$emit('loading-change', $event)"
           />
@@ -62,6 +63,7 @@
             background-panel
             hide-upload
             :value="slide?.background"
+            :value-key="slide?.backgroundVideoKey"
             @select="$emit('select', backgroundTypes.video, $event)"
             @loading-change="$emit('loading-change', $event)"
           />

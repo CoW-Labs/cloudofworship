@@ -1198,6 +1198,22 @@ const removeSetlistSong = async (songIndex: number) => {
 //   emit("slide-update", tempSlide)
 // }
 
+/**
+ * Every way of choosing a background passes through one counter: a tile click
+ * in the panel, a file dropped on the preview, and the deferred half of that
+ * drop once the bytes are on disk. Whichever the operator started last is the
+ * one that lands.
+ *
+ * Without this, a drop that finished after a tile click still applied itself —
+ * the compress/save/upload leg runs for seconds, and the panel's own counter
+ * cannot see it because the panel's dropzone reports up to here rather than
+ * into BgImageSelection.
+ */
+let backgroundSelectionGeneration = 0
+const claimBackgroundSelection = () => ++backgroundSelectionGeneration
+const ownsBackgroundSelection = (generation: number) =>
+  generation === backgroundSelectionGeneration
+
 const onSelectBackground = (
   backgroundType: string,
   data:
@@ -1205,6 +1221,7 @@ const onSelectBackground = (
     | { image: string; key?: string }
     | { video: string; key?: string }
 ) => {
+  claimBackgroundSelection()
   const isImage = typeof data !== "string" && "image" in data
   const isVideo = typeof data !== "string" && "video" in data
   const tempSlide = {
@@ -1246,6 +1263,7 @@ const onBgDragLeave = (event: DragEvent) => {
 }
 
 const addDroppedBackgroundImage = async (file: File) => {
+  const generation = claimBackgroundSelection()
   const online = useOnline()
   try {
     const compressedBlob = await useCompressedImage(file)
@@ -1288,6 +1306,10 @@ const addDroppedBackgroundImage = async (file: File) => {
     }
     const imageUrl = await localMedia.getPlaybackUrl(id)
     if (!imageUrl) throw new Error("The saved image could not be opened.")
+    // The file is saved either way — only the selection is in question. A
+    // background chosen while these bytes were being written is the newer
+    // choice, so this one stays in the library without being applied.
+    if (!ownsBackgroundSelection(generation)) return
     onSelectBackground(backgroundTypes.image, { image: imageUrl, key: id })
   } catch (error) {
     console.error("Failed to add dropped background image:", error)
@@ -1300,6 +1322,7 @@ const addDroppedBackgroundImage = async (file: File) => {
 }
 
 const addDroppedBackgroundVideo = async (file: File) => {
+  const generation = claimBackgroundSelection()
   try {
     const id = `/custom-video-bg-${useID(6)}.${file.type?.split("/")?.[1]}`
     await localMedia.saveBlob({
@@ -1345,6 +1368,10 @@ const addDroppedBackgroundVideo = async (file: File) => {
     }
     const videoUrl = await localMedia.getPlaybackUrl(id)
     if (!videoUrl) throw new Error("The saved video could not be opened.")
+    // The file is saved either way — only the selection is in question. A
+    // background chosen while these bytes were being written is the newer
+    // choice, so this one stays in the library without being applied.
+    if (!ownsBackgroundSelection(generation)) return
     onSelectBackground(backgroundTypes.video, {
       video: videoUrl,
       key: id,
