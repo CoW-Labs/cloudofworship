@@ -112,11 +112,18 @@ const tourVideoSrc = computed(() =>
 /* The mobile operator route (/mobile) puts its action bar exactly where this
    sits, so the launcher would cover the Settings button. The tour itself walks
    the three-panel desktop console via `data-tour` anchors that the mobile
-   layout does not present, so it is hidden rather than repositioned. */
+   layout does not present, so it is hidden rather than repositioned.
+
+   Keyed on the route as well as the width: a tablet can sit above 767px and
+   still be on /mobile, where the anchors are just as absent. */
 @media (max-width: 767px) {
   .cow-tour-fab {
     display: none;
   }
+}
+
+body:has(.mobile-operator) .cow-tour-fab {
+  display: none;
 }
 
 .cow-tour-fab:hover {

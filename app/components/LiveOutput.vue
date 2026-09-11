@@ -1,10 +1,15 @@
 <template>
-  <div ref="liveColumn" class="live-output-column flex flex-col h-full w-full">
+  <div
+    ref="liveColumn"
+    class="live-output-column flex flex-col h-full w-full"
+    :class="mobile ? 'gap-2' : ''"
+  >
     <!-- LIVE PREVIEW (headerless, video panel) -->
     <div
-      :style="{ height: livePreviewHeight + 'px', flexShrink: 0 }"
+      :style="mobile ? undefined : { height: livePreviewHeight + 'px', flexShrink: 0 }"
       data-tour="live-preview"
       class="min-h-0 overflow-hidden rounded-2xl bg-black shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
+      :class="mobile ? 'aspect-video w-full shrink-0' : ''"
     >
       <div class="relative w-full h-full flex items-center justify-center">
         <LiveProjectionOnly
@@ -19,6 +24,7 @@
     </div>
 
     <div
+      v-if="!mobile"
       class="v-resize-handle h-3 shrink-0 rounded cursor-ns-resize opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
       @mousedown.prevent="startVResize($event)"
     />
@@ -32,7 +38,7 @@
     />
 
     <div
-      v-if="showTranscripts"
+      v-if="showTranscripts && !mobile"
       class="v-resize-handle h-3 shrink-0 rounded cursor-ns-resize opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
       @mousedown.prevent="startTranscriptResize($event)"
     />
@@ -55,7 +61,45 @@
       :is-live-window-active="windowRefs?.length > 0"
     >
       <template #actions>
-        <CowTooltip text="Blank the live output" shortcut="blank-output">
+        <!-- LIVE OUTPUT MENU — the actions that belong to what is on screen
+             rather than to the schedule below it. On mobile this is the only
+             route to the livestream URL: the Go Live popover that also offers
+             it is built around opening a second window, which a phone has no
+             way to do. -->
+        <MoreActionsMenu
+          flush
+          trigger-class="rounded-full"
+          @update:open="liveMenuOpen = $event"
+        >
+          <template #default="{ close }">
+            <UButton
+              variant="ghost"
+              color="gray"
+              block
+              @click.stop.prevent="
+                () => {
+                  close()
+                  canUseLivestreamLink
+                    ? copyLivestreamURL()
+                    : useGlobalEmit(appWideActions.showUpgradeModal)
+                }
+              "
+            >
+              <template #leading>
+                <IconWrapper
+                  :name="
+                    isClipboardCopying ? 'i-bx-check-circle' : 'i-bx-clipboard'
+                  "
+                  size="4"
+                />
+                <!-- One-tap Blank keeps its place where the header has room for it.
+             Below md it folds into the menu beside it, which carries the same
+             action — the phone header cannot hold both plus Go Live. -->
+        <CowTooltip
+          text="Blank the live output"
+          shortcut="blank-output"
+          class="hidden md:block"
+        >
           <CowButton
             variant="primary"
             size="2xs"
@@ -69,6 +113,35 @@
             Blank
           </CowButton>
         </CowTooltip>
+
+      </template>
+              Copy livestream link
+              <IconWrapper
+                v-if="!canUseLivestreamLink"
+                name="i-bxs-award"
+                class="inline-flex w-4 h-4 text-xs text-[#FF8980]"
+              />
+            </UButton>
+
+            <UButton
+              variant="ghost"
+              color="gray"
+              block
+              :disabled="!liveSlide"
+              @click.stop.prevent="
+                () => {
+                  close()
+                  goIntermission()
+                }
+              "
+            >
+              <template #leading>
+                <IconWrapper name="i-bx-hide" size="4" />
+              </template>
+              Blank the live output
+            </UButton>
+          </template>
+        </MoreActionsMenu>
       </template>
       <div class="main flex flex-col flex-1 min-h-0" data-tour="schedule-slides">
         <div
@@ -219,7 +292,25 @@ const showTranscripts = ref(false)
 const draggingSlide = ref<Slide | null>(null)
 const shortcutCleanups: Array<() => void> = []
 const { currentState } = storeToRefs(appStore)
+const props = withDefaults(
+  defineProps<{
+    /**
+     * Renders inside the mobile route's live sheet rather than the desktop
+     * console's right column: the preview takes a fixed 16:9 instead of a
+     * draggable height, and the drag handles go away with it.
+     */
+    mobile?: boolean
+  }>(),
+  { mobile: false }
+)
+
 const windowRefs = inject("windowRefs") as any[]
+
+// Live-output menu (livestream link, blank). Shared with the Go Live popover in
+// AppSection so both offer the same link under the same Teams gate.
+const liveMenuOpen = ref(false)
+const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
+  useLivestreamLink()
 
 const online = useOnline()
 const { hasAccessToFeature } = useSubscription()

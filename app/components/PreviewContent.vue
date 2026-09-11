@@ -4,14 +4,6 @@
       heading="Preview and Edit Content"
       :secondary-buttons="[
         {
-          label: 'Edit slide',
-          action: appWideActions.editActiveSlide,
-          icon: 'i-bx-edit',
-          color: 'primary',
-          confirmAction: false,
-          visible: mobile && !!activeSlide && !bulkSelectSlides,
-        },
-        {
           label: 'Select Slides',
           action: appWideActions.selectSlides,
           icon: '',
@@ -672,14 +664,14 @@ const makeSlideActive = (
   activeSlide.value = slide
   if (options?.newlyCreated) {
     appStore.appendActiveSlide(slide)
-    // A slide created from the mobile Quick Actions sheet lands behind that
-    // sheet with nothing to show for the tap. Opening the editor is the mobile
-    // equivalent of the desktop editor already sitting under the grid.
-    if (props.mobile) {
-      mobileEditorOpen.value = true
-      emit("slide-created")
-    }
+    // Lets the mobile route dismiss the Quick Actions sheet the slide was
+    // created from, so it does not stay stacked over the editor.
+    if (props.mobile) emit("slide-created")
   }
+  // On desktop the editor is permanently on screen under the grid, so selecting
+  // a slide is enough. On mobile there is only room for one of the two, so
+  // selecting *is* the request to edit — there is nothing else a tap could mean.
+  if (props.mobile) mobileEditorOpen.value = true
   // Selecting a slide has to resolve its media the same way going live does,
   // or the editor preview and the slide's card stay blank until it is on air.
   void resolveSlideMedia(slide)
@@ -2431,15 +2423,6 @@ const removeFromSelectedSlides = (slideId: string) => {
   )
 }
 
-// AppSection routes its secondary buttons through the global emitter rather
-// than a component event (see the `useGlobalEmit(secondaryButton.action)` call
-// in AppSection), so the "Edit slide" button has to be picked up here. Guarded
-// on `mobile` because the emitter is app-wide and the desktop console keeps the
-// editor permanently on screen.
-emitter.on(appWideActions.editActiveSlide, () => {
-  if (props.mobile) mobileEditorOpen.value = true
-})
-
 // Single source of truth for the editor's props and events. The desktop column
 // and the mobile sheet both spread these, so adding a handler in one layout
 // cannot silently miss the other.
@@ -2459,6 +2442,14 @@ const editorHandlers = {
   "update-bible-version": (version: string) =>
     gotoAction(activeSlide.value?.title!!, version, { durable: true }),
   "take-live": () => handleTakeLiveAction(activeSlide.value!!),
+  // The editor's slide-actions menu is the same component the grid cards use,
+  // so it lands on the same handlers. `save-slide` and `save-as-template` read
+  // the active slide rather than the payload, matching the grid's binding.
+  duplicate: (slide: Slide) => duplicatePreviewSlide(slide),
+  "duplicate-as-overlay": (slide: Slide) =>
+    duplicatePreviewSlideAsOverlay(slide),
+  "save-slide": () => saveSlide(activeSlide.value!!),
+  "save-as-template": () => openSaveTemplateModal(activeSlide.value!!),
 }
 </script>
 

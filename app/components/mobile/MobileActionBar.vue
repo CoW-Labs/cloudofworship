@@ -30,24 +30,37 @@
       Quick Actions
     </CowButton>
 
-    <!-- SETTINGS — routed through the same emitter action the desktop console
-         uses, so the mobile bar opens the identical settings modal. -->
+    <!-- LIVE — the live preview and the slide schedule, i.e. what is on screen
+         right now and what is queued behind it. This slot used to open
+         Settings, which is already reachable from Quick Actions ("Open App
+         Settings") and is not something anyone opens mid-service. -->
     <button
       type="button"
-      class="bar-btn flex flex-col items-center justify-center gap-1 min-w-[64px] min-h-[48px] px-2 rounded-xl text-gray-600 dark:text-[#9aa3b2] hover:bg-gray-100 dark:hover:bg-[#222938] transition-colors"
-      @click="useGlobalEmit(appWideActions.openSettings)"
+      class="bar-btn flex flex-col items-center justify-center gap-1 min-w-[64px] min-h-[48px] px-2 rounded-xl transition-colors"
+      :class="
+        isLive
+          ? 'text-red-600 dark:text-red-400 hover:bg-red-500/10'
+          : 'text-gray-600 dark:text-[#9aa3b2] hover:bg-gray-100 dark:hover:bg-[#222938]'
+      "
+      @click="$emit('open-live')"
     >
-      <SettingsIcon class="w-5 h-5" />
-      <span class="text-[11px] font-medium leading-none">Settings</span>
+      <GoLiveIcon class="w-5 h-5" />
+      <span class="text-[11px] font-medium leading-none">Live</span>
     </button>
   </nav>
 </template>
 
 <script setup lang="ts">
-import { appWideActions } from "~/utils/constants"
+import { useAppStore } from "~/store/app"
 
 defineEmits<{
   (e: "open-quick-actions"): void
   (e: "open-schedules"): void
+  (e: "open-live"): void
 }>()
+
+// Tints the Live entry while something is actually on screen, so the bar says
+// whether the congregation is looking at a slide without opening the sheet.
+const appStore = useAppStore()
+const isLive = computed(() => !!appStore.currentState.liveSlideId)
 </script>

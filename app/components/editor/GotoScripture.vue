@@ -4,9 +4,11 @@
     class="goto-scripture flex h-full w-full flex-col overflow-hidden bg-[#f1f3f6] text-gray-800 dark:bg-[#131724] dark:text-[#F8F9FB]"
   >
     <div
-      class="grid min-h-0 flex-1 grid-cols-[1.15fr_1fr_1fr] divide-x divide-white/80 dark:divide-[#0D0F1A]"
+      class="grid min-h-0 flex-1 grid-cols-2 md:grid-cols-[1.15fr_1fr_1fr] divide-y md:divide-y-0 md:divide-x divide-white/80 dark:divide-[#0D0F1A]"
     >
-      <div class="col-book flex min-h-0 flex-col">
+      <div
+        class="col-book col-span-2 md:col-span-1 flex min-h-0 max-h-[40%] md:max-h-none flex-col"
+      >
         <div class="flex h-9 shrink-0 items-center px-3">
           <span class="text-[12px] font-normal leading-[17px]">Book</span>
         </div>

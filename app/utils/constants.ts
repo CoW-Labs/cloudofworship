@@ -81,7 +81,6 @@ export const appWideActions = {
   newPresentation: 'new-presentation',
   newPresentationFromPdf: 'new-presentation-from-pdf',
   promoteActiveSlide: 'promote-active-slide-live',
-  editActiveSlide: 'edit-active-slide',
   selectSlides: 'select-slides',
   selectAllSlides: 'select-all-slides',
   cancelSelectSlides: 'cancel-select-slides',

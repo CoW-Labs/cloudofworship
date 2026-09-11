@@ -14,6 +14,7 @@
     <MobileActionBar
       @open-quick-actions="quickActionsOpen = true"
       @open-schedules="schedulesOpen = true"
+      @open-live="liveOpen = true"
     />
 
     <!-- QUICK ACTIONS — the same pane as the desktop left column, given the
@@ -22,6 +23,14 @@
          desktop, so they fill the sheet here without any special casing. -->
     <MobileSheet v-model="quickActionsOpen" title="Quick Actions">
       <QuickActions mobile class="h-full" />
+    </MobileSheet>
+
+    <!-- LIVE — the desktop console's right column: the live preview on top,
+         the slide schedule under it, and the live-output menu (livestream link,
+         blank) in its header. Unchanged apart from `mobile`, which swaps the
+         draggable preview height for a fixed 16:9. -->
+    <MobileSheet v-model="liveOpen" title="Live">
+      <LiveOutput mobile class="h-full min-h-0" />
     </MobileSheet>
 
     <!-- SCHEDULES — switching which service you are working on. -->
@@ -61,6 +70,7 @@ useHead({
 
 const quickActionsOpen = ref<boolean>(false)
 const schedulesOpen = ref<boolean>(false)
+const liveOpen = ref<boolean>(false)
 
 // The realtime session — identical to the desktop console's. A phone in a
 // service is a full member of the schedule: its slides reach everyone else's
