@@ -6,10 +6,13 @@
   >
     <!-- LIVE PREVIEW (headerless, video panel) -->
     <div
-      :style="mobile ? undefined : { height: livePreviewHeight + 'px', flexShrink: 0 }"
+      :style="
+        mobile
+          ? { aspectRatio: '16 / 9', width: '100%', flexShrink: 0 }
+          : { height: livePreviewHeight + 'px', flexShrink: 0 }
+      "
       data-tour="live-preview"
       class="min-h-0 overflow-hidden rounded-2xl bg-black shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
-      :class="mobile ? 'aspect-video w-full shrink-0' : ''"
     >
       <div class="relative w-full h-full flex items-center justify-center">
         <LiveProjectionOnly
@@ -54,19 +57,44 @@
           svgIcon: 'GoLiveIcon',
           color: 'black',
           confirmAction: false,
-          visible: true,
+          // Opens a second OS window on a projector or external display, which
+          // a phone has no way to do. The other half of its popover — the
+          // livestream URL — is in the menu beside it on mobile.
+          visible: !mobile,
           variant: 'danger',
         },
       ]"
       :is-live-window-active="windowRefs?.length > 0"
     >
       <template #actions>
-        <!-- LIVE OUTPUT MENU — the actions that belong to what is on screen
-             rather than to the schedule below it. On mobile this is the only
-             route to the livestream URL: the Go Live popover that also offers
-             it is built around opening a second window, which a phone has no
-             way to do. -->
+        <!-- One-tap Blank, exactly as the desktop header has always had it.
+             Hidden on mobile, where the same action lives in the menu below. -->
+        <CowTooltip
+          v-if="!mobile"
+          text="Blank the live output"
+          shortcut="blank-output"
+        >
+          <CowButton
+            variant="primary"
+            size="2xs"
+            class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
+            :disabled="!liveSlide"
+            @click="goIntermission"
+          >
+            <template #leading>
+              <IconWrapper name="i-bx-hide" size="3.5" />
+            </template>
+            Blank
+          </CowButton>
+        </CowTooltip>
+
+        <!-- LIVE OUTPUT MENU — mobile only. The desktop header keeps the layout
+             it has always had (Blank, then Go Live). This menu exists because a
+             phone has neither route: Go Live is hidden there (no second window
+             to open), and it is the popover behind Go Live that normally offers
+             the livestream URL. -->
         <MoreActionsMenu
+          v-if="mobile"
           flush
           trigger-class="rounded-full"
           @update:open="liveMenuOpen = $event"
@@ -92,29 +120,7 @@
                   "
                   size="4"
                 />
-                <!-- One-tap Blank keeps its place where the header has room for it.
-             Below md it folds into the menu beside it, which carries the same
-             action — the phone header cannot hold both plus Go Live. -->
-        <CowTooltip
-          text="Blank the live output"
-          shortcut="blank-output"
-          class="hidden md:block"
-        >
-          <CowButton
-            variant="primary"
-            size="2xs"
-            class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
-            :disabled="!liveSlide"
-            @click="goIntermission"
-          >
-            <template #leading>
-              <IconWrapper name="i-bx-hide" size="3.5" />
-            </template>
-            Blank
-          </CowButton>
-        </CowTooltip>
-
-      </template>
+              </template>
               Copy livestream link
               <IconWrapper
                 v-if="!canUseLivestreamLink"

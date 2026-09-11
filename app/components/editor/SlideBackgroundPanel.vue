@@ -103,6 +103,7 @@
 </template>
 
 <script setup lang="ts">
+import { useMediaQuery } from "@vueuse/core"
 import type { ExtendedFileT, Slide } from "~/types"
 
 type SectionKey = "image" | "video" | "colour" | "gradient" | "style"
@@ -152,6 +153,8 @@ const headings: Record<SectionKey, string> = {
   style: "Adjust Style",
 }
 
+// Desktop sizes. The panel lays its pieces out at fixed offsets side by side,
+// so these are the box that layout needs.
 const panelSizes: Record<SectionKey, PanelSize> = {
   image: { width: 753, height: 314 },
   video: { width: 753, height: 314 },
@@ -173,12 +176,34 @@ const initialSection = (): SectionKey => {
   }
 }
 
+// Mobile stacks the same pieces instead, which needs a different box: taller
+// (the picker and its dropzone sit one above the other rather than beside each
+// other) and as wide as the screen allows rather than a desktop panel's 401px.
+// CoWPopover fixes the popover to whatever height it is given, so these are
+// sized to the stacked content — asking for a flat, generous height instead
+// just reserves dead space under the swatches.
+const mobilePanelSizes: Record<SectionKey, PanelSize> = {
+  image: { width: 9999, height: 430 },
+  video: { width: 9999, height: 430 },
+  colour: { width: 9999, height: 300 },
+  gradient: { width: 9999, height: 300 },
+  style: { width: 9999, height: 250 },
+}
+
+const isNarrowViewport = useMediaQuery("(max-width: 767px)")
+
 const activeSection = ref<SectionKey>(initialSection())
 const activeHeading = computed(() => headings[activeSection.value])
 
 watch(
-  activeSection,
-  (section) => emit("resize", panelSizes[section]),
+  [activeSection, isNarrowViewport],
+  () =>
+    emit(
+      "resize",
+      (isNarrowViewport.value ? mobilePanelSizes : panelSizes)[
+        activeSection.value
+      ]
+    ),
   { immediate: true }
 )
 </script>
