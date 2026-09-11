@@ -9,11 +9,11 @@
         type="button"
         class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-cover transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#E8D1F8]"
         :aria-label="
-          image === value
+          isSelected(image)
             ? 'Selected background image'
             : 'Select background image'
         "
-        :aria-pressed="image === value"
+        :aria-pressed="isSelected(image)"
         @click="selectImage(image)"
       >
         <span
@@ -21,7 +21,7 @@
           :style="{ backgroundImage: `url(${image})` }"
         ></span>
         <span
-          v-if="image === value"
+          v-if="isSelected(image)"
           class="pointer-events-none absolute inset-0 z-10 rounded-[4px] border-2 border-[#E8D1F8]"
         ></span>
       </button>
@@ -48,16 +48,16 @@
               class="bg-image w-full h-full transition rounded-md opacity-100 hover:opacity-30 bg-cover"
               :class="[
                 settingsPage ? 'min-w-[180px] h-[100px]' : '',
-                { 'opacity-30': image === value },
+                { 'opacity-30': isSelected(image) },
               ]"
               :style="`background-image: url(${image})`"
             ></div>
             <span
-              v-if="image === value"
+              v-if="isSelected(image)"
               class="pointer-events-none absolute inset-0 z-10 rounded-md border-2 border-[#E8D1F8]"
             ></span>
             <IconWrapper
-              v-if="image === value"
+              v-if="isSelected(image)"
               name="i-bx-check"
               size="5"
               :rounded-bg="true"
@@ -123,18 +123,23 @@
 
 <script setup lang="ts">
 import { useOnline } from "@vueuse/core"
-import { useAppStore } from "~/store/app"
 import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
 
-defineProps<{
+const props = defineProps<{
   value?: string
+  /**
+   * The slide's `backgroundImageKey`. `value` alone cannot mark the selected
+   * tile: once an image lives on this device the slide holds a blob:/asset: URL
+   * while the tile is still listed under the hosted one, so the tick and the
+   * ring never appeared and a successful click read as a click that missed.
+   */
+  valueKey?: string | null
   settingsPage?: boolean
   hideUpload?: boolean
   backgroundPanel?: boolean
 }>()
 
 const emit = defineEmits(["select", "loading-change"])
-const appStore = useAppStore()
 
 const maxFileSize = computed(() => Infinity)
 const toast = useToast()
@@ -146,9 +151,8 @@ const totalImages = ref(0)
 const deletingImageId = ref<string | null>(null)
 
 const bgImageToBeSelected = ref<string | null>(null)
-const localImageObjectUrls = new Set<string>()
 const transientPreviewUrls = new Set<string>()
-const imageKeysByUrl = new Map<string, string>()
+const imageKeysByUrl = reactive(new Map<string, string>())
 const defaultBackgroundImages = [
   "https://images.unsplash.com/photo-1553901753-215db344677a?q=80&w=1740",
   "https://images.unsplash.com/photo-1506056820413-f8fa4de15de6?q=80&w=1740",
@@ -186,10 +190,36 @@ const openImageFilePicker = () => {
   imageFileInput.value?.click()
 }
 
+const isSelected = (image: string) =>
+  (!!props.value && image === props.value) ||
+  (!!props.valueKey && imageKeysByUrl.get(image) === props.valueKey)
+
+/**
+ * `/preset-image-bg-3` -> 2. Presets are saved under a key derived from their
+ * position in `defaultBackgroundImages`, so the key is enough to find the tile
+ * they belong to.
+ */
+const presetIndexFromKey = (key: string) => {
+  const match = /^\/preset-image-bg-(\d+)$/.exec(key)
+  if (!match) return null
+  const index = Number(match[1]) - 1
+  return index >= 0 && index < defaultBackgroundImages.length ? index : null
+}
+
+let selectionGeneration = 0
+
 const selectImage = async (image: string) => {
+  const requestGeneration = ++selectionGeneration
   const existingKey = imageKeysByUrl.get(image)
   if (existingKey) {
-    emit("select", { image, key: existingKey })
+    // The tile may be listed under its hosted URL even though the bytes are on
+    // this device (that is how a cached preset is drawn). Hand the slide the
+    // device URL regardless, so the projector never goes back to the network
+    // for a file it already holds.
+    const localUrl = (await localMedia.getPlaybackUrl(existingKey)) || image
+    if (requestGeneration !== selectionGeneration) return
+    imageKeysByUrl.set(localUrl, existingKey)
+    emit("select", { image: localUrl, key: existingKey })
     return
   }
 
@@ -209,9 +239,14 @@ const selectImage = async (image: string) => {
       recoverable: true,
     })
     if (!localUrl) throw new Error("The preset image could not be saved.")
+    if (requestGeneration !== selectionGeneration) return
+    // Both spellings: the grid still lists this preset under its hosted URL, so
+    // that is the string `isSelected` will be asked about.
+    imageKeysByUrl.set(image, key)
     imageKeysByUrl.set(localUrl, key)
     emit("select", { image: localUrl, key })
   } catch (error) {
+    if (requestGeneration !== selectionGeneration) return
     console.error("Failed to prepare preset image:", error)
     toast.add({
       title: "Background is not available offline yet",
@@ -229,18 +264,6 @@ const onImageFileSelect = (event: Event) => {
   void saveAndSelectImages(files)
 }
 
-const revokeLocalImageObjectUrls = () => {
-  const usedBackgrounds = new Set(
-    appStore.activeSlides.map((slide) => slide.background)
-  )
-  localImageObjectUrls.forEach((url) => {
-    if (!usedBackgrounds.has(url)) {
-      localMedia.releasePlaybackUrl(url)
-    }
-  })
-  localImageObjectUrls.clear()
-}
-
 const revokeTransientPreviewUrls = () => {
   transientPreviewUrls.forEach((url) => URL.revokeObjectURL(url))
   transientPreviewUrls.clear()
@@ -253,10 +276,16 @@ const getAllLocallySavedImages = async () => {
       (record.category === "background" || record.category === "preset")
   )
 
-  revokeLocalImageObjectUrls()
   imageKeysByUrl.clear()
 
-  revokeLocalImageObjectUrls()
+  // Deliberately not revoking the URLs from a previous pass. `getPlaybackUrl`
+  // memoises one URL per media key for the whole app, so the string handed to
+  // this panel is the same one the editor preview, the slide cards and the
+  // projection window are rendering. Revoking it here — which the old sweep did
+  // for anything not currently a slide background — killed those too, and left
+  // the operator looking at an empty preview until something re-resolved the
+  // key. Nothing leaks by leaving them: the cache hands out the same URL on
+  // every mount and releases it itself when the underlying record moves.
 
   // Create Object URLs from locally saved images - process in batches
   const imageURLs: string[] = []
@@ -268,13 +297,25 @@ const getAllLocallySavedImages = async () => {
     for (const image of chunk) {
       const localUrl = await localMedia.getPlaybackUrl(image.key)
       if (!localUrl) continue
-      if (localUrl.startsWith("blob:")) localImageObjectUrls.add(localUrl)
       imageKeysByUrl.set(localUrl, image.key)
-      imageURLs.push(localUrl)
 
       if (image.key === bgImageToBeSelected.value) {
         bgImageToBeSelected.value = localUrl
       }
+
+      // A preset pulled down for offline use already has a tile, listed under
+      // its hosted URL. Pointing that tile at the same key keeps it as the one
+      // tile for this image instead of adding a second, identical-looking one
+      // backed by a blob: URL.
+      const presetIndex = presetIndexFromKey(image.key)
+      const presetUrl =
+        presetIndex === null ? undefined : defaultBackgroundImages[presetIndex]
+      if (presetUrl) {
+        imageKeysByUrl.set(presetUrl, image.key)
+        continue
+      }
+
+      imageURLs.push(localUrl)
     }
 
     // Allow UI to breathe between chunks
@@ -291,6 +332,7 @@ const getAllLocallySavedImages = async () => {
 const saveAndSelectImages = async (files: File[]) => {
   if (!files || files.length === 0) return
 
+  const requestGeneration = ++selectionGeneration
   const online = useOnline()
   imageCompressionLoading.value = true
   emit("loading-change", true)
@@ -375,13 +417,19 @@ const saveAndSelectImages = async (files: File[]) => {
       }
 
       await getAllLocallySavedImages()
-      if (bgImageToBeSelected.value) {
+      // The save itself succeeded either way — only the selection is in
+      // question. A tile clicked while these bytes were being written is the
+      // newer choice, so the durable URL is filed away without being applied.
+      savedSuccessfully = true
+      if (
+        requestGeneration === selectionGeneration &&
+        bgImageToBeSelected.value
+      ) {
         emit("select", {
           image: bgImageToBeSelected.value,
           key: imageKeysByUrl.get(bgImageToBeSelected.value),
         })
       }
-      savedSuccessfully = true
     } catch (error) {
       console.error("Failed to save custom image:", error)
       toast.add({
@@ -431,7 +479,8 @@ const handleDeleteImage = async (imageUrl: string) => {
 getAllLocallySavedImages()
 
 onBeforeUnmount(() => {
-  revokeLocalImageObjectUrls()
+  // Only the transient preview URLs are this component's to revoke — they are
+  // created here from the picked File, not handed out by the shared cache.
   revokeTransientPreviewUrls()
 })
 </script>
