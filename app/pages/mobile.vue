@@ -2,7 +2,7 @@
   <div
     class="mobile-operator flex flex-col gap-2 px-2 pt-2 h-[calc(100dvh-58px)] overflow-hidden"
   >
-    <!-- DEFAULT VIEW — the slide grid. It is both the schedule and the way in
+    <!-- DEFAULT VIEW: the slide grid. It is both the schedule and the way in
          to every slide, so it holds the screen and nothing is layered over it
          until the operator asks for something. -->
     <PreviewContent
@@ -17,7 +17,7 @@
       @open-live="liveOpen = true"
     />
 
-    <!-- QUICK ACTIONS — the same pane as the desktop left column, given the
+    <!-- QUICK ACTIONS: the same pane as the desktop left column, given the
          whole screen. Its own sub-pages (Bible, songs, hymns, media, library,
          templates, countdown, PDF import) already take over the pane on
          desktop, so they fill the sheet here without any special casing. -->
@@ -25,7 +25,7 @@
       <QuickActions mobile class="h-full" />
     </MobileSheet>
 
-    <!-- LIVE — the desktop console's right column: the live preview on top,
+    <!-- LIVE: the desktop console's right column, the live preview on top,
          the slide schedule under it, and the live-output menu (livestream link,
          blank) in its header. Unchanged apart from `mobile`, which swaps the
          draggable preview height for a fixed 16:9. -->
@@ -33,7 +33,7 @@
       <LiveOutput mobile class="h-full min-h-0" />
     </MobileSheet>
 
-    <!-- SCHEDULES — switching which service you are working on. -->
+    <!-- SCHEDULES: switching which service you are working on. -->
     <MobileSheet v-model="schedulesOpen" title="Schedules">
       <AppSection class="h-full min-h-0">
         <SchedulesList
@@ -57,7 +57,7 @@ useHead({
   link: [{ rel: "manifest", href: "/manifest.json" }],
   // `viewport-fit=cover` is what puts `env(safe-area-inset-*)` in play, which
   // the sheet header and the action bar use to clear the notch and the home
-  // indicator. Pinch-zoom is deliberately left enabled — `maximum-scale=1`
+  // indicator. Pinch-zoom is deliberately left enabled, because `maximum-scale=1`
   // would block it, and someone reading small lyrics text on a phone is exactly
   // who needs it. iOS's own zoom-on-focus is handled in CSS below instead.
   meta: [
@@ -72,7 +72,21 @@ const quickActionsOpen = ref<boolean>(false)
 const schedulesOpen = ref<boolean>(false)
 const liveOpen = ref<boolean>(false)
 
-// The realtime session — identical to the desktop console's. A phone in a
+// The middleware gate can only fire once the church has loaded, and on a cold
+// start the route resolves before that. Re-checking here catches the church
+// landing a moment later and moves a Free-plan operator to the upgrade wall
+// rather than leaving them in an app they cannot use.
+const { isTeamsPlan } = useSubscription()
+const { checkFlag } = useFeatureFlags()
+watch(
+  isTeamsPlan,
+  (isTeams) => {
+    if (!isTeams && checkFlag("teams")) navigateTo("/mobile-upgrade")
+  },
+  { immediate: true }
+)
+
+// The realtime session, identical to the desktop console's. A phone in a
 // service is a full member of the schedule: its slides reach everyone else's
 // grid, and theirs reach its own.
 useOperatorSession()
@@ -89,6 +103,6 @@ watch(
 )
 
 // Settings, upgrade prompts and the shortcuts modal are owned by the `app`
-// layout, which this route shares — nothing to mount here.
+// layout, which this route shares, so there is nothing to mount here.
 </script>
 
