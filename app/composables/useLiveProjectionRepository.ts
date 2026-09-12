@@ -45,31 +45,39 @@ const prepareSlide = async (slide: Slide | null) => {
 }
 
 export const createLiveProjectionRepository = (
-  db: WorshipCloudDatabase = useIndexedDB()
-): LiveProjectionRepository => ({
-  async getCurrent() {
-    return await db.liveProjection.get("current")
-  },
+  injectedDb?: WorshipCloudDatabase
+): LiveProjectionRepository => {
+  // Resolved per call, never captured: this repository is a module-level
+  // singleton written to on every go-live, so a connection captured once would
+  // keep throwing DatabaseClosedError for the rest of a service once the
+  // browser closed it under a backgrounded tab.
+  const db = () => injectedDb ?? useIndexedDB()
 
-  async putCurrent(slide, revision, updatedAt) {
-    const prepared = await prepareSlide(slide)
-    const record: LiveProjectionRecord = {
-      id: "current",
-      revision,
-      slideId: prepared?.id || null,
-      scheduleId: prepared?.scheduleId || null,
-      churchId: prepared?.churchId || null,
-      updatedAt,
-      slide: prepared,
-    }
-    await db.liveProjection.put(record)
-    return record
-  },
+  return {
+    async getCurrent() {
+      return await db().liveProjection.get("current")
+    },
 
-  async clear() {
-    await db.liveProjection.delete("current")
-  },
-})
+    async putCurrent(slide, revision, updatedAt) {
+      const prepared = await prepareSlide(slide)
+      const record: LiveProjectionRecord = {
+        id: "current",
+        revision,
+        slideId: prepared?.id || null,
+        scheduleId: prepared?.scheduleId || null,
+        churchId: prepared?.churchId || null,
+        updatedAt,
+        slide: prepared,
+      }
+      await db().liveProjection.put(record)
+      return record
+    },
+
+    async clear() {
+      await db().liveProjection.delete("current")
+    },
+  }
+}
 
 let repositoryInstance: LiveProjectionRepository | null = null
 

@@ -1,4 +1,20 @@
 import { execSync } from 'child_process'
+import { readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
+
+/**
+ * The version this build was compiled with, read from the same file the app
+ * reads at runtime so the two can never disagree. The release workflow rewrites
+ * only that constant, and this follows it.
+ */
+const readAppVersion = () => {
+  try {
+    const source = readFileSync('app/composables/useAppVersion.ts', 'utf8')
+    return source.match(/APP_VERSION\s*=\s*"([^"]+)"/)?.[1] || ''
+  } catch {
+    return ''
+  }
+}
 
 // The API is on a separate origin, so the browser cannot start its DNS/TCP/TLS
 // handshake until the entry bundle has executed and fired the first request —
@@ -29,6 +45,24 @@ export default defineNuxtConfig({
     // on the deploys that actually serve users.
     'nitro:build:public-assets': (nitro: { options: { output: { publicDir: string } } }) => {
       const publicDir = nitro.options.output.publicDir
+
+      // What a running tab polls to learn it is behind (see
+      // plugins/build-freshness.client.ts). It has to be a file this build
+      // writes rather than the API's /health, which reports the *API's*
+      // version and so never moves when the web app ships.
+      const appVersion = readAppVersion()
+      if (appVersion) {
+        writeFileSync(
+          join(publicDir, 'version.json'),
+          `${JSON.stringify({ appVersion, builtAt: new Date().toISOString() })}\n`
+        )
+        console.log(`[build] Wrote version.json for ${appVersion}`)
+      } else {
+        console.warn(
+          '[build] Could not read APP_VERSION; version.json not written. ' +
+            'Tabs running an older bundle will not know to reload.'
+        )
+      }
 
       // The CLI reads these from the process env. Without them it exits 1, and
       // a build that "succeeded" would quietly ship unsymbolicated stack traces

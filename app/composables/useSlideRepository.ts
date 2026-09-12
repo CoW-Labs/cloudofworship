@@ -77,9 +77,15 @@ const resolveSyncState = (slide: Slide, options?: SlideWriteOptions) => {
 }
 
 export const createSlideRepository = (
-  db: WorshipCloudDatabase = useIndexedDB(),
+  injectedDb?: WorshipCloudDatabase,
   sanitize: SlideSanitizer = cloneDurableSlide
 ): SlideRepository => {
+  // Resolved per call, never captured. `useSlideRepository` is a module-level
+  // singleton, so a connection captured once here would outlive itself: when
+  // the browser closes the database under a backgrounded tab, every later
+  // slide write on this instance throws DatabaseClosedError for the rest of
+  // the session. `useIndexedDB()` hands back a reopened connection instead.
+  const db = () => injectedDb ?? useIndexedDB()
   const prepareSlides = async (slides: readonly Slide[]) => {
     const unique = new Map<string, Slide>()
     slides.forEach((slide) => {
@@ -95,11 +101,11 @@ export const createSlideRepository = (
   ) => {
     if (!prepared.length) return
 
-    await db.transaction("rw", db.slides, async () => {
+    await db().transaction("rw", db().slides, async () => {
       const keys = prepared.map(
         (slide) => [slide.scheduleId, slide.id] as [string, string]
       )
-      const existing = await db.slides.bulkGet(keys)
+      const existing = await db().slides.bulkGet(keys)
       const storedAt = new Date().toISOString()
       const records: StoredSlideRecord[] = prepared.map((slide, index) => {
         const syncState = resolveSyncState(slide, options)
@@ -122,24 +128,24 @@ export const createSlideRepository = (
           slide,
         }
       })
-      await db.slides.bulkPut(records)
+      await db().slides.bulkPut(records)
     })
   }
 
   return {
     async getStoredSlide(scheduleId, slideId) {
       if (!scheduleId || !slideId) return undefined
-      return await db.slides.get([scheduleId, slideId])
+      return await db().slides.get([scheduleId, slideId])
     },
 
     async getSlide(scheduleId, slideId) {
       if (!scheduleId || !slideId) return undefined
-      return (await db.slides.get([scheduleId, slideId]))?.slide
+      return (await db().slides.get([scheduleId, slideId]))?.slide
     },
 
     async getScheduleSlides(scheduleId) {
       if (!scheduleId) return []
-      const records = await db.slides
+      const records = await db().slides
         .where("scheduleId")
         .equals(scheduleId)
         .sortBy("index")
@@ -149,7 +155,7 @@ export const createSlideRepository = (
     },
 
     async getPendingSlides() {
-      const records = await db.slides
+      const records = await db().slides
         .where("syncState")
         .equals("pending")
         .toArray()
@@ -165,8 +171,8 @@ export const createSlideRepository = (
       expectedLocalRevision
     ) {
       if (!scheduleId || !slideId) return
-      await db.transaction("rw", db.slides, async () => {
-        const record = await db.slides.get([scheduleId, slideId])
+      await db().transaction("rw", db().slides, async () => {
+        const record = await db().slides.get([scheduleId, slideId])
         if (!record) return
         // The caller read `localRevision` before an await. A newer revision
         // means the operator edited the slide while the request was in flight,
@@ -177,7 +183,7 @@ export const createSlideRepository = (
         ) {
           return
         }
-        await db.slides.put({
+        await db().slides.put({
           ...record,
           syncState,
           resyncRequestedAt:
@@ -201,8 +207,8 @@ export const createSlideRepository = (
         (slide) => slide.scheduleId === scheduleId
       )
 
-      await db.transaction("rw", db.slides, async () => {
-        const existing = await db.slides
+      await db().transaction("rw", db().slides, async () => {
+        const existing = await db().slides
           .where("scheduleId")
           .equals(scheduleId)
           .toArray()
@@ -240,7 +246,7 @@ export const createSlideRepository = (
           }
         })
 
-        if (records.length) await db.slides.bulkPut(records)
+        if (records.length) await db().slides.bulkPut(records)
 
         if (options.removeMissing) {
           const incomingIds = new Set(records.map((record) => record.id))
@@ -254,19 +260,19 @@ export const createSlideRepository = (
             .map(
               (record) => [record.scheduleId, record.id] as [string, string]
             )
-          if (staleKeys.length) await db.slides.bulkDelete(staleKeys)
+          if (staleKeys.length) await db().slides.bulkDelete(staleKeys)
         }
       })
     },
 
     async deleteSlide(scheduleId, slideId) {
       if (!scheduleId || !slideId) return
-      await db.slides.delete([scheduleId, slideId])
+      await db().slides.delete([scheduleId, slideId])
     },
 
     async deleteSlides(scheduleId, slideIds) {
       if (!scheduleId || !slideIds.length) return
-      await db.slides.bulkDelete(
+      await db().slides.bulkDelete(
         [...new Set(slideIds)].map(
           (slideId) => [scheduleId, slideId] as [string, string]
         )
@@ -274,15 +280,15 @@ export const createSlideRepository = (
     },
 
     async clearAllSlides() {
-      await db.transaction(
+      await db().transaction(
         "rw",
-        db.slides,
-        db.slideOutbox,
-        db.liveProjection,
+        db().slides,
+        db().slideOutbox,
+        db().liveProjection,
         async () => {
-          await db.slides.clear()
-          await db.slideOutbox.clear()
-          await db.liveProjection.clear()
+          await db().slides.clear()
+          await db().slideOutbox.clear()
+          await db().liveProjection.clear()
         }
       )
     },
@@ -293,7 +299,7 @@ export const createSlideRepository = (
       )
       const expectedById = new Map(expected.map((slide) => [slide.id, slide]))
       const expectedIds = new Set(expectedById.keys())
-      const actual = await db.slides
+      const actual = await db().slides
         .where("scheduleId")
         .equals(scheduleId)
         .toArray()

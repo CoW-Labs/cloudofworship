@@ -527,8 +527,8 @@ export const useAppStore = defineStore("app", {
     },
     setRecentBibleSearches(searchQuery: string) {
       if (searchQuery) {
-        let tempArr = [...this.currentState.recentBibleSearches]
-        if (this.currentState.recentBibleSearches.length >= 20) {
+        let tempArr = [...(this.currentState.recentBibleSearches ?? [])]
+        if (tempArr.length >= 20) {
           tempArr.shift()
           this.currentState.recentBibleSearches = tempArr
         }

@@ -1,6 +1,7 @@
 import { useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import type { BibleVersion } from "~/types"
+import { bibleVersionObjects } from "~/utils/constants"
 import { safeDBOperation } from "~/composables/useIndexedDB"
 
 /**
@@ -34,7 +35,7 @@ export const useBibleVersionManager = () => {
   const populateBibleVersionOptions = async (sourceBibleVersions?: BibleVersion[]) => {
     const tempBibleVersions: BibleVersion[] = sourceBibleVersions?.length
       ? sourceBibleVersions.map((v) => ({ ...v }))
-      : currentState.value.settings.bibleVersions.map((v) => ({ ...v }))
+      : bibleVersionOptions.value.map((v) => ({ ...v }))
 
     for (const bibleVersion of tempBibleVersions) {
       bibleVersion.isDownloaded = await isBibleVersionDownloaded(bibleVersion.id)
@@ -76,9 +77,17 @@ export const useBibleVersionManager = () => {
   /**
    * All available Bible versions with their current `isDownloaded` state
    * (driven by the store — already kept in sync via `populateBibleVersionOptions`).
+   *
+   * The stored list can be missing entirely: settings that predate the field,
+   * and a backend settings payload without `bibleVersions`, both leave it
+   * undefined. Falling back to the built-in catalogue keeps the version picker
+   * populated instead of blanking it, and the next `populateBibleVersionOptions`
+   * writes the recovered list back with real `isDownloaded` flags.
    */
   const bibleVersionOptions = computed<BibleVersion[]>(() =>
-    currentState.value.settings.bibleVersions
+    Array.isArray(currentState.value.settings.bibleVersions)
+      ? currentState.value.settings.bibleVersions
+      : bibleVersionObjects
   )
 
   /**
