@@ -82,7 +82,7 @@
       <BgColorSelection
         v-else-if="activeSection === 'colour'"
         background-panel
-        class="p-3 md:p-0 md:absolute md:left-3 md:top-9"
+        class="m-3 md:m-0 md:absolute md:left-3 md:top-9"
         :value="slide?.background"
         @select="$emit('select', backgroundTypes.solid, $event.color)"
       />
@@ -90,7 +90,7 @@
       <BgGradientSelection
         v-else-if="activeSection === 'gradient'"
         background-panel
-        class="p-3 md:p-0 md:absolute md:left-3 md:top-9"
+        class="m-3 md:m-0 md:absolute md:left-3 md:top-9"
         :value="slide?.background"
         @select="$emit('select', backgroundTypes.gradient, $event.gradient)"
       />
@@ -98,7 +98,7 @@
       <BgStyle
         v-else
         background-panel
-        class="p-3 md:p-0 md:absolute md:left-3 md:top-9"
+        class="m-3 md:m-0 md:absolute md:left-3 md:top-9"
       />
     </section>
   </div>

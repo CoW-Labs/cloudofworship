@@ -120,7 +120,10 @@ export const bibleThemes: BibleTheme[] = [
     cssClasses: {
       container: 'bible-theme-overlay',
       content: 'pb-[7.5cqw]',
-      label: 'bg-gradient-to-t from-black/80 to-transparent pb-[3cqw] px-[2cqw] absolute bottom-0 left-0 right-0',
+      // No background here: the scrim is a separate full-bleed element pinned
+      // to the slide frame (see SlideContentByLayout), so it always hugs the
+      // bottom edge of the output rather than the height of this label box.
+      label: 'pb-[3cqw] px-[2cqw] absolute bottom-0 left-0 right-0',
     },
   },
   // {

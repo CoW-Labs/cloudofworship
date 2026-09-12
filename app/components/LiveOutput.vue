@@ -30,11 +30,14 @@
          has no projector of its own, so without this line an operator cannot
          tell whether taking a slide live moves the congregation screen or
          nothing at all. Hidden when no other device is offering an output. -->
-    <button
+    <div
       v-if="mobile && (hasRemoteTarget || availableHosts.length > 0)"
-      type="button"
       class="controlled-output shrink-0 flex items-center gap-2.5 w-full rounded-xl border border-white/80 bg-white px-3 py-2 text-left dark:border-[#202838] dark:bg-[#171d2b]"
+      role="button"
+      tabindex="0"
       @click="liveMenuRef?.open()"
+      @keydown.enter.prevent="liveMenuRef?.open()"
+      @keydown.space.prevent="liveMenuRef?.open()"
     >
       <span
         class="w-2 h-2 rounded-full shrink-0"
@@ -70,12 +73,18 @@
           }}
         </span>
       </span>
-      <span
-        class="text-[11px] font-medium text-primary-600 dark:text-primary-300 shrink-0"
+      <!-- The row is tappable anywhere, but a phone gives no hover to reveal
+           that, so the action is also a real button with the solidity the rest
+           of the app's buttons have. -->
+      <CowButton
+        variant="secondary"
+        size="2xs"
+        class="shrink-0 whitespace-nowrap !px-3 !py-1.5 text-xs"
+        @click.stop="liveMenuRef?.open()"
       >
         {{ hasRemoteTarget ? "Change" : "Connect" }}
-      </span>
-    </button>
+      </CowButton>
+    </div>
 
     <div
       v-if="!mobile"
@@ -263,35 +272,6 @@
           </template>
         </MoreActionsMenu>
 
-        <!-- REMOTE CONTROL — shown only on the device whose screen is being
-             driven from someone else's phone, so a takeover is never silent.
-             "Stop" turns the permission off here rather than kicking one
-             device, which is the switch the operator can find again later.
-             Last in the slot because the row is reversed, which puts this
-             furthest from Blank and Go Live. -->
-        <div
-          v-if="!mobile && activeRemoteController"
-          class="flex items-center gap-2 whitespace-nowrap text-xs"
-        >
-          <CowTooltip
-            :text="`${activeRemoteController.name} is taking slides live on this output from the mobile app`"
-          >
-            <span
-              class="flex items-center gap-1.5 rounded-full bg-primary-50 px-2 py-1 font-medium text-primary-700 dark:bg-primary-900/40 dark:text-primary-200"
-            >
-              <IconWrapper name="i-bx-mobile" size="3.5" />
-              <span class="max-w-[8rem] truncate">{{
-                activeRemoteController.name
-              }}</span>
-            </span>
-          </CowTooltip>
-          <button
-            class="font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-300"
-            @click.stop="stopRemoteControl"
-          >
-            Stop
-          </button>
-        </div>
       </template>
       <div class="main flex flex-col flex-1 min-h-0" data-tour="schedule-slides">
         <div
@@ -552,8 +532,6 @@ const {
   isControllingRemoteHost,
   connectToHost,
   stopControlling,
-  activeRemoteController,
-  stopRemoteControl,
 } = useLiveOutputControl()
 
 const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
