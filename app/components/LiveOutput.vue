@@ -31,7 +31,7 @@
          tell whether taking a slide live moves the congregation screen or
          nothing at all. Hidden when no other device is offering an output. -->
     <button
-      v-if="mobile && (isControllingRemoteHost || availableHosts.length > 0)"
+      v-if="mobile && (hasRemoteTarget || availableHosts.length > 0)"
       type="button"
       class="controlled-output shrink-0 flex items-center gap-2.5 w-full rounded-xl border border-white/80 bg-white px-3 py-2 text-left dark:border-[#202838] dark:bg-[#171d2b]"
       @click="liveMenuRef?.open()"
@@ -41,6 +41,8 @@
         :class="
           isControllingRemoteHost
             ? 'bg-red-500'
+            : hasRemoteTarget
+            ? 'bg-amber-400'
             : 'bg-gray-300 dark:bg-[#3a4252]'
         "
       />
@@ -51,6 +53,8 @@
           {{
             isControllingRemoteHost
               ? `Controlling ${targetHost?.userName}'s screen`
+              : hasRemoteTarget
+              ? `Reconnecting to ${selectedHost?.userName || 'the output'}…`
               : "Not controlling a screen"
           }}
         </span>
@@ -60,6 +64,8 @@
           {{
             isControllingRemoteHost
               ? targetHost?.deviceLabel
+              : hasRemoteTarget
+              ? "Slides are paused until that screen reconnects"
               : "Slides you take live only reach the livestream"
           }}
         </span>
@@ -67,7 +73,7 @@
       <span
         class="text-[11px] font-medium text-primary-600 dark:text-primary-300 shrink-0"
       >
-        {{ isControllingRemoteHost ? "Change" : "Connect" }}
+        {{ hasRemoteTarget ? "Change" : "Connect" }}
       </span>
     </button>
 
@@ -191,7 +197,7 @@
             </UButton>
 
             <UButton
-              v-if="isControllingRemoteHost"
+              v-if="hasRemoteTarget"
               variant="ghost"
               color="gray"
               block
@@ -541,6 +547,8 @@ const {
   blankOutput,
   availableHosts,
   targetHost,
+  selectedHost,
+  hasRemoteTarget,
   isControllingRemoteHost,
   connectToHost,
   stopControlling,

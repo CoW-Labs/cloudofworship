@@ -136,7 +136,7 @@ export const useOperatorSession = () => {
       // source of truth instead of two devices overwriting each other. This is
       // a derived condition, not a flag some other code has to remember to
       // clear: it is true for exactly as long as a host is selected.
-      if (liveOutputControl.isControllingRemoteHost.value) return
+      if (liveOutputControl.hasRemoteTarget.value) return
 
       // Intermission clears liveSlideId (see goIntermission in LiveOutput). Send
       // an explicit null so viewers blank out instead of holding the last slide.
@@ -158,8 +158,11 @@ export const useOperatorSession = () => {
   watch(
     () => appStore.currentState.activeSchedule?._id,
     (newScheduleId, oldScheduleId) => {
-      if (newScheduleId && newScheduleId !== oldScheduleId) {
-        disconnectSocket()
+      if (newScheduleId === oldScheduleId) return
+
+      liveOutputControl.resetForScheduleChange()
+      disconnectSocket()
+      if (newScheduleId) {
         setTimeout(() => {
           connectSocket()
         }, 500)

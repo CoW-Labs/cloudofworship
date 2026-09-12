@@ -249,7 +249,7 @@ const {
   deleteSlide: deleteSlideAPI,
   batchUpdateSlides,
 } = useSlides()
-const { isControllingRemoteHost } = useLiveOutputControl()
+const { hasRemoteTarget } = useLiveOutputControl()
 
 // Derived from the store rather than mirrored into a local ref. A ref captures
 // the array reference at setup time, and every store action that touches slides
@@ -872,7 +872,7 @@ const handleTakeLiveAction = async (slide: Slide) => {
   // to, and no business refusing a slide the output device can play perfectly
   // well. Overlays fall through: they are broadcast to every device as they
   // always have been, not addressed to one output.
-  if (isControllingRemoteHost.value && slide.slideMode !== "overlay") {
+  if (hasRemoteTarget.value && slide.slideMode !== "overlay") {
     makeSlideActive(slide, { goLive: true, newlyCreated: false })
     return
   }
