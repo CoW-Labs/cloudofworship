@@ -3,7 +3,10 @@
     <UModal
       v-model="visible"
       :ui="{
-        base: 'min-w-[700px] rounded-[24px] overflow-hidden',
+        // The advert is a single fixed-aspect image, so the panel tracks the
+        // viewport instead of demanding 700px — below that the old min-width
+        // pushed the image (and its close button) off-screen with no way back.
+        base: 'w-[94vw] max-w-[700px] sm:w-auto sm:min-w-[700px] max-h-[88dvh] rounded-[24px] overflow-hidden',
       }"
       prevent-close
     >
@@ -13,9 +16,17 @@
       >
         <CloseIcon class="p-2 text-white" />
       </button>
-      <a :href="activeAdvert?.url" target="_blank" @click="onAdvertClicked">
-        <img class="scale-105" :src="activeAdvert?.image"
-      /></a>
+      <a
+        :href="activeAdvert?.url"
+        target="_blank"
+        class="block"
+        @click="onAdvertClicked"
+      >
+        <img
+          class="w-full max-h-[88dvh] object-contain scale-105"
+          :src="activeAdvert?.image"
+        />
+      </a>
     </UModal>
   </div>
 </template>

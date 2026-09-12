@@ -35,8 +35,8 @@
           visible: bulkSelectedSlides.length > 0,
         },
       ]"
-      :style="{ height: previewHeight + 'px', flexShrink: 0 }"
-      class="min-h-0"
+      :style="mobile ? undefined : { height: previewHeight + 'px', flexShrink: 0 }"
+      :class="mobile ? 'flex-1 min-h-0' : 'min-h-0'"
       @delete-selected-slides="deleteMultipleSlides(bulkSelectedSlides)"
     >
       <div
@@ -117,26 +117,33 @@
       </div>
     </AppSection>
 
-    <div
-      class="v-resize-handle h-3 shrink-0 rounded cursor-ns-resize opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
-      @mousedown.prevent="startVResize($event)"
-    />
-
-    <AppSection class="flex-1 min-h-0" slot-ctn-styles="!p-0">
-      <EditLiveContent
-        :slide="activeSlide"
-        :editing-by="
-          activeSlide?.id ? getSlideEditor(activeSlide.id) : undefined
-        "
-        @slide-update="onUpdateSlide"
-        @inactive-slide-update="onUpdateInactiveSlide"
-        @goto-verse="gotoAction"
-        @update-bible-version="
-          gotoAction(activeSlide?.title!!, $event, { durable: true })
-        "
-        @take-live="handleTakeLiveAction(activeSlide!!)"
+    <!-- SLIDE EDITOR — the same panel in both layouts. On desktop it is the
+         bottom half of this column, under a drag handle. On mobile there is no
+         room to show the grid and the editor at once, so it moves into a
+         full-screen sheet opened from the "Edit slide" button (and
+         automatically for a slide that was just created). `editorBindings` /
+         `editorHandlers` keep it a single invocation so the two layouts cannot
+         drift apart. -->
+    <template v-if="!mobile">
+      <div
+        class="v-resize-handle h-3 shrink-0 rounded cursor-ns-resize opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
+        @mousedown.prevent="startVResize($event)"
       />
-    </AppSection>
+
+      <AppSection class="flex-1 min-h-0" slot-ctn-styles="!p-0">
+        <EditLiveContent v-bind="editorBindings" v-on="editorHandlers" />
+      </AppSection>
+    </template>
+
+    <MobileSheet
+      v-else
+      v-model="mobileEditorOpen"
+      :title="activeSlide?.name || 'Edit slide'"
+    >
+      <AppSection class="h-full min-h-0" slot-ctn-styles="!p-0">
+        <EditLiveContent v-bind="editorBindings" v-on="editorHandlers" />
+      </AppSection>
+    </MobileSheet>
 
     <SaveAsTemplateModal
       v-model="showSaveTemplateModal"
@@ -194,6 +201,32 @@ import posthog from "posthog-js"
 // shared Pinia store, which this component reads reactively — so there is no
 // separate socket subscription here. A local onAny() listener used to live here
 // but it double-processed every message and went stale after reconnects.
+
+const props = withDefaults(
+  defineProps<{
+    /**
+     * Renders for the mobile operator route (`/mobile`). The slide grid takes
+     * the full column and the editor moves into a full-screen sheet — every
+     * other behaviour in this component, slide creation included, is shared
+     * verbatim with the desktop console.
+     */
+    mobile?: boolean
+  }>(),
+  { mobile: false }
+)
+
+const emit = defineEmits<{
+  /**
+   * A slide was just created on this surface. The mobile route uses it to
+   * dismiss the Quick Actions sheet, which would otherwise stay stacked over
+   * the editor the new slide just opened.
+   */
+  (e: "slide-created"): void
+}>()
+
+// Drives the mobile editor sheet. Ignored entirely on desktop, where the editor
+// is always on screen under the grid.
+const mobileEditorOpen = ref<boolean>(false)
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -631,7 +664,14 @@ const makeSlideActive = (
   activeSlide.value = slide
   if (options?.newlyCreated) {
     appStore.appendActiveSlide(slide)
+    // Lets the mobile route dismiss the Quick Actions sheet the slide was
+    // created from, so it does not stay stacked over the editor.
+    if (props.mobile) emit("slide-created")
   }
+  // On desktop the editor is permanently on screen under the grid, so selecting
+  // a slide is enough. On mobile there is only room for one of the two, so
+  // selecting *is* the request to edit — there is nothing else a tap could mean.
+  if (props.mobile) mobileEditorOpen.value = true
   // Selecting a slide has to resolve its media the same way going live does,
   // or the editor preview and the slide's card stay blank until it is on air.
   void resolveSlideMedia(slide)
@@ -700,6 +740,7 @@ const { transferFor } = useMediaDownloadProgress()
 const projectionMediaStorage = useLocalMediaStorage()
 const { rehydrateSlideMedia: prepareSlideMediaForProjection } =
   useSlideMediaCache()
+const slideMediaResolutionGenerations = new Map<string, number>()
 
 // Media bytes are device-local. Every durable copy of a slide — the IndexedDB
 // cache and the server record — can only carry a hosted URL or an empty one,
@@ -734,12 +775,22 @@ const slideMediaUrl = (slide: Slide) =>
 // Splicing a replacement in would be skipped by the cards' `v-memo`, which only
 // watches id/name/updatedAt — an in-place URL change is what reaches the DOM.
 const resolveSlideMedia = async (slide: Slide) => {
+  const resolutionGeneration =
+    (slideMediaResolutionGenerations.get(slide.id) || 0) + 1
+  slideMediaResolutionGenerations.set(slide.id, resolutionGeneration)
+
   if (!bearsResolvableMedia(slide)) return
   // A local save still streaming to disk assigns the URL itself when it lands.
   if (transferFor(slide.id)?.status === "pending") return
 
   const target =
     appStore.activeSlides.find((stored) => stored.id === slide.id) || slide
+  const selectedBackground = {
+    background: target.background,
+    backgroundType: target.backgroundType,
+    imageKey: target.backgroundImageKey,
+    videoKey: target.backgroundVideoKey,
+  }
   // Nothing paintable on this device: pull the cloud copy down rather than
   // leave the operator looking at an empty preview. A slide that already holds
   // a hosted URL renders while it streams, so it can wait for the idle
@@ -749,10 +800,30 @@ const resolveSlideMedia = async (slide: Slide) => {
     allowDownload: online.value && (!url || isSessionMediaUrl(url)),
   })
 
+  // A newer edit or selection owns the editor now. The older resolution may
+  // still warm the detached store object, but it must not write back over it.
+  if (
+    slideMediaResolutionGenerations.get(slide.id) !== resolutionGeneration
+  ) {
+    return
+  }
+
   // `activeSlide` can hold its own copy of the slide (one just created, or one
   // handed over by an event), so point the editor at the URL just resolved.
   const editing = activeSlide.value
-  if (editing && editing !== target && editing.id === target.id) {
+  // `target` was captured before the await, so the operator may have picked a
+  // different background while the bytes were being resolved. Adopting the
+  // result then reinstates the media they just replaced — only copy back while
+  // both slides still point at the same media.
+  const hasKeyedBackground =
+    !!selectedBackground.imageKey || !!selectedBackground.videoKey
+  const sameMedia =
+    editing?.backgroundImageKey === selectedBackground.imageKey &&
+    editing?.backgroundVideoKey === selectedBackground.videoKey &&
+    (hasKeyedBackground ||
+      (editing?.background === selectedBackground.background &&
+        editing?.backgroundType === selectedBackground.backgroundType))
+  if (editing && editing !== target && editing.id === target.id && sameMedia) {
     if (target.background) editing.background = target.background
     const resolvedUrl = (target.data as ExtendedFileT)?.url
     if (resolvedUrl && editing.data) {
@@ -2154,8 +2225,15 @@ const onUpdateSlide = (slide: Slide) => {
   // Stamp a client-side updatedAt so v-memo detects the change and re-renders the card
   const updatedSlide: Slide = { ...slide, updatedAt: new Date().toISOString() }
 
-  makeSlideActive(updatedSlide)
+  // The store copy has to be current *before* `makeSlideActive` runs. That call
+  // kicks off `resolveSlideMedia`, which looks the slide up in `activeSlides` to
+  // find the object the grid renders — and `updateSlideInActiveSlides` splices a
+  // replacement in, so a lookup made first returned the pre-edit slide. The
+  // copy-back at the end of resolution then wrote that slide's *old* background
+  // onto the one the operator had just re-styled: picking a cached background
+  // applied on the projector and silently reverted in the editor preview.
   appStore.updateSlideInActiveSlides(updatedSlide)
+  makeSlideActive(updatedSlide)
 
   updateSlideOnline(updatedSlide)
   updateLiveOutput(updatedSlide)
@@ -2381,6 +2459,35 @@ const removeFromSelectedSlides = (slideId: string) => {
     bulkSelectedSlides.value.findIndex((id) => id === slideId),
     1
   )
+}
+
+// Single source of truth for the editor's props and events. The desktop column
+// and the mobile sheet both spread these, so adding a handler in one layout
+// cannot silently miss the other.
+const editorBindings = computed(() => ({
+  slide: activeSlide.value,
+  editingBy: activeSlide.value?.id
+    ? getSlideEditor(activeSlide.value.id)
+    : undefined,
+}))
+
+const editorHandlers = {
+  "slide-update": (slide: Slide) => onUpdateSlide(slide),
+  "inactive-slide-update": (slide: Slide) => onUpdateInactiveSlide(slide),
+  // EditLiveContent emits `goto-verse` as (title, version) — forward both, or
+  // the Bible version silently falls back to the slide's current one.
+  "goto-verse": (...args: Parameters<typeof gotoAction>) => gotoAction(...args),
+  "update-bible-version": (version: string) =>
+    gotoAction(activeSlide.value?.title!!, version, { durable: true }),
+  "take-live": () => handleTakeLiveAction(activeSlide.value!!),
+  // The editor's slide-actions menu is the same component the grid cards use,
+  // so it lands on the same handlers. `save-slide` and `save-as-template` read
+  // the active slide rather than the payload, matching the grid's binding.
+  duplicate: (slide: Slide) => duplicatePreviewSlide(slide),
+  "duplicate-as-overlay": (slide: Slide) =>
+    duplicatePreviewSlideAsOverlay(slide),
+  "save-slide": () => saveSlide(activeSlide.value!!),
+  "save-as-template": () => openSaveTemplateModal(activeSlide.value!!),
 }
 </script>
 

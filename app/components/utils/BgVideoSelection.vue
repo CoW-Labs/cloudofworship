@@ -13,12 +13,12 @@
         type="button"
         class="group relative h-[68.125px] w-full shrink-0 overflow-hidden rounded-[4px] bg-black transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#E8D1F8]"
         :aria-label="
-          video?.url === value
+          isSelected(video)
             ? 'Selected background video'
             : 'Select background video'
         "
-        :aria-pressed="video?.url === value"
-        @click="$emit('select', { video: video?.url, key: video?.id })"
+        :aria-pressed="isSelected(video)"
+        @click="selectVideo(video)"
       >
         <VideoThumbnail
           class="h-full w-full object-cover"
@@ -26,7 +26,7 @@
           :playing="previewVideoId === video.id"
         />
         <span
-          v-if="video?.url === value"
+          v-if="isSelected(video)"
           class="pointer-events-none absolute inset-0 z-10 rounded-[4px] border-2 border-[#E8D1F8]"
         ></span>
       </button>
@@ -45,22 +45,22 @@
         @mouseleave="previewVideoId = null"
         @focus="previewVideoId = video.id"
         @blur="previewVideoId = null"
-        @click="$emit('select', { video: video?.url, key: video?.id })"
+        @click="selectVideo(video)"
         class="p-0 text-black bg-cover transition-all overflow-hidden relative group"
         :class="settingsPage ? 'w-[180px] h-[100px]' : 'w-full h-[60px]'"
       >
         <VideoThumbnail
           class="bg-image w-[100%] h-[100%] transition rounded-md opacity-100 hover:opacity-30 object-cover"
-          :class="{ 'opacity-30': video?.url === value }"
+          :class="{ 'opacity-30': isSelected(video) }"
           :src="video?.url"
           :playing="previewVideoId === video.id"
         />
         <span
-          v-if="video?.url === value"
+          v-if="isSelected(video)"
           class="pointer-events-none absolute inset-0 z-10 rounded-md border-2 border-[#E8D1F8]"
         ></span>
         <IconWrapper
-          v-if="video?.url === value"
+          v-if="isSelected(video)"
           name="i-bx-check"
           size="5"
           :rounded-bg="true"
@@ -137,14 +137,39 @@ const maxFileSize = computed(() => Infinity)
 const toast = useToast()
 const localMedia = useLocalMediaStorage()
 
-defineProps<{
+const props = defineProps<{
   value?: string
+  /**
+   * The slide's `backgroundVideoKey`. `value` alone cannot mark the selected
+   * tile: once a video lives on this device the slide holds a blob:/asset: URL
+   * while the tile is still listed under the hosted one, so the tick and the
+   * ring never appeared and a successful click read as a click that missed.
+   */
+  valueKey?: string | null
   settingsPage?: boolean
   hideUpload?: boolean
   backgroundPanel?: boolean
 }>()
 
 const emit = defineEmits(["select", "loading-change"])
+
+const isSelected = (video: BackgroundVideo) =>
+  (!!props.value && video?.url === props.value) ||
+  (!!props.valueKey && video?.id === props.valueKey)
+
+let selectionGeneration = 0
+
+const selectVideo = async (video: BackgroundVideo) => {
+  const requestGeneration = ++selectionGeneration
+  // Prefer the device copy over the hosted one. A preset that has already been
+  // pulled down is still listed under its remote URL, and emitting that URL
+  // sends the projector back to the network for bytes it already holds.
+  const localUrl = video?.id
+    ? await localMedia.getPlaybackUrl(video.id)
+    : null
+  if (requestGeneration !== selectionGeneration) return
+  emit("select", { video: localUrl || video?.url, key: video?.id })
+}
 const videoUploadLoading = ref(false)
 const videoFileInput = ref<HTMLInputElement | null>(null)
 const currentVideoIndex = ref(0)
@@ -153,7 +178,6 @@ const deletingVideoId = ref<string | null>(null)
 
 const previewVideoId = ref<string | null>(null)
 const bgVideoToBeSelected = ref<string | null>(null)
-const localVideoObjectUrls = new Set<string>()
 const defaultBackgroundVideos = [...appStore.currentState.backgroundVideos]
 const backgroundVideos = ref<BackgroundVideo[]>([...defaultBackgroundVideos])
 
@@ -166,18 +190,6 @@ const onVideoFileSelect = (event: Event) => {
   const files = Array.from(input.files || [])
   input.value = ""
   void saveAndSelectVideos(files)
-}
-
-const revokeLocalVideoObjectUrls = () => {
-  const usedBackgrounds = new Set(
-    appStore.activeSlides.map((s) => s.background).filter(Boolean)
-  )
-  localVideoObjectUrls.forEach((url) => {
-    if (!usedBackgrounds.has(url)) {
-      localMedia.releasePlaybackUrl(url)
-    }
-  })
-  localVideoObjectUrls.clear()
 }
 
 const getAllLocallySavedVideos = async () => {
@@ -197,7 +209,14 @@ const getAllLocallySavedVideos = async () => {
     ".flv",
   ] as const
 
-  revokeLocalVideoObjectUrls()
+  // Deliberately not revoking the URLs from a previous pass. `getPlaybackUrl`
+  // memoises one URL per media key for the whole app, so the string handed to
+  // this panel is the same one the editor preview, the slide cards and the
+  // projection window are rendering. Revoking it here — which the old sweep did
+  // for anything not currently a slide background — killed those too, and left
+  // the operator looking at an empty preview until something re-resolved the
+  // key. Nothing leaks by leaving them: the cache hands out the same URL on
+  // every mount and releases it itself when the underlying record moves.
 
   // Create Object URLs from locally saved videos - process in batches
   const locallySavedVideos: BackgroundVideo[] = []
@@ -212,9 +231,6 @@ const getAllLocallySavedVideos = async () => {
 
       const playbackUrl = await localMedia.getPlaybackUrl(video.key)
       if (!playbackUrl) continue
-      if (playbackUrl.startsWith("blob:")) {
-        localVideoObjectUrls.add(playbackUrl)
-      }
       locallySavedVideos.push({ id: video.key, url: playbackUrl })
       if (video.key === bgVideoToBeSelected.value) {
         bgVideoToBeSelected.value = playbackUrl
@@ -238,6 +254,9 @@ const getAllLocallySavedVideos = async () => {
 const saveAndSelectVideos = async (files: File[]) => {
   if (!files || files.length === 0) return
 
+  // Claim the generation as soon as the drop starts: it is the newest intent,
+  // and a tile click still resolving from before it must not land on top.
+  const requestGeneration = ++selectionGeneration
   videoUploadLoading.value = true
   emit("loading-change", true)
   totalVideos.value = files.length
@@ -302,7 +321,10 @@ const saveAndSelectVideos = async (files: File[]) => {
     }
 
     await getAllLocallySavedVideos()
-    if (bgVideoToBeSelected.value) {
+    // The save itself succeeded either way — only the selection is in question.
+    // A tile clicked while these bytes were being written is the newer choice,
+    // so the durable URL is filed away without being applied.
+    if (requestGeneration === selectionGeneration && bgVideoToBeSelected.value) {
       emit("select", {
         video: bgVideoToBeSelected.value,
         key: selectedVideoKey || bgVideoToBeSelected.value,
@@ -350,8 +372,4 @@ const handleDeleteVideo = async (video: BackgroundVideo) => {
 }
 
 getAllLocallySavedVideos()
-
-onBeforeUnmount(() => {
-  revokeLocalVideoObjectUrls()
-})
 </script>

@@ -4,7 +4,9 @@
     class="books-preview behavior-smooth absolute bg-white dark:bg-[#222938] right-0 left-0 top-[46px] z-40 overflow-auto shadow-lg rounded-b-2xl"
   >
     <div class="flex flex-col gap-2 px-4 py-3">
-      <Hint>
+      <!-- Keyboard-only guidance: there is no Tab or arrow key to press on a
+           phone, so this hint is noise that costs a row of the book list. -->
+      <Hint class="hidden md:block">
         <div class="flex items-center">
           Use <span class="hotkey">Tab</span> or
           <span class="hotkey">

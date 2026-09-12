@@ -40,15 +40,8 @@ useHead({
 })
 import { useAppStore } from "~/store/app"
 import { ref } from "vue"
-import { useDebounceFn, useOnline } from "@vueuse/core"
-import type { Emitter } from "mitt"
 
 const appStore = useAppStore()
-const emitter = useNuxtApp().$emitter as Emitter<any>
-const toast = useToast()
-const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
-const MAX_RETRIES = 10
-let retryCount = 0
 
 // Resizable panel widths — bounds and defaults track the viewport so the three
 // columns keep their proportions on smaller screens instead of squeezing the
@@ -116,151 +109,9 @@ const onResizeEnd = () => {
   document.body.style.userSelect = ""
 }
 
-// Realtime slides handling
-const {
-  handleWebSocketMessage,
-  updateOnlineUsers,
-  cleanup: cleanupRealtimeSlides,
-} = useRealtimeSlides({
-  // onSlideCreated: (slide, createdByName) => {
-  //   toast.add({
-  //     title: `${createdByName} added a new slide`,
-  //     icon: "i-tabler-plus",
-  //     color: "blue",
-  //     timeout: 3000,
-  //   })
-  // },
-  onSlideUpdated: (slide, updatedByName) => {
-    // Silent update - no toast for every update to avoid noise
-  },
-  onSlideDeleted: (slideId, deletedByName) => {
-    toast.add({
-      title: `${deletedByName} deleted a slide`,
-      icon: "i-tabler-trash",
-      color: "amber",
-      timeout: 3000,
-    })
-  },
-  onBatchSlidesCreated: (slides, createdByName) => {
-    toast.add({
-      title: `${createdByName} added ${slides.length} slides`,
-      icon: "i-tabler-plus",
-      color: "blue",
-      timeout: 3000,
-    })
-  },
-  onUserJoined: (user) => {
-    // toast.add({
-    //   title: `${user.userName} joined the schedule`,
-    //   icon: 'i-tabler-user-plus',
-    //   color: 'green',
-    //   timeout: 3000,
-    // })
-  },
-  onUserLeft: (userId, userName) => {
-    // toast.add({
-    //   title: `${userName} left the schedule`,
-    //   icon: 'i-tabler-user-minus',
-    //   color: 'gray',
-    //   timeout: 3000,
-    // })
-  },
-})
-
-const uploadOfflineSlides = useDebounceFn(() => {
-  useGlobalEmit(appWideActions.uploadOfflineSlides)
-}, 2000)
-
-const connectSocket = async () => {
-  const scheduleId = appStore.currentState.activeSchedule?._id
-  if (!scheduleId) return
-
-  socketInstance.value = useSocketIO({
-    scheduleId,
-    onMessage: (event, data) => {
-      handleWebSocketMessage(data)
-    },
-    onConnected: () => {
-      // Show toast on reconnection (only if we were previously connected and lost connection)
-      const wasReconnected =
-        socketInstance.value?.isReconnecting?.value === false &&
-        socketInstance.value?.isConnectedRef?.value === true
-
-      // Check if this is a reconnection after a disconnect
-      if (wasReconnected) {
-        toast.add({
-          title: "Connection restored",
-          icon: "i-tabler-wifi",
-          color: "green",
-          timeout: 3000,
-        })
-      }
-    },
-    onDisconnected: () => {
-      // Optionally show disconnect notification
-    },
-    onOnlineUsersChanged: (users) => {
-      updateOnlineUsers(users)
-      appStore.setOnlineUsers(users)
-    },
-    onUserJoined: (user) => {
-      appStore.triggerUserJoinedAnimation(user)
-    },
-  })
-
-  socketInstance.value.connect()
-
-  // Watch for reconnection state changes to show toast
-  watch(
-    () => socketInstance.value?.isConnectedRef?.value,
-    (isConnected, wasConnected) => {
-      if (isConnected && wasConnected === false) {
-        toast.add({
-          title: "Connection restored",
-          icon: "i-tabler-wifi",
-          color: "green",
-          timeout: 3000,
-        })
-      } else if (!isConnected && wasConnected === true) {
-        toast.add({
-          title: "Connection lost. Reconnecting...",
-          icon: "i-tabler-wifi-off",
-          color: "yellow",
-          timeout: 3000,
-        })
-      }
-    }
-  )
-}
-
-const disconnectSocket = () => {
-  socketInstance.value?.disconnect()
-  cleanupRealtimeSlides()
-  appStore.setOnlineUsers([])
-}
-
-// Feed the slide that is currently on screen to livestream viewers. Nothing
-// else broadcasts it, so /livestream/:schedule_id stays blank without this.
-watch(
-  () => appStore.currentState.liveSlideId,
-  (liveSlideId) => {
-    if (!socketInstance.value?.isConnected()) return
-
-    // Intermission clears liveSlideId (see goIntermission in LiveOutput). Send
-    // an explicit null so viewers blank out instead of holding the last slide.
-    if (!liveSlideId) {
-      socketInstance.value.sendLiveSlide(null)
-      return
-    }
-
-    const liveSlide = appStore.activeSlides.find(
-      (slide) => slide.id === liveSlideId
-    )
-    if (liveSlide) {
-      socketInstance.value.sendLiveSlide(liveSlide)
-    }
-  }
-)
+// Realtime session — the socket connection, incoming slide events, presence
+// and the livestream broadcast. Shared verbatim with the mobile operator route.
+useOperatorSession()
 
 onMounted(async () => {
   const emailChange = useRoute().query.email_change
@@ -340,40 +191,13 @@ onMounted(async () => {
   useRegisteredShortcut(shortcutIds.settings, () => {
     useGlobalEmit(appWideActions.openSettings)
   })
-
-
-  // Connect to Socket.IO
-  if (appStore.currentState.activeSchedule) {
-    connectSocket()
-  }
 })
 
-// Watch for schedule changes to reconnect Socket
-watch(
-  () => appStore.currentState.activeSchedule?._id,
-  (newScheduleId, oldScheduleId) => {
-    if (newScheduleId && newScheduleId !== oldScheduleId) {
-      disconnectSocket()
-      setTimeout(() => {
-        connectSocket()
-      }, 500)
-    }
-  }
-)
-
-// Cleanup on unmount
+// Cleanup on unmount — the socket half is owned by useOperatorSession.
 onBeforeUnmount(() => {
   appStore.setPanelSize("quickActionsWidth", quickActionsWidth.value)
   appStore.setPanelSize("liveOutputWidth", liveOutputWidth.value)
-  disconnectSocket()
   document.removeEventListener("mousemove", onResizeMove)
   document.removeEventListener("mouseup", onResizeEnd)
 })
-
-emitter.on("refresh-slides", () => {
-  if (!socketInstance.value?.isConnected()) {
-    connectSocket()
-  }
-})
-
 </script>

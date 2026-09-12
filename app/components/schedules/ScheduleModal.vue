@@ -4,7 +4,7 @@
       v-model="visible"
       :prevent-close="true"
       :ui="{
-        base: 'min-w-[570px] max-w-[570px]',
+        base: 'w-[94vw] max-w-[570px] sm:w-auto sm:min-w-[570px] max-h-[88dvh] flex flex-col',
         background: 'bg-transparent dark:bg-transparent',
         ring: '',
         rounded: 'rounded-2xl',
@@ -16,6 +16,7 @@
       <AppSection
         heading="Create a schedule"
         heading-styles="text-lg font-semibold"
+        class="min-h-0 flex-1"
       >
         <template #actions>
           <button
@@ -30,13 +31,13 @@
         </template>
 
         <div
-          class="schedule-modal-body rounded-2xl bg-gray-50 dark:bg-[#1b212e] p-4"
+          class="schedule-modal-body min-h-0 flex-1 overflow-y-auto rounded-2xl bg-gray-50 dark:bg-[#1b212e] p-3 sm:p-4"
         >
           <div class="starters-ctn">
             <div class="flex items-center justify-between mb-3">
               <p class="text-sm text-gray-400">Start with a template</p>
             </div>
-            <div class="grid grid-cols-4 gap-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <div class="flex flex-col gap-2.5">
                 <button
                   class="relative h-[80px] rounded-xl border-2 border-dashed border-gray-200 dark:border-[#2a3244] flex items-center justify-center transition-colors hover:border-primary-500 disabled:cursor-not-allowed"
@@ -95,7 +96,7 @@
                 See all
               </span>
             </div>
-            <div class="max-h-[370px] overflow-auto">
+            <div class="sm:max-h-[370px] sm:overflow-auto">
               <ScheduleCard
                 v-for="schedule in recentSchedules.slice(0, scheduleListLimit)"
                 :key="schedule?._id"

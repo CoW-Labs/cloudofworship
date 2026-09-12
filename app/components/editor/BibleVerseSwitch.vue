@@ -77,3 +77,17 @@ defineEmits<{
   (e: "predict", target: EventTarget | null): void
 }>()
 </script>
+
+<style scoped>
+/* The input's width is set inline, in `ch`, from the length of the reference it
+   holds — "1 Thessalonians 5:23" asks for 21ch. That is fine in the desktop
+   toolbar and ruinous on a phone: measured at 375px it took 223px of the 241px
+   control strip, so the Bible version, Scripture and Background controls all
+   started off-screen behind a scroll nobody would guess was there.
+   `max-width` overrides the inline width without touching the sizing logic. */
+@media (max-width: 767px) {
+  .verse-switch :deep(input) {
+    max-width: 9ch;
+  }
+}
+</style>

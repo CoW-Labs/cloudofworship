@@ -1,7 +1,7 @@
 <template>
   <div
     v-show="slide?.type !== slideTypes.presentation"
-    class="absolute z-30 top-[46px] left-2 right-2 flex"
+    class="editor-floating-toolbar absolute z-30 top-[46px] left-2 right-2 flex"
     :class="containerOverflow"
   >
     <div

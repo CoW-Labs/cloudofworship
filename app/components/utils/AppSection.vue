@@ -200,10 +200,6 @@ import { appWideActions } from "~/utils/constants"
 import GoLiveIcon from "~/components/svgs/GoLiveIcon.vue"
 import ArrowRightIcon from "~/components/svgs/ArrowRightIcon.vue"
 
-// Check if user has Teams subscription for livestream URL feature
-const { isTeamsPlan } = useSubscription()
-const canUseLivestreamLink = computed(() => isTeamsPlan.value)
-
 defineProps({
   heading: String,
   subHeading: String,
@@ -228,7 +224,11 @@ defineProps({
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const secondaryActionPopoverOpen = ref(false)
-const isClipboardCopying = ref(false)
+
+// Shared with the live-output panel's own menu, so the two entry points cannot
+// disagree about the URL or the Teams gate.
+const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
+  useLivestreamLink()
 type CowButtonVariant = "primary" | "secondary" | "dark" | "danger"
 
 const getCowButtonVariant = (variant?: string): CowButtonVariant => {
@@ -240,23 +240,6 @@ const getCowButtonVariant = (variant?: string): CowButtonVariant => {
     : "dark"
 }
 
-const copyLivestreamURL = async () => {
-  isClipboardCopying.value = true
-  const origin = window.location.origin?.includes("localhost:30")
-    ? window.location.origin
-    : "https://app.cloudofworship.com"
-  await navigator.clipboard.writeText(
-    `${window.location.origin}/livestream/${currentState.value.activeSchedule?._id}`
-  )
-  useToast().add({
-    title: "Livestream URL copied to clipboard",
-    color: "green",
-    icon: "i-bx-check-circle",
-  })
-  setTimeout(() => {
-    isClipboardCopying.value = false
-  }, 3000)
-}
 </script>
 
 <style scoped></style>

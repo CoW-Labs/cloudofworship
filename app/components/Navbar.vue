@@ -9,9 +9,13 @@
         :class="{ 'opacity-100': currentState.slidesLoading && online }"
         size="xs"
       />
-      <div class="logo flex items-center gap-2 w-[400px] short:w-[300px]">
+      <div
+        class="logo flex items-center gap-2 min-w-0 md:w-[400px] short:w-[300px]"
+      >
         <Logo class="w-[38px] short:w-[30px]" />
-        <h1 class="text-md font-semibold short:text-sm truncate">
+        <h1
+          class="text-md font-semibold short:text-sm truncate hidden md:block"
+        >
           Cloud of Worship
         </h1>
 
@@ -78,7 +82,7 @@
             <button
               ref="scheduleNameButton"
               type="button"
-              class="schedule-switcher__name max-w-[280px] truncate px-4 text-sm font-normal hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
+              class="schedule-switcher__name max-w-[140px] md:max-w-[280px] truncate px-4 text-sm font-normal hover:bg-gray-100 dark:hover:bg-[#202838] transition-colors"
               @click="startScheduleNameEdit"
             >
               {{ currentState.activeSchedule?.name || "Untitled" }}
@@ -114,7 +118,7 @@
         </div>
       </div>
       <div
-        class="actions text-sm flex gap-2 items-center justify-end w-[400px]"
+        class="actions text-sm flex gap-2 items-center justify-end min-w-0 md:w-[400px]"
       >
         <SettingsModal
           :is-open="settingsModalOpen"
@@ -164,8 +168,14 @@
           </UButton>
         </CowTooltip>
 
-        <!-- INVITE PEOPLE BUTTON -->
-        <CowTooltip text="Invite your church media team" placement="bottom">
+        <!-- INVITE PEOPLE BUTTON — hidden on phones, where it is the widest
+             control in the bar and never used mid-service. Still reachable
+             from Quick Actions ("Invite to Workspace"). -->
+        <CowTooltip
+          text="Invite your church media team"
+          placement="bottom"
+          class="hidden md:block"
+        >
           <CowButton
             variant="primary"
             size="sm"
@@ -177,11 +187,15 @@
           </CowButton>
         </CowTooltip>
 
-        <!-- DARK / LIGHT MODE TOGGLE (sliding switch) -->
+        <!-- DARK / LIGHT MODE TOGGLE (sliding switch) — hidden on phones. The
+             60px switch plus its gap is a meaningful slice of a 375px bar, and
+             a phone already follows the OS theme by default. Still reachable
+             from Quick Actions ("Toggle Dark Mode") and Other Settings. -->
         <ClientOnly>
           <CowTooltip
             :text="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
             placement="bottom"
+            class="hidden md:block"
           >
             <button
               type="button"
@@ -213,7 +227,7 @@
             </button>
           </CowTooltip>
           <template #fallback>
-            <div class="w-[60px] h-8" />
+            <div class="hidden md:block w-[60px] h-8" />
           </template>
         </ClientOnly>
 
