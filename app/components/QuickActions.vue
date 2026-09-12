@@ -1414,6 +1414,27 @@ const searchedActions = computed(() => {
     if (group.length < cap) group.push(action)
   }
 
+  // Library songs come before API songs above, which is right when the
+  // library has the song the user typed — but a library near-miss
+  // ("Praise Him") would sit above the API's exact hit ("Praise"). Within the
+  // song group, lift exact title matches to the front; the sort is stable, so
+  // library-before-API is kept among equals.
+  const songGroup = groupedResults.get(slideTypes.song)
+  if (songGroup && songGroup.length > 1) {
+    const normalize = (value?: string) =>
+      (value || "")
+        .toLowerCase()
+        .replace(/\s*[([]?\b(ft\.?|feat\.?|featuring)\b.*$/, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+    const songQuery = normalize(searchInput.value)
+    if (songQuery) {
+      const isExact = (action: QuickAction) =>
+        normalize(action?.songData?.title) === songQuery ? 0 : 1
+      songGroup.sort((a, b) => isExact(a) - isExact(b))
+    }
+  }
+
   // Enforce a fixed reading order for the well-known groups — all runnable
   // actions first (the quickActionsArr entries, then their settings siblings,
   // kept adjacent so the Actions section reads as one block), then the dynamic
