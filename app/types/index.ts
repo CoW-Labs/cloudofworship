@@ -423,6 +423,10 @@ export interface AppSettings {
   liveWindowFullscreen?: boolean // Whether live window opens in fullscreen mode
   closeLiveWindowWithOperator?: boolean // Whether live window closes when the operator tab/window closes
   ndiEnabled?: boolean // Device-local desktop NDI preference. Never synced to the backend.
+  // Whether this device answers live-output control requests from a team
+  // member's phone. Device-local like ndiEnabled — it describes the machine
+  // wired to the projector, so it must never follow the operator elsewhere.
+  allowRemoteControl?: boolean
   transcriptionAutoActions?: boolean
   transcriptionVoiceBibleVersionCommands?: boolean
   uploadVideosToCloud?: boolean // Upload video media slides to cloud (S3). Defaults to true.

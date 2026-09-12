@@ -161,7 +161,10 @@
               v-if="slide?.type === slideTypes.presentation"
               class="page-switch button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
             >
-              <CowTooltip text="Previous page" :shortcut="shortcutIds.previousVerse">
+              <CowTooltip
+                text="Previous page"
+                :shortcut="shortcutIds.previousVerse"
+              >
                 <UButton
                   variant="ghost"
                   color="gray"
@@ -386,9 +389,7 @@
             <h3 class="text-white font-semibold text-md">
               {{ imageUnavailableCopy.title }}
             </h3>
-            <p
-              class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto"
-            >
+            <p class="text-primary-300 text-sm mt-1 max-w-[260px] mx-auto">
               {{ imageUnavailableCopy.description }}
             </p>
           </div>
@@ -690,7 +691,6 @@ const backgroundPopoverSize = ref<PopoverSize>(
 )
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
-
 
 // Toolbar tabs that toggle the overlay panels. Scripture/Layout are Bible-only;
 // Background mirrors the old "add background" visibility (hidden for presentation
@@ -1518,10 +1518,6 @@ const onUpdateSongLyrics = async (song: Song) => {
       { activeSongIndex, verseIndex: activeItem.verseIndex }
     )
     emit("slide-update", updatedSlide)
-    useToast().add({
-      icon: "i-bx-music",
-      title: "Song lyrics updated",
-    })
     return
   }
 
@@ -1545,11 +1541,6 @@ const onUpdateSongLyrics = async (song: Song) => {
     ? slideLayoutTypes.bible
     : slideLayoutTypes.full_text
   emit("slide-update", tempSlide)
-  // console.log(verse.value)
-  useToast().add({
-    icon: "i-bx-music",
-    title: "Song lyrics updated",
-  })
 }
 
 const onUpdateSongLines = async (linesPerSlide: number) => {
@@ -1605,10 +1596,6 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
       ? slideLayoutTypes.bible
       : slideLayoutTypes.full_text
     emit("slide-update", tempSlide)
-    useToast().add({
-      icon: "i-tabler-list-numbers",
-      title: "Lines per slide updated",
-    })
     return
   }
 
@@ -1651,10 +1638,6 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
         : previousVerseIndex,
     })
     emit("slide-update", updatedSlide)
-    useToast().add({
-      icon: "i-tabler-list-numbers",
-      title: "Lines per slide updated",
-    })
     return
   }
 

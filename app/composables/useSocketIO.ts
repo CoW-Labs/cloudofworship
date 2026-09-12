@@ -426,6 +426,18 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('live-slide', { action: 'live-slide', data })
       })
 
+      // Live output control — a phone driving the machine with the projector.
+      // Hosts advertise themselves with `live-control-host`; controllers send
+      // `live-control-request` addressed to exactly one host id. Neither is a
+      // reply to the other, so there is no loop here. See useLiveOutputControl.
+      socket.on('live-control-host', (data) => {
+        onMessage?.('live-control-host', { action: 'live-control-host', data })
+      })
+
+      socket.on('live-control-request', (data) => {
+        onMessage?.('live-control-request', { action: 'live-control-request', data })
+      })
+
       // Alert and overlay events
       socket.on('add-alert', (data) => {
         onMessage?.('add-alert', { action: 'add-alert', data })

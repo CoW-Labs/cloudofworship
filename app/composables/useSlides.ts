@@ -16,6 +16,10 @@ export default function useSlides() {
   const authStore = useAuthStore()
   const toast = useToast()
   const online = useOnline()
+  const {
+    goLive: goLiveOnControlledOutput,
+    isControllingRemoteHost,
+  } = useLiveOutputControl()
   const getChurchId = () => authStore.church?._id || authStore.user?.churchId
   const loading = ref<boolean>(false)
   const removeStaleSlide = (slideId?: string) => {
@@ -45,6 +49,18 @@ export default function useSlides() {
     // Update only the changed slide. Replacing the full schedule array here
     // made every verse navigation re-filter and re-render unrelated slides.
     appStore.updateSlideInActiveSlides(updatedSlide)
+
+    // While this device is driving another device's screen (a phone running
+    // the mobile app, say), that device owns the projection and the local copy
+    // of the media — so ask it rather than projecting into a window that is not
+    // there. `forceGoLive` is the only genuine "put this on screen" intent
+    // here: a plain edit to the slide that is already live reaches the host as
+    // an `update-slide` event and is re-projected there, so asking again would
+    // only race that.
+    if (shouldUpdateLiveSlide && isControllingRemoteHost.value) {
+      if (options?.forceGoLive) goLiveOnControlledOutput(updatedSlide.id)
+      return
+    }
 
     if (shouldUpdateLiveSlide) {
       // Same-slide verse changes already have the correct live id. Avoid a

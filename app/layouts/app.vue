@@ -231,6 +231,18 @@ const inaccessibleDateRemaining = computed(() => {
 
 provide("windowRefs", windowRefs)
 
+// Owning a live output window is what makes this device eligible to be driven
+// from a phone — and, just as importantly, what makes every other device
+// ineligible. useLiveOutputControl reads nothing else to decide it.
+const localOutputPresent = useLocalOutputPresence()
+watch(
+  windowRefs,
+  (refs) => {
+    localOutputPresent.value = (refs?.length ?? 0) > 0
+  },
+  { immediate: true }
+)
+
 const fetchUser = async () => {
   const { data, error } = await useAPIFetch(`/user/auth`)
   if (data.value) {
