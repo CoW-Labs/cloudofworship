@@ -19,7 +19,7 @@
         <header
           v-if="!headerless"
           class="sheet-header flex items-center gap-2 shrink-0 px-4 pb-3 border-b border-white/80 dark:border-[#202838] bg-white dark:bg-[#171d2b]"
-          :style="{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }"
+          :style="{ paddingTop: headerPaddingTop }"
         >
           <button
             type="button"
@@ -119,6 +119,14 @@ const measureNavbar = () => {
     navbarOffset.value = navbar?.getBoundingClientRect().bottom ?? 0
   })
 }
+
+// Only a full-screen sheet owns the top of the viewport. An `inline` one sits
+// inside the page, below a navbar the `app` layout has already padded by the
+// safe-area inset, so repeating the inset here would open a second notch-sized
+// gap under the navbar.
+const headerPaddingTop = computed(() =>
+  props.inline ? "0.75rem" : "max(0.75rem, env(safe-area-inset-top))"
+)
 
 const sheetStyle = computed(() =>
   props.belowNavbar && navbarOffset.value > 0

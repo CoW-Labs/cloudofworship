@@ -1,7 +1,7 @@
 <template>
   <nav
     class="mobile-action-bar shrink-0 flex items-center justify-between gap-2 px-3 pt-2 bg-white dark:bg-[#171d2b] border-t border-white/80 dark:border-[#202838]"
-    :style="{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }"
+    :style="{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }"
     aria-label="Mobile actions"
   >
     <!-- SCHEDULES — the service you are working on. Secondary because it is a

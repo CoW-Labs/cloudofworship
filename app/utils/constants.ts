@@ -234,7 +234,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newTimeSlide,
     meta: "time clock live clock current time",
     type: slideTypes.time,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-mdi-youtube",

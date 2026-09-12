@@ -105,7 +105,11 @@ export default defineNuxtConfig({
       htmlAttrs: {
         lang: "en",
       },
-      viewport: "initial-scale=1",
+      // `viewport-fit=cover` is what makes `env(safe-area-inset-*)` resolve to
+      // anything other than 0. Every surface that sits against a screen edge
+      // (the navbar, the mobile action bar) pads itself with those insets, so
+      // this has to be on the document, not just the /mobile route.
+      viewport: "initial-scale=1, viewport-fit=cover",
       title: "Cloud of Worship - Your church's powerpoint",
       meta: [
         {
@@ -114,6 +118,26 @@ export default defineNuxtConfig({
             "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worship is your church's power point.",
         },
         { name: "format-detection", content: "telephone=no" },
+        // Installed-PWA chrome on iOS. `default` keeps the status bar opaque
+        // and sized, which is what stops the navbar rendering underneath the
+        // notch / Dynamic Island; `black-translucent` would put it back there.
+        { name: "apple-mobile-web-app-capable", content: "yes" },
+        { name: "mobile-web-app-capable", content: "yes" },
+        { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+        { name: "apple-mobile-web-app-title", content: "Cloud of Worship" },
+        // The status-bar strip the OS paints above the app. The manifest can
+        // only carry one colour, so it is declared per colour scheme here —
+        // otherwise a dark-mode install gets a white band over a dark navbar.
+        {
+          name: "theme-color",
+          media: "(prefers-color-scheme: light)",
+          content: "#f3f4f6",
+        },
+        {
+          name: "theme-color",
+          media: "(prefers-color-scheme: dark)",
+          content: "#111722",
+        },
         { property: "og:type", content: "website" },
         {
           name: "og:url",
