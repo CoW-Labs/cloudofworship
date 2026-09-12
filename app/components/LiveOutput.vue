@@ -330,6 +330,7 @@
                   liveSlide?.id === slide?.id,
                   currentState.activeOverlaySlide?.id === slide?.id,
                   ctrlOrMetaActive,
+                  openActionsSlideId === slide?.id,
                 ]"
                 :class="{
                   'bg-red-100 dark:bg-red-900': liveSlide?.id === slide?.id,
@@ -337,7 +338,7 @@
                     currentState.activeOverlaySlide?.id === slide?.id,
                 }"
                 @click="handleScheduleSlideAction(slide)"
-                @dblclick="useGlobalEmit(appWideActions.newActiveSlide, slide)"
+                @dblclick="editSlide(slide)"
                 @dragstart="draggingSlide = slide"
                 @dragover.prevent="
                   slide?.type === slideTypes.songSetlist &&
@@ -371,36 +372,93 @@
                   hide-text
                   class="mt-3 left-20 right-auto"
                 />
-                <!-- DELETE SLIDE BUTTON -->
-                <div class="actions absolute bottom-2 right-2 flex gap-1">
-                  <CowTooltip text="Preview / edit slide">
-                    <UButton
-                      size="xs"
-                      variant="ghost"
-                      class="px-1 text-primary-500 hover:bg-primary-white"
-                      @click.stop.prevent="
-                        useGlobalEmit(appWideActions.newActiveSlide, slide)
-                      "
-                    >
-                      <template #leading>
-                        <EditIcon class="w-4 h-4" />
-                      </template>
-                    </UButton>
-                </CowTooltip>
-
-                <ConfirmDialog
-                  button-icon="i-tabler-trash"
-                  button-styles="px-1 text-red-500 hover:bg-primary-white"
-                  button-color="red"
-                  header="Delete slide"
-                  label="Are you sure you want to delete this slide? This action is not reversible"
-                  @confirm="useGlobalEmit(appWideActions.deleteSlide, slide)"
+                <!-- EDIT / DELETE SLIDE — side by side on desktop, where the
+                     row has the width for them and hover reveals them. A phone
+                     has neither, and two exposed icons on a 100%-wide row are
+                     two things to hit by accident while scrolling the schedule
+                     mid-service, so there they fold into the same "more" menu
+                     the rest of the app uses. -->
+                <div
+                  class="actions absolute bottom-2 right-2 flex gap-1"
+                  :class="{ 'menu-open': openActionsSlideId === slide?.id }"
                 >
-                  <template #icon>
-                    <DeleteIcon class="w-4 h-4" />
+                  <MoreActionsMenu
+                    v-if="mobile"
+                    flush
+                    trigger-class="rounded-full"
+                    @update:open="
+                      openActionsSlideId = $event ? slide?.id ?? null : null
+                    "
+                  >
+                    <template #default="{ close }">
+                      <UButton
+                        variant="ghost"
+                        color="gray"
+                        block
+                        @click.stop.prevent="
+                          () => {
+                            close()
+                            editSlide(slide)
+                          }
+                        "
+                      >
+                        <template #leading>
+                          <EditIcon class="w-4 h-4" />
+                        </template>
+                        Edit slide
+                      </UButton>
+
+                      <ConfirmDialog
+                        button-icon="i-tabler-trash"
+                        no-tooltip
+                        button-variant="ghost"
+                        button-color="red"
+                        button-label="Delete Slide"
+                        button-styles="more-item-danger"
+                        header="Delete slide"
+                        label="Are you sure you want to delete this slide? This action is not reversible"
+                        @confirm="
+                          () => {
+                            useGlobalEmit(appWideActions.deleteSlide, slide)
+                            close()
+                          }
+                        "
+                      >
+                        <template #icon>
+                          <DeleteIcon class="w-4 h-4" />
+                        </template>
+                      </ConfirmDialog>
+                    </template>
+                  </MoreActionsMenu>
+
+                  <template v-else>
+                    <CowTooltip text="Preview / edit slide">
+                      <UButton
+                        size="xs"
+                        variant="ghost"
+                        class="px-1 text-primary-500 hover:bg-primary-white"
+                        @click.stop.prevent="editSlide(slide)"
+                      >
+                        <template #leading>
+                          <EditIcon class="w-4 h-4" />
+                        </template>
+                      </UButton>
+                    </CowTooltip>
+
+                    <ConfirmDialog
+                      button-icon="i-tabler-trash"
+                      button-styles="px-1 text-red-500 hover:bg-primary-white"
+                      button-color="red"
+                      header="Delete slide"
+                      label="Are you sure you want to delete this slide? This action is not reversible"
+                      @confirm="useGlobalEmit(appWideActions.deleteSlide, slide)"
+                    >
+                      <template #icon>
+                        <DeleteIcon class="w-4 h-4" />
+                      </template>
+                    </ConfirmDialog>
                   </template>
-                </ConfirmDialog>
-              </div>
+                </div>
               <!-- SLIDE INDEX -->
               <div
                 v-show="ctrlOrMetaActive"
@@ -447,6 +505,24 @@ const props = withDefaults(
   }>(),
   { mobile: false }
 )
+
+const emit = defineEmits<{
+  /**
+   * A slide was sent to the editor. On mobile the live pane and the editor
+   * cannot both be on screen, so the route that opened this pane uses this to
+   * step out of the way rather than leaving the editor stacked behind it.
+   */
+  (e: "edit-slide", slide: Slide): void
+}>()
+
+// Which row's actions menu is open, so its icons stay visible while it is (the
+// `.actions` group is otherwise hover-only).
+const openActionsSlideId = ref<string | null>(null)
+
+const editSlide = (slide: Slide) => {
+  emit("edit-slide", slide)
+  useGlobalEmit(appWideActions.newActiveSlide, slide)
+}
 
 const windowRefs = inject("windowRefs") as any[]
 
@@ -829,7 +905,8 @@ const handleDropOnSetlist = (targetSlide: Slide) => {
   transform: translateX(10px);
   transition: 0.3s;
 }
-.slide-card:hover .actions {
+.slide-card:hover .actions,
+.slide-card .actions.menu-open {
   visibility: visible;
   opacity: 1;
   transform: translateX(0);
