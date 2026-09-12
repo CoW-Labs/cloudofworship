@@ -17,6 +17,8 @@
       <UInputMenu
         :model-value="selectedOption"
         :options="options"
+        :search="search"
+        :debounce="search ? 120 : undefined"
         :placeholder="floated ? placeholder : undefined"
         variant="none"
         size="lg"
@@ -52,6 +54,10 @@ const props = withDefaults(
     modelValue?: string
     label?: string
     options?: string[]
+    // An alternative to `options` for lists too long to hand over wholesale:
+    // the menu calls this (debounced) with the typed query and shows only what
+    // comes back, so it never renders more rows than the search returns.
+    search?: (query: string) => string[] | Promise<string[]>
     placeholder?: string
     error?: string
   }>(),
