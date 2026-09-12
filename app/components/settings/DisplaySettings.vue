@@ -90,6 +90,28 @@
           "
         />
       </SettingsRow>
+
+      <SettingsRow
+        label="Let a team member's phone control this output"
+        description="When enabled, someone on the mobile app can pick this device and take slides live on the screen it is driving. They can only do that while the live window is open here, and you will see who is controlling it above the slide schedule. This preference is stored on this device only."
+      >
+        <CowToggle
+          bare
+          label="Let a team member's phone control this output"
+          :model-value="currentState.settings.allowRemoteControl !== false"
+          @update:model-value="
+            (value: boolean) => {
+              appStore.setAllowRemoteControl(value)
+              useToast().add({
+                title: value
+                  ? 'Mobile devices can control this live output'
+                  : 'Only this device can change its live output',
+                icon: 'i-bx-check-circle',
+              })
+            }
+          "
+        />
+      </SettingsRow>
     </SettingsGroup>
 
     <SettingsGroup

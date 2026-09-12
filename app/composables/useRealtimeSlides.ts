@@ -38,6 +38,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const authStore = useAuthStore()
   const toast = useToast()
   const { applyOverlaySettings } = useOverlaySettings()
+  const { handleControlMessage } = useLiveOutputControl()
 
   // Track online users
   const onlineUsers = ref<OnlineUser[]>([])
@@ -409,6 +410,15 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         if (data.onlineUsers) {
           onlineUsers.value = data.onlineUsers
         }
+        break
+
+      // Live output control. Deliberately thin: the decision about whether this
+      // device is the one being addressed — and whether it owns an output at
+      // all — belongs to useLiveOutputControl, not to a switch case that every
+      // client runs.
+      case 'live-control-host':
+      case 'live-control-request':
+        handleControlMessage(action, data)
         break
 
     }
