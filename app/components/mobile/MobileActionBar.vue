@@ -8,7 +8,12 @@
          once-per-session switch, not something touched mid-service. -->
     <button
       type="button"
-      class="bar-btn flex flex-col items-center justify-center gap-1 min-w-[64px] min-h-[48px] px-2 rounded-xl text-gray-600 dark:text-[#9aa3b2] hover:bg-gray-100 dark:hover:bg-[#222938] transition-colors"
+      class="bar-btn flex flex-col items-center justify-center gap-1 min-w-[64px] min-h-[48px] px-2 rounded-xl transition-colors"
+      :class="
+        activeTab === 'schedules'
+          ? 'text-primary-600 dark:text-primary-300 bg-primary-500/10'
+          : 'text-gray-600 dark:text-[#9aa3b2] hover:bg-gray-100 dark:hover:bg-[#222938]'
+      "
       @click="$emit('open-schedules')"
     >
       <SchedulesIcon class="w-5 h-5" />
@@ -37,11 +42,12 @@
     <button
       type="button"
       class="bar-btn flex flex-col items-center justify-center gap-1 min-w-[64px] min-h-[48px] px-2 rounded-xl transition-colors"
-      :class="
+      :class="[
         isLive
           ? 'text-red-600 dark:text-red-400 hover:bg-red-500/10'
-          : 'text-gray-600 dark:text-[#9aa3b2] hover:bg-gray-100 dark:hover:bg-[#222938]'
-      "
+          : 'text-gray-600 dark:text-[#9aa3b2] hover:bg-gray-100 dark:hover:bg-[#222938]',
+        activeTab === 'live' ? 'bg-primary-500/10' : '',
+      ]"
       @click="$emit('open-live')"
     >
       <GoLiveIcon class="w-5 h-5" />
@@ -52,6 +58,12 @@
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+
+// Which tab the content area is showing, so the bar says where you are — the
+// tabs themselves dropped their headers, and this is what replaced them.
+defineProps<{
+  activeTab?: "quick-actions" | "schedules" | "live" | null
+}>()
 
 defineEmits<{
   (e: "open-quick-actions"): void

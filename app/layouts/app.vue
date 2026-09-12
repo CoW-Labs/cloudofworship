@@ -119,6 +119,7 @@ const { refreshLibrary } = useLibrary()
 const { fetchPlans } = useSubscriptionPlans()
 const { fetchUserSettings } = useUserSettings()
 const ndiBroadcast = useNdiBroadcast()
+let tauriLiveWindowCloseListenerBound = false
 
 const { currentState } = storeToRefs(appStore)
 
@@ -230,6 +231,18 @@ const inaccessibleDateRemaining = computed(() => {
 })
 
 provide("windowRefs", windowRefs)
+
+// Owning a live output window is what makes this device eligible to be driven
+// from a phone — and, just as importantly, what makes every other device
+// ineligible. useLiveOutputControl reads nothing else to decide it.
+const localOutputPresent = useLocalOutputPresence()
+watch(
+  windowRefs,
+  (refs) => {
+    localOutputPresent.value = (refs?.length ?? 0) > 0
+  },
+  { immediate: true }
+)
 
 const fetchUser = async () => {
   const { data, error } = await useAPIFetch(`/user/auth`)
@@ -853,6 +866,51 @@ async function startNdiForLiveWindow() {
   }
 }
 
+/**
+ * Reattach a Tauri live window to this control-center session. This also
+ * handles the refresh case, where the native window survives but `windowRefs`
+ * is recreated empty in the new JavaScript context.
+ */
+async function trackTauriLiveWindow(liveWindow: any) {
+  windowRefs.value = [liveWindow]
+  if (tauriLiveWindowCloseListenerBound) return
+
+  tauriLiveWindowCloseListenerBound = true
+  try {
+    await liveWindow.once("tauri://close-requested", async () => {
+      console.log("Live window closed")
+      try {
+        await ndiBroadcast.stop()
+      } catch (error) {
+        console.warn("NDI cleanup after live window close failed:", error)
+      } finally {
+        windowRefs.value = []
+        tauriLiveWindowCloseListenerBound = false
+      }
+    })
+  } catch (error) {
+    tauriLiveWindowCloseListenerBound = false
+    throw error
+  }
+}
+
+async function restoreExistingTauriLiveWindow() {
+  try {
+    const { getAllWebviewWindows } = await import(
+      "@tauri-apps/api/webviewWindow"
+    )
+    const existingLiveWindow = (await getAllWebviewWindows()).find(
+      (window: any) => window.label === "live-output"
+    )
+    if (!existingLiveWindow) return
+
+    await trackTauriLiveWindow(existingLiveWindow)
+    await startNdiForLiveWindow()
+  } catch (error) {
+    console.warn("Could not restore the existing live window:", error)
+  }
+}
+
 async function openTauriLiveWindow() {
   try {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
@@ -881,6 +939,7 @@ async function openTauriLiveWindow() {
     )
 
     if (existingLiveWindow) {
+      await trackTauriLiveWindow(existingLiveWindow)
       await existingLiveWindow.setFocus()
       await startNdiForLiveWindow()
       return
@@ -983,20 +1042,8 @@ async function openTauriLiveWindow() {
 
     // Capture can only resolve the native window after Tauri confirms creation.
     await liveWindow.once("tauri://created", async () => {
-      windowRefs.value = [...windowRefs.value, liveWindow]
+      await trackTauriLiveWindow(liveWindow)
       await startNdiForLiveWindow()
-    })
-
-    // Listen for window close
-    await liveWindow.once("tauri://close-requested", async () => {
-      console.log("Live window closed")
-      try {
-        await ndiBroadcast.stop()
-      } catch (error) {
-        console.warn("NDI cleanup after live window close failed:", error)
-      }
-      // Clean up windowRefs when window is closed
-      windowRefs.value = []
     })
   } catch (error) {
     console.error("Error opening Tauri window:", error)
@@ -1056,6 +1103,7 @@ async function closeAllWindows() {
         console.log("Window already closed or error closing:", error)
       }
     }
+    tauriLiveWindowCloseListenerBound = false
   } else {
     windowRefs.value.forEach((windowRef: any) => {
       try {
@@ -1447,6 +1495,7 @@ onMounted(async () => {
   const { isTauri } = useTauri()
   if (isTauri) {
     await ndiBroadcast.initialize()
+    await restoreExistingTauriLiveWindow()
     bindTauriLiveWindowLifecycle()
   }
 

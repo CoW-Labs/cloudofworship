@@ -198,6 +198,7 @@ export const useAppStore = defineStore("app", {
           liveWindowFullscreen: true, // Default to fullscreen mode
           closeLiveWindowWithOperator: false, // Default: live window stays open when operator tab closes
           ndiEnabled: false,
+          allowRemoteControl: true, // Default: a teammate's phone may drive this device's live output
           transcriptionAutoActions: true,
           transcriptionVoiceBibleVersionCommands: true,
           uploadVideosToCloud: true,
@@ -611,6 +612,13 @@ export const useAppStore = defineStore("app", {
         ...this.currentState.settings,
         closeLiveWindowWithOperator: value,
       }
+    },
+    setAllowRemoteControl(value: boolean) {
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        allowRemoteControl: value,
+      }
+      usePosthogCapture("ALLOW_REMOTE_CONTROL_SETTINGS_CHANGED", { value })
     },
     setNdiEnabled(value: boolean) {
       this.currentState.settings = {

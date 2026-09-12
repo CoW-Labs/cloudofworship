@@ -108,6 +108,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
   const online = useOnline()
   const nuxtApp = useNuxtApp()
   const authStore = useAuthStore()
+  const { getToken } = useAuthToken()
 
   let socket: Socket | null = null
   let retryCount = 0
@@ -264,6 +265,13 @@ export const useSocketIO = (options: SocketIOOptions) => {
       socket = io(getSocketUrl(), {
         path: '/socket.io/',
         query: getConnectionQuery(),
+        // Authentication belongs in Socket.IO's auth payload rather than the
+        // URL query, where it would be logged by proxies and could be spoofed
+        // by changing `user_id`. The server uses this token to authorize the
+        // live-output host/request events against the selected schedule.
+        auth: {
+          token: getToken() || undefined,
+        },
         // Start with polling first (more reliable behind proxies/load balancers)
         // then upgrade to websocket
         transports: ['polling', 'websocket'],
@@ -424,6 +432,18 @@ export const useSocketIO = (options: SocketIOOptions) => {
       // the only way /livestream/:schedule_id learns which slide is on screen.
       socket.on('live-slide', (data) => {
         onMessage?.('live-slide', { action: 'live-slide', data })
+      })
+
+      // Live output control — a phone driving the machine with the projector.
+      // Hosts advertise themselves with `live-control-host`; controllers send
+      // `live-control-request` addressed to exactly one host id. Neither is a
+      // reply to the other, so there is no loop here. See useLiveOutputControl.
+      socket.on('live-control-host', (data) => {
+        onMessage?.('live-control-host', { action: 'live-control-host', data })
+      })
+
+      socket.on('live-control-request', (data) => {
+        onMessage?.('live-control-request', { action: 'live-control-request', data })
       })
 
       // Alert and overlay events
