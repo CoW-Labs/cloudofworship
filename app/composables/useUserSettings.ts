@@ -2,6 +2,7 @@ import type { AppSettings } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { useDebounceFn } from "@vueuse/core"
+import { bibleVersionObjects } from "~/utils/constants"
 import { toTransportSafeMediaSetting } from "~/utils/mediaTransport"
 
 // Track the timestamp of the last local settings change across composable instances
@@ -103,7 +104,13 @@ export const useUserSettings = () => {
           overlaySettings:
             userSettings.overlaySettings ||
             appStore.currentState.settings.overlaySettings,
-          bibleVersions: userSettings.bibleVersions || appStore.currentState.settings.bibleVersions,
+          // Never resolves to undefined: an account saved before this field
+          // existed has it on neither side, and writing the gap through would
+          // blank the Bible version picker for the rest of the session.
+          bibleVersions:
+            userSettings.bibleVersions ||
+            appStore.currentState.settings.bibleVersions ||
+            bibleVersionObjects,
           animations: userSettings.animations,
           microAnimations: userSettings.microAnimations ?? true,
           footnotes: userSettings.footnotes,
