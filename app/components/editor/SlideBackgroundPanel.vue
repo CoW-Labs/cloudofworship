@@ -1,15 +1,15 @@
 <template>
   <div
-    class="slide-background-panel flex h-full w-full overflow-hidden bg-gray-50 text-gray-800 dark:bg-[#131724] dark:text-[#F8F9FB]"
+    class="slide-background-panel flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 text-gray-800 dark:bg-[#131724] dark:text-[#F8F9FB]"
   >
     <aside
-      class="h-full w-[158px] shrink-0 border-r border-gray-200 bg-[#f1f3f6] dark:border-white/[0.06] dark:bg-[#131724]"
+      class="flex md:block w-full md:w-[158px] h-auto md:h-full shrink-0 overflow-x-auto md:overflow-x-visible border-b md:border-b-0 md:border-r border-gray-200 bg-[#f1f3f6] dark:border-white/[0.06] dark:bg-[#131724]"
     >
       <button
         v-for="section in sections"
         :key="section.key"
         type="button"
-        class="flex h-9 w-full items-center border-b border-gray-200 px-[15px] text-left text-[12px] font-normal leading-none transition-colors duration-150 dark:border-[#0D0F1A]"
+        class="flex h-9 w-auto md:w-full shrink-0 items-center whitespace-nowrap border-b-0 md:border-b border-gray-200 px-[15px] text-left text-[12px] font-normal leading-none transition-colors duration-150 dark:border-[#0D0F1A]"
         :class="
           activeSection === section.key
             ? 'bg-white text-gray-900 dark:bg-[#2B3140] dark:text-[#F8F9FB]'
@@ -22,28 +22,31 @@
       </button>
     </aside>
 
-    <section class="relative h-full min-w-0 flex-1 overflow-hidden">
+    <section
+      class="relative min-h-0 min-w-0 flex-1 overflow-y-auto md:h-full md:overflow-hidden"
+    >
       <h3
-        class="absolute left-3 top-[13px] z-10 text-[12px] font-normal leading-[17px] text-gray-800 dark:text-[#F8F9FB]"
+        class="static md:absolute px-3 pt-3 md:p-0 md:left-3 md:top-[13px] z-10 block text-[12px] font-normal leading-[17px] text-gray-800 dark:text-[#F8F9FB]"
       >
         {{ activeHeading }}
       </h3>
 
       <template v-if="activeSection === 'image'">
         <div
-          class="absolute left-3 top-9 h-[268px] w-[382px] overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
+          class="mx-3 mt-2 h-[220px] w-auto md:absolute md:left-3 md:top-9 md:m-0 md:h-[268px] md:w-[382px] overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
         >
           <BgImageSelection
             background-panel
             hide-upload
             :value="slide?.background"
+            :value-key="slide?.backgroundImageKey"
             @select="$emit('select', backgroundTypes.image, $event)"
             @loading-change="$emit('loading-change', $event)"
           />
         </div>
         <FileDropzone
           background-panel
-          class="absolute left-[414px] top-[14px] h-[285px] w-[169px]"
+          class="m-3 h-[110px] w-auto md:absolute md:left-[414px] md:top-[14px] md:m-0 md:h-[285px] md:w-[169px]"
           accept="image/*"
           icon="i-bx-image"
           description="Upload an Image or Drag & Drop here"
@@ -54,19 +57,20 @@
 
       <template v-else-if="activeSection === 'video'">
         <div
-          class="absolute left-3 top-9 h-[268px] w-[382px] overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
+          class="mx-3 mt-2 h-[220px] w-auto md:absolute md:left-3 md:top-9 md:m-0 md:h-[268px] md:w-[382px] overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
         >
           <BgVideoSelection
             background-panel
             hide-upload
             :value="slide?.background"
+            :value-key="slide?.backgroundVideoKey"
             @select="$emit('select', backgroundTypes.video, $event)"
             @loading-change="$emit('loading-change', $event)"
           />
         </div>
         <FileDropzone
           background-panel
-          class="absolute left-[414px] top-[14px] h-[285px] w-[169px]"
+          class="m-3 h-[110px] w-auto md:absolute md:left-[414px] md:top-[14px] md:m-0 md:h-[285px] md:w-[169px]"
           accept="video/*"
           icon="i-bx-film"
           description="Upload a Video or Drag & Drop here"
@@ -78,7 +82,7 @@
       <BgColorSelection
         v-else-if="activeSection === 'colour'"
         background-panel
-        class="absolute left-3 top-9"
+        class="p-3 md:p-0 md:absolute md:left-3 md:top-9"
         :value="slide?.background"
         @select="$emit('select', backgroundTypes.solid, $event.color)"
       />
@@ -86,7 +90,7 @@
       <BgGradientSelection
         v-else-if="activeSection === 'gradient'"
         background-panel
-        class="absolute left-3 top-9"
+        class="p-3 md:p-0 md:absolute md:left-3 md:top-9"
         :value="slide?.background"
         @select="$emit('select', backgroundTypes.gradient, $event.gradient)"
       />
@@ -94,13 +98,14 @@
       <BgStyle
         v-else
         background-panel
-        class="absolute left-3 top-9"
+        class="p-3 md:p-0 md:absolute md:left-3 md:top-9"
       />
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useMediaQuery } from "@vueuse/core"
 import type { ExtendedFileT, Slide } from "~/types"
 
 type SectionKey = "image" | "video" | "colour" | "gradient" | "style"
@@ -150,6 +155,8 @@ const headings: Record<SectionKey, string> = {
   style: "Adjust Style",
 }
 
+// Desktop sizes. The panel lays its pieces out at fixed offsets side by side,
+// so these are the box that layout needs.
 const panelSizes: Record<SectionKey, PanelSize> = {
   image: { width: 753, height: 314 },
   video: { width: 753, height: 314 },
@@ -171,12 +178,34 @@ const initialSection = (): SectionKey => {
   }
 }
 
+// Mobile stacks the same pieces instead, which needs a different box: taller
+// (the picker and its dropzone sit one above the other rather than beside each
+// other) and as wide as the screen allows rather than a desktop panel's 401px.
+// CoWPopover fixes the popover to whatever height it is given, so these are
+// sized to the stacked content — asking for a flat, generous height instead
+// just reserves dead space under the swatches.
+const mobilePanelSizes: Record<SectionKey, PanelSize> = {
+  image: { width: 9999, height: 430 },
+  video: { width: 9999, height: 430 },
+  colour: { width: 9999, height: 300 },
+  gradient: { width: 9999, height: 300 },
+  style: { width: 9999, height: 250 },
+}
+
+const isNarrowViewport = useMediaQuery("(max-width: 767px)")
+
 const activeSection = ref<SectionKey>(initialSection())
 const activeHeading = computed(() => headings[activeSection.value])
 
 watch(
-  activeSection,
-  (section) => emit("resize", panelSizes[section]),
+  [activeSection, isNarrowViewport],
+  () =>
+    emit(
+      "resize",
+      (isNarrowViewport.value ? mobilePanelSizes : panelSizes)[
+        activeSection.value
+      ]
+    ),
   { immediate: true }
 )
 </script>

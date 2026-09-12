@@ -8,10 +8,18 @@
       v-if="slide?.type === slideTypes.presentation"
       class="absolute inset-0"
     >
+      <!-- `object-cover`, not `contain`. This component only ever draws
+           thumbnails (DeferredSlidePreview and TemplateCard) — the projector
+           goes through LiveProjectionOnly, which keeps `contain` so a deck page
+           is never cropped on screen. Here the box is 3:2 while pages are 16:9
+           or 4:3, so `contain` left black bars that are invisible against the
+           dark schedule row: a deck slide read as a shorter thumbnail than the
+           text and Bible slides around it. Cover matches the `bg-cover` every
+           other slide type already gets in this same component. -->
       <img
         v-if="currentPresentationPageUrl"
         :src="currentPresentationPageUrl"
-        class="w-full h-full object-contain"
+        class="w-full h-full object-cover"
         alt="Presentation page"
       />
     </div>

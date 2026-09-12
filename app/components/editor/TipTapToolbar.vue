@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="isEditorReady"
-    class="absolute z-10 top-[46px] left-2 right-2 flex"
+    class="editor-floating-toolbar absolute z-10 top-[46px] left-2 right-2 flex"
     :class="containerOverflow"
     @mousedown.capture="onToolbarMouseDown"
   >

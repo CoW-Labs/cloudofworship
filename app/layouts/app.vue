@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="!loadingResources"
-    class="app-ctn min-h-[100vh] max-h-[100vh] overflow-hidden bg-gray-100 text dark:bg-[#111722]"
+    class="app-ctn min-h-[100dvh] max-h-[100dvh] overflow-hidden bg-gray-100 text dark:bg-[#111722]"
   >
     <Navbar :app-version="appVersion" :online="isAppOnline" />
     <SubscriptionExpiryBanner />

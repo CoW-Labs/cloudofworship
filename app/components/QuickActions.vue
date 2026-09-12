@@ -274,7 +274,7 @@ import {
   prewarmScriptureVersion,
   isScriptureReferenceValidSync,
 } from "~/composables/useScripture"
-import { quickActionsArr } from "~/utils/constants"
+import { quickActionsArr, desktopOnlyActions } from "~/utils/constants"
 import { escapePriority } from "~/composables/useEscapeKey"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
@@ -284,6 +284,19 @@ const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 const online = useOnline()
 const { savedSongs } = useLibrary()
 const { searchSongs } = useSongs()
+
+const props = withDefaults(
+  defineProps<{
+    /**
+     * Renders inside the mobile route's full-screen sheet rather than the
+     * desktop console's left panel. The pane itself is unchanged — this only
+     * drops the actions a phone cannot carry out (see `desktopOnlyActions`),
+     * so a mobile operator never taps "Go Live" and gets nothing.
+     */
+    mobile?: boolean
+  }>(),
+  { mobile: false }
+)
 
 let searchInputBeforeTwoDigitNumbers = ""
 const searchInputEl = ref<{ input: HTMLInputElement }>()
@@ -766,7 +779,12 @@ const actions = computed(() => {
 
 const validActions = computed(() => {
   return actions.value.filter((action): action is QuickAction => {
-    return Boolean(action?.name && action?.icon && action?.action)
+    if (!action?.name || !action?.icon || !action?.action) return false
+    // Filtered here rather than in `visibleActions` so the exclusions apply to
+    // fuzzy search results too — otherwise typing "go live" on a phone would
+    // still surface an action that cannot do anything.
+    if (props.mobile && desktopOnlyActions.includes(action.action)) return false
+    return true
   })
 })
 
