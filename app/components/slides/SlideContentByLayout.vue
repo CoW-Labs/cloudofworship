@@ -69,12 +69,17 @@
     ></div>
   </div>
 
-  <!-- Bible Layout with Theme Support -->
+  <!-- Bible Layout with Theme Support.
+       Note the conditional `relative`: the overlay theme deliberately leaves
+       this box unpositioned so its scrim and label resolve against
+       `.live-output` (the slide frame) instead of against this padded,
+       shrink-wrapping container. Every other theme keeps its own context. -->
   <div
     v-else-if="slide?.layout === slideLayoutTypes.bible"
-    class="slide-layout-ctn flex h-[100%] justify-center relative"
+    class="slide-layout-ctn flex h-[100%] justify-center"
     :class="[
       bibleThemeClasses.container,
+      bibleTheme.layout.labelPosition === 'overlay' ? '' : 'relative',
       bibleTheme.layout.labelPosition === 'left' ||
       bibleTheme.layout.labelPosition === 'right'
         ? 'flex-row items-center gap-[2cqw]'
@@ -160,6 +165,12 @@
 
     <!-- For 'overlay' label position -->
     <template v-else-if="bibleTheme.layout.labelPosition === 'overlay'">
+      <!-- Scrim: pinned to the bottom edge of the slide frame, full bleed and
+           a fixed height, so it reads as a vignette on the output rather than a
+           box that grows and shrinks with the reference text. -->
+      <div
+        class="bible-overlay-scrim absolute inset-x-0 bottom-0 h-[14cqw] bg-gradient-to-t from-black/80 to-transparent pointer-events-none"
+      ></div>
       <div
         v-if="contentVisible"
         :key="contentKey(0)"
