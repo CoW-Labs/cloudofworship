@@ -231,48 +231,58 @@
           </template>
         </ClientOnly>
 
+        <!-- ONLINE TEAMMATES — each avatar opens a presence card, so "who is
+             this?" is answerable by clicking the face rather than by hovering
+             and reading a list. The one driving this output from their phone
+             wears a badge here; that is the only place it is announced. -->
         <div
-          v-if="onlineUsersExcludingSelf.length > 0"
-          class="online-users-ctn relative z-0 -mr-5 flex items-center"
+          v-if="presenceUsers.length > 0"
+          class="online-users-ctn relative z-30 -mr-5 flex items-center gap-1"
         >
-          <CowTooltip placement="bottom">
-            <template #text>
-              <div class="text-sm">
-                <div
-                  v-for="user in onlineUsersExcludingSelf"
-                  :key="user.userId"
-                  class="py-0.5"
-                >
-                  {{ user.userName }}
-                </div>
-              </div>
-            </template>
-            <div class="flex items-center gap-1">
-              <div class="flex -space-x-2">
-                <div
-                  class="relative h-8 w-8 grid place-items-center transition-all duration-200 ease-out hover:z-50 hover:translate-x-1"
-                  v-for="(user, index) in displayOnlineUsers"
-                  :key="user.userId"
-                  :style="{
-                    zIndex: displayOnlineUsers.length - index,
-                  }"
+          <div class="flex -space-x-2">
+            <UPopover
+              v-for="(onlineUser, index) in presenceUsers"
+              :key="onlineUser.userId"
+              mode="click"
+              class="relative transition-all duration-200 ease-out hover:z-50"
+              :style="{ zIndex: presenceUsers.length - index }"
+              :ui="{
+                ring: 'ring-0',
+                rounded: 'rounded-xl',
+                shadow:
+                  'shadow-xl shadow-gray-900/10 dark:shadow-2xl dark:shadow-black/60',
+                background: 'bg-white dark:bg-[#222838] border-0',
+              }"
+            >
+              <CowTooltip
+                :text="
+                  isRemoteController(onlineUser.userName)
+                    ? `${onlineUser.userName} is taking slides live on this output from the mobile app`
+                    : onlineUser.userName
+                "
+                placement="bottom"
+              >
+                <button
+                  type="button"
+                  class="relative h-8 w-8 grid place-items-center transition-transform duration-200 ease-out hover:translate-x-1"
+                  :aria-label="onlineUser.userName"
                 >
                   <UAvatar
-                    :src="user.avatar"
-                    :alt="user.userName"
+                    :src="onlineUser.avatar"
+                    :alt="onlineUser.userName"
                     :text="
-                      !user.avatar
-                        ? user.userName?.charAt(0)?.toUpperCase()
+                      !onlineUser.avatar
+                        ? onlineUser.userName?.charAt(0)?.toUpperCase()
                         : undefined
                     "
                     size="sm"
                     class="ring-2 transition-all duration-200 cursor-pointer hover:scale-110"
                     :class="{ 'grayscale opacity-50': !online }"
                     :style="{
-                      '--tw-ring-color': user?.theme || '#6366f1',
-                      backgroundColor: user?.theme || '#6366f1',
-                      color: !user.avatar
-                        ? user?.theme || '#6366f1'
+                      '--tw-ring-color': onlineUser?.theme || '#6366f1',
+                      backgroundColor: onlineUser?.theme || '#6366f1',
+                      color: !onlineUser.avatar
+                        ? onlineUser?.theme || '#6366f1'
                         : undefined,
                     }"
                   />
@@ -280,22 +290,49 @@
                     v-if="online"
                     class="animate-ping absolute inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75"
                   ></span>
-                </div>
-              </div>
-              <span
-                v-if="onlineUsersExcludingSelf.length > 3"
-                class="text-xs text-gray-500 ml-1"
-              >
-                +{{ onlineUsersExcludingSelf.length - 3 }}
-              </span>
-            </div>
-          </CowTooltip>
+                  <!-- MOBILE CONTROL BADGE — this face is the phone driving
+                       this screen. It rides the avatar rather than sitting in
+                       a chip of its own, so the takeover is announced exactly
+                       once, on the person doing it. -->
+                  <span
+                    v-if="isRemoteController(onlineUser.userName)"
+                    class="absolute bottom-[-5px] left-1/2 -translate-x-1/2 grid h-[16px] w-[16px] place-items-center rounded-full bg-primary-500 text-white ring-2 ring-gray-100 dark:ring-[#111722]"
+                  >
+                    <UIcon
+                      name="i-bx-mobile"
+                      class="block w-[10px] h-[10px] shrink-0"
+                    />
+                  </span>
+                </button>
+              </CowTooltip>
+              <template #panel>
+                <PresenceMiniModal
+                  :name="onlineUser.userName"
+                  :avatar="onlineUser.avatar"
+                  :theme="onlineUser.theme"
+                  :joined-at="onlineUser.joinedAt"
+                  :controlling="isRemoteController(onlineUser.userName)"
+                  @stop="stopRemoteControl"
+                />
+              </template>
+            </UPopover>
+          </div>
+          <span
+            v-if="onlineUsersExcludingSelf.length > MAX_VISIBLE_ONLINE_USERS"
+            class="text-xs text-gray-500 ml-1"
+          >
+            +{{ onlineUsersExcludingSelf.length - MAX_VISIBLE_ONLINE_USERS }}
+          </span>
         </div>
 
         <!-- ACCOUNT PROFILE + MENU -->
+        <!-- z-50, not z-30: the popover's panel is positioned inside this
+             wrapper's stacking context, so the wrapper is what has to clear the
+             mobile route's sheets (z-30 inline tabs, z-40 slide editor). At
+             z-30 the account menu opened *behind* whichever one was on screen. -->
         <UPopover
           mode="click"
-          class="relative z-30"
+          class="relative z-50"
           :ui="{
             ring: 'ring-0',
             rounded: 'rounded-xl',
@@ -376,15 +413,54 @@ const onlineUsersExcludingSelf = computed(() => {
   )
 })
 
-// Show max 5 avatars in the navbar
+// REMOTE CONTROL — the phone currently driving this device's live output, if
+// any. Only a session that owns an output ever has one, so this is naturally
+// absent on every other window.
+const { activeRemoteController, stopRemoteControl } = useLiveOutputControl()
+
+// A control request carries a device id and a display name, not a user id, so
+// the controller is matched to the presence row by name. That is also what
+// decides whose avatar wears the mobile badge and whose card carries the Stop.
+const isRemoteController = (userName: string) =>
+  !!activeRemoteController.value &&
+  activeRemoteController.value.name === userName
+
+// Show max 5 avatars in the navbar; the rest are counted in the "+N" beside
+// them. Both halves read the same constant so the count cannot drift from what
+// is actually on screen.
+const MAX_VISIBLE_ONLINE_USERS = 5
+
 const displayOnlineUsers = computed(() =>
   onlineUsersExcludingSelf.value
     .map((user) => ({
       ...user,
       theme: user.theme?.replace("##", "#"),
     }))
-    .slice(0, 5)
+    .slice(0, MAX_VISIBLE_ONLINE_USERS)
 )
+
+// The faces in the bar. Normally just the online teammates, but a phone
+// driving this output that is somehow not in the presence list is added on the
+// end: this row is the only place a takeover is announced now, and an
+// unannounced takeover is the failure the whole feature guards against.
+const presenceUsers = computed(() => {
+  const users = displayOnlineUsers.value
+  const controller = activeRemoteController.value
+  if (!controller) return users
+  if (users.some((u) => u.userName === controller.name)) return users
+
+  return [
+    ...users,
+    {
+      userId: `remote-controller-${controller.id}`,
+      userName: controller.name,
+      avatar: "",
+      theme: "#6366f1",
+      joinedAt: "",
+      scheduleId: currentState.value.activeSchedule?._id || "",
+    },
+  ]
+})
 
 // Inline rename of the active schedule (left half of the schedule switcher)
 const isEditingName = ref(false)
@@ -598,6 +674,24 @@ emitter?.on("sign-out", () => {
 </script>
 
 <style scoped>
+/* The presence row tucks behind the account button at rest — that overlap is
+   what the -mr-5 buys. But the face you are pointing at, or whose card is open,
+   must not be the one that is half-covered, so hovering the row or opening a
+   card lifts the whole row above the account button for as long as it lasts.
+   It has to be the row rather than the single avatar: the account button is the
+   row's sibling, so a z-index raised on an avatar inside it never clears. */
+.online-users-ctn:hover,
+.online-users-ctn:has([data-headlessui-state~="open"]) {
+  z-index: 40;
+}
+
+/* Inside the row, the avatar whose card is open stays on top of the faces
+   stacked after it — the same lift hover already gives (hover:z-50), held for
+   as long as the card is open rather than only while the pointer is there. */
+.online-users-ctn :has([data-headlessui-state~="open"]) {
+  z-index: 50;
+}
+
 /* Schedule name field grows/shrinks fluidly instead of snapping to size.
    Duration must stay in sync with NAME_TRANSITION_MS in the script. */
 .schedule-switcher__input {
