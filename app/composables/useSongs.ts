@@ -17,8 +17,12 @@ export default function useSongs() {
     try {
       loading.value = true
 
+      // Encode the query: an unescaped "&" ("Kari Jobe & Cody Carnes") or "#"
+      // would otherwise end the search value and drop the rest of the text.
       const { data, error } = await useAPIFetch(
-        `/church/${churchId}/songs?search=${query}&limit=${limit}`,
+        `/church/${churchId}/songs?search=${encodeURIComponent(
+          query
+        )}&limit=${limit}`,
         {
           method: 'GET',
           key: `search-songs-${query}`,
