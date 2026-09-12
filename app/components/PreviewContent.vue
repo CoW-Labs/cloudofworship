@@ -245,6 +245,7 @@ const {
   deleteSlide: deleteSlideAPI,
   batchUpdateSlides,
 } = useSlides()
+const { isControllingRemoteHost } = useLiveOutputControl()
 
 // Derived from the store rather than mirrored into a local ref. A ref captures
 // the array reference at setup time, and every store action that touches slides
@@ -860,6 +861,18 @@ const resolveScheduleMedia = async (scheduleId: string) => {
 }
 
 const handleTakeLiveAction = async (slide: Slide) => {
+  // When this device is driving another device's screen, that device projects
+  // from its own copy of the media, so neither the download below nor the "not
+  // saved locally" gate after it belongs here — a phone has no reason to pull a
+  // service's video down over mobile data for a projector it is not attached
+  // to, and no business refusing a slide the output device can play perfectly
+  // well. Overlays fall through: they are broadcast to every device as they
+  // always have been, not addressed to one output.
+  if (isControllingRemoteHost.value && slide.slideMode !== "overlay") {
+    makeSlideActive(slide, { goLive: true, newlyCreated: false })
+    return
+  }
+
   // Resolving before broadcast keeps projection local-first: a slide that
   // arrived from a teammate still holds remote URLs until its bytes are pulled
   // down here. Missing inherited backgrounds remain non-blocking; primary

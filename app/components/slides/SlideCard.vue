@@ -277,20 +277,9 @@ const handleOverlayAction = () => {
   emit(isActiveOverlay.value ? "clear-overlay" : "show-overlay", props.slide)
 }
 
-const applyLiveSlide = (slideId: string) => {
-  const slide = appStore.activeSlides.find(
-    (activeSlide) => activeSlide.id === slideId || activeSlide._id === slideId
-  )
-  if (!slide) return
-  if (slide.slideMode === "overlay") return
-
-  useBroadcastPost(slide)
-  appStore.setLiveSlide(slideId)
-}
-
-const goLive = (slideId: string) => {
-  applyLiveSlide(slideId)
-}
+// Projects on this device, or asks the device this one is controlling to do it
+// — the card does not need to know which. See useLiveOutputControl.
+const { goLive } = useLiveOutputControl()
 
 </script>
 

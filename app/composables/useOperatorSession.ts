@@ -23,6 +23,7 @@ export const useOperatorSession = () => {
   const toast = useToast()
   const emitter = useNuxtApp().$emitter as Emitter<any>
   const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
+  const liveOutputControl = useLiveOutputControl()
 
   const {
     handleWebSocketMessage,
@@ -60,6 +61,11 @@ export const useOperatorSession = () => {
         handleWebSocketMessage(data)
       },
       onConnected: () => {
+        // Re-advertise this device's live output (if it has one) as soon as
+        // there is a socket to say it on, rather than leaving a phone to wait
+        // out a heartbeat before the screen it wants shows up in its list.
+        liveOutputControl.announce()
+
         const wasReconnected =
           socketInstance.value?.isReconnecting?.value === false &&
           socketInstance.value?.isConnectedRef?.value === true
@@ -82,6 +88,8 @@ export const useOperatorSession = () => {
       },
       onUserJoined: (user) => {
         appStore.triggerUserJoinedAnimation(user)
+        // Whoever just arrived may be the phone looking for a screen to drive.
+        liveOutputControl.announce()
       },
     })
 
@@ -122,6 +130,14 @@ export const useOperatorSession = () => {
     (liveSlideId) => {
       if (!socketInstance.value?.isConnected()) return
 
+      // While this device is driving another device's output, that device is
+      // the one with a slide on screen — and it broadcasts this same feed. A
+      // controller staying quiet is what keeps livestream viewers on a single
+      // source of truth instead of two devices overwriting each other. This is
+      // a derived condition, not a flag some other code has to remember to
+      // clear: it is true for exactly as long as a host is selected.
+      if (liveOutputControl.isControllingRemoteHost.value) return
+
       // Intermission clears liveSlideId (see goIntermission in LiveOutput). Send
       // an explicit null so viewers blank out instead of holding the last slide.
       if (!liveSlideId) {
@@ -161,9 +177,14 @@ export const useOperatorSession = () => {
     if (appStore.currentState.activeSchedule) {
       connectSocket()
     }
+    // Advertises this device's output (when it has one) and listens for the
+    // devices offering theirs. Started here so both operator routes get it on
+    // the same terms as the socket itself.
+    liveOutputControl.start()
   })
 
   onBeforeUnmount(() => {
+    liveOutputControl.stop()
     disconnectSocket()
   })
 

@@ -26,6 +26,51 @@
       </div>
     </div>
 
+    <!-- CONTROLLED OUTPUT — which screen this device's taps land on. A phone
+         has no projector of its own, so without this line an operator cannot
+         tell whether taking a slide live moves the congregation screen or
+         nothing at all. Hidden when no other device is offering an output. -->
+    <button
+      v-if="mobile && (isControllingRemoteHost || availableHosts.length > 0)"
+      type="button"
+      class="controlled-output shrink-0 flex items-center gap-2.5 w-full rounded-xl border border-white/80 bg-white px-3 py-2 text-left dark:border-[#202838] dark:bg-[#171d2b]"
+      @click="liveMenuRef?.open()"
+    >
+      <span
+        class="w-2 h-2 rounded-full shrink-0"
+        :class="
+          isControllingRemoteHost
+            ? 'bg-red-500'
+            : 'bg-gray-300 dark:bg-[#3a4252]'
+        "
+      />
+      <span class="min-w-0 flex-1">
+        <span
+          class="block text-xs font-medium text-gray-700 dark:text-[#a7afbd] truncate"
+        >
+          {{
+            isControllingRemoteHost
+              ? `Controlling ${targetHost?.userName}'s screen`
+              : "Not controlling a screen"
+          }}
+        </span>
+        <span
+          class="block text-[11px] text-gray-500 dark:text-[#6f7889] truncate"
+        >
+          {{
+            isControllingRemoteHost
+              ? targetHost?.deviceLabel
+              : "Slides you take live only reach the livestream"
+          }}
+        </span>
+      </span>
+      <span
+        class="text-[11px] font-medium text-primary-600 dark:text-primary-300 shrink-0"
+      >
+        {{ isControllingRemoteHost ? "Change" : "Connect" }}
+      </span>
+    </button>
+
     <div
       v-if="!mobile"
       class="v-resize-handle h-3 shrink-0 rounded cursor-ns-resize opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
@@ -95,11 +140,74 @@
              the livestream URL. -->
         <MoreActionsMenu
           v-if="mobile"
+          ref="liveMenuRef"
           flush
           trigger-class="rounded-full"
           @update:open="liveMenuOpen = $event"
         >
           <template #default="{ close }">
+            <!-- OUTPUT DEVICES — the screens offering themselves for control
+                 right now. Picking one is the only way a tap on this phone
+                 reaches a projector; until then nothing here is addressed to
+                 any screen, which is what keeps a phone out of a service it
+                 was not invited into. -->
+            <UButton
+              v-for="host in availableHosts"
+              :key="host.hostId"
+              variant="ghost"
+              color="gray"
+              block
+              @click.stop.prevent="
+                () => {
+                  close()
+                  connectToHost(host.hostId)
+                }
+              "
+            >
+              <template #leading>
+                <IconWrapper
+                  :name="
+                    host.hostId === targetHost?.hostId
+                      ? 'i-bx-check-circle'
+                      : 'i-lucide-monitor'
+                  "
+                  size="4"
+                />
+              </template>
+              {{ host.userName }}'s screen
+            </UButton>
+
+            <UButton
+              v-if="availableHosts.length === 0"
+              variant="ghost"
+              color="gray"
+              block
+              disabled
+            >
+              <template #leading>
+                <IconWrapper name="i-lucide-monitor" size="4" />
+              </template>
+              No output device online
+            </UButton>
+
+            <UButton
+              v-if="isControllingRemoteHost"
+              variant="ghost"
+              color="gray"
+              block
+              @click.stop.prevent="
+                () => {
+                  close()
+                  stopControlling()
+                }
+              "
+            >
+              <template #leading>
+                <IconWrapper name="i-bx-unlink" size="4" />
+              </template>
+              Stop controlling
+            </UButton>
+
             <UButton
               variant="ghost"
               color="gray"
@@ -148,6 +256,36 @@
             </UButton>
           </template>
         </MoreActionsMenu>
+
+        <!-- REMOTE CONTROL — shown only on the device whose screen is being
+             driven from someone else's phone, so a takeover is never silent.
+             "Stop" turns the permission off here rather than kicking one
+             device, which is the switch the operator can find again later.
+             Last in the slot because the row is reversed, which puts this
+             furthest from Blank and Go Live. -->
+        <div
+          v-if="!mobile && activeRemoteController"
+          class="flex items-center gap-2 whitespace-nowrap text-xs"
+        >
+          <CowTooltip
+            :text="`${activeRemoteController.name} is taking slides live on this output from the mobile app`"
+          >
+            <span
+              class="flex items-center gap-1.5 rounded-full bg-primary-50 px-2 py-1 font-medium text-primary-700 dark:bg-primary-900/40 dark:text-primary-200"
+            >
+              <IconWrapper name="i-bx-mobile" size="3.5" />
+              <span class="max-w-[8rem] truncate">{{
+                activeRemoteController.name
+              }}</span>
+            </span>
+          </CowTooltip>
+          <button
+            class="font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-300"
+            @click.stop="stopRemoteControl"
+          >
+            Stop
+          </button>
+        </div>
       </template>
       <div class="main flex flex-col flex-1 min-h-0" data-tour="schedule-slides">
         <div
@@ -312,9 +450,28 @@ const props = withDefaults(
 
 const windowRefs = inject("windowRefs") as any[]
 
-// Live-output menu (livestream link, blank). Shared with the Go Live popover in
-// AppSection so both offer the same link under the same Teams gate.
+// Live-output menu (output device, livestream link, blank). Shared with the Go
+// Live popover in AppSection so both offer the same link under the same Teams
+// gate. The ref lets the "controlled output" strip open the same menu rather
+// than growing a second picker of its own.
 const liveMenuOpen = ref(false)
+const liveMenuRef = ref<{ open: () => void; close: () => void } | null>(null)
+
+// Taking a slide live goes through here rather than touching the store
+// directly, so one device driving another's screen is a routing decision made
+// in one place instead of a special case in every call site.
+const {
+  goLive: setLiveSlide,
+  blankOutput,
+  availableHosts,
+  targetHost,
+  isControllingRemoteHost,
+  connectToHost,
+  stopControlling,
+  activeRemoteController,
+  stopRemoteControl,
+} = useLiveOutputControl()
+
 const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
   useLivestreamLink()
 
@@ -583,18 +740,6 @@ onMounted(() => {
 //   }
 // }
 
-const setLiveSlide = (slideId: string) => {
-  const slide = appStore.activeSlides.find(
-    (s) => s.id === slideId || s._id === slideId
-  )
-  if (!slide) return
-  if (slide.slideMode === "overlay") return
-
-  // useDebounceFn(useBroadcastPost, 0)(JSON.stringify(slide))
-  useBroadcastPost(slide)
-  appStore.setLiveSlide(slideId)
-}
-
 const emitOverlaySocketAction = (action: string, slide?: Slide) => {
   if (!online.value) return
   const socket = useNuxtApp().$socketio as any
@@ -624,8 +769,7 @@ const toggleSlideOverlay = (slide: Slide) => {
 
 const goIntermission = () => {
   if (!liveSlide.value) return
-  useBroadcastPost(null)
-  appStore.setLiveSlide("")
+  blankOutput()
 }
 
 // Clicking a schedule card sends it live; double-clicking opens it in the
