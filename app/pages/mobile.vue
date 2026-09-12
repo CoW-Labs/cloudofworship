@@ -2,46 +2,71 @@
   <div
     class="mobile-operator flex flex-col gap-2 px-2 pt-2 h-[calc(100dvh-58px)] overflow-hidden"
   >
-    <!-- DEFAULT VIEW: the slide grid. It is both the schedule and the way in
-         to every slide, so it holds the screen and nothing is layered over it
-         until the operator asks for something. -->
-    <PreviewContent
-      mobile
-      class="flex-1 min-w-0 min-h-0"
-      @slide-created="quickActionsOpen = false"
-    />
+    <!-- CONTENT AREA — the grid and the three tabs share it, one at a time.
+         The tabs render inside it rather than over the whole viewport, so the
+         action bar below and the app navbar above stay on screen and switching
+         tabs never feels like leaving the app. -->
+    <div class="mobile-content relative flex-1 min-w-0 min-h-0">
+      <!-- DEFAULT VIEW: the slide grid. It is both the schedule and the way in
+           to every slide, so it holds the screen and nothing is layered over it
+           until the operator asks for something. -->
+      <PreviewContent
+        mobile
+        class="h-full min-w-0 min-h-0"
+        @slide-created="activeTab = null"
+      />
+
+      <!-- QUICK ACTIONS: the same pane as the desktop left column, given the
+           whole screen. Its own sub-pages (Bible, songs, hymns, media, library,
+           templates, countdown, PDF import) already take over the pane on
+           desktop, so they fill the sheet here without any special casing. -->
+      <MobileSheet
+        :model-value="activeTab === 'quick-actions'"
+        title="Quick Actions"
+        inline
+        headerless
+        @update:model-value="activeTab = null"
+      >
+        <QuickActions mobile class="h-full" />
+      </MobileSheet>
+
+      <!-- LIVE: the desktop console's right column, the live preview on top,
+           the slide schedule under it, and the live-output menu (livestream link,
+           blank) in its header. Unchanged apart from `mobile`, which swaps the
+           draggable preview height for a fixed 16:9. -->
+      <MobileSheet
+        :model-value="activeTab === 'live'"
+        title="Live"
+        inline
+        headerless
+        @update:model-value="activeTab = null"
+      >
+        <LiveOutput mobile class="h-full min-h-0" @edit-slide="activeTab = null" />
+      </MobileSheet>
+
+      <!-- SCHEDULES: switching which service you are working on. -->
+      <MobileSheet
+        :model-value="activeTab === 'schedules'"
+        title="Schedules"
+        inline
+        headerless
+        @update:model-value="activeTab = null"
+      >
+        <AppSection class="h-full min-h-0">
+          <SchedulesList
+            class="h-full min-h-0 overflow-auto"
+            @close="activeTab = null"
+          />
+        </AppSection>
+      </MobileSheet>
+    </div>
 
     <MobileActionBar
-      @open-quick-actions="quickActionsOpen = true"
-      @open-schedules="schedulesOpen = true"
-      @open-live="liveOpen = true"
+      :active-tab="activeTab"
+      @open-quick-actions="toggleTab('quick-actions')"
+      @open-schedules="toggleTab('schedules')"
+      @open-live="toggleTab('live')"
     />
-
-    <!-- QUICK ACTIONS: the same pane as the desktop left column, given the
-         whole screen. Its own sub-pages (Bible, songs, hymns, media, library,
-         templates, countdown, PDF import) already take over the pane on
-         desktop, so they fill the sheet here without any special casing. -->
-    <MobileSheet v-model="quickActionsOpen" title="Quick Actions">
-      <QuickActions mobile class="h-full" />
-    </MobileSheet>
-
-    <!-- LIVE: the desktop console's right column, the live preview on top,
-         the slide schedule under it, and the live-output menu (livestream link,
-         blank) in its header. Unchanged apart from `mobile`, which swaps the
-         draggable preview height for a fixed 16:9. -->
-    <MobileSheet v-model="liveOpen" title="Live">
-      <LiveOutput mobile class="h-full min-h-0" />
-    </MobileSheet>
-
-    <!-- SCHEDULES: switching which service you are working on. -->
-    <MobileSheet v-model="schedulesOpen" title="Schedules">
-      <AppSection class="h-full min-h-0">
-        <SchedulesList
-          class="h-full min-h-0 overflow-auto"
-          @close="schedulesOpen = false"
-        />
-      </AppSection>
-    </MobileSheet>
   </div>
 </template>
 
@@ -68,9 +93,14 @@ useHead({
   ],
 })
 
-const quickActionsOpen = ref<boolean>(false)
-const schedulesOpen = ref<boolean>(false)
-const liveOpen = ref<boolean>(false)
+// One tab at a time, or none — the slide grid is what a closed tab returns to.
+// Tapping the tab you are already on closes it, which is the only way back to
+// the grid now that the tabs have no close button of their own.
+type MobileTab = "quick-actions" | "schedules" | "live"
+const activeTab = ref<MobileTab | null>(null)
+const toggleTab = (tab: MobileTab) => {
+  activeTab.value = activeTab.value === tab ? null : tab
+}
 
 // The middleware gate can only fire once the church has loaded, and on a cold
 // start the route resolves before that. Re-checking here catches the church
@@ -98,7 +128,7 @@ const appStore = useAppStore()
 watch(
   () => appStore.currentState.activeSchedule?._id,
   () => {
-    schedulesOpen.value = false
+    if (activeTab.value === "schedules") activeTab.value = null
   }
 )
 

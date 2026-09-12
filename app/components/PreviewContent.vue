@@ -135,10 +135,14 @@
       </AppSection>
     </template>
 
+    <!-- The editor keeps its title and close button — it is a thing you open on
+         top of the grid, not a tab — but stops below the app navbar so the way
+         out of the app is never buried under it. -->
     <MobileSheet
       v-else
       v-model="mobileEditorOpen"
       :title="activeSlide?.name || 'Edit slide'"
+      below-navbar
     >
       <AppSection class="h-full min-h-0" slot-ctn-styles="!p-0">
         <EditLiveContent v-bind="editorBindings" v-on="editorHandlers" />
