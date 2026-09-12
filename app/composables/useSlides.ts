@@ -18,7 +18,7 @@ export default function useSlides() {
   const online = useOnline()
   const {
     goLive: goLiveOnControlledOutput,
-    isControllingRemoteHost,
+    hasRemoteTarget,
   } = useLiveOutputControl()
   const getChurchId = () => authStore.church?._id || authStore.user?.churchId
   const loading = ref<boolean>(false)
@@ -57,7 +57,7 @@ export default function useSlides() {
     // here: a plain edit to the slide that is already live reaches the host as
     // an `update-slide` event and is re-projected there, so asking again would
     // only race that.
-    if (shouldUpdateLiveSlide && isControllingRemoteHost.value) {
+    if (shouldUpdateLiveSlide && hasRemoteTarget.value) {
       if (options?.forceGoLive) goLiveOnControlledOutput(updatedSlide.id)
       return
     }

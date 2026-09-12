@@ -1,6 +1,7 @@
 import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
+import { resolveLiveOutputDestination } from "~/utils/liveOutputRouting"
 
 /**
  * Driving one device's live output from another — specifically, a phone on
@@ -203,6 +204,14 @@ export const useLiveOutputControl = () => {
       null
   )
 
+  /** The chosen host, including a stale entry retained during reconnection. */
+  const selectedHost = computed(() =>
+    targetHostId.value ? hosts.value[targetHostId.value] || null : null
+  )
+
+  /** True while this device has delegated its output, even during an outage. */
+  const hasRemoteTarget = computed(() => !!targetHostId.value)
+
   /** True while this session's go-live actions belong to another device. */
   const isControllingRemoteHost = computed(() => !!targetHost.value)
 
@@ -397,6 +406,17 @@ export const useLiveOutputControl = () => {
     return true
   }
 
+  const notifyUnavailableTarget = () => {
+    toast.add({
+      title: "The live output is reconnecting",
+      description:
+        "Nothing was taken live. Wait for the output device to return or choose another one.",
+      icon: "i-bx-wifi-off",
+      color: "amber",
+      timeout: 3000,
+    })
+  }
+
   /**
    * A host confirms by announcing its new `liveSlideId`. If the screen has not
    * moved by the time this fires, the operator is told rather than being left
@@ -418,13 +438,15 @@ export const useLiveOutputControl = () => {
       // up to one beat stale and would call a dead host healthy.
       const host = hosts.value[hostId]
       if (!host || Date.now() - host.seenAt >= HOST_TIMEOUT) {
+        // Keep the target selected so its next heartbeat can restore control.
+        // Routing remains blocked by `hasRemoteTarget` while it is unavailable.
+        clock.value = Date.now()
         toast.add({
           title: "Lost the live output device",
           description: "It stopped responding, so nothing was taken live there.",
           icon: "i-bx-error-circle",
           color: "red",
         })
-        stopControlling({ silent: true })
         return
       }
 
@@ -453,7 +475,17 @@ export const useLiveOutputControl = () => {
     if (!slide) return
     if (slide.slideMode === "overlay") return
 
-    if (isControllingRemoteHost.value) {
+    const destination = resolveLiveOutputDestination(
+      hasRemoteTarget.value,
+      isControllingRemoteHost.value
+    )
+
+    if (destination === "unavailable") {
+      notifyUnavailableTarget()
+      return
+    }
+
+    if (destination === "remote") {
       if (!sendControlRequest("go-live", slide.id)) return
       // Optimistic only — the host's next announcement confirms or corrects it.
       appStore.setLiveSlide(slide.id)
@@ -465,7 +497,17 @@ export const useLiveOutputControl = () => {
 
   /** Blank the output this device is responsible for. */
   const blankOutput = () => {
-    if (isControllingRemoteHost.value) {
+    const destination = resolveLiveOutputDestination(
+      hasRemoteTarget.value,
+      isControllingRemoteHost.value
+    )
+
+    if (destination === "unavailable") {
+      notifyUnavailableTarget()
+      return
+    }
+
+    if (destination === "remote") {
       if (!sendControlRequest("blank", null)) return
       appStore.setLiveSlide("")
       return
@@ -597,6 +639,39 @@ export const useLiveOutputControl = () => {
     announce()
   }
 
+  /**
+   * Clear room-scoped state before the socket leaves one schedule for another.
+   * Hosts explicitly withdraw from the old room so controllers do not spend a
+   * timeout believing that output still belongs to their service.
+   */
+  const resetForScheduleChange = () => {
+    if (isOutputHost.value) {
+      const connection = socket()
+      if (connection?.connected) {
+        connection.emit("live-control-host", {
+          hostId: deviceId,
+          userId: authStore.user?._id || "",
+          userName: authStore.user?.fullname || "Operator",
+          deviceLabel: deviceLabel.value,
+          available: false,
+          liveSlideId: null,
+          ts: Date.now(),
+        } satisfies LiveOutputHostAnnouncement)
+      }
+    }
+
+    if (ackTimer) {
+      clearTimeout(ackTimer)
+      ackTimer = null
+    }
+    hosts.value = {}
+    targetHostId.value = null
+    remoteController.value = null
+    lastAppliedRequestTs.clear()
+    announcedHostLoss = false
+    clock.value = Date.now()
+  }
+
   const stop = () => {
     if (heartbeatTimer) {
       clearInterval(heartbeatTimer)
@@ -640,6 +715,8 @@ export const useLiveOutputControl = () => {
     // Controller
     availableHosts,
     targetHost,
+    selectedHost,
+    hasRemoteTarget,
     isControllingRemoteHost,
     connectToHost,
     stopControlling,
@@ -653,6 +730,7 @@ export const useLiveOutputControl = () => {
 
     // Plumbing
     handleControlMessage,
+    resetForScheduleChange,
     start,
     stop,
   }

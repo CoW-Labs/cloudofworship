@@ -66,7 +66,8 @@ describe("chunk error recovery plugin", () => {
     ).toHaveLength(1)
     expect(posthogCapture).toHaveBeenCalledWith(
       "chunk_load_recovered_by_reload",
-      expect.objectContaining({ attempt: 1 })
+      expect.objectContaining({ attempt: 1 }),
+      { send_instantly: true }
     )
   })
 
