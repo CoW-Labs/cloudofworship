@@ -138,22 +138,53 @@ export default defineNuxtConfig({
           media: "(prefers-color-scheme: dark)",
           content: "#111722",
         },
+        // Social card. This app is `ssr: false` and only `/` is prerendered, so
+        // every route serves the same shell and therefore the same tags — there
+        // is no per-route card here. The image is a static file in this repo so
+        // previews do not depend on the marketing site's deploy; it is rendered
+        // from the shared template in cow-labs-website (app/utils/ogCards.ts,
+        // key `app`) and copied here, so regenerate it there.
         { property: "og:type", content: "website" },
+        { property: "og:site_name", content: "Cloud of Worship" },
         {
-          name: "og:url",
-          content: "https://cloudofworship.com",
+          property: "og:url",
+          content: "https://app.cloudofworship.com",
+        },
+        {
+          property: "og:title",
+          content: "Cloud of Worship - Your church's powerpoint",
+        },
+        {
+          property: "og:description",
+          content:
+            "Simple and easy to use church presentation software that grows with your church needs. Cloud of Worship is your church's power point.",
         },
         {
           property: "og:image",
-          content: "https://cloudofworship.com/images/cow-og-image.jpeg",
+          content: "https://app.cloudofworship.com/images/og/app.jpg",
         },
+        { property: "og:image:type", content: "image/jpeg" },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        {
+          property: "og:image:alt",
+          content:
+            "Cloud of Worship - prepare once, use everywhere. Scriptures. Songs. Slides. Sermons - everything.",
+        },
+        // Without this, X renders the 1200x630 image as a small square crop
+        // instead of a full-width card.
+        { name: "twitter:card", content: "summary_large_image" },
         {
           name: "twitter:image",
-          content: "https://cloudofworship.com/images/cow-og-image.jpeg",
+          content: "https://app.cloudofworship.com/images/og/app.jpg",
+        },
+        {
+          name: "twitter:title",
+          content: "Cloud of Worship - Your church's powerpoint",
         },
         {
           name: "twitter:domain",
-          content: "cloudofworship.com",
+          content: "app.cloudofworship.com",
         },
         {
           name: "twitter:description",
@@ -162,7 +193,7 @@ export default defineNuxtConfig({
         },
         {
           name: "twitter:url",
-          content: "https://cloudofworship.com",
+          content: "https://app.cloudofworship.com",
         },
       ],
       link: [
