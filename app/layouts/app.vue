@@ -2,6 +2,11 @@
   <div
     v-if="!loadingResources"
     class="app-ctn min-h-[100dvh] max-h-[100dvh] overflow-hidden bg-gray-100 text dark:bg-[#111722]"
+    :style="{
+      paddingTop: 'env(safe-area-inset-top)',
+      paddingLeft: 'env(safe-area-inset-left)',
+      paddingRight: 'env(safe-area-inset-right)',
+    }"
   >
     <Navbar :app-version="appVersion" :online="isAppOnline" />
     <SubscriptionExpiryBanner />

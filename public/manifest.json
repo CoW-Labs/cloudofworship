@@ -4,7 +4,7 @@
   "description": "Cloud of Worship",
   "theme_color": "#ffffff",
   "start_url": "/",
-  "display": "fullscreen",
+  "display": "standalone",
   "icons": [
     {
       "src": "/cloud-w-144.png",
