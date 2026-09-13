@@ -2,7 +2,13 @@
 // Custom auto-updating service worker for Cloud of Worship
 // For APP to be updated, the service worker must be activated 
 
-const VERSION_ENDPOINT = "https://api.cloudofworship.com/api/v1/health"
+// The web app's own version, written into the build output by the
+// `nitro:build:public-assets` hook. This used to point at the API's /health,
+// which reports the *API's* version — a string that does not move when the web
+// app ships, so `latestVersion !== prevVersion` was never true and the cache
+// below was never purged. A cache that is never purged can hand a whole
+// months-old app back to a client the first time the network hiccups.
+const VERSION_ENDPOINT = "/version.json"
 const APP_VERSION_KEY = "appVersion"
 const DB_NAME = "cow-sw-meta"
 const DB_STORE = "meta"
@@ -104,9 +110,13 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url)
   if (req.method !== "GET") return
 
-  // Only handle same-origin requests, and skip the version endpoint itself
+  // Only handle same-origin requests, and never the version file: serving a
+  // cached copy of it would tell a stale tab it is up to date, which is the one
+  // answer that keeps it stale. Letting it fail while offline is correct — the
+  // page treats "could not check" as "assume fresh".
   if (
     url.origin === self.location.origin &&
+    url.pathname !== VERSION_ENDPOINT &&
     !url.pathname.endsWith("/api/v1/health")
   ) {
     event.respondWith(

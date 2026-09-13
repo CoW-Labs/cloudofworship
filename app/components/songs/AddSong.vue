@@ -20,7 +20,19 @@
           </p>
         </Transition>
       </div>
-      <CowInput v-model="artist" label="Artist" />
+      <!-- Suggesting the artists already in the library keeps spellings
+           consistent. It stays free text, though: no list covers every local
+           worship leader, so an unmatched name is offered back, not rejected. -->
+      <CowInputMenu
+        v-model="artist"
+        label="Artist"
+        :search="searchArtists"
+        placeholder="Start typing an artist's name"
+      >
+        <template #option-empty="{ query }">
+          We'll use &ldquo;{{ query }}&rdquo;
+        </template>
+      </CowInputMenu>
 
       <!-- Proactive duplicate check: existing matches surfaced as the user types -->
       <div
@@ -142,6 +154,7 @@ const props = defineProps<{
 
 const { saveSong } = useLibrary()
 const { findSimilarSongs } = useSongs()
+const { searchArtists } = useArtistSearch()
 const loading = ref<boolean>(false)
 const artist = ref<string>(props.song?.artist || "")
 const title = ref<string>(props.song?.title || "")

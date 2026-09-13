@@ -51,20 +51,49 @@ export const IGNORED_ERROR_FRAGMENTS = [
   "/_nuxt/builds/meta/",
 ]
 
+/**
+ * Set by `plugins/build-freshness.client.ts` once this tab has confirmed the
+ * origin is serving a newer build than the one it is running.
+ *
+ * Everything such a tab throws is unactionable. The code is not in the
+ * repository any more, so the "fix" has already shipped; the frames point at
+ * chunks the origin deleted on deploy, so they cannot be symbolicated; and the
+ * fingerprint changes with every build, so each stale client opens a fresh
+ * issue that looks like a new regression. Three of those cost an afternoon
+ * before this flag existed. The tab reports `stale_build_detected` instead,
+ * which is the one fact worth knowing about it.
+ *
+ * Deliberately one-way: a tab that has fallen behind does not catch up without
+ * a reload, and a reload resets this.
+ */
+let buildIsStale = false
+
+export const markBuildStale = () => {
+  buildIsStale = true
+}
+
+export const isBuildStale = () => buildIsStale
+
 const matchesFragment = (text: string) =>
   IGNORED_ERROR_FRAGMENTS.some((fragment) => text.includes(fragment))
 
 /** Filter for a thrown value (Vue errorHandler, unhandledrejection). */
 export const shouldSuppressError = (error: unknown) => {
   const err = error as Error | undefined
+
+  // Deliberately evaluated before the stale-build check: this call is what
+  // hands a dead chunk to the reload plugin, and a stale tab is the one most
+  // likely to hit one. Short-circuiting past it would strand the very tab the
+  // recovery exists for. A dead post-deploy chunk the plugin is already healing
+  // is then suppressed; the unrecoverable case still reports.
+  if (isHandledChunkLoadError(err?.message)) return true
+
+  if (buildIsStale) return true
   if (!err) return false
   return Boolean(
     (err.message && IGNORED_ERROR_MESSAGES.has(err.message)) ||
       (err.name && IGNORED_ERROR_NAMES.has(err.name)) ||
-      (err.message && matchesFragment(err.message)) ||
-      // A dead post-deploy chunk that the reload plugin is already healing.
-      // Not in the static lists: the unrecoverable case must still report.
-      isHandledChunkLoadError(err.message)
+      (err.message && matchesFragment(err.message))
   )
 }
 
@@ -76,13 +105,6 @@ export const shouldSuppressExceptionEvent = (event: any) => {
     : []
 
   const message = properties.$exception_message
-  if (message && IGNORED_ERROR_MESSAGES.has(message)) return true
-
-  const types = [
-    properties.$exception_type,
-    ...exceptionList.map((exception: any) => exception?.type),
-  ].filter(Boolean)
-  if (types.some((type: string) => IGNORED_ERROR_NAMES.has(type))) return true
 
   const text = [
     message,
@@ -96,5 +118,19 @@ export const shouldSuppressExceptionEvent = (event: any) => {
     .filter(Boolean)
     .join("\n")
 
-  return Boolean(text && (matchesFragment(text) || isHandledChunkLoadError(text)))
+  // Same ordering as `shouldSuppressError`: the chunk check notifies recovery,
+  // so it has to run whether or not this tab already knows it is behind.
+  if (text && isHandledChunkLoadError(text)) return true
+
+  if (buildIsStale) return true
+
+  if (message && IGNORED_ERROR_MESSAGES.has(message)) return true
+
+  const types = [
+    properties.$exception_type,
+    ...exceptionList.map((exception: any) => exception?.type),
+  ].filter(Boolean)
+  if (types.some((type: string) => IGNORED_ERROR_NAMES.has(type))) return true
+
+  return Boolean(text && matchesFragment(text))
 }

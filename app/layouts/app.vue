@@ -85,7 +85,8 @@ import type {
   AppSettings,
 } from "~/types"
 import { useOnline } from "@vueuse/core"
-import { appWideActions } from "~/utils/constants"
+import { appWideActions, backgroundTypes } from "~/utils/constants"
+import { isRetryableMediaDownloadError } from "~/utils/mediaDownloadErrors"
 import { safeDBOperation } from "~/composables/useIndexedDB"
 import { invalidateHymnCache } from "~/composables/useHymn"
 import { cloneDurableSlide } from "~/utils/durableSlide"
@@ -723,12 +724,45 @@ const retrieveSchedules = async () => {
   setLoadingTask("schedules", "Schedules and slides are ready.", 100)
 }
 
+/**
+ * Drop a media key that will never resolve again, so the next launch stops
+ * reaching for it. The resolved URL is deliberately left alone: it is what the
+ * background still renders from, and a key with no file behind it is the only
+ * part that is wrong.
+ */
+const forgetSettingsBackgroundKey = (
+  label: "default-background" | "intermission"
+) => {
+  if (label === "default-background") {
+    const current = appStore.currentState.settings.defaultBackground?.default
+    appStore.setDefaultSlideBackground(
+      current?.backgroundType || backgroundTypes.image,
+      current?.background || "",
+      current?.backgroundVideoKey ?? null,
+      null
+    )
+    return
+  }
+
+  const intermission = appStore.currentState.settings.intermission
+  appStore.setIntermissionSettings({
+    ...intermission,
+    mode: intermission?.mode || "default",
+    backgroundImageKey: null,
+  })
+}
+
 // The two settings backgrounds are fetched before any slide is rehydrated.
 // When the hosted file is gone (deleted from the media library while still
 // set as a background — S3 answers 403, not 404, for a missing key) the
 // download threw straight out of `retrieveAllMediaFilesFromDB`, so no slide
 // was rehydrated and the schedule stayed in its loading state for the whole
 // service. Keep the remote URL, report once, and move on.
+//
+// "Once" has to mean once: a deleted file fails identically on every launch,
+// so without forgetting the key the same church re-reports the same dead
+// background for the rest of the account's life. Only permanent failures are
+// forgotten — an offline launch must still find the key waiting for it.
 const ensureSettingsBackgroundLocal = async (
   label: "default-background" | "intermission",
   key: string,
@@ -744,15 +778,21 @@ const ensureSettingsBackgroundLocal = async (
     })
   } catch (error) {
     console.warn(`Settings ${label} could not be made local:`, error)
-    posthog.captureException?.(
-      error instanceof Error ? error : new Error(String(error)),
-      {
-        source: "retrieveAllMediaFilesFromDB",
-        setting: label,
-        media_key: key,
-        status: (error as { status?: number })?.status,
-      }
-    )
+
+    if (isRetryableMediaDownloadError(error)) {
+      posthog.captureException?.(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          source: "retrieveAllMediaFilesFromDB",
+          setting: label,
+          media_key: key,
+          status: (error as { status?: number })?.status,
+        }
+      )
+      return null
+    }
+
+    forgetSettingsBackgroundKey(label)
     return null
   }
 }

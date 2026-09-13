@@ -55,7 +55,8 @@
       <!-- RECENTLY OPENED SCRIPTURES -->
       <div
         v-if="
-          currentState.recentBibleSearches.length > 0 && searchInput.length < 2
+          (currentState.recentBibleSearches?.length ?? 0) > 0 &&
+          searchInput.length < 2
         "
         class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
       >
@@ -300,7 +301,7 @@ const searchedActions = computed<QuickAction[]>(() => {
 })
 
 const recentBibleActions = computed<QuickAction[]>(() => {
-  return [...currentState.value.recentBibleSearches]
+  return [...(currentState.value.recentBibleSearches ?? [])]
     .reverse()
     .map((bibleQuery) => {
       const colonIndex = bibleQuery.indexOf(":")
