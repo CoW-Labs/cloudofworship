@@ -86,6 +86,17 @@ export class WorshipCloudDatabase extends Dexie {
 
   public constructor() {
     super('WorshipCloudDatabase')
+
+    // The browser closes this connection on its own — a backgrounded tab whose
+    // storage is reclaimed, private mode, or another tab upgrading the schema.
+    // Dexie then throws DatabaseClosedError from every later call on this
+    // instance. `useIndexedDB()` only notices via `isOpen()`, which leaves any
+    // caller still holding this object failing forever, so retire the singleton
+    // the moment the connection goes rather than waiting to be asked.
+    this.on('close', () => {
+      if (dbInstance === this) dbInstance = null
+    })
+
     this.version(2).stores({
       songs: 'id,lyrics,title,album,cover,artist,verses,createdAt,updatedAt',
       media: 'id,content,data,createdAt,updatedAt', // id === slide.id
