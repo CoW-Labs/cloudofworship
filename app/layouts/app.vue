@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="!loadingResources"
-    class="app-ctn min-h-[100dvh] max-h-[100dvh] overflow-hidden bg-gray-100 text dark:bg-[#111722]"
+    class="app-ctn flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-gray-100 text dark:bg-[#111722]"
     :style="{
       paddingTop: 'env(safe-area-inset-top)',
       paddingLeft: 'env(safe-area-inset-left)',
@@ -10,7 +10,11 @@
   >
     <Navbar :app-version="appVersion" :online="isAppOnline" />
     <SubscriptionExpiryBanner />
-    <slot />
+    <!-- The page fills whatever the navbar and banner leave behind, so nothing
+         below them is ever pushed off the bottom of the window. -->
+    <div class="app-page min-h-0 flex-1 overflow-hidden">
+      <slot />
+    </div>
     <FullScreenLoader v-if="fullScreenLoading" />
     <ClientOnly>
       <Transition name="fade-sm">
@@ -94,6 +98,17 @@ import { cloneDurableSlide } from "~/utils/durableSlide"
 useHead({
   title: "Cloud of Worship",
   link: [{ rel: "stylesheet", href: "/css/main.css" }],
+})
+
+// Lock the document while the operator shell is mounted. The shell owns its own
+// height, so the page itself must never scroll — that is what makes the app read
+// as a desktop window instead of a web page. Toggled imperatively rather than
+// through useHead so it only ever adds to the classes colour mode manages.
+onMounted(() => {
+  document.documentElement.classList.add("app-shell-locked")
+})
+onUnmounted(() => {
+  document.documentElement.classList.remove("app-shell-locked")
 })
 const props = defineProps({
   appVersion: String,

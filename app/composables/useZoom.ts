@@ -24,6 +24,14 @@ export const useZoom = () => {
       // Apply zoom using CSS transform on the body
       if (typeof document !== 'undefined') {
         document.body.style.zoom = `${clampedLevel * 100}%`
+        // The locked app shell sizes itself off the body, whose percentage
+        // height resolves against the *unzoomed* html box — so it has to divide
+        // by the zoom factor to still fill exactly one window. See
+        // --app-zoom in public/css/main.css.
+        document.documentElement.style.setProperty(
+          '--app-zoom',
+          String(clampedLevel)
+        )
         zoomLevel.value = clampedLevel
         
         // Store zoom level in localStorage for persistence

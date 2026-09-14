@@ -2,7 +2,7 @@
   <Transition name="fade-sm">
     <div
       v-if="showBanner"
-      class="subscription-expiry-banner w-full bg-amber-50 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-700 px-4 py-2 flex items-center justify-between gap-4 text-sm"
+      class="subscription-expiry-banner w-full shrink-0 bg-amber-50 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-700 px-4 py-2 flex items-center justify-between gap-4 text-sm"
     >
       <div
         class="flex items-center gap-2 text-amber-800 dark:text-amber-200 w-full"

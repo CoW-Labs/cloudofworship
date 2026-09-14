@@ -1,6 +1,6 @@
 <template #default="{ defaultProps }">
   <div
-    class="flex mt-2 px-4 h-[calc(100vh-80px)] short:mt-1 short:px-3 short:h-[calc(100vh-64px)]"
+    class="flex h-full min-h-0 px-4 pb-2 pt-2 short:px-3 short:pb-1 short:pt-1"
   >
     <div
       :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }"
