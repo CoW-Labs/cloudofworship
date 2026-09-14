@@ -10,6 +10,7 @@
  */
 
 import { isHandledChunkLoadError } from "~/utils/chunkErrors"
+import { isDatabaseClosedError, isDatabaseWiping } from "~/utils/databaseWipe"
 
 /** Exact `error.message` matches. */
 export const IGNORED_ERROR_MESSAGES = new Set([
@@ -88,6 +89,10 @@ export const shouldSuppressError = (error: unknown) => {
   // is then suppressed; the unrecoverable case still reports.
   if (isHandledChunkLoadError(err?.message)) return true
 
+  // "Delete all local data" closes the connection under everything still using
+  // it; those rejections are the operator's own request arriving late.
+  if (isDatabaseWiping() && isDatabaseClosedError(err?.name)) return true
+
   if (buildIsStale) return true
   if (!err) return false
   return Boolean(
@@ -121,6 +126,8 @@ export const shouldSuppressExceptionEvent = (event: any) => {
   // Same ordering as `shouldSuppressError`: the chunk check notifies recovery,
   // so it has to run whether or not this tab already knows it is behind.
   if (text && isHandledChunkLoadError(text)) return true
+
+  if (isDatabaseWiping() && isDatabaseClosedError(text)) return true
 
   if (buildIsStale) return true
 

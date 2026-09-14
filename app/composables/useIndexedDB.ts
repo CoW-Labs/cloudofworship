@@ -1,5 +1,6 @@
 import Dexie from 'dexie'
 import type { Table } from 'dexie'
+import { markDatabaseWipe } from '~/utils/databaseWipe'
 import type {
   Song,
   Media,
@@ -186,8 +187,20 @@ const clearOldCaches = async () => {
  * should be wrapped with the helpers below for consistent error handling.
  */
 const useIndexedDB = () => {
-  if (!dbInstance || !dbInstance.isOpen()) {
-    dbInstance = new WorshipCloudDatabase()
+  // Deliberately not an `isOpen()` check. Dexie opens asynchronously, so
+  // `isOpen()` is false for the whole of startup's first tick — long enough
+  // that the burst of callers made during boot each minted their own
+  // connection, leaving orphaned ones open behind the singleton. The `close`
+  // handler in the constructor retires the instance the moment a connection
+  // really goes, and the `catch` below covers an open that never succeeds, so
+  // a live-but-still-opening instance is the right one to hand back.
+  if (!dbInstance) {
+    const db = new WorshipCloudDatabase()
+    dbInstance = db
+    db.open().catch((error) => {
+      console.warn('IndexedDB could not be opened:', error)
+      if (dbInstance === db) dbInstance = null
+    })
   }
   return dbInstance
 }
@@ -242,6 +255,43 @@ export const safeDBOperation = async <T>(
     }
     console.error('DB operation failed:', err)
     return undefined
+  }
+}
+
+/**
+ * Delete every local table and hand back a fresh, open connection.
+ *
+ * `db.delete()` closes the connection, which is what the caller wants, but
+ * every other holder of the old instance — the media cache, the slide
+ * repository, this app's own long-lived composables — keeps its reference and
+ * fails on the next call with `DatabaseClosedError`. Retiring the singleton
+ * here means the very next `useIndexedDB()` anywhere in the app opens a new
+ * connection instead, so the window keeps working without a reload.
+ *
+ * Work already in flight when the connection goes still rejects; those
+ * rejections are marked expected (see `utils/databaseWipe.ts`) rather than
+ * reported as crashes.
+ */
+export const deleteDatabase = async () => {
+  markDatabaseWipe()
+  try {
+    await useIndexedDB().delete()
+  } finally {
+    // Re-marked because `delete()` blocks while another window still holds the
+    // database open — on desktop the live projection window routinely does —
+    // and the grace period has to cover the rejections that follow the close,
+    // not the wait that preceded it.
+    markDatabaseWipe()
+    dbInstance = null
+    // Re-open eagerly: a wipe is not a sign-out, the operator is still looking
+    // at the app, and the next read should find a working database rather than
+    // paying for the open itself. Dexie's `open()` is idempotent, so this just
+    // waits on the one `useIndexedDB()` already started.
+    await useIndexedDB()
+      .open()
+      .catch((error) =>
+        console.warn('IndexedDB could not be re-opened after a wipe:', error)
+      )
   }
 }
 

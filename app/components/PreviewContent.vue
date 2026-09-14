@@ -1994,6 +1994,10 @@ const reportSlideUpdateFailure = (slide: Slide, error: any, durable: boolean) =>
       slide_type: slide.type,
       status: getAPIErrorStatus(error),
       server_error: error?.data?.error,
+      // A status-less failure is either the network or the fetch layer itself
+      // throwing; only the constructor name separates the two once the message
+      // is all that survives into error tracking.
+      error_name: error?.name,
       durable,
     }
   )

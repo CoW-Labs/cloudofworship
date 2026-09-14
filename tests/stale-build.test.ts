@@ -9,6 +9,13 @@ vi.mock("posthog-js", () => ({
 const RUNNING_VERSION = "v1.1.2"
 const DEPLOYED_VERSION = "v1.2.0"
 
+// The plugin imports this composable directly, so the `stubGlobal` below never
+// reaches it — the suite only passed while the shipped constant happened to
+// equal RUNNING_VERSION, and every release bump broke it. Mock the module.
+vi.mock("~/composables/useAppVersion", () => ({
+  default: () => ({ appVersion: RUNNING_VERSION }),
+}))
+
 type PluginHarness = Awaited<ReturnType<typeof installPlugin>>
 
 const installPlugin = async (options?: {
