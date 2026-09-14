@@ -47,6 +47,16 @@
 </template>
 
 <script setup lang="ts">
+
+/**
+ * `select` is a bubbling native DOM event name. Declared so a parent's
+ * `@select` binds as a component event instead of *also* being attached to
+ * this component's root element as a native listener — the fallthrough that
+ * had the font menu delivering a DOM `Event` where a value was expected.
+ */
+defineEmits<{
+  select: [layout: string | null]
+}>()
 const slideLayouts = Object.values(slideLayoutTypes)?.slice(0, 3)
 defineProps<{
   value: string

@@ -330,6 +330,7 @@ import type { LocalMediaCategory, Slide } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { useAuthStore } from "~/store/auth"
 import { useAppStore } from "~/store/app"
+import { deleteDatabase } from "~/composables/useIndexedDB"
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -337,7 +338,9 @@ const { fetchChurch } = useChurch()
 const online = useOnline()
 const emitter = useNuxtApp().$emitter as any
 const toast = useToast()
-const db = useIndexedDB()
+// Reassigned after a wipe: `deleteDatabase()` retires the old connection, and
+// a stale handle here would fail every size calculation below.
+let db = useIndexedDB()
 const localMedia = useLocalMediaStorage()
 const { deleteSlide: deleteLibrarySlide } = useLibrary()
 const { localTransfers, migrationCount } = useMediaDownloadProgress()
@@ -678,7 +681,8 @@ const deleteAllData = async () => {
   loading.value = true
 
   await localMedia.clearAll()
-  await db.delete()
+  await deleteDatabase()
+  db = useIndexedDB()
   deletePrompt.value = false
   deletePromptText.value = ""
   loading.value = false
