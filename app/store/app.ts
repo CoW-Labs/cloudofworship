@@ -11,6 +11,7 @@ import type {
   AppState,
   OnlineUser,
   OverlaySettings,
+  SlideBackgroundKey,
 } from "~/types/index"
 import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
@@ -722,32 +723,89 @@ export const useAppStore = defineStore("app", {
     setActiveAdvert(advert: Advert | null) {
       this.currentState.activeAdvert = advert
     },
+    /**
+     * Write one entry of the default-background map. `slideTypeKey` picks the
+     * entry: "default" is the app-wide fallback, the others are per-slide-type
+     * overrides and are marked `custom` so slide creation knows the user chose
+     * them deliberately rather than inheriting a seeded value.
+     */
     setDefaultSlideBackground(
       type: string,
       background: string,
       backgroundVideoKey?: string | null,
-      backgroundImageKey?: string | null
+      backgroundImageKey?: string | null,
+      slideTypeKey: SlideBackgroundKey = "default"
     ) {
-      console.log(
-        "setDefaultSlideBackground",
-        type,
-        background,
-        backgroundVideoKey
-      )
       this.currentState.settings = {
         ...this.currentState.settings,
         defaultBackground: {
           ...this.currentState.settings.defaultBackground,
-          default: {
+          [slideTypeKey]: {
             backgroundType: type,
             background,
             backgroundVideoKey: backgroundVideoKey || null,
             backgroundImageKey: backgroundImageKey || null,
+            ...(slideTypeKey !== "default" && { custom: true }),
           },
         },
       }
-      usePosthogCapture("DEFAULT_BACKGROUND_SETTINGS_CHANGED")
-      // console.log("setDefaultSlideBackground", this.currentState.settings)
+      usePosthogCapture("DEFAULT_BACKGROUND_SETTINGS_CHANGED", {
+        slide_type: slideTypeKey,
+      })
+    },
+    /**
+     * Drop a per-slide-type override so that slide type follows the app-wide
+     * default again. The stored background is kept with `custom: false` so
+     * re-enabling the override restores the last choice.
+     */
+    clearDefaultSlideBackground(slideTypeKey: Exclude<SlideBackgroundKey, "default">) {
+      const current =
+        this.currentState.settings.defaultBackground?.[slideTypeKey]
+      if (!current) return
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        defaultBackground: {
+          ...this.currentState.settings.defaultBackground,
+          [slideTypeKey]: {
+            ...current,
+            // `false` distinguishes a disabled user choice from an untouched
+            // legacy seed, allowing re-enable to restore the previous choice.
+            custom: false,
+          },
+        },
+      }
+      usePosthogCapture("DEFAULT_BACKGROUND_SETTINGS_CHANGED", {
+        slide_type: slideTypeKey,
+        cleared: true,
+      })
+    },
+    enableDefaultSlideBackground(
+      slideTypeKey: Exclude<SlideBackgroundKey, "default">
+    ) {
+      const backgrounds = this.currentState.settings.defaultBackground
+      const current = backgrounds?.[slideTypeKey]
+      // A deliberately disabled override restores its retained value. A group
+      // that has never been customised starts from what it currently inherits,
+      // so enabling it does not unexpectedly change the slide background.
+      const source = current?.custom === false
+        ? current
+        : backgrounds?.default || current
+      if (!source) return
+
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        defaultBackground: {
+          ...backgrounds,
+          [slideTypeKey]: {
+            ...source,
+            custom: true,
+          },
+        },
+      }
+      usePosthogCapture("DEFAULT_BACKGROUND_SETTINGS_CHANGED", {
+        slide_type: slideTypeKey,
+        enabled: true,
+      })
     },
     setIntermissionSettings(payload: AppSettings["intermission"]) {
       this.currentState.settings = {

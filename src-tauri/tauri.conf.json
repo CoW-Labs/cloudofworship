@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cloud of Worship",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "identifier": "com.cloudofworship.app",
   "build": {
     "frontendDist": "../dist",
@@ -85,7 +85,7 @@
   },
   "plugins": {
     "shell": {
-      "open": "^https?://"
+      "open": true
     },
     "updater": {
       "active": true,

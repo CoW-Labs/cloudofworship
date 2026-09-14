@@ -60,6 +60,21 @@ const props = defineProps<{
   editor: Editor
 }>()
 
+/**
+ * Declared so the parent's `@change` / `@open` / `@close` bind as *component*
+ * events. Without a declaration they stay in `$attrs` and, because this
+ * component's root is a real element, Vue also attaches them to that root as
+ * native DOM listeners — so the searchable menu's own `<input>` bubbled a
+ * native `change` straight into the parent handler alongside the real
+ * selection. PostHog caught the result: a DOM `Event` arriving where a font
+ * name was expected (see `utils/fontFamily.ts`).
+ */
+defineEmits<{
+  change: [font: string]
+  open: []
+  close: []
+}>()
+
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const fonts = ref<string[]>(appFonts)

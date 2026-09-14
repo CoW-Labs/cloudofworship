@@ -20,7 +20,7 @@
       :disabled="disabled"
       @open="$emit('open')"
       @close="$emit('close')"
-      @change="$emit('change', $event)"
+      @change="$emit('change', Number($event))"
     >
       <template #label>
         <IconWrapper name="i-tabler-list-numbers" size="4"> </IconWrapper>
@@ -46,6 +46,25 @@ const props = defineProps<{
   size?: string
   selectedLine?: number
   disabled?: boolean
+}>()
+
+/**
+ * Declared so the parent's `@change` / `@open` / `@close` bind as *component*
+ * events. Without a declaration they stay in `$attrs` and, because this
+ * component's root is a real element, Vue also attaches them to that root as
+ * native DOM listeners — so the searchable menu's own `<input>` bubbled a
+ * native `change` straight into the parent handler alongside the real
+ * selection. PostHog caught the result: a DOM `Event` arriving where a font
+ * name was expected (see `utils/fontFamily.ts`).
+ *
+ * The options are strings, so the menu's own payload is `"3"`. Every consumer
+ * chunks verses with it, so it is coerced in the template rather than left for
+ * each of them to remember.
+ */
+defineEmits<{
+  change: [linesPerSlide: number]
+  open: []
+  close: []
 }>()
 
 const appStore = useAppStore()

@@ -1,7 +1,7 @@
 <template>
   <Transition>
     <div
-      class="navbar-ctn relative h-[50px] w-[100%] flex justify-between items-center px-4 short:h-[42px] short:px-3"
+      class="navbar-ctn relative h-[50px] w-[100%] shrink-0 flex justify-between items-center px-4 short:h-[42px] short:px-3"
       v-if="route.name !== 'live'"
     >
       <UProgress
