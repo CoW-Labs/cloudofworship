@@ -278,6 +278,7 @@ const {
 const { gotoVerse } = useSlideNavigation()
 const { appendSongToSetlist, getSetlistData, refreshSongSetlistSlide } =
   useSongSetlist()
+const { askSongDestination } = useSongDestinationPrompt()
 
 // Online status for conditional API/WS calls
 const online = useOnline()
@@ -1276,7 +1277,18 @@ emitter.on("new-song", async (data: Song) => {
     if (song) {
       const setlistSlide = getRelevantSongSetlist()
 
-      if (setlistSlide) {
+      if (!setlistSlide) {
+        addSongAsSeparateSlide(song)
+        return
+      }
+
+      // With a setlist already in the schedule the song could reasonably go
+      // either way, so ask — unless the operator has already answered once and
+      // ticked "don't ask again" for this session.
+      const destination = await askSongDestination(song)
+      if (!destination) return
+
+      if (destination === "setlist") {
         addSongToSetlist(setlistSlide, song)
       } else {
         addSongAsSeparateSlide(song)

@@ -37,6 +37,9 @@
       <Transition name="fade-sm">
         <UpdateNotification />
       </Transition>
+      <Transition name="fade-sm">
+        <SongDestinationPrompt />
+      </Transition>
       <AdvertModal
         v-model="showAdvertModal"
         :active-advert="currentState.activeAdvert"
