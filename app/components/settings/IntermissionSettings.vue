@@ -34,6 +34,7 @@
                 v-if="activeMediaTab === 0"
                 settings-page
                 :value="intermission?.background"
+                :value-key="intermission?.backgroundVideoKey"
                 @select="
                   appStore.setIntermissionSettings({
                     mode: 'media',
@@ -48,6 +49,7 @@
                 v-else-if="activeMediaTab === 1"
                 settings-page
                 :value="intermission?.background"
+                :value-key="intermission?.backgroundImageKey"
                 @select="
                   appStore.setIntermissionSettings({
                     mode: 'media',

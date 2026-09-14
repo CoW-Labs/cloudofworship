@@ -23,7 +23,10 @@ export const useOpenExternal = async (url: string) => {
     const { open } = await import("@tauri-apps/plugin-shell")
     await open(url)
   } catch (error) {
-    console.error("Failed to open external link:", error)
+    // A rejection here is almost always the shell scope refusing the URL
+    // (`tauri.conf.json > plugins > shell > open`), which otherwise looks to
+    // the operator like the click did nothing at all.
+    console.error("Failed to open external link:", url, error)
   }
 }
 

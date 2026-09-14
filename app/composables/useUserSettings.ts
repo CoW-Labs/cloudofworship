@@ -1,4 +1,4 @@
-import type { AppSettings } from "~/types"
+import type { AppSettings, DefaultBackgroundSetting } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { useDebounceFn } from "@vueuse/core"
@@ -8,6 +8,26 @@ import { toTransportSafeMediaSetting } from "~/utils/mediaTransport"
 // Track the timestamp of the last local settings change across composable instances
 // so that fetchUserSettings can skip overwriting in-flight user edits
 let lastLocalSaveTimestamp = 0
+
+/**
+ * Merge one saved background entry over the local one, keeping fields the
+ * backend does not know about. `custom` is taken from the saved entry alone:
+ * an explicit false preserves a disabled override for later restoration,
+ * while an omitted flag clears stale local state from legacy saved settings.
+ */
+export const mergeBackgroundEntry = (
+  local?: DefaultBackgroundSetting,
+  remote?: DefaultBackgroundSetting
+): DefaultBackgroundSetting => {
+  const merged = { ...local, ...remote } as DefaultBackgroundSetting
+  if (
+    remote &&
+    !Object.prototype.hasOwnProperty.call(remote, "custom")
+  ) {
+    delete merged.custom
+  }
+  return merged
+}
 
 export const useUserSettings = () => {
   const appStore = useAppStore()
@@ -71,22 +91,22 @@ export const useUserSettings = () => {
           defaultBibleVersion: userSettings.defaultBibleVersion,
           // Deep merge defaultBackground to preserve all nested properties
           defaultBackground: {
-            default: {
-              ...appStore.currentState.settings.defaultBackground?.default,
-              ...userSettings.defaultBackground?.default,
-            },
-            hymn: {
-              ...appStore.currentState.settings.defaultBackground?.hymn,
-              ...userSettings.defaultBackground?.hymn,
-            },
-            bible: {
-              ...appStore.currentState.settings.defaultBackground?.bible,
-              ...userSettings.defaultBackground?.bible,
-            },
-            text: {
-              ...appStore.currentState.settings.defaultBackground?.text,
-              ...userSettings.defaultBackground?.text,
-            },
+            default: mergeBackgroundEntry(
+              appStore.currentState.settings.defaultBackground?.default,
+              userSettings.defaultBackground?.default
+            ),
+            hymn: mergeBackgroundEntry(
+              appStore.currentState.settings.defaultBackground?.hymn,
+              userSettings.defaultBackground?.hymn
+            ),
+            bible: mergeBackgroundEntry(
+              appStore.currentState.settings.defaultBackground?.bible,
+              userSettings.defaultBackground?.bible
+            ),
+            text: mergeBackgroundEntry(
+              appStore.currentState.settings.defaultBackground?.text,
+              userSettings.defaultBackground?.text
+            ),
           },
           // Deep merge slideStyles to preserve all properties.
           // lineSpacing is coerced back to "normal" when the account predates
