@@ -1,7 +1,6 @@
 <template>
   <div
-    class="mobile-operator flex flex-col gap-2 px-2 pt-2 overflow-hidden"
-    :style="{ height: 'calc(100dvh - 58px - env(safe-area-inset-top))' }"
+    class="mobile-operator flex h-full min-h-0 flex-col gap-2 overflow-hidden px-2 pt-2"
   >
     <!-- CONTENT AREA — the grid and the three tabs share it, one at a time.
          The tabs render inside it rather than over the whole viewport, so the

@@ -3,6 +3,44 @@
 body {
   font-family: Geist, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+
+/* Desktop-app feel: never let a gesture rubber-band or chain a scroll out of
+   the surface it started in. Applies everywhere, including auth pages that do
+   still scroll normally. */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+/* The operator shell (app layout) sizes itself to the window, so the document
+   behind it must not scroll at all — otherwise an overshoot drags the whole
+   chrome, navbar included, off the top of the window. Scrolling belongs to the
+   individual panels inside the shell, never to the page.
+
+   Every element from <html> down to .app-ctn has to be in this list: a
+   percentage height is ignored the moment one ancestor in the chain is
+   auto-height, so skipping the .app-root wrapper in app.vue silently lets the
+   shell grow to its content height instead. */
+html.app-shell-locked,
+html.app-shell-locked body,
+html.app-shell-locked #__nuxt,
+html.app-shell-locked .app-root,
+html.app-shell-locked .app-ctn {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* Desktop zoom (Cmd +/- in Tauri) scales the body with CSS zoom, but the body's
+   percentage height still resolves against the unzoomed html box — so at 120%
+   an uncorrected shell would render 120% of the window tall and, with the
+   document locked, the bottom would be unreachable. Dividing by the factor
+   keeps the shell exactly one window tall at any zoom: the UI gets bigger and
+   the panels scroll internally, which is what zooming a desktop app should do. */
+html.app-shell-locked body {
+  height: calc(100% / var(--app-zoom, 1));
+  max-height: calc(100% / var(--app-zoom, 1));
+}
 /* body.tauri {
   zoom: 0.9;
 } */
