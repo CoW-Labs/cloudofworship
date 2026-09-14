@@ -410,6 +410,13 @@ const revokeIntermissionVideoUrl = () => {
   localMedia.releasePlaybackUrl(intermissionVideoUrl.value)
 }
 
+/**
+ * Retry-queue key shared by both intermission branches, so switching the
+ * intermission between an image and a video cancels the previous one's
+ * outstanding retries instead of leaving them racing each other.
+ */
+const INTERMISSION_MEDIA_ID = "__intermission__"
+
 const resolveIntermissionVideo = async () => {
   const s = intermissionSettings.value
   if (
@@ -417,16 +424,25 @@ const resolveIntermissionVideo = async () => {
     s?.backgroundType === backgroundTypes.image &&
     s?.backgroundImageKey
   ) {
-    const previous = intermissionImageLocalUrl.value
-    intermissionImageLocalUrl.value = await localMedia.ensureLocal(
-      s.backgroundImageKey,
+    // Routed through the shared media cache rather than calling `ensureLocal`
+    // directly, exactly as the video branch below is. A download that fails on
+    // a weak connection is then caught, queued on the shared backoff and
+    // retried when the network returns. The bare call threw straight out of
+    // this function instead — an unhandled rejection in the projection window,
+    // where nothing catches it and nothing can be shown to the congregation,
+    // leaving the intermission blank until someone reloaded.
+    const resolved = await rehydrateSlideMedia(
       {
-        url: s.background,
-        category: "background",
-        kind: "image",
-        groupId: s.backgroundImageKey,
-      }
+        id: INTERMISSION_MEDIA_ID,
+        type: slideTypes.text,
+        backgroundType: backgroundTypes.image,
+        background: s.background,
+        backgroundImageKey: s.backgroundImageKey,
+      } as unknown as Slide,
+      { allowDownload: true }
     )
+    const previous = intermissionImageLocalUrl.value
+    intermissionImageLocalUrl.value = resolved.background || null
     if (previous && previous !== intermissionImageLocalUrl.value) {
       localMedia.releasePlaybackUrl(previous)
     }
@@ -449,7 +465,7 @@ const resolveIntermissionVideo = async () => {
   // through the shared local media service.
   const resolved = await rehydrateSlideMedia(
     {
-      id: "__intermission__",
+      id: INTERMISSION_MEDIA_ID,
       type: slideTypes.text,
       backgroundType: backgroundTypes.video,
       background: s.background,
@@ -465,12 +481,24 @@ const resolveIntermissionVideo = async () => {
   }
 }
 
+/**
+ * Both callers below are fire-and-forget, so anything this rejects with becomes
+ * an unhandled rejection on the projector — a window with no toaster, no
+ * console anyone is watching, and a congregation looking at it. The media work
+ * inside already handles its own failures; this is the backstop for everything
+ * else (a revoked URL, a settings shape that changed under us).
+ */
+const resolveIntermissionMedia = () =>
+  resolveIntermissionVideo().catch((error) =>
+    console.warn("Intermission media could not be resolved:", error)
+  )
+
 watch(
   () => intermissionSettings.value,
-  () => resolveIntermissionVideo(),
+  () => resolveIntermissionMedia(),
   { deep: true }
 )
-onMounted(() => resolveIntermissionVideo())
+onMounted(() => resolveIntermissionMedia())
 onBeforeUnmount(() => {
   revokeIntermissionVideoUrl()
   localMedia.releasePlaybackUrl(intermissionImageLocalUrl.value)

@@ -381,35 +381,31 @@ export interface ExtendedFileT extends File {
   url: string
 }
 
+/** Key of one entry in AppSettings["defaultBackground"]. */
+export type SlideBackgroundKey = "default" | "hymn" | "bible" | "text"
+
+export interface DefaultBackgroundSetting {
+  backgroundType: string
+  background: string
+  backgroundVideoKey: string | null
+  backgroundImageKey?: string | null
+  /**
+   * True while this slide type overrides the app-wide default. False means a
+   * prior user choice is retained but disabled, while undefined identifies an
+   * untouched seeded fallback from older settings.
+   */
+  custom?: boolean
+}
+
 export interface AppSettings {
   appVersion: string
   defaultBibleVersion: string
   defaultFont: string
   defaultBackground: {
-    default?: {
-      backgroundType: string
-      background: string
-      backgroundVideoKey: string | null
-      backgroundImageKey?: string | null
-    }
-    hymn: {
-      backgroundType: string
-      background: string
-      backgroundVideoKey: string | null
-      backgroundImageKey?: string | null
-    }
-    bible: {
-      backgroundType: string
-      background: string
-      backgroundVideoKey: string | null
-      backgroundImageKey?: string | null
-    }
-    text: {
-      backgroundType: string
-      background: string
-      backgroundVideoKey: string | null
-      backgroundImageKey?: string | null
-    }
+    default?: DefaultBackgroundSetting
+    hymn: DefaultBackgroundSetting
+    bible: DefaultBackgroundSetting
+    text: DefaultBackgroundSetting
   }
   slideStyles: SlideStyle
   overlaySettings?: OverlaySettings
