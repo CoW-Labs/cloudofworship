@@ -99,12 +99,11 @@ export default function useSlideCreation() {
       isMediaPlaying: tempSlide.slideStyle?.isMediaPlaying,
       backgroundFillType: tempSlide.slideStyle?.backgroundFillType,
     }
-    tempSlide.background =
-      appStore.currentState.settings.defaultBackground.default?.background ||
-      appStore.currentState.settings.defaultBackground.text?.background
-    tempSlide.backgroundType =
-      appStore.currentState.settings.defaultBackground.default?.backgroundType ||
-      appStore.currentState.settings.defaultBackground.text?.backgroundType
+    const textBackground = useResolvedDefaultBackground("text")
+    tempSlide.background = textBackground.background
+    tempSlide.backgroundVideoKey = textBackground.backgroundVideoKey
+    tempSlide.backgroundImageKey = textBackground.backgroundImageKey
+    tempSlide.backgroundType = textBackground.backgroundType
     tempSlide.id = useObjectID()
     usePosthogCapture("NEW_TEXT_SLIDE_CREATED")
     return tempSlide
@@ -171,18 +170,11 @@ export default function useSlideCreation() {
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.bible
     tempSlide.type = slideTypes.bible
-    tempSlide.background =
-      appStore.currentState.settings.defaultBackground.default?.background ||
-      appStore.currentState.settings.defaultBackground.bible?.background
-    tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey ||
-      appStore.currentState.settings.defaultBackground.bible?.backgroundVideoKey
-    tempSlide.backgroundImageKey =
-      appStore.currentState.settings.defaultBackground.default?.backgroundImageKey ||
-      appStore.currentState.settings.defaultBackground.bible?.backgroundImageKey
-    tempSlide.backgroundType =
-      appStore.currentState.settings.defaultBackground.default?.backgroundType ||
-      appStore.currentState.settings.defaultBackground.bible?.backgroundType
+    const bibleBackground = useResolvedDefaultBackground("bible")
+    tempSlide.background = bibleBackground.background
+    tempSlide.backgroundVideoKey = bibleBackground.backgroundVideoKey
+    tempSlide.backgroundImageKey = bibleBackground.backgroundImageKey
+    tempSlide.backgroundType = bibleBackground.backgroundType
     tempSlide.title = scripture?.label
     tempSlide.name = useSlideName(tempSlide)
     const fontSize = useScreenFontSize(scripture?.content as string)
@@ -203,18 +195,11 @@ export default function useSlideCreation() {
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.bible
     tempSlide.type = slideTypes.hymn
-    tempSlide.background =
-      appStore.currentState.settings.defaultBackground.default?.background ||
-      appStore.currentState.settings.defaultBackground.hymn?.background
-    tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey ||
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundVideoKey
-    tempSlide.backgroundImageKey =
-      appStore.currentState.settings.defaultBackground.default?.backgroundImageKey ||
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundImageKey
-    tempSlide.backgroundType =
-      appStore.currentState.settings.defaultBackground.default?.backgroundType ||
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundType
+    const hymnBackground = useResolvedDefaultBackground("hymn")
+    tempSlide.background = hymnBackground.background
+    tempSlide.backgroundVideoKey = hymnBackground.backgroundVideoKey
+    tempSlide.backgroundImageKey = hymnBackground.backgroundImageKey
+    tempSlide.backgroundType = hymnBackground.backgroundType
     tempSlide.songId = hymn.number
     tempSlide.hasChorus = hymn.chorus === "false" ? false : !!hymn.chorus
     tempSlide.title = "Verse 1"
@@ -246,18 +231,11 @@ export default function useSlideCreation() {
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.bible
     tempSlide.type = slideTypes.song
-    tempSlide.background =
-      appStore.currentState.settings.defaultBackground.default?.background ||
-      appStore.currentState.settings.defaultBackground.hymn?.background
-    tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey ||
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundVideoKey
-    tempSlide.backgroundImageKey =
-      appStore.currentState.settings.defaultBackground.default?.backgroundImageKey ||
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundImageKey
-    tempSlide.backgroundType =
-      appStore.currentState.settings.defaultBackground.default?.backgroundType ||
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundType
+    const songBackground = useResolvedDefaultBackground("hymn")
+    tempSlide.background = songBackground.background
+    tempSlide.backgroundVideoKey = songBackground.backgroundVideoKey
+    tempSlide.backgroundImageKey = songBackground.backgroundImageKey
+    tempSlide.backgroundType = songBackground.backgroundType
     tempSlide.songId = song._id || song.id
     tempSlide.title = "Verse 1"
     const currentSongVerse = song.verses?.[0]?.trim() ?? ""
@@ -283,18 +261,11 @@ export default function useSlideCreation() {
       ? slideLayoutTypes.bible
       : slideLayoutTypes.full_text
     tempSlide.type = slideTypes.songSetlist
-    tempSlide.background =
-      appStore.currentState.settings.defaultBackground.default?.background ||
-      appStore.currentState.settings.defaultBackground.hymn?.background
-    tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.default?.backgroundVideoKey ||
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundVideoKey
-    tempSlide.backgroundImageKey =
-      appStore.currentState.settings.defaultBackground.default?.backgroundImageKey ||
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundImageKey
-    tempSlide.backgroundType =
-      appStore.currentState.settings.defaultBackground.default?.backgroundType ||
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundType
+    const setlistBackground = useResolvedDefaultBackground("hymn")
+    tempSlide.background = setlistBackground.background
+    tempSlide.backgroundVideoKey = setlistBackground.backgroundVideoKey
+    tempSlide.backgroundImageKey = setlistBackground.backgroundImageKey
+    tempSlide.backgroundType = setlistBackground.backgroundType
     tempSlide.title = "Song Setlist"
     // Stamped at creation, the way createHymnSlide does it: without it the
     // setlist rides whatever the app-wide default happens to be at the moment
@@ -854,14 +825,11 @@ export default function useSlideCreation() {
     const tempSlide = { ...preSlideCreation() }
     tempSlide.layout = slideLayoutTypes.countdown
     tempSlide.type = slideTypes.countdown
-    tempSlide.background =
-      appStore.currentState.settings.defaultBackground.hymn?.background
-    tempSlide.backgroundVideoKey =
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundVideoKey
-    tempSlide.backgroundImageKey =
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundImageKey
-    tempSlide.backgroundType =
-      appStore.currentState.settings.defaultBackground.hymn?.backgroundType
+    const countdownBackground = useResolvedDefaultBackground("default")
+    tempSlide.background = countdownBackground.background
+    tempSlide.backgroundVideoKey = countdownBackground.backgroundVideoKey
+    tempSlide.backgroundImageKey = countdownBackground.backgroundImageKey
+    tempSlide.backgroundType = countdownBackground.backgroundType
     tempSlide.data = countdown
     tempSlide.name = `${countdown.time?.replace("00:", "")}`
     tempSlide.contents = useSlideContent(tempSlide, countdown)
