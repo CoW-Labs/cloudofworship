@@ -50,6 +50,8 @@ export const appWideActions = {
   startStageTimer: 'start-stage-timer',
   stopStageTimer: 'stop-stage-timer',
   restartStageTimer: 'restart-stage-timer',
+  newStageCountdown: 'new-stage-countdown',
+  clearStageCountdown: 'clear-stage-countdown',
   openSettings: 'open-settings',
   newActiveSlide: 'new-active-slide',
   deleteSlide: 'delete-slide',
@@ -353,6 +355,24 @@ export const quickActionsArr: QuickAction[] = [
     tier: "free",
   },
   {
+    icon: "i-ph-timer",
+    name: "Stage Display Countdown",
+    desc: "Count a break or segment down on the stage display only",
+    action: appWideActions.newStageCountdown,
+    meta: "stage countdown break segment backstage confidence monitor musician speaker timer minutes",
+    searchableOnly: true,
+    tier: "teams",
+  },
+  {
+    icon: "i-ph-x-circle",
+    name: "Clear Stage Countdown",
+    desc: "Take the countdown off the stage display",
+    action: appWideActions.clearStageCountdown,
+    meta: "clear remove stop end stage countdown confidence monitor back to timer",
+    searchableOnly: true,
+    tier: "teams",
+  },
+  {
     icon: "i-ph-play-circle",
     name: "Start Stage Timer",
     desc: "Start or resume the timer on the stage display",
@@ -611,12 +631,14 @@ export const desktopOnlyActions: string[] = [
   appWideActions.goLive,
   appWideActions.closeLiveWindow,
   appWideActions.openStageDisplay,
-  // The stage timer travels between windows on one machine (BroadcastChannel,
+  // The stage clock travels between windows on one machine (BroadcastChannel,
   // mirrored over Tauri events). A phone is a different device, so its command
   // would only move its own copy of the clock and never reach the stage screen.
   appWideActions.startStageTimer,
   appWideActions.stopStageTimer,
   appWideActions.restartStageTimer,
+  appWideActions.newStageCountdown,
+  appWideActions.clearStageCountdown,
   // Keyboard shortcuts reference. There is no physical keyboard to bind.
   appWideActions.openShortcutsModal,
   // Continuous microphone capture streamed to Deepgram. Mobile browsers drop
