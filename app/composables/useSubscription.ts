@@ -12,6 +12,9 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-alert': 'teams',
   'remove-alert': 'teams',
   'new-countdown': 'teams',
+  // A countdown sent to the stage display only — same feature, other screen.
+  'new-stage-countdown': 'teams',
+  'clear-stage-countdown': 'teams',
   'new-time-slide': 'teams',
   'show-slide-overlay': 'teams',
   'remove-slide-overlay': 'teams',
@@ -28,6 +31,10 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   // Free tier features
   'new-slide': 'free',
   'open-stage-display': 'free',
+  // Stage timer controls ride with the stage display itself.
+  'start-stage-timer': 'free',
+  'stop-stage-timer': 'free',
+  'restart-stage-timer': 'free',
   'new-search-bible': 'free',
   'new-hymn': 'free',
   'new-media': 'free',

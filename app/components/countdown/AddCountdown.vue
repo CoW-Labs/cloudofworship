@@ -1,5 +1,19 @@
 <template>
   <div class="add-song-main mb-4">
+    <!-- Same countdown, two destinations: the congregation's screen (a slide in
+         the schedule) or the stage display alone (a clock only the band and
+         speaker see). The form below is shared; only where it lands changes. -->
+    <UTabs
+      v-if="stageAvailable"
+      v-model="activeTab"
+      :items="destinationTabs"
+      class="mt-3"
+    />
+
+    <p class="mt-3 text-xs text-gray-500 dark:text-[#7d8695]">
+      {{ destination.hint }}
+    </p>
+
     <form class="flex flex-col gap-5 mt-3">
       <!-- <UFormGroup size="xl">
         <div class="flex items-center gap-2">
@@ -50,7 +64,7 @@
 
       <CowTextarea
         v-model="content"
-        label="Optional text above your countdown"
+        :label="destination.textareaLabel"
         :rows="6"
       />
 
@@ -59,11 +73,11 @@
         block
         size="lg"
         class="mt-4"
-        :disabled="!time"
+        :disabled="!hasDuration"
         :loading="loading"
         @click="createCountdown"
       >
-        Create countdown slide
+        {{ destination.cta }}
       </CowButton>
     </form>
   </div>
@@ -77,7 +91,43 @@ import { min } from "rxjs"
 
 const emitter = useNuxtApp().$emitter as Emitter<any>
 
+const props = defineProps<{
+  /** 0 = live display, 1 = stage display. Set by whoever opened the panel. */
+  initialTab?: number
+  stageAvailable?: boolean
+}>()
+
 const appStore = useAppStore()
+
+// No icons: the quick actions panel is only ~340px wide by default, and an
+// icon pushes "Stage Display" into an ellipsis.
+const destinationTabs = [{ label: "Live Display" }, { label: "Stage Display" }]
+
+const activeTab = ref(props.stageAvailable ? props.initialTab || 0 : 0)
+watch(
+  () => [props.initialTab, props.stageAvailable] as const,
+  ([tab, stageAvailable]) => {
+    activeTab.value = stageAvailable ? tab || 0 : 0
+  }
+)
+
+/** Everything that differs between the two destinations, in one place. */
+const destination = computed(() =>
+  props.stageAvailable && activeTab.value === 1
+    ? {
+        hint: "Counts down on the stage display only. Nothing reaches the congregation's screen.",
+        textareaLabel: "Optional text beneath the countdown",
+        cta: "Start stage countdown",
+        action: appWideActions.newStageCountdown,
+      }
+    : {
+        hint: "Adds a countdown slide to this schedule, ready to take live.",
+        textareaLabel: "Optional text above your countdown",
+        cta: "Create countdown slide",
+        action: appWideActions.newCountdown,
+      }
+)
+
 const timeOptions = ref<Array<any>>([
   { label: "1 minute", value: "00:01:00" },
   { label: "3 minutes", value: "00:03:00" },
@@ -98,14 +148,23 @@ const second = ref<string>("00")
 const toast = useToast()
 const emit = defineEmits(["go-home"])
 
+/** The duration the three inputs currently spell out, as "HH:MM:SS". */
+const duration = computed(() => `${hour.value}:${minute.value}:${second.value}`)
+
+// The dropdown can be cleared and the minute/second boxes emptied, and a
+// countdown of nothing is not worth sending anywhere.
+const hasDuration = computed(() => useTimeStringToMilli(duration.value) > 0)
+
 const createCountdown = async () => {
+  if (!hasDuration.value) return
+
   const countdown: Countdown = {
     id: useID(),
     content: content.value,
-    time: `${hour.value}:${minute.value}:${second.value}`,
-    timeLeft: `${hour.value}:${minute.value}:${second.value}`,
+    time: duration.value,
+    timeLeft: duration.value,
   }
-  useGlobalEmit(appWideActions.newCountdown, countdown)
+  useGlobalEmit(destination.value.action, countdown)
 }
 
 const formatTime = (value: string | number) => {
