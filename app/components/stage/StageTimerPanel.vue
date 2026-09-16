@@ -57,10 +57,15 @@
 
 <script setup lang="ts">
 import type { Countdown, Slide } from "~/types"
+import { stageTimerElapsed } from "~/utils/stageTimer"
 
 /**
  * Bottom-left panel: the countdown that is currently on screen when there is
  * one, otherwise a stopwatch the team can run for the service or a segment.
+ *
+ * The stopwatch itself lives in shared state (`useStageTimerSync`) so the
+ * operator can start, stop and restart it from quick actions and every stage
+ * screen shows the same reading. The buttons here drive that same state.
  */
 const props = defineProps<{
   slide?: Slide | null
@@ -69,10 +74,18 @@ const props = defineProps<{
   slideCount?: number
 }>()
 
-const running = ref(false)
-const elapsedMs = ref(0)
+const stageTimer = useStageTimerSync()
+const running = computed(() => stageTimer.isRunning.value)
+
+// A ticking clock reference rather than a ticking counter: the reading is
+// always derived from the shared start time, so a tick the browser throttled
+// or skipped corrects itself on the next one instead of losing time.
+const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | null = null
-let startedAt = 0
+
+const elapsedMs = computed(() =>
+  stageTimerElapsed(stageTimer.timer.value, now.value)
+)
 
 const countdown = computed(() =>
   props.slide?.type === slideTypes.countdown
@@ -111,26 +124,27 @@ const stopTicking = () => {
   ticker = null
 }
 
-const toggle = () => {
-  if (running.value) {
-    running.value = false
-    stopTicking()
-    return
-  }
-
-  running.value = true
-  // Tracking against a wall-clock start keeps a long service timer accurate,
-  // which a per-tick += 1000 would not be.
-  startedAt = Date.now() - elapsedMs.value
+const startTicking = () => {
+  if (ticker) return
   ticker = setInterval(() => {
-    elapsedMs.value = Date.now() - startedAt
+    now.value = Date.now()
   }, 250)
 }
 
-const reset = () => {
-  elapsedMs.value = 0
-  startedAt = Date.now()
-}
+// Only a running timer needs the interval; a paused one cannot change until
+// somebody sends a command, which updates the shared state on its own.
+watch(
+  running,
+  (isRunning) => {
+    now.value = Date.now()
+    if (isRunning) startTicking()
+    else stopTicking()
+  },
+  { immediate: true }
+)
+
+const toggle = () => stageTimer.toggle()
+const reset = () => stageTimer.reset()
 
 onBeforeUnmount(stopTicking)
 </script>
