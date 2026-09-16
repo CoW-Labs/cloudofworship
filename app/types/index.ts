@@ -177,23 +177,28 @@ export interface TimeSlideData {
  */
 export type StageTimerMode = "stopwatch" | "countdown"
 
+export interface StageStopwatchState {
+  running: boolean
+  startedAt: number
+  elapsedMs: number
+}
+
 /**
  * The stage display's clock. Stored rather than ticked so every window derives
  * the same reading from the same wall clock: a running clock has run for
  * `now - startedAt`, a paused one for the `elapsedMs` it banked when it
  * stopped. A countdown subtracts that from `durationMs`.
  */
-export interface StageTimerState {
+export interface StageTimerState extends StageStopwatchState {
   mode: StageTimerMode
-  running: boolean
   /** Wall-clock ms the clock counts from. 0 while it is paused. */
-  startedAt: number
   /** Elapsed ms banked when the clock was paused. */
-  elapsedMs: number
   /** Countdown mode: the full duration to count down from. */
   durationMs: number
   /** Countdown mode: the optional line shown above the clock. */
   message: string
+  /** The service stopwatch continues underneath a stage countdown. */
+  serviceTimer: StageStopwatchState | null
   /** When this state was set — settles races between windows. */
   updatedAt: number
 }

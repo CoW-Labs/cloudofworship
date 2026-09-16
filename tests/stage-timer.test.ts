@@ -93,7 +93,8 @@ describe("stage stopwatch transitions", () => {
 })
 
 describe("stage countdown", () => {
-  const fiveMinutes = () => stageCountdownFrom(5 * MINUTE, "Back in five", NOW)
+  const fiveMinutes = () =>
+    stageCountdownFrom(defaultStageTimerState(), 5 * MINUTE, "Back in five", NOW)
 
   it("counts down from its duration and carries its message", () => {
     const countdown = fiveMinutes()
@@ -142,16 +143,64 @@ describe("stage countdown", () => {
   })
 
   it("is cleared back to the stopwatch", () => {
-    const cleared = clearedStageTimer(NOW)
+    const cleared = clearedStageTimer(fiveMinutes(), NOW + MINUTE)
 
     expect(cleared.mode).toBe("stopwatch")
     expect(cleared.durationMs).toBe(0)
     expect(cleared.message).toBe("")
-    expect(cleared.updatedAt).toBe(NOW)
+    expect(cleared.updatedAt).toBe(NOW + MINUTE)
   })
 
   it("refuses a countdown with no duration", () => {
-    expect(stageCountdownFrom(0, "Nothing to count", NOW).mode).toBe("stopwatch")
+    expect(
+      stageCountdownFrom(defaultStageTimerState(), 0, "Nothing to count", NOW)
+        .mode
+    ).toBe("stopwatch")
+  })
+
+  it("keeps the service stopwatch running underneath a countdown", () => {
+    const serviceTimer = startedStageTimer(defaultStageTimerState(), NOW)
+    const countdown = stageCountdownFrom(
+      serviceTimer,
+      5 * MINUTE,
+      "Back in five",
+      NOW + 35 * MINUTE
+    )
+    const replaced = stageCountdownFrom(
+      countdown,
+      3 * MINUTE,
+      "Three more minutes",
+      NOW + 36 * MINUTE
+    )
+    const restored = clearedStageTimer(replaced, NOW + 38 * MINUTE)
+
+    expect(stageTimerReading(restored, NOW + 38 * MINUTE)).toBe(38 * MINUTE)
+    expect(restored.running).toBe(true)
+    expect(restored.serviceTimer).toBeNull()
+  })
+
+  it("restores a paused service stopwatch at its original reading", () => {
+    const serviceTimer = stoppedStageTimer(
+      startedStageTimer(defaultStageTimerState(), NOW),
+      NOW + 12 * MINUTE
+    )
+    const countdown = stageCountdownFrom(
+      serviceTimer,
+      5 * MINUTE,
+      "",
+      NOW + 20 * MINUTE
+    )
+    const restored = clearedStageTimer(countdown, NOW + 25 * MINUTE)
+
+    expect(restored.running).toBe(false)
+    expect(stageTimerReading(restored, NOW + 25 * MINUTE)).toBe(12 * MINUTE)
+  })
+
+  it("does not reset the service timer when no countdown is active", () => {
+    const serviceTimer = startedStageTimer(defaultStageTimerState(), NOW)
+
+    expect(clearedStageTimer(serviceTimer, NOW + 10 * MINUTE)).toBe(serviceTimer)
+    expect(stageTimerReading(serviceTimer, NOW + 10 * MINUTE)).toBe(10 * MINUTE)
   })
 
   it("never reports the stopwatch as a finished countdown", () => {
@@ -195,6 +244,22 @@ describe("normaliseStageTimer", () => {
     expect(stageTimerElapsed(legacy, NOW)).toBe(MINUTE)
   })
 
+  it("restores a persisted service timer after a countdown", () => {
+    const serviceTimer = startedStageTimer(defaultStageTimerState(), NOW)
+    const countdown = stageCountdownFrom(
+      serviceTimer,
+      5 * MINUTE,
+      "",
+      NOW + MINUTE
+    )
+    const restored = clearedStageTimer(
+      normaliseStageTimer(JSON.parse(JSON.stringify(countdown)), NOW + 2 * MINUTE),
+      NOW + 2 * MINUTE
+    )
+
+    expect(stageTimerReading(restored, NOW + 2 * MINUTE)).toBe(2 * MINUTE)
+  })
+
   it("drops a clock left over from a previous service", () => {
     const lastSunday = NOW - 7 * 24 * 60 * 60 * 1000
     const staleRun = startedStageTimer(defaultStageTimerState(), lastSunday)
@@ -215,7 +280,7 @@ describe("isStageTimerIdle", () => {
   })
 
   it("is false while a countdown is loaded, even a paused one", () => {
-    const countdown = stageCountdownFrom(5 * MINUTE, "", NOW)
+    const countdown = stageCountdownFrom(defaultStageTimerState(), 5 * MINUTE, "", NOW)
 
     expect(isStageTimerIdle(countdown)).toBe(false)
     expect(isStageTimerIdle(stoppedStageTimer(countdown, NOW + MINUTE))).toBe(

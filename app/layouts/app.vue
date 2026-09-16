@@ -98,6 +98,7 @@ import { isRetryableMediaDownloadError } from "~/utils/mediaDownloadErrors"
 import { safeDBOperation } from "~/composables/useIndexedDB"
 import { invalidateHymnCache } from "~/composables/useHymn"
 import { cloneDurableSlide } from "~/utils/durableSlide"
+import { stageTimerReading } from "~/utils/stageTimer"
 
 useHead({
   title: "Cloud of Worship",
@@ -435,27 +436,46 @@ const announceStageTimer = (
 }
 
 emitter.on(appWideActions.startStageTimer, () => {
+  const isCountdown = stageTimer.isCountdown.value
   const wasRunning = stageTimer.isRunning.value
-  const resumingFrom = useMilliToTimeString(stageTimer.timer.value.elapsedMs)
-  stageTimer.start()
+  const started = stageTimer.start()
+  const reading = useMilliToTimeString(stageTimerReading(started))
 
   announceStageTimer(
     "start",
-    wasRunning ? "Stage timer is already running" : "Stage timer started",
-    wasRunning || resumingFrom === "00:00:00"
+    isCountdown
+      ? wasRunning
+        ? "Stage countdown is already running"
+        : "Stage countdown started"
+      : wasRunning
+      ? "Stage timer is already running"
+      : "Stage timer started",
+    isCountdown
+      ? wasRunning
+        ? `${reading} remaining on the stage display.`
+        : `Counting down from ${reading} on the stage display.`
+      : wasRunning || reading === "00:00:00"
       ? "Counting up on the stage display."
-      : `Resumed from ${resumingFrom}.`
+      : `Resumed from ${reading}.`
   )
 })
 
 emitter.on(appWideActions.stopStageTimer, () => {
+  const isCountdown = stageTimer.isCountdown.value
   const wasRunning = stageTimer.isRunning.value
   const stopped = stageTimer.stop()
+  const reading = useMilliToTimeString(stageTimerReading(stopped))
 
   announceStageTimer(
     "stop",
-    wasRunning ? "Stage timer stopped" : "Stage timer is not running",
-    `Holding at ${useMilliToTimeString(stopped.elapsedMs)}.`
+    isCountdown
+      ? wasRunning
+        ? "Stage countdown paused"
+        : "Stage countdown is already paused"
+      : wasRunning
+      ? "Stage timer stopped"
+      : "Stage timer is not running",
+    `Holding at ${reading}${isCountdown ? " remaining" : ""}.`
   )
 })
 
@@ -491,12 +511,19 @@ emitter.on(appWideActions.newStageCountdown, (countdown?: Countdown) => {
 })
 
 emitter.on(appWideActions.clearStageCountdown, () => {
-  const hadCountdown = stageTimer.isCountdown.value
+  if (!stageTimer.isCountdown.value) {
+    announceStageTimer(
+      "clear-countdown",
+      "No stage countdown to clear",
+      "The stage clock is unchanged."
+    )
+    return
+  }
   stageTimer.clearCountdown()
 
   announceStageTimer(
     "clear-countdown",
-    hadCountdown ? "Stage countdown cleared" : "No stage countdown to clear",
+    "Stage countdown cleared",
     "The stage display is back to the service timer."
   )
 })
