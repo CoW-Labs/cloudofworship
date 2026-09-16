@@ -245,6 +245,7 @@
     <!-- COUNTDOWN SECTION-->
     <AddCountdown
       v-else-if="page === 'countdown'"
+      :initial-tab="countdownInitialTab"
       class="fade-in-right h-full min-h-0 overflow-auto"
       @close="page = ''"
     />
@@ -536,6 +537,8 @@ const emitter = useNuxtApp().$emitter as Emitter<any>
 const libraryPage = ref<string>("")
 const librarySongToEdit = ref<Song | undefined>()
 const libraryOpenToken = ref<number>(0)
+// Which destination the countdown panel opens on: 0 live display, 1 stage.
+const countdownInitialTab = ref<number>(0)
 
 // Active Bible version, used to validate parsed references against the right
 // verse index (see the reference filter in `searchedActions`).
@@ -967,8 +970,18 @@ emitter.on("add-song", (song?: Song) => {
   page.value = "library"
 })
 
+// No payload means "open the countdown panel"; a payload is a countdown that
+// has already been filled in and is on its way to its destination.
 emitter.on("new-countdown", (data) => {
   if (!data) {
+    countdownInitialTab.value = 0
+    page.value = "countdown"
+  }
+})
+
+emitter.on(appWideActions.newStageCountdown, (data) => {
+  if (!data) {
+    countdownInitialTab.value = 1
     page.value = "countdown"
   }
 })
@@ -1227,6 +1240,28 @@ const timerQuickAction = computed((): QuickAction | null => {
   }
 })
 
+// The same typed duration, sent to the confidence monitor instead of the
+// congregation's screen — "5 min countdown" offers both, so an operator
+// counting a break down for the band never has to open a panel.
+const stageTimerQuickAction = computed((): QuickAction | null => {
+  const parsed = timerCommandMatch.value
+  if (!parsed) return null
+
+  return {
+    icon: "i-ph-monitor-play",
+    name: `Start ${parsed.label} countdown on stage display`,
+    desc: "Counts down for the band and speaker only, not the congregation",
+    action: appWideActions.newStageCountdown,
+    type: slideTypes.countdown,
+    countdownData: {
+      id: useID(),
+      content: "",
+      time: parsed.time,
+      timeLeft: parsed.time,
+    },
+  }
+})
+
 // Reference set of the static, user-runnable quick actions (the ones authored
 // in `quickActionsArr`). Used by the search grouping to tell an *action* the
 // user can run — "Display Bible", "Add Media", "Add Countdown Timer" — apart
@@ -1353,7 +1388,11 @@ const searchedActions = computed(() => {
   }
 
   if (timerQuickAction.value) {
-    results = [timerQuickAction.value, ...results]
+    results = [
+      timerQuickAction.value,
+      ...(stageTimerQuickAction.value ? [stageTimerQuickAction.value] : []),
+      ...results,
+    ]
   }
 
   // Group results by type (hymn, song, bible, media, etc.) so each category

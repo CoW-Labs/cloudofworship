@@ -1,17 +1,22 @@
-import type { StageTimerState } from "~/types"
+import type { Countdown, StageTimerState } from "~/types"
 import { useAppStore } from "~/store/app"
 import { postCrossWindowNotification } from "~/composables/useBroadcastPost"
+import useBroadcastMessage from "~/composables/useBroadcastMessage"
+import useTimeStringToMilli from "~/composables/useTimeStringToMilli"
 import {
+  clearedStageTimer,
   isStageTimerIdle,
   normaliseStageTimer,
   resetStageTimer,
   restartedStageTimer,
+  stageCountdownFrom,
   startedStageTimer,
   stoppedStageTimer,
 } from "~/utils/stageTimer"
 
 /**
- * The stage display's count-up timer, driven from the operator window.
+ * The stage display's clock, driven from the operator window — the service
+ * stopwatch, and the countdowns an operator sends to the stage only.
  *
  * ── Why the state travels twice ─────────────────────────────────────────────
  *
@@ -73,6 +78,7 @@ const useStageTimer = () => {
     normaliseStageTimer(appStore.currentState.stageTimer)
   )
   const isRunning = computed(() => timer.value.running)
+  const isCountdown = computed(() => timer.value.mode === "countdown")
 
   /**
    * Write locally and tell the other windows, in that order. A transition that
@@ -91,9 +97,25 @@ const useStageTimer = () => {
 
   const start = () => publish(startedStageTimer(timer.value))
   const stop = () => publish(stoppedStageTimer(timer.value))
-  const restart = () => publish(restartedStageTimer())
+  const restart = () => publish(restartedStageTimer(timer.value))
   const reset = () => publish(resetStageTimer(timer.value))
   const toggle = () => (timer.value.running ? stop() : start())
+
+  /**
+   * Put a countdown on the stage screens and start it. Nothing reaches the
+   * congregation's output — this is the confidence monitor only, which is the
+   * whole point of sending a countdown here rather than taking a slide live.
+   */
+  const startCountdown = (countdown: Countdown) =>
+    publish(
+      stageCountdownFrom(
+        useTimeStringToMilli(countdown?.time || "00:00:00"),
+        countdown?.content || ""
+      )
+    )
+
+  /** Take the countdown off the stage screens, handing them back the stopwatch. */
+  const clearCountdown = () => publish(clearedStageTimer())
 
   /**
    * Adopt state another window sent. Out-of-order deliveries lose to the
@@ -108,11 +130,14 @@ const useStageTimer = () => {
   return {
     timer,
     isRunning,
+    isCountdown,
     start,
     stop,
     restart,
     reset,
     toggle,
+    startCountdown,
+    clearCountdown,
     adopt,
     publish,
   }
@@ -140,9 +165,9 @@ export const useStageTimerSync = () => {
         return
       }
 
-      // A window that just opened asks what the timer is doing. Only a window
+      // A window that just opened asks what the clock is doing. Only a window
       // with something worth reporting answers, so a freshly opened stage
-      // screen cannot reset a service timer that is already running.
+      // screen cannot reset a timer or countdown that is already running.
       if (isStageTimerRequestBroadcast(payload)) {
         if (payload.from === windowId) return
         if (isStageTimerIdle(stageTimer.timer.value)) return

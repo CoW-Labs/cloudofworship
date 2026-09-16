@@ -172,16 +172,28 @@ export interface TimeSlideData {
 }
 
 /**
- * The stage display's count-up timer. Stored rather than ticked so every
- * window derives the same reading from the same wall clock: a running timer is
- * `now - startedAt`, a paused one is the `elapsedMs` it banked when it stopped.
+ * What the stage display's clock is doing: counting up for the service, or
+ * down to the end of a segment the operator set.
+ */
+export type StageTimerMode = "stopwatch" | "countdown"
+
+/**
+ * The stage display's clock. Stored rather than ticked so every window derives
+ * the same reading from the same wall clock: a running clock has run for
+ * `now - startedAt`, a paused one for the `elapsedMs` it banked when it
+ * stopped. A countdown subtracts that from `durationMs`.
  */
 export interface StageTimerState {
+  mode: StageTimerMode
   running: boolean
-  /** Wall-clock ms a running timer counts up from. 0 while it is paused. */
+  /** Wall-clock ms the clock counts from. 0 while it is paused. */
   startedAt: number
-  /** Elapsed ms banked when the timer was paused. */
+  /** Elapsed ms banked when the clock was paused. */
   elapsedMs: number
+  /** Countdown mode: the full duration to count down from. */
+  durationMs: number
+  /** Countdown mode: the optional line shown above the clock. */
+  message: string
   /** When this state was set — settles races between windows. */
   updatedAt: number
 }
@@ -490,8 +502,9 @@ export interface AppState {
   // operator has not assigned one — the stage display then opens in a new tab.
   stageDisplayLabel: string
   stageDisplayScreen: Screen | null
-  // Count-up timer shown on the stage display, driven from the operator's
-  // quick actions so the same clock runs on every stage screen at once.
+  // The stage display's clock — a count-up timer for the service, or a
+  // countdown the operator sent to the stage only. Driven from quick actions
+  // so the same clock runs on every stage screen at once.
   stageTimer: StageTimerState
   defaultMicrophoneId: string
   defaultCameraId: string

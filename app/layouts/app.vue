@@ -90,6 +90,7 @@ import type {
   Slide,
   Hymn,
   AppSettings,
+  Countdown,
 } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { appWideActions, backgroundTypes } from "~/utils/constants"
@@ -420,7 +421,7 @@ emitter.on(appWideActions.openStageDisplay, async () => {
 const stageTimer = useStageTimerSync()
 
 const announceStageTimer = (
-  command: "start" | "stop" | "restart",
+  command: "start" | "stop" | "restart" | "countdown" | "clear-countdown",
   title: string,
   description: string
 ) => {
@@ -463,8 +464,40 @@ emitter.on(appWideActions.restartStageTimer, () => {
 
   announceStageTimer(
     "restart",
-    "Stage timer restarted",
-    "Back to 00:00:00 and counting."
+    stageTimer.isCountdown.value
+      ? "Stage countdown restarted"
+      : "Stage timer restarted",
+    `Back to ${useMilliToTimeString(
+      stageTimer.timer.value.mode === "countdown"
+        ? stageTimer.timer.value.durationMs
+        : 0
+    )} and counting.`
+  )
+})
+
+// A payload is a countdown to run; without one the quick action is just
+// asking for the panel, which QuickActions opens on the stage tab.
+emitter.on(appWideActions.newStageCountdown, (countdown?: Countdown) => {
+  if (!countdown?.time) return
+  stageTimer.startCountdown(countdown)
+
+  announceStageTimer(
+    "countdown",
+    "Stage countdown started",
+    `${useMilliToTimeString(
+      useTimeStringToMilli(countdown.time)
+    )} on the stage display. The congregation's screen is untouched.`
+  )
+})
+
+emitter.on(appWideActions.clearStageCountdown, () => {
+  const hadCountdown = stageTimer.isCountdown.value
+  stageTimer.clearCountdown()
+
+  announceStageTimer(
+    "clear-countdown",
+    hadCountdown ? "Stage countdown cleared" : "No stage countdown to clear",
+    "The stage display is back to the service timer."
   )
 })
 

@@ -1,24 +1,30 @@
 import { describe, expect, it } from "vitest"
 import {
+  clearedStageTimer,
   defaultStageTimerState,
+  isStageCountdownFinished,
   isStageTimerIdle,
   normaliseStageTimer,
   resetStageTimer,
   restartedStageTimer,
+  stageCountdownFrom,
   stageTimerElapsed,
+  stageTimerReading,
+  stageTimerRemaining,
   startedStageTimer,
   stoppedStageTimer,
 } from "~/utils/stageTimer"
 
 const NOW = 1_700_000_000_000
+const MINUTE = 60_000
 
-describe("stage timer transitions", () => {
+describe("stage stopwatch transitions", () => {
   it("starts an untouched timer from zero", () => {
     const started = startedStageTimer(defaultStageTimerState(), NOW)
 
     expect(started.running).toBe(true)
-    expect(stageTimerElapsed(started, NOW)).toBe(0)
-    expect(stageTimerElapsed(started, NOW + 5_000)).toBe(5_000)
+    expect(stageTimerReading(started, NOW)).toBe(0)
+    expect(stageTimerReading(started, NOW + 5_000)).toBe(5_000)
   })
 
   it("resumes from the reading a stop banked", () => {
@@ -28,11 +34,11 @@ describe("stage timer transitions", () => {
     expect(stopped.running).toBe(false)
     expect(stopped.elapsedMs).toBe(90_000)
     // Time passes while it is paused; the reading must not move.
-    expect(stageTimerElapsed(stopped, NOW + 300_000)).toBe(90_000)
+    expect(stageTimerReading(stopped, NOW + 300_000)).toBe(90_000)
 
     const resumed = startedStageTimer(stopped, NOW + 300_000)
-    expect(stageTimerElapsed(resumed, NOW + 300_000)).toBe(90_000)
-    expect(stageTimerElapsed(resumed, NOW + 310_000)).toBe(100_000)
+    expect(stageTimerReading(resumed, NOW + 300_000)).toBe(90_000)
+    expect(stageTimerReading(resumed, NOW + 310_000)).toBe(100_000)
   })
 
   it("leaves a running timer alone when started again", () => {
@@ -55,23 +61,25 @@ describe("stage timer transitions", () => {
       startedStageTimer(defaultStageTimerState(), NOW),
       NOW + 600_000
     )
-    const restarted = restartedStageTimer(NOW + 700_000)
+    const restarted = restartedStageTimer(paused, NOW + 700_000)
 
     expect(paused.elapsedMs).toBe(600_000)
     expect(restarted.running).toBe(true)
-    expect(stageTimerElapsed(restarted, NOW + 700_000)).toBe(0)
-    expect(stageTimerElapsed(restarted, NOW + 701_000)).toBe(1_000)
+    expect(stageTimerReading(restarted, NOW + 700_000)).toBe(0)
+    expect(stageTimerReading(restarted, NOW + 701_000)).toBe(1_000)
   })
 
   it("resets to zero without changing whether the timer is running", () => {
     const running = startedStageTimer(defaultStageTimerState(), NOW)
     const paused = stoppedStageTimer(running, NOW + 5_000)
 
-    expect(resetStageTimer(running, NOW + 5_000).running).toBe(true)
-    expect(stageTimerElapsed(resetStageTimer(running, NOW + 5_000), NOW + 5_000))
-      .toBe(0)
-    expect(resetStageTimer(paused, NOW + 5_000).running).toBe(false)
-    expect(resetStageTimer(paused, NOW + 5_000).elapsedMs).toBe(0)
+    const resetRunning = resetStageTimer(running, NOW + 5_000)
+    expect(resetRunning.running).toBe(true)
+    expect(stageTimerReading(resetRunning, NOW + 5_000)).toBe(0)
+
+    const resetPaused = resetStageTimer(paused, NOW + 5_000)
+    expect(resetPaused.running).toBe(false)
+    expect(resetPaused.elapsedMs).toBe(0)
   })
 
   it("stamps every transition so windows can settle a race", () => {
@@ -79,8 +87,78 @@ describe("stage timer transitions", () => {
 
     expect(started.updatedAt).toBe(NOW)
     expect(stoppedStageTimer(started, NOW + 1).updatedAt).toBe(NOW + 1)
-    expect(restartedStageTimer(NOW + 2).updatedAt).toBe(NOW + 2)
+    expect(restartedStageTimer(started, NOW + 2).updatedAt).toBe(NOW + 2)
     expect(resetStageTimer(started, NOW + 3).updatedAt).toBe(NOW + 3)
+  })
+})
+
+describe("stage countdown", () => {
+  const fiveMinutes = () => stageCountdownFrom(5 * MINUTE, "Back in five", NOW)
+
+  it("counts down from its duration and carries its message", () => {
+    const countdown = fiveMinutes()
+
+    expect(countdown.mode).toBe("countdown")
+    expect(countdown.running).toBe(true)
+    expect(countdown.message).toBe("Back in five")
+    expect(stageTimerReading(countdown, NOW)).toBe(5 * MINUTE)
+    expect(stageTimerReading(countdown, NOW + MINUTE)).toBe(4 * MINUTE)
+  })
+
+  it("stops at zero rather than going negative", () => {
+    const countdown = fiveMinutes()
+
+    expect(stageTimerRemaining(countdown, NOW + 10 * MINUTE)).toBe(0)
+    expect(isStageCountdownFinished(countdown, NOW + 10 * MINUTE)).toBe(true)
+    expect(isStageCountdownFinished(countdown, NOW + MINUTE)).toBe(false)
+  })
+
+  it("holds its remaining time across a pause", () => {
+    const paused = stoppedStageTimer(fiveMinutes(), NOW + 2 * MINUTE)
+
+    expect(stageTimerReading(paused, NOW + 30 * MINUTE)).toBe(3 * MINUTE)
+
+    const resumed = startedStageTimer(paused, NOW + 30 * MINUTE)
+    expect(stageTimerReading(resumed, NOW + 30 * MINUTE)).toBe(3 * MINUTE)
+    expect(stageTimerReading(resumed, NOW + 31 * MINUTE)).toBe(2 * MINUTE)
+  })
+
+  it("restarts from the full duration, keeping the message", () => {
+    const restarted = restartedStageTimer(fiveMinutes(), NOW + 4 * MINUTE)
+
+    expect(restarted.mode).toBe("countdown")
+    expect(restarted.message).toBe("Back in five")
+    expect(stageTimerReading(restarted, NOW + 4 * MINUTE)).toBe(5 * MINUTE)
+  })
+
+  it("starts a finished countdown over instead of leaving it at zero", () => {
+    const finished = fiveMinutes()
+    const stopped = stoppedStageTimer(finished, NOW + 9 * MINUTE)
+    expect(stageTimerReading(stopped, NOW + 9 * MINUTE)).toBe(0)
+
+    const restarted = startedStageTimer(stopped, NOW + 10 * MINUTE)
+    expect(restarted.running).toBe(true)
+    expect(stageTimerReading(restarted, NOW + 10 * MINUTE)).toBe(5 * MINUTE)
+  })
+
+  it("is cleared back to the stopwatch", () => {
+    const cleared = clearedStageTimer(NOW)
+
+    expect(cleared.mode).toBe("stopwatch")
+    expect(cleared.durationMs).toBe(0)
+    expect(cleared.message).toBe("")
+    expect(cleared.updatedAt).toBe(NOW)
+  })
+
+  it("refuses a countdown with no duration", () => {
+    expect(stageCountdownFrom(0, "Nothing to count", NOW).mode).toBe("stopwatch")
+  })
+
+  it("never reports the stopwatch as a finished countdown", () => {
+    const running = startedStageTimer(defaultStageTimerState(), NOW)
+
+    expect(isStageCountdownFinished(running, NOW + MINUTE)).toBe(false)
+    expect(stageTimerReading(running, NOW + MINUTE)).toBe(MINUTE)
   })
 })
 
@@ -94,10 +172,30 @@ describe("normaliseStageTimer", () => {
         { running: "yes", startedAt: NaN, elapsedMs: -5, updatedAt: NOW },
         NOW
       )
-    ).toEqual({ running: false, startedAt: 0, elapsedMs: 0, updatedAt: NOW })
+    ).toEqual({ ...defaultStageTimerState(), updatedAt: NOW })
   })
 
-  it("drops a timer left over from a previous service", () => {
+  it("reads a countdown with no duration as the stopwatch", () => {
+    const broken = normaliseStageTimer(
+      { mode: "countdown", running: true, startedAt: NOW, updatedAt: NOW },
+      NOW
+    )
+
+    expect(broken.mode).toBe("stopwatch")
+    expect(isStageCountdownFinished(broken, NOW)).toBe(false)
+  })
+
+  it("keeps a snapshot written by a build that had no countdown mode", () => {
+    const legacy = normaliseStageTimer(
+      { running: true, startedAt: NOW - MINUTE, elapsedMs: 0, updatedAt: NOW },
+      NOW
+    )
+
+    expect(legacy.mode).toBe("stopwatch")
+    expect(stageTimerElapsed(legacy, NOW)).toBe(MINUTE)
+  })
+
+  it("drops a clock left over from a previous service", () => {
     const lastSunday = NOW - 7 * 24 * 60 * 60 * 1000
     const staleRun = startedStageTimer(defaultStageTimerState(), lastSunday)
 
@@ -108,11 +206,20 @@ describe("normaliseStageTimer", () => {
 })
 
 describe("isStageTimerIdle", () => {
-  it("is true only when the timer has nothing to report", () => {
+  it("is true only when the clock has nothing to report", () => {
     expect(isStageTimerIdle(defaultStageTimerState())).toBe(true)
 
     const running = startedStageTimer(defaultStageTimerState(), NOW)
     expect(isStageTimerIdle(running)).toBe(false)
     expect(isStageTimerIdle(stoppedStageTimer(running, NOW + 1_000))).toBe(false)
+  })
+
+  it("is false while a countdown is loaded, even a paused one", () => {
+    const countdown = stageCountdownFrom(5 * MINUTE, "", NOW)
+
+    expect(isStageTimerIdle(countdown)).toBe(false)
+    expect(isStageTimerIdle(stoppedStageTimer(countdown, NOW + MINUTE))).toBe(
+      false
+    )
   })
 })
