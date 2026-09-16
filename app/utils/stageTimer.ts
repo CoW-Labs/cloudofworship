@@ -1,4 +1,4 @@
-import type { StageTimerState } from "~/types"
+import type { StageStopwatchState, StageTimerState } from "~/types"
 
 /**
  * Pure helpers for the stage display's clock — the service stopwatch, and the
@@ -14,6 +14,7 @@ export const defaultStageTimerState = (): StageTimerState => ({
   elapsedMs: 0,
   durationMs: 0,
   message: "",
+  serviceTimer: null,
   updatedAt: 0,
 })
 
@@ -38,19 +39,29 @@ export const normaliseStageTimer = (
     typeof input === "number" && Number.isFinite(input) && input >= 0
       ? input
       : 0
+  const serviceTimer = timer.serviceTimer as Partial<StageStopwatchState> | null
+  const mode =
+    timer.mode === "countdown" && number(timer.durationMs) > 0
+      ? "countdown"
+      : "stopwatch"
 
   const normalised: StageTimerState = {
     // A countdown with no duration has nothing to count, so it reads as the
     // stopwatch rather than sitting at 00:00:00 for ever.
-    mode:
-      timer.mode === "countdown" && number(timer.durationMs) > 0
-        ? "countdown"
-        : "stopwatch",
+    mode,
     running: timer.running === true,
     startedAt: number(timer.startedAt),
     elapsedMs: number(timer.elapsedMs),
     durationMs: number(timer.durationMs),
     message: typeof timer.message === "string" ? timer.message : "",
+    serviceTimer:
+      mode === "countdown" && serviceTimer && typeof serviceTimer === "object"
+        ? {
+            running: serviceTimer.running === true,
+            startedAt: number(serviceTimer.startedAt),
+            elapsedMs: number(serviceTimer.elapsedMs),
+          }
+        : null,
     updatedAt: number(timer.updatedAt),
   }
 
@@ -172,6 +183,7 @@ export const resetStageTimer = (
  * nothing to count, so it clears the countdown instead of showing 00:00:00.
  */
 export const stageCountdownFrom = (
+  timer: StageTimerState,
   durationMs: number,
   message: string = "",
   now: number = Date.now()
@@ -184,14 +196,27 @@ export const stageCountdownFrom = (
         elapsedMs: 0,
         durationMs,
         message,
+        serviceTimer:
+          timer.mode === "countdown"
+            ? timer.serviceTimer
+            : {
+                running: timer.running,
+                startedAt: timer.startedAt,
+                elapsedMs: timer.elapsedMs,
+              },
         updatedAt: now,
       }
-    : clearedStageTimer(now)
+    : clearedStageTimer(timer, now)
 
 /** Take the countdown off the stage screen, handing the panel back to the stopwatch. */
 export const clearedStageTimer = (
+  timer: StageTimerState,
   now: number = Date.now()
-): StageTimerState => ({
-  ...defaultStageTimerState(),
-  updatedAt: now,
-})
+): StageTimerState => {
+  if (timer.mode !== "countdown") return timer
+  return {
+    ...defaultStageTimerState(),
+    ...(timer.serviceTimer || {}),
+    updatedAt: now,
+  }
+}

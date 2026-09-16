@@ -374,8 +374,8 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-ph-play-circle",
-    name: "Start Stage Timer",
-    desc: "Start or resume the timer on the stage display",
+    name: "Start Stage Clock",
+    desc: "Start or resume the active stage timer or countdown",
     action: appWideActions.startStageTimer,
     meta: "stage timer start resume run stopwatch count up service sermon confidence monitor",
     searchableOnly: true,
@@ -383,8 +383,8 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-ph-pause-circle",
-    name: "Stop Stage Timer",
-    desc: "Pause the stage display timer where it is",
+    name: "Pause Stage Clock",
+    desc: "Pause the active stage timer or countdown",
     action: appWideActions.stopStageTimer,
     meta: "stage timer stop pause hold stopwatch service sermon confidence monitor",
     searchableOnly: true,
@@ -392,8 +392,8 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-ph-arrow-counter-clockwise",
-    name: "Restart Stage Timer",
-    desc: "Send the stage timer back to zero and start counting",
+    name: "Restart Stage Clock",
+    desc: "Restart the active stage timer or countdown",
     action: appWideActions.restartStageTimer,
     meta: "stage timer restart reset zero again stopwatch service sermon confidence monitor",
     searchableOnly: true,

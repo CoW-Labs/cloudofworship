@@ -246,6 +246,7 @@
     <AddCountdown
       v-else-if="page === 'countdown'"
       :initial-tab="countdownInitialTab"
+      :stage-available="!mobile"
       class="fade-in-right h-full min-h-0 overflow-auto"
       @close="page = ''"
     />
@@ -1390,7 +1391,9 @@ const searchedActions = computed(() => {
   if (timerQuickAction.value) {
     results = [
       timerQuickAction.value,
-      ...(stageTimerQuickAction.value ? [stageTimerQuickAction.value] : []),
+      ...(!props.mobile && stageTimerQuickAction.value
+        ? [stageTimerQuickAction.value]
+        : []),
       ...results,
     ]
   }

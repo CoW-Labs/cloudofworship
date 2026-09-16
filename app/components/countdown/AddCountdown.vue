@@ -3,7 +3,12 @@
     <!-- Same countdown, two destinations: the congregation's screen (a slide in
          the schedule) or the stage display alone (a clock only the band and
          speaker see). The form below is shared; only where it lands changes. -->
-    <UTabs v-model="activeTab" :items="destinationTabs" class="mt-3" />
+    <UTabs
+      v-if="stageAvailable"
+      v-model="activeTab"
+      :items="destinationTabs"
+      class="mt-3"
+    />
 
     <p class="mt-3 text-xs text-gray-500 dark:text-[#7d8695]">
       {{ destination.hint }}
@@ -89,6 +94,7 @@ const emitter = useNuxtApp().$emitter as Emitter<any>
 const props = defineProps<{
   /** 0 = live display, 1 = stage display. Set by whoever opened the panel. */
   initialTab?: number
+  stageAvailable?: boolean
 }>()
 
 const appStore = useAppStore()
@@ -97,17 +103,17 @@ const appStore = useAppStore()
 // icon pushes "Stage Display" into an ellipsis.
 const destinationTabs = [{ label: "Live Display" }, { label: "Stage Display" }]
 
-const activeTab = ref(props.initialTab || 0)
+const activeTab = ref(props.stageAvailable ? props.initialTab || 0 : 0)
 watch(
-  () => props.initialTab,
-  (tab) => {
-    activeTab.value = tab || 0
+  () => [props.initialTab, props.stageAvailable] as const,
+  ([tab, stageAvailable]) => {
+    activeTab.value = stageAvailable ? tab || 0 : 0
   }
 )
 
 /** Everything that differs between the two destinations, in one place. */
 const destination = computed(() =>
-  activeTab.value === 1
+  props.stageAvailable && activeTab.value === 1
     ? {
         hint: "Counts down on the stage display only. Nothing reaches the congregation's screen.",
         textareaLabel: "Optional text beneath the countdown",

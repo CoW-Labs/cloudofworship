@@ -109,13 +109,14 @@ const useStageTimer = () => {
   const startCountdown = (countdown: Countdown) =>
     publish(
       stageCountdownFrom(
+        timer.value,
         useTimeStringToMilli(countdown?.time || "00:00:00"),
         countdown?.content || ""
       )
     )
 
   /** Take the countdown off the stage screens, handing them back the stopwatch. */
-  const clearCountdown = () => publish(clearedStageTimer())
+  const clearCountdown = () => publish(clearedStageTimer(timer.value))
 
   /**
    * Adopt state another window sent. Out-of-order deliveries lose to the
