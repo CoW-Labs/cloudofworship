@@ -3,16 +3,15 @@
     <div class="flex h-full min-h-0 items-center justify-between gap-6">
       <div class="flex min-w-0 flex-1 flex-col justify-center gap-1">
         <p
-          class="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/50 sm:text-xs"
+          class="text-[0.65rem] font-bold uppercase tracking-[0.2em] sm:text-xs"
+          :class="mode === 'stage-countdown' ? 'text-purple-300/70' : 'text-white/50'"
         >
-          {{ mode === "countdown" ? "Countdown" : "Timer" }}
+          {{ label }}
         </p>
         <p
           class="font-extrabold tabular-nums leading-none"
           :class="[
-            mode === 'countdown' && isCountdownFinished
-              ? 'text-red-400'
-              : 'text-white',
+            isFinished ? 'text-red-400' : 'text-white',
             'text-[clamp(2rem,7vh,4.5rem)]',
           ]"
         >
@@ -23,17 +22,20 @@
         </p>
       </div>
 
-      <!-- `.stop` on both events so tapping the controls never trips the
+      <!-- The live countdown belongs to the slide the operator is running, so
+           it has no controls here. Everything else on this panel is the stage
+           screen's own clock and can be driven from it.
+           `.stop` on both events so tapping the controls never trips the
            page's double-click-to-fullscreen handler. -->
       <div
-        v-if="mode === 'timer'"
+        v-if="isStageClock"
         class="flex shrink-0 items-center gap-2 opacity-40 transition-opacity hover:opacity-100"
         @dblclick.stop
       >
         <button
           type="button"
           class="flex h-11 w-11 items-center justify-center rounded-full border border-white/40 text-white transition-colors hover:border-white hover:bg-white/10"
-          :aria-label="running ? 'Pause timer' : 'Start timer'"
+          :aria-label="running ? `Pause ${controlNoun}` : `Start ${controlNoun}`"
           @click.stop="toggle"
         >
           <UIcon
@@ -45,7 +47,7 @@
         <button
           type="button"
           class="flex h-11 w-11 items-center justify-center rounded-full border border-white/40 text-white transition-colors hover:border-white hover:bg-white/10"
-          aria-label="Reset timer"
+          :aria-label="`Reset ${controlNoun}`"
           @click.stop="reset"
         >
           <UIcon name="i-bx-reset" class="h-5 w-5" dynamic />
@@ -57,10 +59,23 @@
 
 <script setup lang="ts">
 import type { Countdown, Slide } from "~/types"
+import {
+  isStageCountdownFinished,
+  stageTimerReading,
+} from "~/utils/stageTimer"
 
 /**
- * Bottom-left panel: the countdown that is currently on screen when there is
- * one, otherwise a stopwatch the team can run for the service or a segment.
+ * Bottom-left panel: whatever clock the stage needs most right now.
+ *
+ *  - **Stage countdown** — one the operator sent to this screen alone (see
+ *    `useStageTimer`). It wins because it was aimed here deliberately.
+ *  - **Countdown** — mirrors the countdown slide the congregation is looking
+ *    at, so the band knows what the room knows.
+ *  - **Timer** — the service stopwatch, when there is nothing to count down.
+ *
+ * The first and last are shared state, so the operator can drive them from
+ * quick actions and every stage screen shows the same reading; the buttons
+ * here drive that same state.
  */
 const props = defineProps<{
   slide?: Slide | null
@@ -69,35 +84,58 @@ const props = defineProps<{
   slideCount?: number
 }>()
 
-const running = ref(false)
-const elapsedMs = ref(0)
-let ticker: ReturnType<typeof setInterval> | null = null
-let startedAt = 0
+const stageTimer = useStageTimerSync()
+const running = computed(() => stageTimer.isRunning.value)
 
-const countdown = computed(() =>
+// A ticking clock reference rather than a ticking counter: the reading is
+// always derived from the shared start time, so a tick the browser throttled
+// or skipped corrects itself on the next one instead of losing time.
+const now = ref(Date.now())
+let ticker: ReturnType<typeof setInterval> | null = null
+
+const liveCountdown = computed(() =>
   props.slide?.type === slideTypes.countdown
     ? (props.slide?.data as Countdown | undefined)
     : undefined
 )
 
-const mode = computed<"countdown" | "timer">(() =>
-  countdown.value?.timeLeft ? "countdown" : "timer"
+const mode = computed<"stage-countdown" | "countdown" | "timer">(() => {
+  if (stageTimer.isCountdown.value) return "stage-countdown"
+  if (liveCountdown.value?.timeLeft) return "countdown"
+  return "timer"
+})
+
+/** True for the two clocks this screen owns and can control. */
+const isStageClock = computed(() => mode.value !== "countdown")
+const controlNoun = computed(() =>
+  mode.value === "stage-countdown" ? "countdown" : "timer"
 )
 
-const isCountdownFinished = computed(
-  () => useTimeStringToMilli(countdown.value?.timeLeft || "00:00:00") <= 0
+const label = computed(() =>
+  mode.value === "stage-countdown"
+    ? "Stage Countdown"
+    : mode.value === "countdown"
+    ? "Countdown"
+    : "Timer"
+)
+
+const isFinished = computed(() =>
+  mode.value === "stage-countdown"
+    ? isStageCountdownFinished(stageTimer.timer.value, now.value)
+    : mode.value === "countdown"
+    ? useTimeStringToMilli(liveCountdown.value?.timeLeft || "00:00:00") <= 0
+    : false
 )
 
 const displayTime = computed(() =>
   mode.value === "countdown"
-    ? countdown.value?.timeLeft || "00:00:00"
-    : useMilliToTimeString(elapsedMs.value)
+    ? liveCountdown.value?.timeLeft || "00:00:00"
+    : useMilliToTimeString(stageTimerReading(stageTimer.timer.value, now.value))
 )
 
-const subtitle = computed(() => {
-  if (mode.value === "countdown") {
-    return countdown.value?.content || props.slide?.name || ""
-  }
+// What the slide-and-position line says, used whenever the clock itself has
+// nothing of its own to say.
+const slideSubtitle = computed(() => {
   if (props.slidePosition && props.slideCount) {
     return `${props.slide?.name || "Live"} • Slide ${props.slidePosition} of ${
       props.slideCount
@@ -106,31 +144,42 @@ const subtitle = computed(() => {
   return props.slide?.name || "No slide live"
 })
 
+const subtitle = computed(() => {
+  if (mode.value === "stage-countdown") {
+    return stageTimer.timer.value.message || slideSubtitle.value
+  }
+  if (mode.value === "countdown") {
+    return liveCountdown.value?.content || props.slide?.name || ""
+  }
+  return slideSubtitle.value
+})
+
 const stopTicking = () => {
   if (ticker) clearInterval(ticker)
   ticker = null
 }
 
-const toggle = () => {
-  if (running.value) {
-    running.value = false
-    stopTicking()
-    return
-  }
-
-  running.value = true
-  // Tracking against a wall-clock start keeps a long service timer accurate,
-  // which a per-tick += 1000 would not be.
-  startedAt = Date.now() - elapsedMs.value
+const startTicking = () => {
+  if (ticker) return
   ticker = setInterval(() => {
-    elapsedMs.value = Date.now() - startedAt
+    now.value = Date.now()
   }, 250)
 }
 
-const reset = () => {
-  elapsedMs.value = 0
-  startedAt = Date.now()
-}
+// Only a running clock needs the interval; a paused one cannot change until
+// somebody sends a command, which updates the shared state on its own.
+watch(
+  running,
+  (isRunning) => {
+    now.value = Date.now()
+    if (isRunning) startTicking()
+    else stopTicking()
+  },
+  { immediate: true }
+)
+
+const toggle = () => stageTimer.toggle()
+const reset = () => stageTimer.reset()
 
 onBeforeUnmount(stopTicking)
 </script>

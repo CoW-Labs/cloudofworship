@@ -171,6 +171,38 @@ export interface TimeSlideData {
   label: string
 }
 
+/**
+ * What the stage display's clock is doing: counting up for the service, or
+ * down to the end of a segment the operator set.
+ */
+export type StageTimerMode = "stopwatch" | "countdown"
+
+export interface StageStopwatchState {
+  running: boolean
+  startedAt: number
+  elapsedMs: number
+}
+
+/**
+ * The stage display's clock. Stored rather than ticked so every window derives
+ * the same reading from the same wall clock: a running clock has run for
+ * `now - startedAt`, a paused one for the `elapsedMs` it banked when it
+ * stopped. A countdown subtracts that from `durationMs`.
+ */
+export interface StageTimerState extends StageStopwatchState {
+  mode: StageTimerMode
+  /** Wall-clock ms the clock counts from. 0 while it is paused. */
+  /** Elapsed ms banked when the clock was paused. */
+  /** Countdown mode: the full duration to count down from. */
+  durationMs: number
+  /** Countdown mode: the optional line shown above the clock. */
+  message: string
+  /** The service stopwatch continues underneath a stage countdown. */
+  serviceTimer: StageStopwatchState | null
+  /** When this state was set — settles races between windows. */
+  updatedAt: number
+}
+
 export interface QuickAction {
   icon: string
   name: string
@@ -475,6 +507,10 @@ export interface AppState {
   // operator has not assigned one — the stage display then opens in a new tab.
   stageDisplayLabel: string
   stageDisplayScreen: Screen | null
+  // The stage display's clock — a count-up timer for the service, or a
+  // countdown the operator sent to the stage only. Driven from quick actions
+  // so the same clock runs on every stage screen at once.
+  stageTimer: StageTimerState
   defaultMicrophoneId: string
   defaultCameraId: string
   // Realtime collaboration

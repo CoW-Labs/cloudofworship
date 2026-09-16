@@ -90,6 +90,7 @@ import type {
   Slide,
   Hymn,
   AppSettings,
+  Countdown,
 } from "~/types"
 import { useOnline } from "@vueuse/core"
 import { appWideActions, backgroundTypes } from "~/utils/constants"
@@ -97,6 +98,7 @@ import { isRetryableMediaDownloadError } from "~/utils/mediaDownloadErrors"
 import { safeDBOperation } from "~/composables/useIndexedDB"
 import { invalidateHymnCache } from "~/composables/useHymn"
 import { cloneDurableSlide } from "~/utils/durableSlide"
+import { stageTimerReading } from "~/utils/stageTimer"
 
 useHead({
   title: "Cloud of Worship",
@@ -412,6 +414,118 @@ emitter.on(appWideActions.openStageDisplay, async () => {
   }
 
   usePosthogCapture("STAGE_DISPLAY_OPENED")
+})
+
+// The operator's copy of the stage timer. `useStageTimerSync` keeps it level
+// with the stage display windows, so the quick actions below drive the clock
+// the band is reading even though this window never shows it.
+const stageTimer = useStageTimerSync()
+
+const announceStageTimer = (
+  command: "start" | "stop" | "restart" | "countdown" | "clear-countdown",
+  title: string,
+  description: string
+) => {
+  useToast().add({
+    title,
+    description,
+    icon: "i-bx-stopwatch",
+    timeout: 3000,
+  })
+  usePosthogCapture("STAGE_TIMER_CONTROLLED", { command })
+}
+
+emitter.on(appWideActions.startStageTimer, () => {
+  const isCountdown = stageTimer.isCountdown.value
+  const wasRunning = stageTimer.isRunning.value
+  const started = stageTimer.start()
+  const reading = useMilliToTimeString(stageTimerReading(started))
+
+  announceStageTimer(
+    "start",
+    isCountdown
+      ? wasRunning
+        ? "Stage countdown is already running"
+        : "Stage countdown started"
+      : wasRunning
+      ? "Stage timer is already running"
+      : "Stage timer started",
+    isCountdown
+      ? wasRunning
+        ? `${reading} remaining on the stage display.`
+        : `Counting down from ${reading} on the stage display.`
+      : wasRunning || reading === "00:00:00"
+      ? "Counting up on the stage display."
+      : `Resumed from ${reading}.`
+  )
+})
+
+emitter.on(appWideActions.stopStageTimer, () => {
+  const isCountdown = stageTimer.isCountdown.value
+  const wasRunning = stageTimer.isRunning.value
+  const stopped = stageTimer.stop()
+  const reading = useMilliToTimeString(stageTimerReading(stopped))
+
+  announceStageTimer(
+    "stop",
+    isCountdown
+      ? wasRunning
+        ? "Stage countdown paused"
+        : "Stage countdown is already paused"
+      : wasRunning
+      ? "Stage timer stopped"
+      : "Stage timer is not running",
+    `Holding at ${reading}${isCountdown ? " remaining" : ""}.`
+  )
+})
+
+emitter.on(appWideActions.restartStageTimer, () => {
+  stageTimer.restart()
+
+  announceStageTimer(
+    "restart",
+    stageTimer.isCountdown.value
+      ? "Stage countdown restarted"
+      : "Stage timer restarted",
+    `Back to ${useMilliToTimeString(
+      stageTimer.timer.value.mode === "countdown"
+        ? stageTimer.timer.value.durationMs
+        : 0
+    )} and counting.`
+  )
+})
+
+// A payload is a countdown to run; without one the quick action is just
+// asking for the panel, which QuickActions opens on the stage tab.
+emitter.on(appWideActions.newStageCountdown, (countdown?: Countdown) => {
+  if (!countdown?.time) return
+  stageTimer.startCountdown(countdown)
+
+  announceStageTimer(
+    "countdown",
+    "Stage countdown started",
+    `${useMilliToTimeString(
+      useTimeStringToMilli(countdown.time)
+    )} on the stage display. The congregation's screen is untouched.`
+  )
+})
+
+emitter.on(appWideActions.clearStageCountdown, () => {
+  if (!stageTimer.isCountdown.value) {
+    announceStageTimer(
+      "clear-countdown",
+      "No stage countdown to clear",
+      "The stage clock is unchanged."
+    )
+    return
+  }
+  stageTimer.clearCountdown()
+
+  announceStageTimer(
+    "clear-countdown",
+    "Stage countdown cleared",
+    "The stage display is back to the service timer."
+  )
 })
 
 const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
