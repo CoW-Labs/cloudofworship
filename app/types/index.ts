@@ -171,6 +171,21 @@ export interface TimeSlideData {
   label: string
 }
 
+/**
+ * The stage display's count-up timer. Stored rather than ticked so every
+ * window derives the same reading from the same wall clock: a running timer is
+ * `now - startedAt`, a paused one is the `elapsedMs` it banked when it stopped.
+ */
+export interface StageTimerState {
+  running: boolean
+  /** Wall-clock ms a running timer counts up from. 0 while it is paused. */
+  startedAt: number
+  /** Elapsed ms banked when the timer was paused. */
+  elapsedMs: number
+  /** When this state was set — settles races between windows. */
+  updatedAt: number
+}
+
 export interface QuickAction {
   icon: string
   name: string
@@ -475,6 +490,9 @@ export interface AppState {
   // operator has not assigned one — the stage display then opens in a new tab.
   stageDisplayLabel: string
   stageDisplayScreen: Screen | null
+  // Count-up timer shown on the stage display, driven from the operator's
+  // quick actions so the same clock runs on every stage screen at once.
+  stageTimer: StageTimerState
   defaultMicrophoneId: string
   defaultCameraId: string
   // Realtime collaboration

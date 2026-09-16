@@ -414,6 +414,60 @@ emitter.on(appWideActions.openStageDisplay, async () => {
   usePosthogCapture("STAGE_DISPLAY_OPENED")
 })
 
+// The operator's copy of the stage timer. `useStageTimerSync` keeps it level
+// with the stage display windows, so the quick actions below drive the clock
+// the band is reading even though this window never shows it.
+const stageTimer = useStageTimerSync()
+
+const announceStageTimer = (
+  command: "start" | "stop" | "restart",
+  title: string,
+  description: string
+) => {
+  useToast().add({
+    title,
+    description,
+    icon: "i-bx-stopwatch",
+    timeout: 3000,
+  })
+  usePosthogCapture("STAGE_TIMER_CONTROLLED", { command })
+}
+
+emitter.on(appWideActions.startStageTimer, () => {
+  const wasRunning = stageTimer.isRunning.value
+  const resumingFrom = useMilliToTimeString(stageTimer.timer.value.elapsedMs)
+  stageTimer.start()
+
+  announceStageTimer(
+    "start",
+    wasRunning ? "Stage timer is already running" : "Stage timer started",
+    wasRunning || resumingFrom === "00:00:00"
+      ? "Counting up on the stage display."
+      : `Resumed from ${resumingFrom}.`
+  )
+})
+
+emitter.on(appWideActions.stopStageTimer, () => {
+  const wasRunning = stageTimer.isRunning.value
+  const stopped = stageTimer.stop()
+
+  announceStageTimer(
+    "stop",
+    wasRunning ? "Stage timer stopped" : "Stage timer is not running",
+    `Holding at ${useMilliToTimeString(stopped.elapsedMs)}.`
+  )
+})
+
+emitter.on(appWideActions.restartStageTimer, () => {
+  stageTimer.restart()
+
+  announceStageTimer(
+    "restart",
+    "Stage timer restarted",
+    "Back to 00:00:00 and counting."
+  )
+})
+
 const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
   const videoIds = [1, 2, 3, 4, 5, 6, 9, 10]
   const savedKeys = new Set(

@@ -12,9 +12,11 @@ import type {
   OnlineUser,
   OverlaySettings,
   SlideBackgroundKey,
+  StageTimerState,
 } from "~/types/index"
 import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
+import { defaultStageTimerState } from "~/utils/stageTimer"
 import { useThrottleFn } from "@vueuse/core"
 import posthog from "posthog-js"
 import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
@@ -237,6 +239,7 @@ export const useAppStore = defineStore("app", {
         mainDisplayScreen: null,
         stageDisplayLabel: "",
         stageDisplayScreen: null,
+        stageTimer: defaultStageTimerState(),
         defaultMicrophoneId: "",
         defaultCameraId: "",
         onlineUsers: [] as OnlineUser[],
@@ -594,6 +597,14 @@ export const useAppStore = defineStore("app", {
     },
     setStageDisplayScreen(screen: Screen | null) {
       this.currentState.stageDisplayScreen = screen
+    },
+    /**
+     * Replace the stage timer wholesale. The reading is derived from these
+     * three fields, so start/stop/restart are single writes rather than a
+     * per-second mutation that every window would have to broadcast.
+     */
+    setStageTimer(timer: StageTimerState) {
+      this.currentState.stageTimer = { ...timer }
     },
     setDefaultMicrophone(deviceId: string) {
       this.currentState.defaultMicrophoneId = deviceId

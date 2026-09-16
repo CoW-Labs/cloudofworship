@@ -47,6 +47,9 @@ export const appWideActions = {
   goLive: 'go-live',
   closeLiveWindow: 'close-live-window',
   openStageDisplay: 'open-stage-display',
+  startStageTimer: 'start-stage-timer',
+  stopStageTimer: 'stop-stage-timer',
+  restartStageTimer: 'restart-stage-timer',
   openSettings: 'open-settings',
   newActiveSlide: 'new-active-slide',
   deleteSlide: 'delete-slide',
@@ -350,6 +353,33 @@ export const quickActionsArr: QuickAction[] = [
     tier: "free",
   },
   {
+    icon: "i-ph-play-circle",
+    name: "Start Stage Timer",
+    desc: "Start or resume the timer on the stage display",
+    action: appWideActions.startStageTimer,
+    meta: "stage timer start resume run stopwatch count up service sermon confidence monitor",
+    searchableOnly: true,
+    tier: "free",
+  },
+  {
+    icon: "i-ph-pause-circle",
+    name: "Stop Stage Timer",
+    desc: "Pause the stage display timer where it is",
+    action: appWideActions.stopStageTimer,
+    meta: "stage timer stop pause hold stopwatch service sermon confidence monitor",
+    searchableOnly: true,
+    tier: "free",
+  },
+  {
+    icon: "i-ph-arrow-counter-clockwise",
+    name: "Restart Stage Timer",
+    desc: "Send the stage timer back to zero and start counting",
+    action: appWideActions.restartStageTimer,
+    meta: "stage timer restart reset zero again stopwatch service sermon confidence monitor",
+    searchableOnly: true,
+    tier: "free",
+  },
+  {
     icon: "i-ph-presentation-chart-slash",
     name: "Close Live Window",
     desc: "Close the active presentation window",
@@ -581,6 +611,12 @@ export const desktopOnlyActions: string[] = [
   appWideActions.goLive,
   appWideActions.closeLiveWindow,
   appWideActions.openStageDisplay,
+  // The stage timer travels between windows on one machine (BroadcastChannel,
+  // mirrored over Tauri events). A phone is a different device, so its command
+  // would only move its own copy of the clock and never reach the stage screen.
+  appWideActions.startStageTimer,
+  appWideActions.stopStageTimer,
+  appWideActions.restartStageTimer,
   // Keyboard shortcuts reference. There is no physical keyboard to bind.
   appWideActions.openShortcutsModal,
   // Continuous microphone capture streamed to Deepgram. Mobile browsers drop
