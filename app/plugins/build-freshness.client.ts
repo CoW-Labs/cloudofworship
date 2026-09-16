@@ -71,7 +71,6 @@ const isProjectionWindow = () =>
 
 export default defineNuxtPlugin((nuxtApp) => {
   const runningVersion = useAppVersion().appVersion
-  const appStore = useAppStore()
 
   let lastInteractionAt = Date.now()
   let hiddenSince: number | null =
@@ -106,6 +105,13 @@ export default defineNuxtPlugin((nuxtApp) => {
   const isSafeToReload = () => {
     if (!navigator.onLine) return false
     if (isProjectionWindow()) return false
+    // Resolved on demand, never at plugin setup. Creating the store here would
+    // create it before `pinia-shared-state` (a later filename, so a later
+    // plugin) registers its Pinia plugin, and Pinia applies plugins only to
+    // stores created after registration — the operator and projection windows
+    // would silently stop sharing state. Nothing calls this before the idle
+    // timer, long after every plugin has run.
+    const appStore = useAppStore()
     if (appStore.currentState.liveSlideId) return false
     if (appStore.currentState.activeAlert) return false
 
