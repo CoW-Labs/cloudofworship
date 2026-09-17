@@ -286,7 +286,7 @@
             action-text=""
           />
         </div>
-        <draggable
+        <CowDraggable
           v-show="!(liveOutputSlides?.length === 0 || !liveOutputSlides)"
           v-model="liveOutputSlides"
           group="slides"
@@ -455,7 +455,7 @@
               </button>
             </CowTooltip>
           </template>
-        </draggable>
+        </CowDraggable>
       </div>
     </AppSection>
   </div>
@@ -463,7 +463,6 @@
 
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from "@vueuse/core"
-import draggable from "vuedraggable"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
