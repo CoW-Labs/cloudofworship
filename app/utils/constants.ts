@@ -641,10 +641,6 @@ export const desktopOnlyActions: string[] = [
   appWideActions.clearStageCountdown,
   // Keyboard shortcuts reference. There is no physical keyboard to bind.
   appWideActions.openShortcutsModal,
-  // Continuous microphone capture streamed to Deepgram. Mobile browsers drop
-  // the audio track when the screen locks or the tab backgrounds, so the
-  // transcript silently stops mid-sermon — worse than not offering it.
-  appWideActions.newTranscribe,
   // Legacy PowerPoint import (already commented out of quickActionsArr). PDF
   // import stays available on mobile: it is the only way to create a
   // `presentation` slide, and every other slide type is reachable there.

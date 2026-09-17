@@ -2,7 +2,7 @@
   <div
     class="mobile-operator flex h-full min-h-0 flex-col gap-2 overflow-hidden px-2 pt-2"
   >
-    <!-- CONTENT AREA — the grid and the three tabs share it, one at a time.
+    <!-- CONTENT AREA — the grid and the tabs share it, one at a time.
          The tabs render inside it rather than over the whole viewport, so the
          action bar below and the app navbar above stay on screen and switching
          tabs never feels like leaving the app. -->
@@ -13,7 +13,7 @@
       <PreviewContent
         mobile
         class="h-full min-w-0 min-h-0"
-        @slide-created="activeTab = null"
+        @slide-created="onSlideCreated"
       />
 
       <!-- QUICK ACTIONS: the same pane as the desktop left column, given the
@@ -44,6 +44,30 @@
         <LiveOutput mobile class="h-full min-h-0" @edit-slide="activeTab = null" />
       </MobileSheet>
 
+      <!-- TRANSCRIBE: the desktop console's transcript panel, given the screen.
+           Headerless like the other tabs — the panel carries its own title,
+           session controls and "Close panel" action, so a sheet header would
+           only repeat them. It is the one tab that stays mounted once opened:
+           the panel owns the microphone and stops the session when it is torn
+           down, and a sermon transcript has to survive the operator stepping
+           away to take a slide live. -->
+      <MobileSheet
+        :model-value="activeTab === 'transcribe'"
+        title="Transcribe"
+        inline
+        headerless
+        :keep-mounted="transcribeOpened"
+        @update:model-value="activeTab = null"
+      >
+        <TranscriptsPanel
+          mobile
+          :visible="activeTab === 'transcribe'"
+          class="h-full min-h-0"
+          @session="isTranscribing = $event"
+          @close="activeTab = null"
+        />
+      </MobileSheet>
+
       <!-- SCHEDULES: switching which service you are working on. -->
       <MobileSheet
         :model-value="activeTab === 'schedules'"
@@ -61,6 +85,26 @@
       </MobileSheet>
     </div>
 
+    <!-- A running session is invisible once the transcribe tab is closed, and a
+         hot microphone that nobody can see is the wrong thing to leave on a
+         phone. This is both the indicator and the way back into it. -->
+    <Transition name="fade-sm">
+      <button
+        v-if="isTranscribing && activeTab !== 'transcribe'"
+        type="button"
+        class="transcribing-bar shrink-0 flex items-center justify-center gap-2 min-h-[36px] px-3 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-medium"
+        @click="activeTab = 'transcribe'"
+      >
+        <span class="relative flex h-2 w-2 shrink-0">
+          <span
+            class="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 motion-safe:animate-ping"
+          />
+          <span class="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+        </span>
+        Transcribing · tap to return
+      </button>
+    </Transition>
+
     <MobileActionBar
       :active-tab="activeTab"
       @open-quick-actions="toggleTab('quick-actions')"
@@ -72,6 +116,8 @@
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+import { appWideActions } from "~/utils/constants"
+import type { Emitter } from "mitt"
 
 definePageMeta({
   layout: "app",
@@ -96,10 +142,34 @@ useHead({
 // One tab at a time, or none — the slide grid is what a closed tab returns to.
 // Tapping the tab you are already on closes it, which is the only way back to
 // the grid now that the tabs have no close button of their own.
-type MobileTab = "quick-actions" | "schedules" | "live"
+type MobileTab = "quick-actions" | "schedules" | "live" | "transcribe"
 const activeTab = ref<MobileTab | null>(null)
 const toggleTab = (tab: MobileTab) => {
   activeTab.value = activeTab.value === tab ? null : tab
+}
+
+// "Transcribe Sermon" is a Quick Action rather than a bar tab — it is opened
+// once at the start of a sermon, not switched between. The panel it opens is
+// the desktop console's, which on desktop lives in the live column; here it
+// needs the whole screen, so the route takes the action and opens its own tab
+// instead (LiveOutput ignores the event when it is mobile).
+const emitter = useNuxtApp().$emitter as Emitter<any>
+const transcribeOpened = ref(false)
+const isTranscribing = ref(false)
+const openTranscribe = () => {
+  transcribeOpened.value = true
+  activeTab.value = "transcribe"
+}
+emitter.on(appWideActions.newTranscribe, openTranscribe)
+onBeforeUnmount(() => emitter.off(appWideActions.newTranscribe, openTranscribe))
+
+// Creating a slide steps out of the tab it was created from, so the editor is
+// not left stacked behind it. Transcribe is the exception: it is a session the
+// operator is watching, and a scripture it detected becoming a slide is not a
+// reason to throw them out of it.
+const onSlideCreated = () => {
+  if (activeTab.value === "transcribe") return
+  activeTab.value = null
 }
 
 // The middleware gate can only fire once the church has loaded, and on a cold
