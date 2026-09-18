@@ -14,9 +14,21 @@ interface SocketIOOptions {
   onDisconnected?: () => void
   onError?: (error: any) => void
   onMaxRetriesReached?: () => void
+  onTierRestricted?: (data: TierRestriction) => void
   onOnlineUsersChanged?: (users: OnlineUser[]) => void
   onUserJoined?: (user: OnlineUser) => void
   onUserLeft?: (userId: string, userName: string) => void
+}
+
+/**
+ * The server refused to put this socket in the schedule room because the
+ * schedule's church is not on Teams. The socket stays connected — it just never
+ * receives anything — so this event is the only signal a listener gets.
+ */
+export interface TierRestriction {
+  feature?: string
+  plan?: string
+  message?: string
 }
 
 export interface OnlineUser {
@@ -99,6 +111,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
     onDisconnected,
     onError,
     onMaxRetriesReached,
+    onTierRestricted,
     onOnlineUsersChanged,
     onUserJoined,
     onUserLeft,
@@ -426,6 +439,15 @@ export const useSocketIO = (options: SocketIOOptions) => {
 
       socket.on('lock-denied', (data) => {
         onMessage?.('lock-denied', { action: 'lock-denied', data })
+      })
+
+      // The schedule's church is not on Teams, so the server kept this socket
+      // out of the room. It stays connected and simply never receives anything,
+      // which would otherwise look identical to a service that has not started
+      // — this event is what lets a listener tell the two apart.
+      socket.on('tier-restricted', (data) => {
+        onTierRestricted?.(data || {})
+        onMessage?.('tier-restricted', { action: 'tier-restricted', data })
       })
 
       // Live slide feed — one-way, operator to the livestream viewers. This is
