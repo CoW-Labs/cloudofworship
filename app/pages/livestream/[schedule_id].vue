@@ -1,6 +1,10 @@
 <template>
+  <!-- The server refused this schedule: no slide will ever arrive, so the
+       loader below would spin forever and the projection surface would stay
+       black with nothing to explain it. -->
+  <LivestreamUnavailable v-if="tierRestricted" />
   <div
-    v-if="loadingResources"
+    v-else-if="loadingResources"
     class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center dark:bg-gray-900"
   >
     <div class="wrapper flex flex-col gap-6">
@@ -51,9 +55,9 @@
     </div>
   </div>
   <div
+    v-else
     class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
     :id="currentState.liveSlideId?.toString()"
-    v-else
   >
     <!-- Connection Status Indicator -->
     <div
@@ -119,7 +123,7 @@
 import type { Emitter } from "mitt"
 import type { BackgroundVideo, Slide } from "~/types"
 import { useAppStore } from "@/store/app"
-import { useOnline } from "@vueuse/core"
+import { useOnline, until } from "@vueuse/core"
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const liveSlide = ref<Slide | null>(null)
@@ -137,6 +141,10 @@ const connectionStatus = ref<
   "connecting" | "connected" | "disconnected" | "failed"
 >("connecting")
 const showConnectionError = ref(false)
+// Set by the server's `tier-restricted` event. Once refused, stay refused: the
+// socket remains connected but empty, and flipping back would need a fresh
+// connection, which is what a reload gives.
+const tierRestricted = ref(false)
 
 useHead({
   title: "CoW Live",
@@ -235,10 +243,21 @@ const updateBlobBackgroundURls = (slides: Slide[]) => {
   return slides?.map((slide) => updateBlobBackgroundURl(slide))
 }
 
-const localizeSlide = async (slide: Slide) =>
-  await rehydrateSlideMedia(updateBlobBackgroundURl({ ...slide }), {
+// Resolved once the background videos are cached and registered on the store.
+// The socket now connects before that work starts, so without this a slide
+// arriving early would resolve its video background against an empty list and
+// render with no background at all.
+let markResourcesReady: () => void = () => {}
+const resourcesReady = new Promise<void>((resolve) => {
+  markResourcesReady = resolve
+})
+
+const localizeSlide = async (slide: Slide) => {
+  await resourcesReady
+  return await rehydrateSlideMedia(updateBlobBackgroundURl({ ...slide }), {
     allowDownload: true,
   })
+}
 
 const handleWebSocketMessage = async (parsedData: any) => {
   const { data, action } = parsedData
@@ -247,6 +266,7 @@ const handleWebSocketMessage = async (parsedData: any) => {
     case "connected":
       // Only process if data contains slides array
       if (Array.isArray(data)) {
+        await resourcesReady
         const slides = updateBlobBackgroundURls(data)
         await prefetchScheduleMedia(slides, currentState.value.liveSlideId)
       }
@@ -317,11 +337,24 @@ const handleWebSocketMessage = async (parsedData: any) => {
 
 const socketManager = useSocketIO({
   scheduleId: route.params.schedule_id as string,
+  // Identifies this as the public viewer, which is what scopes the Teams gate
+  // to this page. The operator console and /mobile stay ungated on every plan.
+  client: "livestream",
   maxRetries: 30,
   baseRetryDelay: 1000,
   maxRetryDelay: 30000,
   connectionTimeout: 10000,
   onMessage: (event, data) => void handleWebSocketMessage(data),
+  onTierRestricted: () => {
+    tierRestricted.value = true
+    // A refused socket never reports a connection problem, so clear the
+    // reconnecting chrome that would otherwise sit over the wall.
+    connectionStatus.value = "connected"
+    loadingResources.value = false
+    usePosthogCapture("LIVESTREAM_TIER_RESTRICTED", {
+      scheduleId: route.params.schedule_id,
+    })
+  },
   onConnected: () => {
     connectionStatus.value = "connected"
     showConnectionError.value = false
@@ -369,15 +402,27 @@ watch(
 )
 
 onBeforeMount(async () => {
+  // Connect before downloading, not after. The background videos are hundreds
+  // of megabytes, and a refused viewer used to pay for all of them before
+  // finding out no slide was ever coming.
+  socketManager.connect()
+
+  // The server answers from a cached plan, so a refusal lands in milliseconds.
+  // This only ever waits out the grace period when the schedule is allowed —
+  // and a fraction of a second is nothing against the download it precedes.
+  await Promise.race([
+    until(tierRestricted).toBe(true),
+    new Promise((resolve) => setTimeout(resolve, 1500)),
+  ])
+  if (tierRestricted.value) return
+
   await saveAllBackgroundVideos()
   await setCachedVideosURL()
+  markResourcesReady()
 
   // All computations completed
   downloadStep.value = 5
   downloadResource.value = "All resources downloaded."
-
-  // Connect to Socket.IO
-  socketManager.connect()
 
   setTimeout(() => {
     loadingResources.value = false

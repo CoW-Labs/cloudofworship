@@ -6,14 +6,14 @@ vi.mock("posthog-js", () => ({
   default: { capture: posthogCapture },
 }))
 
-const RUNNING_VERSION = "v1.1.2"
-const DEPLOYED_VERSION = "v1.2.0"
+const RUNNING_VERSION = "build-one"
+const DEPLOYED_VERSION = "build-two"
+const RELEASE_VERSION = "v1.1.5"
 
-// The plugin imports this composable directly, so the `stubGlobal` below never
-// reaches it — the suite only passed while the shipped constant happened to
-// equal RUNNING_VERSION, and every release bump broke it. Mock the module.
+// The plugin imports this composable directly, so a global stub cannot replace
+// it. Keep the release name separate from the build ids in these tests.
 vi.mock("~/composables/useAppVersion", () => ({
-  default: () => ({ appVersion: RUNNING_VERSION }),
+  default: () => ({ appVersion: RELEASE_VERSION }),
 }))
 
 type PluginHarness = Awaited<ReturnType<typeof installPlugin>>
@@ -22,6 +22,8 @@ const installPlugin = async (options?: {
   pathname?: string
   liveSlideId?: string
   deployedVersion?: string | null
+  runtimeBuildId?: string
+  deployedRelease?: string
   sessionValues?: Map<string, string>
 }) => {
   const pathname = options?.pathname ?? "/"
@@ -39,7 +41,9 @@ const installPlugin = async (options?: {
 
   vi.stubGlobal("defineNuxtPlugin", (setup: unknown) => setup)
   vi.stubGlobal("useToast", () => ({ add: toastAdd }))
-  vi.stubGlobal("useAppVersion", () => ({ appVersion: RUNNING_VERSION }))
+  vi.stubGlobal("useRuntimeConfig", () => ({
+    public: { BUILD_ID: options?.runtimeBuildId ?? RUNNING_VERSION },
+  }))
   vi.stubGlobal("navigator", { onLine: true })
   vi.stubGlobal("sessionStorage", {
     getItem: (key: string) => values.get(key) ?? null,
@@ -69,7 +73,9 @@ const installPlugin = async (options?: {
     vi.fn(async () => ({
       ok: true,
       json: async () => ({
-        appVersion:
+        appVersion: `${options?.deployedRelease ?? RELEASE_VERSION}+${DEPLOYED_VERSION}`,
+        releaseVersion: options?.deployedRelease ?? RELEASE_VERSION,
+        buildId:
           options?.deployedVersion === undefined
             ? DEPLOYED_VERSION
             : options?.deployedVersion,
@@ -155,6 +161,28 @@ describe("stale build detection", () => {
 
     expect(harness.filters.isBuildStale()).toBe(false)
     expect(harness.filters.shouldSuppressError(new Error("real bug"))).toBe(false)
+  })
+
+  it("compares builds when the release name has not changed", async () => {
+    const harness = await installPlugin()
+    await harness.runFirstCheck()
+    expect(harness.filters.isBuildStale()).toBe(true)
+  })
+
+  it("uses the release name when this tab has no build id", async () => {
+    const harness = await installPlugin({
+      runtimeBuildId: "",
+      deployedRelease: "v1.1.6",
+    })
+    await harness.runFirstCheck()
+    expect(harness.filters.isBuildStale()).toBe(true)
+    expect(posthogCapture).toHaveBeenCalledWith(
+      "stale_build_detected",
+      expect.objectContaining({
+        running_version: RELEASE_VERSION,
+        deployed_version: "v1.1.6",
+      }),
+    )
   })
 
   it("still hands a dead chunk to recovery after the tab knows it is behind", async () => {

@@ -188,6 +188,17 @@
         />
       </div>
 
+      <!-- A phone suspends the microphone when the screen locks or the browser
+           is sent to the background, and neither is something this panel can
+           recover from silently. The wake lock below covers the first; the
+           operator has to be told about the second. -->
+      <div v-if="mobile" class="shrink-0 px-3 pt-3">
+        <Hint dismissible dismiss-key="mobile-transcribe-screen-lock">
+          Keep this tab in front while transcribing. Your phone stops the
+          microphone if you switch apps, and the transcript stops with it.
+        </Hint>
+      </div>
+
       <!-- ── Transcripts pane ── -->
       <div
         v-show="activeTabIndex === 0"
@@ -396,9 +407,27 @@ import type { ScriptureResult } from "~/composables/useScriptureSearch"
 import { appWideActions } from "~/utils/constants"
 import { highlightText } from "~/utils/highlightText"
 import { useAppStore } from "~/store/app"
+import { useWakeLock } from "@vueuse/core"
 
-defineProps<{ visible: boolean }>()
-const emit = defineEmits<{ close: [] }>()
+const props = withDefaults(
+  defineProps<{
+    visible: boolean
+    /**
+     * Rendered as the mobile route's own tab rather than a column of the
+     * desktop console. Adds the two things a phone needs: a screen wake lock
+     * for the length of the session, and the warning that backgrounding the
+     * browser still cuts the microphone.
+     */
+    mobile?: boolean
+  }>(),
+  { mobile: false }
+)
+const emit = defineEmits<{
+  close: []
+  /** Whether a session is running, so the route around the panel can say so
+   * while the panel itself is off screen. */
+  session: [active: boolean]
+}>()
 const appStore = useAppStore()
 
 // ── Feature intro ──────────────────────────────────────────────────────────
@@ -430,6 +459,30 @@ const {
   useDeepgramEngine,
   micLevel,
 } = useSermonTranscription()
+
+// The panel is the only thing holding the session — on mobile it can be hidden
+// behind another tab while it runs, so the route needs to know it is still on.
+watch(isTranscribing, (active) => emit("session", active), { immediate: true })
+
+// A locked screen suspends the microphone, and the transcript stops without
+// saying so. Held only while a session is actually running, and only on the
+// mobile route: a desktop operator's screen is already awake and the lock would
+// be one more thing to release. Unsupported browsers (iOS Safari below 16.4)
+// no-op, which is what the hint above is there for.
+const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
+watch(isTranscribing, (active) => {
+  if (!props.mobile) return
+  if (active) {
+    // Rejected when the tab is not visible — the panel is on screen when a
+    // session starts, so a rejection here is not worth surfacing.
+    requestWakeLock("screen").catch(() => {})
+  } else {
+    releaseWakeLock().catch(() => {})
+  }
+})
+onBeforeUnmount(() => {
+  if (props.mobile) releaseWakeLock().catch(() => {})
+})
 
 // Below this threshold (5 mins) the session pill switches to a warning tint
 const isLowOnTime = computed(

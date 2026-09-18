@@ -1,9 +1,10 @@
 // minimalist-church-presentation-software/public/sw.js
 // Custom auto-updating service worker for Cloud of Worship
 // For APP to be updated, the service worker must be activated 
+const BUILD_ID = "__COW_BUILD_ID__"
 
-// The web app's own version, written into the build output by the
-// `nitro:build:public-assets` hook. This used to point at the API's /health,
+// The web app's compatibility cache version, written into the build output by
+// the `nitro:build:public-assets` hook. This used to point at the API's /health,
 // which reports the *API's* version — a string that does not move when the web
 // app ships, so `latestVersion !== prevVersion` was never true and the cache
 // below was never purged. A cache that is never purged can hand a whole
@@ -12,7 +13,9 @@ const VERSION_ENDPOINT = "/version.json"
 const APP_VERSION_KEY = "appVersion"
 const DB_NAME = "cow-sw-meta"
 const DB_STORE = "meta"
-const DEFAULT_APP_VERSION = "v0"
+const DEFAULT_APP_VERSION = `v0+${BUILD_ID}`
+const CACHE_PREFIX = "app-cache-"
+const CACHE_HISTORY_LIMIT = 3
 const NAVIGATION_FALLBACK_URLS = ["/", "/login"]
 
 // IndexedDB helpers
@@ -49,7 +52,14 @@ async function setVersion(version) {
 
 async function getCacheName() {
   const appVersion = (await getVersion()) || DEFAULT_APP_VERSION
-  return `app-cache-${appVersion}`
+  return `${CACHE_PREFIX}${appVersion}`
+}
+
+async function getFallbackCaches(currentName) {
+  const names = (await caches.keys())
+    .filter((name) => name.startsWith(CACHE_PREFIX) && name !== currentName)
+    .reverse()
+  return Promise.all([currentName, ...names].map((name) => caches.open(name)))
 }
 
 async function matchCachedResponse(cache, req) {
@@ -94,9 +104,16 @@ self.addEventListener("activate", (event) => {
       }
 
       if (latestVersion !== prevVersion) {
-        // Delete all caches
-        const cacheNames = await caches.keys()
-        await Promise.all(cacheNames.map((name) => caches.delete(name)))
+        // Retain a few previous builds. An older tab can still be on screen
+        // when this worker activates and may need its cached chunks offline.
+        const currentName = `${CACHE_PREFIX}${latestVersion}`
+        await caches.open(currentName)
+        const cacheNames = (await caches.keys()).filter((name) =>
+          name.startsWith(CACHE_PREFIX)
+        )
+        await Promise.all(
+          cacheNames.slice(0, -CACHE_HISTORY_LIMIT).map((name) => caches.delete(name))
+        )
         await setVersion(latestVersion)
         await self.clients.claim()
       }
@@ -131,13 +148,17 @@ self.addEventListener("fetch", (event) => {
           return networkResp
         } catch (e) {
           // Network failed, try cache
-          const cache = await caches.open(cacheKey)
-          const cachedResp = await matchCachedResponse(cache, req)
-          if (cachedResp) return cachedResp
+          const fallbackCaches = await getFallbackCaches(cacheKey)
+          for (const cache of fallbackCaches) {
+            const cachedResp = await matchCachedResponse(cache, req)
+            if (cachedResp) return cachedResp
+          }
 
           if (req.mode === "navigate") {
-            const fallbackResp = await matchNavigationFallback(cache)
-            if (fallbackResp) return fallbackResp
+            for (const cache of fallbackCaches) {
+              const fallbackResp = await matchNavigationFallback(cache)
+              if (fallbackResp) return fallbackResp
+            }
           }
 
           throw e

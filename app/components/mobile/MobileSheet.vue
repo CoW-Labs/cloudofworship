@@ -5,7 +5,8 @@
   <Teleport to="body" :disabled="inline">
     <Transition name="fade-sm">
       <div
-        v-if="modelValue"
+        v-if="modelValue || keepMounted"
+        v-show="modelValue"
         class="mobile-sheet flex flex-col bg-gray-100 dark:bg-[#111722]"
         :class="inline ? 'absolute inset-0 z-30' : 'fixed inset-0 z-40'"
         :style="sheetStyle"
@@ -73,8 +74,15 @@ const props = withDefaults(
      * it, so the way out of the app is never hidden behind the sheet.
      */
     belowNavbar?: boolean
+    /**
+     * Keeps the sheet in the DOM while it is closed (hidden with `v-show`
+     * instead of torn down). For sheets whose contents own something that must
+     * outlive the sheet being dismissed — the transcription session's
+     * microphone, in particular, which its panel stops on unmount.
+     */
+    keepMounted?: boolean
   }>(),
-  { inline: false, headerless: false, belowNavbar: false }
+  { inline: false, headerless: false, belowNavbar: false, keepMounted: false }
 )
 
 const emit = defineEmits<{

@@ -39,7 +39,9 @@ useHead({
   ],
 })
 import { useAppStore } from "~/store/app"
-import { ref } from "vue"
+import { useAuthStore } from "~/store/auth"
+import { until } from "@vueuse/core"
+import { computed, ref } from "vue"
 
 const appStore = useAppStore()
 
@@ -113,6 +115,46 @@ const onResizeEnd = () => {
 // and the livestream broadcast. Shared verbatim with the mobile operator route.
 useOperatorSession()
 
+/**
+ * Open the plan chooser for a `/?upgrade=1` / `/?plan_id=<id>` link.
+ *
+ * `getCurrentPlan` fails safe to "free" until the church lands, so firing on
+ * mount would hand a Teams church a bill for what it already pays for. Wait
+ * for the plan to be knowable first, and give up on the wait after a moment so
+ * a slow (or failed) church fetch doesn't swallow the link entirely.
+ */
+const openUpgradeFromDeeplink = async (planId?: string) => {
+  const authStore = useAuthStore()
+  const { isTeamsPlan } = useSubscription()
+  const isPlanKnown = computed(
+    () => !!authStore.church && authStore.church._id === authStore.user?.churchId
+  )
+
+  await Promise.all([
+    // UpgradePlanModal only registers its emitter listener after it has
+    // fetched plans and detected currency, so an emit fired the instant the
+    // church hydrates from persisted state would land on nobody. The same
+    // one-second floor the signup hand-off below relies on.
+    new Promise((resolve) => setTimeout(resolve, 1000)),
+    Promise.race([
+      until(isPlanKnown).toBe(true),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]),
+  ])
+
+  if (isPlanKnown.value && isTeamsPlan.value) return
+
+  usePosthogCapture("UPGRADE_MODAL_OPENED_FROM_DEEPLINK", {
+    planId,
+    hasPlanId: !!planId,
+  })
+
+  useGlobalEmit(
+    appWideActions.showUpgradeModal,
+    planId ? { planId } : undefined
+  )
+}
+
 onMounted(async () => {
   const emailChange = useRoute().query.email_change
 
@@ -131,20 +173,42 @@ onMounted(async () => {
     markOnboardingTourPending()
   }
 
+  // Deeplink — `/?upgrade=1` opens the plan chooser, and `/?plan_id=<id>` does
+  // the same with that plan preselected. These are for links we send out (win-
+  // back mail, expiry notices), so unlike the signup hand-off below they work
+  // for any signed-in user, not only a fresh account.
+  const route = useRoute()
+  const router = useRouter()
+  const deeplinkPlanId = (route.query.plan_id as string) || undefined
+  const upgradeDeeplinked = !!route.query.upgrade || !!deeplinkPlanId
+
+  if (upgradeDeeplinked) {
+    // Consume the params immediately so a reload — or the operator leaving this
+    // tab open all service — doesn't put the modal back up.
+    const { upgrade: _upgrade, plan_id: _planId, ...restQuery } = route.query
+    router.replace({ query: restQuery })
+
+    openUpgradeFromDeeplink(deeplinkPlanId)
+  }
+
   // Check for pending plan_id from signup flow
   try {
     const pendingPlanId = localStorage.getItem("pending_plan_id")
     if (pendingPlanId) {
       localStorage.removeItem("pending_plan_id")
 
-      usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
-        planId: pendingPlanId,
-      })
+      // The deeplink already opened the modal (and with a plan id of its own,
+      // which is the more deliberate of the two). Just clear the stashed key.
+      if (!upgradeDeeplinked) {
+        usePosthogCapture("UPGRADE_MODAL_OPENED_AFTER_VERIFICATION", {
+          planId: pendingPlanId,
+        })
 
-      // Show upgrade modal after a brief delay
-      setTimeout(() => {
-        useGlobalEmit("show-upgrade-modal", { planId: pendingPlanId })
-      }, 1000)
+        // Show upgrade modal after a brief delay
+        setTimeout(() => {
+          useGlobalEmit("show-upgrade-modal", { planId: pendingPlanId })
+        }, 1000)
+      }
     }
   } catch {
     // localStorage unavailable (private mode / SecurityError)
