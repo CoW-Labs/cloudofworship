@@ -42,7 +42,7 @@
       </Transition>
       <AdvertModal
         v-model="showAdvertModal"
-        :active-advert="currentState.activeAdvert"
+        :active-advert="currentState?.activeAdvert"
       />
       <UpgradePlanModal />
       <OnboardingTour />

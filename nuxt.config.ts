@@ -1,16 +1,42 @@
 import { execSync } from 'child_process'
+import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
 /**
- * The version this build was compiled with, read from the same file the app
- * reads at runtime so the two can never disagree. The release workflow rewrites
- * only that constant, and this follows it.
+ * The release name this build was compiled with, read from the same file the
+ * app reads at runtime. The version file exposes it as `releaseVersion` and
+ * also carries a separate compatibility value for older tabs.
  */
 const readAppVersion = () => {
   try {
     const source = readFileSync('app/composables/useAppVersion.ts', 'utf8')
     return source.match(/APP_VERSION\s*=\s*"([^"]+)"/)?.[1] || ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * The identity of *this build*, as opposed to the release name above.
+ *
+ * `APP_VERSION` only moves when a release is cut, so it is the same string
+ * across every deploy in between — which made the freshness check in
+ * `plugins/build-freshness.client.ts` a no-op for exactly the deploys that
+ * delete a tab's chunks out from under it. A commit can be built or redeployed
+ * more than once, so its SHA is not a build identity. Generate an id once when
+ * loading this config and use it in the client and the public version file.
+ */
+const BUILD_ID = randomUUID()
+
+// PostHog still groups sourcemaps by source commit.
+const readSourceCommit = () => {
+  const fromEnv = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA
+  if (fromEnv) return fromEnv
+  try {
+    return execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
   } catch {
     return ''
   }
@@ -52,11 +78,33 @@ export default defineNuxtConfig({
       // version and so never moves when the web app ships.
       const appVersion = readAppVersion()
       if (appVersion) {
+        // Older tabs and the existing service worker only read `appVersion`.
+        // This compatibility value makes the first rollout visible to them and
+        // gives each service-worker cache its own name. The release name stays
+        // available separately for newer clients.
+        const legacyVersion = `${appVersion}+${BUILD_ID}`
         writeFileSync(
           join(publicDir, 'version.json'),
-          `${JSON.stringify({ appVersion, builtAt: new Date().toISOString() })}\n`
+          `${JSON.stringify({
+            appVersion: legacyVersion,
+            releaseVersion: appVersion,
+            buildId: BUILD_ID,
+            builtAt: new Date().toISOString(),
+          })}\n`
         )
-        console.log(`[build] Wrote version.json for ${appVersion}`)
+        // Changing the service-worker script on every build runs its activate
+        // handler, which rotates offline caches while retaining recent builds.
+        const serviceWorkerSource = readFileSync('public/sw.js', 'utf8')
+        if (!serviceWorkerSource.includes('__COW_BUILD_ID__')) {
+          throw new Error('[build] Service-worker build marker is missing')
+        }
+        writeFileSync(
+          join(publicDir, 'sw.js'),
+          serviceWorkerSource.replace('__COW_BUILD_ID__', BUILD_ID)
+        )
+        console.log(
+          `[build] Wrote version.json for ${appVersion} (build ${BUILD_ID || 'unknown'})`
+        )
       } else {
         console.warn(
           '[build] Could not read APP_VERSION; version.json not written. ' +
@@ -77,8 +125,7 @@ export default defineNuxtConfig({
 
       // Ties each symbol set to a release. Auto-derivation from git is unreliable
       // on CI checkouts, so prefer the SHA the platform hands us.
-      const releaseVersion =
-        process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || ''
+      const releaseVersion = readSourceCommit()
       const release = releaseVersion
         ? ` --release-name cloud-of-worship --release-version ${releaseVersion}`
         : ''
@@ -296,6 +343,9 @@ export default defineNuxtConfig({
       GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID || "",
       GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET || "",
       PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY,
+      // Baked into the client bundle so a tab can recognise its own build in
+      // `/version.json`.
+      BUILD_ID,
     },
   },
 
