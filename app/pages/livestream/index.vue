@@ -1,5 +1,7 @@
 <template>
+  <LivestreamUnavailable v-if="!canLivestream" />
   <div
+    v-else
     class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
     :id="currentState.liveSlideId?.toString()"
   >
@@ -52,9 +54,29 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
+import { useAuthStore } from "~/store/auth"
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const isFullScreen = ref(false)
+
+// Unlike /livestream/:schedule_id, this page is driven straight from the local
+// store — same browser, same `pinia-shared-state` — so the church is right here
+// and the gate is the ordinary client-side one, matching /mobile.
+//
+// It stays paired with the `teams` flag for the same reason mobile.global.ts
+// does: the flag has to keep working as a kill switch. And the plan is only
+// trusted once the church has actually loaded, since `getCurrentPlan` fails
+// safe to "free" and would otherwise black out a paying church on a cold start.
+const { isTeamsPlan } = useSubscription()
+const { checkFlag } = useFeatureFlags()
+const authStore = useAuthStore()
+const isPlanKnown = computed(
+  () =>
+    !!authStore.church && authStore.church._id === authStore.user?.churchId
+)
+const canLivestream = computed(
+  () => !isPlanKnown.value || !checkFlag("teams") || isTeamsPlan.value
+)
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
 const FPS = 10

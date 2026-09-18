@@ -62,7 +62,7 @@ import { useAppStore } from "~/store/app"
 // Which tab the content area is showing, so the bar says where you are — the
 // tabs themselves dropped their headers, and this is what replaced them.
 defineProps<{
-  activeTab?: "quick-actions" | "schedules" | "live" | null
+  activeTab?: "quick-actions" | "schedules" | "live" | "transcribe" | null
 }>()
 
 defineEmits<{

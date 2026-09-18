@@ -286,7 +286,7 @@
             action-text=""
           />
         </div>
-        <draggable
+        <CowDraggable
           v-show="!(liveOutputSlides?.length === 0 || !liveOutputSlides)"
           v-model="liveOutputSlides"
           group="slides"
@@ -455,7 +455,7 @@
               </button>
             </CowTooltip>
           </template>
-        </draggable>
+        </CowDraggable>
       </div>
     </AppSection>
   </div>
@@ -463,7 +463,6 @@
 
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from "@vueuse/core"
-import draggable from "vuedraggable"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
@@ -631,9 +630,15 @@ onBeforeUnmount(() => {
 
 // Listen for transcription toggle event
 const emitter = useNuxtApp().$emitter as any
-emitter?.on(appWideActions.newTranscribe, () => {
+const openTranscripts = () => {
+  // On mobile the transcript panel is a tab of its own, owned by the route, so
+  // that the session survives the live sheet being closed. Opening a second
+  // copy here would put two of them on the same microphone.
+  if (props.mobile) return
   showTranscripts.value = true
-})
+}
+emitter?.on(appWideActions.newTranscribe, openTranscripts)
+onBeforeUnmount(() => emitter?.off(appWideActions.newTranscribe, openTranscripts))
 
 /**
  * Broadcast slide reorder via Socket.IO for realtime collaboration

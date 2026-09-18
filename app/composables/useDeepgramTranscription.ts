@@ -441,6 +441,14 @@ export default function useDeepgramTranscription() {
 
     sourceNode.connect(workletNode)
     // We don't connect to destination — we don't want to play the mic back
+
+    // iOS starts an AudioContext suspended whenever the gesture that created it
+    // has already resolved — which it has here, behind the getUserMedia prompt
+    // and the WebSocket handshake. A suspended context runs no worklet, so the
+    // session would connect and then transcribe silence.
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume().catch(() => { })
+    }
   }
 
   /**

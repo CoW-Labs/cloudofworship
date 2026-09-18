@@ -70,7 +70,22 @@ const isProjectionWindow = () =>
   PROJECTION_ROUTES.some((route) => window.location.pathname.startsWith(route))
 
 export default defineNuxtPlugin((nuxtApp) => {
-  const runningVersion = useAppVersion().appVersion
+  /**
+   * Compare build identity, not release name.
+   *
+   * `APP_VERSION` ("v1.1.5") only moves when a release is cut, so for every
+   * deploy in between, the `version.json` this build wrote held the very string
+   * the tab was already running — `check()` returned at the equality test and
+   * no tab was ever found stale. PostHog bears that out: `stale_build_detected`
+   * has never fired, while `chunk_load_recovered_by_reload` did for 23 users in
+   * a month, i.e. tabs kept discovering they were behind the loud way, by
+   * importing a chunk the deploy had deleted.
+   *
+   * The build id changes for every build, including a rebuild of the same
+   * commit. Tabs without a build id compare release names instead.
+   */
+  const runtimeBuildId = useRuntimeConfig().public.BUILD_ID as string | undefined
+  const runningVersion = runtimeBuildId || useAppVersion().appVersion
 
   let lastInteractionAt = Date.now()
   let hiddenSince: number | null =
@@ -208,7 +223,12 @@ export default defineNuxtPlugin((nuxtApp) => {
     try {
       const response = await fetch(VERSION_URL, { cache: "no-store" })
       if (!response.ok) return
-      const deployedVersion = (await response.json())?.appVersion
+      const payload = await response.json()
+      // Only compare like with like: a tab running a build id must not measure
+      // itself against a release name, or every deploy would read as stale.
+      const deployedVersion = runtimeBuildId
+        ? payload?.buildId
+        : payload?.releaseVersion ?? payload?.appVersion
       // Only a confirmed mismatch counts. A missing or unreadable version must
       // never mark a tab stale: that would silence its error reports for the
       // rest of the session over a deploy that forgot to write the file.

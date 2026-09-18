@@ -26,8 +26,12 @@ export function synchronizeStore(
   options: { omit?: string[]; initialize?: boolean } = {}
 ) {
   const omitted = new Set([...NEVER_BROADCAST, ...(options.omit || [])])
+  // `$state` is undefined once the store is disposed — see the note in the
+  // patch below. An empty snapshot is the honest answer for a store that no
+  // longer exists, and it keeps the watcher and the post-patch re-read from
+  // throwing on the way out.
   const serialize = () => sharedStateSerializer.serialize(Object.fromEntries(
-    Object.keys(store.$state)
+    Object.keys(store.$state || {})
       .filter((key) => !omitted.has(key))
       .map((key) => [key, store.$state[key]])
   ))
@@ -57,8 +61,21 @@ export function synchronizeStore(
       return
     }
     if (message.timestamp <= latestTimestamp) return
+    // Another window wrote this; nothing guarantees its shape. A payload
+    // without a state object has nothing to merge, and reading keys off it
+    // throws before the first one is applied.
+    if (!message.state || typeof message.state !== "object") return
     latestTimestamp = message.timestamp
     store.$patch((state) => {
+      // Pinia hands back whatever `pinia.state.value[$id]` holds, which is
+      // gone once the store has been disposed. `broadcast-channel` delivers a
+      // queued batch in one pass (a single `forEach` over the pending
+      // messages), so a store torn down partway through that pass still
+      // receives the rest of the batch — and `Object.keys(undefined)` threw
+      // "Cannot convert undefined or null to object" from inside this
+      // callback, 45 times in one session on /stage. A disposed store has no
+      // state left to merge into, so there is nothing to do but stop.
+      if (!state) return
       Object.keys(state).filter((key) => !omitted.has(key)).forEach((key) => {
         if (Object.prototype.hasOwnProperty.call(message.state, key)) {
           state[key] = mergeSharedStateValue(state[key], message.state[key])
