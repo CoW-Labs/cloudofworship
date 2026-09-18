@@ -15,6 +15,12 @@ interface SocketIOOptions {
   onError?: (error: any) => void
   onMaxRetriesReached?: () => void
   onTierRestricted?: (data: TierRestriction) => void
+  /**
+   * Names this connection to the server. Only the public livestream viewer sets
+   * it ("livestream"), and it is what scopes the Teams gate to that page — the
+   * operator surfaces stay ungated on every plan. See the API's socketio/index.
+   */
+  client?: "livestream"
   onOnlineUsersChanged?: (users: OnlineUser[]) => void
   onUserJoined?: (user: OnlineUser) => void
   onUserLeft?: (userId: string, userName: string) => void
@@ -112,6 +118,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
     onError,
     onMaxRetriesReached,
     onTierRestricted,
+    client,
     onOnlineUsersChanged,
     onUserJoined,
     onUserLeft,
@@ -220,6 +227,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
       user_name: userName,
       avatar,
       theme,
+      ...(client ? { client } : {}),
     }
   }
 

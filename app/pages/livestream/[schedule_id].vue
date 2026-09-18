@@ -337,6 +337,9 @@ const handleWebSocketMessage = async (parsedData: any) => {
 
 const socketManager = useSocketIO({
   scheduleId: route.params.schedule_id as string,
+  // Identifies this as the public viewer, which is what scopes the Teams gate
+  // to this page. The operator console and /mobile stay ungated on every plan.
+  client: "livestream",
   maxRetries: 30,
   baseRetryDelay: 1000,
   maxRetryDelay: 30000,
