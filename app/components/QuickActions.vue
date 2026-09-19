@@ -535,6 +535,22 @@ const songSearchQuery = ref<string>("")
 const bibleSearchQuery = ref<string>("")
 const hymns = ref<Hymn[]>([])
 const emitter = useNuxtApp().$emitter as Emitter<any>
+
+// On the desktop console this panel is mounted for the life of the route, so
+// handlers registered in setup never needed taking off again. The mobile route
+// tears it down every time its tab is closed, and a handler left behind keeps a
+// dead instance listening — "remove-alert" would then fire once per reopen,
+// with a toast and a socket emit each time. Register through this so every
+// binding comes off with the component.
+const emitterBindings: Array<[string, (payload?: any) => void]> = []
+const onEmitter = (type: string, handler: (payload?: any) => void) => {
+  emitterBindings.push([type, handler])
+  emitter.on(type, handler)
+}
+onUnmounted(() => {
+  emitterBindings.forEach(([type, handler]) => emitter.off(type, handler))
+  emitterBindings.length = 0
+})
 const libraryPage = ref<string>("")
 const librarySongToEdit = ref<Song | undefined>()
 const libraryOpenToken = ref<number>(0)
@@ -883,36 +899,36 @@ watch(
 // regardless of what payload the click happened to emit.
 const isInSearchResults = computed(() => searchInput.value.length >= 2)
 
-emitter.on("new-bible", (data) => {
+onEmitter("new-bible", (data) => {
   if (data === "" && !isInSearchResults.value) {
     page.value = "bible"
   }
 })
 
-emitter.on("bible-search-demo", () => {
+onEmitter("bible-search-demo", () => {
   bibleSearchQuery.value = "Gen 1:1"
 })
 
-emitter.on("new-song", (data: any) => {
+onEmitter("new-song", (data: any) => {
   if (!data && !isInSearchResults.value) {
     if (!ensureSongSearchAccess()) return
     page.value = "song"
   }
 })
 
-emitter.on("new-song-search", (query) => {
+onEmitter("new-song-search", (query) => {
   if (!ensureSongSearchAccess()) return
   songSearchQuery.value = query || ""
   page.value = "song"
 })
 
-emitter.on("new-hymn", (data) => {
+onEmitter("new-hymn", (data) => {
   if (data === "undefined" && !isInSearchResults.value) {
     page.value = "hymn"
   }
 })
 
-emitter.on("new-media", (data) => {
+onEmitter("new-media", (data) => {
   const fromSaved = data?.[0]?.fromSaved
   const fromDrop = data?.[0]?.fromDrop
   if (!fromSaved && !fromDrop) {
@@ -920,35 +936,35 @@ emitter.on("new-media", (data) => {
   }
 })
 
-emitter.on("new-youtube-video", () => {
+onEmitter("new-youtube-video", () => {
   page.value = "youtube"
 })
 
-emitter.on("new-vimeo-video", () => {
+onEmitter("new-vimeo-video", () => {
   page.value = "vimeo"
 })
 
-emitter.on("new-search-bible", () => {
+onEmitter("new-search-bible", () => {
   page.value = "search-bible"
 })
 
-emitter.on("new-library", () => {
+onEmitter("new-library", () => {
   page.value = "library"
 })
 
-emitter.on("new-templates", () => {
+onEmitter("new-templates", () => {
   page.value = "templates"
 })
 
-emitter.on(appWideActions.newSchedulesList, () => {
+onEmitter(appWideActions.newSchedulesList, () => {
   page.value = "schedules-list"
 })
 
-emitter.on("new-alert", () => {
+onEmitter("new-alert", () => {
   page.value = "alert"
 })
 
-emitter.on("remove-alert", () => {
+onEmitter("remove-alert", () => {
   appStore.setActiveAlert(null)
   useToast().add({
     icon: "i-bx-trash",
@@ -962,7 +978,7 @@ emitter.on("remove-alert", () => {
 
 // A payload means an existing song is being edited (e.g. from a song slide's
 // "Edit song in library"); no payload opens a blank add-song form.
-emitter.on("add-song", (song?: Song) => {
+onEmitter("add-song", (song?: Song) => {
   librarySongToEdit.value = song ? { ...song } : undefined
   libraryPage.value = "add-song"
   // The library panel may already be open on its own page, in which case none
@@ -973,14 +989,14 @@ emitter.on("add-song", (song?: Song) => {
 
 // No payload means "open the countdown panel"; a payload is a countdown that
 // has already been filled in and is on its way to its destination.
-emitter.on("new-countdown", (data) => {
+onEmitter("new-countdown", (data) => {
   if (!data) {
     countdownInitialTab.value = 0
     page.value = "countdown"
   }
 })
 
-emitter.on(appWideActions.newStageCountdown, (data) => {
+onEmitter(appWideActions.newStageCountdown, (data) => {
   if (!data) {
     countdownInitialTab.value = 1
     page.value = "countdown"
@@ -988,11 +1004,11 @@ emitter.on(appWideActions.newStageCountdown, (data) => {
 })
 
 // A payload means a deck is being imported, not that the panel should open.
-emitter.on("new-presentation", (data) => {
+onEmitter("new-presentation", (data) => {
   if (!data) page.value = "presentation"
 })
 
-emitter.on("new-presentation-from-pdf", () => {
+onEmitter("new-presentation-from-pdf", () => {
   page.value = "presentation-pdf"
 })
 
@@ -1062,7 +1078,7 @@ onMounted(() => {
 
   // console.log("mounted", quickActions.value)
 
-  emitter.on(appWideActions.quickActionsFocus, () => {
+  onEmitter(appWideActions.quickActionsFocus, () => {
     // Focus on Quick actions search bar input
     if (page.value !== "") {
       setTimeout(() => {
