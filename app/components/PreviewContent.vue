@@ -1400,6 +1400,15 @@ emitter.on("delete-slide", (data: Slide) => {
   deleteSlide(data?.id)
 })
 
+// "Edit song in library" is reachable from the editor's own actions menu, and
+// on mobile that editor is a full-viewport sheet stacked above the Quick
+// Actions tab the library form opens in. Leaving it up would bury the form the
+// operator just asked for, so the editor stands down and the grid (with the
+// library over it) is what closing the form returns to.
+emitter.on(appWideActions.addSong, () => {
+  if (props.mobile) mobileEditorOpen.value = false
+})
+
 emitter.on(
   appWideActions.addSongSlideToSetlist,
   async (data: { setlistSlide: Slide; songSlide: Slide }) => {

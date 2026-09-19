@@ -117,6 +117,7 @@
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
 import { appWideActions } from "~/utils/constants"
+import type { Song } from "~/types"
 import type { Emitter } from "mitt"
 
 definePageMeta({
@@ -162,6 +163,30 @@ const openTranscribe = () => {
 }
 emitter.on(appWideActions.newTranscribe, openTranscribe)
 onBeforeUnmount(() => emitter.off(appWideActions.newTranscribe, openTranscribe))
+
+// "Edit song in library" on a song (or song-setlist) slide opens the library's
+// add-song form, which lives inside QuickActions. On this route QuickActions
+// only exists while its tab is open, so the slide menu was emitting into
+// nothing: the tab has to be opened first, and the event replayed once the
+// panel is mounted and listening. The guard keeps the replay from re-entering
+// this handler.
+let replayingAddSong = false
+const openAddSong = (song?: Song) => {
+  if (replayingAddSong) return
+  const wasMounted = activeTab.value === "quick-actions"
+  activeTab.value = "quick-actions"
+  if (wasMounted) return
+  nextTick(() => {
+    replayingAddSong = true
+    try {
+      emitter.emit(appWideActions.addSong, song)
+    } finally {
+      replayingAddSong = false
+    }
+  })
+}
+emitter.on(appWideActions.addSong, openAddSong)
+onBeforeUnmount(() => emitter.off(appWideActions.addSong, openAddSong))
 
 // Creating a slide steps out of the tab it was created from, so the editor is
 // not left stacked behind it. Transcribe is the exception: it is a session the

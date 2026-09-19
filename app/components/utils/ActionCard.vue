@@ -189,7 +189,17 @@ const previewPositionStyle = computed(() => ({
   left: `${previewPosition.value.left}px`,
 }))
 
+// The preview is a pointer affordance: it opens *beside* the row the mouse is
+// resting on. A phone has no pointer to rest — a tap fires the same synthetic
+// `mouseenter`, so every tap on a hymn, verse or song would flash a floating
+// card over a screen with no room for it, with no way to dismiss it, on the way
+// to the slide the tap was actually for. The mobile route has no hover, so it
+// has no preview.
+const route = useRoute()
+const isMobileRoute = computed(() => route.path === "/mobile")
+
 const canPreview = computed(() => {
+  if (isMobileRoute.value) return false
   if (props.action?.type === slideTypes.hymn && props.action?.hymnIndex)
     return true
   if (props.action?.type === slideTypes.bible && props.action?.bibleBookIndex)
