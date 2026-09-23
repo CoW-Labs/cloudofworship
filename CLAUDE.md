@@ -103,7 +103,9 @@ The base URL comes from `runtimeConfig.public.BASE_URL` (default: `https://api.c
 
 - **PostHog** (`app/plugins/posthog.ts`) is the feature flag backend. Not initialized on `localhost`.
 - `useFeatureFlags` composable wraps PostHog flag checks. Valid flag keys are typed as `FeatureFlagKey` in that file.
-- `useSubscription` (`app/composables/useSubscription.ts`) maps action names to tiers (`free` | `teams`) via `ACTION_TIER_MAP`. Check `hasAccessToFeature(actionName)` before gating UI. The `tier` field on `QuickAction` objects drives the same logic.
+- `useSubscription` (`app/composables/useSubscription.ts`) maps action names to tiers (`free` | `teams`). The effective map is the `tier` field authored on each `QuickAction` in `quickActionsArr`, overlaid by `ACTION_TIER_MAP` (which also covers actions that have no quick action of their own). Call `hasAccessToFeature(actionName)` to gate UI — it already folds in the app-wide paywall switch, so no call site should add its own kill-switch clause.
+- The paywall switch is `paywallEnabled` from `GET /app-config/info` (see `useAppInfo`), **not** a PostHog flag. It defaults to on for every uncertain state. Never gate a paid feature on a feature flag: flag SDKs fail open when they cannot reach their backend, which hands the paid tier to anyone offline or behind a filter.
+- Client-side gating is for UX only. Anything that costs money — storage, transcription minutes, PPT conversion, the public livestream relay, the shared song catalogue, seats, schedule count — is enforced by the API as well.
 
 ### Global event bus
 

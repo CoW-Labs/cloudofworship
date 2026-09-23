@@ -201,12 +201,11 @@ const onSlideCreated = () => {
 // start the route resolves before that. Re-checking here catches the church
 // landing a moment later and moves a Free-plan operator to the upgrade wall
 // rather than leaving them in an app they cannot use.
-const { isTeamsPlan } = useSubscription()
-const { checkFlag } = useFeatureFlags()
+const { isTeamsPlan, isPlanKnown, isPaywallEnabled } = useSubscription()
 watch(
-  isTeamsPlan,
-  (isTeams) => {
-    if (!isTeams && checkFlag("teams")) navigateTo("/mobile-upgrade")
+  [isTeamsPlan, isPlanKnown, isPaywallEnabled],
+  ([isTeams, planKnown, paywallEnabled]) => {
+    if (planKnown && !isTeams && paywallEnabled) navigateTo("/mobile-upgrade")
   },
   { immediate: true }
 )
@@ -230,4 +229,3 @@ watch(
 // Settings, upgrade prompts and the shortcuts modal are owned by the `app`
 // layout, which this route shares, so there is nothing to mount here.
 </script>
-

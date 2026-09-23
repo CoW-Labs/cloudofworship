@@ -391,7 +391,6 @@ const restoreModalVisible = ref(false)
 const { hasAccessToFeature, hasLapsedTeamsSubscription } = useSubscription()
 
 const { isUpdateReady } = useAppUpdater()
-const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 
 const { user, church } = storeToRefs(authStore)
 const { currentState } = storeToRefs(appStore)
@@ -587,21 +586,19 @@ const handleRestoreAccount = () => {
 }
 
 const handleInviteClick = () => {
-  if (isPremiumFeatureEnabled.value) {
-    if (hasAccessToFeature("open-invite-modal")) {
-      inviteModalVisible.value = true
-    } else {
-      // Show upgrade modal
-      useGlobalEmit("show-upgrade-modal")
-      usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
-        feature: "Invite to Workspace",
-        location: "navbar",
-      })
-    }
-  } else {
+  // hasAccessToFeature returns true when the paywall is switched off app-wide,
+  // so the "gating disabled" branch this used to carry is no longer needed.
+  if (hasAccessToFeature("open-invite-modal")) {
     inviteModalVisible.value = true
     usePosthogCapture("OPEN_INVITE_MODAL")
+    return
   }
+
+  useGlobalEmit("show-upgrade-modal")
+  usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
+    feature: "Invite to Workspace",
+    location: "navbar",
+  })
 }
 
 defineProps({
