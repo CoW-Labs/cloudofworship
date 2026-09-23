@@ -282,7 +282,6 @@ import { useDebounceFn, useOnline } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
 const { hasAccessToFeature } = useSubscription()
-const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 const online = useOnline()
 const { savedSongs } = useLibrary()
 const { searchSongs } = useSongs()
@@ -605,7 +604,7 @@ const quickSearchPromo = computed(() => {
 })
 
 const handleChipClick = (action: string) => {
-  if (!hasAccessToFeature(action) && isPremiumFeatureEnabled.value) {
+  if (!hasAccessToFeature(action)) {
     emitter.emit("show-upgrade-modal")
     usePosthogCapture("TEAMS_FEATURE_BLOCKED", { feature: action })
     return
@@ -624,8 +623,7 @@ const handlePromoClick = () => {
 // of the search — while songs it already owns (personal library, "Add Song")
 // keep working, since those emit "new-song" with a payload.
 const canSearchSongLyrics = () =>
-  hasAccessToFeature(appWideActions.newSongSearch) ||
-  !isPremiumFeatureEnabled.value
+  hasAccessToFeature(appWideActions.newSongSearch)
 
 const ensureSongSearchAccess = () => {
   if (canSearchSongLyrics()) return true
@@ -661,9 +659,9 @@ const mapSongToAction = (song: Song, fromSaved: boolean): QuickAction => {
 // Remote (global) song search results — always fetched alongside the local
 // library match so both sources are represented; duplicates and the 3+3 cap
 // are resolved when the song group is built in searchedActions. Gated behind
-// the Teams subscription like the rest of the online lyrics search (only
-// skipped when the paywall flag is actually enabled, matching hasAccessToFeature
-// usage elsewhere). Locally saved songs are unaffected — they stay free.
+// the Teams subscription like the rest of the online lyrics search, through
+// the same hasAccessToFeature check everything else uses. Locally saved songs
+// are unaffected — they stay free.
 const remoteSongActions = ref<QuickAction[]>([])
 const isSearchingRemoteSongs = ref(false)
 // Guards against out-of-order results when overlapping calls fire (e.g. fast
@@ -1042,7 +1040,7 @@ const handleInputKeydown = (e: KeyboardEvent) => {
       ] as unknown as QuickAction
       if (action) {
         const actionName = action?.action || ""
-        if (!hasAccessToFeature(actionName) && isPremiumFeatureEnabled.value) {
+        if (!hasAccessToFeature(actionName)) {
           emitter.emit("show-upgrade-modal")
           usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
             feature: actionName,

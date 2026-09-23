@@ -1,6 +1,27 @@
 <template>
   <div class="login-main section">
-    <div class="header flex flex-col items-center text-center mb-10">
+    <!-- An invitation link that is missing, expired or already used. Shown
+         instead of the form, since there is nothing to join. -->
+    <div
+      v-if="inviteInvalid"
+      class="header flex flex-col items-center text-center mb-10"
+    >
+      <Logo class="w-32 h-32 mb-12" />
+      <p class="max-w-[320px] mx-auto come-up-1">
+        <span class="font-semibold">This invitation link has expired</span>
+        <br />
+        <span class="text-sm opacity-80">
+          Invitation links are single-use and last 14 days. Ask whoever invited
+          you to send a new one from their workspace.
+        </span>
+      </p>
+      <CowButton class="mt-8" to="/login">Go to sign in</CowButton>
+    </div>
+
+    <div
+      v-else
+      class="header flex flex-col items-center text-center mb-10"
+    >
       <Logo class="w-32 h-32 mb-12" />
       <p class="max-w-[280px] mx-auto come-up-1">
         Join
@@ -37,6 +58,7 @@
 
     <!-- FORM 1 -->
     <form
+      v-if="!inviteInvalid"
       v-show="step === 1"
       class="flex flex-col gap-3.5 mx-auto come-up-2"
       @submit.prevent="signup"
@@ -122,24 +144,58 @@ const getChurchId = () => {
   return Array.isArray(churchId) ? churchId[0] : churchId
 }
 
+/**
+ * The single-use token from the invitation email (`?invite=`). It is what
+ * actually authorises joining this workspace — the church id in the path only
+ * says which one, and on its own opens nothing.
+ */
+const getInviteToken = () => {
+  const invite = route.query.invite
+  const token = Array.isArray(invite) ? invite[0] : invite
+  return typeof token === "string" && token.length ? token : ""
+}
+
+const inviteToken = ref(getInviteToken())
+const inviteInvalid = ref(false)
+
 const passwordValid = computed(() => {
   const regex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
   return regex.test(password.value)
 })
 
 const getChurch = async () => {
-  // console.log(authStore.user)
   const churchId = getChurchId()
-  if (churchId) {
-    const promise = await useAPIFetch(`/church/${churchId}?teammates=true`)
-    church.value = promise.data.value as Church
-  } else {
+
+  if (!churchId) {
     navigateTo("/signup")
     toast.add({
       icon: "i-bx-church",
       title: "Add your church in less than 1 minute to continue.",
     })
+    return
   }
+
+  // A link with no token is an old-style invitation, from before invitations
+  // were tokens. It cannot join anything now, so say so here rather than
+  // letting someone fill the whole form and be refused on submit.
+  if (!inviteToken.value) {
+    inviteInvalid.value = true
+    return
+  }
+
+  // Resolving the church THROUGH the token means an expired or already-used
+  // link never renders a workspace name at all.
+  const { data, error } = await useAPIFetch(
+    `/auth/invite/${encodeURIComponent(inviteToken.value)}`
+  )
+
+  if (error.value || !data.value) {
+    inviteInvalid.value = true
+    return
+  }
+
+  const payload = data.value as { churchId: string; church: Church }
+  church.value = payload.church
 }
 
 // The Google signup endpoint returns `newUser` for a fresh account, and `user`
@@ -197,6 +253,10 @@ const signup = async () => {
     navigateTo("/signup")
     return
   }
+  if (!inviteToken.value) {
+    inviteInvalid.value = true
+    return
+  }
 
   loading.value = true
 
@@ -212,6 +272,7 @@ const signup = async () => {
         email: email.value,
         password: password.value,
         churchId,
+        inviteToken: inviteToken.value,
         utmParams,
       },
     }
@@ -248,6 +309,10 @@ const handleGoogleSignUp = async (redirectResult?: UserCredential) => {
     navigateTo("/signup")
     return
   }
+  if (!inviteToken.value) {
+    inviteInvalid.value = true
+    return
+  }
 
   loading.value = true
 
@@ -273,6 +338,7 @@ const handleGoogleSignUp = async (redirectResult?: UserCredential) => {
         headers: { "x-access-token": `Bearer ${idToken}` },
         body: {
           churchId,
+          inviteToken: inviteToken.value,
           utmParams,
         },
       }
