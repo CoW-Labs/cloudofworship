@@ -54,7 +54,6 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
-import { useAuthStore } from "~/store/auth"
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const isFullScreen = ref(false)
@@ -63,19 +62,15 @@ const isFullScreen = ref(false)
 // store — same browser, same `pinia-shared-state` — so the church is right here
 // and the gate is the ordinary client-side one, matching /mobile.
 //
-// It stays paired with the `teams` flag for the same reason mobile.global.ts
-// does: the flag has to keep working as a kill switch. And the plan is only
-// trusted once the church has actually loaded, since `getCurrentPlan` fails
-// safe to "free" and would otherwise black out a paying church on a cold start.
-const { isTeamsPlan } = useSubscription()
-const { checkFlag } = useFeatureFlags()
-const authStore = useAuthStore()
-const isPlanKnown = computed(
-  () =>
-    !!authStore.church && authStore.church._id === authStore.user?.churchId
-)
+// It stays paired with the paywall kill switch for the same reason
+// mobile.global.ts does: the switch has to keep working. Unlike the PostHog
+// flag it replaced, it is served by our own API and defaults to on, so a
+// dropped network no longer opens the page up. And the plan is only trusted
+// once the church has actually loaded, since `getCurrentPlan` fails safe to
+// "free" and would otherwise black out a paying church on a cold start.
+const { isTeamsPlan, isPlanKnown, isPaywallEnabled } = useSubscription()
 const canLivestream = computed(
-  () => !isPlanKnown.value || !checkFlag("teams") || isTeamsPlan.value
+  () => !isPlanKnown.value || !isPaywallEnabled.value || isTeamsPlan.value
 )
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()

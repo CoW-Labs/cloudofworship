@@ -218,12 +218,18 @@ const createScheduleOnline = async (schedule: Schedule) => {
 
 // Returns true (and surfaces the upgrade prompt) when the free-plan schedule
 // limit has been reached, so callers should abort.
+// Hoisted to setup scope: these read Nuxt state (the server-driven paywall
+// switch), which must be resolved while the Nuxt context is guaranteed, not
+// from inside a click handler.
+const { isFreePlan, isPaywallEnabled } = useSubscription()
+
 const isScheduleLimitReached = (): boolean => {
-  const { isFreePlan } = useSubscription()
-  const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
+  // isPaywallEnabled is the app-wide kill switch, served by our own API and
+  // defaulting to on — the schedule cap is not in ACTION_TIER_MAP, so unlike
+  // the action gates it has to consult it directly.
   const scheduleCount = appStore.currentState.schedules.length
 
-  if (isFreePlan.value && scheduleCount >= 5 && isPremiumFeatureEnabled.value) {
+  if (isFreePlan.value && scheduleCount >= 5 && isPaywallEnabled.value) {
     useGlobalEmit("show-upgrade-modal")
     usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
       feature: "Create Schedule",

@@ -62,8 +62,7 @@ import { tabSessionId } from "~/composables/useRealtimeSlides"
 
 const appStore = useAppStore()
 const emitter = useNuxtApp().$emitter as any
-const { hasAccessToFeature } = useSubscription()
-const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
+const { hasAccessToFeature, isPaywallEnabled } = useSubscription()
 const {
   overlaySettings,
   applyOverlaySettings,
@@ -85,12 +84,9 @@ const decorativeOverlayOptions = [
   { key: "none", label: "None selected" },
 ]
 
-const hasAccessToOverlays = computed(() => {
-  if (!isPremiumFeatureEnabled.value) return true
-  return hasAccessToFeature("overlays-themes")
-})
+const hasAccessToOverlays = computed(() => hasAccessToFeature("overlays-themes"))
 
-const showTeamsBadge = computed(() => isPremiumFeatureEnabled.value)
+const showTeamsBadge = computed(() => isPaywallEnabled.value)
 
 const draftScale = ref(overlaySettings.value.scale)
 

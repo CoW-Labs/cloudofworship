@@ -305,6 +305,46 @@ const fetchChurch = async () => {
   }
 }
 
+/**
+ * Keep the cached subscription plan fresh while the app is open.
+ *
+ * Every paid gate reads the plan out of persisted state, and that copy is only
+ * trusted for PLAN_GRACE_PERIOD_MS after the API last confirmed it. Boot alone
+ * is not enough: an operator leaves this window open across a whole service,
+ * and often across an upgrade they just paid for on their phone. Refreshing on
+ * focus, and when the connection comes back, picks up an upgrade and a
+ * downgrade alike — without putting a network call on the gate itself, which
+ * would break the app for the offline services we support.
+ *
+ * Throttled, because focus fires on every alt-tab between this window and the
+ * live output, which during a service is constant.
+ */
+const PLAN_REVALIDATE_INTERVAL_MS = 5 * 60 * 1000
+// Seeded at setup so the boot fetch counts as the first confirmation.
+let lastPlanRevalidateAt = Date.now()
+
+const revalidateChurchPlan = () => {
+  if (!online.value) return
+  if (!authStore.user?.churchId) return
+  if (Date.now() - lastPlanRevalidateAt < PLAN_REVALIDATE_INTERVAL_MS) return
+
+  lastPlanRevalidateAt = Date.now()
+  fetchChurch()
+}
+
+onMounted(() => {
+  window.addEventListener("focus", revalidateChurchPlan)
+})
+onUnmounted(() => {
+  window.removeEventListener("focus", revalidateChurchPlan)
+})
+
+watch(online, (isOnline) => {
+  // Coming back from a dropout is the other moment the cached plan is most
+  // likely to be out of date.
+  if (isOnline) revalidateChurchPlan()
+})
+
 const fetchHymns = async () => {
   if (!online.value) {
     setLoadingTask(

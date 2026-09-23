@@ -361,7 +361,6 @@ watch(previewIdentity, () => {
 })
 
 const { requiresTeams, hasAccessToFeature } = useSubscription()
-const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
 const emitter = useNuxtApp().$emitter as any
 
 // Check if feature flag is enabled for this action
@@ -401,11 +400,12 @@ const emitParameter = computed(() => {
   }
 })
 
-// Show teams badge if the action requires teams subscription
+// Show teams badge if the action requires teams subscription.
+// `hasAccessToFeature` already returns true when the paywall is switched off
+// app-wide, so no separate kill-switch clause is needed here.
 const showTeamsBadge = computed(() => {
   return (
     requiresTeams(props.action?.action || "") &&
-    isPremiumFeatureEnabled.value &&
     !hasAccessToFeature(props.action?.action || "")
   )
 })
@@ -419,7 +419,7 @@ const handleActionClick = () => {
   }
 
   // Check if user has access to this feature
-  if (!hasAccessToFeature(actionName) && isPremiumFeatureEnabled.value) {
+  if (!hasAccessToFeature(actionName)) {
     // Show upgrade modal instead of executing the action
     emitter.emit("show-upgrade-modal")
     usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
