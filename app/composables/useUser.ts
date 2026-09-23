@@ -101,7 +101,10 @@ export default function useUser() {
       )
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to send invitations')
+        // `data.error` carries the API's own explanation (e.g. the Teams seat
+        // limit); `message` is only the transport-level failure.
+        const reason = (error.value as any)?.data?.error
+        throw new Error(reason || error.value?.message || 'Failed to send invitations')
       }
 
       toast.add({
@@ -116,7 +119,7 @@ export default function useUser() {
       console.error('Error sending email invitations:', error)
       toast.add({
         icon: 'i-bx-error',
-        title: 'Error sending email',
+        title: error?.message || 'Error sending email',
         description: error.message,
         color: 'red',
       })

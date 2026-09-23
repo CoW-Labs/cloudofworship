@@ -1,7 +1,22 @@
 import { PostHog } from "posthog-js"
 import { ref, onMounted } from "vue"
 
-export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "transcripts-free" | "ppt-conversion" | "allow-online-scripture-search-for-only-teams" | "force-sw-unregister" | "hide-free-trial-promotion" | "teams"
+/**
+ * NOTE: the paywall kill switch is deliberately NOT in here any more.
+ *
+ * It used to be the `teams` flag, and every paid gate read it. Flag SDKs
+ * return their default when they cannot reach their backend, so an operator
+ * who was offline — which this app supports on purpose — or behind a filter
+ * that blocked PostHog silently got the entire Teams tier. Anything that
+ * decides entitlement has to fail closed, so that switch now comes from our
+ * own API as `paywallEnabled` on /app-config/info (see useAppInfo), and the
+ * only thing that reads it is useSubscription. Do not gate a paid feature on
+ * a flag key.
+ *
+ * Flags below are rollout switches, where failing open is the correct and
+ * intended behaviour.
+ */
+export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "transcripts-free" | "ppt-conversion" | "allow-online-scripture-search-for-only-teams" | "force-sw-unregister" | "hide-free-trial-promotion"
 
 /**
  * Composable for managing PostHog feature flags

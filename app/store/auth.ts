@@ -52,6 +52,12 @@ export const useAuthStore = defineStore('auth', {
       user: null as User | null,
       church: null as Church | null,
       token: null as string | null, // Store token for Tauri
+      // When `church` (and so `subscriptionPlan`) was last confirmed by the
+      // API. The plan is cached to localStorage and read on every gate check,
+      // including offline, so it needs an age: see PLAN_GRACE_PERIOD_MS in
+      // useSubscription. Null means "cached by a build that predates this
+      // field", which is treated as unverified.
+      planVerifiedAt: null as number | null,
       subscriptionDetails: null as SubscriptionDetails | null, // Cached subscription details
       subscriptionDetailsLastFetched: null as number | null // Timestamp of last fetch
     }
@@ -65,12 +71,22 @@ export const useAuthStore = defineStore('auth', {
 
       if (isDifferentUser || isDifferentChurch) {
         this.church = null
+        this.planVerifiedAt = null
         this.subscriptionDetails = null
         this.subscriptionDetailsLastFetched = null
       }
     },
+    /**
+     * Stores the church and stamps the plan as freshly verified.
+     *
+     * Every caller is either a direct read of GET /church or a server-confirmed
+     * billing activation, so reaching here always means the API has just told
+     * us what the plan is. Nothing client-side may call this to assert a plan
+     * of its own.
+     */
     setChurch(church: Church) {
       this.church = church
+      this.planVerifiedAt = Date.now()
     },
     setToken(token: string | null) {
       this.token = token
@@ -96,6 +112,7 @@ export const useAuthStore = defineStore('auth', {
 
       this.user = null
       this.church = null
+      this.planVerifiedAt = null
       this.subscriptionDetails = null
       this.subscriptionDetailsLastFetched = null
       navigateTo('/login')

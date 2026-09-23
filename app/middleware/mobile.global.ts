@@ -1,5 +1,3 @@
-import { useAuthStore } from "~/store/auth"
-
 /**
  * Routes touch devices to the mobile operator app, and gates it behind Teams.
  *
@@ -28,30 +26,26 @@ export default defineNuxtRouteMiddleware((to) => {
     window.matchMedia("(max-width: 767px)").matches &&
     window.matchMedia("(pointer: coarse)").matches
 
-  const { isTeamsPlan } = useSubscription()
-  const { checkFlag } = useFeatureFlags()
-  const authStore = useAuthStore()
-
   // `getCurrentPlan` fails safe to "free" when the church is not loaded, which
   // is the right default for granting features but the wrong one for a hard
   // redirect. It would wall a Teams church out of its own app on a cold start
   // before the church lands. So the gate only fires once the plan is knowable,
   // and `/mobile` re-checks when it resolves.
-  const isPlanKnown =
-    !!authStore.church && authStore.church._id === authStore.user?.churchId
+  const { isTeamsPlan, isPlanKnown, isPaywallEnabled } = useSubscription()
 
   // Matches every other paid gate in the app (see ScheduleModal, QuickActions):
-  // premium gating only applies while the `teams` flag is on, so the flag stays
-  // usable as a kill switch without locking anyone out of the mobile app.
+  // gating only applies while the paywall switch is on, so it stays usable as a
+  // kill switch without locking anyone out of the mobile app. That switch comes
+  // from our own API and defaults to on, so an offline phone keeps the gate.
   const gateOnTeams =
-    isPlanKnown && checkFlag("teams") && !isTeamsPlan.value
+    isPlanKnown.value && isPaywallEnabled.value && !isTeamsPlan.value
 
   if (to.path === "/mobile" && gateOnTeams) {
     return navigateTo("/mobile-upgrade")
   }
 
   // A church that is on Teams has no reason to sit on the upgrade wall.
-  if (to.path === "/mobile-upgrade" && isPlanKnown && isTeamsPlan.value) {
+  if (to.path === "/mobile-upgrade" && isPlanKnown.value && isTeamsPlan.value) {
     return navigateTo("/mobile")
   }
 

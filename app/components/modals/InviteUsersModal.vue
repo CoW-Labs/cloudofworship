@@ -150,17 +150,44 @@ const closeModal = () => {
   emit("close")
 }
 
-const copyToClipboard = () => {
-  const input = document.createElement("input")
-  input.value = `http://${location.host}/signup/${authStore.user?.churchId}`
-  document.body.appendChild(input)
-  input.select()
-  document.execCommand("copy")
+const copyToClipboard = async () => {
+  const churchId = authStore.user?.churchId
+  if (!churchId) return
+
+  const { data, error } = await useAPIFetch<{ token: string }>(
+    `/church/${churchId}/invite-link`,
+    { method: "POST" }
+  )
+
+  if (error.value || !data.value?.token) {
+    const reason = (error.value as any)?.data?.error
+    useToast().add({
+      title: reason || "Unable to create an invitation link.",
+      color: "red",
+      icon: "i-bx-error",
+    })
+    return
+  }
+
+  const inviteUrl = `${location.origin}/signup/${churchId}?invite=${encodeURIComponent(
+    data.value.token
+  )}`
+
+  try {
+    await navigator.clipboard.writeText(inviteUrl)
+  } catch {
+    const input = document.createElement("input")
+    input.value = inviteUrl
+    document.body.appendChild(input)
+    input.select()
+    document.execCommand("copy")
+    document.body.removeChild(input)
+  }
+
   copied.value = true
   setTimeout(() => {
     copied.value = false
   }, 2000)
-  document.body.removeChild(input)
 }
 
 const sendEmailInvite = async () => {
@@ -178,8 +205,11 @@ const sendEmailInvite = async () => {
     }
   )
   if (error.value) {
+    // The API explains itself for the cases a user can act on — notably
+    // SEAT_LIMIT, where the answer is "upgrade to Teams" rather than "retry".
+    const reason = (error.value as any)?.data?.error
     useToast().add({
-      title: "Error sending email.",
+      title: reason || "Error sending email.",
       color: "red",
       icon: "i-bx-error",
     })
