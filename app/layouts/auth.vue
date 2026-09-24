@@ -52,6 +52,22 @@ const handleGoogleSignIn = async (): Promise<UserCredential> => {
 }
 
 provide("handleGoogleSignIn", handleGoogleSignIn)
+
+// Desktop: the browser hands sign-in back through a cloudofworship:// link.
+const { isTauri } = useTauri()
+const { listenForLinks } = useDesktopSignin()
+let stopListeningForLinks: (() => void) | undefined
+
+onMounted(async () => {
+  if (!isTauri) return
+  try {
+    stopListeningForLinks = await listenForLinks()
+  } catch (error) {
+    console.error("Failed to listen for desktop sign-in links:", error)
+  }
+})
+
+onBeforeUnmount(() => stopListeningForLinks?.())
 </script>
 
 <style scoped>

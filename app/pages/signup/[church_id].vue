@@ -93,6 +93,7 @@
         Create your account
       </CowButton>
       <CowButton
+        v-if="!isTauri"
         variant="secondary"
         block
         type="button"
@@ -120,6 +121,8 @@ definePageMeta({
 })
 
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
+// Web-only: the desktop browser handoff does not carry an invitation yet.
+const { isTauri } = useTauri()
 const { checkRedirectResult } = useTauriGoogleAuth()
 
 const { token } = useAuthToken()

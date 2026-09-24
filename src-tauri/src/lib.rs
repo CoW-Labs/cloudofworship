@@ -1,18 +1,9 @@
 use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
-use tauri::{Emitter, Manager, Window, WindowEvent};
+use tauri::{Manager, WindowEvent};
 
 mod ndi;
 mod desktop_update;
-
-#[tauri::command]
-async fn start_oauth_server(window: Window) -> Result<u16, String> {
-    tauri_plugin_oauth::start(move |url| {
-        // Send the OAuth redirect URL back to the frontend
-        let _ = window.emit("oauth_url", url);
-    })
-    .map_err(|err| err.to_string())
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -151,13 +142,34 @@ mod tests {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
+  let builder = tauri::Builder::default();
+
+  // Must be the first plugin. A second launch (e.g. the OS opening a
+  // cloudofworship:// sign-in link on Windows/Linux) hands its URL to the
+  // running app through the deep-link plugin, then exits.
+  #[cfg(desktop)]
+  let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+    if let Some(window) = app.get_webview_window("main") {
+      let _ = window.unminimize();
+      let _ = window.show();
+      let _ = window.set_focus();
+    }
+  }));
+
+  builder
+    .plugin(tauri_plugin_deep_link::init())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
-    .plugin(tauri_plugin_oauth::init())
     .setup(|app| {
+      // macOS registers the scheme from the bundle's Info.plist. Linux (and
+      // Windows in dev, where no installer ran) register it at runtime.
+      #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+      {
+        use tauri_plugin_deep_link::DeepLinkExt;
+        app.deep_link().register_all()?;
+      }
       app.manage(ndi::NdiBridge::new(app.handle().clone()));
       app.manage(desktop_update::DesktopUpdateState::default());
       if cfg!(debug_assertions) {
@@ -180,7 +192,6 @@ pub fn run() {
       }
     })
     .invoke_handler(tauri::generate_handler![
-      start_oauth_server,
       media_storage_stats,
       media_storage_capacity,
       desktop_update::desktop_stage_update,
