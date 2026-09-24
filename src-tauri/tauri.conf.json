@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cloud of Worship",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "identifier": "com.cloudofworship.app",
   "build": {
     "frontendDist": "../dist",
@@ -53,6 +53,7 @@
             "core:window:allow-set-decorations",
             "core:window:allow-set-always-on-top",
             "shell:allow-open",
+            "deep-link:default",
             "updater:default",
             "process:allow-restart",
             "process:allow-exit",
@@ -84,6 +85,11 @@
     "withGlobalTauri": true
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["cloudofworship"]
+      }
+    },
     "shell": {
       "open": true
     },

@@ -1,5 +1,6 @@
 <template>
-  <div class="w-full">
+  <DesktopSigninPending v-if="desktopSignin.pending.value" />
+  <div v-else class="w-full">
     <div class="flex flex-col items-center text-center mb-8 come-up-1">
       <Logo class="w-32 h-32 mb-12" />
       <h1
@@ -19,21 +20,17 @@
 
     <form class="flex flex-col gap-3.5 come-up-2" @submit.prevent="login">
       <CowButton
-        v-if="!isTauri"
         variant="secondary"
         block
         type="button"
         :loading="googleLoading"
-        @click="() => handleGoogleSignIn()"
+        @click="() => (isTauri ? desktopSignin.start('login') : handleGoogleSignIn())"
       >
         <GoogleIcon class="w-5 h-5" />
         Continue with Google
       </CowButton>
 
-      <div
-        v-if="!isTauri"
-        class="flex items-center gap-4 my-1 text-gray-500 text-sm"
-      >
+      <div class="flex items-center gap-4 my-1 text-gray-500 text-sm">
         <span class="h-px flex-1 bg-gray-200 dark:bg-gray-700/70" />
         Or
         <span class="h-px flex-1 bg-gray-200 dark:bg-gray-700/70" />
@@ -132,6 +129,8 @@ const googleSignIn = inject("handleGoogleSignIn") as () => Promise<
 >
 const { isTauri } = useTauri()
 const { checkRedirectResult } = useTauriGoogleAuth()
+// Desktop signs in with Google through the browser.
+const desktopSignin = useDesktopSignin()
 // console.log(runtimeConfig.public.BASE_URL, isDevEnvironment)
 
 const toast = useToast()

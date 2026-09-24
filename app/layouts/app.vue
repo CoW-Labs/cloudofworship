@@ -1094,6 +1094,8 @@ async function trackTauriLiveWindow(liveWindow: any) {
 
   tauriLiveWindowCloseListenerBound = true
   try {
+    // A JS listener on close-requested makes Tauri hold the close and wait for
+    // JS to finish it, so the window has to be destroyed here or it stays open.
     await liveWindow.once("tauri://close-requested", async () => {
       console.log("Live window closed")
       try {
@@ -1103,6 +1105,9 @@ async function trackTauriLiveWindow(liveWindow: any) {
       } finally {
         windowRefs.value = []
         tauriLiveWindowCloseListenerBound = false
+        await liveWindow.destroy().catch((error: unknown) => {
+          console.warn("Failed to destroy the live window:", error)
+        })
       }
     })
   } catch (error) {
