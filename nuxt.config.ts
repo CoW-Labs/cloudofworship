@@ -340,8 +340,8 @@ export default defineNuxtConfig({
       BASE_URL: process.env.BASE_URL || "https://api.cloudofworship.com/api/v1",
       NODE_ENV: process.env.NODE_ENV || "production",
       DEV_TOKEN: process.env.DEV_ACCESS_TOKEN || "",
-      GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID || "",
-      GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET || "",
+      // Where the desktop app sends the operator to sign in (useDesktopSignin).
+      APP_URL: process.env.APP_URL || "https://app.cloudofworship.com",
       PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY,
       // Baked into the client bundle so a tab can recognise its own build in
       // `/version.json`.

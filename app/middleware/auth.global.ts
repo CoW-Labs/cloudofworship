@@ -13,7 +13,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
     token = tokenCookie.value || authStore.token
   }
 
-  const publicPaths = ["/live", "/stage", "/livestream", "/offline", "/update", "/endofyear", "/logout"]
+  const publicPaths = ["/live", "/stage", "/livestream", "/offline", "/update", "/endofyear", "/logout", "/desktop-signin"]
   const authPaths = ["/login", "/signup", "/forgot-password", "/reset-password"]
   const isPublicPath = publicPaths.some(
     (path) => to.path === path || to.path.startsWith(`${path}/`)
@@ -25,6 +25,12 @@ export default defineNuxtRouteMiddleware((to, from) => {
 
   if (!hasSession && !isPublicPath && !isAuthPath && to.path !== "/verify") {
     return navigateTo('/login')
+  }
+
+  // Signing in for the desktop app: every sign-in and signup path ends on "/",
+  // so that is where the browser is sent back to finish the handoff.
+  if (hasSession && to.path === "/" && readDesktopHandoff()) {
+    return navigateTo("/desktop-signin")
   }
 
   if (hasSession && isAuthPath) {
