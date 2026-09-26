@@ -21,6 +21,13 @@ export default defineNuxtPlugin(nuxtApp => {
         if (shouldSuppressExceptionEvent(event)) {
           return null
         }
+        // Drop generic DOM click/input/submit/copy events so only the app's
+        // own events show up. Autocapture itself stays on because $rageclick
+        // is emitted through it; dead clicks, heatmaps and page views are
+        // separate events and still flow.
+        if (event?.event === "$autocapture" || event?.event === "$copy_autocapture") {
+          return null
+        }
         return event
       },
     });
