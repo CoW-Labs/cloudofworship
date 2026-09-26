@@ -158,7 +158,7 @@
                   @click="
                     canUseLivestreamLink
                       ? copyLivestreamURL()
-                      : useGlobalEmit('show-upgrade-modal')
+                      : useGlobalEmit('show-upgrade-modal', { feature: 'livestream-url' })
                   "
                 >
                   <div class="pl-2">
