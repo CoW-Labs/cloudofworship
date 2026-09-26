@@ -25,11 +25,19 @@
         </button>
 
         <!-- Heading -->
-        <h2
-          class="text-center text-2xl sm:text-[1.75rem] font-bold text-gray-900 dark:text-white mb-8 lg:mb-10"
-        >
-          How do you want to continue?
-        </h2>
+        <div class="text-center mb-8 lg:mb-10">
+          <h2
+            class="text-2xl sm:text-[1.75rem] font-bold text-gray-900 dark:text-white"
+          >
+            {{ featureCopy?.title ?? "How do you want to continue?" }}
+          </h2>
+          <p
+            v-if="featureCopy"
+            class="mt-2 text-[15px] text-gray-500 dark:text-gray-400"
+          >
+            {{ featureCopy.description }}
+          </p>
+        </div>
 
         <div
           class="grid grid-cols-1 md:grid-cols-[4fr_3fr] gap-6 lg:gap-8 max-w-[850px] mx-auto"
@@ -258,6 +266,75 @@ const billingTabIndex = computed({
   },
 })
 
+// Experiment: which billing interval the modal opens on when nothing picked
+// one for us (signup deep links carry their own plan). Variant "monthly" opens
+// on Monthly; "control", a missing flag or an offline client stay on Annually.
+const { getFlagValue } = useFeatureFlags()
+const billingDefaultVariant = ref<string>("control")
+const applyBillingDefaultExperiment = () => {
+  const value = getFlagValue("upgrade-modal-billing-default")
+  billingDefaultVariant.value = typeof value === "string" ? value : "control"
+  selectedPlan.value =
+    billingDefaultVariant.value === "monthly" ? "monthly" : "yearly"
+}
+
+// Headline for the locked feature that opened the modal. Gates pass their
+// action name as `feature`; anything unlisted (navbar, banners, storage, the
+// schedule cap) keeps the generic heading.
+const FEATURE_UPGRADE_COPY: Record<string, { title: string; description: string }> = {
+  "new-countdown": {
+    title: "Countdowns are part of Teams",
+    description: "Start every service on time, on screen and on stage.",
+  },
+  "new-alert": {
+    title: "Alerts are part of Teams",
+    description: "Scroll announcements along the bottom of the live screen.",
+  },
+  "show-slide-overlay": {
+    title: "Overlays are part of Teams",
+    description: "Layer lower thirds and logos over live slides.",
+  },
+  "new-song-search": {
+    title: "Search every song with Teams",
+    description: "Find any song's lyrics in seconds, no typing.",
+  },
+  "new-transcribe": {
+    title: "Live transcription is part of Teams",
+    description: "Turn the sermon into text as it's preached.",
+  },
+  "open-invite-modal": {
+    title: "Bring your team in with Teams",
+    description: "Let your media team edit and project slides together.",
+  },
+  "livestream-url": {
+    title: "Share a livestream link with Teams",
+    description: "Share your slides in real time to anywhere in the world.",
+  },
+  "new-youtube-video": {
+    title: "Play YouTube and Vimeo with Teams",
+    description: "Show online videos without downloading them.",
+  },
+  "new-templates": {
+    title: "Slide templates are part of Teams",
+    description: "Keep every slide on brand in one click.",
+  },
+  "new-time-slide": {
+    title: "Clock slides are part of Teams",
+    description: "Show the current time on screen.",
+  },
+}
+// Sibling actions that share a feature's copy.
+FEATURE_UPGRADE_COPY["new-stage-countdown"] = FEATURE_UPGRADE_COPY["new-countdown"]!
+FEATURE_UPGRADE_COPY["clear-stage-countdown"] = FEATURE_UPGRADE_COPY["new-countdown"]!
+FEATURE_UPGRADE_COPY["remove-alert"] = FEATURE_UPGRADE_COPY["new-alert"]!
+FEATURE_UPGRADE_COPY["remove-slide-overlay"] = FEATURE_UPGRADE_COPY["show-slide-overlay"]!
+FEATURE_UPGRADE_COPY["new-vimeo-video"] = FEATURE_UPGRADE_COPY["new-youtube-video"]!
+
+const lockedFeature = ref<string | undefined>()
+const featureCopy = computed(() =>
+  lockedFeature.value ? FEATURE_UPGRADE_COPY[lockedFeature.value] : undefined
+)
+
 // Right-side animation refs
 const heartEl = ref<HTMLElement | null>(null)
 const titleEl = ref<HTMLElement | null>(null)
@@ -377,8 +454,12 @@ onMounted(async () => {
 
   emitter.on(
     "show-upgrade-modal",
-    (data?: { planCode?: string; planId?: string }) => {
+    (data?: { planCode?: string; planId?: string; feature?: string }) => {
       visible.value = true
+      lockedFeature.value = data?.feature
+      // Signup deep links pick their own interval, so they sit outside the
+      // billing-default experiment.
+      billingDefaultVariant.value = "excluded"
 
       if (data?.planId) {
         const plan = plans.value.find((p) => p.id === data.planId)
@@ -412,8 +493,13 @@ onMounted(async () => {
           })
         }
       } else {
+        applyBillingDefaultExperiment()
+        selectedTier.value = "team"
         usePosthogCapture("UPGRADE_MODAL_OPENED", {
           source: "feature_gate",
+          feature: data?.feature,
+          interval: selectedPlan.value,
+          billingDefaultVariant: billingDefaultVariant.value,
           currency: selectedCurrency.value,
           autoDetectedCurrency: detectedCurrency.value,
         })
@@ -444,6 +530,8 @@ const handleContinue = () => {
 const handleDismiss = () => {
   usePosthogCapture("UPGRADE_MODAL_DISMISSED", {
     tier: selectedTier.value,
+    interval: selectedPlan.value,
+    billingDefaultVariant: billingDefaultVariant.value,
     currency: selectedCurrency.value,
   })
   visible.value = false
@@ -476,6 +564,8 @@ const handleUpgrade = async () => {
     autoDetectedCurrency: detectedCurrency.value,
     amount: amount,
     planId: planDetails?.id,
+    billingDefaultVariant: billingDefaultVariant.value,
+    feature: lockedFeature.value,
   })
 
   await initiatePayment({

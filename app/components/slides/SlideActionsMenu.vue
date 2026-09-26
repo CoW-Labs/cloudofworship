@@ -300,7 +300,7 @@ const handleDownloadMediaClick = async () => {
 
 const handleSaveAsTemplateClick = () => {
   if (!hasAccessToFeature("new-templates")) {
-    useGlobalEmit("show-upgrade-modal")
+    useGlobalEmit("show-upgrade-modal", { feature: "new-templates" })
     usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
       feature: "Slide Templates",
       location: "slide_card_template",

@@ -421,7 +421,7 @@ const handleActionClick = () => {
   // Check if user has access to this feature
   if (!hasAccessToFeature(actionName)) {
     // Show upgrade modal instead of executing the action
-    emitter.emit("show-upgrade-modal")
+    emitter.emit("show-upgrade-modal", { feature: actionName })
     usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
       feature: actionName,
     })

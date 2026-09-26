@@ -16,7 +16,7 @@ import { ref, onMounted } from "vue"
  * Flags below are rollout switches, where failing open is the correct and
  * intended behaviour.
  */
-export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "transcripts-free" | "ppt-conversion" | "allow-online-scripture-search-for-only-teams" | "force-sw-unregister" | "hide-free-trial-promotion"
+export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "transcripts-free" | "ppt-conversion" | "allow-online-scripture-search-for-only-teams" | "force-sw-unregister" | "hide-free-trial-promotion" | "upgrade-modal-billing-default"
 
 /**
  * Composable for managing PostHog feature flags
