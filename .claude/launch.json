@@ -20,6 +20,15 @@
       ],
       "port": 3100,
       "autoPort": true
+    },
+    {
+      "name": "cow-api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && cd ~/nodeProjects/minimalist-church-presentation-software-api && exec node src/server.js"
+      ],
+      "port": 4500
     }
   ]
 }
