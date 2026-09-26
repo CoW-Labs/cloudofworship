@@ -594,7 +594,7 @@ const handleInviteClick = () => {
     return
   }
 
-  useGlobalEmit("show-upgrade-modal")
+  useGlobalEmit("show-upgrade-modal", { feature: "open-invite-modal" })
   usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
     feature: "Invite to Workspace",
     location: "navbar",

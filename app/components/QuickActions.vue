@@ -605,7 +605,7 @@ const quickSearchPromo = computed(() => {
 
 const handleChipClick = (action: string) => {
   if (!hasAccessToFeature(action)) {
-    emitter.emit("show-upgrade-modal")
+    emitter.emit("show-upgrade-modal", { feature: action })
     usePosthogCapture("TEAMS_FEATURE_BLOCKED", { feature: action })
     return
   }
@@ -627,7 +627,7 @@ const canSearchSongLyrics = () =>
 
 const ensureSongSearchAccess = () => {
   if (canSearchSongLyrics()) return true
-  emitter.emit("show-upgrade-modal")
+  emitter.emit("show-upgrade-modal", { feature: appWideActions.newSongSearch })
   usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
     feature: appWideActions.newSongSearch,
   })
@@ -1041,7 +1041,7 @@ const handleInputKeydown = (e: KeyboardEvent) => {
       if (action) {
         const actionName = action?.action || ""
         if (!hasAccessToFeature(actionName)) {
-          emitter.emit("show-upgrade-modal")
+          emitter.emit("show-upgrade-modal", { feature: actionName })
           usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
             feature: actionName,
           })

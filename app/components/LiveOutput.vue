@@ -232,7 +232,9 @@
                   close()
                   canUseLivestreamLink
                     ? copyLivestreamURL()
-                    : useGlobalEmit(appWideActions.showUpgradeModal)
+                    : useGlobalEmit(appWideActions.showUpgradeModal, {
+                        feature: 'livestream-url',
+                      })
                 }
               "
             >
@@ -817,7 +819,9 @@ const emitOverlaySocketAction = (action: string, slide?: Slide) => {
 
 const toggleSlideOverlay = (slide: Slide) => {
   if (!hasAccessToFeature(appWideActions.showSlideOverlay)) {
-    useGlobalEmit(appWideActions.showUpgradeModal)
+    useGlobalEmit(appWideActions.showUpgradeModal, {
+      feature: appWideActions.showSlideOverlay,
+    })
     return
   }
 

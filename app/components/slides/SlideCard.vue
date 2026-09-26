@@ -270,7 +270,9 @@ const isActiveOverlay = computed(
 )
 const handleOverlayAction = () => {
   if (!hasAccessToFeature(appWideActions.showSlideOverlay)) {
-    useGlobalEmit(appWideActions.showUpgradeModal)
+    useGlobalEmit(appWideActions.showUpgradeModal, {
+      feature: appWideActions.showSlideOverlay,
+    })
     return
   }
 
