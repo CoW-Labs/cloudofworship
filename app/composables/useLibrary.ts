@@ -190,21 +190,21 @@ export default function useLibrary() {
       const db = useIndexedDB()
 
       const librarySlides = slides.reduce<LibraryItem[]>((items, slide) => {
-          const cacheableSlide = toCacheableSlide(slide)
-          if (!cacheableSlide) return items
+        const cacheableSlide = toCacheableSlide(slide)
+        if (!cacheableSlide) return items
 
-          const slideId = cacheableSlide._id || cacheableSlide.id
-          if (!slideId) return items
+        const slideId = cacheableSlide._id || cacheableSlide.id
+        if (!slideId) return items
 
-          items.push({
-            id: slideId,
-            type: libraryTypes.slide,
-            content: cacheableSlide,
-            createdAt: cacheableSlide.createdAt || new Date().toISOString(),
-            updatedAt: cacheableSlide.updatedAt || new Date().toISOString(),
-          })
-          return items
-        }, [])
+        items.push({
+          id: slideId,
+          type: libraryTypes.slide,
+          content: cacheableSlide,
+          createdAt: cacheableSlide.createdAt || new Date().toISOString(),
+          updatedAt: cacheableSlide.updatedAt || new Date().toISOString(),
+        })
+        return items
+      }, [])
 
       // Replace all slide entries in a single transaction so the liveQuery only
       // emits once (after commit) and never observes the empty mid-state between
@@ -343,22 +343,22 @@ export default function useLibrary() {
       const db = useIndexedDB()
 
       const librarySongs = songs.reduce<LibraryItem[]>((items, song) => {
-          const cacheableSong = toCacheableSong(song)
-          if (!cacheableSong) return items
+        const cacheableSong = toCacheableSong(song)
+        if (!cacheableSong) return items
 
-          // Key on the client `id` so delete/lookup (which use song.id) keep working.
-          const songId = cacheableSong.id || cacheableSong._id
-          if (!songId) return items
+        // Key on the client `id` so delete/lookup (which use song.id) keep working.
+        const songId = cacheableSong.id || cacheableSong._id
+        if (!songId) return items
 
-          items.push({
-            id: songId,
-            type: libraryTypes.song,
-            content: cacheableSong,
-            createdAt: cacheableSong.createdAt || new Date().toISOString(),
-            updatedAt: cacheableSong.updatedAt || new Date().toISOString(),
-          })
-          return items
-        }, [])
+        items.push({
+          id: songId,
+          type: libraryTypes.song,
+          content: cacheableSong,
+          createdAt: cacheableSong.createdAt || new Date().toISOString(),
+          updatedAt: cacheableSong.updatedAt || new Date().toISOString(),
+        })
+        return items
+      }, [])
 
       // Replace all song entries in a single transaction so the liveQuery only
       // emits once (after commit) and never observes the empty mid-state between
@@ -396,7 +396,7 @@ export default function useLibrary() {
         .put(libraryItem)
         .catch((err) => console.error('Failed to add song to library:', err))
 
-      toast.add({ icon: 'i-bx-save', title: 'Song saved to Library' })
+      // toast.add({ icon: 'i-bx-save', title: 'Song saved to Library' })
       return libraryItem
     } catch (error) {
       console.error('Error saving song to library:', error)
