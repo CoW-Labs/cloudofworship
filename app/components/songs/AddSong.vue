@@ -99,17 +99,17 @@
         </div>
 
         <!-- Shown only after a near-dup blocked the submit (warn-don't-block) -->
-        <CowButton
-          v-if="canForce"
-          variant="secondary"
-          block
-          size="sm"
-          class="mt-2"
-          :loading="loading"
-          @click="addAnyway"
-        >
-          None of these — add anyway
-        </CowButton>
+        <div v-if="canForce" ref="addAnywayEl" class="mt-2">
+          <CowButton
+            variant="secondary"
+            block
+            size="sm"
+            :loading="loading"
+            @click="addAnyway"
+          >
+            None of these — add anyway
+          </CowButton>
+        </div>
       </div>
 
       <Hint>
@@ -218,6 +218,15 @@ const useExistingSong = (existing: Song) => {
   emit("go-home")
 }
 
+// The submit button sits below the lyrics, so the offer to add anyway appears
+// off-screen. Bring it into view so the user sees their next step.
+const addAnywayEl = ref<HTMLElement | null>(null)
+watch(canForce, async (value) => {
+  if (!value) return
+  await nextTick()
+  addAnywayEl.value?.scrollIntoView({ behavior: "smooth", block: "center" })
+})
+
 // "Add anyway" — re-submit past the near-duplicate warning.
 const addAnyway = () => addSong(true)
 
@@ -266,7 +275,7 @@ const addSong = async (force = false) => {
     const outcome = await uploadSongToAPI(song, force)
     if (outcome.ok) {
       await saveSong(song)
-      toast.add({ icon: "i-bx-check", title: "Song added" })
+      // toast.add({ icon: "i-bx-check", title: "Song added" })
       emit("go-home")
     } else if (outcome.duplicates?.length) {
       // Keep the form open, show the matches, and offer "add anyway" for a
