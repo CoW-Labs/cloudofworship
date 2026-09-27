@@ -1548,6 +1548,53 @@ emitter.on("refresh-slides", () => {
   )
 })
 
+// Teammates keep editing the schedule while the operator is away, and the
+// realtime socket may have dropped events in the meantime (browsers throttle
+// and freeze hidden tabs). Coming back reconciles with the server. "Away" is
+// either the page being hidden (tab switch, minimise) or the window losing
+// focus — the desktop app has no tabs, and its window often stays visible
+// beside other apps, so visibility alone would rarely fire there. Quick
+// alt-tabs are skipped so the grid does not churn.
+const RETURN_REFRESH_AFTER_MS = 15_000
+let awaySince: number | null =
+  document.visibilityState === "hidden" || !document.hasFocus()
+    ? Date.now()
+    : null
+
+const markAway = () => {
+  awaySince ??= Date.now()
+}
+const markBack = () => {
+  if (awaySince === null) return
+  const awayFor = Date.now() - awaySince
+  awaySince = null
+  if (awayFor < RETURN_REFRESH_AFTER_MS) return
+  const scheduleId = appStore.currentState.activeSchedule?._id
+  if (!scheduleId) return
+  retrieveSlidesOnline(scheduleId).catch((error) =>
+    console.warn("Unable to refresh schedule slides on return:", error)
+  )
+}
+const onVisibilityChange = () => {
+  if (document.visibilityState === "hidden") markAway()
+  else if (document.hasFocus()) markBack()
+}
+const onWindowBlur = () => {
+  // Focus moving into an embedded iframe (e.g. a video in the live preview)
+  // blurs the window without the operator leaving the app.
+  setTimeout(() => {
+    if (document.activeElement?.tagName !== "IFRAME") markAway()
+  })
+}
+document.addEventListener("visibilitychange", onVisibilityChange)
+window.addEventListener("blur", onWindowBlur)
+window.addEventListener("focus", markBack)
+onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", onVisibilityChange)
+  window.removeEventListener("blur", onWindowBlur)
+  window.removeEventListener("focus", markBack)
+})
+
 emitter.on("upload-offline-slides", () => {
   uploadOfflineSlides()
 })
