@@ -89,13 +89,16 @@
         >
           <AppSection heading="Preview" :sub-heading="action?.name || ''">
             <div
+              ref="previewScrollEl"
               class="rounded-xl bg-gray-100 dark:bg-[#2b3242] max-h-[190px] overflow-y-auto"
             >
-              <p class="px-3 py-3 whitespace-pre-line">
-                {{
-                  previewContent ||
-                  (previewError ? "Preview unavailable" : "Loading...")
-                }}
+              <p
+                v-if="previewContent"
+                class="px-3 py-3 whitespace-pre-line"
+                v-html="previewHtml"
+              />
+              <p v-else class="px-3 py-3 whitespace-pre-line">
+                {{ previewError ? "Preview unavailable" : "Loading..." }}
               </p>
             </div>
           </AppSection>
@@ -137,6 +140,9 @@ const props = defineProps<{
   showSubtext?: boolean
   iconOverride?: Component
   active?: boolean
+  // Search query to highlight in the hover preview; the preview also scrolls
+  // to the first match so the operator can see where and how it matched.
+  highlightQuery?: string
 }>()
 
 // Maps an action name to a custom line-icon component. Actions without an entry
@@ -179,6 +185,7 @@ const previewContent = ref("")
 const previewError = ref(false)
 const cardRow = ref<HTMLElement | null>(null)
 const previewEl = ref<HTMLElement | null>(null)
+const previewScrollEl = ref<HTMLElement | null>(null)
 const previewPosition = ref({ top: 0, left: 0 })
 const isCardHovered = ref(false)
 const isPreviewHovered = ref(false)
@@ -347,8 +354,50 @@ const fetchPreviewContent = async () => {
   }
 }
 
-watch(previewOpen, (open) => {
-  if (open) fetchPreviewContent()
+// Highlight the query throughout, and tag the line that matches it best so the
+// preview can scroll there rather than to the first stray common word.
+const previewHtml = computed(() => {
+  const query = props.highlightQuery || ""
+  const lines = previewContent.value.split("\n")
+  const best = findBestMatchLine(lines, query)
+  return lines
+    .map((line, i) => {
+      const html = highlightText(line, query)
+      return i === best ? `<span data-best-match>${html}</span>` : html
+    })
+    .join("\n")
+})
+
+// Centre the best-matching line in the preview's scroll area.
+const scrollPreviewToMatch = async () => {
+  await nextTick()
+  const container = previewScrollEl.value
+  if (!container) return
+  const bestLine = container.querySelector(
+    "[data-best-match]"
+  ) as HTMLElement | null
+  // A long single-line excerpt (a Bible verse) is one "line", so aim at the
+  // first highlight inside it rather than the start of the line.
+  const target = (bestLine?.querySelector("mark") ||
+    bestLine) as HTMLElement | null
+  if (!target) {
+    container.scrollTop = 0
+    return
+  }
+  const targetRect = target.getBoundingClientRect()
+  const offset = targetRect.top - container.getBoundingClientRect().top
+  container.scrollTop +=
+    offset - container.clientHeight / 2 + targetRect.height / 2
+}
+
+watch(previewOpen, async (open) => {
+  if (!open) return
+  await fetchPreviewContent()
+  scrollPreviewToMatch()
+})
+
+watch([previewContent, () => props.highlightQuery], () => {
+  if (previewOpen.value) scrollPreviewToMatch()
 })
 
 // The underlying action changed under this (reused) instance — drop the

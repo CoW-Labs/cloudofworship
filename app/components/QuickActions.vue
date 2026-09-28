@@ -120,6 +120,7 @@
           :key="getActionKey(action)"
           :action="action"
           compact
+          :highlight-query="searchInput"
           :data-action-index="index"
           :active="hasInteracted && index === focusedActionIndex"
           :class="{
@@ -156,6 +157,7 @@
               action?.bibleChapterAndVerse || bibleChapterAndVerse,
           }"
           compact
+          :highlight-query="searchInput"
           :data-action-index="index"
           :active="hasInteracted && index === focusedActionIndex"
           :class="{
