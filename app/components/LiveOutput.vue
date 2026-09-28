@@ -142,7 +142,7 @@
             @click="goIntermission"
           >
             <template #leading>
-              <IconWrapper name="i-bx-hide" size="3.5" />
+              <IconWrapper name="i-ph-eye-slash" size="3.5" />
             </template>
             Blank
           </CowButton>
@@ -183,8 +183,8 @@
                 <IconWrapper
                   :name="
                     host.hostId === targetHost?.hostId
-                      ? 'i-bx-check-circle'
-                      : 'i-lucide-monitor'
+                      ? 'i-ph-check-circle'
+                      : 'i-ph-monitor'
                   "
                   size="4"
                 />
@@ -200,7 +200,7 @@
               disabled
             >
               <template #leading>
-                <IconWrapper name="i-lucide-monitor" size="4" />
+                <IconWrapper name="i-ph-monitor" size="4" />
               </template>
               No output device online
             </UButton>
@@ -218,7 +218,7 @@
               "
             >
               <template #leading>
-                <IconWrapper name="i-bx-unlink" size="4" />
+                <IconWrapper name="i-ph-link-break" size="4" />
               </template>
               Stop controlling
             </UButton>
@@ -241,7 +241,7 @@
               <template #leading>
                 <IconWrapper
                   :name="
-                    isClipboardCopying ? 'i-bx-check-circle' : 'i-bx-clipboard'
+                    isClipboardCopying ? 'i-ph-check-circle' : 'i-ph-broadcast'
                   "
                   size="4"
                 />
@@ -249,7 +249,7 @@
               Copy livestream link
               <IconWrapper
                 v-if="!canUseLivestreamLink"
-                name="i-bxs-award"
+                name="i-ph-crown-simple-fill"
                 class="inline-flex w-4 h-4 text-xs text-[#FF8980]"
               />
             </UButton>
@@ -272,7 +272,7 @@
               <template #leading>
                 <IconWrapper
                   :name="
-                    isStageLinkCopying ? 'i-bx-check-circle' : 'i-bx-clipboard'
+                    isStageLinkCopying ? 'i-ph-check-circle' : 'i-ph-link'
                   "
                   size="4"
                 />
@@ -280,7 +280,7 @@
               Copy stage display link
               <IconWrapper
                 v-if="!canUseStageStreamLink"
-                name="i-bxs-award"
+                name="i-ph-crown-simple-fill"
                 class="inline-flex w-4 h-4 text-xs text-[#FF8980]"
               />
             </UButton>
@@ -298,7 +298,7 @@
               "
             >
               <template #leading>
-                <IconWrapper name="i-bx-hide" size="4" />
+                <IconWrapper name="i-ph-eye-slash" size="4" />
               </template>
               Blank the live output
             </UButton>
