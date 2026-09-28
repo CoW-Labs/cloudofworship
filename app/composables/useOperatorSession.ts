@@ -67,6 +67,9 @@ export const useOperatorSession = () => {
         handleWebSocketMessage(data)
       },
       onConnected: () => {
+        // Delivery state belongs to one admitted socket connection. The server
+        // may have restarted, even when it reports the same viewer count.
+        stageStreamFeed.reset()
         // Re-advertise this device's live output (if it has one) as soon as
         // there is a socket to say it on, rather than leaving a phone to wait
         // out a heartbeat before the screen it wants shows up in its list.
@@ -86,7 +89,7 @@ export const useOperatorSession = () => {
         }
       },
       onDisconnected: () => {
-        // Optionally show disconnect notification
+        stageStreamFeed.reset()
       },
       onOnlineUsersChanged: (users) => {
         updateOnlineUsers(users)

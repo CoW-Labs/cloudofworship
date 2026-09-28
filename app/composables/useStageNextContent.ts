@@ -310,6 +310,7 @@ export default function useStageNextContent(
 
     if (!slide) {
       nextContent.value = null
+      pending.value = false
       return
     }
 

@@ -14,17 +14,21 @@ const useScheduleViewerLink = (options: {
   const appStore = useAppStore()
   const { currentState } = storeToRefs(appStore)
   const toast = useToast()
+  const runtimeConfig = useRuntimeConfig()
 
   // Drives the tick-vs-clipboard icon on the trigger for a few seconds.
   const isClipboardCopying = ref(false)
 
   const url = computed(() => {
     if (typeof window === "undefined") return ""
-    // NOTE: this deliberately uses the current origin. The original had an
-    // unused `origin` local that fell back to https://app.cloudofworship.com
-    // off localhost, which would make a preview deploy hand out production
-    // links — behaviour preserved here rather than changed on the quiet.
-    return `${window.location.origin}/${options.route}/${currentState.value.activeSchedule?._id}`
+    const { origin } = window.location
+    // Packaged desktop origins only exist on this machine. Browser previews
+    // and localhost development retain their own web origin.
+    const isWebOrigin =
+      /^https?:\/\//.test(origin) &&
+      !/^https?:\/\/tauri\.localhost(?::\d+)?$/.test(origin)
+    const viewerOrigin = isWebOrigin ? origin : runtimeConfig.public.APP_URL
+    return `${viewerOrigin.replace(/\/+$/, "")}/${options.route}/${currentState.value.activeSchedule?._id}`
   })
 
   const copy = async () => {

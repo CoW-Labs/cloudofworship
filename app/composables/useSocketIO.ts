@@ -2,6 +2,7 @@ import { io, Socket } from "socket.io-client"
 import { useAuthStore } from "~/store/auth"
 import { useOnline } from "@vueuse/core"
 import { watch, onUnmounted, ref } from "vue"
+import { getLiveSourceId } from "~/utils/socketSource"
 
 interface SocketIOOptions {
   scheduleId: string
@@ -62,6 +63,11 @@ export interface SlideEditLock {
 // always forwards to whatever socket is live right now, so `nuxtApp.$socketio`
 // never points at a dead socket.
 let activeSocket: Socket | null = null
+
+// One source per operator tab, stable through reconnects and page reloads.
+// The server also binds ownership to one active socket, since duplicating a
+// browser tab can copy its sessionStorage along with this id.
+const liveSourceId = getLiveSourceId()
 
 // Methods callers reach for on `$socketio`. Without a live socket the proxy has
 // nothing to forward to, and returning `undefined` turned every one of these
@@ -294,6 +300,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
         // live-output host/request events against the selected schedule.
         auth: {
           token: getToken() || undefined,
+          ...(!client ? { liveSourceId } : {}),
         },
         // Start with polling first (more reliable behind proxies/load balancers)
         // then upgrade to websocket
