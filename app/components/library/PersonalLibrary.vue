@@ -183,6 +183,7 @@
                 :icon-override="SongsIcon"
                 compact
                 show-subtext
+                :highlight-query="searchInput"
                 :active="hasInteracted && index === focusedActionIndex"
                 :class="{
                   'bg-white/70 dark:bg-[#2b3242]/70':
