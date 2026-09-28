@@ -352,7 +352,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.openStageDisplay,
     meta: "stage display confidence monitor musician speaker lyrics next verse timer foldback",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-timer",
@@ -379,7 +379,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.startStageTimer,
     meta: "stage timer start resume run stopwatch count up service sermon confidence monitor",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-pause-circle",
@@ -388,7 +388,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.stopStageTimer,
     meta: "stage timer stop pause hold stopwatch service sermon confidence monitor",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-arrow-counter-clockwise",
@@ -397,7 +397,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.restartStageTimer,
     meta: "stage timer restart reset zero again stopwatch service sermon confidence monitor",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-presentation-chart-slash",

@@ -16,11 +16,13 @@ interface SocketIOOptions {
   onMaxRetriesReached?: () => void
   onTierRestricted?: (data: TierRestriction) => void
   /**
-   * Names this connection to the server. Only the public livestream viewer sets
-   * it ("livestream"), and it is what scopes the Teams gate to that page — the
-   * operator surfaces stay ungated on every plan. See the API's socketio/index.
+   * Names this connection to the server. Only the public viewers set it — the
+   * livestream ("livestream") and the stage display ("stagestream") — and it is
+   * what scopes the Teams gate to those pages and puts them in rooms of their
+   * own. The operator surfaces stay ungated on every plan. See the API's
+   * socketio/index.
    */
-  client?: "livestream"
+  client?: "livestream" | "stagestream"
   onOnlineUsersChanged?: (users: OnlineUser[]) => void
   onUserJoined?: (user: OnlineUser) => void
   onUserLeft?: (userId: string, userName: string) => void
@@ -464,6 +466,17 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('live-slide', { action: 'live-slide', data })
       })
 
+      // Stage display feed. Viewers receive the owning console's worked-out
+      // stage view; consoles are told how many viewers are watching, so they
+      // only do that work while somebody is. See useStageStreamFeed.
+      socket.on('stage-state', (data) => {
+        onMessage?.('stage-state', { action: 'stage-state', data })
+      })
+
+      socket.on('stage-viewers', (data) => {
+        onMessage?.('stage-viewers', { action: 'stage-viewers', data })
+      })
+
       // Live output control — a phone driving the machine with the projector.
       // Hosts advertise themselves with `live-control-host`; controllers send
       // `live-control-request` addressed to exactly one host id. Neither is a
@@ -608,6 +621,13 @@ export const useSocketIO = (options: SocketIOOptions) => {
   }
 
   /**
+   * Send the worked-out stage display to `/stagestream` viewers
+   */
+  const sendStageState = (state: unknown) => {
+    return emit('stage-state', state)
+  }
+
+  /**
    * Send batch slides created event
    */
   const sendBatchSlidesCreated = (slides: any[]) => {
@@ -695,6 +715,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
     sendSlideUpdated,
     sendSlideDeleted,
     sendLiveSlide,
+    sendStageState,
     sendBatchSlidesCreated,
     sendBatchSlidesUpdated,
     sendBatchSlidesDeleted,

@@ -176,6 +176,37 @@
                     </div>
                   </div>
                 </UButton>
+                <div class="line border-b dark:border-[#202838]"></div>
+                <UButton
+                  class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-[#222938]"
+                  :class="!canUseStageStreamLink ? 'cursor-pointer' : ''"
+                  color="black"
+                  variant="ghost"
+                  :icon="
+                    isStageLinkCopying ? 'i-bx-check-circle' : 'i-bx-clipboard'
+                  "
+                  size="sm"
+                  @click="
+                    canUseStageStreamLink
+                      ? copyStageStreamURL()
+                      : useGlobalEmit('show-upgrade-modal', { feature: 'stagestream-url' })
+                  "
+                >
+                  <div class="pl-2">
+                    <div class="text-sm flex items-center gap-2">
+                      Copy stage display link
+
+                      <IconWrapper
+                        v-if="!canUseStageStreamLink"
+                        name="i-bxs-award"
+                        class="inline-flex w-6 h-6 text-xs text-[#FF8980]"
+                      />
+                    </div>
+                    <div class="text-xs opacity-80">
+                      Open the stage display on any phone, tablet or TV
+                    </div>
+                  </div>
+                </UButton>
               </div>
             </template>
           </UPopover>
@@ -229,6 +260,8 @@ const secondaryActionPopoverOpen = ref(false)
 // disagree about the URL or the Teams gate.
 const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
   useLivestreamLink()
+const { canUseStageStreamLink, isStageLinkCopying, copyStageStreamURL } =
+  useStageStreamLink()
 type CowButtonVariant = "primary" | "secondary" | "dark" | "danger"
 
 const getCowButtonVariant = (variant?: string): CowButtonVariant => {

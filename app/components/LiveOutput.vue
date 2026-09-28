@@ -258,6 +258,37 @@
               variant="ghost"
               color="gray"
               block
+              @click.stop.prevent="
+                () => {
+                  close()
+                  canUseStageStreamLink
+                    ? copyStageStreamURL()
+                    : useGlobalEmit(appWideActions.showUpgradeModal, {
+                        feature: 'stagestream-url',
+                      })
+                }
+              "
+            >
+              <template #leading>
+                <IconWrapper
+                  :name="
+                    isStageLinkCopying ? 'i-bx-check-circle' : 'i-bx-clipboard'
+                  "
+                  size="4"
+                />
+              </template>
+              Copy stage display link
+              <IconWrapper
+                v-if="!canUseStageStreamLink"
+                name="i-bxs-award"
+                class="inline-flex w-4 h-4 text-xs text-[#FF8980]"
+              />
+            </UButton>
+
+            <UButton
+              variant="ghost"
+              color="gray"
+              block
               :disabled="!liveSlide"
               @click.stop.prevent="
                 () => {
@@ -537,6 +568,8 @@ const {
 
 const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
   useLivestreamLink()
+const { canUseStageStreamLink, isStageLinkCopying, copyStageStreamURL } =
+  useStageStreamLink()
 
 const online = useOnline()
 const { hasAccessToFeature } = useSubscription()

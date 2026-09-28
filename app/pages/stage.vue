@@ -38,66 +38,27 @@
 
     <DisplayWindowBanner
       v-if="!isFullScreen && !isTauri"
+      floating
       label="Stage Display"
       :active="!!liveSlide"
       hint="anywhere to go full screen and hide this bar"
       @fullscreen="toggleFullScreen"
     />
 
-    <main
-      class="grid min-h-0 flex-1 gap-4 p-4 sm:gap-6 sm:p-6"
-      :class="
-        stackedLayout
-          ? 'grid-cols-1 grid-rows-[1fr_1fr_auto_auto]'
-          : 'grid-cols-2 grid-rows-[1fr_minmax(110px,0.3fr)]'
-      "
+    <StageBoard
+      :now="nowView"
+      :next="nextView"
+      :clear-banner="!isFullScreen && !isTauri"
     >
-      <StagePanel label="Now" tone="now" class="min-h-0">
-        <template v-if="nowLabel" #header>
-          <p
-            class="line-clamp-2 text-[clamp(1.75rem,4.5vh,3rem)] font-bold uppercase leading-tight tracking-[0.06em] text-white/70"
-          >
-            {{ nowLabel }}
-          </p>
-        </template>
-
-        <StageAutoText v-if="nowText" :text="nowText" />
-        <div
-          v-else
-          class="flex h-full flex-col items-center justify-center gap-3 text-center text-white/40"
-        >
-          <UIcon :name="placeholderIcon" class="h-10 w-10" dynamic />
-          <p class="text-xl font-semibold">{{ nowPlaceholder }}</p>
-        </div>
-      </StagePanel>
-
-      <StagePanel label="Next" tone="next" class="min-h-0">
-        <template v-if="nextLabel" #header>
-          <p
-            class="line-clamp-2 text-[clamp(1.75rem,4.5vh,3rem)] font-bold uppercase leading-tight tracking-[0.06em] text-purple-300/90"
-          >
-            {{ nextLabel }}
-          </p>
-        </template>
-
-        <StageAutoText v-if="nextText" :text="nextText" />
-        <div
-          v-else
-          class="flex h-full flex-col items-center justify-center gap-3 text-center text-purple-300/40"
-        >
-          <UIcon :name="nextPlaceholderIcon" class="h-10 w-10" dynamic />
-          <p class="text-xl font-semibold">{{ nextPlaceholder }}</p>
-        </div>
-      </StagePanel>
-
-      <StageTimerPanel
-        :slide="liveSlide"
-        :slide-position="slidePosition"
-        :slide-count="slideCount"
-        class="min-h-0"
-      />
-      <StageClockPanel class="min-h-0" />
-    </main>
+      <template #timer>
+        <StageTimerPanel
+          :slide="liveSlide"
+          :slide-position="slidePosition"
+          :slide-count="slideCount"
+          class="min-h-0"
+        />
+      </template>
+    </StageBoard>
   </div>
 </template>
 
@@ -115,11 +76,23 @@ import {
   exitFullscreenSafely,
   requestFullscreenSafely,
 } from "~/utils/browserSafety"
-import { slideToPlainLabel, slideToPlainText } from "~/utils/slideText"
+import { stageNextView, stageNowView } from "~/utils/stageView"
 
 definePageMeta({
   layout: "stage",
 })
+
+// Same late-plan re-check as `/mobile`: the middleware gate only fires once the
+// church has loaded, so this moves a Starter church to the upgrade wall when
+// the plan lands after the route has resolved.
+const { isTeamsPlan, isPlanKnown, isPaywallEnabled } = useSubscription()
+watch(
+  [isTeamsPlan, isPlanKnown, isPaywallEnabled],
+  ([isTeams, planKnown, paywallEnabled]) => {
+    if (planKnown && !isTeams && paywallEnabled) navigateTo("/stage-upgrade")
+  },
+  { immediate: true }
+)
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -132,31 +105,9 @@ const windowMenuRef = ref<{ open: () => void; close: () => void } | null>(null)
 const { closeWindow } = useCloseDisplayWindow("stage display")
 const isFullScreen = ref(false)
 const lastBroadcastTs = ref(0)
-const viewportWidth = ref(1280)
-
-// The stage screen is often a TV in portrait or a tablet on a music stand;
-// below this the four panels stack instead of sitting two-up.
-const stackedLayout = computed(() => viewportWidth.value < 900)
 
 // ── What is on screen now ──────────────────────────────────────────────────
-const nowText = computed(() => slideToPlainText(liveSlide.value))
-
-const nowPlaceholder = computed(() => {
-  if (!liveSlide.value) return "Nothing is live yet"
-  if (liveSlide.value.type === slideTypes.media) return "Media is playing"
-  if (liveSlide.value.type === slideTypes.presentation) {
-    const pages = liveSlide.value.presentationObjects?.length || 0
-    const page = (liveSlide.value.presentationPageIndex ?? 0) + 1
-    return pages ? `Presentation — page ${page} of ${pages}` : "Presentation"
-  }
-  return liveSlide.value.name || "Nothing is live yet"
-})
-
-const placeholderIcon = computed(() => {
-  if (liveSlide.value?.type === slideTypes.media) return "i-bx-play-circle"
-  if (liveSlide.value?.type === slideTypes.presentation) return "i-bx-slideshow"
-  return "i-bx-tv"
-})
+const nowView = computed(() => stageNowView(liveSlide.value))
 
 // ── What is coming next ────────────────────────────────────────────────────
 // `scheduleSlides` is the open schedule's slides only — `activeSlides` spans
@@ -201,30 +152,7 @@ const { nextContent, scheduleSlides } = useStageNextContent(
   indexedScheduleSlides
 )
 
-const nextText = computed(() => nextContent.value?.text || "")
-
-const nextLabel = computed(() => {
-  const next = nextContent.value
-  if (!next) return ""
-  // A new slide is a bigger jump than the next verse of what is already up, so
-  // name it — "Up next: Hymn 24" reads very differently to "Verse 3".
-  if (next.source === "slide") return `Up next • ${next.slideName}`
-  return [next.slideName, next.label].filter(Boolean).join(" • ")
-})
-
-// Slides with no words of their own — media, presentation pages — still have
-// something worth naming, so fall back to their label rather than claiming the
-// schedule has ended.
-const nextPlaceholder = computed(() => {
-  if (!liveSlide.value) return "Waiting for the operator"
-  const next = nextContent.value
-  if (!next) return "End of schedule"
-  return next.label || next.slideName || "End of schedule"
-})
-
-const nextPlaceholderIcon = computed(() =>
-  nextContent.value ? "i-bx-slideshow" : "i-bx-check-circle"
-)
+const nextView = computed(() => stageNextView(liveSlide.value, nextContent.value))
 
 // ── Schedule position, shown alongside the timer ────────────────────────────
 // "Slide 4 of 12" has to count today's service, not every slide the session
@@ -242,7 +170,7 @@ const slidePosition = computed(() => {
 
 // Surfaced through the document title so an operator can tell stage windows
 // apart in a taskbar full of browser windows.
-const nowLabel = computed(() => slideToPlainLabel(liveSlide.value))
+const nowLabel = computed(() => nowView.value.label)
 
 useHead({
   title: computed(() =>
@@ -350,15 +278,9 @@ const toggleFullScreen = () => {
   }
 }
 
-const onResize = () => {
-  viewportWidth.value = window.innerWidth
-}
-
 let cleanupShortcut: (() => void) | null = null
 
 onMounted(() => {
-  onResize()
-  window.addEventListener("resize", onResize)
   window.addEventListener("fullscreenchange", checkFullScreen)
   window.addEventListener("webkitfullscreenchange", checkFullScreen)
   window.addEventListener("mozfullscreenchange", checkFullScreen)
@@ -372,7 +294,6 @@ onBeforeUnmount(() => {
   cleanupBroadcast()
   cleanupSlideDatabaseNotifications()
   cleanupShortcut?.()
-  window.removeEventListener("resize", onResize)
   window.removeEventListener("fullscreenchange", checkFullScreen)
   window.removeEventListener("webkitfullscreenchange", checkFullScreen)
   window.removeEventListener("mozfullscreenchange", checkFullScreen)
