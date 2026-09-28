@@ -56,6 +56,11 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   // A countdown sent to the stage display only — same feature, other screen.
   'new-stage-countdown': 'teams',
   'clear-stage-countdown': 'teams',
+  'open-stage-display': 'teams',
+  // Stage timer controls ride with the stage display itself.
+  'start-stage-timer': 'teams',
+  'stop-stage-timer': 'teams',
+  'restart-stage-timer': 'teams',
   'new-time-slide': 'teams',
   'show-slide-overlay': 'teams',
   'remove-slide-overlay': 'teams',
@@ -63,6 +68,8 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-vimeo-video': 'teams',
   'open-invite-modal': 'teams',
   'livestream-url': 'teams',
+  // The stage display over the network (/stagestream/:schedule_id).
+  'stagestream-url': 'teams',
   'new-transcribe': 'teams',
   // The online song/lyrics library search ("Search song lyrics" → SongsList).
   // Only the *search* is gated: 'new-song' below stays free so a church can
@@ -71,11 +78,6 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
 
   // Free tier features
   'new-slide': 'free',
-  'open-stage-display': 'free',
-  // Stage timer controls ride with the stage display itself.
-  'start-stage-timer': 'free',
-  'stop-stage-timer': 'free',
-  'restart-stage-timer': 'free',
   'new-search-bible': 'free',
   'new-hymn': 'free',
   'new-media': 'free',

@@ -7,7 +7,8 @@ import { useAppStore } from "~/store/app"
  * Both operator routes — the desktop console (`/`) and the mobile route
  * (`/mobile`) — need the exact same thing: one Socket.IO connection scoped to
  * the active schedule, incoming slide events applied to the store, presence
- * kept current, and the live slide fed to `/livestream/:schedule_id` viewers.
+ * kept current, the live slide fed to `/livestream/:schedule_id` viewers, and
+ * the stage display fed to `/stagestream/:schedule_id` viewers.
  *
  * This lived inline in pages/index.vue until the mobile route needed it too.
  * Duplicating it would have been the worst outcome available: two connections
@@ -24,6 +25,10 @@ export const useOperatorSession = () => {
   const emitter = useNuxtApp().$emitter as Emitter<any>
   const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
   const liveOutputControl = useLiveOutputControl()
+  const stageStreamFeed = useStageStreamFeed({
+    getSocket: () => socketInstance.value,
+    hasRemoteTarget: liveOutputControl.hasRemoteTarget,
+  })
 
   const {
     handleWebSocketMessage,
@@ -58,6 +63,7 @@ export const useOperatorSession = () => {
     socketInstance.value = useSocketIO({
       scheduleId,
       onMessage: (event, data) => {
+        if (stageStreamFeed.handleMessage(event, data?.data)) return
         handleWebSocketMessage(data)
       },
       onConnected: () => {
@@ -119,6 +125,7 @@ export const useOperatorSession = () => {
 
   const disconnectSocket = () => {
     socketInstance.value?.disconnect()
+    stageStreamFeed.reset()
     cleanupRealtimeSlides()
     appStore.setOnlineUsers([])
   }

@@ -310,6 +310,10 @@ const FEATURE_UPGRADE_COPY: Record<string, { title: string; description: string 
     title: "Share a livestream link with Teams",
     description: "Share your slides in real time to anywhere in the world.",
   },
+  "open-stage-display": {
+    title: "Stage Display is part of Teams",
+    description: "Show your team the words, what's next and the clock.",
+  },
   "new-youtube-video": {
     title: "Play YouTube and Vimeo with Teams",
     description: "Show online videos without downloading them.",
@@ -329,6 +333,7 @@ FEATURE_UPGRADE_COPY["clear-stage-countdown"] = FEATURE_UPGRADE_COPY["new-countd
 FEATURE_UPGRADE_COPY["remove-alert"] = FEATURE_UPGRADE_COPY["new-alert"]!
 FEATURE_UPGRADE_COPY["remove-slide-overlay"] = FEATURE_UPGRADE_COPY["show-slide-overlay"]!
 FEATURE_UPGRADE_COPY["new-vimeo-video"] = FEATURE_UPGRADE_COPY["new-youtube-video"]!
+FEATURE_UPGRADE_COPY["stagestream-url"] = FEATURE_UPGRADE_COPY["open-stage-display"]!
 
 const lockedFeature = ref<string | undefined>()
 const featureCopy = computed(() =>

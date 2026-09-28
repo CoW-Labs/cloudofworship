@@ -59,34 +59,7 @@
     class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
     :id="currentState.liveSlideId?.toString()"
   >
-    <!-- Connection Status Indicator -->
-    <div
-      v-if="connectionStatus !== 'connected'"
-      class="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
-      :class="{
-        'bg-primary-200 text-primary-800':
-          connectionStatus === 'connecting' ||
-          connectionStatus === 'disconnected',
-        'bg-red-500 text-white': connectionStatus === 'failed',
-      }"
-    >
-      <div
-        v-if="
-          connectionStatus === 'connecting' ||
-          connectionStatus === 'disconnected'
-        "
-        class="w-2 h-2 bg-primary-800 rounded-full animate-pulse"
-      ></div>
-      <span class="text-sm font-medium">
-        {{
-          connectionStatus === "connecting"
-            ? "Connecting..."
-            : connectionStatus === "disconnected"
-            ? "Reconnecting..."
-            : "Connection Failed"
-        }}
-      </span>
-    </div>
+    <DisplayConnectionStatus :status="connectionStatus" />
 
     <!-- <div
       v-if="!isFullScreen"
