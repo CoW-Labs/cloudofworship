@@ -141,7 +141,7 @@ const getSongs = async (query: string = "") => {
   hasInteracted.value = false
 
   try {
-    const results = await searchSongs(query, 20)
+    const results = await searchSongs(query, 20, "songs-list")
     if (searchId === latestSongSearchId) {
       songs.value = results
     }

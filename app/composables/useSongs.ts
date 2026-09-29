@@ -1,5 +1,6 @@
 import { useAuthStore } from '~/store/auth'
 import type { Song } from '~/types'
+import { rememberSongSearch } from './useSongSearchLog'
 
 export default function useSongs() {
   const authStore = useAuthStore()
@@ -13,7 +14,11 @@ export default function useSongs() {
   /**
    * Search songs by query
    */
-  const searchSongs = async (query: string = '', limit: number = 20): Promise<Song[]> => {
+  const searchSongs = async (
+    query: string = '',
+    limit: number = 20,
+    source?: 'songs-list' | 'quick-actions'
+  ): Promise<Song[]> => {
     try {
       loading.value = true
 
@@ -22,10 +27,10 @@ export default function useSongs() {
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/songs?search=${encodeURIComponent(
           query
-        )}&limit=${limit}`,
+        )}&limit=${limit}${source ? `&source=${source}` : ''}`,
         {
           method: 'GET',
-          key: `search-songs-${query}`,
+          key: `search-songs-${source}-${limit}-${query}`,
         }
       )
 
@@ -41,6 +46,7 @@ export default function useSongs() {
         })
       )
 
+      rememberSongSearch((data.value as any)?.data?.search_id, songsData)
       songs.value = songsData
       return songsData
     } catch (error: any) {
@@ -106,6 +112,7 @@ export default function useSongs() {
       }
 
       const songsData = (data.value as Song[]) || []
+      rememberSongSearch((data.value as any)?.data?.search_id, songsData)
       songs.value = songsData
       return songsData
     } catch (error: any) {
