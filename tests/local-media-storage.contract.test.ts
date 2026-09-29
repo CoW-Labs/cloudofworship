@@ -587,6 +587,84 @@ describe("legacy migration, capacity, and cleanup", () => {
     })
   })
 
+  it("leaves IndexedDB alone when a slide already carries cloud URLs", async () => {
+    const db = useIndexedDB()
+    const syncRead = vi.spyOn(db.mediaCloudSync, "bulkGet")
+    const fileRead = vi.spyOn(db.localMediaFiles, "bulkGet")
+
+    const safe = await toTransportSafeSlide({
+      id: "cloud-deck",
+      index: 0,
+      name: "Deck",
+      type: "presentation",
+      layout: "empty",
+      userId: "user",
+      churchId: "church",
+      scheduleId: "schedule",
+      contents: [],
+      backgroundType: "image",
+      background: "https://cdn.example/deck-1.png",
+      presentationObjects: [
+        { page: 1, imageUrl: "https://cdn.example/deck-1.png" },
+        { page: 2, imageUrl: "https://cdn.example/deck-2.png" },
+      ],
+    } as any)
+
+    expect(syncRead).not.toHaveBeenCalled()
+    expect(fileRead).not.toHaveBeenCalled()
+    expect(safe.presentationObjects?.map((page) => page.imageUrl)).toEqual([
+      "https://cdn.example/deck-1.png",
+      "https://cdn.example/deck-2.png",
+    ])
+    syncRead.mockRestore()
+    fileRead.mockRestore()
+  })
+
+  it("resolves only the device-local pages of a deck in one batched read", async () => {
+    const storage = createLocalMediaStorage(adapter)
+    await storage.saveBlob({
+      key: "mixed-deck-page-2",
+      groupId: "mixed-deck",
+      category: "slide",
+      kind: "image",
+      blob: new Blob(["page"], { type: "image/png" }),
+      remoteUrl: "https://cdn.example/mixed-2.png",
+      recoverable: true,
+    })
+    const fileRead = vi.spyOn(useIndexedDB().localMediaFiles, "bulkGet")
+
+    const safe = await toTransportSafeSlide({
+      id: "mixed-deck",
+      index: 0,
+      name: "Deck",
+      type: "presentation",
+      layout: "empty",
+      userId: "user",
+      churchId: "church",
+      scheduleId: "schedule",
+      contents: [],
+      backgroundType: "image",
+      background: "https://cdn.example/mixed-1.png",
+      presentationObjects: [
+        { page: 1, imageUrl: "https://cdn.example/mixed-1.png" },
+        { page: 2, imageUrl: "blob:operator-only" },
+        { page: 3, imageUrl: "blob:never-uploaded" },
+      ],
+    } as any)
+
+    expect(fileRead).toHaveBeenCalledTimes(1)
+    expect(fileRead.mock.calls[0]![0]).toEqual([
+      "mixed-deck-page-2",
+      "mixed-deck-page-3",
+    ])
+    expect(safe.presentationObjects?.map((page) => page.imageUrl)).toEqual([
+      "https://cdn.example/mixed-1.png",
+      "https://cdn.example/mixed-2.png",
+      "",
+    ])
+    fileRead.mockRestore()
+  })
+
   it("transports cloud recovery history after local metadata is lost", async () => {
     const storage = createLocalMediaStorage(adapter)
     await storage.setCloudSyncState("remote-only-slide", {
@@ -614,8 +692,12 @@ describe("legacy migration, capacity, and cleanup", () => {
       } as any,
     })
 
-    expect(safe.background).toBe("")
-    expect((safe.data as any).url).toBe("")
+    // The file row is gone, but the sync record still knows the CDN copy, so
+    // the slide keeps pointing at it instead of being blanked.
+    expect(safe.background).toBe("https://cdn.example.com/remote-only.mp4")
+    expect((safe.data as any).url).toBe(
+      "https://cdn.example.com/remote-only.mp4"
+    )
     expect(safe.mediaCloudSync?.["remote-only-slide"]).toMatchObject({
       status: "uploaded",
       remoteUrl: "https://cdn.example.com/remote-only.mp4",
