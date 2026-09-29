@@ -12,7 +12,7 @@ const useShortSlideName = (slide: Slide, options?: { longer: boolean }) => {
       }
       return `${slide?.name?.slice(0, 6)} ${slide?.name?.slice(lastWhitespaceCharacter)}`
     case slideTypes.text:
-    case slideTypes.intermission:
+    case slideTypes.interlude:
       if (slide?.name?.length <= 15) {
         return slide.name
       } else {

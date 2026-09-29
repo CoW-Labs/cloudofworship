@@ -2,7 +2,7 @@ import { useAppStore } from "~/store/app"
 import type {
   Countdown,
   Hymn,
-  IntermissionSlideData,
+  InterludeSlideData,
   Scripture,
   Slide,
   Song,
@@ -18,7 +18,7 @@ import type {
  */
 const useSlideContent = (
   slide: Slide,
-  data: Scripture | Hymn | Song | Countdown | TimeSlideData | IntermissionSlideData,
+  data: Scripture | Hymn | Song | Countdown | TimeSlideData | InterludeSlideData,
   nextVerse: string = ""
 ) => {
   const appStore = useAppStore()
@@ -107,8 +107,8 @@ const useSlideContent = (
       ]
     // The slide draws itself from `data`. These plain-text contents are what
     // search, the stage display and anything else reading `contents` sees.
-    case slideTypes.intermission: {
-      data = data as IntermissionSlideData
+    case slideTypes.interlude: {
+      data = data as InterludeSlideData
       const escape = (s = "") =>
         s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       return [

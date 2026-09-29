@@ -2,7 +2,7 @@ import { useAppStore } from "~/store/app"
 import type {
   Countdown,
   ExtendedFileT,
-  IntermissionSlideData,
+  InterludeSlideData,
   Slide,
   Song,
   SongSetlistData,
@@ -48,8 +48,8 @@ const useSlideName = (slide: Slide) => {
       return (slide?.data as Countdown)?.time?.replace('00:', '')
     case slideTypes.time:
       return (slide?.data as TimeSlideData)?.label || "Live Time"
-    case slideTypes.intermission:
-      return (slide?.data as IntermissionSlideData)?.heading?.trim() || "Intermission"
+    case slideTypes.interlude:
+      return (slide?.data as InterludeSlideData)?.heading?.trim() || "Interlude"
     default:
       return `${slide?.title}`
   }

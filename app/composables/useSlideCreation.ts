@@ -11,9 +11,9 @@ import type {
   ExtendedFileT,
   PresentationObject,
   TimeSlideData,
-  IntermissionSlideData,
+  InterludeSlideData,
 } from "~/types"
-import { withIntermissionData } from "~/utils/intermission/slide"
+import { withInterludeData } from "~/utils/interlude/slide"
 import { tabSessionId } from "./useRealtimeSlides"
 import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
 
@@ -865,14 +865,14 @@ export default function useSlideCreation() {
     return tempSlide
   }
 
-  const createIntermissionSlide = (
-    input: Omit<IntermissionSlideData, "id">
+  const createInterludeSlide = (
+    input: Omit<InterludeSlideData, "id">
   ): Slide => {
     const tempSlide = { ...preSlideCreation() }
-    tempSlide.layout = slideLayoutTypes.intermission
-    tempSlide.type = slideTypes.intermission
+    tempSlide.layout = slideLayoutTypes.interlude
+    tempSlide.type = slideTypes.interlude
     tempSlide.slideMode = "slide"
-    // The intermission sets its own type, so global text effects stay off.
+    // The interlude sets its own type, so global text effects stay off.
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
       alignment: "center",
@@ -880,10 +880,10 @@ export default function useSlideCreation() {
       textBold: false,
       textLinesBackground: false,
     }
-    usePosthogCapture("NEW_INTERMISSION_SLIDE_CREATED", {
+    usePosthogCapture("NEW_INTERLUDE_SLIDE_CREATED", {
       variant: input.variant,
     })
-    return withIntermissionData(tempSlide, { id: useID(), ...input })
+    return withInterludeData(tempSlide, { id: useID(), ...input })
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -942,7 +942,7 @@ export default function useSlideCreation() {
     createMultipleMediaSlides,
     createCountdownSlide,
     createTimeSlide,
-    createIntermissionSlide,
+    createInterludeSlide,
     createPresentationSlide,
     saveSlideToLib,
     duplicateSlide,

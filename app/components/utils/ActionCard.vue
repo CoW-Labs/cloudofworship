@@ -132,7 +132,7 @@ import HymnIcon from "~/components/svgs/HymnIcon.vue"
 import TemplatesIcon from "~/components/svgs/TemplatesIcon.vue"
 import RecentClockIcon from "~/components/svgs/RecentClockIcon.vue"
 import TimeIcon from "~/components/svgs/TimeIcon.vue"
-import IntermissionIcon from "~/components/svgs/IntermissionIcon.vue"
+import InterludeIcon from "~/components/svgs/InterludeIcon.vue"
 
 const props = defineProps<{
   action: QuickAction
@@ -167,7 +167,7 @@ const actionIconComponentMap: Record<string, Component> = {
   "new-alert": BannersAndAlertsIcon,
   "new-countdown": CountdownIcon,
   "new-time-slide": TimeIcon,
-  "new-intermission": IntermissionIcon,
+  "new-interlude": InterludeIcon,
   "new-presentation": PptIcon,
   "new-presentation-from-pdf": PdfIcon,
   "open-schedule-modal": SchedulesIcon,

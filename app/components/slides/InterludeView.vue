@@ -1,11 +1,11 @@
 <template>
   <div
     ref="root"
-    class="intermission-view"
+    class="interlude-view"
     :class="{ 'is-static': isStatic }"
     :style="{ backgroundColor: variant.palettes[0].bg }"
   >
-    <canvas ref="canvas" class="intermission-canvas" aria-hidden="true" />
+    <canvas ref="canvas" class="interlude-canvas" aria-hidden="true" />
     <!-- One text layer per palette. During a palette drop the incoming layer
          is clipped to the same circle the canvas wipes with, so the text
          changes colour with the background instead of after it. -->
@@ -13,7 +13,7 @@
       v-for="(palette, i) in variant.palettes"
       :key="i"
       :ref="(el) => (layers[i] = el as HTMLElement | null)"
-      class="intermission-text"
+      class="interlude-text"
       :class="{ 'with-background': textBackgroundOn }"
       :style="{
         '--ix-ink': palette.ink,
@@ -22,47 +22,47 @@
         '--ix-chip-ink': palette.chipInk,
       }"
     >
-      <div class="intermission-heading">
-        <span class="intermission-heading-inner">{{ heading }}</span>
+      <div class="interlude-heading">
+        <span class="interlude-heading-inner">{{ heading }}</span>
       </div>
-      <div v-if="subtitle" class="intermission-sub">
-        <span class="intermission-chip">{{ subtitle }}</span>
+      <div v-if="subtitle" class="interlude-sub">
+        <span class="interlude-chip">{{ subtitle }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { IntermissionSlideData, Slide } from "~/types"
+import type { InterludeSlideData, Slide } from "~/types"
 import {
   STATIC_FRAME_T,
   TEXT_MOTION,
-  getIntermissionVariant,
-  renderIntermissionFrame,
+  getInterludeVariant,
+  renderInterludeFrame,
   scrimAmount,
   textMotion,
   textPulse,
   wipeRadius,
   type FrameState,
   type WipeState,
-} from "~/utils/intermission/engine"
+} from "~/utils/interlude/engine"
 import {
-  intermissionExitKey,
-  intermissionModeKey,
-  type IntermissionExitSignal,
-  type IntermissionRenderMode,
-} from "~/utils/intermission/context"
+  interludeExitKey,
+  interludeModeKey,
+  type InterludeExitSignal,
+  type InterludeRenderMode,
+} from "~/utils/interlude/context"
 
 const props = defineProps<{
   slide: Slide
   /** Overrides the injected mode, e.g. to animate one hovered thumbnail. */
-  mode?: IntermissionRenderMode
+  mode?: InterludeRenderMode
 }>()
 
-const injectedMode = inject(intermissionModeKey, "static")
+const injectedMode = inject(interludeModeKey, "static")
 const exitSignal = inject(
-  intermissionExitKey,
-  ref<IntermissionExitSignal | null>(null)
+  interludeExitKey,
+  ref<InterludeExitSignal | null>(null)
 )
 const reduceMotion =
   typeof window !== "undefined" &&
@@ -73,9 +73,9 @@ const mode = computed(() =>
 const isStatic = computed(() => mode.value === "static")
 
 const data = computed(
-  () => props.slide?.data as IntermissionSlideData | undefined
+  () => props.slide?.data as InterludeSlideData | undefined
 )
-const variant = computed(() => getIntermissionVariant(data.value?.variant))
+const variant = computed(() => getInterludeVariant(data.value?.variant))
 const heading = computed(() => data.value?.heading ?? "")
 const subtitle = computed(() => data.value?.subtitle?.trim() ?? "")
 const textBackgroundOn = computed(() => {
@@ -182,11 +182,11 @@ const draw = (T: number) => {
   if (!ctx || !width || !height) return
   ctx.setTransform(density, 0, 0, density, 0, 0)
   if (isStatic.value) {
-    renderIntermissionFrame(ctx, width, height, T, variant.value, 1)
+    renderInterludeFrame(ctx, width, height, T, variant.value, 1)
     return
   }
   const scrim = scrimAmount(T, textIn, textOut)
-  const { S, wipe } = renderIntermissionFrame(
+  const { S, wipe } = renderInterludeFrame(
     ctx,
     width,
     height,
@@ -318,26 +318,26 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.intermission-view {
+.interlude-view {
   position: absolute;
   inset: 0;
   overflow: hidden;
   container-type: inline-size;
   isolation: isolate;
   /* Global slide text settings (outline, alignment, case) inherit into
-     descendants; the intermission sets its own type. */
+     descendants; the interlude sets its own type. */
   text-align: center;
   text-shadow: none;
   text-transform: none;
 }
-.intermission-canvas {
+.interlude-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
 }
-.intermission-text {
+.interlude-text {
   position: absolute;
   inset: 0;
   display: flex;
@@ -348,12 +348,12 @@ onBeforeUnmount(() => {
   padding: 0 7cqw;
   pointer-events: none;
 }
-.intermission-heading,
-.intermission-sub {
+.interlude-heading,
+.interlude-sub {
   opacity: 0;
   will-change: transform, filter, opacity;
 }
-.intermission-heading {
+.interlude-heading {
   color: var(--ix-ink);
   font-family: "Unbounded", "Geist", ui-sans-serif, system-ui, sans-serif;
   font-weight: 800;
@@ -363,22 +363,22 @@ onBeforeUnmount(() => {
   text-wrap: balance;
   transform-origin: 50% 55%;
 }
-.intermission-heading-inner {
+.interlude-heading-inner {
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
   padding: 0 0.12em;
 }
-.with-background .intermission-heading-inner {
+.with-background .interlude-heading-inner {
   background: var(--ix-plate);
 }
-.intermission-sub {
+.interlude-sub {
   font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 2.2cqw;
   line-height: 1;
   letter-spacing: 0.01em;
 }
-.intermission-chip {
+.interlude-chip {
   display: inline-block;
   background: var(--ix-chip-bg);
   color: var(--ix-chip-ink);
@@ -387,12 +387,12 @@ onBeforeUnmount(() => {
 }
 
 /* Thumbnails and reduced motion: one settled frame, first palette only. */
-.is-static .intermission-heading,
-.is-static .intermission-sub {
+.is-static .interlude-heading,
+.is-static .interlude-sub {
   opacity: 1;
   will-change: auto;
 }
-.is-static .intermission-text + .intermission-text {
+.is-static .interlude-text + .interlude-text {
   display: none;
 }
 </style>

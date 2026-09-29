@@ -1,5 +1,5 @@
 <template>
-  <div class="intermission-form flex flex-col gap-4 text-gray-800 dark:text-[#F8F9FB]">
+  <div class="interlude-form flex flex-col gap-4 text-gray-800 dark:text-[#F8F9FB]">
     <div class="flex flex-col gap-3" :class="{ 'sm:flex-row': !narrow }">
       <CowInput
         :model-value="local.heading"
@@ -33,7 +33,7 @@
         :class="narrow ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4'"
       >
         <button
-          v-for="variant in intermissionVariants"
+          v-for="variant in interludeVariants"
           :key="variant.id"
           type="button"
           class="min-w-0 rounded-xl bg-white/70 p-2 text-left ring-2 transition-colors dark:bg-[#222838]"
@@ -53,7 +53,7 @@
             class="relative w-full overflow-hidden rounded-lg"
             style="aspect-ratio: 16 / 9"
           >
-            <IntermissionView
+            <InterludeView
               :slide="previewSlide(variant.id)"
               :mode="previewing === variant.id ? 'preview' : undefined"
             />
@@ -75,25 +75,25 @@
 </template>
 
 <script setup lang="ts">
-import type { IntermissionSlideData, Slide } from "~/types"
-import { intermissionVariants } from "~/utils/intermission/engine"
-import { intermissionModeKey } from "~/utils/intermission/context"
+import type { InterludeSlideData, Slide } from "~/types"
+import { interludeVariants } from "~/utils/interlude/engine"
+import { interludeModeKey } from "~/utils/interlude/context"
 
-type IntermissionInput = Omit<IntermissionSlideData, "id">
+type InterludeInput = Omit<InterludeSlideData, "id">
 
 const props = defineProps<{
-  modelValue: IntermissionInput
+  modelValue: InterludeInput
   /** One card per row, for the narrow Quick Actions panel. */
   narrow?: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: "update:modelValue", value: IntermissionInput): void
+  (e: "update:modelValue", value: InterludeInput): void
 }>()
 
 // Thumbnails are still frames, even inside the animated editor. Only the one
 // under the pointer (or keyboard focus) animates, so at most one runs at once.
-provide(intermissionModeKey, "static")
+provide(interludeModeKey, "static")
 const previewing = ref<string | null>(null)
 const stopPreview = (id: string) => {
   if (previewing.value === id) previewing.value = null
@@ -101,16 +101,16 @@ const stopPreview = (id: string) => {
 
 // Seeded once: the parent keys this form by slide, so a prop echo of our own
 // update never overwrites text the operator is still typing.
-const local = reactive<IntermissionInput>({ ...props.modelValue })
+const local = reactive<InterludeInput>({ ...props.modelValue })
 
-const textBackgroundLabels: Record<IntermissionInput["textBackground"], string> =
+const textBackgroundLabels: Record<InterludeInput["textBackground"], string> =
   {
     auto: "Animation default",
     on: "Always on",
     off: "Off",
   }
 
-const update = (patch: Partial<IntermissionInput>) => {
+const update = (patch: Partial<InterludeInput>) => {
   Object.assign(local, patch)
   emit("update:modelValue", { ...local })
 }
@@ -119,12 +119,12 @@ const onTextBackground = (label: string) => {
   const entry = Object.entries(textBackgroundLabels).find(
     ([, value]) => value === label
   )
-  if (entry) update({ textBackground: entry[0] as IntermissionInput["textBackground"] })
+  if (entry) update({ textBackground: entry[0] as InterludeInput["textBackground"] })
 }
 
 const previewSlide = (variant: string) =>
   ({
-    id: `intermission-preview-${variant}`,
+    id: `interlude-preview-${variant}`,
     data: { id: variant, ...local, variant },
   }) as unknown as Slide
 </script>

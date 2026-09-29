@@ -86,7 +86,7 @@ export interface Slide {
   hymnVerseIndex?: number // 0-based index of current hymn verse, used for chorus navigation
   hymnSubVerseIndex?: number // 0-based chunk index inside the current verse/chorus
   hymnSubVerseTotal?: number // total chunks in the current verse/chorus
-  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | IntermissionSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
+  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | InterludeSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
   slideStyle?: SlideStyle
   saved?: boolean
   createdAt?: string
@@ -172,10 +172,10 @@ export interface TimeSlideData {
 }
 
 /**
- * An animated intermission slide: one of the fixed variants in
- * utils/intermission/engine.ts behind a heading and a sub text.
+ * An animated interlude slide: one of the fixed variants in
+ * utils/interlude/engine.ts behind a heading and a sub text.
  */
-export interface IntermissionSlideData {
+export interface InterludeSlideData {
   id: string
   variant: string
   heading: string

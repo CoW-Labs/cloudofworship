@@ -2,7 +2,7 @@
   <!-- The scroll container is this root (QuickActions adds overflow-auto), so
        the padding lives on an inner box: selected-card rings and the button's
        raised edge would otherwise be clipped at the scroll edge. -->
-  <div class="add-intermission-main">
+  <div class="add-interlude-main">
     <div class="flex flex-col gap-4 px-1.5 pt-3">
       <p class="text-xs text-gray-500 dark:text-[#7d8695]">
         Adds an animated break screen to this schedule. The heading and sub text
@@ -11,7 +11,7 @@
 
       <!-- Bottom padding keeps the last row of previews clear of the floating
            button once scrolled to the end. -->
-      <IntermissionForm v-model="form" narrow class="pb-4" />
+      <InterludeForm v-model="form" narrow class="pb-4" />
 
       <!-- Floats: sticky to the scroll container's bottom edge, so it stays in
            reach however far the preview grid is scrolled. -->
@@ -21,9 +21,9 @@
           block
           size="lg"
           :disabled="!form.heading.trim()"
-          @click="createIntermission"
+          @click="createInterlude"
         >
-          Create intermission slide
+          Create interlude slide
         </CowButton>
       </div>
     </div>
@@ -31,14 +31,14 @@
 </template>
 
 <script setup lang="ts">
-import { defaultIntermissionData } from "~/utils/intermission/slide"
+import { defaultInterludeData } from "~/utils/interlude/slide"
 
 const emit = defineEmits(["close"])
 
-const form = ref(defaultIntermissionData())
+const form = ref(defaultInterludeData())
 
-const createIntermission = () => {
-  useGlobalEmit(appWideActions.newIntermission, {
+const createInterlude = () => {
+  useGlobalEmit(appWideActions.newInterlude, {
     ...form.value,
     heading: form.value.heading.trim(),
     subtitle: form.value.subtitle.trim(),
