@@ -683,7 +683,7 @@ const fetchRemoteSongsIfNeeded = useDebounceFn(async (query: string) => {
 
   isSearchingRemoteSongs.value = true
   try {
-    const results = await searchSongs(query, 6)
+    const results = await searchSongs(query, 6, "quick-actions")
     if (requestId !== remoteSongsRequestId) return
     remoteSongActions.value = (results || []).map((song) =>
       mapSongToAction(song, false)

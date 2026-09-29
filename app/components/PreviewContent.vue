@@ -161,6 +161,7 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
+import { reportSongSearchPick } from "~/composables/useSongSearchLog"
 import {
   enqueueCoalescedSlideShadowPut,
   enqueueSlideShadowWrite,
@@ -1235,6 +1236,7 @@ emitter.on("new-hymn", async (data: string) => {
 })
 
 emitter.on(appWideActions.newSongSetlist, async (song?: Song) => {
+  reportSongSearchPick(song)
   const resolvedSong = song ? await useSong(song) : undefined
   const newSlide = await createSongSetlistSlide(resolvedSong || undefined)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
@@ -1273,6 +1275,7 @@ const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
 
 emitter.on("new-song", async (data: Song) => {
   if (data) {
+    reportSongSearchPick(data)
     const song = await useSong(data)
     if (song) {
       const setlistSlide = getRelevantSongSetlist()
