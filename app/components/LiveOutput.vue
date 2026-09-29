@@ -139,7 +139,7 @@
             size="2xs"
             class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
             :disabled="!liveSlide"
-            @click="goIntermission"
+            @click="goBlank"
           >
             <template #leading>
               <IconWrapper name="i-ph-eye-slash" size="3.5" />
@@ -293,7 +293,7 @@
               @click.stop.prevent="
                 () => {
                   close()
-                  goIntermission()
+                  goBlank()
                 }
               "
             >
@@ -801,7 +801,7 @@ onMounted(() => {
   shortcutCleanups.push(
     useRegisteredShortcut(shortcutIds.blankOutput, () => {
       if (!liveSlide.value) return false
-      goIntermission()
+      goBlank()
       return true
     })
   )
@@ -871,7 +871,7 @@ const toggleSlideOverlay = (slide: Slide) => {
   emitOverlaySocketAction(appWideActions.showSlideOverlay, overlaySlide)
 }
 
-const goIntermission = () => {
+const goBlank = () => {
   if (!liveSlide.value) return
   blankOutput()
 }

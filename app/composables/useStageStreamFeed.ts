@@ -83,7 +83,7 @@ export const useStageStreamFeed = (options: {
     const socket = options.getSocket()
     // `pending` means NEXT is still resolving for a change that has already
     // landed; sending now would pair the new NOW with the old NEXT. Its settling
-    // re-triggers the watcher below. Intermission has no NEXT to wait for.
+    // re-triggers the watcher below. Blank has no NEXT to wait for.
     if (
       !active.value ||
       (liveSlide.value && pending.value) ||

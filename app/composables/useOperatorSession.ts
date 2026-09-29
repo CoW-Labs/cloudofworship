@@ -148,7 +148,7 @@ export const useOperatorSession = () => {
       // clear: it is true for exactly as long as a host is selected.
       if (liveOutputControl.hasRemoteTarget.value) return
 
-      // Intermission clears liveSlideId (see goIntermission in LiveOutput). Send
+      // Blank clears liveSlideId (see goBlank in LiveOutput). Send
       // an explicit null so viewers blank out instead of holding the last slide.
       if (!liveSlideId) {
         socketInstance.value.sendLiveSlide(null)
