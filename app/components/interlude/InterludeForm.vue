@@ -38,12 +38,12 @@
           type="button"
           class="min-w-0 rounded-xl bg-white/70 p-2 text-left ring-2 transition-colors dark:bg-[#222838]"
           :class="
-            local.variant === variant.id
+            isSelected(variant.id)
               ? 'bg-white ring-primary-300 dark:bg-[#2B3140] dark:ring-[#E8D1F8]'
               : 'ring-transparent hover:bg-white dark:hover:bg-[#2B3140]'
           "
-          :aria-pressed="local.variant === variant.id"
-          @click="update({ variant: variant.id })"
+          :aria-pressed="isSelected(variant.id)"
+          @click="pick(variant.id)"
           @mouseenter="previewing = variant.id"
           @mouseleave="stopPreview(variant.id)"
           @focus="previewing = variant.id"
@@ -85,11 +85,26 @@ const props = defineProps<{
   modelValue: InterludeInput
   /** One card per row, for the narrow Quick Actions panel. */
   narrow?: boolean
+  /**
+   * Leave every card unhighlighted until the operator picks one, for flows
+   * that wait on a deliberate choice (the create panel).
+   */
+  awaitPick?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: InterludeInput): void
+  (e: "select", variant: string): void
 }>()
+
+const picked = ref(false)
+const isSelected = (id: string) =>
+  local.variant === id && (!props.awaitPick || picked.value)
+const pick = (id: string) => {
+  picked.value = true
+  update({ variant: id })
+  emit("select", id)
+}
 
 // Thumbnails are still frames, even inside the animated editor. Only the one
 // under the pointer (or keyboard focus) animates, so at most one runs at once.
