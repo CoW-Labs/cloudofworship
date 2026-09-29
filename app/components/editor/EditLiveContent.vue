@@ -513,6 +513,7 @@ import CoWPopover from "~/components/cow/CoWPopover.vue"
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { asFontFamily } from "~/utils/fontFamily"
+import { isSessionMediaUrl } from "~/utils/mediaTransport"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import {
@@ -902,7 +903,11 @@ const checkImageAvailability = async () => {
   if (!bg) return
 
   // If the background is already a remote URL, it's available everywhere
-  if (bg.startsWith("http://") || bg.startsWith("https://")) return
+  if (
+    (bg.startsWith("http://") || bg.startsWith("https://")) &&
+    !isSessionMediaUrl(bg)
+  )
+    return
 
   try {
     const localUrl = await localMedia.ensureLocal(slideId, {

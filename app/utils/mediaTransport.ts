@@ -31,8 +31,15 @@ export const toTransportSafeSlide = async (slide: Slide): Promise<Slide> => {
     })),
   }
 
+  // The file row is the usual home of the cloud URL, but a slide rehydrated
+  // from the server may only remember it in `mediaCloudSync`. Falling through
+  // to "" there would blank a page that is safely on the CDN.
   const remoteUrlFor = async (key?: string | null) =>
-    key ? (await db.localMediaFiles.get(key))?.remoteUrl || "" : ""
+    key
+      ? (await db.localMediaFiles.get(key))?.remoteUrl ||
+        safe.mediaCloudSync?.[key]?.remoteUrl ||
+        ""
+      : ""
 
   const mediaKeys = [
     ...(safe.type === slideTypes.media ? [safe.id] : []),

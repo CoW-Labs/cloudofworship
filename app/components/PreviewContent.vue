@@ -2117,7 +2117,7 @@ const persistSlideOnline = useThrottleFn(
         slideUpdatePath(activeChurchId, slide.scheduleId, slide._id),
         {
           method: "PUT",
-          body: toSlideUpdatePayload(slide),
+          body: await toSlideUpdatePayload(slide),
         }
       ))
     } catch (err) {
