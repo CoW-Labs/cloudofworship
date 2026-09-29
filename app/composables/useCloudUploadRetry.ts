@@ -18,6 +18,9 @@ export type CloudRetryResult = {
 // schedule sweep and a "Retry now" tap never upload the same page twice.
 const inFlight = new Set<string>()
 
+// Pages of one slide re-uploaded at the same time.
+const UPLOAD_CONCURRENCY = 3
+
 /**
  * A page that never reached the cloud and is still worth another try. Quota
  * and the video opt-out are the church's decision, not a transient failure,
@@ -58,7 +61,9 @@ export default function useCloudUploadRetry() {
     )
 
   const retrySlideUploads = async (
-    slideId: string
+    slideId: string,
+    // The sweep has already read these; pass them on instead of reading again.
+    knownRecords?: Map<string, MediaCloudSyncRecord | undefined>
   ): Promise<CloudRetryResult> => {
     const result: CloudRetryResult = {
       uploaded: 0,
@@ -75,18 +80,27 @@ export default function useCloudUploadRetry() {
     try {
       const db = useIndexedDB()
       const keys = cloudKeysFor(slide)
-      const records = await db.mediaCloudSync.bulkGet(keys)
+      // Fall back to a fresh read if pages changed since the sweep read them.
+      const records = keys.every((key) => knownRecords?.has(key))
+        ? keys.map((key) => knownRecords!.get(key))
+        : await db.mediaCloudSync.bulkGet(keys)
+      const pending = keys.filter((_, index) => needsUpload(records[index]))
+      if (!pending.length) return result
 
-      for (const [index, key] of keys.entries()) {
-        if (!needsUpload(records[index])) continue
-        const file = await db.localMediaFiles.get(key)
-        // Videos have their own opt-out and multipart retries, and are far
-        // too heavy to push again behind the operator's back.
-        if (!file || file.kind === "video") continue
+      const files = await db.localMediaFiles.bulkGet(pending)
+      // Videos have their own opt-out and multipart retries, and are far
+      // too heavy to push again behind the operator's back.
+      const queue = pending
+        .map((key, index) => ({ key, file: files[index] }))
+        .filter(({ file }) => file && file.kind !== "video")
 
+      const uploadPage = async (
+        key: string,
+        file: NonNullable<(typeof files)[number]>
+      ) => {
         try {
           const url = await localMedia.getPlaybackUrl(key)
-          if (!url) continue
+          if (!url) return
           const bytes = await (await fetch(url)).blob()
           // A Tauri asset:// read can come back untyped, which would push a
           // PNG off the direct upload path.
@@ -112,22 +126,38 @@ export default function useCloudUploadRetry() {
           })
           if (reason === "quota") {
             result.quotaExceeded = true
-            break
+            return
           }
           result.failed++
           console.error(`Cloud re-upload failed for ${key}:`, err)
         }
       }
 
+      // A few pages at a time: a large deck recovers quickly without
+      // saturating the connection the live service is also using.
+      let next = 0
+      const worker = async () => {
+        while (next < queue.length && !result.quotaExceeded) {
+          const { key, file } = queue[next++]!
+          await uploadPage(key, file!)
+        }
+      }
+      await Promise.all(
+        Array.from(
+          { length: Math.min(UPLOAD_CONCURRENCY, queue.length) },
+          worker
+        )
+      )
+
       if (result.uploaded) {
         // Re-read the slide: the operator may have edited it while pages
         // were uploading, and that edit must not be overwritten.
         const latest = findActiveSlide(slideId) || slide
+        const safe = await toTransportSafeSlide(latest)
         const { updateSlide } = useSlides()
-        const saved = await updateSlide(latest)
+        const saved = await updateSlide(latest, safe)
         const socket = useNuxtApp().$socketio as any
         if (saved && socket?.connected) {
-          const safe = await toTransportSafeSlide(latest)
           socket.emit("update-slide", {
             ...safe,
             slideId: latest.id,
@@ -154,18 +184,25 @@ export default function useCloudUploadRetry() {
     }
     if (!navigator.onLine) return total
 
-    const db = useIndexedDB()
-    const candidates = toSlideArray(appStore.currentState.activeSlides).filter(
-      (slide) =>
-        slide._id &&
-        (slide.type === slideTypes.presentation ||
-          slide.type === slideTypes.media)
+    const candidates = toSlideArray(appStore.currentState.activeSlides)
+      .filter(
+        (slide) =>
+          slide._id &&
+          (slide.type === slideTypes.presentation ||
+            slide.type === slideTypes.media)
+      )
+      .map((slide) => ({ slide, keys: cloudKeysFor(slide) }))
+
+    // One read for the whole schedule rather than one per slide.
+    const allKeys = candidates.flatMap(({ keys }) => keys)
+    const allRecords = await useIndexedDB().mediaCloudSync.bulkGet(allKeys)
+    const recordsByKey = new Map(
+      allKeys.map((key, index) => [key, allRecords[index]])
     )
 
-    for (const slide of candidates) {
-      const records = await db.mediaCloudSync.bulkGet(cloudKeysFor(slide))
-      if (!records.some(needsUpload)) continue
-      const result = await retrySlideUploads(slide.id)
+    for (const { slide, keys } of candidates) {
+      if (!keys.some((key) => needsUpload(recordsByKey.get(key)))) continue
+      const result = await retrySlideUploads(slide.id, recordsByKey)
       total.uploaded += result.uploaded
       total.failed += result.failed
       if (result.quotaExceeded) {
