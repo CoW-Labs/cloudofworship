@@ -193,14 +193,18 @@
             :style="backgroundStyles"
           ></div>
 
+          <!-- An intermission paints an opaque canvas, so its label has to sit
+               above the content instead of showing through it. -->
           <div
             v-if="!fullScreen || slideLabel"
-            class="overlay-gradient absolute z-10 inset-0"
+            class="overlay-gradient absolute inset-0"
+            :class="labelLayerClass"
           ></div>
 
           <div
             v-if="!fullScreen || slideLabel"
-            class="heading p-3 absolute z-10 inset-0"
+            class="heading p-3 absolute inset-0"
+            :class="labelLayerClass"
           >
             <h5
               class="font-semibold text-white overflow-hidden truncate w-48 2xl:w-64"
@@ -344,6 +348,12 @@ import {
   safePlayMedia,
   safePostMessage,
 } from "~/utils/browserSafety"
+import {
+  INTERMISSION_EXIT_MS,
+  intermissionExitKey,
+  intermissionModeKey,
+  type IntermissionExitSignal,
+} from "~/utils/intermission/context"
 
 const appMounted = ref<boolean>(false)
 const video = ref<HTMLVideoElement | null>(null)
@@ -509,6 +519,19 @@ onBeforeUnmount(() => {
 // Same-slide edits share this object's reactivity and update in place.
 const displayedSlide = ref<Slide | null | undefined>(props.slide)
 
+// Intermission slides animate here: at full rate on the projector, at the
+// preview rate in the operator's live output panel.
+provide(
+  intermissionModeKey,
+  computed(() => (props.fullScreen ? "live" : "preview"))
+)
+const labelLayerClass = computed(() =>
+  displayedSlide.value?.type === slideTypes.intermission ? "z-20" : "z-10"
+)
+const intermissionExit = ref<IntermissionExitSignal | null>(null)
+provide(intermissionExitKey, intermissionExit)
+let slideChangeToken = 0
+
 // Resolve the Vue transition name from the transition type. Only `fade` is
 // implemented today; future types (slide/zoom/cut) plug in here + one CSS block.
 const transitionName = computed(() => `cow-slide-${transitionTypes.fade}`)
@@ -571,6 +594,28 @@ const preloadBackgroundImage = async (slide: Slide): Promise<boolean> => {
 watch(
   () => props.slide,
   async (newSlide, oldSlide) => {
+    // Moving off an intermission: hold it while its text blurs out, then
+    // let the usual crossfade take over. A newer change supersedes this one.
+    const token = ++slideChangeToken
+    const leaving = displayedSlide.value
+    if (
+      leaving?.type === slideTypes.intermission &&
+      leaving.id !== newSlide?.id &&
+      currentState.value.settings.animations
+    ) {
+      intermissionExit.value = { id: leaving.id, exiting: true }
+      await new Promise((resolve) => setTimeout(resolve, INTERMISSION_EXIT_MS))
+      if (token !== slideChangeToken) return
+    } else if (
+      leaving &&
+      newSlide?.id === leaving.id &&
+      intermissionExit.value?.id === leaving.id &&
+      intermissionExit.value.exiting
+    ) {
+      // Back to the same intermission before its exit finished.
+      intermissionExit.value = { id: leaving.id, exiting: false }
+    }
+
     if (!newSlide) {
       displayedSlide.value = newSlide
       return

@@ -6,6 +6,7 @@
         { 'cow-input__field--error': !!error },
         { 'cow-input__field--floated': floated },
         { 'cow-input__field--focused': focused },
+        { 'cow-input__field--sm': size === 'sm' },
       ]"
     >
       <label
@@ -56,6 +57,8 @@ const props = withDefaults(
     label?: string
     type?: string
     error?: string
+    /** "sm" is the slightly tighter field used inside editor panels. */
+    size?: "md" | "sm"
   }>(),
   {
     modelValue: "",
@@ -105,6 +108,20 @@ const onBlur = () => {
 
 .cow-input__field.cow-input__field--floated {
   box-shadow: inset 0 0 0 1.5px rgba(15, 23, 42, 0.22);
+}
+
+.cow-input__field--sm {
+  border-radius: 0.85rem;
+  padding: 0.8rem 0.85rem 0.65rem;
+}
+
+.cow-input__field--sm .cow-input__control {
+  font-size: 14px;
+}
+
+.cow-input__field--sm .cow-input__label:not(.cow-input__label--float) {
+  left: 0.85rem;
+  font-size: 0.875rem;
 }
 
 .cow-input__control {

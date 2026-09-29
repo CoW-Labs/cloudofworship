@@ -6,6 +6,7 @@
         { 'cow-dd__field--error': !!error },
         { 'cow-dd__field--floated': floated },
         { 'cow-dd__field--focused': focused },
+        { 'cow-dd__field--sm': size === 'sm' },
       ]"
       @focusin="focused = true"
       @focusout="focused = false"
@@ -53,6 +54,8 @@ const props = withDefaults(
     placeholder?: string
     error?: string
     searchable?: boolean
+    /** "sm" is the slightly tighter field used inside editor panels. */
+    size?: "md" | "sm"
   }>(),
   {
     modelValue: "",
@@ -108,6 +111,20 @@ const menuPanelUi = {
 
 .cow-dd__field.cow-dd__field--floated {
   box-shadow: inset 0 0 0 1.5px rgba(15, 23, 42, 0.22);
+}
+
+.cow-dd__field--sm {
+  border-radius: 0.85rem;
+  padding: 0.8rem 0.85rem 0.65rem;
+}
+
+.cow-dd__field--sm :deep(button) {
+  font-size: 14px;
+}
+
+.cow-dd__field--sm .cow-dd__label:not(.cow-dd__label--float) {
+  left: 0.85rem;
+  font-size: 0.875rem;
 }
 
 .cow-dd__field.cow-dd__field--focused {

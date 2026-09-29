@@ -259,6 +259,11 @@
       {{ formattedTime }}
     </div>
   </div>
+
+  <IntermissionView
+    v-else-if="slide?.layout === slideLayoutTypes.intermission"
+    :slide="slide"
+  />
 </template>
 
 <script setup lang="ts">
