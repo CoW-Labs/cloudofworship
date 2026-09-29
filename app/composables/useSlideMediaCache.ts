@@ -5,6 +5,7 @@ import type {
   Slide,
 } from "~/types"
 import { isRetryableMediaDownloadError } from "~/utils/mediaDownloadErrors"
+import { isSessionMediaUrl } from "~/utils/mediaTransport"
 
 /**
  * Local-first media resolution for operator, projection, and livestream
@@ -39,8 +40,13 @@ export default function useSlideMediaCache() {
   const reportProgress = (key: string, fraction: number) =>
     setProgress(key, Number.isFinite(fraction) ? fraction * 100 : Number.NaN)
 
+  // `http://asset.localhost/...` is a Tauri file path on one PC, not a cloud
+  // copy. Older builds wrote those to the server, and treating them as remote
+  // sent every other device off to download from a machine it can't reach.
   const isRemoteUrl = (url?: string | null): url is string =>
-    !!url && (url.startsWith("http://") || url.startsWith("https://"))
+    !!url &&
+    (url.startsWith("http://") || url.startsWith("https://")) &&
+    !isSessionMediaUrl(url)
 
   /**
    * The first candidate that can actually be fetched over the network.

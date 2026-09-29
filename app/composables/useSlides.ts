@@ -2,7 +2,7 @@ import { useDebounceFn, useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
-import { toTransportSafeSlide } from "~/utils/mediaTransport"
+import { isSessionMediaUrl, toTransportSafeSlide } from "~/utils/mediaTransport"
 import { enqueueSlideShadowWrite } from "~/composables/useSlideRepository"
 import {
   getAPIErrorMessage,
@@ -106,7 +106,10 @@ export default function useSlides() {
 
   const localizeLiveSlideMedia = (liveSlide: Slide) => {
     const bg = liveSlide.background
-    const isRemote = !!bg && (bg.startsWith("http://") || bg.startsWith("https://"))
+    const isRemote =
+      !!bg &&
+      (bg.startsWith("http://") || bg.startsWith("https://")) &&
+      !isSessionMediaUrl(bg)
     const bearsMedia =
       liveSlide.type === slideTypes.media ||
       liveSlide.type === slideTypes.presentation ||
