@@ -294,21 +294,26 @@ const FEATURE_UPGRADE_COPY: Record<string, { title: string; description: string 
     title: "Overlays are part of Teams",
     description: "Layer lower thirds and logos over live slides.",
   },
+  // Song search, transcription and the livestream link are metered on Free
+  // rather than locked, so their modal mostly opens when the free allowance
+  // runs out. The copy speaks to that.
   "new-song-search": {
-    title: "Search every song with Teams",
-    description: "Find any song's lyrics in seconds, no typing.",
+    title: "Add every song you need with Teams",
+    description:
+      "Free churches add 10 library songs a month. Teams has no limit.",
   },
   "new-transcribe": {
-    title: "Live transcription is part of Teams",
-    description: "Turn the sermon into text as it's preached.",
+    title: "Keep transcribing with Teams",
+    description: "Turn the sermon into text as it's preached, 3 hours a week.",
   },
   "open-invite-modal": {
     title: "Bring your team in with Teams",
     description: "Let your media team edit and project slides together.",
   },
   "livestream-url": {
-    title: "Share a livestream link with Teams",
-    description: "Share your slides in real time to anywhere in the world.",
+    title: "Keep livestreaming with Teams",
+    description:
+      "Free churches get 5 livestream sessions. Teams streams every service.",
   },
   "open-stage-display": {
     title: "Stage Display is part of Teams",
@@ -325,6 +330,10 @@ const FEATURE_UPGRADE_COPY: Record<string, { title: string; description: string 
   "new-time-slide": {
     title: "Clock slides are part of Teams",
     description: "Show the current time on screen.",
+  },
+  [appWideActions.newInterlude]: {
+    title: "Interludes are part of Teams",
+    description: "Fill the moments between songs with an animated break screen.",
   },
 }
 // Sibling actions that share a feature's copy.

@@ -79,8 +79,12 @@ declare global {
 /**
  * Composable for real-time sermon transcription.
  *
- * - FREE users: uses the browser's built-in Web Speech API (offline, no limit).
- * - TEAMS users: uses Deepgram via the backend WebSocket proxy (AI, 60 min/week).
+ * Every plan uses Deepgram via the backend WebSocket proxy. The API meters it:
+ * 10 minutes once per church on Free, 180 minutes a week on Teams.
+ *
+ * The Web Speech engine below is no longer selected. Free churches used to get
+ * it (offline, unlimited) in place of Deepgram; they now get a real taste of
+ * Deepgram instead, and an upgrade prompt when it is spent.
  *
  * The composable auto-detects the plan and delegates to the appropriate engine.
  * The returned API surface is identical for both engines so the UI doesn't change.
@@ -89,18 +93,10 @@ export default function useSermonTranscription() {
   const appStore = useAppStore()
   const toast = useToast()
 
-  // Teams plan check — delegate to Deepgram for teams users
   const { isTeamsPlan } = useSubscription()
-  // Use the reactive isEnabled ref so the computed re-evaluates once PostHog loads the flag.
-  // checkFlag() is non-reactive (plain function) and would always read false on first render.
-  const { isEnabled: isTranscriptsFreeEnabled } = useFeatureFlags('transcripts-free')
-  const useDeepgramEngine = computed(() => {
-    if (isTeamsPlan.value) return true
-    if (isTranscriptsFreeEnabled.value) return true
-    // TODO: Remove after 2026-05-05
-    if (new Date() < new Date('2026-05-05T23:59:59Z')) return true
-    return false
-  })
+  // Kept as a computed so the engine switch below stays in one place if a
+  // second engine is ever brought back.
+  const useDeepgramEngine = computed(() => true)
 
   // Lazily create the Deepgram composable so FREE users don't trigger
   // its initialisation (which fires an API request for usage stats).
@@ -600,10 +596,12 @@ export default function useSermonTranscription() {
     // Mic loudness level (0–100), live during transcription
     micLevel: computed(() => useDeepgramEngine.value ? deepgram.micLevel.value : micLevel.value),
 
-    // Deepgram usage stats (null for free users)
+    // Deepgram usage against the church's allowance
     remainingMinutes: deepgram.remainingMinutes,
     remainingSeconds: deepgram.remainingSeconds,
     usedMinutes: deepgram.usedMinutes,
+    usagePeriod: deepgram.usagePeriod,
+    limitSeconds: deepgram.limitSeconds,
     isTeamsPlan,
     useDeepgramEngine,
 

@@ -1,5 +1,12 @@
 <template>
   <div class="song-main min-h-[80vh] h-[100%] flex flex-col" ref="quickActions">
+    <CowTeamsPreviewNotice
+      v-if="isMetered"
+      :feature="appWideActions.newSongSearch"
+      :title="quotaNotice.title"
+      :description="quotaNotice.description"
+      class="mb-2"
+    />
     <div
       class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1.5 flex flex-col flex-1 min-h-0"
     >
@@ -111,6 +118,36 @@ const onRowMouseEnter = (index: number) => {
 }
 const quickActions = ref<HTMLDivElement | null>(null)
 const authStore = useAuthStore()
+const { isMetered, songsLeft, songsLimit, usage, refresh: refreshUsage } =
+  useUsageQuotas()
+refreshUsage()
+
+// Free churches search the whole library but get previews; adding a library
+// song to the schedule spends one of the month's allowance (see claimSong).
+const quotaNotice = computed(() => {
+  const limit = songsLimit.value ?? 10
+  if (songsLeft.value === 0) {
+    const resetsAt = usage.value?.songs.resetsAt
+    const resetDate = resetsAt
+      ? new Date(resetsAt).toLocaleDateString(undefined, {
+          month: "long",
+          day: "numeric",
+        })
+      : "the 1st"
+    return {
+      title: `You've used this month's ${limit} free library songs`,
+      description: `More arrive on ${resetDate}. Upgrade to Teams for unlimited songs. Your own songs are always free.`,
+    }
+  }
+  return {
+    title:
+      songsLeft.value === null
+        ? `${limit} free library songs a month`
+        : `${songsLeft.value} of ${limit} free library songs left this month`,
+    description:
+      "Search and preview any song. Adding a library song to your schedule uses one. Your own songs are always free.",
+  }
+})
 const itemRefs = ref<(HTMLElement | null)[]>([])
 let latestSongSearchId = 0
 

@@ -9,6 +9,7 @@ import { useAppStore } from "~/store/app"
 const useScheduleViewerLink = (options: {
   route: string
   copiedTitle: string
+  copiedDescription?: ComputedRef<string | undefined>
   canUse: ComputedRef<boolean>
 }) => {
   const appStore = useAppStore()
@@ -36,6 +37,7 @@ const useScheduleViewerLink = (options: {
     await navigator.clipboard.writeText(url.value)
     toast.add({
       title: options.copiedTitle,
+      description: options.copiedDescription?.value,
       color: "green",
       icon: "i-bx-check-circle",
     })
@@ -56,19 +58,47 @@ const useScheduleViewerLink = (options: {
  * the Go Live popover it used to hide behind is about opening a second window,
  * which a phone has no way to do.
  *
- * Teams-gated: `canUseLivestreamLink` is false on the free plan, and callers are
- * expected to show the upgrade prompt instead of copying.
+ * Unlimited on Teams. A free church gets a lifetime allowance of sessions (a
+ * schedule watched on a new day spends one), counted and enforced by the
+ * server when a viewer connects. `canUseLivestreamLink` is false only once the
+ * allowance is known to be spent, and callers show the upgrade prompt then.
  */
 export const useLivestreamLink = () => {
-  const { isTeamsPlan } = useSubscription()
+  const { hasAccessToFeature } = useSubscription()
+  const {
+    usage,
+    isMetered,
+    refresh,
+    livestreamSessionsLeft,
+    livestreamSessionsLimit,
+  } = useUsageQuotas()
+  if (isMetered.value && !usage.value) refresh()
+
+  const hasTeamsAccess = computed(() => hasAccessToFeature("livestream-url"))
+
+  /** e.g. "3 of 5 free sessions left". Null on Teams or while unknown. */
+  const livestreamSessionsLabel = computed(() => {
+    if (hasTeamsAccess.value || livestreamSessionsLeft.value === null) return null
+    return `${livestreamSessionsLeft.value} of ${livestreamSessionsLimit.value} free sessions left`
+  })
+
   const link = useScheduleViewerLink({
     route: "livestream",
     copiedTitle: "Livestream URL copied to clipboard",
-    canUse: computed(() => isTeamsPlan.value),
+    copiedDescription: computed(() =>
+      livestreamSessionsLabel.value
+        ? `Streaming a schedule on a new day uses one free session. ${livestreamSessionsLabel.value}.`
+        : undefined
+    ),
+    // An unknown count is let through: the server has the final say.
+    canUse: computed(
+      () => hasTeamsAccess.value || livestreamSessionsLeft.value !== 0
+    ),
   })
 
   return {
     canUseLivestreamLink: link.canUse,
+    livestreamSessionsLabel,
     isClipboardCopying: link.isClipboardCopying,
     livestreamURL: link.url,
     copyLivestreamURL: link.copy,

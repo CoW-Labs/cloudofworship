@@ -188,6 +188,66 @@ export default function useSongs() {
   }
 
   /**
+   * Releases the full lyrics of a library song a free church is about to use.
+   *
+   * A free church's search returns library songs as previews (first verse,
+   * `isPreview: true`). Turning one into a slide goes through here, which
+   * spends one of the month's library songs server-side and returns the whole
+   * song. Out of songs (429 SONG_QUOTA) opens the upgrade modal and resolves
+   * null, so the caller simply does not create the slide.
+   *
+   * Never queued offline: a retried claim would spend a song later for a slide
+   * that was never made.
+   */
+  const claimSong = async (song: Song): Promise<Song | null> => {
+    const songId = (song as any)?._id
+    if (!songId) return null
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.add({
+        icon: 'i-bx-wifi-off',
+        title: 'Library songs need a connection',
+        description: 'Reconnect to add this song. Your own saved songs still work offline.',
+        color: 'amber',
+      })
+      return null
+    }
+
+    // Read at call time: PreviewContent creates this composable at setup,
+    // possibly before the signed-in user has loaded.
+    const { data, error } = await useAPIFetch(
+      `/church/${authStore.user?.churchId}/songs/${songId}/claim`,
+      { method: 'POST' }
+    )
+
+    if (error.value) {
+      const body = (error.value as any)?.data
+      if (body?.code === 'SONG_QUOTA') {
+        useUsageQuotas().setSongsUsed(body.used)
+        useGlobalEmit(appWideActions.showUpgradeModal, {
+          feature: appWideActions.newSongSearch,
+        })
+        usePosthogCapture('SONG_QUOTA_REACHED', { used: body.used, limit: body.limit })
+        return null
+      }
+      toast.add({
+        icon: 'i-bx-error',
+        title: "Couldn't add this song",
+        description: body?.msg || body?.message || (error.value as any)?.message,
+        color: 'red',
+      })
+      return null
+    }
+
+    // The count moved (or not, for a song already added this month); re-read
+    // it rather than guess.
+    useUsageQuotas().refresh()
+
+    const full = (data.value as any)?.data as Song
+    return full ? { ...song, ...full, isPreview: false } as Song : null
+  }
+
+  /**
    * Create a new song
    */
   const createSong = async (songData: Partial<Song>): Promise<Song | null> => {
@@ -372,6 +432,7 @@ export default function useSongs() {
     loading,
     songs,
     searchSongs,
+    claimSong,
     findSimilarSongs,
     getAllSongs,
     getSongsCount,

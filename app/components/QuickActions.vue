@@ -290,7 +290,7 @@ import { escapePriority } from "~/composables/useEscapeKey"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
-const { hasAccessToFeature } = useSubscription()
+const { openFeatureOrUpgrade, requireFeatureAccess } = useSubscription()
 const online = useOnline()
 const { savedSongs } = useLibrary()
 const { searchSongs } = useSongs()
@@ -613,11 +613,7 @@ const quickSearchPromo = computed(() => {
 })
 
 const handleChipClick = (action: string) => {
-  if (!hasAccessToFeature(action)) {
-    emitter.emit("show-upgrade-modal", { feature: action })
-    usePosthogCapture("TEAMS_FEATURE_BLOCKED", { feature: action })
-    return
-  }
+  if (!openFeatureOrUpgrade(action)) return
   useGlobalEmit(action)
 }
 
@@ -626,22 +622,13 @@ const handlePromoClick = () => {
   if (action) handleChipClick(action)
 }
 
-// The online lyrics library is Teams-only. Every route into the song search
-// page funnels through here (the "Search song lyrics" card, the "Search in
-// songs" banner in HymnList), so a free church gets the upgrade modal instead
-// of the search — while songs it already owns (personal library, "Add Song")
-// keep working, since those emit "new-song" with a payload.
-const canSearchSongLyrics = () =>
-  hasAccessToFeature(appWideActions.newSongSearch)
-
-const ensureSongSearchAccess = () => {
-  if (canSearchSongLyrics()) return true
-  emitter.emit("show-upgrade-modal", { feature: appWideActions.newSongSearch })
-  usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
-    feature: appWideActions.newSongSearch,
-  })
-  return false
-}
+// The online lyrics library is open to every plan for searching. A free
+// church gets catalogue songs back as previews (first verse, `isPreview`) and
+// spends one of its monthly library songs when it adds one (see claimSong in
+// useSongs). Every route into the song search page funnels through here (the
+// "Search song lyrics" card, the "Search in songs" banner in HymnList).
+const ensureSongSearchAccess = () =>
+  openFeatureOrUpgrade(appWideActions.newSongSearch)
 
 const getAllHymns = async () => {
   const allHymns = await db.bibleAndHymns.get("hymns")
@@ -667,10 +654,9 @@ const mapSongToAction = (song: Song, fromSaved: boolean): QuickAction => {
 
 // Remote (global) song search results — always fetched alongside the local
 // library match so both sources are represented; duplicates and the 3+3 cap
-// are resolved when the song group is built in searchedActions. Gated behind
-// the Teams subscription like the rest of the online lyrics search, through
-// the same hasAccessToFeature check everything else uses. Locally saved songs
-// are unaffected — they stay free.
+// are resolved when the song group is built in searchedActions. Open to every
+// plan: a free church's catalogue hits come back as previews, and adding one
+// spends a monthly library song (PreviewContent → claimSong).
 const remoteSongActions = ref<QuickAction[]>([])
 const isSearchingRemoteSongs = ref(false)
 // Guards against out-of-order results when overlapping calls fire (e.g. fast
@@ -680,9 +666,8 @@ let remoteSongsRequestId = 0
 
 const fetchRemoteSongsIfNeeded = useDebounceFn(async (query: string) => {
   const requestId = ++remoteSongsRequestId
-  const songSearchAllowed = canSearchSongLyrics()
 
-  if (query.length < 2 || !songSearchAllowed) {
+  if (query.length < 2) {
     remoteSongActions.value = []
     isSearchingRemoteSongs.value = false
     return
@@ -1054,16 +1039,7 @@ const handleInputKeydown = (e: KeyboardEvent) => {
         focusedActionIndex.value
       ] as unknown as QuickAction
       if (action) {
-        const actionName = action?.action || ""
-        if (!hasAccessToFeature(actionName)) {
-          emitter.emit("show-upgrade-modal", { feature: actionName })
-          usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
-            feature: actionName,
-          })
-          return
-        }
-        useGlobalEmit(
-          action?.action,
+        const payload =
           action?.type === slideTypes.bible
             ? `${action?.bibleBookIndex}:${
                 action?.bibleChapterAndVerse || bibleChapterAndVerse.value
@@ -1075,7 +1051,11 @@ const handleInputKeydown = (e: KeyboardEvent) => {
             : action?.type === slideTypes.countdown && action?.countdownData
             ? action?.countdownData
             : action?.actionArg || ""
-        )
+        // Same rule as ActionCard: an action carrying its payload creates
+        // straight away, so it is the commit step, not a preview.
+        const gate = payload ? requireFeatureAccess : openFeatureOrUpgrade
+        if (!gate(action?.action || "")) return
+        useGlobalEmit(action?.action, payload)
       }
       break
     default:

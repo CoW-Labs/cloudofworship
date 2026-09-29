@@ -37,6 +37,10 @@ interface SocketIOOptions {
 export interface TierRestriction {
   feature?: string
   plan?: string
+  /** "quota" when a free church has used its livestream sessions. */
+  reason?: "plan" | "quota"
+  used?: number
+  limit?: number
   message?: string
 }
 

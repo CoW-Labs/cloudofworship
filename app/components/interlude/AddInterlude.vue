@@ -4,6 +4,10 @@
        raised edge would otherwise be clipped at the scroll edge. -->
   <div class="add-interlude-main">
     <div class="flex flex-col gap-4 px-1.5 pt-3">
+      <CowTeamsPreviewNotice
+        v-if="!hasAccessToFeature(appWideActions.newInterlude)"
+        :feature="appWideActions.newInterlude"
+      />
       <p class="text-xs text-gray-500 dark:text-[#7d8695]">
         Adds an animated break screen to this schedule. The heading and sub text
         stay on screen while the animation loops.
@@ -48,11 +52,13 @@
 import { defaultInterludeData } from "~/utils/interlude/slide"
 
 const emit = defineEmits(["close"])
+const { hasAccessToFeature, requireFeatureAccess } = useSubscription()
 
 const form = ref(defaultInterludeData())
 const picked = ref(false)
 
 const createInterlude = () => {
+  if (!requireFeatureAccess(appWideActions.newInterlude)) return
   useGlobalEmit(appWideActions.newInterlude, {
     ...form.value,
     heading: form.value.heading.trim(),

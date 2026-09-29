@@ -2,7 +2,10 @@
   <!-- The server refused this schedule: no slide will ever arrive, so the
        loader below would spin forever and the projection surface would stay
        black with nothing to explain it. -->
-  <LivestreamUnavailable v-if="tierRestricted" />
+  <LivestreamUnavailable
+    v-if="tierRestricted"
+    :reason="tierRestrictionReason"
+  />
   <div
     v-else-if="loadingResources"
     class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center dark:bg-gray-900"
@@ -118,6 +121,7 @@ const showConnectionError = ref(false)
 // socket remains connected but empty, and flipping back would need a fresh
 // connection, which is what a reload gives.
 const tierRestricted = ref(false)
+const tierRestrictionReason = ref<"plan" | "quota">("plan")
 
 useHead({
   title: "CoW Live",
@@ -318,14 +322,17 @@ const socketManager = useSocketIO({
   maxRetryDelay: 30000,
   connectionTimeout: 10000,
   onMessage: (event, data) => void handleWebSocketMessage(data),
-  onTierRestricted: () => {
+  onTierRestricted: (restriction) => {
     tierRestricted.value = true
+    tierRestrictionReason.value =
+      restriction?.reason === "quota" ? "quota" : "plan"
     // A refused socket never reports a connection problem, so clear the
     // reconnecting chrome that would otherwise sit over the wall.
     connectionStatus.value = "connected"
     loadingResources.value = false
     usePosthogCapture("LIVESTREAM_TIER_RESTRICTED", {
       scheduleId: route.params.schedule_id,
+      reason: tierRestrictionReason.value,
     })
   },
   onConnected: () => {

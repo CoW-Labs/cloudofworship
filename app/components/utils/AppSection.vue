@@ -214,8 +214,12 @@ const secondaryActionPopoverOpen = ref(false)
 
 // Shared with the live-output panel's own menu, so the two entry points cannot
 // disagree about the URL or the Teams gate.
-const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
-  useLivestreamLink()
+const {
+  canUseLivestreamLink,
+  livestreamSessionsLabel,
+  isClipboardCopying,
+  copyLivestreamURL,
+} = useLivestreamLink()
 const { canUseStageStreamLink, isStageLinkCopying, copyStageStreamURL } =
   useStageStreamLink()
 const { hasAccessToFeature } = useSubscription()
@@ -248,7 +252,9 @@ const goLiveMenuItems = computed(() => [
   },
   {
     label: "Copy livestream link",
-    desc: "For OBS, vMix or similar software",
+    desc: livestreamSessionsLabel.value
+      ? `For OBS, vMix or similar software. ${livestreamSessionsLabel.value}`
+      : "For OBS, vMix or similar software",
     icon: isClipboardCopying.value ? "i-ph-check-circle" : "i-ph-broadcast",
     disabled: false,
     locked: !canUseLivestreamLink.value,
