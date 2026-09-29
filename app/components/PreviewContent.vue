@@ -177,6 +177,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
   Hymn,
+  IntermissionSlideData,
   Scripture,
   Slide,
   Song,
@@ -272,6 +273,7 @@ const {
   createPresentationSlide,
   createCountdownSlide,
   createTimeSlide,
+  createIntermissionSlide,
   saveSlideToLib,
   duplicateSlide,
   duplicateSlideAsOverlay,
@@ -1139,6 +1141,18 @@ emitter.on(appWideActions.newTimeSlide, () => {
   broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
 })
+
+emitter.on(
+  appWideActions.newIntermission,
+  (data?: Omit<IntermissionSlideData, "id">) => {
+    // No payload is the Quick Actions panel opening, not a new slide.
+    if (!data) return
+    const newSlide = createIntermissionSlide(data)
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
+  }
+)
 
 emitter.on("new-text", (slide: Slide[] | Slide) => {
   let newSlide: Slide | null

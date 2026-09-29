@@ -253,6 +253,13 @@
       @close="page = ''"
     />
 
+    <!-- INTERMISSION SECTION-->
+    <AddIntermission
+      v-else-if="page === 'intermission'"
+      class="fade-in-right h-full min-h-0 overflow-auto"
+      @close="page = ''"
+    />
+
     <!-- IMPORT SLIDES (PRESENTATION) SECTION-->
     <AddPresentation
       v-else-if="page === 'presentation'"
@@ -1001,6 +1008,12 @@ onEmitter(appWideActions.newStageCountdown, (data) => {
     countdownInitialTab.value = 1
     page.value = "countdown"
   }
+})
+
+// No payload opens the panel; a payload is a finished intermission on its way
+// to the schedule (PreviewContent creates the slide).
+onEmitter(appWideActions.newIntermission, (data) => {
+  if (!data) page.value = "intermission"
 })
 
 // A payload means a deck is being imported, not that the panel should open.

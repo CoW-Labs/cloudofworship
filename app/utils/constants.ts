@@ -10,6 +10,7 @@ export const slideTypes = {
   countdown: 'countdown',
   time: 'time',
   presentation: 'presentation',
+  intermission: 'intermission',
   // sermon: 'sermon',
   // carousel: 'carousel',
 }
@@ -40,6 +41,7 @@ export const appWideActions = {
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
   newTimeSlide: 'new-time-slide',
+  newIntermission: 'new-intermission',
   showSlideOverlay: 'show-slide-overlay',
   removeSlideOverlay: 'remove-slide-overlay',
   newSearchBible: 'new-search-bible',
@@ -239,6 +241,15 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newTimeSlide,
     meta: "time clock live clock current time",
     type: slideTypes.time,
+    tier: "teams",
+  },
+  {
+    icon: "i-ph-coffee",
+    name: "Add Intermission",
+    desc: "An animated break screen with a heading and sub text",
+    action: appWideActions.newIntermission,
+    meta: "intermission break pause animated background welcome coffee fellowship selah we'll be right back",
+    type: slideTypes.intermission,
     tier: "teams",
   },
   {
@@ -654,6 +665,7 @@ export const slideLayoutTypes = {
   bible: 'bible',
   countdown: 'countdown',
   time: 'time',
+  intermission: 'intermission',
   empty: 'empty',
 }
 

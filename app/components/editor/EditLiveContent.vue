@@ -224,6 +224,8 @@
                       ? backgroundPopoverSize.width
                       : tab.key === 'scripture'
                       ? scripturePopoverSize.width
+                      : tab.key === 'intermission'
+                      ? intermissionPopoverSize.width
                       : layoutPopoverSize.width
                   "
                   :max-height="
@@ -231,6 +233,8 @@
                       ? backgroundPopoverSize.height
                       : tab.key === 'scripture'
                       ? scripturePopoverSize.height
+                      : tab.key === 'intermission'
+                      ? intermissionPopoverSize.height
                       : layoutPopoverSize.height
                   "
                   :boundary-overflow="120"
@@ -271,6 +275,14 @@
                         @loading-change="onBgPanelLoading"
                         @upload-files="onPanelUploadFiles"
                         @resize="backgroundPopoverSize = $event"
+                        @close="activePanel = null"
+                      />
+                      <IntermissionBackgroundPanel
+                        v-else-if="tab.key === 'intermission'"
+                        :slide="slide"
+                        @select="onSelectIntermissionVariant"
+                        @save-texts="onSaveIntermissionTexts"
+                        @resize="intermissionPopoverSize = $event"
                         @close="activePanel = null"
                       />
                       <BibleThemeSelection
@@ -334,7 +346,9 @@
         :editor="focusedEditor"
       />
       <SlideContentToolbar
-        v-else-if="slide && !isEmptySongSetlist"
+        v-else-if="
+          slide && !isEmptySongSetlist && slide.type !== slideTypes.intermission
+        "
         :slide="slide"
         @update-style="onUpdateSlideStyle($event, false)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
@@ -505,9 +519,15 @@ import {
   mediaCloudFailureReason,
   unavailableMediaCopy,
 } from "~/utils/mediaCloudSync"
+import {
+  withIntermissionData,
+  defaultIntermissionData,
+} from "~/utils/intermission/slide"
+import { intermissionModeKey } from "~/utils/intermission/context"
 import type {
   ExtendedFileT,
   ExternalVideo,
+  IntermissionSlideData,
   MediaCloudSyncReason,
   Slide,
   SlideStyle,
@@ -678,7 +698,7 @@ const backgroundImageLoading = ref<boolean>(false)
 const backgroundVideoLoading = ref<boolean>(false)
 
 // Only one editor action popover can be open at a time.
-type PanelKey = "scripture" | "background" | "layout"
+type PanelKey = "scripture" | "background" | "layout" | "intermission"
 type PopoverSize = { width: number; height: number }
 const activePanel = ref<PanelKey | null>(null)
 const getInitialBackgroundPopoverSize = (): PopoverSize =>
@@ -691,6 +711,39 @@ const backgroundPopoverSize = ref<PopoverSize>(
 )
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+const intermissionPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+
+// Intermission slides animate in the editor, at the preview rate.
+provide(intermissionModeKey, "preview")
+
+const intermissionInput = computed(() => {
+  const { id: _id, ...input } = (props.slide?.data ||
+    {}) as IntermissionSlideData
+  return { ...defaultIntermissionData(), ...input }
+})
+
+// Each intermission panel section patches only its own fields; the rest of the
+// slide's data is carried over untouched.
+const patchIntermission = (patch: Partial<IntermissionSlideData>) => {
+  if (props.slide?.type !== slideTypes.intermission) return
+  const id = (props.slide.data as IntermissionSlideData | undefined)?.id
+  emit(
+    "slide-update",
+    withIntermissionData(props.slide, {
+      ...intermissionInput.value,
+      ...patch,
+      id: id || useID(),
+    })
+  )
+}
+const onSelectIntermissionVariant = (variant: string) =>
+  patchIntermission({ variant })
+const onSaveIntermissionTexts = (
+  texts: Pick<IntermissionSlideData, "heading" | "subtitle" | "textBackground">
+) => {
+  patchIntermission(texts)
+  activePanel.value = null
+}
 
 // Toolbar tabs that toggle the overlay panels. Scripture/Layout are Bible-only;
 // Background mirrors the old "add background" visibility (hidden for presentation
@@ -698,10 +751,19 @@ const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const visibleTabs = computed(() => {
   const isAudio = (props.slide?.data as ExtendedFileT)?.type?.includes("audio")
   const isBible = props.slide?.type === slideTypes.bible
+  const isIntermission = props.slide?.type === slideTypes.intermission
+  // An intermission paints its own background.
   const showBackground =
     props.slide?.type !== slideTypes.presentation &&
+    !isIntermission &&
     (props.slide?.type !== slideTypes.media || isAudio)
   const tabs: { key: PanelKey; label: string; hint: string }[] = []
+  if (isIntermission)
+    tabs.push({
+      key: "intermission",
+      label: "Intermission",
+      hint: "Change the animation, heading and sub text",
+    })
   if (isBible)
     tabs.push({
       key: "scripture",
