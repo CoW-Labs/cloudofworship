@@ -260,8 +260,8 @@
     </div>
   </div>
 
-  <IntermissionView
-    v-else-if="slide?.layout === slideLayoutTypes.intermission"
+  <InterludeView
+    v-else-if="slide?.layout === slideLayoutTypes.interlude"
     :slide="slide"
   />
 </template>

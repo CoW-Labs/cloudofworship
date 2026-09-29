@@ -1,5 +1,5 @@
 /**
- * Intermission slide engine.
+ * Interlude slide engine.
  *
  * Every frame is a pure function of time T (seconds since the slide mounted):
  * a 2.4s intro that plays once, then an 8s loop at 120 BPM whose second half
@@ -7,7 +7,7 @@
  * uses `u`, which is periodic in LOOP, so rotations use whole turns (or the
  * symbol's own symmetry) and the loop has no visible seam.
  *
- * Lives under utils/intermission/ (not utils/) on purpose: Nuxt auto-imports
+ * Lives under utils/interlude/ (not utils/) on purpose: Nuxt auto-imports
  * top-level utils, and helpers like `clamp` would collide app-wide.
  */
 
@@ -50,7 +50,7 @@ const hexA = (h: string, a: number) => {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
 }
 
-export interface IntermissionPalette {
+export interface InterludePalette {
   name: string
   bg: string
   c: string[]
@@ -86,7 +86,7 @@ export interface WipeState {
   since: number
 }
 
-export interface IntermissionVariant {
+export interface InterludeVariant {
   id: string
   name: string
   symbol: string
@@ -98,8 +98,8 @@ export interface IntermissionVariant {
    * drawing it smaller and scaling up looks the same. Defaults to 1.
    */
   renderScale?: number
-  palettes: [IntermissionPalette, IntermissionPalette]
-  draw: (c: CanvasRenderingContext2D, S: FrameState, P: IntermissionPalette) => void
+  palettes: [InterludePalette, InterludePalette]
+  draw: (c: CanvasRenderingContext2D, S: FrameState, P: InterludePalette) => void
 }
 
 export function frameState(T: number, w: number, h: number): FrameState {
@@ -192,8 +192,8 @@ export function textPulse(S: FrameState, wipe: WipeState) {
 function renderScene(
   c: CanvasRenderingContext2D,
   S: FrameState,
-  P: IntermissionPalette,
-  v: IntermissionVariant,
+  P: InterludePalette,
+  v: InterludeVariant,
   scrim: number
 ) {
   c.fillStyle = P.bg
@@ -211,12 +211,12 @@ function renderScene(
 }
 
 /** Draws one frame. The caller sets the device-pixel transform first. */
-export function renderIntermissionFrame(
+export function renderInterludeFrame(
   c: CanvasRenderingContext2D,
   w: number,
   h: number,
   T: number,
-  v: IntermissionVariant,
+  v: InterludeVariant,
   scrim: number
 ) {
   const S = frameState(T, w, h)
@@ -299,7 +299,7 @@ function superShape(
 function flower(
   c: CanvasRenderingContext2D,
   S: FrameState,
-  P: IntermissionPalette,
+  P: InterludePalette,
   x: number,
   y: number,
   size: number,
@@ -348,7 +348,7 @@ function flower(
 // for new slides.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const intermissionVariants: IntermissionVariant[] = [
+export const interludeVariants: InterludeVariant[] = [
   {
     id: "cow-original",
     name: "CoW Original",
@@ -836,7 +836,7 @@ export const intermissionVariants: IntermissionVariant[] = [
   },
 ]
 
-export const DEFAULT_INTERMISSION_VARIANT = intermissionVariants[0]!.id
+export const DEFAULT_INTERLUDE_VARIANT = interludeVariants[0]!.id
 
-export const getIntermissionVariant = (id?: string): IntermissionVariant =>
-  intermissionVariants.find((v) => v.id === id) || intermissionVariants[0]!
+export const getInterludeVariant = (id?: string): InterludeVariant =>
+  interludeVariants.find((v) => v.id === id) || interludeVariants[0]!

@@ -224,8 +224,8 @@
                       ? backgroundPopoverSize.width
                       : tab.key === 'scripture'
                       ? scripturePopoverSize.width
-                      : tab.key === 'intermission'
-                      ? intermissionPopoverSize.width
+                      : tab.key === 'interlude'
+                      ? interludePopoverSize.width
                       : layoutPopoverSize.width
                   "
                   :max-height="
@@ -233,8 +233,8 @@
                       ? backgroundPopoverSize.height
                       : tab.key === 'scripture'
                       ? scripturePopoverSize.height
-                      : tab.key === 'intermission'
-                      ? intermissionPopoverSize.height
+                      : tab.key === 'interlude'
+                      ? interludePopoverSize.height
                       : layoutPopoverSize.height
                   "
                   :boundary-overflow="120"
@@ -277,12 +277,12 @@
                         @resize="backgroundPopoverSize = $event"
                         @close="activePanel = null"
                       />
-                      <IntermissionBackgroundPanel
-                        v-else-if="tab.key === 'intermission'"
+                      <InterludeBackgroundPanel
+                        v-else-if="tab.key === 'interlude'"
                         :slide="slide"
-                        @select="onSelectIntermissionVariant"
-                        @save-texts="onSaveIntermissionTexts"
-                        @resize="intermissionPopoverSize = $event"
+                        @select="onSelectInterludeVariant"
+                        @save-texts="onSaveInterludeTexts"
+                        @resize="interludePopoverSize = $event"
                         @close="activePanel = null"
                       />
                       <BibleThemeSelection
@@ -347,7 +347,7 @@
       />
       <SlideContentToolbar
         v-else-if="
-          slide && !isEmptySongSetlist && slide.type !== slideTypes.intermission
+          slide && !isEmptySongSetlist && slide.type !== slideTypes.interlude
         "
         :slide="slide"
         @update-style="onUpdateSlideStyle($event, false)"
@@ -520,14 +520,14 @@ import {
   unavailableMediaCopy,
 } from "~/utils/mediaCloudSync"
 import {
-  withIntermissionData,
-  defaultIntermissionData,
-} from "~/utils/intermission/slide"
-import { intermissionModeKey } from "~/utils/intermission/context"
+  withInterludeData,
+  defaultInterludeData,
+} from "~/utils/interlude/slide"
+import { interludeModeKey } from "~/utils/interlude/context"
 import type {
   ExtendedFileT,
   ExternalVideo,
-  IntermissionSlideData,
+  InterludeSlideData,
   MediaCloudSyncReason,
   Slide,
   SlideStyle,
@@ -698,7 +698,7 @@ const backgroundImageLoading = ref<boolean>(false)
 const backgroundVideoLoading = ref<boolean>(false)
 
 // Only one editor action popover can be open at a time.
-type PanelKey = "scripture" | "background" | "layout" | "intermission"
+type PanelKey = "scripture" | "background" | "layout" | "interlude"
 type PopoverSize = { width: number; height: number }
 const activePanel = ref<PanelKey | null>(null)
 const getInitialBackgroundPopoverSize = (): PopoverSize =>
@@ -711,37 +711,37 @@ const backgroundPopoverSize = ref<PopoverSize>(
 )
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
-const intermissionPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+const interludePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 
-// Intermission slides animate in the editor, at the preview rate.
-provide(intermissionModeKey, "preview")
+// Interlude slides animate in the editor, at the preview rate.
+provide(interludeModeKey, "preview")
 
-const intermissionInput = computed(() => {
+const interludeInput = computed(() => {
   const { id: _id, ...input } = (props.slide?.data ||
-    {}) as IntermissionSlideData
-  return { ...defaultIntermissionData(), ...input }
+    {}) as InterludeSlideData
+  return { ...defaultInterludeData(), ...input }
 })
 
-// Each intermission panel section patches only its own fields; the rest of the
+// Each interlude panel section patches only its own fields; the rest of the
 // slide's data is carried over untouched.
-const patchIntermission = (patch: Partial<IntermissionSlideData>) => {
-  if (props.slide?.type !== slideTypes.intermission) return
-  const id = (props.slide.data as IntermissionSlideData | undefined)?.id
+const patchInterlude = (patch: Partial<InterludeSlideData>) => {
+  if (props.slide?.type !== slideTypes.interlude) return
+  const id = (props.slide.data as InterludeSlideData | undefined)?.id
   emit(
     "slide-update",
-    withIntermissionData(props.slide, {
-      ...intermissionInput.value,
+    withInterludeData(props.slide, {
+      ...interludeInput.value,
       ...patch,
       id: id || useID(),
     })
   )
 }
-const onSelectIntermissionVariant = (variant: string) =>
-  patchIntermission({ variant })
-const onSaveIntermissionTexts = (
-  texts: Pick<IntermissionSlideData, "heading" | "subtitle" | "textBackground">
+const onSelectInterludeVariant = (variant: string) =>
+  patchInterlude({ variant })
+const onSaveInterludeTexts = (
+  texts: Pick<InterludeSlideData, "heading" | "subtitle" | "textBackground">
 ) => {
-  patchIntermission(texts)
+  patchInterlude(texts)
   activePanel.value = null
 }
 
@@ -751,17 +751,17 @@ const onSaveIntermissionTexts = (
 const visibleTabs = computed(() => {
   const isAudio = (props.slide?.data as ExtendedFileT)?.type?.includes("audio")
   const isBible = props.slide?.type === slideTypes.bible
-  const isIntermission = props.slide?.type === slideTypes.intermission
-  // An intermission paints its own background.
+  const isInterlude = props.slide?.type === slideTypes.interlude
+  // An interlude paints its own background.
   const showBackground =
     props.slide?.type !== slideTypes.presentation &&
-    !isIntermission &&
+    !isInterlude &&
     (props.slide?.type !== slideTypes.media || isAudio)
   const tabs: { key: PanelKey; label: string; hint: string }[] = []
-  if (isIntermission)
+  if (isInterlude)
     tabs.push({
-      key: "intermission",
-      label: "Intermission",
+      key: "interlude",
+      label: "Interlude",
       hint: "Change the animation, heading and sub text",
     })
   if (isBible)

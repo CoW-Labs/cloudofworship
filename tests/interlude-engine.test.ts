@@ -5,13 +5,13 @@ import {
   TEXT_MOTION,
   WIPE,
   frameState,
-  getIntermissionVariant,
-  intermissionVariants,
-  renderIntermissionFrame,
+  getInterludeVariant,
+  interludeVariants,
+  renderInterludeFrame,
   scrimAmount,
   textMotion,
   wipeState,
-} from "~/utils/intermission/engine"
+} from "~/utils/interlude/engine"
 
 // A 2D context that accepts every call and records nothing. Enough to prove
 // each variant's draw code runs for any time and either palette.
@@ -30,9 +30,9 @@ const stubContext = () => {
   }) as unknown as CanvasRenderingContext2D
 }
 
-describe("intermission variants", () => {
+describe("interlude variants", () => {
   it("lists CoW Original first, then Gathering, Selah and Open Heavens", () => {
-    expect(intermissionVariants.map((v) => v.id)).toEqual([
+    expect(interludeVariants.map((v) => v.id)).toEqual([
       "cow-original",
       "gathering",
       "selah",
@@ -45,23 +45,23 @@ describe("intermission variants", () => {
   })
 
   it("falls back to CoW Original for an unknown or missing variant", () => {
-    expect(getIntermissionVariant("retired-variant").id).toBe("cow-original")
-    expect(getIntermissionVariant(undefined).id).toBe("cow-original")
+    expect(getInterludeVariant("retired-variant").id).toBe("cow-original")
+    expect(getInterludeVariant(undefined).id).toBe("cow-original")
   })
 
   it("draws every variant through the intro, the loop and both palettes", () => {
     const ctx = stubContext()
-    for (const variant of intermissionVariants) {
+    for (const variant of interludeVariants) {
       for (let T = 0; T < INTRO + LOOP * 2; T += 0.37) {
         expect(() =>
-          renderIntermissionFrame(ctx, 1280, 720, T, variant, 0.5)
+          renderInterludeFrame(ctx, 1280, 720, T, variant, 0.5)
         ).not.toThrow()
       }
     }
   })
 })
 
-describe("intermission timeline", () => {
+describe("interlude timeline", () => {
   it("holds the first palette through the intro and the first half-loop", () => {
     for (const T of [0, 1, INTRO, INTRO + LOOP / 2 - 0.01]) {
       expect(wipeState(T)).toMatchObject({ base: 0, wp: 0 })
@@ -112,7 +112,7 @@ describe("intermission timeline", () => {
   })
 })
 
-describe("intermission text motion", () => {
+describe("interlude text motion", () => {
   const M = TEXT_MOTION
 
   it("starts hidden, blurred and zoomed in, then settles", () => {

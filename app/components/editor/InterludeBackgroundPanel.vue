@@ -1,6 +1,6 @@
 <template>
   <div
-    class="intermission-background-panel flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 text-gray-800 dark:bg-[#131724] dark:text-[#F8F9FB]"
+    class="interlude-background-panel flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 text-gray-800 dark:bg-[#131724] dark:text-[#F8F9FB]"
   >
     <aside
       class="flex md:block w-full md:w-[158px] h-auto md:h-full shrink-0 overflow-x-auto md:overflow-x-visible border-b md:border-b-0 md:border-r border-gray-200 bg-[#f1f3f6] dark:border-white/[0.06] dark:bg-[#131724]"
@@ -74,7 +74,7 @@
       >
         <div class="grid grid-cols-2 md:grid-cols-4 gap-[8.5px]">
           <button
-            v-for="variant in intermissionVariants"
+            v-for="variant in interludeVariants"
             :key="variant.id"
             type="button"
             class="min-w-0 text-left focus-visible:outline-none"
@@ -95,7 +95,7 @@
               "
               style="aspect-ratio: 16 / 9"
             >
-              <IntermissionView
+              <InterludeView
                 :slide="previewSlide(variant.id)"
                 :mode="previewing === variant.id ? 'preview' : undefined"
               />
@@ -115,15 +115,15 @@
 
 <script setup lang="ts">
 import { useMediaQuery } from "@vueuse/core"
-import type { IntermissionSlideData, Slide } from "~/types"
-import { intermissionVariants } from "~/utils/intermission/engine"
-import { intermissionModeKey } from "~/utils/intermission/context"
-import { defaultIntermissionData } from "~/utils/intermission/slide"
+import type { InterludeSlideData, Slide } from "~/types"
+import { interludeVariants } from "~/utils/interlude/engine"
+import { interludeModeKey } from "~/utils/interlude/context"
+import { defaultInterludeData } from "~/utils/interlude/slide"
 
 type SectionKey = "animation" | "texts"
 type PanelSize = { width: number; height: number }
-type IntermissionTexts = Pick<
-  IntermissionSlideData,
+type InterludeTexts = Pick<
+  InterludeSlideData,
   "heading" | "subtitle" | "textBackground"
 >
 
@@ -133,14 +133,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "select", variant: string): void
-  (e: "save-texts", texts: IntermissionTexts): void
+  (e: "save-texts", texts: InterludeTexts): void
   (e: "resize", size: PanelSize): void
   (e: "close"): void
 }>()
 
 const slideData = computed(() => ({
-  ...defaultIntermissionData(),
-  ...(props.slide?.data as IntermissionSlideData | undefined),
+  ...defaultInterludeData(),
+  ...(props.slide?.data as InterludeSlideData | undefined),
 }))
 const value = computed(() => slideData.value.variant)
 
@@ -166,19 +166,19 @@ const mobilePanelSizes: Record<SectionKey, PanelSize> = {
 
 // Texts are edited as a draft and applied together on Save, so the live slide
 // and every teammate see one change rather than one per keystroke.
-const textsOf = (): IntermissionTexts => ({
+const textsOf = (): InterludeTexts => ({
   heading: slideData.value.heading,
   subtitle: slideData.value.subtitle,
   textBackground: slideData.value.textBackground,
 })
-const draft = reactive<IntermissionTexts>(textsOf())
+const draft = reactive<InterludeTexts>(textsOf())
 watch(
   () => props.slide?.id,
   () => Object.assign(draft, textsOf())
 )
 
 const textBackgroundLabels: Record<
-  IntermissionTexts["textBackground"],
+  InterludeTexts["textBackground"],
   string
 > = {
   auto: "Animation default",
@@ -191,7 +191,7 @@ const onTextBackground = (label: string) => {
     ([, text]) => text === label
   )
   if (entry)
-    draft.textBackground = entry[0] as IntermissionTexts["textBackground"]
+    draft.textBackground = entry[0] as InterludeTexts["textBackground"]
 }
 
 const canSave = computed(() => {
@@ -220,7 +220,7 @@ const activeHeading = computed(() => headings[activeSection.value])
 
 // Thumbnails are still frames, even inside the animated editor. Only the one
 // under the pointer (or keyboard focus) animates, so at most one runs at once.
-provide(intermissionModeKey, "static")
+provide(interludeModeKey, "static")
 const previewing = ref<string | null>(null)
 const stopPreview = (id: string) => {
   if (previewing.value === id) previewing.value = null
@@ -230,7 +230,7 @@ const stopPreview = (id: string) => {
 // actually look like on that animation.
 const previewSlide = (variant: string) =>
   ({
-    id: `intermission-preview-${variant}`,
+    id: `interlude-preview-${variant}`,
     data: { ...slideData.value, id: variant, variant },
   }) as unknown as Slide
 

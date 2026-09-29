@@ -193,7 +193,7 @@
             :style="backgroundStyles"
           ></div>
 
-          <!-- An intermission paints an opaque canvas, so its label has to sit
+          <!-- An interlude paints an opaque canvas, so its label has to sit
                above the content instead of showing through it. -->
           <div
             v-if="!fullScreen || slideLabel"
@@ -349,11 +349,11 @@ import {
   safePostMessage,
 } from "~/utils/browserSafety"
 import {
-  INTERMISSION_EXIT_MS,
-  intermissionExitKey,
-  intermissionModeKey,
-  type IntermissionExitSignal,
-} from "~/utils/intermission/context"
+  INTERLUDE_EXIT_MS,
+  interludeExitKey,
+  interludeModeKey,
+  type InterludeExitSignal,
+} from "~/utils/interlude/context"
 
 const appMounted = ref<boolean>(false)
 const video = ref<HTMLVideoElement | null>(null)
@@ -519,17 +519,17 @@ onBeforeUnmount(() => {
 // Same-slide edits share this object's reactivity and update in place.
 const displayedSlide = ref<Slide | null | undefined>(props.slide)
 
-// Intermission slides animate here: at full rate on the projector, at the
+// Interlude slides animate here: at full rate on the projector, at the
 // preview rate in the operator's live output panel.
 provide(
-  intermissionModeKey,
+  interludeModeKey,
   computed(() => (props.fullScreen ? "live" : "preview"))
 )
 const labelLayerClass = computed(() =>
-  displayedSlide.value?.type === slideTypes.intermission ? "z-20" : "z-10"
+  displayedSlide.value?.type === slideTypes.interlude ? "z-20" : "z-10"
 )
-const intermissionExit = ref<IntermissionExitSignal | null>(null)
-provide(intermissionExitKey, intermissionExit)
+const interludeExit = ref<InterludeExitSignal | null>(null)
+provide(interludeExitKey, interludeExit)
 let slideChangeToken = 0
 
 // Resolve the Vue transition name from the transition type. Only `fade` is
@@ -594,26 +594,26 @@ const preloadBackgroundImage = async (slide: Slide): Promise<boolean> => {
 watch(
   () => props.slide,
   async (newSlide, oldSlide) => {
-    // Moving off an intermission: hold it while its text blurs out, then
+    // Moving off an interlude: hold it while its text blurs out, then
     // let the usual crossfade take over. A newer change supersedes this one.
     const token = ++slideChangeToken
     const leaving = displayedSlide.value
     if (
-      leaving?.type === slideTypes.intermission &&
+      leaving?.type === slideTypes.interlude &&
       leaving.id !== newSlide?.id &&
       currentState.value.settings.animations
     ) {
-      intermissionExit.value = { id: leaving.id, exiting: true }
-      await new Promise((resolve) => setTimeout(resolve, INTERMISSION_EXIT_MS))
+      interludeExit.value = { id: leaving.id, exiting: true }
+      await new Promise((resolve) => setTimeout(resolve, INTERLUDE_EXIT_MS))
       if (token !== slideChangeToken) return
     } else if (
       leaving &&
       newSlide?.id === leaving.id &&
-      intermissionExit.value?.id === leaving.id &&
-      intermissionExit.value.exiting
+      interludeExit.value?.id === leaving.id &&
+      interludeExit.value.exiting
     ) {
-      // Back to the same intermission before its exit finished.
-      intermissionExit.value = { id: leaving.id, exiting: false }
+      // Back to the same interlude before its exit finished.
+      interludeExit.value = { id: leaving.id, exiting: false }
     }
 
     if (!newSlide) {

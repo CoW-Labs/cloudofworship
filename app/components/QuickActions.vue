@@ -253,9 +253,9 @@
       @close="page = ''"
     />
 
-    <!-- INTERMISSION SECTION-->
-    <AddIntermission
-      v-else-if="page === 'intermission'"
+    <!-- INTERLUDE SECTION-->
+    <AddInterlude
+      v-else-if="page === 'interlude'"
       class="fade-in-right h-full min-h-0 overflow-auto"
       @close="page = ''"
     />
@@ -1010,10 +1010,10 @@ onEmitter(appWideActions.newStageCountdown, (data) => {
   }
 })
 
-// No payload opens the panel; a payload is a finished intermission on its way
+// No payload opens the panel; a payload is a finished interlude on its way
 // to the schedule (PreviewContent creates the slide).
-onEmitter(appWideActions.newIntermission, (data) => {
-  if (!data) page.value = "intermission"
+onEmitter(appWideActions.newInterlude, (data) => {
+  if (!data) page.value = "interlude"
 })
 
 // A payload means a deck is being imported, not that the panel should open.
