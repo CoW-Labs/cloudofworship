@@ -7,7 +7,16 @@
 
       <h1 class="text-2xl font-semibold mb-3">{{ title }}</h1>
 
-      <p class="text-white/60 text-[15px] leading-relaxed">
+      <p
+        v-if="reason === 'quota'"
+        class="text-white/60 text-[15px] leading-relaxed"
+      >
+        This church has used its free livestream sessions. Unlimited
+        livestreaming is part of the
+        <span class="text-white/90 font-medium">Teams</span> plan. Nothing is
+        being sent to this screen.
+      </p>
+      <p v-else class="text-white/60 text-[15px] leading-relaxed">
         Live output to a shared link is part of the
         <span class="text-white/90 font-medium">Teams</span> plan, and this
         church isn't on it right now. Nothing is being sent to this screen.
@@ -37,7 +46,15 @@
  *
  * Also the wall for /stagestream/:schedule_id, the same gate on the same plan.
  */
-withDefaults(defineProps<{ title?: string }>(), {
-  title: "This livestream isn't active",
-})
+withDefaults(
+  defineProps<{
+    title?: string
+    /** "quota": a free church has spent its livestream sessions. */
+    reason?: "plan" | "quota"
+  }>(),
+  {
+    title: "This livestream isn't active",
+    reason: "plan",
+  }
+)
 </script>

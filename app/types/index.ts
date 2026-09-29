@@ -283,6 +283,9 @@ export interface Song {
   createdAt?: string
   updatedAt?: string
   fromSaved?: boolean // client-side only, set when the song came from the personal library
+  // A library song served to a free church: first verse only. The full song
+  // comes from useSongs().claimSong, which spends a monthly library song.
+  isPreview?: boolean
 }
 
 export interface ExternalVideo {

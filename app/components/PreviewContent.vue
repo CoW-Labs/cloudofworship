@@ -1249,7 +1249,20 @@ emitter.on("new-hymn", async (data: string) => {
   }
 })
 
+// A free church's library search results are previews (first verse only).
+// Turning one into a slide claims it first: that spends one of the month's
+// library songs and returns the full lyrics, or opens the upgrade modal and
+// returns null when none are left. Everything else passes straight through.
+const { claimSong } = useSongs()
+const claimIfPreview = async (song: Song): Promise<Song | null> =>
+  song?.isPreview ? await claimSong(song) : song
+
 emitter.on(appWideActions.newSongSetlist, async (song?: Song) => {
+  if (song) {
+    const claimed = await claimIfPreview(song)
+    if (!claimed) return
+    song = claimed
+  }
   reportSongSearchPick(song)
   const resolvedSong = song ? await useSong(song) : undefined
   const newSlide = await createSongSetlistSlide(resolvedSong || undefined)
@@ -1289,8 +1302,10 @@ const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
 
 emitter.on("new-song", async (data: Song) => {
   if (data) {
-    reportSongSearchPick(data)
-    const song = await useSong(data)
+    const claimed = await claimIfPreview(data)
+    if (!claimed) return
+    reportSongSearchPick(claimed)
+    const song = await useSong(claimed)
     if (song) {
       const setlistSlide = getRelevantSongSetlist()
 

@@ -411,8 +411,12 @@ watch(previewIdentity, () => {
   if (previewOpen.value) fetchPreviewContent()
 })
 
-const { requiresTeams, hasAccessToFeature } = useSubscription()
-const emitter = useNuxtApp().$emitter as any
+const {
+  requiresTeams,
+  hasAccessToFeature,
+  openFeatureOrUpgrade,
+  requireFeatureAccess,
+} = useSubscription()
 
 // Check if feature flag is enabled for this action
 const { checkFlag } = useFeatureFlags()
@@ -469,15 +473,12 @@ const handleActionClick = () => {
     return
   }
 
-  // Check if user has access to this feature
-  if (!hasAccessToFeature(actionName)) {
-    // Show upgrade modal instead of executing the action
-    emitter.emit("show-upgrade-modal", { feature: actionName })
-    usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
-      feature: actionName,
-    })
-    return
-  }
+  // Teams features with a panel open for a free church to try; the upgrade
+  // modal waits for the step that delivers them. A card that carries its own
+  // payload (e.g. "Start 5 minute countdown timer") creates on click, so the
+  // click is that step.
+  const gate = emitParameter.value ? requireFeatureAccess : openFeatureOrUpgrade
+  if (!gate(actionName)) return
 
   // Execute the action normally
   useGlobalEmit(

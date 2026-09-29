@@ -252,6 +252,13 @@
                 name="i-ph-crown-simple-fill"
                 class="inline-flex w-4 h-4 text-xs text-[#FF8980]"
               />
+              <template v-if="livestreamSessionsLabel" #trailing>
+                <span
+                  class="ms-auto text-[11px] font-normal tabular-nums text-gray-500 dark:text-[#9ba3b2]"
+                >
+                  {{ livestreamSessionsLabel.replace(" free sessions left", " left") }}
+                </span>
+              </template>
             </UButton>
 
             <UButton
@@ -566,8 +573,12 @@ const {
   stopControlling,
 } = useLiveOutputControl()
 
-const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
-  useLivestreamLink()
+const {
+  canUseLivestreamLink,
+  livestreamSessionsLabel,
+  isClipboardCopying,
+  copyLivestreamURL,
+} = useLivestreamLink()
 const { canUseStageStreamLink, isStageLinkCopying, copyStageStreamURL } =
   useStageStreamLink()
 

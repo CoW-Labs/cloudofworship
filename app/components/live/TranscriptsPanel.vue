@@ -106,7 +106,8 @@
                           : 'text-primary-700 dark:text-primary-300'
                       "
                     >
-                      {{ remainingMinutes }}m left
+                      {{ remainingMinutes }}m{{ isFreeAllowance ? " free" : "" }}
+                      left
                     </span>
                   </Transition>
                 </span>
@@ -214,20 +215,30 @@
             name="i-material-symbols-speech-to-text"
             class="text-3xl mb-2 opacity-50"
           />
-          <div
-            v-if="
-              useDeepgramEngine &&
-              remainingSeconds !== null &&
-              remainingSeconds <= 0
-            "
-            class="mb-3"
-          >
+          <div v-if="isOutOfTime && isFreeAllowance" class="mb-3 text-left">
+            <CowTeamsPreviewNotice
+              :feature="appWideActions.newTranscribe"
+              title="Your free minutes are used"
+              :description="`You've used your ${limitMinutes} free transcription minutes. Upgrade to Teams for 3 hours of transcription every week.`"
+            />
+          </div>
+          <div v-else-if="isOutOfTime" class="mb-3">
             <UAlert
               color="amber"
               variant="subtle"
               title="Weekly limit reached"
-              description="Your 60-minute transcription limit resets every Monday."
+              :description="`Your ${limitMinutes}-minute transcription limit resets every Monday.`"
               icon="i-bx-time"
+            />
+          </div>
+          <div
+            v-else-if="isFreeAllowance && !isTranscribing"
+            class="mb-3 text-left"
+          >
+            <CowTeamsPreviewNotice
+              :feature="appWideActions.newTranscribe"
+              :title="`${remainingMinutes} of ${limitMinutes} free minutes left`"
+              description="Try live transcription on a real sermon. Once your free minutes are used, it's part of Teams."
             />
           </div>
           <div
@@ -455,6 +466,8 @@ const {
   clearTranscript,
   remainingMinutes,
   remainingSeconds,
+  usagePeriod,
+  limitSeconds,
   isTeamsPlan,
   useDeepgramEngine,
   micLevel,
@@ -484,9 +497,18 @@ onBeforeUnmount(() => {
   if (props.mobile) releaseWakeLock().catch(() => {})
 })
 
-// Below this threshold (5 mins) the session pill switches to a warning tint
+// A free church's one-off allowance, as opposed to Teams' weekly one.
+const isFreeAllowance = computed(() => usagePeriod.value === "lifetime")
+const limitMinutes = computed(() =>
+  limitSeconds.value ? Math.round(limitSeconds.value / 60) : null
+)
+
+// Below this threshold the session pill switches to a warning tint: 5 minutes
+// of a weekly allowance, 2 of the 10 free ones (5 would be half of them).
 const isLowOnTime = computed(
-  () => remainingSeconds.value !== null && remainingSeconds.value <= 300
+  () =>
+    remainingSeconds.value !== null &&
+    remainingSeconds.value <= (isFreeAllowance.value ? 120 : 300)
 )
 
 const isOutOfTime = computed(
