@@ -132,6 +132,9 @@ const quotaNotice = computed(() => {
       ? new Date(resetsAt).toLocaleDateString(undefined, {
           month: "long",
           day: "numeric",
+          // The allowance resets at midnight UTC on the 1st; formatted in
+          // local time that reads as the 30th/31st west of Greenwich.
+          timeZone: "UTC",
         })
       : "the 1st"
     return {
