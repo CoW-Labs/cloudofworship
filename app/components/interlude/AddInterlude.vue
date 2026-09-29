@@ -11,21 +11,35 @@
 
       <!-- Bottom padding keeps the last row of previews clear of the floating
            button once scrolled to the end. -->
-      <InterludeForm v-model="form" narrow class="pb-4" />
+      <InterludeForm
+        v-model="form"
+        narrow
+        await-pick
+        class="pb-4"
+        @select="picked = true"
+      />
 
-      <!-- Floats: sticky to the scroll container's bottom edge, so it stays in
-           reach however far the preview grid is scrolled. -->
-      <div class="sticky bottom-0 z-10 pb-6">
-        <CowButton
-          variant="primary"
-          block
-          size="lg"
-          :disabled="!form.heading.trim()"
-          @click="createInterlude"
-        >
-          Create interlude slide
-        </CowButton>
-      </div>
+      <!-- Hidden until an interlude is picked, then slides up from the bottom
+           edge. Sticky to the scroll container, so it stays in reach however
+           far the preview list is scrolled. -->
+      <Transition
+        enter-active-class="transition duration-300 ease-out motion-reduce:transition-none"
+        enter-from-class="translate-y-full opacity-0"
+        leave-active-class="transition duration-200 ease-in motion-reduce:transition-none"
+        leave-to-class="translate-y-full opacity-0"
+      >
+        <div v-if="picked" class="sticky bottom-0 z-10 pb-6">
+          <CowButton
+            variant="primary"
+            block
+            size="lg"
+            :disabled="!form.heading.trim()"
+            @click="createInterlude"
+          >
+            Create interlude slide
+          </CowButton>
+        </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -36,6 +50,7 @@ import { defaultInterludeData } from "~/utils/interlude/slide"
 const emit = defineEmits(["close"])
 
 const form = ref(defaultInterludeData())
+const picked = ref(false)
 
 const createInterlude = () => {
   useGlobalEmit(appWideActions.newInterlude, {
