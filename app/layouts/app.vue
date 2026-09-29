@@ -345,6 +345,32 @@ watch(online, (isOnline) => {
   if (isOnline) revalidateChurchPlan()
 })
 
+// Media that was saved on this device but never reached the cloud (a dropped
+// upload, or added offline) is re-uploaded when the connection returns and
+// whenever a schedule finishes loading. A short delay keeps it out of the way
+// of the loads that matter first.
+const { retryActiveScheduleUploads } = useCloudUploadRetry()
+let cloudRetryTimer: ReturnType<typeof setTimeout> | undefined
+const scheduleCloudRetry = () => {
+  clearTimeout(cloudRetryTimer)
+  cloudRetryTimer = setTimeout(() => {
+    if (!online.value) return
+    retryActiveScheduleUploads().catch((err) =>
+      console.error("Cloud upload retry sweep failed:", err)
+    )
+  }, 5000)
+}
+watch(online, (isOnline) => {
+  if (isOnline) scheduleCloudRetry()
+})
+watch(
+  () => appStore.currentState.slidesLoading,
+  (loading, wasLoading) => {
+    if (wasLoading && !loading) scheduleCloudRetry()
+  }
+)
+onUnmounted(() => clearTimeout(cloudRetryTimer))
+
 const fetchHymns = async () => {
   if (!online.value) {
     setLoadingTask(

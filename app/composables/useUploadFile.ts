@@ -28,7 +28,11 @@ export type UploadFileOptions = {
   signal?: AbortSignal
 }
 
-type ApiError = { data?: { message?: string }; message?: string }
+type ApiError = {
+  data?: { message?: string }
+  message?: string
+  statusCode?: number
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Routing constants (mirror the File Uploads API)
@@ -48,6 +52,26 @@ const PATH_A_TYPES = new Set([
 // Upload 4 parts at a time; retry a failed part a few times before giving up.
 const PART_CONCURRENCY = 4
 const PART_MAX_RETRIES = 3
+
+// Path A gets the same patience. A church uploading from a phone on patchy
+// venue Wi-Fi lost single PDF pages to one dropped request, because nothing
+// ever asked twice.
+const DIRECT_MAX_ATTEMPTS = 3
+const DIRECT_RETRY_DELAYS_MS = [1000, 3000]
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * A 4xx is the server saying no (quota, bad type, too large, signed out) and
+ * will say it again; only a dropped request or a 5xx is worth repeating.
+ */
+const isRetryableUploadError = (error: ApiError | null | undefined) => {
+  const status = error?.statusCode
+  if (/quota|storage limit|storage full/i.test(errorMessage(error, ""))) {
+    return false
+  }
+  return !status || status >= 500 || status === 408 || status === 429
+}
 
 const errorMessage = (error: ApiError | null | undefined, fallback: string) =>
   error?.data?.message || error?.message || fallback
@@ -77,26 +101,36 @@ const directUpload = async (
   file: Blob,
   name: string
 ): Promise<UploadFileResult> => {
-  const formData = new FormData()
-  formData.append("file", file, name)
+  for (let attempt = 1; ; attempt++) {
+    const formData = new FormData()
+    formData.append("file", file, name)
 
-  const { data, error } = await useAPIFetch<UploadFileResult, ApiError>(
-    `/church/${churchId}/files`,
-    {
-      method: "POST",
-      body: formData,
-      // do NOT set Content-Type — the browser adds the multipart boundary
-      key: `upload-file-${name}-${file.size}`,
+    const { data, error } = await useAPIFetch<UploadFileResult, ApiError>(
+      `/church/${churchId}/files`,
+      {
+        method: "POST",
+        body: formData,
+        // do NOT set Content-Type — the browser adds the multipart boundary
+        // The attempt is part of the key so a retry is a new request, not
+        // the cached failure of the last one.
+        key: `upload-file-${name}-${file.size}-${attempt}`,
+      }
+    )
+
+    if (!error.value && data.value) return data.value
+
+    const canRetry =
+      attempt < DIRECT_MAX_ATTEMPTS &&
+      navigator.onLine &&
+      (!error.value || isRetryableUploadError(error.value))
+    if (!canRetry) {
+      if (error.value) {
+        throw new Error(errorMessage(error.value, "File upload failed"))
+      }
+      throw new Error("File upload completed without a response")
     }
-  )
-
-  if (error.value) {
-    throw new Error(errorMessage(error.value, "File upload failed"))
+    await wait(DIRECT_RETRY_DELAYS_MS[attempt - 1] ?? 3000)
   }
-  if (!data.value) {
-    throw new Error("File upload completed without a response")
-  }
-  return data.value
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
