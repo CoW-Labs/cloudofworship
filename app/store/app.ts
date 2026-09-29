@@ -818,7 +818,7 @@ export const useAppStore = defineStore("app", {
         enabled: true,
       })
     },
-    setIntermissionSettings(payload: AppSettings["intermission"]) {
+    setBlankSettings(payload: AppSettings["intermission"]) {
       this.currentState.settings = {
         ...this.currentState.settings,
         intermission: {

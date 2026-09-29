@@ -916,10 +916,10 @@ const forgetSettingsBackgroundKey = (
     return
   }
 
-  const intermission = appStore.currentState.settings.intermission
-  appStore.setIntermissionSettings({
-    ...intermission,
-    mode: intermission?.mode || "default",
+  const blank = appStore.currentState.settings.intermission
+  appStore.setBlankSettings({
+    ...blank,
+    mode: blank?.mode || "default",
     backgroundImageKey: null,
   })
 }
@@ -983,14 +983,14 @@ const retrieveAllMediaFilesFromDB = async () => {
     if (url) defaultBackground.background = url
   }
 
-  const intermission = appStore.currentState.settings.intermission
-  if (intermission?.backgroundImageKey) {
+  const blank = appStore.currentState.settings.intermission
+  if (blank?.backgroundImageKey) {
     const url = await ensureSettingsBackgroundLocal(
       "intermission",
-      intermission.backgroundImageKey,
-      intermission.background
+      blank.backgroundImageKey,
+      blank.background
     )
-    if (url) intermission.background = url
+    if (url) blank.background = url
   }
 
   // For active slides - use Promise.all instead of forEach

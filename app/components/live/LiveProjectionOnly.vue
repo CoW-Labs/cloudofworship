@@ -241,11 +241,11 @@
           />
         </div>
 
-        <!-- INTERMISSION / IDLE STATE - no slide is live -->
+        <!-- BLANK / IDLE STATE - no slide is live -->
         <div
           v-else
-          key="intermission"
-          class="slide-face intermission-face relative flex items-center justify-center bg-transparent"
+          key="blank"
+          class="slide-face blank-face relative flex items-center justify-center bg-transparent"
           :class="{
             'h-[100vh]': fullScreen,
             'h-[88vh]': fullScreenHeight,
@@ -253,16 +253,16 @@
           }"
           style="z-index: 2"
         >
-          <!-- MEDIA INTERMISSION (video / image) — shown clean, no branding -->
+          <!-- MEDIA BLANK (video / image) — shown clean, no branding -->
           <BackgroundVideo
-            v-if="isIntermissionMedia && intermissionVideoUrl"
-            :source="intermissionVideoUrl"
+            v-if="isBlankMedia && blankVideoUrl"
+            :source="blankVideoUrl"
             :repeat="true"
             :visible="true"
           />
           <img
-            v-else-if="isIntermissionMedia && intermissionImageUrl"
-            :src="intermissionImageUrl"
+            v-else-if="isBlankMedia && blankImageUrl"
+            :src="blankImageUrl"
             class="h-full w-full object-cover absolute inset-0"
             alt=""
           />
@@ -384,41 +384,41 @@ const transitionDuration = computed(() => {
 // blank screen; the operator can optionally set a video/image background.
 // Settings sync into the live window via pinia-shared-state.
 const { rehydrateSlideMedia } = useSlideMediaCache()
-const intermissionSettings = computed(
+const blankSettings = computed(
   () => currentState.value.settings.intermission
 )
-const isIntermissionMedia = computed(
+const isBlankMedia = computed(
   () =>
-    intermissionSettings.value?.mode === "media" &&
-    !!intermissionSettings.value?.background
+    blankSettings.value?.mode === "media" &&
+    !!blankSettings.value?.background
 )
-const intermissionImageLocalUrl = ref<string | null>(null)
-const intermissionImageUrl = computed(() =>
-  intermissionSettings.value?.backgroundType === backgroundTypes.image
-    ? intermissionImageLocalUrl.value ||
-      intermissionSettings.value?.background ||
+const blankImageLocalUrl = ref<string | null>(null)
+const blankImageUrl = computed(() =>
+  blankSettings.value?.backgroundType === backgroundTypes.image
+    ? blankImageLocalUrl.value ||
+      blankSettings.value?.background ||
       null
     : null
 )
-// Resolved LOCAL object URL for the intermission video (created in THIS
-// document). Kept ready even while a slide is live so switching to intermission
+// Resolved LOCAL object URL for the blank-screen video (created in THIS
+// document). Kept ready even while a slide is live so switching to blank
 // is instant; the <BackgroundVideo> only mounts inside the idle v-else block.
-const intermissionVideoUrl = ref<string | null>(null)
+const blankVideoUrl = ref<string | null>(null)
 const localMedia = useLocalMediaStorage()
 
-const revokeIntermissionVideoUrl = () => {
-  localMedia.releasePlaybackUrl(intermissionVideoUrl.value)
+const revokeBlankVideoUrl = () => {
+  localMedia.releasePlaybackUrl(blankVideoUrl.value)
 }
 
 /**
- * Retry-queue key shared by both intermission branches, so switching the
- * intermission between an image and a video cancels the previous one's
+ * Retry-queue key shared by both blank-screen branches, so switching the
+ * blank screen between an image and a video cancels the previous one's
  * outstanding retries instead of leaving them racing each other.
  */
-const INTERMISSION_MEDIA_ID = "__intermission__"
+const BLANK_MEDIA_ID = "__blank__"
 
-const resolveIntermissionVideo = async () => {
-  const s = intermissionSettings.value
+const resolveBlankVideo = async () => {
+  const s = blankSettings.value
   if (
     s?.mode === "media" &&
     s?.backgroundType === backgroundTypes.image &&
@@ -430,10 +430,10 @@ const resolveIntermissionVideo = async () => {
     // retried when the network returns. The bare call threw straight out of
     // this function instead — an unhandled rejection in the projection window,
     // where nothing catches it and nothing can be shown to the congregation,
-    // leaving the intermission blank until someone reloaded.
+    // leaving the blank screen empty until someone reloaded.
     const resolved = await rehydrateSlideMedia(
       {
-        id: INTERMISSION_MEDIA_ID,
+        id: BLANK_MEDIA_ID,
         type: slideTypes.text,
         backgroundType: backgroundTypes.image,
         background: s.background,
@@ -441,22 +441,22 @@ const resolveIntermissionVideo = async () => {
       } as unknown as Slide,
       { allowDownload: true }
     )
-    const previous = intermissionImageLocalUrl.value
-    intermissionImageLocalUrl.value = resolved.background || null
-    if (previous && previous !== intermissionImageLocalUrl.value) {
+    const previous = blankImageLocalUrl.value
+    blankImageLocalUrl.value = resolved.background || null
+    if (previous && previous !== blankImageLocalUrl.value) {
       localMedia.releasePlaybackUrl(previous)
     }
-  } else if (intermissionImageLocalUrl.value) {
-    localMedia.releasePlaybackUrl(intermissionImageLocalUrl.value)
-    intermissionImageLocalUrl.value = null
+  } else if (blankImageLocalUrl.value) {
+    localMedia.releasePlaybackUrl(blankImageLocalUrl.value)
+    blankImageLocalUrl.value = null
   }
   if (
     s?.mode !== "media" ||
     s?.backgroundType !== backgroundTypes.video ||
     !s?.backgroundVideoKey
   ) {
-    revokeIntermissionVideoUrl()
-    intermissionVideoUrl.value = null
+    revokeBlankVideoUrl()
+    blankVideoUrl.value = null
     return
   }
 
@@ -465,7 +465,7 @@ const resolveIntermissionVideo = async () => {
   // through the shared local media service.
   const resolved = await rehydrateSlideMedia(
     {
-      id: INTERMISSION_MEDIA_ID,
+      id: BLANK_MEDIA_ID,
       type: slideTypes.text,
       backgroundType: backgroundTypes.video,
       background: s.background,
@@ -474,9 +474,9 @@ const resolveIntermissionVideo = async () => {
     { allowDownload: true }
   )
 
-  const prev = intermissionVideoUrl.value
-  intermissionVideoUrl.value = resolved.background || null
-  if (prev && prev !== intermissionVideoUrl.value) {
+  const prev = blankVideoUrl.value
+  blankVideoUrl.value = resolved.background || null
+  if (prev && prev !== blankVideoUrl.value) {
     localMedia.releasePlaybackUrl(prev)
   }
 }
@@ -488,20 +488,20 @@ const resolveIntermissionVideo = async () => {
  * inside already handles its own failures; this is the backstop for everything
  * else (a revoked URL, a settings shape that changed under us).
  */
-const resolveIntermissionMedia = () =>
-  resolveIntermissionVideo().catch((error) =>
-    console.warn("Intermission media could not be resolved:", error)
+const resolveBlankMedia = () =>
+  resolveBlankVideo().catch((error) =>
+    console.warn("Blank media could not be resolved:", error)
   )
 
 watch(
-  () => intermissionSettings.value,
-  () => resolveIntermissionMedia(),
+  () => blankSettings.value,
+  () => resolveBlankMedia(),
   { deep: true }
 )
-onMounted(() => resolveIntermissionMedia())
+onMounted(() => resolveBlankMedia())
 onBeforeUnmount(() => {
-  revokeIntermissionVideoUrl()
-  localMedia.releasePlaybackUrl(intermissionImageLocalUrl.value)
+  revokeBlankVideoUrl()
+  localMedia.releasePlaybackUrl(blankImageLocalUrl.value)
 })
 
 // The slide currently rendered in the crossfading face. It lags props.slide by
