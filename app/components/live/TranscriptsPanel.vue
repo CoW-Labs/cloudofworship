@@ -236,7 +236,7 @@
           >
             <CowTeamsPreviewNotice
               :feature="appWideActions.newTranscribe"
-              :title="`${remainingMinutes} of ${limitMinutes} free minutes left`"
+              :title="freeMinutesTitle"
             />
           </div>
           <div
@@ -499,6 +499,14 @@ onBeforeUnmount(() => {
 const isFreeAllowance = computed(() => usagePeriod.value === "lifetime")
 const limitMinutes = computed(() =>
   limitSeconds.value ? Math.round(limitSeconds.value / 60) : null
+)
+
+// Picked once per mount so the line doesn't reshuffle as the minutes tick.
+const minutesQuip = pickOne(["Preach on.","Let the Word go forth."])
+const freeMinutesTitle = computed(() =>
+  (remainingMinutes.value ?? 0) <= 2
+    ? `${remainingMinutes.value} minute${remainingMinutes.value === 1 ? "" : "s"} left. Speak quickly, with conviction.`
+    : `${remainingMinutes.value} of ${limitMinutes.value} free minutes left. ${minutesQuip}`
 )
 
 // Below this threshold the session pill switches to a warning tint: 5 minutes
