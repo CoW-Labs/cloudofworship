@@ -39,10 +39,10 @@
         class="hidden min-w-0 items-center gap-2 text-[13px] leading-none text-white/55 md:flex"
       >
         <kbd
-          v-if="shortcut"
+          v-if="shortcutLabel"
           class="shrink-0 rounded-md border border-white/[0.12] bg-white/[0.12] px-1.5 py-[3px] text-[11px] font-semibold leading-none text-white/90"
         >
-          {{ shortcut }}
+          {{ shortcutLabel }}
         </kbd>
         <span class="truncate">{{ hint }}</span>
       </p>
@@ -60,15 +60,20 @@
 </template>
 
 <script setup lang="ts">
+import { useMediaQuery } from "@vueuse/core"
 import Logo from "~/components/svgs/Logo.vue"
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** Which output window this is — "Live Output", "Stage Display". */
     label: string
     /** What the operator should do next, shown beside the shortcut chip. */
     hint: string
-    /** Key/gesture chip rendered before the hint. */
+    /**
+     * Key/gesture chip rendered before the hint. Left unset, it names the
+     * double click or double tap that toggles full screen, whichever fits the
+     * screen. An empty string hides the chip.
+     */
     shortcut?: string
     /** Pulses the status dot while something is actually being projected. */
     active?: boolean
@@ -79,7 +84,14 @@ withDefaults(
      */
     floating?: boolean
   }>(),
-  { shortcut: "Double click", active: false, floating: false }
+  { shortcut: undefined, active: false, floating: false }
+)
+
+// A stage display is as likely to be a phone or tablet as a monitor, and
+// telling someone with no mouse to double click reads as a bug.
+const isTouchScreen = useMediaQuery("(pointer: coarse)")
+const shortcutLabel = computed(() =>
+  props.shortcut ?? (isTouchScreen.value ? "Double tap" : "Double click")
 )
 
 const emit = defineEmits<{ fullscreen: [] }>()

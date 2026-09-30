@@ -1,5 +1,10 @@
 <template>
   <div class="add-song-main mb-4">
+    <CowTeamsPreviewNotice
+      v-if="!hasAccessToFeature('new-alert')"
+      feature="new-alert"
+      class="mb-5"
+    />
     <!-- ALERT SCHEDULE — the alerts saved for this service. One of them can be
          on the live output at a time, marked with the same live dot the slide
          thumbnails use. -->
@@ -38,7 +43,7 @@
           block
           class="alert-card flex items-center gap-3 justify-start text-left px-2.5 py-2.5 border-b border-gray-100 dark:border-[#202838] last:border-0 transition-colors hover:!bg-gray-50 dark:hover:!bg-[#222938]"
           :class="{ 'is-live': isLive(alert) }"
-          @click="appStore.setActiveAlert(alert)"
+          @click="sendSavedAlertLive(alert)"
         >
           <!-- Miniature of the banner itself: its colour, and which edge of the
                screen it sits on. Reads at a glance where a purple check could
@@ -171,6 +176,7 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
+const { hasAccessToFeature, requireFeatureAccess } = useSubscription()
 
 const { currentState } = storeToRefs(appStore)
 const loading = ref<boolean>(false)
@@ -228,7 +234,14 @@ const deleteAlert = (alert: Alert) => {
   toast.add({ icon: "i-bx-trash", title: "Deleted alert" })
 }
 
+/** Putting an alert on screen is the Teams step, saved alert or new. */
+const sendSavedAlertLive = (alert: Alert) => {
+  if (!requireFeatureAccess("new-alert")) return
+  appStore.setActiveAlert(alert)
+}
+
 const addAlert = async () => {
+  if (!requireFeatureAccess("new-alert")) return
   if (atAlertLimit.value) {
     toast.add({
       icon: "i-bx-error-circle",

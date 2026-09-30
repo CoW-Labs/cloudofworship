@@ -11,7 +11,9 @@ import type {
   ExtendedFileT,
   PresentationObject,
   TimeSlideData,
+  InterludeSlideData,
 } from "~/types"
+import { withInterludeData } from "~/utils/interlude/slide"
 import { tabSessionId } from "./useRealtimeSlides"
 import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
 
@@ -581,6 +583,18 @@ export default function useSlideCreation() {
                 })
               }
             }
+          } else {
+            // Offline: mark images as stranded so the reconnect sweep uploads
+            // them, instead of leaving no trace that they never left the device.
+            for (const [index, blob] of compressedBlobs.entries()) {
+              const storedSlide = newSlides[index]
+              if (!storedSlide || !blob?.type?.includes("image")) continue
+              await localMedia.setCloudSyncState(storedSlide.id, {
+                groupId: storedSlide.id,
+                status: "local-only",
+                reason: "offline",
+              })
+            }
           }
 
           if (quotaExceeded) {
@@ -698,6 +712,7 @@ export default function useSlideCreation() {
         beginLocalSave(tempSlide.id)
         let localSaveFailed = false
         let quotaExceeded = false
+        let cloudFailedPages = 0
         const remotePageUrls = new Map<number, string>()
         for (const obj of presentationObjects) {
           try {
@@ -753,9 +768,18 @@ export default function useSlideCreation() {
                 if (/quota|storage limit|storage full/i.test(String(uploadErr))) {
                   quotaExceeded = true
                 } else {
+                  cloudFailedPages++
                   console.error(`Cloud upload failed for page ${obj.page}:`, uploadErr)
                 }
               }
+            } else {
+              // Record the page as stranded rather than skipping it silently,
+              // so the reconnect sweep knows to upload it later.
+              cloudFailedPages++
+              await localMedia.setCloudSyncState(
+                `${tempSlide.id}-page-${obj.page}`,
+                { groupId: tempSlide.id, status: "local-only", reason: "offline" }
+              )
             }
           } catch (err) {
             localSaveFailed = true
@@ -812,6 +836,36 @@ export default function useSlideCreation() {
         if (socket?.connected) {
           socket.emit("create-slide", { ...createdSlide, tabId: tabSessionId })
         }
+
+        // 2e — Pages that didn't reach the cloud are only on this device.
+        // Say so, and try again shortly; the reconnect sweep covers the rest.
+        if (cloudFailedPages && !quotaExceeded) {
+          const { retrySlideUploads } = useCloudUploadRetry()
+          const retry = async (manual: boolean) => {
+            const result = await retrySlideUploads(tempSlide.id, {
+              force: manual,
+            })
+            if (manual && result.failed) {
+              toast.add({
+                title: "Some pages still didn't upload",
+                description:
+                  "They're safe on this device. We'll try again when the connection improves.",
+                icon: "i-bx-cloud",
+                color: "amber",
+              })
+            }
+          }
+          toast.add({
+            title: `${cloudFailedPages} of ${presentationObjects.length} pages didn't upload`,
+            description:
+              "They show on this device, but not on other screens or for your team yet. We'll keep retrying in the background.",
+            icon: "i-bx-cloud",
+            color: "amber",
+            timeout: 0,
+            actions: [{ label: "Retry now", click: () => void retry(true) }],
+          })
+          if (navigator.onLine) setTimeout(() => void retry(false), 15_000)
+        }
       })()
 
     usePosthogCapture("NEW_PRESENTATION_SLIDE_CREATED", {
@@ -861,6 +915,27 @@ export default function useSlideCreation() {
     }
     usePosthogCapture("NEW_TIME_SLIDE_CREATED")
     return tempSlide
+  }
+
+  const createInterludeSlide = (
+    input: Omit<InterludeSlideData, "id">
+  ): Slide => {
+    const tempSlide = { ...preSlideCreation() }
+    tempSlide.layout = slideLayoutTypes.interlude
+    tempSlide.type = slideTypes.interlude
+    tempSlide.slideMode = "slide"
+    // The interlude sets its own type, so global text effects stay off.
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      alignment: "center",
+      textOutlined: false,
+      textBold: false,
+      textLinesBackground: false,
+    }
+    usePosthogCapture("NEW_INTERLUDE_SLIDE_CREATED", {
+      variant: input.variant,
+    })
+    return withInterludeData(tempSlide, { id: useID(), ...input })
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -919,6 +994,7 @@ export default function useSlideCreation() {
     createMultipleMediaSlides,
     createCountdownSlide,
     createTimeSlide,
+    createInterludeSlide,
     createPresentationSlide,
     saveSlideToLib,
     duplicateSlide,

@@ -1,5 +1,11 @@
 <template>
   <div class="song-main min-h-[80vh] h-[100%] flex flex-col" ref="quickActions">
+    <CowTeamsPreviewNotice
+      v-if="isMetered"
+      :feature="appWideActions.newSongSearch"
+      :title="quotaTitle"
+      class="mb-2"
+    />
     <div
       class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1.5 flex flex-col flex-1 min-h-0"
     >
@@ -67,6 +73,7 @@
             :icon-override="SongsIcon"
             compact
             show-subtext
+            :highlight-query="searchInput"
             :active="hasInteracted && index === focusedActionIndex"
             :class="{
               'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
@@ -110,6 +117,29 @@ const onRowMouseEnter = (index: number) => {
 }
 const quickActions = ref<HTMLDivElement | null>(null)
 const authStore = useAuthStore()
+const { isMetered, songsLeft, songsLimit, refresh: refreshUsage } =
+  useUsageQuotas()
+refreshUsage()
+
+// Free churches search the whole library but get previews; adding a library
+// song to the schedule spends one of the month's allowance (see claimSong).
+// Picked once per mount so the line doesn't reshuffle as the count changes.
+const songQuip = pickOne([
+  "Choose wisely.",
+  "Pick your anthems.",
+  "Save a few for Sunday.",
+  "Make them count.",
+  "Make a joyful noise.",
+  "The choir is warming up.",
+  "Let everything that has breath sing.",
+])
+const quotaTitle = computed(() => {
+  const limit = songsLimit.value ?? 10
+  if (songsLeft.value === 0) return `You've used this month's ${limit} free library songs`
+  if (songsLeft.value === null) return `${limit} free library songs a month`
+  if (songsLeft.value === 1) return "1 song left this month. Make it count."
+  return `${songsLeft.value} of ${limit} free songs left this month. ${songQuip}`
+})
 const itemRefs = ref<(HTMLElement | null)[]>([])
 let latestSongSearchId = 0
 
@@ -140,7 +170,7 @@ const getSongs = async (query: string = "") => {
   hasInteracted.value = false
 
   try {
-    const results = await searchSongs(query, 20)
+    const results = await searchSongs(query, 20, "songs-list")
     if (searchId === latestSongSearchId) {
       songs.value = results
     }

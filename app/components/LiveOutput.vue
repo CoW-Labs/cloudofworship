@@ -139,10 +139,10 @@
             size="2xs"
             class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
             :disabled="!liveSlide"
-            @click="goIntermission"
+            @click="goBlank"
           >
             <template #leading>
-              <IconWrapper name="i-bx-hide" size="3.5" />
+              <IconWrapper name="i-ph-eye-slash" size="3.5" />
             </template>
             Blank
           </CowButton>
@@ -183,8 +183,8 @@
                 <IconWrapper
                   :name="
                     host.hostId === targetHost?.hostId
-                      ? 'i-bx-check-circle'
-                      : 'i-lucide-monitor'
+                      ? 'i-ph-check-circle'
+                      : 'i-ph-monitor'
                   "
                   size="4"
                 />
@@ -200,7 +200,7 @@
               disabled
             >
               <template #leading>
-                <IconWrapper name="i-lucide-monitor" size="4" />
+                <IconWrapper name="i-ph-monitor" size="4" />
               </template>
               No output device online
             </UButton>
@@ -218,7 +218,7 @@
               "
             >
               <template #leading>
-                <IconWrapper name="i-bx-unlink" size="4" />
+                <IconWrapper name="i-ph-link-break" size="4" />
               </template>
               Stop controlling
             </UButton>
@@ -241,7 +241,7 @@
               <template #leading>
                 <IconWrapper
                   :name="
-                    isClipboardCopying ? 'i-bx-check-circle' : 'i-bx-clipboard'
+                    isClipboardCopying ? 'i-ph-check-circle' : 'i-ph-broadcast'
                   "
                   size="4"
                 />
@@ -249,7 +249,45 @@
               Copy livestream link
               <IconWrapper
                 v-if="!canUseLivestreamLink"
-                name="i-bxs-award"
+                name="i-ph-crown-simple-fill"
+                class="inline-flex w-4 h-4 text-xs text-[#FF8980]"
+              />
+              <template v-if="livestreamSessionsLabel" #trailing>
+                <span
+                  class="ms-auto text-[11px] font-normal tabular-nums text-gray-500 dark:text-[#9ba3b2]"
+                >
+                  {{ livestreamSessionsLabel.replace(" free sessions left", " left") }}
+                </span>
+              </template>
+            </UButton>
+
+            <UButton
+              variant="ghost"
+              color="gray"
+              block
+              @click.stop.prevent="
+                () => {
+                  close()
+                  canUseStageStreamLink
+                    ? copyStageStreamURL()
+                    : useGlobalEmit(appWideActions.showUpgradeModal, {
+                        feature: 'stagestream-url',
+                      })
+                }
+              "
+            >
+              <template #leading>
+                <IconWrapper
+                  :name="
+                    isStageLinkCopying ? 'i-ph-check-circle' : 'i-ph-link'
+                  "
+                  size="4"
+                />
+              </template>
+              Copy stage display link
+              <IconWrapper
+                v-if="!canUseStageStreamLink"
+                name="i-ph-crown-simple-fill"
                 class="inline-flex w-4 h-4 text-xs text-[#FF8980]"
               />
             </UButton>
@@ -262,12 +300,12 @@
               @click.stop.prevent="
                 () => {
                   close()
-                  goIntermission()
+                  goBlank()
                 }
               "
             >
               <template #leading>
-                <IconWrapper name="i-bx-hide" size="4" />
+                <IconWrapper name="i-ph-eye-slash" size="4" />
               </template>
               Blank the live output
             </UButton>
@@ -535,8 +573,14 @@ const {
   stopControlling,
 } = useLiveOutputControl()
 
-const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
-  useLivestreamLink()
+const {
+  canUseLivestreamLink,
+  livestreamSessionsLabel,
+  isClipboardCopying,
+  copyLivestreamURL,
+} = useLivestreamLink()
+const { canUseStageStreamLink, isStageLinkCopying, copyStageStreamURL } =
+  useStageStreamLink()
 
 const online = useOnline()
 const { hasAccessToFeature } = useSubscription()
@@ -768,7 +812,7 @@ onMounted(() => {
   shortcutCleanups.push(
     useRegisteredShortcut(shortcutIds.blankOutput, () => {
       if (!liveSlide.value) return false
-      goIntermission()
+      goBlank()
       return true
     })
   )
@@ -838,7 +882,7 @@ const toggleSlideOverlay = (slide: Slide) => {
   emitOverlaySocketAction(appWideActions.showSlideOverlay, overlaySlide)
 }
 
-const goIntermission = () => {
+const goBlank = () => {
   if (!liveSlide.value) return
   blankOutput()
 }

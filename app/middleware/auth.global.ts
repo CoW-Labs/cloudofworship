@@ -13,7 +13,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
     token = tokenCookie.value || authStore.token
   }
 
-  const publicPaths = ["/live", "/stage", "/livestream", "/offline", "/update", "/endofyear", "/logout", "/desktop-signin"]
+  const publicPaths = ["/live", "/stage", "/stagestream", "/livestream", "/offline", "/update", "/endofyear", "/logout", "/desktop-signin"]
   const authPaths = ["/login", "/signup", "/forgot-password", "/reset-password"]
   const isPublicPath = publicPaths.some(
     (path) => to.path === path || to.path.startsWith(`${path}/`)

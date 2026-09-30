@@ -86,7 +86,7 @@ export interface Slide {
   hymnVerseIndex?: number // 0-based index of current hymn verse, used for chorus navigation
   hymnSubVerseIndex?: number // 0-based chunk index inside the current verse/chorus
   hymnSubVerseTotal?: number // total chunks in the current verse/chorus
-  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
+  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | InterludeSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
   slideStyle?: SlideStyle
   saved?: boolean
   createdAt?: string
@@ -169,6 +169,19 @@ export interface Countdown {
 export interface TimeSlideData {
   id: string
   label: string
+}
+
+/**
+ * An animated interlude slide: one of the fixed variants in
+ * utils/interlude/engine.ts behind a heading and a sub text.
+ */
+export interface InterludeSlideData {
+  id: string
+  variant: string
+  heading: string
+  subtitle: string
+  /** "auto" follows the variant's default. */
+  textBackground: "auto" | "on" | "off"
 }
 
 /**
@@ -270,6 +283,9 @@ export interface Song {
   createdAt?: string
   updatedAt?: string
   fromSaved?: boolean // client-side only, set when the song came from the personal library
+  // A library song served to a free church: first verse only. The full song
+  // comes from useSongs().claimSong, which spends a monthly library song.
+  isPreview?: boolean
 }
 
 export interface ExternalVideo {
@@ -317,6 +333,10 @@ export interface MediaCloudSyncRecord {
   createdAt: string
   updatedAt: string
   uploadedAt?: string
+  /** Background re-uploads that have failed in a row. Any other write resets it. */
+  retryAttempts?: number
+  /** When the last background re-upload was tried. */
+  lastRetryAt?: string
 }
 
 /**
@@ -462,6 +482,8 @@ export interface AppSettings {
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number
   alertLimit?: number
+  // Settings for the "Blank" screen. The key keeps its old name because it is
+  // persisted locally and synced to the server; renaming it drops saved settings.
   intermission?: {
     mode: "default" | "media" // "default" = church-branding screen (logo/name)
     backgroundType?: string // backgroundTypes.image | backgroundTypes.video

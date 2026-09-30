@@ -7,7 +7,8 @@ import { useAppStore } from "~/store/app"
  * Both operator routes — the desktop console (`/`) and the mobile route
  * (`/mobile`) — need the exact same thing: one Socket.IO connection scoped to
  * the active schedule, incoming slide events applied to the store, presence
- * kept current, and the live slide fed to `/livestream/:schedule_id` viewers.
+ * kept current, the live slide fed to `/livestream/:schedule_id` viewers, and
+ * the stage display fed to `/stagestream/:schedule_id` viewers.
  *
  * This lived inline in pages/index.vue until the mobile route needed it too.
  * Duplicating it would have been the worst outcome available: two connections
@@ -24,6 +25,10 @@ export const useOperatorSession = () => {
   const emitter = useNuxtApp().$emitter as Emitter<any>
   const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
   const liveOutputControl = useLiveOutputControl()
+  const stageStreamFeed = useStageStreamFeed({
+    getSocket: () => socketInstance.value,
+    hasRemoteTarget: liveOutputControl.hasRemoteTarget,
+  })
 
   const {
     handleWebSocketMessage,
@@ -58,9 +63,13 @@ export const useOperatorSession = () => {
     socketInstance.value = useSocketIO({
       scheduleId,
       onMessage: (event, data) => {
+        if (stageStreamFeed.handleMessage(event, data?.data)) return
         handleWebSocketMessage(data)
       },
       onConnected: () => {
+        // Delivery state belongs to one admitted socket connection. The server
+        // may have restarted, even when it reports the same viewer count.
+        stageStreamFeed.reset()
         // Re-advertise this device's live output (if it has one) as soon as
         // there is a socket to say it on, rather than leaving a phone to wait
         // out a heartbeat before the screen it wants shows up in its list.
@@ -80,7 +89,7 @@ export const useOperatorSession = () => {
         }
       },
       onDisconnected: () => {
-        // Optionally show disconnect notification
+        stageStreamFeed.reset()
       },
       onOnlineUsersChanged: (users) => {
         updateOnlineUsers(users)
@@ -119,6 +128,7 @@ export const useOperatorSession = () => {
 
   const disconnectSocket = () => {
     socketInstance.value?.disconnect()
+    stageStreamFeed.reset()
     cleanupRealtimeSlides()
     appStore.setOnlineUsers([])
   }
@@ -138,7 +148,7 @@ export const useOperatorSession = () => {
       // clear: it is true for exactly as long as a host is selected.
       if (liveOutputControl.hasRemoteTarget.value) return
 
-      // Intermission clears liveSlideId (see goIntermission in LiveOutput). Send
+      // Blank clears liveSlideId (see goBlank in LiveOutput). Send
       // an explicit null so viewers blank out instead of holding the last slide.
       if (!liveSlideId) {
         socketInstance.value.sendLiveSlide(null)

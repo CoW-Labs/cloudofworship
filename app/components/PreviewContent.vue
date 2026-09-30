@@ -161,6 +161,7 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
+import { reportSongSearchPick } from "~/composables/useSongSearchLog"
 import {
   enqueueCoalescedSlideShadowPut,
   enqueueSlideShadowWrite,
@@ -176,6 +177,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
   Hymn,
+  InterludeSlideData,
   Scripture,
   Slide,
   Song,
@@ -271,6 +273,7 @@ const {
   createPresentationSlide,
   createCountdownSlide,
   createTimeSlide,
+  createInterludeSlide,
   saveSlideToLib,
   duplicateSlide,
   duplicateSlideAsOverlay,
@@ -1139,6 +1142,18 @@ emitter.on(appWideActions.newTimeSlide, () => {
   uploadOfflineSlides()
 })
 
+emitter.on(
+  appWideActions.newInterlude,
+  (data?: Omit<InterludeSlideData, "id">) => {
+    // No payload is the Quick Actions panel opening, not a new slide.
+    if (!data) return
+    const newSlide = createInterludeSlide(data)
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
+  }
+)
+
 emitter.on("new-text", (slide: Slide[] | Slide) => {
   let newSlide: Slide | null
   if (slide) {
@@ -1234,7 +1249,21 @@ emitter.on("new-hymn", async (data: string) => {
   }
 })
 
+// A free church's library search results are previews (first verse only).
+// Turning one into a slide claims it first: that spends one of the month's
+// library songs and returns the full lyrics, or opens the upgrade modal and
+// returns null when none are left. Everything else passes straight through.
+const { claimSong } = useSongs()
+const claimIfPreview = async (song: Song): Promise<Song | null> =>
+  song?.isPreview ? await claimSong(song) : song
+
 emitter.on(appWideActions.newSongSetlist, async (song?: Song) => {
+  if (song) {
+    const claimed = await claimIfPreview(song)
+    if (!claimed) return
+    song = claimed
+  }
+  reportSongSearchPick(song)
   const resolvedSong = song ? await useSong(song) : undefined
   const newSlide = await createSongSetlistSlide(resolvedSong || undefined)
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
@@ -1273,7 +1302,10 @@ const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
 
 emitter.on("new-song", async (data: Song) => {
   if (data) {
-    const song = await useSong(data)
+    const claimed = await claimIfPreview(data)
+    if (!claimed) return
+    reportSongSearchPick(claimed)
+    const song = await useSong(claimed)
     if (song) {
       const setlistSlide = getRelevantSongSetlist()
 
@@ -1546,6 +1578,53 @@ emitter.on("refresh-slides", () => {
   retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!).catch(
     (error) => console.warn("Unable to refresh schedule slides:", error)
   )
+})
+
+// Teammates keep editing the schedule while the operator is away, and the
+// realtime socket may have dropped events in the meantime (browsers throttle
+// and freeze hidden tabs). Coming back reconciles with the server. "Away" is
+// either the page being hidden (tab switch, minimise) or the window losing
+// focus — the desktop app has no tabs, and its window often stays visible
+// beside other apps, so visibility alone would rarely fire there. Quick
+// alt-tabs are skipped so the grid does not churn.
+const RETURN_REFRESH_AFTER_MS = 15_000
+let awaySince: number | null =
+  document.visibilityState === "hidden" || !document.hasFocus()
+    ? Date.now()
+    : null
+
+const markAway = () => {
+  awaySince ??= Date.now()
+}
+const markBack = () => {
+  if (awaySince === null) return
+  const awayFor = Date.now() - awaySince
+  awaySince = null
+  if (awayFor < RETURN_REFRESH_AFTER_MS) return
+  const scheduleId = appStore.currentState.activeSchedule?._id
+  if (!scheduleId) return
+  retrieveSlidesOnline(scheduleId).catch((error) =>
+    console.warn("Unable to refresh schedule slides on return:", error)
+  )
+}
+const onVisibilityChange = () => {
+  if (document.visibilityState === "hidden") markAway()
+  else if (document.hasFocus()) markBack()
+}
+const onWindowBlur = () => {
+  // Focus moving into an embedded iframe (e.g. a video in the live preview)
+  // blurs the window without the operator leaving the app.
+  setTimeout(() => {
+    if (document.activeElement?.tagName !== "IFRAME") markAway()
+  })
+}
+document.addEventListener("visibilitychange", onVisibilityChange)
+window.addEventListener("blur", onWindowBlur)
+window.addEventListener("focus", markBack)
+onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", onVisibilityChange)
+  window.removeEventListener("blur", onWindowBlur)
+  window.removeEventListener("focus", markBack)
 })
 
 emitter.on("upload-offline-slides", () => {
@@ -2053,7 +2132,7 @@ const persistSlideOnline = useThrottleFn(
         slideUpdatePath(activeChurchId, slide.scheduleId, slide._id),
         {
           method: "PUT",
-          body: toSlideUpdatePayload(slide),
+          body: await toSlideUpdatePayload(slide),
         }
       ))
     } catch (err) {

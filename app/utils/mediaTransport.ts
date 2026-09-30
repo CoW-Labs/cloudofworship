@@ -19,7 +19,6 @@ export const isSessionMediaUrl = (value: unknown): value is string => {
  * its own platform URL.
  */
 export const toTransportSafeSlide = async (slide: Slide): Promise<Slide> => {
-  const db = useIndexedDB()
   const safe: Slide = {
     ...slide,
     data:
@@ -30,58 +29,74 @@ export const toTransportSafeSlide = async (slide: Slide): Promise<Slide> => {
       ...page,
     })),
   }
+  const data = safe.data && typeof safe.data === "object" ? (safe.data as any) : null
+  if (data) delete data.blob
 
-  const remoteUrlFor = async (key?: string | null) =>
-    key ? (await db.localMediaFiles.get(key))?.remoteUrl || "" : ""
-
-  const mediaKeys = [
-    ...(safe.type === slideTypes.media ? [safe.id] : []),
-    ...(safe.presentationObjects || []).map(
-      (page) => `${safe.id}-page-${page.page}`
-    ),
-    ...(safe.backgroundImageKey ? [safe.backgroundImageKey] : []),
-    ...(safe.backgroundVideoKey ? [safe.backgroundVideoKey] : []),
-  ]
-  if (mediaKeys.length) {
-    const syncRecords = await db.mediaCloudSync.bulkGet([...new Set(mediaKeys)])
-    const mediaCloudSync = { ...(safe.mediaCloudSync || {}) }
-    syncRecords.forEach((record) => {
-      if (record) mediaCloudSync[record.key] = record
-    })
-    if (Object.keys(mediaCloudSync).length) safe.mediaCloudSync = mediaCloudSync
-  }
-
-  if (safe.data && typeof safe.data === "object") {
-    delete (safe.data as any).blob
-    if (isSessionMediaUrl((safe.data as any).url)) {
-      ;(safe.data as any).url = await remoteUrlFor(safe.id)
-    }
-  }
-
-  if (safe.presentationObjects) {
-    for (const page of safe.presentationObjects) {
-      if (isSessionMediaUrl(page.imageUrl)) {
-        page.imageUrl = await remoteUrlFor(
-          `${safe.id}-page-${page.page}`
-        )
-      }
-    }
-  }
-
-  if (isSessionMediaUrl(safe.background)) {
-    const backgroundKey =
-      safe.backgroundImageKey ||
+  const pageKey = (page: number) => `${safe.id}-page-${page}`
+  const localPages = (safe.presentationObjects || []).filter((page) =>
+    isSessionMediaUrl(page.imageUrl)
+  )
+  const localData = !!data && isSessionMediaUrl(data.url)
+  const localBackground = isSessionMediaUrl(safe.background)
+  const backgroundKey = localBackground
+    ? safe.backgroundImageKey ||
       safe.backgroundVideoKey ||
       (safe.type === slideTypes.presentation
-        ? `${safe.id}-page-${
+        ? pageKey(
             safe.presentationObjects?.[safe.presentationPageIndex || 0]?.page ||
-            1
-          }`
+              1
+          )
         : safe.type === slideTypes.media
         ? safe.id
         : undefined)
-    safe.background = await remoteUrlFor(backgroundKey)
-  }
+    : undefined
+
+  // Every edit of a media or presentation slide passes through here. When its
+  // URLs are already cloud URLs there is nothing to swap, so don't touch
+  // IndexedDB at all.
+  if (!localPages.length && !localData && !localBackground) return safe
+
+  const db = useIndexedDB()
+  const mediaKeys = [
+    ...new Set([
+      ...(safe.type === slideTypes.media ? [safe.id] : []),
+      ...(safe.presentationObjects || []).map((page) => pageKey(page.page)),
+      ...(safe.backgroundImageKey ? [safe.backgroundImageKey] : []),
+      ...(safe.backgroundVideoKey ? [safe.backgroundVideoKey] : []),
+    ]),
+  ]
+  const localKeys = [
+    ...new Set([
+      ...localPages.map((page) => pageKey(page.page)),
+      ...(localData ? [safe.id] : []),
+      ...(backgroundKey ? [backgroundKey] : []),
+    ]),
+  ]
+  const [syncRecords, files] = await Promise.all([
+    mediaKeys.length ? db.mediaCloudSync.bulkGet(mediaKeys) : [],
+    db.localMediaFiles.bulkGet(localKeys),
+  ])
+
+  const mediaCloudSync = { ...(safe.mediaCloudSync || {}) }
+  syncRecords.forEach((record) => {
+    if (record) mediaCloudSync[record.key] = record
+  })
+  if (Object.keys(mediaCloudSync).length) safe.mediaCloudSync = mediaCloudSync
+
+  // The file row is the usual home of the cloud URL, but a slide rehydrated
+  // from the server may only remember it in `mediaCloudSync`. Falling through
+  // to "" there would blank a page that is safely on the CDN.
+  const fileUrls = new Map(
+    localKeys.map((key, index) => [key, files[index]?.remoteUrl])
+  )
+  const remoteUrlFor = (key?: string | null) =>
+    key ? fileUrls.get(key) || mediaCloudSync[key]?.remoteUrl || "" : ""
+
+  if (localData) data.url = remoteUrlFor(safe.id)
+  localPages.forEach((page) => {
+    page.imageUrl = remoteUrlFor(pageKey(page.page))
+  })
+  if (localBackground) safe.background = remoteUrlFor(backgroundKey)
 
   return safe
 }

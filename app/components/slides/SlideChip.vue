@@ -36,6 +36,7 @@ import MediaIcon from "~/components/svgs/MediaIcon.vue"
 import CountdownIcon from "~/components/svgs/CountdownIcon.vue"
 import PptIcon from "~/components/svgs/PptIcon.vue"
 import TimeIcon from "~/components/svgs/TimeIcon.vue"
+import InterludeIcon from "~/components/svgs/InterludeIcon.vue"
 
 const props = defineProps({
   slideType: String,
@@ -64,6 +65,8 @@ const getIconBySlideType = (slideType?: string): Component | null => {
       return CountdownIcon
     case slideTypes.time:
       return TimeIcon
+    case slideTypes.interlude:
+      return InterludeIcon
     case slideTypes.presentation:
       return PptIcon
   }
@@ -111,6 +114,11 @@ const getBGBySlideType = (slideType?: string) => {
         return "bg-slate-100 text-slate-700"
       }
       return "bg-slate-100 border border-slate-500 text-slate-700"
+    case slideTypes.interlude:
+      if (props.darkMode) {
+        return "bg-fuchsia-100 text-fuchsia-700"
+      }
+      return "bg-fuchsia-100 border border-fuchsia-500 text-fuchsia-700"
     case slideTypes.presentation:
       if (props.darkMode) {
         return "bg-blue-100 text-blue-700"

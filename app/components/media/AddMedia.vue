@@ -49,6 +49,11 @@
           v-if="activeTab === 1"
           class="collector-ctn flex flex-col gap-3 mt-4"
         >
+          <CowTeamsPreviewNotice
+            v-if="!hasAccessToFeature('new-youtube-video')"
+            feature="new-youtube-video"
+          />
+
           <Hint dismissible dismiss-key="add-media-external-video">
             Paste a YouTube or Vimeo link below and we'll fetch the video for
             you.
@@ -257,6 +262,7 @@ const props = defineProps<{
 }>()
 
 const authStore = useAuthStore()
+const { hasAccessToFeature, requireFeatureAccess } = useSubscription()
 
 // Local limits are capacity-based. Cloud subscription limits remain enforced
 // independently by the upload API.
@@ -516,6 +522,20 @@ const pickedFilesLabel = computed(() => {
 const addMediaEmitter = async () => {
   if (isConvertingPdf.value) return
   errorMessage.value = ""
+
+  // YouTube and Vimeo links are Teams. A free church can paste one and see it
+  // fetched; adding it is where the upgrade modal comes in. Checked before any
+  // file is touched so a mixed batch is not half added.
+  const externalTypes = new Set(
+    fileObjs.value.filter((f) => f.isExternal).map((f) => f.type)
+  )
+  if (
+    (externalTypes.has("youtube") &&
+      !requireFeatureAccess("new-youtube-video")) ||
+    (externalTypes.has("vimeo") && !requireFeatureAccess("new-vimeo-video"))
+  ) {
+    return
+  }
 
   // PDFs don't become media slides — each one is rendered page-by-page into a
   // single presentation slide, exactly as the Import Slides screen does.
