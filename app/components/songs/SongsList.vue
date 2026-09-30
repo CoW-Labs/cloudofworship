@@ -3,8 +3,7 @@
     <CowTeamsPreviewNotice
       v-if="isMetered"
       :feature="appWideActions.newSongSearch"
-      :title="quotaNotice.title"
-      :description="quotaNotice.description"
+      :title="quotaTitle"
       class="mb-2"
     />
     <div
@@ -118,38 +117,17 @@ const onRowMouseEnter = (index: number) => {
 }
 const quickActions = ref<HTMLDivElement | null>(null)
 const authStore = useAuthStore()
-const { isMetered, songsLeft, songsLimit, usage, refresh: refreshUsage } =
+const { isMetered, songsLeft, songsLimit, refresh: refreshUsage } =
   useUsageQuotas()
 refreshUsage()
 
 // Free churches search the whole library but get previews; adding a library
 // song to the schedule spends one of the month's allowance (see claimSong).
-const quotaNotice = computed(() => {
+const quotaTitle = computed(() => {
   const limit = songsLimit.value ?? 10
-  if (songsLeft.value === 0) {
-    const resetsAt = usage.value?.songs.resetsAt
-    const resetDate = resetsAt
-      ? new Date(resetsAt).toLocaleDateString(undefined, {
-          month: "long",
-          day: "numeric",
-          // The allowance resets at midnight UTC on the 1st; formatted in
-          // local time that reads as the 30th/31st west of Greenwich.
-          timeZone: "UTC",
-        })
-      : "the 1st"
-    return {
-      title: `You've used this month's ${limit} free library songs`,
-      description: `More arrive on ${resetDate}. Upgrade to Teams for unlimited songs. Your own songs are always free.`,
-    }
-  }
-  return {
-    title:
-      songsLeft.value === null
-        ? `${limit} free library songs a month`
-        : `${songsLeft.value} of ${limit} free library songs left this month`,
-    description:
-      "Search and preview any song. Adding a library song to your schedule uses one. Your own songs are always free.",
-  }
+  if (songsLeft.value === 0) return `You've used this month's ${limit} free library songs`
+  if (songsLeft.value === null) return `${limit} free library songs a month`
+  return `${songsLeft.value} of ${limit} free library songs left this month`
 })
 const itemRefs = ref<(HTMLElement | null)[]>([])
 let latestSongSearchId = 0

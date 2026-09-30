@@ -219,7 +219,6 @@
             <CowTeamsPreviewNotice
               :feature="appWideActions.newTranscribe"
               title="Your free minutes are used"
-              :description="`You've used your ${limitMinutes} free transcription minutes. Upgrade to Teams for 3 hours of transcription every week.`"
             />
           </div>
           <div v-else-if="isOutOfTime" class="mb-3">
@@ -238,7 +237,6 @@
             <CowTeamsPreviewNotice
               :feature="appWideActions.newTranscribe"
               :title="`${remainingMinutes} of ${limitMinutes} free minutes left`"
-              description="Try live transcription on a real sermon. Once your free minutes are used, it's part of Teams."
             />
           </div>
           <div
