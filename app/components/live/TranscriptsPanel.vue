@@ -715,24 +715,38 @@ const handleScriptureClick = (result: ScriptureResult) => {
   transition-delay: 0ms, 140ms;
 }
 
-/* Idle mic breathes a soft ring so the operator knows where to start. */
+/* Idle mic breathes a soft ring so the operator knows where to start. The
+   ring is a pseudo-element moved only by transform and opacity, so it runs on
+   the compositor instead of repainting the header every frame. */
 .mic-control :deep(.mic-idle-pulse) {
+  position: relative;
+}
+
+.mic-control :deep(.mic-idle-pulse)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px rgb(168 85 247 / 0.45);
+  pointer-events: none;
   animation: mic-idle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @keyframes mic-idle-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgb(168 85 247 / 0.45);
+    transform: scale(1);
+    opacity: 1;
   }
   70%,
   100% {
-    box-shadow: 0 0 0 8px rgb(168 85 247 / 0);
+    transform: scale(1.4);
+    opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mic-control :deep(.mic-idle-pulse) {
-    animation: none;
+  .mic-control :deep(.mic-idle-pulse)::after {
+    display: none;
   }
   .mic-control,
   .session-controls {

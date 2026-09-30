@@ -842,7 +842,9 @@ export default function useSlideCreation() {
         if (cloudFailedPages && !quotaExceeded) {
           const { retrySlideUploads } = useCloudUploadRetry()
           const retry = async (manual: boolean) => {
-            const result = await retrySlideUploads(tempSlide.id)
+            const result = await retrySlideUploads(tempSlide.id, {
+              force: manual,
+            })
             if (manual && result.failed) {
               toast.add({
                 title: "Some pages still didn't upload",

@@ -14,6 +14,8 @@ export interface UsageQuotas {
   livestream: { used: number; limit: number | null }
 }
 
+let inFlight: Promise<void> | null = null
+
 /**
  * The free-tier allowances from `GET /church/:churchId/usage`, for showing a
  * free church what it has left. Shared app-wide through useState, so a claim
@@ -35,20 +37,26 @@ export default function useUsageQuotas() {
 
   const isMetered = computed(() => isFreePlan.value && isPaywallEnabled.value)
 
-  const refresh = async () => {
+  const refresh = () => {
     const churchId = authStore.user?.churchId
-    if (!churchId || !isMetered.value) return
+    if (!churchId || !isMetered.value) return Promise.resolve()
+    // Every AppSection asks on mount, so callers share one request.
+    if (inFlight) return inFlight
     loading.value = true
-    try {
-      const { data, error } = await useAPIFetch(`/church/${churchId}/usage`, {
-        key: `usage-quotas-${Date.now()}`,
-      })
-      if (!error.value && data.value) usage.value = data.value as UsageQuotas
-    } catch (err) {
-      console.error('Failed to fetch usage quotas:', err)
-    } finally {
-      loading.value = false
-    }
+    inFlight = (async () => {
+      try {
+        const { data, error } = await useAPIFetch(`/church/${churchId}/usage`, {
+          key: `usage-quotas-${Date.now()}`,
+        })
+        if (!error.value && data.value) usage.value = data.value as UsageQuotas
+      } catch (err) {
+        console.error('Failed to fetch usage quotas:', err)
+      } finally {
+        loading.value = false
+        inFlight = null
+      }
+    })()
+    return inFlight
   }
 
   const left = (used?: number, limit?: number | null) =>

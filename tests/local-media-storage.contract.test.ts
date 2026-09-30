@@ -256,6 +256,36 @@ describe.each(["opfs", "tauri-fs"] as const)(
       })
     })
 
+    it("counts consecutive background retries and resets on success", async () => {
+      const storage = createLocalMediaStorage(adapter)
+      const failRetry = () =>
+        storage.setCloudSyncState("backoff-image", {
+          status: "failed",
+          reason: "upload-error",
+          retried: true,
+        })
+
+      await storage.setCloudSyncState("backoff-image", {
+        status: "failed",
+        reason: "upload-error",
+      })
+      expect(
+        (await storage.getCloudSyncState("backoff-image"))?.retryAttempts
+      ).toBeUndefined()
+
+      await failRetry()
+      const second = await failRetry()
+      expect(second.retryAttempts).toBe(2)
+      expect(second.lastRetryAt).toBeTruthy()
+
+      const uploaded = await storage.setCloudSyncState("backoff-image", {
+        status: "uploaded",
+        remoteUrl: "https://cdn.example.com/backoff.png",
+      })
+      expect(uploaded.retryAttempts).toBeUndefined()
+      expect(uploaded.lastRetryAt).toBeUndefined()
+    })
+
     it("removes cloud sync history when its media group is deleted", async () => {
       const storage = createLocalMediaStorage(adapter)
       await storage.saveBlob({

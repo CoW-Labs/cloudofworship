@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
+  CLOUD_RETRY_BACKOFF_MS,
+  isCloudRetryDue,
   mediaCloudFailureReason,
   unavailableMediaCopy,
 } from "../app/utils/mediaCloudSync"
@@ -102,5 +104,40 @@ describe("media cloud sync reporting", () => {
 
     expect(copy.title).toBe("Media is unavailable")
     expect(copy.description).toContain("no recoverable cloud copy")
+  })
+})
+
+describe("background re-upload backoff", () => {
+  const now = Date.parse("2026-09-30T12:00:00.000Z")
+  const triedAgo = (ms: number) => new Date(now - ms).toISOString()
+
+  it("retries a page that has never been retried in the background", () => {
+    expect(isCloudRetryDue(record({ status: "failed" }), now)).toBe(true)
+  })
+
+  it("waits longer after each failed retry", () => {
+    const first = record({ retryAttempts: 1, lastRetryAt: triedAgo(30_000) })
+    expect(isCloudRetryDue(first, now)).toBe(false)
+    expect(
+      isCloudRetryDue({ ...first, lastRetryAt: triedAgo(60_000) }, now)
+    ).toBe(true)
+
+    const third = record({
+      retryAttempts: 3,
+      lastRetryAt: triedAgo(10 * 60_000),
+    })
+    expect(isCloudRetryDue(third, now)).toBe(false)
+    expect(
+      isCloudRetryDue({ ...third, lastRetryAt: triedAgo(30 * 60_000) }, now)
+    ).toBe(true)
+  })
+
+  it("caps the wait instead of giving up", () => {
+    const longest = CLOUD_RETRY_BACKOFF_MS[CLOUD_RETRY_BACKOFF_MS.length - 1]!
+    const stuck = record({ retryAttempts: 40, lastRetryAt: triedAgo(longest) })
+    expect(isCloudRetryDue(stuck, now)).toBe(true)
+    expect(
+      isCloudRetryDue({ ...stuck, lastRetryAt: triedAgo(longest - 1) }, now)
+    ).toBe(false)
   })
 })
