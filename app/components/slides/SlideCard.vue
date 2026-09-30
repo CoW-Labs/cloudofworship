@@ -2,7 +2,7 @@
   <!-- GRID TYPE CARD -->
   <div
     v-if="gridType"
-    class="slide-card gap-3 h-[120px] rounded-lg bg-primary hover:bg-primary-700 transition-all cursor-pointer relative overflow-hidden"
+    class="slide-card gap-3 h-[120px] rounded-lg bg-black transition-all cursor-pointer relative overflow-hidden"
     :id="slide?.id?.replace(/\d+/g, '')"
     :class="[
       selected ? 'border-black' : 'border-transparent',

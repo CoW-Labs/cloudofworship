@@ -194,15 +194,16 @@ export const quickActionsArr: QuickAction[] = [
     tier: "free",
     // type: slideTypes.text
   },
-  {
-    icon: "i-bx-slideshow",
-    name: "Slide Templates",
-    desc: "Use pre-made, fancy slide templates",
-    action: appWideActions.newTemplates,
-    meta: "template preset saved design layout",
-    tier: "teams",
-    // type: slideTypes.text
-  },
+  // Slide templates are hidden for everyone for now.
+  // {
+  //   icon: "i-bx-slideshow",
+  //   name: "Slide Templates",
+  //   desc: "Use pre-made, fancy slide templates",
+  //   action: appWideActions.newTemplates,
+  //   meta: "template preset saved design layout",
+  //   tier: "teams",
+  //   // type: slideTypes.text
+  // },
   {
     icon: "i-bx-bell",
     name: "Add Banners/Alert",

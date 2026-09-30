@@ -1,5 +1,17 @@
 <template>
+  <!-- Text variant: a bare inline link for tight spots like an empty state. -->
   <button
+    v-if="variant === 'text'"
+    type="button"
+    class="group inline-flex items-center gap-1.5 rounded text-sm font-medium text-[#E5675E] dark:text-[#FF8980] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8980]"
+    :aria-label="`${title}. Upgrade to Teams`"
+    @click="upgrade"
+  >
+    <UIcon name="i-bxs-award" class="h-4 w-4 shrink-0" />
+    <span>{{ title }}</span>
+  </button>
+  <button
+    v-else
     type="button"
     class="cow-teams-preview-notice group block w-full rounded-2xl text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8980]"
     :aria-label="`${title}. Upgrade to Teams`"
@@ -39,6 +51,8 @@ const props = defineProps<{
   feature: string
   /** Omit for a random line from PREVIEW_TITLES, picked once per mount. */
   title?: string
+  /** "card" (default) is the tinted alert; "text" is a plain text button. */
+  variant?: "card" | "text"
 }>()
 
 const PREVIEW_TITLES = [

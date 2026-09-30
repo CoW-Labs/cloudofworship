@@ -103,15 +103,15 @@
                `.right-group` wrapper so it is a direct flex child: it takes the
                space between the slide name and Go Live and scrolls inside it.
 
-               `justify-end` is desktop-only on purpose. A flex container that
-               overflows cannot scroll back past its start when its content is
-               end-justified, so on a phone — where this strip always overflows
-               — it would open scrolled into its own middle with the first
-               control unreachable. -->
+               Controls are pushed right by a collapsing spacer, not
+               `justify-end`: an overflowing end-justified flex row cannot
+               scroll back past its start, which clipped the verse switch. The
+               spacer shrinks to zero once the row overflows, so it scrolls. -->
           <div
-            class="actions flex-1 flex items-center gap-1 min-w-0 md:justify-end"
+            class="actions flex-1 flex items-center gap-1 min-w-0"
             :class="containerOverflow"
           >
+            <div class="hidden md:block flex-1 min-w-0" aria-hidden="true" />
             <!-- VERSE SWITCH -->
             <BibleVerseSwitch
               v-if="
@@ -499,6 +499,8 @@
             :padding="editorPreviewPadding"
             :content-visible="true"
             class="static-slide-editor-preview z-10"
+            @mouseenter="previewHovered = true"
+            @mouseleave="previewHovered = false"
           />
         </div>
       </template>
@@ -714,8 +716,19 @@ const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const interludePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 
-// Interlude slides animate in the editor, at the preview rate.
-provide(interludeModeKey, "preview")
+// Interlude slides hold a still frame in the editor so the operator's eye
+// stays on the schedule and live output. They animate, at the preview rate,
+// while hovered or while the interlude panel is open for picking a variant.
+// InterludeView already forces static under prefers-reduced-motion.
+const previewHovered = ref(false)
+provide(
+  interludeModeKey,
+  computed(() =>
+    previewHovered.value || activePanel.value === "interlude"
+      ? "preview"
+      : "static"
+  )
+)
 
 const interludeInput = computed(() => {
   const { id: _id, ...input } = (props.slide?.data ||

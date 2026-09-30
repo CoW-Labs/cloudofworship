@@ -19,6 +19,7 @@
               color="primary"
               variant="ghost"
               class="session-button"
+              :class="{ 'mic-idle-pulse': !isConnecting && !isOutOfTime }"
               :loading="isConnecting"
               :disabled="isOutOfTime"
               @click.stop="startTranscription"
@@ -215,13 +216,13 @@
             name="i-material-symbols-speech-to-text"
             class="text-3xl mb-2 opacity-50"
           />
-          <div v-if="isOutOfTime && isFreeAllowance" class="mb-3 text-left">
+          <div v-if="isOutOfTime && isFreeAllowance" class="mb-1 text-left">
             <CowTeamsPreviewNotice
               :feature="appWideActions.newTranscribe"
               title="Your free minutes are used"
             />
           </div>
-          <div v-else-if="isOutOfTime" class="mb-3">
+          <div v-else-if="isOutOfTime" class="mb-1">
             <UAlert
               color="amber"
               variant="subtle"
@@ -230,18 +231,16 @@
               icon="i-bx-time"
             />
           </div>
-          <div
-            v-else-if="isFreeAllowance && !isTranscribing"
-            class="mb-3 text-left"
-          >
+          <div v-else-if="isFreeAllowance && !isTranscribing" class="mb-1">
             <CowTeamsPreviewNotice
+              variant="text"
               :feature="appWideActions.newTranscribe"
               :title="freeMinutesTitle"
             />
           </div>
           <div
             v-else-if="!useDeepgramEngine && !isSpeechRecognitionSupported"
-            class="mb-3"
+            class="mb-1"
           >
             <UAlert
               color="amber"
@@ -251,13 +250,9 @@
               icon="i-bx-error"
             />
           </div>
-          <p class="text-sm">
+          <p v-if="isTranscribing" class="text-sm">
             {{
-              isPaused
-                ? "Paused. Press play to keep transcribing."
-                : isTranscribing
-                ? "Listening..."
-                : "Click the microphone to start transcribing"
+              isPaused ? "Paused. Press play to keep transcribing." : "Listening..."
             }}
           </p>
           <p class="text-xs mt-1 opacity-70">
@@ -309,7 +304,7 @@
             }}
           </p>
           <p class="text-xs mt-1 opacity-70">
-            Scriptures matching the sermon will appear here automatically
+            Scriptures matching transcripts will appear here
           </p>
         </div>
 
@@ -720,7 +715,25 @@ const handleScriptureClick = (result: ScriptureResult) => {
   transition-delay: 0ms, 140ms;
 }
 
+/* Idle mic breathes a soft ring so the operator knows where to start. */
+.mic-control :deep(.mic-idle-pulse) {
+  animation: mic-idle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes mic-idle-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(168 85 247 / 0.45);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 8px rgb(168 85 247 / 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .mic-control :deep(.mic-idle-pulse) {
+    animation: none;
+  }
   .mic-control,
   .session-controls {
     transition-duration: 0ms;

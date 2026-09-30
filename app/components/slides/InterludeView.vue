@@ -233,8 +233,14 @@ const resize = () => {
     ? baseDensity * scale
     : baseDensity * scale * QUALITY_STEPS[quality]!
   el.dataset.quality = String(QUALITY_STEPS[quality])
-  cv.width = Math.max(1, Math.round(width * density))
-  cv.height = Math.max(1, Math.round(height * density))
+  // Assigning a canvas size, even the same one, throws away its backing
+  // store and allocates a new one. Mode flips (a hovered preview) would
+  // churn a full-resolution buffer each time; every frame repaints the
+  // whole canvas, so keeping the old one is safe.
+  const w = Math.max(1, Math.round(width * density))
+  const h = Math.max(1, Math.round(height * density))
+  if (cv.width !== w) cv.width = w
+  if (cv.height !== h) cv.height = h
   if (isStatic.value) draw(STATIC_FRAME_T)
   else if (!raf) draw(elapsed())
 }
@@ -273,6 +279,7 @@ watch(
 // Going from a still frame to animated plays the intro from the start.
 watch(mode, (next, prev) => {
   stop()
+  if (next === "preview") observeVisibility()
   if (next === "static") clearTextStyles()
   else if (prev === "static") {
     startedAt = performance.now()
@@ -294,19 +301,24 @@ watch(exitSignal, (signal) => {
 let resizeObserver: ResizeObserver | null = null
 let intersectionObserver: IntersectionObserver | null = null
 
+// Previews pause while scrolled out of view. Set up on first use, since a
+// preview can mount static and only animate later (hover, an open panel).
+const observeVisibility = () => {
+  if (intersectionObserver || !root.value) return
+  intersectionObserver = new IntersectionObserver(([entry]) => {
+    visible = !!entry?.isIntersecting
+    if (visible) start()
+    else stop()
+  })
+  intersectionObserver.observe(root.value)
+}
+
 onMounted(() => {
   ctx = canvas.value?.getContext("2d") ?? null
   resizeObserver = new ResizeObserver(resize)
   if (root.value) resizeObserver.observe(root.value)
   resize()
-  if (mode.value === "preview" && root.value) {
-    intersectionObserver = new IntersectionObserver(([entry]) => {
-      visible = !!entry?.isIntersecting
-      if (visible) start()
-      else stop()
-    })
-    intersectionObserver.observe(root.value)
-  }
+  if (mode.value === "preview") observeVisibility()
   start()
 })
 

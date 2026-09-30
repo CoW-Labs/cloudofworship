@@ -458,8 +458,11 @@ const emitParameter = computed(() => {
 // Show teams badge if the action requires teams subscription.
 // `hasAccessToFeature` already returns true when the paywall is switched off
 // app-wide, so no separate kill-switch clause is needed here.
+// Hidden for now. Set SHOW_TEAMS_BADGE to true to bring the badge back.
+const SHOW_TEAMS_BADGE = false
 const showTeamsBadge = computed(() => {
   return (
+    SHOW_TEAMS_BADGE &&
     requiresTeams(props.action?.action || "") &&
     !hasAccessToFeature(props.action?.action || "")
   )
