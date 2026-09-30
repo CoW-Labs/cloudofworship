@@ -18,6 +18,12 @@
         >
           Cloud of Worship
         </h1>
+        <span
+          v-if="isTeamsPlan"
+          class="shrink-0 rounded-md bg-primary-500/10 px-1.5 py-0.5 text-xs font-semibold text-primary-600 dark:text-primary-400 short:text-[10px]"
+        >
+          Teams
+        </span>
 
         <!-- ACCOUNT ATTENTION CHIP — only for churches that had Teams and lost it -->
         <CowTooltip
@@ -37,13 +43,13 @@
         <!-- UPDATE READY CHIP — the staged update survives dismissing the card -->
         <CowTooltip
           v-if="isUpdateReady"
-          text="An update is ready to install"
+          :text="isTauri ? 'An update is ready to install' : 'A new version is ready. Click to reload.'"
           placement="bottom"
         >
           <button
             type="button"
             class="update-chip shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-semibold leading-none text-primary-600 dark:text-primary-400 bg-primary-500/10 hover:bg-primary-500/20 transition-colors"
-            @click="useGlobalEmit(appWideActions.revealUpdate)"
+            @click="useGlobalEmit(isTauri ? appWideActions.revealUpdate : appWideActions.installUpdate)"
           >
             <span class="w-1.5 h-1.5 rounded-full bg-primary-500" />
             Update ready
@@ -185,6 +191,18 @@
             <UserIcon class="w-4 h-4" />
             Invite
           </CowButton>
+        </CowTooltip>
+
+        <!-- COMMUNITY — same pill surface as the theme toggle beside it. -->
+        <CowTooltip v-if="showCommunity" text="Join our Discord community" placement="bottom" class="hidden md:block">
+          <button
+            type="button"
+            class="theme-toggle grid place-items-center w-8 h-8 rounded-full bg-gray-100 dark:bg-[#171d2b] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+            aria-label="Join the Discord community"
+            @click="openCommunity"
+          >
+            <UIcon name="i-bi-discord" class="w-4 h-4" />
+          </button>
         </CowTooltip>
 
         <!-- DARK / LIGHT MODE TOGGLE (sliding switch) — hidden on phones. The
@@ -388,9 +406,12 @@ const shortcutsModalVisible = ref(false)
 const restoreModalVisible = ref(false)
 
 // Subscription check
-const { hasAccessToFeature, hasLapsedTeamsSubscription } = useSubscription()
+const { hasAccessToFeature, hasLapsedTeamsSubscription, isTeamsPlan } = useSubscription()
 
 const { isUpdateReady } = useAppUpdater()
+// Web has no card: the chip reloads straight away. Desktop opens the card,
+// which carries the Windows "will close while it installs" warning.
+const { isTauri } = useTauri()
 
 const { user, church } = storeToRefs(authStore)
 const { currentState } = storeToRefs(appStore)
@@ -614,6 +635,14 @@ const isDark = computed({
     colorMode.preference = colorMode.value === "dark" ? "light" : "dark"
   },
 })
+
+const COMMUNITY_URL = "https://discord.gg/dAP8UdmyP"
+const { isEnabled: showCommunity } = useFeatureFlags("discord-community")
+
+const openCommunity = () => {
+  usePosthogCapture("COMMUNITY_OPENED", { source: "navbar" })
+  useOpenExternal(COMMUNITY_URL)
+}
 
 // Explicit theme setter for the segmented toggle (each half targets one mode)
 const setDark = (dark: boolean) => {

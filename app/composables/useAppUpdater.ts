@@ -57,6 +57,22 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null
 let retryAttempt = 0
 let stopServiceWatch: WatchStopHandle | null = null
 let stopLiveSlideWatch: WatchStopHandle | null = null
+// Web only: set by build-freshness.client.ts once this tab is behind the
+// deployed build. "Installing" a web update is just a reload.
+let webReload: (() => void) | null = null
+
+/**
+ * The web app's counterpart to a staged desktop update. Web shows only the
+ * navbar chip, never the card: the tab reloads itself once nothing is live, so
+ * the chip is a fallback. Plain module state: callable from a plugin.
+ */
+export const markWebUpdateReady = (reload: () => void, version?: string | null) => {
+  if (status.value === "ready") return
+  webReload = reload
+  availableVersion.value = version ?? null
+  bannerDismissed.value = true
+  status.value = "ready"
+}
 
 /** Windows tears the app down to run its installer; macOS swaps in place. */
 const isWindows = () =>
@@ -109,6 +125,8 @@ export default function useAppUpdater() {
   const isServiceLive = () => {
     try {
       const slideLive = Boolean(useAppStore().currentState.liveSlideId)
+      // The web has no projection windows to probe, so a live slide is enough.
+      if (!isTauri) return slideLive
       return (slideLive && projectionWindowOpen.value) || isNdiLive()
     } catch {
       return false
@@ -120,13 +138,15 @@ export default function useAppUpdater() {
   )
 
   const installLabel = computed(() =>
-    isWindows() ? "Install now" : "Restart now"
+    !isTauri ? "Reload now" : isWindows() ? "Install now" : "Restart now"
   )
 
   // Reads as a standalone sentence under the heading, and is honest about the
   // platform difference: Windows hands off to its installer and exits.
   const installHint = computed(() =>
-    isWindows()
+    !isTauri
+      ? "Reload now to get it straight away, or leave it and it reloads on its own once nothing is live."
+      : isWindows()
       ? "Cloud of Worship will close while it installs. Leave it and it updates the next time you quit."
       : "Restart now to get it straight away, or leave it and it installs when you close the app."
   )
@@ -202,6 +222,11 @@ export default function useAppUpdater() {
    * is only ever reached on macOS.
    */
   const installNow = async () => {
+    if (webReload) {
+      status.value = "installing"
+      webReload()
+      return
+    }
     if (!stagedUpdate) return
 
     const toast = useToast()

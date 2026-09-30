@@ -281,7 +281,10 @@ const applyBillingDefaultExperiment = () => {
 // Headline for the locked feature that opened the modal. Gates pass their
 // action name as `feature`; anything unlisted (navbar, banners, storage, the
 // schedule cap) keeps the generic heading.
-const FEATURE_UPGRADE_COPY: Record<string, { title: string; description: string }> = {
+const FEATURE_UPGRADE_COPY: Record<
+  string,
+  { title: string; description: string }
+> = {
   "new-countdown": {
     title: "Countdowns are part of Teams",
     description: "Start every service on time, on screen and on stage.",
@@ -328,21 +331,27 @@ const FEATURE_UPGRADE_COPY: Record<string, { title: string; description: string 
     description: "Keep every slide on brand in one click.",
   },
   "new-time-slide": {
-    title: "Clock slides are part of Teams",
+    title: "Time slides are part of Teams",
     description: "Show the current time on screen.",
   },
   [appWideActions.newInterlude]: {
     title: "Interludes are part of Teams",
-    description: "Fill the moments between songs with an animated break screen.",
+    description:
+      "Fill the moments between songs with an animated break screen.",
   },
 }
 // Sibling actions that share a feature's copy.
-FEATURE_UPGRADE_COPY["new-stage-countdown"] = FEATURE_UPGRADE_COPY["new-countdown"]!
-FEATURE_UPGRADE_COPY["clear-stage-countdown"] = FEATURE_UPGRADE_COPY["new-countdown"]!
+FEATURE_UPGRADE_COPY["new-stage-countdown"] =
+  FEATURE_UPGRADE_COPY["new-countdown"]!
+FEATURE_UPGRADE_COPY["clear-stage-countdown"] =
+  FEATURE_UPGRADE_COPY["new-countdown"]!
 FEATURE_UPGRADE_COPY["remove-alert"] = FEATURE_UPGRADE_COPY["new-alert"]!
-FEATURE_UPGRADE_COPY["remove-slide-overlay"] = FEATURE_UPGRADE_COPY["show-slide-overlay"]!
-FEATURE_UPGRADE_COPY["new-vimeo-video"] = FEATURE_UPGRADE_COPY["new-youtube-video"]!
-FEATURE_UPGRADE_COPY["stagestream-url"] = FEATURE_UPGRADE_COPY["open-stage-display"]!
+FEATURE_UPGRADE_COPY["remove-slide-overlay"] =
+  FEATURE_UPGRADE_COPY["show-slide-overlay"]!
+FEATURE_UPGRADE_COPY["new-vimeo-video"] =
+  FEATURE_UPGRADE_COPY["new-youtube-video"]!
+FEATURE_UPGRADE_COPY["stagestream-url"] =
+  FEATURE_UPGRADE_COPY["open-stage-display"]!
 
 const lockedFeature = ref<string | undefined>()
 const featureCopy = computed(() =>

@@ -2,6 +2,7 @@ import posthog from "posthog-js"
 import { useAppStore } from "~/store/app"
 import useAppVersion from "~/composables/useAppVersion"
 import { markBuildStale } from "~/utils/errorFilters"
+import { markWebUpdateReady } from "~/composables/useAppUpdater"
 
 /**
  * Reloads a tab that is running an older build than the one being served.
@@ -69,7 +70,7 @@ const writeReloadGuard = (version: string) => {
 const isProjectionWindow = () =>
   PROJECTION_ROUTES.some((route) => window.location.pathname.startsWith(route))
 
-export default defineNuxtPlugin((nuxtApp) => {
+export default defineNuxtPlugin(() => {
   /**
    * Compare build identity, not release name.
    *
@@ -85,7 +86,8 @@ export default defineNuxtPlugin((nuxtApp) => {
    * commit. Tabs without a build id compare release names instead.
    */
   const runtimeBuildId = useRuntimeConfig().public.BUILD_ID as string | undefined
-  const runningVersion = runtimeBuildId || useAppVersion().appVersion
+  const runningRelease = useAppVersion().appVersion
+  const runningVersion = runtimeBuildId || runningRelease
 
   let lastInteractionAt = Date.now()
   let hiddenSince: number | null =
@@ -93,6 +95,8 @@ export default defineNuxtPlugin((nuxtApp) => {
   let detectedAt = 0
   let promptShown = false
   let reloading = false
+  // The human-readable release ("1.2.0") for the card heading, when known.
+  let deployedReleaseVersion: string | null = null
   let idleTimer: ReturnType<typeof setInterval> | null = null
 
   const noteInteraction = () => {
@@ -160,24 +164,8 @@ export default defineNuxtPlugin((nuxtApp) => {
     if (promptShown || isProjectionWindow()) return
     promptShown = true
 
-    nuxtApp.runWithContext(() => {
-      useToast().add({
-        title: "A new version of Cloud of Worship is ready",
-        description:
-          "This tab is still running an older version. Reload when you get a moment — it will also reload on its own once nothing is live.",
-        icon: "i-bx-download",
-        color: "primary",
-        // Nuxt UI v2: 0 disables auto-dismiss. Nothing else tells the operator,
-        // so it stays until they act on it.
-        timeout: 0,
-        actions: [
-          {
-            label: "Reload now",
-            click: () => reload(deployedVersion),
-          },
-        ],
-      })
-    })
+    // Surfaces the navbar "Update ready" chip, which reloads on click.
+    markWebUpdateReady(() => reload(deployedVersion), deployedReleaseVersion)
   }
 
   const onStale = (deployedVersion: string) => {
@@ -233,6 +221,12 @@ export default defineNuxtPlugin((nuxtApp) => {
       // never mark a tab stale: that would silence its error reports for the
       // rest of the session over a deploy that forgot to write the file.
       if (!deployedVersion || deployedVersion === runningVersion) return
+      const release = payload?.releaseVersion
+      // A rebuild between releases keeps the release name, and "Version 1.1.5
+      // is ready" on a tab already running 1.1.5 reads as a bug.
+      const current = String(runningRelease ?? "").replace(/^v/, "")
+      const next = typeof release === "string" ? release.replace(/^v/, "") : ""
+      deployedReleaseVersion = next && next !== current ? next : null
       onStale(deployedVersion)
     } catch {
       // Offline, or the service worker served a cached copy. Either way this

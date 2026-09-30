@@ -391,15 +391,16 @@ const quickSearchSuggestionsByAction = {
     "audio file",
     "motion background",
   ],
-  templates: [
-    "Slide Templates",
-    "lower third template",
-    "sermon notes template",
-    "announcement template",
-    "Bible verse template",
-    "minimal worship template",
-    "countdown template",
-  ],
+  // Slide templates are hidden for everyone for now.
+  // templates: [
+  //   "Slide Templates",
+  //   "lower third template",
+  //   "sermon notes template",
+  //   "announcement template",
+  //   "Bible verse template",
+  //   "minimal worship template",
+  //   "countdown template",
+  // ],
   alerts: [
     "Add Banners/Alert",
     "Remove Alert",
