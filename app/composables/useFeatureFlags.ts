@@ -1,5 +1,5 @@
 import { PostHog } from "posthog-js"
-import { ref, onMounted } from "vue"
+import { ref, getCurrentScope, onScopeDispose } from "vue"
 
 /**
  * NOTE: the paywall kill switch is deliberately NOT in here any more.
@@ -109,14 +109,29 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
     return result
   }
 
-  // Initialize on mount
-  onMounted(async () => {
-    if (posthog) {
-      await reloadFlags()
+  // Keep `isEnabled` in step for the one flag this caller asked about.
+  //
+  // PostHog fetches flags itself at init and on identify, and calls back at
+  // once when they're already loaded, so listening is enough. This used to
+  // reload flags on every mount, which sent a /flags request for each
+  // component using useSubscription (every action card), and registered hooks
+  // from plain function calls (claimSong) where there is no component at all.
+  if (flagKey) {
+    if (!posthog) {
+      isLoading.value = false
+    } else if (getCurrentScope()) {
+      const stopListening = posthog.onFeatureFlags(() => {
+        isEnabled.value = checkFlag(flagKey)
+        isLoading.value = false
+      })
+      onScopeDispose(stopListening)
     } else {
+      isEnabled.value = checkFlag(flagKey)
       isLoading.value = false
     }
-  })
+  } else {
+    isLoading.value = false
+  }
 
   return {
     // State

@@ -3,7 +3,10 @@ import useIndexedDB from "~/composables/useIndexedDB"
 import useLocalMediaStorage from "~/composables/useLocalMediaStorage"
 import useUploadFile from "~/composables/useUploadFile"
 import { tabSessionId } from "./useRealtimeSlides"
-import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
+import {
+  isCloudRetryDue,
+  mediaCloudFailureReason,
+} from "~/utils/mediaCloudSync"
 import { toTransportSafeSlide } from "~/utils/mediaTransport"
 import { slideTypes } from "~/utils/constants"
 import type { MediaCloudSyncRecord, Slide } from "~/types"
@@ -24,14 +27,18 @@ const UPLOAD_CONCURRENCY = 3
 /**
  * A page that never reached the cloud and is still worth another try. Quota
  * and the video opt-out are the church's decision, not a transient failure,
- * so they are left alone until something changes on their side.
+ * so they are left alone until something changes on their side. Pages whose
+ * background re-uploads keep failing wait out a backoff (see
+ * isCloudRetryDue), so flaky Wi-Fi doesn't resend them on every reconnect;
+ * `force` is for the operator's own "Retry now".
  */
-const needsUpload = (record?: MediaCloudSyncRecord) =>
+const needsUpload = (record?: MediaCloudSyncRecord, force = false) =>
   !!record &&
   record.reason !== "quota" &&
   record.reason !== "disabled" &&
   (record.status === "failed" ||
-    (record.status === "local-only" && record.reason === "offline"))
+    (record.status === "local-only" && record.reason === "offline")) &&
+  (force || isCloudRetryDue(record))
 
 const cloudKeysFor = (slide: Slide): string[] => {
   if (slide.type === slideTypes.presentation) {
@@ -62,9 +69,14 @@ export default function useCloudUploadRetry() {
 
   const retrySlideUploads = async (
     slideId: string,
-    // The sweep has already read these; pass them on instead of reading again.
-    knownRecords?: Map<string, MediaCloudSyncRecord | undefined>
+    options: {
+      // The sweep has already read these; pass them on instead of reading again.
+      knownRecords?: Map<string, MediaCloudSyncRecord | undefined>
+      // Skip the backoff: the operator asked for this retry.
+      force?: boolean
+    } = {}
   ): Promise<CloudRetryResult> => {
+    const { knownRecords, force = false } = options
     const result: CloudRetryResult = {
       uploaded: 0,
       failed: 0,
@@ -84,7 +96,9 @@ export default function useCloudUploadRetry() {
       const records = keys.every((key) => knownRecords?.has(key))
         ? keys.map((key) => knownRecords!.get(key))
         : await db.mediaCloudSync.bulkGet(keys)
-      const pending = keys.filter((_, index) => needsUpload(records[index]))
+      const pending = keys.filter((_, index) =>
+        needsUpload(records[index], force)
+      )
       if (!pending.length) return result
 
       const files = await db.localMediaFiles.bulkGet(pending)
@@ -123,6 +137,7 @@ export default function useCloudUploadRetry() {
             status: "failed",
             reason,
             error: err,
+            retried: true,
           })
           if (reason === "quota") {
             result.quotaExceeded = true
@@ -202,7 +217,9 @@ export default function useCloudUploadRetry() {
 
     for (const { slide, keys } of candidates) {
       if (!keys.some((key) => needsUpload(recordsByKey.get(key)))) continue
-      const result = await retrySlideUploads(slide.id, recordsByKey)
+      const result = await retrySlideUploads(slide.id, {
+        knownRecords: recordsByKey,
+      })
       total.uploaded += result.uploaded
       total.failed += result.failed
       if (result.quotaExceeded) {

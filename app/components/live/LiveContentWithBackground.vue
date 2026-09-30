@@ -43,16 +43,21 @@
       </div>
     </div>
 
-    <!-- VIDEO BACKGROUND -->
+    <!-- VIDEO BACKGROUND — mounted only for video backgrounds. Every thumbnail
+         used to carry a hidden <video>, even image slides (fed the image URL),
+         and each one is a media player of its own. Thumbnails never play, so
+         `metadata` loads just enough for the first frame instead of letting
+         WebKit (Safari, the macOS desktop app) buffer the whole file. -->
     <BackgroundVideo
-      v-show="
+      v-if="
         slide?.backgroundType === backgroundTypes.video &&
         (slide?.data as ExternalVideo)?.type !== 'youtube' &&
         (slide?.data as ExternalVideo)?.type !== 'vimeo'
       "
       :source="slide?.background"
       :repeat="slide?.slideStyle?.repeatMedia ?? false"
-      :visible="slide?.backgroundType === backgroundTypes.video"
+      :visible="true"
+      preload="metadata"
     />
 
     <!-- MAIN FOREGROUND CONTENT -->

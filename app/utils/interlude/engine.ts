@@ -32,7 +32,10 @@ export const TEXT_MOTION = {
 const TAU = Math.PI * 2
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x))
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
-const smooth = (e0: number, e1: number, x: number) => {
+// Math.hypot is several times slower than this in V8 and allocates on every
+// call, which added up to most of a frame's garbage in the per-dot loops.
+const dist = (x: number, y: number) => Math.sqrt(x * x + y * y)
+const smooth =(e0: number, e1: number, x: number) => {
   const t = clamp((x - e0) / (e1 - e0))
   return t * t * (3 - 2 * t)
 }
@@ -258,6 +261,11 @@ function star(
   c.closePath()
 }
 
+const SUPER_STEPS = 160
+// One scratch buffer shared by every superShape call (shapes are built one at
+// a time). A fresh array per shape was nearly all of Open Heavens' garbage.
+const superRadii = new Float64Array(SUPER_STEPS)
+
 function superShape(
   c: CanvasRenderingContext2D,
   x: number,
@@ -269,25 +277,23 @@ function superShape(
   n3: number,
   rot: number
 ) {
-  const steps = 160
-  const pts: number[] = []
   let max = 0
-  for (let j = 0; j < steps; j++) {
-    const t = (j / steps) * TAU
+  for (let j = 0; j < SUPER_STEPS; j++) {
+    const t = (j / SUPER_STEPS) * TAU
     let r = Math.pow(
       Math.pow(Math.abs(Math.cos((m * t) / 4)), n2) +
         Math.pow(Math.abs(Math.sin((m * t) / 4)), n3),
       -1 / n1
     )
     if (!isFinite(r)) r = 0
-    pts.push(t, r)
+    superRadii[j] = r
     if (r > max) max = r
   }
   const k = max ? R / max : 0
   c.beginPath()
-  for (let j = 0; j < pts.length; j += 2) {
-    const a = pts[j]! + rot
-    const r = pts[j + 1]! * k
+  for (let j = 0; j < SUPER_STEPS; j++) {
+    const a = (j / SUPER_STEPS) * TAU + rot
+    const r = superRadii[j]! * k
     const px = x + Math.cos(a) * r
     const py = y + Math.sin(a) * r
     if (j) c.lineTo(px, py)
@@ -407,13 +413,13 @@ export const interludeVariants: InterludeVariant[] = [
           const y = oy + (r + 0.5) * rh
           const dx = (x - S.cx) / S.w
           const dy = (y - S.cy) / S.h
-          const d = Math.hypot(dx * 1.78, dy)
+          const d = dist(dx * 1.78, dy)
           const e = S.enter(0.1 + d * 0.9, 0.9, eOutBack)
           if (e <= 0.001) continue
           const clear = lerp(
             0.22,
             1,
-            smooth(0.75, 1.35, Math.hypot(dx / 0.42, dy / 0.3))
+            smooth(0.75, 1.35, dist(dx / 0.42, dy / 0.3))
           )
           const crest = Math.pow(0.5 + 0.5 * Math.sin(d * 9 - S.spin(1)), 3)
           const sz =
@@ -803,6 +809,10 @@ export const interludeVariants: InterludeVariant[] = [
         x: S.cx + Math.cos(a2) * S.w * 0.3,
         y: S.cy + Math.sin(a2 * 2) * S.h * 0.28,
       }
+      // The same for every dot in a frame, so worked out once, not ~2,000 times.
+      const spin3 = S.spin(3)
+      const spin2 = S.spin(2)
+      const dotSize = sp * 0.64 * (1 + 0.15 * S.kick)
       const layer = (col: string, dx: number, dy: number, ph: number) => {
         c.fillStyle = col
         c.beginPath()
@@ -810,18 +820,16 @@ export const interludeVariants: InterludeVariant[] = [
           for (let k = 0; k < cols; k++) {
             const x = (k + 0.5) * sp + dx
             const y = oy + (r + 0.5) * sp + dy
-            const d1 = Math.hypot(x - p1.x, y - p1.y) / S.m
-            const d2 = Math.hypot(x - p2.x, y - p2.y) / S.m
+            const d1 = dist(x - p1.x, y - p1.y) / S.m
+            const d2 = dist(x - p2.x, y - p2.y) / S.m
             const v =
               0.5 +
-              0.5 *
-                Math.sin(d1 * 18 - S.spin(3) + ph) *
-                Math.cos(d2 * 14 + S.spin(2))
+              0.5 * Math.sin(d1 * 18 - spin3 + ph) * Math.cos(d2 * 14 + spin2)
             const e = S.enter(
-              0.05 + (Math.hypot(x - S.cx, y - S.cy) / S.D) * 1.4,
+              0.05 + (dist(x - S.cx, y - S.cy) / S.D) * 1.4,
               0.6
             )
-            const rad = sp * 0.64 * v * e * (1 + 0.15 * S.kick)
+            const rad = dotSize * v * e
             if (rad > 0.4) {
               c.moveTo(x + rad, y)
               c.arc(x, y, rad, 0, TAU)

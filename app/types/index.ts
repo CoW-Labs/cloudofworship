@@ -333,6 +333,10 @@ export interface MediaCloudSyncRecord {
   createdAt: string
   updatedAt: string
   uploadedAt?: string
+  /** Background re-uploads that have failed in a row. Any other write resets it. */
+  retryAttempts?: number
+  /** When the last background re-upload was tried. */
+  lastRetryAt?: string
 }
 
 /**

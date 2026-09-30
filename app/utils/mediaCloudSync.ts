@@ -10,6 +10,36 @@ export const mediaCloudFailureReason = (
     ? "quota"
     : "upload-error"
 
+/**
+ * How long to wait after the nth background re-upload in a row has failed.
+ * A dropped connection usually recovers within minutes, so the early waits
+ * are short; a page still failing after that is tried a few times a day
+ * rather than on every reconnect. It is never abandoned: the bytes exist
+ * only on the device that added them.
+ */
+export const CLOUD_RETRY_BACKOFF_MS = [
+  60_000,
+  5 * 60_000,
+  30 * 60_000,
+  2 * 60 * 60_000,
+  6 * 60 * 60_000,
+]
+
+/** Whether a stranded page's backoff has run out. */
+export const isCloudRetryDue = (
+  record: Pick<MediaCloudSyncRecord, "retryAttempts" | "lastRetryAt">,
+  now = Date.now()
+) => {
+  const attempts = record.retryAttempts ?? 0
+  const lastTried = record.lastRetryAt ? Date.parse(record.lastRetryAt) : NaN
+  if (!attempts || Number.isNaN(lastTried)) return true
+  const wait =
+    CLOUD_RETRY_BACKOFF_MS[
+      Math.min(attempts, CLOUD_RETRY_BACKOFF_MS.length) - 1
+    ]!
+  return now - lastTried >= wait
+}
+
 export const unavailableMediaCopy = (
   record?: MediaCloudSyncRecord | null,
   label = "Media"
