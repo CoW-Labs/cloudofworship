@@ -123,11 +123,22 @@ refreshUsage()
 
 // Free churches search the whole library but get previews; adding a library
 // song to the schedule spends one of the month's allowance (see claimSong).
+// Picked once per mount so the line doesn't reshuffle as the count changes.
+const songQuip = pickOne([
+  "Choose wisely.",
+  "Pick your anthems.",
+  "Save a few for Sunday.",
+  "Make them count.",
+  "Make a joyful noise.",
+  "The choir is warming up.",
+  "Let everything that has breath sing.",
+])
 const quotaTitle = computed(() => {
   const limit = songsLimit.value ?? 10
   if (songsLeft.value === 0) return `You've used this month's ${limit} free library songs`
   if (songsLeft.value === null) return `${limit} free library songs a month`
-  return `${songsLeft.value} of ${limit} free library songs left this month`
+  if (songsLeft.value === 1) return "1 song left this month. Make it count."
+  return `${songsLeft.value} of ${limit} free songs left this month. ${songQuip}`
 })
 const itemRefs = ref<(HTMLElement | null)[]>([])
 let latestSongSearchId = 0
