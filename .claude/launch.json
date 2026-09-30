@@ -12,6 +12,16 @@
       "autoPort": true
     },
     {
+      "name": "nuxt-dev-local-api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && BASE_URL=http://localhost:4500/api/v1 exec npx nuxt dev --port $PORT"
+      ],
+      "port": 3010,
+      "autoPort": true
+    },
+    {
       "name": "cow-website",
       "runtimeExecutable": "bash",
       "runtimeArgs": [

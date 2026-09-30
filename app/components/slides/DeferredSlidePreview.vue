@@ -8,7 +8,7 @@
     />
     <div
       v-else
-      class="h-full w-full grid place-items-center bg-primary-900 text-white/80 px-2"
+      class="h-full w-full grid place-items-center bg-black text-white/80 px-2"
     >
       <span class="text-[10px] leading-tight text-center line-clamp-2">
         {{ useShortSlideName(slide) }}

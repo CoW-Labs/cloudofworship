@@ -5,9 +5,18 @@
     <div class="flex flex-col items-center text-center max-w-[26rem]">
       <Logo class="w-[56px] mb-8 opacity-90" />
 
-      <h1 class="text-2xl font-semibold mb-3">This livestream isn't active</h1>
+      <h1 class="text-2xl font-semibold mb-3">{{ title }}</h1>
 
-      <p class="text-white/60 text-[15px] leading-relaxed">
+      <p
+        v-if="reason === 'quota'"
+        class="text-white/60 text-[15px] leading-relaxed"
+      >
+        This church has used its free livestream sessions. Unlimited
+        livestreaming is part of the
+        <span class="text-white/90 font-medium">Teams</span> plan. Nothing is
+        being sent to this screen.
+      </p>
+      <p v-else class="text-white/60 text-[15px] leading-relaxed">
         Live output to a shared link is part of the
         <span class="text-white/90 font-medium">Teams</span> plan, and this
         church isn't on it right now. Nothing is being sent to this screen.
@@ -34,5 +43,18 @@
  *
  * Black rather than the app's surface colours: this renders on the same screen
  * the projection would have, and the rest of that route is already black.
+ *
+ * Also the wall for /stagestream/:schedule_id, the same gate on the same plan.
  */
+withDefaults(
+  defineProps<{
+    title?: string
+    /** "quota": a free church has spent its livestream sessions. */
+    reason?: "plan" | "quota"
+  }>(),
+  {
+    title: "This livestream isn't active",
+    reason: "plan",
+  }
+)
 </script>

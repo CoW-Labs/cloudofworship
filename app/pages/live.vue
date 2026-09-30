@@ -42,7 +42,7 @@
       floating
       label="Live Output"
       :active="!!mostUpdatedLiveSlide"
-      :shortcut="mostUpdatedLiveSlide ? 'Double click' : ''"
+      :shortcut="mostUpdatedLiveSlide ? undefined : ''"
       :hint="
         mostUpdatedLiveSlide
           ? 'the display to go full screen and hide this bar'

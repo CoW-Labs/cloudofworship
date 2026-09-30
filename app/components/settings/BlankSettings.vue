@@ -33,10 +33,10 @@
               <BgVideoSelection
                 v-if="activeMediaTab === 0"
                 settings-page
-                :value="intermission?.background"
-                :value-key="intermission?.backgroundVideoKey"
+                :value="blank?.background"
+                :value-key="blank?.backgroundVideoKey"
                 @select="
-                  appStore.setIntermissionSettings({
+                  appStore.setBlankSettings({
                     mode: 'media',
                     backgroundType: backgroundTypes.video,
                     background: $event.video,
@@ -48,10 +48,10 @@
               <BgImageSelection
                 v-else-if="activeMediaTab === 1"
                 settings-page
-                :value="intermission?.background"
-                :value-key="intermission?.backgroundImageKey"
+                :value="blank?.background"
+                :value-key="blank?.backgroundImageKey"
                 @select="
-                  appStore.setIntermissionSettings({
+                  appStore.setBlankSettings({
                     mode: 'media',
                     backgroundType: backgroundTypes.image,
                     background: $event.image,
@@ -74,8 +74,8 @@ import { useAppStore } from "~/store/app"
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 
-const intermission = computed(() => currentState.value.settings.intermission)
-const isMediaMode = computed(() => intermission.value?.mode === "media")
+const blank = computed(() => currentState.value.settings.intermission)
+const isMediaMode = computed(() => blank.value?.mode === "media")
 
 const mediaTabs = [
   { label: "Video", icon: "i-bx-video" },
@@ -83,10 +83,10 @@ const mediaTabs = [
 ]
 // Default the picker tab to whatever is already chosen.
 const activeMediaTab = ref<number>(
-  intermission.value?.backgroundType === backgroundTypes.image ? 1 : 0
+  blank.value?.backgroundType === backgroundTypes.image ? 1 : 0
 )
 
 const onToggleMode = (value: boolean) => {
-  appStore.setIntermissionSettings({ mode: value ? "media" : "default" })
+  appStore.setBlankSettings({ mode: value ? "media" : "default" })
 }
 </script>

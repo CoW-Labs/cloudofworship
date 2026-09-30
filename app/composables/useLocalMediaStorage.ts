@@ -99,6 +99,8 @@ export interface LocalMediaStorage {
       reason?: MediaCloudSyncReason
       remoteUrl?: string
       error?: unknown
+      /** A failed background re-upload: counts toward the retry backoff. */
+      retried?: boolean
     }
   ): Promise<MediaCloudSyncRecord>
 }
@@ -511,6 +513,12 @@ export const createLocalMediaStorage = (
         input.status === "uploaded"
           ? existing?.uploadedAt || timestamp
           : existing?.uploadedAt,
+      // Only consecutive background failures build up the backoff. A success
+      // or a fresh upload of new bytes starts the count again.
+      retryAttempts: input.retried
+        ? (existing?.retryAttempts ?? 0) + 1
+        : undefined,
+      lastRetryAt: input.retried ? timestamp : undefined,
     }
     await db.mediaCloudSync.put(record)
     if (input.status === "uploaded" && record.remoteUrl) {

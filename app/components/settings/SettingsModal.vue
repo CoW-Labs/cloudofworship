@@ -95,7 +95,7 @@
                   v-else-if="activeTab === 'Slide Background Settings'"
                 />
                 <!-- BLANK SETTINGS -->
-                <IntermissionSettings
+                <BlankSettings
                   v-else-if="activeTab === 'Blank Settings'"
                 />
                 <!-- BIBLE SLIDE SETTINGS -->

@@ -1,7 +1,7 @@
 import { useAuthStore } from '~/store/auth'
 import { useFeatureFlags } from '~/composables/useFeatureFlags'
 import { useAppInfo } from '~/composables/useAppInfo'
-import { quickActionsArr } from '~/utils/constants'
+import { appWideActions, quickActionsArr } from '~/utils/constants'
 
 export type SubscriptionPlan = 'free' | 'teams'
 
@@ -56,6 +56,11 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   // A countdown sent to the stage display only — same feature, other screen.
   'new-stage-countdown': 'teams',
   'clear-stage-countdown': 'teams',
+  'open-stage-display': 'teams',
+  // Stage timer controls ride with the stage display itself.
+  'start-stage-timer': 'teams',
+  'stop-stage-timer': 'teams',
+  'restart-stage-timer': 'teams',
   'new-time-slide': 'teams',
   'show-slide-overlay': 'teams',
   'remove-slide-overlay': 'teams',
@@ -63,6 +68,8 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-vimeo-video': 'teams',
   'open-invite-modal': 'teams',
   'livestream-url': 'teams',
+  // The stage display over the network (/stagestream/:schedule_id).
+  'stagestream-url': 'teams',
   'new-transcribe': 'teams',
   // The online song/lyrics library search ("Search song lyrics" → SongsList).
   // Only the *search* is gated: 'new-song' below stays free so a church can
@@ -71,11 +78,6 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
 
   // Free tier features
   'new-slide': 'free',
-  'open-stage-display': 'free',
-  // Stage timer controls ride with the stage display itself.
-  'start-stage-timer': 'free',
-  'stop-stage-timer': 'free',
-  'restart-stage-timer': 'free',
   'new-search-bible': 'free',
   'new-hymn': 'free',
   'new-media': 'free',
@@ -93,6 +95,30 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'animations-transitions': 'free',
   'overlays-themes': 'free',
 }
+
+/**
+ * Teams features a free church may open and try before paying.
+ *
+ * These are the ones with a panel to fill in (a countdown, an alert, an
+ * interlude, a template gallery) or a metered free allowance (song library,
+ * transcription). The panel opens so the church can see what it would get,
+ * and the upgrade modal waits for the step that delivers it: the Create, Add
+ * or Send. That step calls `requireFeatureAccess`.
+ *
+ * One-click actions (remove alert, stage clock controls, time slide) have
+ * nothing to preview and stay gated where they are clicked.
+ */
+export const PREVIEWABLE_ACTIONS: ReadonlySet<string> = new Set([
+  'new-templates',
+  'new-alert',
+  'new-countdown',
+  'new-stage-countdown',
+  appWideActions.newInterlude,
+  'new-youtube-video',
+  'new-vimeo-video',
+  appWideActions.newSongSearch,
+  appWideActions.newTranscribe,
+])
 
 export default function useSubscription() {
   const authStore = useAuthStore()
@@ -220,6 +246,39 @@ export default function useSubscription() {
   }
 
   /**
+   * Whether a feature's panel may open. True with access, and for a free church
+   * on a previewable feature (see PREVIEWABLE_ACTIONS). Otherwise shows the
+   * upgrade modal and returns false. For entry points: cards, chips, Enter.
+   */
+  const openFeatureOrUpgrade = (actionName: string): boolean => {
+    if (hasAccessToFeature(actionName)) return true
+
+    if (PREVIEWABLE_ACTIONS.has(actionName)) {
+      usePosthogCapture('TEAMS_FEATURE_PREVIEWED', { feature: actionName })
+      return true
+    }
+
+    showUpgradeFor(actionName, 'open')
+    return false
+  }
+
+  /**
+   * Gate for the step that delivers a Teams feature: the Create, Add or Send
+   * inside a previewable panel. Shows the upgrade modal and returns false when
+   * the church has no access.
+   */
+  const requireFeatureAccess = (actionName: string): boolean => {
+    if (hasAccessToFeature(actionName)) return true
+    showUpgradeFor(actionName, 'commit')
+    return false
+  }
+
+  const showUpgradeFor = (actionName: string, stage: 'open' | 'commit') => {
+    useGlobalEmit(appWideActions.showUpgradeModal, { feature: actionName })
+    usePosthogCapture('TEAMS_FEATURE_BLOCKED', { feature: actionName, stage })
+  }
+
+  /**
    * True when the church used to be on Teams but is not any more — the
    * subscription lapsed, was canceled, or they paid for Teams at some point
    * and have since dropped back to Free.
@@ -270,6 +329,8 @@ export default function useSubscription() {
     isPaywallEnabled,
     requiresTeams,
     hasAccessToFeature,
+    openFeatureOrUpgrade,
+    requireFeatureAccess,
     getStorageLimit,
     hasLapsedTeamsSubscription,
   }

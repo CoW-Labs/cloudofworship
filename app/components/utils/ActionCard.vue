@@ -89,13 +89,16 @@
         >
           <AppSection heading="Preview" :sub-heading="action?.name || ''">
             <div
+              ref="previewScrollEl"
               class="rounded-xl bg-gray-100 dark:bg-[#2b3242] max-h-[190px] overflow-y-auto"
             >
-              <p class="px-3 py-3 whitespace-pre-line">
-                {{
-                  previewContent ||
-                  (previewError ? "Preview unavailable" : "Loading...")
-                }}
+              <p
+                v-if="previewContent"
+                class="px-3 py-3 whitespace-pre-line"
+                v-html="previewHtml"
+              />
+              <p v-else class="px-3 py-3 whitespace-pre-line">
+                {{ previewError ? "Preview unavailable" : "Loading..." }}
               </p>
             </div>
           </AppSection>
@@ -129,6 +132,7 @@ import HymnIcon from "~/components/svgs/HymnIcon.vue"
 import TemplatesIcon from "~/components/svgs/TemplatesIcon.vue"
 import RecentClockIcon from "~/components/svgs/RecentClockIcon.vue"
 import TimeIcon from "~/components/svgs/TimeIcon.vue"
+import InterludeIcon from "~/components/svgs/InterludeIcon.vue"
 
 const props = defineProps<{
   action: QuickAction
@@ -137,6 +141,9 @@ const props = defineProps<{
   showSubtext?: boolean
   iconOverride?: Component
   active?: boolean
+  // Search query to highlight in the hover preview; the preview also scrolls
+  // to the first match so the operator can see where and how it matched.
+  highlightQuery?: string
 }>()
 
 // Maps an action name to a custom line-icon component. Actions without an entry
@@ -160,6 +167,7 @@ const actionIconComponentMap: Record<string, Component> = {
   "new-alert": BannersAndAlertsIcon,
   "new-countdown": CountdownIcon,
   "new-time-slide": TimeIcon,
+  "new-interlude": InterludeIcon,
   "new-presentation": PptIcon,
   "new-presentation-from-pdf": PdfIcon,
   "open-schedule-modal": SchedulesIcon,
@@ -179,6 +187,7 @@ const previewContent = ref("")
 const previewError = ref(false)
 const cardRow = ref<HTMLElement | null>(null)
 const previewEl = ref<HTMLElement | null>(null)
+const previewScrollEl = ref<HTMLElement | null>(null)
 const previewPosition = ref({ top: 0, left: 0 })
 const isCardHovered = ref(false)
 const isPreviewHovered = ref(false)
@@ -347,8 +356,50 @@ const fetchPreviewContent = async () => {
   }
 }
 
-watch(previewOpen, (open) => {
-  if (open) fetchPreviewContent()
+// Highlight the query throughout, and tag the line that matches it best so the
+// preview can scroll there rather than to the first stray common word.
+const previewHtml = computed(() => {
+  const query = props.highlightQuery || ""
+  const lines = previewContent.value.split("\n")
+  const best = findBestMatchLine(lines, query)
+  return lines
+    .map((line, i) => {
+      const html = highlightText(line, query)
+      return i === best ? `<span data-best-match>${html}</span>` : html
+    })
+    .join("\n")
+})
+
+// Centre the best-matching line in the preview's scroll area.
+const scrollPreviewToMatch = async () => {
+  await nextTick()
+  const container = previewScrollEl.value
+  if (!container) return
+  const bestLine = container.querySelector(
+    "[data-best-match]"
+  ) as HTMLElement | null
+  // A long single-line excerpt (a Bible verse) is one "line", so aim at the
+  // first highlight inside it rather than the start of the line.
+  const target = (bestLine?.querySelector("mark") ||
+    bestLine) as HTMLElement | null
+  if (!target) {
+    container.scrollTop = 0
+    return
+  }
+  const targetRect = target.getBoundingClientRect()
+  const offset = targetRect.top - container.getBoundingClientRect().top
+  container.scrollTop +=
+    offset - container.clientHeight / 2 + targetRect.height / 2
+}
+
+watch(previewOpen, async (open) => {
+  if (!open) return
+  await fetchPreviewContent()
+  scrollPreviewToMatch()
+})
+
+watch([previewContent, () => props.highlightQuery], () => {
+  if (previewOpen.value) scrollPreviewToMatch()
 })
 
 // The underlying action changed under this (reused) instance — drop the
@@ -360,8 +411,12 @@ watch(previewIdentity, () => {
   if (previewOpen.value) fetchPreviewContent()
 })
 
-const { requiresTeams, hasAccessToFeature } = useSubscription()
-const emitter = useNuxtApp().$emitter as any
+const {
+  requiresTeams,
+  hasAccessToFeature,
+  openFeatureOrUpgrade,
+  requireFeatureAccess,
+} = useSubscription()
 
 // Check if feature flag is enabled for this action
 const { checkFlag } = useFeatureFlags()
@@ -403,8 +458,11 @@ const emitParameter = computed(() => {
 // Show teams badge if the action requires teams subscription.
 // `hasAccessToFeature` already returns true when the paywall is switched off
 // app-wide, so no separate kill-switch clause is needed here.
+// Hidden for now. Set SHOW_TEAMS_BADGE to true to bring the badge back.
+const SHOW_TEAMS_BADGE = false
 const showTeamsBadge = computed(() => {
   return (
+    SHOW_TEAMS_BADGE &&
     requiresTeams(props.action?.action || "") &&
     !hasAccessToFeature(props.action?.action || "")
   )
@@ -418,15 +476,12 @@ const handleActionClick = () => {
     return
   }
 
-  // Check if user has access to this feature
-  if (!hasAccessToFeature(actionName)) {
-    // Show upgrade modal instead of executing the action
-    emitter.emit("show-upgrade-modal", { feature: actionName })
-    usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
-      feature: actionName,
-    })
-    return
-  }
+  // Teams features with a panel open for a free church to try; the upgrade
+  // modal waits for the step that delivers them. A card that carries its own
+  // payload (e.g. "Start 5 minute countdown timer") creates on click, so the
+  // click is that step.
+  const gate = emitParameter.value ? requireFeatureAccess : openFeatureOrUpgrade
+  if (!gate(actionName)) return
 
   // Execute the action normally
   useGlobalEmit(

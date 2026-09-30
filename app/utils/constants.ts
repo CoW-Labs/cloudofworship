@@ -10,6 +10,7 @@ export const slideTypes = {
   countdown: 'countdown',
   time: 'time',
   presentation: 'presentation',
+  interlude: 'interlude',
   // sermon: 'sermon',
   // carousel: 'carousel',
 }
@@ -40,6 +41,7 @@ export const appWideActions = {
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
   newTimeSlide: 'new-time-slide',
+  newInterlude: 'new-interlude',
   showSlideOverlay: 'show-slide-overlay',
   removeSlideOverlay: 'remove-slide-overlay',
   newSearchBible: 'new-search-bible',
@@ -192,15 +194,16 @@ export const quickActionsArr: QuickAction[] = [
     tier: "free",
     // type: slideTypes.text
   },
-  {
-    icon: "i-bx-slideshow",
-    name: "Slide Templates",
-    desc: "Use pre-made, fancy slide templates",
-    action: appWideActions.newTemplates,
-    meta: "template preset saved design layout",
-    tier: "teams",
-    // type: slideTypes.text
-  },
+  // Slide templates are hidden for everyone for now.
+  // {
+  //   icon: "i-bx-slideshow",
+  //   name: "Slide Templates",
+  //   desc: "Use pre-made, fancy slide templates",
+  //   action: appWideActions.newTemplates,
+  //   meta: "template preset saved design layout",
+  //   tier: "teams",
+  //   // type: slideTypes.text
+  // },
   {
     icon: "i-bx-bell",
     name: "Add Banners/Alert",
@@ -239,6 +242,15 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newTimeSlide,
     meta: "time clock live clock current time",
     type: slideTypes.time,
+    tier: "teams",
+  },
+  {
+    icon: "i-ph-coffee",
+    name: "Add Interlude",
+    desc: "An animated break screen with a heading and sub text",
+    action: appWideActions.newInterlude,
+    meta: "interlude intermission break pause animated background welcome coffee fellowship selah we'll be right back",
+    type: slideTypes.interlude,
     tier: "teams",
   },
   {
@@ -352,7 +364,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.openStageDisplay,
     meta: "stage display confidence monitor musician speaker lyrics next verse timer foldback",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-timer",
@@ -379,7 +391,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.startStageTimer,
     meta: "stage timer start resume run stopwatch count up service sermon confidence monitor",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-pause-circle",
@@ -388,7 +400,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.stopStageTimer,
     meta: "stage timer stop pause hold stopwatch service sermon confidence monitor",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-arrow-counter-clockwise",
@@ -397,7 +409,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.restartStageTimer,
     meta: "stage timer restart reset zero again stopwatch service sermon confidence monitor",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-presentation-chart-slash",
@@ -654,6 +666,7 @@ export const slideLayoutTypes = {
   bible: 'bible',
   countdown: 'countdown',
   time: 'time',
+  interlude: 'interlude',
   empty: 'empty',
 }
 

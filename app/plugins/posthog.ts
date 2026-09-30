@@ -33,9 +33,17 @@ export default defineNuxtPlugin(nuxtApp => {
     });
     // Stamped on every event, so a failure can be traced to the build that
     // produced it. `$app_version` is only populated by the mobile SDKs.
+    // The hardware pair sizes performance work against what churches run.
+    // deviceMemory is Chromium-only (GB, rounded to a power of two and capped
+    // by the browser, 8 in most), so it is left off where it isn't reported.
+    const nav = navigator as Navigator & { deviceMemory?: number };
     posthog.register({
       app_version: useAppVersion().appVersion,
       app_platform: useTauri().isTauri ? "desktop" : "web",
+      ...(nav.deviceMemory ? { device_memory_gb: nav.deviceMemory } : {}),
+      ...(nav.hardwareConcurrency
+        ? { hardware_concurrency: nav.hardwareConcurrency }
+        : {}),
     });
     posthog.identify(auth.user?._id, {
       email: auth.user?.email,

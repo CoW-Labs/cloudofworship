@@ -103,15 +103,15 @@
                `.right-group` wrapper so it is a direct flex child: it takes the
                space between the slide name and Go Live and scrolls inside it.
 
-               `justify-end` is desktop-only on purpose. A flex container that
-               overflows cannot scroll back past its start when its content is
-               end-justified, so on a phone — where this strip always overflows
-               — it would open scrolled into its own middle with the first
-               control unreachable. -->
+               Controls are pushed right by a collapsing spacer, not
+               `justify-end`: an overflowing end-justified flex row cannot
+               scroll back past its start, which clipped the verse switch. The
+               spacer shrinks to zero once the row overflows, so it scrolls. -->
           <div
-            class="actions flex-1 flex items-center gap-1 min-w-0 md:justify-end"
+            class="actions flex-1 flex items-center gap-1 min-w-0"
             :class="containerOverflow"
           >
+            <div class="hidden md:block flex-1 min-w-0" aria-hidden="true" />
             <!-- VERSE SWITCH -->
             <BibleVerseSwitch
               v-if="
@@ -224,6 +224,8 @@
                       ? backgroundPopoverSize.width
                       : tab.key === 'scripture'
                       ? scripturePopoverSize.width
+                      : tab.key === 'interlude'
+                      ? interludePopoverSize.width
                       : layoutPopoverSize.width
                   "
                   :max-height="
@@ -231,6 +233,8 @@
                       ? backgroundPopoverSize.height
                       : tab.key === 'scripture'
                       ? scripturePopoverSize.height
+                      : tab.key === 'interlude'
+                      ? interludePopoverSize.height
                       : layoutPopoverSize.height
                   "
                   :boundary-overflow="120"
@@ -271,6 +275,14 @@
                         @loading-change="onBgPanelLoading"
                         @upload-files="onPanelUploadFiles"
                         @resize="backgroundPopoverSize = $event"
+                        @close="activePanel = null"
+                      />
+                      <InterludeBackgroundPanel
+                        v-else-if="tab.key === 'interlude'"
+                        :slide="slide"
+                        @select="onSelectInterludeVariant"
+                        @save-texts="onSaveInterludeTexts"
+                        @resize="interludePopoverSize = $event"
                         @close="activePanel = null"
                       />
                       <BibleThemeSelection
@@ -334,7 +346,9 @@
         :editor="focusedEditor"
       />
       <SlideContentToolbar
-        v-else-if="slide && !isEmptySongSetlist"
+        v-else-if="
+          slide && !isEmptySongSetlist && slide.type !== slideTypes.interlude
+        "
         :slide="slide"
         @update-style="onUpdateSlideStyle($event, false)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
@@ -485,6 +499,8 @@
             :padding="editorPreviewPadding"
             :content-visible="true"
             class="static-slide-editor-preview z-10"
+            @mouseenter="previewHovered = true"
+            @mouseleave="previewHovered = false"
           />
         </div>
       </template>
@@ -499,15 +515,22 @@ import CoWPopover from "~/components/cow/CoWPopover.vue"
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { asFontFamily } from "~/utils/fontFamily"
+import { isSessionMediaUrl } from "~/utils/mediaTransport"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import {
   mediaCloudFailureReason,
   unavailableMediaCopy,
 } from "~/utils/mediaCloudSync"
+import {
+  withInterludeData,
+  defaultInterludeData,
+} from "~/utils/interlude/slide"
+import { interludeModeKey } from "~/utils/interlude/context"
 import type {
   ExtendedFileT,
   ExternalVideo,
+  InterludeSlideData,
   MediaCloudSyncReason,
   Slide,
   SlideStyle,
@@ -678,7 +701,7 @@ const backgroundImageLoading = ref<boolean>(false)
 const backgroundVideoLoading = ref<boolean>(false)
 
 // Only one editor action popover can be open at a time.
-type PanelKey = "scripture" | "background" | "layout"
+type PanelKey = "scripture" | "background" | "layout" | "interlude"
 type PopoverSize = { width: number; height: number }
 const activePanel = ref<PanelKey | null>(null)
 const getInitialBackgroundPopoverSize = (): PopoverSize =>
@@ -691,6 +714,50 @@ const backgroundPopoverSize = ref<PopoverSize>(
 )
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+const interludePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+
+// Interlude slides hold a still frame in the editor so the operator's eye
+// stays on the schedule and live output. They animate, at the preview rate,
+// while hovered or while the interlude panel is open for picking a variant.
+// InterludeView already forces static under prefers-reduced-motion.
+const previewHovered = ref(false)
+provide(
+  interludeModeKey,
+  computed(() =>
+    previewHovered.value || activePanel.value === "interlude"
+      ? "preview"
+      : "static"
+  )
+)
+
+const interludeInput = computed(() => {
+  const { id: _id, ...input } = (props.slide?.data ||
+    {}) as InterludeSlideData
+  return { ...defaultInterludeData(), ...input }
+})
+
+// Each interlude panel section patches only its own fields; the rest of the
+// slide's data is carried over untouched.
+const patchInterlude = (patch: Partial<InterludeSlideData>) => {
+  if (props.slide?.type !== slideTypes.interlude) return
+  const id = (props.slide.data as InterludeSlideData | undefined)?.id
+  emit(
+    "slide-update",
+    withInterludeData(props.slide, {
+      ...interludeInput.value,
+      ...patch,
+      id: id || useID(),
+    })
+  )
+}
+const onSelectInterludeVariant = (variant: string) =>
+  patchInterlude({ variant })
+const onSaveInterludeTexts = (
+  texts: Pick<InterludeSlideData, "heading" | "subtitle" | "textBackground">
+) => {
+  patchInterlude(texts)
+  activePanel.value = null
+}
 
 // Toolbar tabs that toggle the overlay panels. Scripture/Layout are Bible-only;
 // Background mirrors the old "add background" visibility (hidden for presentation
@@ -698,10 +765,19 @@ const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const visibleTabs = computed(() => {
   const isAudio = (props.slide?.data as ExtendedFileT)?.type?.includes("audio")
   const isBible = props.slide?.type === slideTypes.bible
+  const isInterlude = props.slide?.type === slideTypes.interlude
+  // An interlude paints its own background.
   const showBackground =
     props.slide?.type !== slideTypes.presentation &&
+    !isInterlude &&
     (props.slide?.type !== slideTypes.media || isAudio)
   const tabs: { key: PanelKey; label: string; hint: string }[] = []
+  if (isInterlude)
+    tabs.push({
+      key: "interlude",
+      label: "Interlude",
+      hint: "Change the animation, heading and sub text",
+    })
   if (isBible)
     tabs.push({
       key: "scripture",
@@ -840,7 +916,11 @@ const checkImageAvailability = async () => {
   if (!bg) return
 
   // If the background is already a remote URL, it's available everywhere
-  if (bg.startsWith("http://") || bg.startsWith("https://")) return
+  if (
+    (bg.startsWith("http://") || bg.startsWith("https://")) &&
+    !isSessionMediaUrl(bg)
+  )
+    return
 
   try {
     const localUrl = await localMedia.ensureLocal(slideId, {

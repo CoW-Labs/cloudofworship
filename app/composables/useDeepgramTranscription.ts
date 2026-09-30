@@ -14,6 +14,9 @@ interface TranscriptionState {
   currentTranscript: string
   remainingSeconds: number | null
   usedSeconds: number
+  /** Free: one lifetime allowance. Teams: weekly, resets Monday. */
+  period: 'lifetime' | 'week' | null
+  limitSeconds: number | null
 }
 
 interface ReferenceMessageMeta {
@@ -25,7 +28,8 @@ interface ReferenceMessageMeta {
 }
 
 /**
- * Composable for Deepgram-powered real-time transcription (Teams plan only).
+ * Composable for Deepgram-powered real-time transcription. Metered by the
+ * API: 10 minutes once per church on Free, 180 a week on Teams.
  *
  * Streams microphone audio to the backend WebSocket proxy which relays to
  * Deepgram, then pushes back four kinds of messages over the same connection:
@@ -57,6 +61,8 @@ export default function useDeepgramTranscription() {
     currentTranscript: '',
     remainingSeconds: null,
     usedSeconds: 0,
+    period: null,
+    limitSeconds: null,
   })
 
   const micLevel = ref(0)
@@ -241,13 +247,49 @@ export default function useDeepgramTranscription() {
     try {
       const { data } = await useAPIFetch(`/church/${churchId}/transcription/usage`)
       if (data.value) {
-        const usage = data.value as { used: number; remaining: number; limit: number }
+        const usage = data.value as {
+          used: number
+          remaining: number
+          limit: number
+          period?: 'lifetime' | 'week'
+        }
         state.value.remainingSeconds = usage.remaining
         state.value.usedSeconds = usage.used
+        state.value.limitSeconds = usage.limit
+        state.value.period = usage.period ?? 'week'
       }
     } catch (err) {
       console.error('Failed to fetch transcription usage:', err)
     }
+  }
+
+  const showLimitReachedToast = (message?: string) => {
+    const isLifetime = state.value.period === 'lifetime'
+    const minutes = state.value.limitSeconds ? Math.round(state.value.limitSeconds / 60) : null
+    toast.add({
+      title: isLifetime ? 'Free transcription minutes used' : 'Weekly limit reached',
+      description:
+        message ||
+        (isLifetime
+          ? `Your ${minutes ?? 10} free minutes have been used. Upgrade to Teams to keep transcribing.`
+          : `Your ${minutes ?? 180}-minute weekly transcription limit has been reached. It resets on Monday.`),
+      icon: 'i-bx-time',
+      color: 'amber',
+      timeout: 8000,
+      ...(isLifetime
+        ? {
+            actions: [
+              {
+                label: 'Upgrade to Teams',
+                click: () =>
+                  useGlobalEmit(appWideActions.showUpgradeModal, {
+                    feature: appWideActions.newTranscribe,
+                  }),
+              },
+            ],
+          }
+        : {}),
+    })
   }
 
   const startTranscription = async () => {
@@ -295,6 +337,8 @@ export default function useDeepgramTranscription() {
 
           if (msg.type === 'ready') {
             state.value.remainingSeconds = msg.remainingSeconds
+            if (msg.period) state.value.period = msg.period
+            if (msg.limit) state.value.limitSeconds = msg.limit
             state.value.isTranscribing = true
             state.value.isConnecting = false
 
@@ -346,13 +390,10 @@ export default function useDeepgramTranscription() {
               sentAt: msg.sentAt,
             })
           } else if (msg.type === 'limit_reached') {
-            toast.add({
-              title: 'Weekly limit reached',
-              description: 'Your 60-minute weekly transcription limit has been reached. It resets on Monday.',
-              icon: 'i-bx-time',
-              color: 'amber',
-              timeout: 8000,
-            })
+            if (msg.period) state.value.period = msg.period
+            if (msg.limit) state.value.limitSeconds = msg.limit
+            state.value.remainingSeconds = 0
+            showLimitReachedToast(msg.message)
             stopTranscription()
           } else if (msg.type === 'error') {
             state.value.error = msg.message
@@ -368,16 +409,24 @@ export default function useDeepgramTranscription() {
         }
       }
 
-      ws.onerror = () => {
-        state.value.error = 'WebSocket connection error'
+      ws.onerror = async () => {
         state.value.isConnecting = false
+        cleanup()
+        // The server refuses a spent allowance at the handshake (HTTP 429),
+        // which a browser WebSocket only reports as a bare error. Re-read the
+        // usage to tell that apart from a real connection failure.
+        await fetchUsage()
+        if (state.value.remainingSeconds === 0) {
+          showLimitReachedToast()
+          return
+        }
+        state.value.error = 'WebSocket connection error'
         toast.add({
           title: 'Connection error',
           description: 'Failed to connect to transcription service',
           icon: 'i-bx-error',
           color: 'red',
         })
-        cleanup()
       }
 
       ws.onclose = () => {
@@ -608,6 +657,8 @@ export default function useDeepgramTranscription() {
     currentTranscript: computed(() => state.value.currentTranscript),
     remainingSeconds: computed(() => state.value.remainingSeconds),
     usedSeconds: computed(() => state.value.usedSeconds),
+    usagePeriod: computed(() => state.value.period),
+    limitSeconds: computed(() => state.value.limitSeconds),
     remainingMinutes,
     usedMinutes,
     allBibleReferences,

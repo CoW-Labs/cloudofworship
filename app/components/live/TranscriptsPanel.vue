@@ -19,6 +19,7 @@
               color="primary"
               variant="ghost"
               class="session-button"
+              :class="{ 'mic-idle-pulse': !isConnecting && !isOutOfTime }"
               :loading="isConnecting"
               :disabled="isOutOfTime"
               @click.stop="startTranscription"
@@ -106,7 +107,8 @@
                           : 'text-primary-700 dark:text-primary-300'
                       "
                     >
-                      {{ remainingMinutes }}m left
+                      {{ remainingMinutes }}m{{ isFreeAllowance ? " free" : "" }}
+                      left
                     </span>
                   </Transition>
                 </span>
@@ -214,25 +216,31 @@
             name="i-material-symbols-speech-to-text"
             class="text-3xl mb-2 opacity-50"
           />
-          <div
-            v-if="
-              useDeepgramEngine &&
-              remainingSeconds !== null &&
-              remainingSeconds <= 0
-            "
-            class="mb-3"
-          >
+          <div v-if="isOutOfTime && isFreeAllowance" class="mb-1 text-left">
+            <CowTeamsPreviewNotice
+              :feature="appWideActions.newTranscribe"
+              title="Your free minutes are used"
+            />
+          </div>
+          <div v-else-if="isOutOfTime" class="mb-1">
             <UAlert
               color="amber"
               variant="subtle"
               title="Weekly limit reached"
-              description="Your 60-minute transcription limit resets every Monday."
+              :description="`Your ${limitMinutes}-minute transcription limit resets every Monday.`"
               icon="i-bx-time"
+            />
+          </div>
+          <div v-else-if="isFreeAllowance && !isTranscribing" class="mb-1">
+            <CowTeamsPreviewNotice
+              variant="text"
+              :feature="appWideActions.newTranscribe"
+              :title="freeMinutesTitle"
             />
           </div>
           <div
             v-else-if="!useDeepgramEngine && !isSpeechRecognitionSupported"
-            class="mb-3"
+            class="mb-1"
           >
             <UAlert
               color="amber"
@@ -242,13 +250,9 @@
               icon="i-bx-error"
             />
           </div>
-          <p class="text-sm">
+          <p v-if="isTranscribing" class="text-sm">
             {{
-              isPaused
-                ? "Paused. Press play to keep transcribing."
-                : isTranscribing
-                ? "Listening..."
-                : "Click the microphone to start transcribing"
+              isPaused ? "Paused. Press play to keep transcribing." : "Listening..."
             }}
           </p>
           <p class="text-xs mt-1 opacity-70">
@@ -300,7 +304,7 @@
             }}
           </p>
           <p class="text-xs mt-1 opacity-70">
-            Scriptures matching the sermon will appear here automatically
+            Scriptures matching transcripts will appear here
           </p>
         </div>
 
@@ -455,6 +459,8 @@ const {
   clearTranscript,
   remainingMinutes,
   remainingSeconds,
+  usagePeriod,
+  limitSeconds,
   isTeamsPlan,
   useDeepgramEngine,
   micLevel,
@@ -484,9 +490,26 @@ onBeforeUnmount(() => {
   if (props.mobile) releaseWakeLock().catch(() => {})
 })
 
-// Below this threshold (5 mins) the session pill switches to a warning tint
+// A free church's one-off allowance, as opposed to Teams' weekly one.
+const isFreeAllowance = computed(() => usagePeriod.value === "lifetime")
+const limitMinutes = computed(() =>
+  limitSeconds.value ? Math.round(limitSeconds.value / 60) : null
+)
+
+// Picked once per mount so the line doesn't reshuffle as the minutes tick.
+const minutesQuip = pickOne(["Preach on.","Let the Word go forth."])
+const freeMinutesTitle = computed(() =>
+  (remainingMinutes.value ?? 0) <= 2
+    ? `${remainingMinutes.value} minute${remainingMinutes.value === 1 ? "" : "s"} left. Speak quickly, with conviction.`
+    : `${remainingMinutes.value} of ${limitMinutes.value} free minutes left. ${minutesQuip}`
+)
+
+// Below this threshold the session pill switches to a warning tint: 5 minutes
+// of a weekly allowance, 2 of the 10 free ones (5 would be half of them).
 const isLowOnTime = computed(
-  () => remainingSeconds.value !== null && remainingSeconds.value <= 300
+  () =>
+    remainingSeconds.value !== null &&
+    remainingSeconds.value <= (isFreeAllowance.value ? 120 : 300)
 )
 
 const isOutOfTime = computed(
@@ -692,7 +715,39 @@ const handleScriptureClick = (result: ScriptureResult) => {
   transition-delay: 0ms, 140ms;
 }
 
+/* Idle mic breathes a soft ring so the operator knows where to start. The
+   ring is a pseudo-element moved only by transform and opacity, so it runs on
+   the compositor instead of repainting the header every frame. */
+.mic-control :deep(.mic-idle-pulse) {
+  position: relative;
+}
+
+.mic-control :deep(.mic-idle-pulse)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px rgb(168 85 247 / 0.45);
+  pointer-events: none;
+  animation: mic-idle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes mic-idle-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  70%,
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .mic-control :deep(.mic-idle-pulse)::after {
+    display: none;
+  }
   .mic-control,
   .session-controls {
     transition-duration: 0ms;

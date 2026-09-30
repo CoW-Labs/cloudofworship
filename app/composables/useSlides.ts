@@ -2,7 +2,7 @@ import { useDebounceFn, useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
-import { toTransportSafeSlide } from "~/utils/mediaTransport"
+import { isSessionMediaUrl, toTransportSafeSlide } from "~/utils/mediaTransport"
 import { enqueueSlideShadowWrite } from "~/composables/useSlideRepository"
 import {
   getAPIErrorMessage,
@@ -106,7 +106,10 @@ export default function useSlides() {
 
   const localizeLiveSlideMedia = (liveSlide: Slide) => {
     const bg = liveSlide.background
-    const isRemote = !!bg && (bg.startsWith("http://") || bg.startsWith("https://"))
+    const isRemote =
+      !!bg &&
+      (bg.startsWith("http://") || bg.startsWith("https://")) &&
+      !isSessionMediaUrl(bg)
     const bearsMedia =
       liveSlide.type === slideTypes.media ||
       liveSlide.type === slideTypes.presentation ||
@@ -365,9 +368,13 @@ export default function useSlides() {
   }
 
   /**
-   * Update a single slide online
+   * Update a single slide online. Pass `transportSlide` when the caller has
+   * already built the network-safe copy (e.g. to reuse it for a socket event).
    */
-  const updateSlide = async (slide: Slide): Promise<Slide | null> => {
+  const updateSlide = async (
+    slide: Slide,
+    transportSlide?: Slide
+  ): Promise<Slide | null> => {
     if (!online.value) {
       console.warn('Cannot update slide while offline')
       return null
@@ -386,13 +393,13 @@ export default function useSlides() {
       }
 
       loading.value = true
-      const transportSlide = await toTransportSafeSlide(slide)
+      const body = transportSlide || (await toTransportSafeSlide(slide))
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/${slide._id}`,
         {
           method: 'PUT',
-          body: transportSlide,
+          body,
           key: `update-slide-${slide._id}`,
         }
       )
