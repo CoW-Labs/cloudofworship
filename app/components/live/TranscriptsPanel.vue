@@ -227,7 +227,7 @@
               color="amber"
               variant="subtle"
               title="Weekly limit reached"
-              :description="`Your ${limitMinutes}-minute transcription limit resets every Monday.`"
+              :description="`You've used this week's ${limitMinutes} minutes. They reset on Monday.`"
               icon="i-bx-time"
             />
           </div>
