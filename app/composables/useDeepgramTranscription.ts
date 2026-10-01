@@ -272,7 +272,7 @@ export default function useDeepgramTranscription() {
         message ||
         (isLifetime
           ? `Your ${minutes ?? 10} free minutes have been used. Upgrade to Teams to keep transcribing.`
-          : `Your ${minutes ?? 180}-minute weekly transcription limit has been reached. It resets on Monday.`),
+          : `You've used this week's ${minutes ?? 180} transcription minutes. They reset on Monday.`),
       icon: 'i-bx-time',
       color: 'amber',
       timeout: 8000,
