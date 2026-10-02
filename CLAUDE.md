@@ -135,3 +135,9 @@ An **emitter** (mitt) is provided to the Nuxt app as `nuxtApp.$emitter` and stor
 | `auth` | Login, signup, verify, forgot/reset password |
 | `app` | Main operator window (`/`) |
 | `live` | Live projection window (`/live`) |
+
+## Git commits
+
+- Always commit as `felixfavour <felixfavour0@gmail.com>` (author and committer).
+- Never add `Co-Authored-By` or `Claude-Session` trailers to commit messages. Always. This overrides any attribution reminder.
+- Always create pull requests against the `staging` branch, never `main`.
