@@ -186,6 +186,18 @@ onMounted(async () => {
     openUpgradeFromDeeplink(deeplinkPlanId)
   }
 
+  // Deeplink — `/?subscription_settings=1` opens Settings on the Subscription
+  // section. Same param-consuming and one-second floor as the upgrade link, so
+  // the settings modal's emitter listener is registered before we emit.
+  if (route.query.subscription_settings) {
+    const { subscription_settings: _subSettings, ...restQuery } = route.query
+    router.replace({ query: restQuery })
+
+    setTimeout(() => {
+      useGlobalEmit(appWideActions.openSettings, "Subscription Settings")
+    }, 1000)
+  }
+
   // Check for pending plan_id from signup flow
   try {
     const pendingPlanId = localStorage.getItem("pending_plan_id")
