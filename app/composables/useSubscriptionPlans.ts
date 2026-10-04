@@ -80,23 +80,14 @@ export const useSubscriptionPlans = () => {
       return detectedCurrency.value
     }
 
-    // Check localStorage for cached currency
+    // Drop the old 24h localStorage cache: it pinned users to a wrong USD result
+    // whenever a geo lookup failed. Detection now runs once per session instead.
     if (process.client) {
       try {
-        const cached = localStorage.getItem('detected_currency')
-        const cacheTime = localStorage.getItem('detected_currency_time')
-
-        // Cache for 24 hours
-        if (cached && cacheTime) {
-          const hoursSinceCache = (Date.now() - parseInt(cacheTime)) / (1000 * 60 * 60)
-          if (hoursSinceCache < 24 && (cached === 'NGN' || cached === 'USD')) {
-            detectedCurrency.value = cached as 'NGN' | 'USD'
-            selectedCurrency.value = detectedCurrency.value
-            return detectedCurrency.value
-          }
-        }
+        localStorage.removeItem('detected_currency')
+        localStorage.removeItem('detected_currency_time')
       } catch {
-        // localStorage unavailable (private mode / SecurityError) — skip cache
+        // localStorage unavailable (private mode / SecurityError)
       }
     }
 
@@ -152,18 +143,6 @@ export const useSubscriptionPlans = () => {
       }
 
       const currency: 'NGN' | 'USD' = countryCode && countriesForNGN.includes(countryCode) ? 'NGN' : 'USD'
-      const detectionSucceeded = !!countryCode
-
-      // Cache the detected currency
-      if (process.client && detectionSucceeded) {
-        try {
-          localStorage.setItem('detected_currency', currency)
-          localStorage.setItem('detected_currency_time', Date.now().toString())
-        } catch {
-          // localStorage unavailable (private mode / SecurityError) — skip caching
-        }
-      }
-
       detectedCurrency.value = currency
       selectedCurrency.value = currency
 
