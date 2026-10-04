@@ -80,23 +80,14 @@ export const useSubscriptionPlans = () => {
       return detectedCurrency.value
     }
 
-    // Check localStorage for cached currency
+    // Drop the old 24h localStorage cache: it pinned users to a wrong USD result
+    // whenever a geo lookup failed. Detection now runs once per session instead.
     if (process.client) {
       try {
-        const cached = localStorage.getItem('detected_currency')
-        const cacheTime = localStorage.getItem('detected_currency_time')
-
-        // Cache for 24 hours
-        if (cached && cacheTime) {
-          const hoursSinceCache = (Date.now() - parseInt(cacheTime)) / (1000 * 60 * 60)
-          if (hoursSinceCache < 24 && (cached === 'NGN' || cached === 'USD')) {
-            detectedCurrency.value = cached as 'NGN' | 'USD'
-            selectedCurrency.value = detectedCurrency.value
-            return detectedCurrency.value
-          }
-        }
+        localStorage.removeItem('detected_currency')
+        localStorage.removeItem('detected_currency_time')
       } catch {
-        // localStorage unavailable (private mode / SecurityError) — skip cache
+        // localStorage unavailable (private mode / SecurityError)
       }
     }
 
@@ -104,58 +95,61 @@ export const useSubscriptionPlans = () => {
 
     try {
       // Try multiple detection services for reliability
-      let currency: 'NGN' | 'USD' = 'USD' // Default fallback
-
       // Only Nigeria is billed in NGN (Paystack). Everywhere else pays in USD via Dodo,
       // whose checkout accepts international cards.
       const countriesForNGN = ['NG']
 
-      try {
-        // Try ipapi.co first (free, reliable)
-        const response = await fetch('https://ipapi.co/json/')
-        const data = await response.json()
+      // Resolve a country code, trying each source until one yields a real answer.
+      // A rate-limited/blocked/errored lookup must never count as "not Nigeria".
+      const lookups: Array<() => Promise<string | undefined>> = [
+        async () => {
+          const res = await fetch('https://ipapi.co/json/')
+          if (!res.ok) return undefined
+          return (await res.json())?.country_code
+        },
+        async () => {
+          const res = await fetch('https://ip-api.com/json/')
+          if (!res.ok) return undefined
+          return (await res.json())?.countryCode
+        },
+        async () => {
+          const res = await fetch('https://api.country.is/')
+          if (!res.ok) return undefined
+          return (await res.json())?.country
+        },
+      ]
 
-        if (countriesForNGN.includes(data.country_code)) {
-          currency = 'NGN'
-        } else {
-          currency = 'USD'
-        }
-      } catch (err) {
-        console.warn('Primary currency detection failed, trying fallback:', err)
-
+      let countryCode: string | undefined
+      for (const lookup of lookups) {
         try {
-          // Fallback to ip-api.com
-          const response = await fetch('https://ip-api.com/json/')
-          const data = await response.json()
+          countryCode = await lookup()
+          if (countryCode) break
+        } catch (err) {
+          console.warn('Currency detection source failed, trying next:', err)
+        }
+      }
 
-          if (countriesForNGN.includes(data.countryCode)) {
-            currency = 'NGN'
-          } else {
-            currency = 'USD'
+      // Last resort: browser timezone (Nigeria is Africa/Lagos)
+      let detectionMethod = 'ip_location'
+      if (!countryCode) {
+        detectionMethod = 'timezone'
+        try {
+          if (Intl.DateTimeFormat().resolvedOptions().timeZone === 'Africa/Lagos') {
+            countryCode = 'NG'
           }
-        } catch (fallbackErr) {
-          console.warn('Fallback currency detection failed, using default USD:', fallbackErr)
-          // Keep default USD
-        }
-      }
-
-      // Cache the detected currency
-      if (process.client) {
-        try {
-          localStorage.setItem('detected_currency', currency)
-          localStorage.setItem('detected_currency_time', Date.now().toString())
         } catch {
-          // localStorage unavailable (private mode / SecurityError) — skip caching
+          // Intl unavailable — keep default USD
         }
       }
 
+      const currency: 'NGN' | 'USD' = countryCode && countriesForNGN.includes(countryCode) ? 'NGN' : 'USD'
       detectedCurrency.value = currency
       selectedCurrency.value = currency
 
       // Track detection
       usePosthogCapture('CURRENCY_AUTO_DETECTED', {
         detectedCurrency: currency,
-        method: 'ip_location'
+        method: detectionMethod
       })
 
       return currency
