@@ -35,7 +35,8 @@ export const useSubscriptionPlans = () => {
 
   // Allow local testing by setting currency in localStorage
   const getTestCurrency = (): 'NGN' | 'USD' | null => {
-    if (process.client) {
+    // Dev builds only: in production this would let anyone pick the NGN price.
+    if (process.client && import.meta.dev) {
       try {
         const testCurrency = localStorage.getItem('test_currency')
         if (testCurrency === 'NGN' || testCurrency === 'USD') {
@@ -94,43 +95,21 @@ export const useSubscriptionPlans = () => {
     isDetectingCurrency.value = true
 
     try {
-      // Try multiple detection services for reliability
-      // Only Nigeria is billed in NGN (Paystack). Everywhere else pays in USD via Dodo,
-      // whose checkout accepts international cards.
-      const countriesForNGN = ['NG']
-
-      // Resolve a country code, trying each source until one yields a real answer.
-      // A rate-limited/blocked/errored lookup must never count as "not Nigeria".
-      const lookups: Array<() => Promise<string | undefined>> = [
-        async () => {
-          const res = await fetch('https://ipapi.co/json/')
-          if (!res.ok) return undefined
-          return (await res.json())?.country_code
-        },
-        async () => {
-          const res = await fetch('https://ip-api.com/json/')
-          if (!res.ok) return undefined
-          return (await res.json())?.countryCode
-        },
-        async () => {
-          const res = await fetch('https://api.country.is/')
-          if (!res.ok) return undefined
-          return (await res.json())?.country
-        },
-      ]
-
+      // The API reads Cloudflare's CF-IPCountry header, which is far more
+      // reliable than client-side lookups and can't be altered by the visitor.
       let countryCode: string | undefined
-      for (const lookup of lookups) {
-        try {
-          countryCode = await lookup()
-          if (countryCode) break
-        } catch (err) {
-          console.warn('Currency detection source failed, trying next:', err)
-        }
+      let detectionMethod = 'cloudflare_ip_country'
+      try {
+        const { data } = await useAPIFetch<{ country: string | null; currency: 'NGN' | 'USD' }>('/app-config/geo', {
+          key: `billing-geo-${Date.now()}`,
+        })
+        countryCode = data.value?.country ?? undefined
+      } catch (err) {
+        console.warn('Currency detection via API failed:', err)
       }
 
-      // Last resort: browser timezone (Nigeria is Africa/Lagos)
-      let detectionMethod = 'ip_location'
+      // Only when Cloudflare has no country: browser timezone (Nigeria is
+      // Africa/Lagos), so a failed lookup doesn't push Nigerians onto USD.
       if (!countryCode) {
         detectionMethod = 'timezone'
         try {
@@ -142,7 +121,8 @@ export const useSubscriptionPlans = () => {
         }
       }
 
-      const currency: 'NGN' | 'USD' = countryCode && countriesForNGN.includes(countryCode) ? 'NGN' : 'USD'
+      // Only Nigeria is billed in NGN (Paystack). Everywhere else pays in USD via Dodo.
+      const currency: 'NGN' | 'USD' = countryCode === 'NG' ? 'NGN' : 'USD'
       detectedCurrency.value = currency
       selectedCurrency.value = currency
 
