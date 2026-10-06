@@ -286,6 +286,9 @@ export interface Song {
   // A library song served to a free church: first verse only. The full song
   // comes from useSongs().claimSong, which spends a monthly library song.
   isPreview?: boolean
+  // Search results only: the lyric line the query matched, when the title
+  // alone doesn't explain why the song came back (see matchedLine.js in the API).
+  matchedLine?: string
 }
 
 export interface ExternalVideo {

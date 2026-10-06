@@ -61,11 +61,16 @@
           {{ action?.name || "" }}
         </h4>
         <p
-          v-if="!compact || showSubtext"
+          v-if="!compact || showSubtext || matchedLine"
           class="font-light mt-1 text-gray-500 dark:text-[#7d8695]"
           :class="compact ? 'text-xs mt-0.5 truncate' : 'text-xs'"
         >
-          <slot name="desc">{{ action?.desc || "" }}</slot>
+          <span
+            v-if="matchedLine"
+            class="italic"
+            v-html="highlightText(matchedLine, highlightQuery || '')"
+          />
+          <slot v-else name="desc">{{ action?.desc || "" }}</slot>
         </p>
       </div>
     </button>
@@ -174,6 +179,14 @@ const actionIconComponentMap: Record<string, Component> = {
   "new-schedules-list": SchedulesIcon,
   "open-settings": SettingsIcon,
 }
+
+// A song found by its lyrics rather than its title shows the line it matched
+// in place of the artist, so the operator can see why it came back.
+const matchedLine = computed(() =>
+  props.action?.type === slideTypes.song
+    ? props.action?.songData?.matchedLine || ""
+    : ""
+)
 
 const customIconComponent = computed(
   () => actionIconComponentMap[props.action?.action || ""] || null
