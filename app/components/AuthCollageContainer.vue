@@ -140,6 +140,9 @@ const open = (img: string, e: MouseEvent) => {
     // hand the shared name over to the modal image (clear it from the tile)
     imgEl.style.viewTransitionName = ""
   })
+  // A skipped transition (the tab was hidden mid-morph) rejects `ready` as
+  // well as `finished`; left alone it surfaces as an unhandled rejection.
+  vt.ready.catch(() => {})
   vt.finished.catch(() => {}).finally(() => {
     imgEl.style.viewTransitionName = ""
     isTransitioning.value = false
@@ -167,6 +170,7 @@ const close = async () => {
     // morph back into the originating tile
     if (sharedEl) sharedEl.style.viewTransitionName = SHARED
   })
+  vt.ready.catch(() => {})
   vt.finished.catch(() => {}).finally(() => {
     if (sharedEl) sharedEl.style.viewTransitionName = ""
     sharedEl = null
