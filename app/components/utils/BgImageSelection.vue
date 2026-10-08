@@ -86,12 +86,17 @@
           :loading="imageCompressionLoading"
         />
       </div>
-      <Teleport to="#settings-modal-device-action">
-        <!-- Fixed to the settings modal, outside its scrolling content. -->
-        <div
-          v-if="!hideUpload && settingsPage"
-          class="pointer-events-auto w-[190px] shadow-xl transition-all"
-        >
+      <!-- Fixed to the settings modal, outside its scrolling content.
+           `defer`: when the modal opens on this tab, the target is built in
+           the same render but not attached to the document yet, so an eager
+           lookup misses it, leaves the button unmounted, and the next update
+           crashes patching it ("reading 'emitsOptions'"), freezing the app. -->
+      <Teleport
+        v-if="!hideUpload && settingsPage"
+        defer
+        to="#settings-modal-device-action"
+      >
+        <div class="pointer-events-auto w-[190px] shadow-xl transition-all">
           <input
             ref="imageFileInput"
             type="file"
