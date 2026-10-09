@@ -89,12 +89,14 @@
         :loading="videoUploadLoading"
       />
     </div>
-    <Teleport to="#settings-modal-device-action">
-      <!-- Fixed to the settings modal, outside its scrolling content. -->
-      <div
-        v-if="!hideUpload && settingsPage"
-        class="pointer-events-auto w-[190px] shadow-xl transition-all"
-      >
+    <!-- Fixed to the settings modal, outside its scrolling content. `defer`
+         for the reason given in BgImageSelection. -->
+    <Teleport
+      v-if="!hideUpload && settingsPage"
+      defer
+      to="#settings-modal-device-action"
+    >
+      <div class="pointer-events-auto w-[190px] shadow-xl transition-all">
         <input
           ref="videoFileInput"
           type="file"

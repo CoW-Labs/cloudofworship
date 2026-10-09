@@ -177,20 +177,27 @@ const saveAllBackgroundVideos = async () => {
   for (let i = 0; i < missingVideoIds.length; i += batchSize) {
     await Promise.all(
       missingVideoIds.slice(i, i + batchSize).map(async (id) => {
-        await localMedia.downloadToLocal({
-          key: `/video-bg-${id}.mp4`,
-          groupId: `/video-bg-${id}.mp4`,
-          category: "preset",
-          kind: "video",
-          url: videoUrlMap[id]!,
-          mimeType: "video/mp4",
-          recoverable: true,
-          onProgress: (fraction) => {
-            if (Number.isFinite(fraction)) {
-              downloadProgress.value = (fraction * 100).toFixed(2)
-            }
-          },
-        })
+        // One dropped download must not hold the viewer on the loader: a
+        // video that failed to cache is simply left out of the cached list,
+        // as the operator console does.
+        try {
+          await localMedia.downloadToLocal({
+            key: `/video-bg-${id}.mp4`,
+            groupId: `/video-bg-${id}.mp4`,
+            category: "preset",
+            kind: "video",
+            url: videoUrlMap[id]!,
+            mimeType: "video/mp4",
+            recoverable: true,
+            onProgress: (fraction) => {
+              if (Number.isFinite(fraction)) {
+                downloadProgress.value = (fraction * 100).toFixed(2)
+              }
+            },
+          })
+        } catch (err) {
+          console.warn(`Failed to download video-bg-${id}:`, err)
+        }
       })
     )
   }
@@ -396,17 +403,22 @@ onBeforeMount(async () => {
   ])
   if (tierRestricted.value) return
 
-  await saveAllBackgroundVideos()
-  await setCachedVideosURL()
-  markResourcesReady()
+  try {
+    await saveAllBackgroundVideos()
+    await setCachedVideosURL()
+  } finally {
+    // Whatever failed is still reported, but the viewer gets the stream:
+    // until this runs no live slide renders, and the loader never clears.
+    markResourcesReady()
 
-  // All computations completed
-  downloadStep.value = 5
-  downloadResource.value = "All resources downloaded."
+    // All computations completed
+    downloadStep.value = 5
+    downloadResource.value = "All resources downloaded."
 
-  setTimeout(() => {
-    loadingResources.value = false
-  }, 100)
+    setTimeout(() => {
+      loadingResources.value = false
+    }, 100)
+  }
 })
 
 onBeforeUnmount(() => {
