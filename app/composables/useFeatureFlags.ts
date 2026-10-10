@@ -16,7 +16,7 @@ import { ref, getCurrentScope, onScopeDispose } from "vue"
  * Flags below are rollout switches, where failing open is the correct and
  * intended behaviour.
  */
-export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "transcripts-free" | "ppt-conversion" | "allow-online-scripture-search-for-only-teams" | "force-sw-unregister" | "hide-free-trial-promotion" | "upgrade-modal-billing-default" | "discord-community"
+export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "transcripts-free" | "ppt-conversion" | "allow-online-scripture-search-for-only-teams" | "force-sw-unregister" | "hide-free-trial-promotion" | "upgrade-modal-billing-default" | "discord-community" | "signup-video-layout"
 
 /**
  * Composable for managing PostHog feature flags
@@ -118,6 +118,8 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
   // from plain function calls (claimSong) where there is no component at all.
   if (flagKey) {
     if (!posthog) {
+      // same localhost rule as checkFlag, so a flagged feature can be seen in dev
+      isEnabled.value = checkFlag(flagKey)
       isLoading.value = false
     } else if (getCurrentScope()) {
       const stopListening = posthog.onFeatureFlags(() => {
