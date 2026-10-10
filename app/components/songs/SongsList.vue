@@ -134,7 +134,7 @@ const songQuip = pickOne([
   "Let everything that has breath sing.",
 ])
 const quotaTitle = computed(() => {
-  const limit = songsLimit.value ?? 10
+  const limit = songsLimit.value ?? 50
   if (songsLeft.value === 0) return `You've used this month's ${limit} free library songs`
   if (songsLeft.value === null) return `${limit} free library songs a month`
   if (songsLeft.value === 1) return "1 song left this month. Make it count."

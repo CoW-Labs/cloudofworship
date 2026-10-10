@@ -303,7 +303,7 @@ const FEATURE_UPGRADE_COPY: Record<
   "new-song-search": {
     title: "Add every song you need with Teams",
     description:
-      "Free churches add 10 library songs a month. Teams has no limit.",
+      "Free churches add 50 library songs a month. Teams has no limit.",
   },
   "new-transcribe": {
     title: "Keep transcribing with Teams",
