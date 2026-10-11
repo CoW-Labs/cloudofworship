@@ -30,6 +30,7 @@
           placeholder="Search versions"
           size="sm"
           class="w-48 cow-search-input"
+          input-class="!rounded-xl"
           aria-label="Search Bible versions"
         >
           <template #leading>
@@ -39,7 +40,7 @@
       </template>
 
       <p
-        v-if="!filteredBibleVersions.length"
+        v-if="versionSearch.trim() && !filteredBibleVersions.length"
         class="px-1 py-3 text-xs text-gray-500 dark:text-[#9aa3b2]"
       >
         No versions match “{{ versionSearch.trim() }}”.

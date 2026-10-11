@@ -80,15 +80,15 @@ export const useBibleVersionManager = () => {
    *
    * The stored list can be missing entirely: settings that predate the field,
    * and a backend settings payload without `bibleVersions`, both leave it
-   * undefined. Falling back to the built-in catalogue keeps the version picker
-   * populated instead of blanking it, and the next `populateBibleVersionOptions`
-   * writes the recovered list back with real `isDownloaded` flags.
+   * undefined, and some stored settings hold an empty array. Falling back to
+   * the built-in catalogue keeps the version picker populated instead of
+   * blanking it, and the next `populateBibleVersionOptions` writes the
+   * recovered list back with real `isDownloaded` flags.
    */
-  const bibleVersionOptions = computed<BibleVersion[]>(() =>
-    Array.isArray(currentState.value.settings.bibleVersions)
-      ? currentState.value.settings.bibleVersions
-      : bibleVersionObjects
-  )
+  const bibleVersionOptions = computed<BibleVersion[]>(() => {
+    const stored = currentState.value.settings.bibleVersions
+    return Array.isArray(stored) && stored.length ? stored : bibleVersionObjects
+  })
 
   /**
    * Select-menu options: only downloaded versions + a "+ More Versions" sentinel
