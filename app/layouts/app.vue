@@ -617,7 +617,7 @@ const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
   const downloadMissingVideos = async () => {
     const downloadVideo = async (id: number) => {
       try {
-        const url = `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`
+        const url = await backgroundVideoAssetUrl(id)
         await localMedia.downloadToLocal({
           key: `/video-bg-${id}.mp4`,
           groupId: `/video-bg-${id}.mp4`,
@@ -792,7 +792,7 @@ const downloadEssentialResources = async () => {
         if (!tempBible) {
           try {
             let kjvBible = await useDetailedFetch(
-              `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/kjv.json`,
+              await bibleVersionAssetUrl("KJV"),
               downloadProgress
             )
             kjvBible = await kjvBible.json()
