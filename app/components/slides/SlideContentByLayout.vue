@@ -11,6 +11,7 @@
       :class="[
         inheritedFontClass,
         verseTransitionClass,
+        { 'balanced-wrap': !usesTipTapTextStyles },
       ]"
       :style="verseTransitionStyleVar"
       v-html="getSlideContentHtml(slide?.contents?.[0])"
@@ -22,6 +23,7 @@
       :class="[
         inheritedFontClass,
         verseTransitionClass,
+        { 'balanced-wrap': !usesTipTapTextStyles },
       ]"
       :style="verseTransitionStyleVar"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
@@ -35,13 +37,15 @@
   >
     <div
       v-if="contentVisible"
+      ref="autoFitEl"
       :key="contentKey(1)"
       class="content"
       :class="[
         inheritedFontClass,
         verseTransitionClass,
+        { 'balanced-wrap': !usesTipTapTextStyles },
       ]"
-      :style="verseTransitionStyleVar"
+      :style="[verseTransitionStyleVar, autoFitStyle]"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
   </div>
@@ -104,13 +108,14 @@
       <div
         v-if="contentVisible"
         :key="contentKey(0)"
+        ref="autoFitEl"
         class="content bible-content flex-1"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
           verseTransitionClass,
           bibleThemeClasses.content,
         ]"
-        :style="verseTransitionStyleVar"
+        :style="[verseTransitionStyleVar, autoFitStyle]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
     </template>
@@ -128,13 +133,14 @@
       <div
         v-if="contentVisible"
         :key="contentKey(0)"
+        ref="autoFitEl"
         class="content bible-content flex-1"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
           verseTransitionClass,
           bibleThemeClasses.content,
         ]"
-        :style="verseTransitionStyleVar"
+        :style="[verseTransitionStyleVar, autoFitStyle]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
     </template>
@@ -152,13 +158,14 @@
       <div
         v-if="contentVisible"
         :key="contentKey(0)"
+        ref="autoFitEl"
         class="content bible-content flex-1"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
           verseTransitionClass,
           bibleThemeClasses.content,
         ]"
-        :style="verseTransitionStyleVar"
+        :style="[verseTransitionStyleVar, autoFitStyle]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
     </template>
@@ -174,13 +181,14 @@
       <div
         v-if="contentVisible"
         :key="contentKey(0)"
+        ref="autoFitEl"
         class="content bible-content"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
           verseTransitionClass,
           bibleThemeClasses.content,
         ]"
-        :style="verseTransitionStyleVar"
+        :style="[verseTransitionStyleVar, autoFitStyle]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
       <div
@@ -198,13 +206,14 @@
       <div
         v-if="contentVisible"
         :key="contentKey(0)"
+        ref="autoFitEl"
         class="content bible-content"
         :class="[
           useURLFriendlyString(slide?.slideStyle?.font || 'Inter'),
           verseTransitionClass,
           bibleThemeClasses.content,
         ]"
-        :style="verseTransitionStyleVar"
+        :style="[verseTransitionStyleVar, autoFitStyle]"
         v-html="getSlideContentHtml(slide?.contents?.[0])"
       ></div>
       <div
@@ -403,9 +412,152 @@ const verseTransitionStyleVar = computed(() => {
   const interval = currentState.value.settings.verseTransitionInterval ?? 0.3
   return { animationDuration: `${interval}s` }
 })
+// Auto-fit: shrink the lyric text just enough that its lines fit on one row
+// each. Text width scales linearly with font size, so one nowrap measurement
+// of every line gives the exact factor each line needs.
+//
+// A line that would need shrinking below AUTO_FIT_MIN_SCALE (60% of the slide's
+// font size) is left to wrap rather than counted: it wraps at the floor anyway,
+// so letting it set the size would make the whole verse tiny and still not fit
+// it. The size is set by the longest line that *can* fit.
+const AUTO_FIT_MIN_SCALE = 0.6
+const autoFitEl = ref<HTMLElement | null>(null)
+const autoFitScale = ref(1)
+// Lyrics only: the toolbar offers the toggle on song, setlist and hymn
+// slides, and the Bible layout shares this markup for scripture.
+const autoFitEnabled = computed(
+  () =>
+    Boolean(props.slide?.slideStyle?.autoFitLines) &&
+    (props.slide?.type === slideTypes.song ||
+      props.slide?.type === slideTypes.songSetlist ||
+      props.slide?.type === slideTypes.hymn)
+)
+const autoFitStyle = computed(() =>
+  autoFitEnabled.value && autoFitScale.value < 1
+    ? { fontSize: `${autoFitScale.value * 100}%` }
+    : {}
+)
+
+/**
+ * The width the lyrics may use, read from the layout box around them rather
+ * than from the lyric element. That element shrinks to its own text, so its
+ * width falls every time the text does: measuring it fed each fit's result
+ * back into the next, which shrank the text again until a line dropped past
+ * the floor and the size sprang back up. The surrounding box does not move
+ * with the text. Labels beside the lyrics (the Bible layout's left and right
+ * label positions) are taken off.
+ */
+const availableWidth = (el: HTMLElement) => {
+  const parent = el.parentElement
+  if (!parent) return el.clientWidth
+  const style = getComputedStyle(parent)
+  let width =
+    parent.clientWidth -
+    parseFloat(style.paddingLeft || "0") -
+    parseFloat(style.paddingRight || "0")
+  if (style.flexDirection.startsWith("row")) {
+    const siblings = Array.from(parent.children).filter(
+      (child): child is HTMLElement => child !== el && child instanceof HTMLElement
+    )
+    const gap = parseFloat(style.columnGap || "0") || 0
+    width -= siblings.reduce((sum, child) => sum + child.offsetWidth + gap, 0)
+  }
+  return Math.max(0, width)
+}
+
+/** Width of every rendered line box, read while the text cannot wrap. */
+const measureLineWidths = (el: HTMLElement) => {
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  const lines = new Map<number, { left: number; right: number }>()
+  for (const rect of Array.from(range.getClientRects())) {
+    if (!rect.width) continue
+    // Fragments of one line share a top edge, give or take subpixel rounding.
+    const key = Math.round(rect.top / 4)
+    const line = lines.get(key)
+    if (line) {
+      line.left = Math.min(line.left, rect.left)
+      line.right = Math.max(line.right, rect.right)
+    } else {
+      lines.set(key, { left: rect.left, right: rect.right })
+    }
+  }
+  range.detach?.()
+  return [...lines.values()].map((line) => line.right - line.left)
+}
+
+const fitToWidth = () => {
+  const el = autoFitEl.value
+  if (!el || !autoFitEnabled.value) {
+    autoFitScale.value = 1
+    return
+  }
+  const available = availableWidth(el)
+  const previousWhiteSpace = el.style.whiteSpace
+  el.style.whiteSpace = "nowrap"
+  const widths = measureLineWidths(el)
+  el.style.whiteSpace = previousWhiteSpace
+  if (!available || !widths.length) return
+
+  // Each line's width was measured at the current scale, so this is the scale
+  // that would make it exactly fill the row — the same answer whatever size
+  // the text is at now. 0.98 leaves room for subpixel rounding.
+  const scales = widths
+    .map((width) => autoFitScale.value * (available / width) * 0.98)
+    // Lines needing more than the floor are left to wrap (see above)
+    .filter((scale) => scale >= AUTO_FIT_MIN_SCALE)
+  const next = Math.min(1, ...scales)
+  // Ignore rounding-sized changes so a refit never nudges the text back and
+  // forth by a pixel.
+  if (Math.abs(next - autoFitScale.value) > 0.005) autoFitScale.value = next
+}
+
+const scheduleFit = () => nextTick(fitToWidth)
+
+watch(
+  () => [
+    autoFitEl.value,
+    autoFitEnabled.value,
+    // Lyrics are contents[1] without labels (full text) and contents[0] with
+    // them (the Bible layout).
+    props.slide?.contents?.[0],
+    props.slide?.contents?.[1],
+    props.slide?.layout,
+    props.slide?.slideStyle?.fontSize,
+    props.slide?.slideStyle?.fontSizePercent,
+    props.slide?.slideStyle?.font,
+    props.slide?.slideStyle?.textBold,
+    props.slide?.slideStyle?.lettercase,
+    props.slide?.slideStyle?.textLinesBackground,
+  ],
+  scheduleFit,
+  { immediate: true }
+)
+
+// Refit when the slide's box changes size (a window resized, a panel dragged).
+// The box around the lyrics, never the lyrics themselves: those resize every
+// time a fit changes the font, and observing them looped. Late web fonts
+// change glyph widths too, so refit once they finish loading.
+watch(autoFitEl, (el, _old, onCleanup) => {
+  const parent = el?.parentElement
+  if (!parent || typeof ResizeObserver === "undefined") return
+  const observer = new ResizeObserver(() => scheduleFit())
+  observer.observe(parent)
+  onCleanup(() => observer.disconnect())
+})
+onMounted(() => {
+  document.fonts?.ready.then(scheduleFit)
+})
 </script>
 
 <style scoped>
+/* Keeps a wrapped line from stranding its last word ("...MY STRENGTH MY /
+   SHIELD") without narrowing every row the way `balance` does, which left
+   wide empty margins either side. Inherited by the paragraphs. */
+.balanced-wrap {
+  text-wrap: pretty;
+}
+
 .writing-mode-vertical {
   writing-mode: vertical-rl;
 }

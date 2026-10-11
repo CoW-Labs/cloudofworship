@@ -44,9 +44,7 @@ export default function useSongSetlist() {
     song: Song,
     linesPerSlide?: number
   ): Promise<SongSetlistItem | null> => {
-    const resolvedSong = await useSong(detachSong(song), linesPerSlide, {
-      persistLinesPerSlide: false,
-    })
+    const resolvedSong = await useSong(detachSong(song), linesPerSlide)
     if (!resolvedSong) return null
 
     return {
@@ -84,8 +82,7 @@ export default function useSongSetlist() {
     const activeItem: SongSetlistItem = { ...activeItemSource }
     const resolvedSong = await useSong(
       detachSong(activeItem.song || activeItem.songId),
-      linesPerSlide,
-      { persistLinesPerSlide: false }
+      linesPerSlide
     )
     if (!resolvedSong) return tempSlide
 
@@ -189,8 +186,7 @@ export default function useSongSetlist() {
     if (!activeItem) return null
     const activeSong = await useSong(
       detachSong(activeItem.song || activeItem.songId),
-      linesPerSlide,
-      { persistLinesPerSlide: false }
+      linesPerSlide
     )
     if (!activeSong) return null
 
@@ -228,8 +224,7 @@ export default function useSongSetlist() {
       if (!previousItem) return null
       const previousSong = await useSong(
         detachSong(previousItem.song || previousItem.songId),
-        linesPerSlide,
-        { persistLinesPerSlide: false }
+        linesPerSlide
       )
       return await refreshSongSetlistSlide(slide, {
         activeSongIndex: previousSongIndex,

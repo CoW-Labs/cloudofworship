@@ -402,6 +402,8 @@ export interface SlideStyle {
   textOutlined?: boolean
   textBold?: boolean
   textLinesBackground?: boolean
+  // Shrinks song/hymn text so each lyric line fits on one row (down to a floor)
+  autoFitLines?: boolean
   bibleVersion?: string
   theme?: string // Theme ID for slide styling (e.g., for Bible slides)
   overlayPlacement?: OverlayPosition

@@ -1513,7 +1513,8 @@ const refreshSlidesForSong = async (song: Song) => {
   const songId = song?._id || song?.id
   if (!songId) return
 
-  // Re-derive verses from the edited lyrics once, then reuse for every slide.
+  // Re-derive verses from the edited lyrics once for setlists (which re-chunk
+  // at their own linesPerSlide anyway); song slides re-chunk at their own value.
   const resolvedSong = await useSong({ ...song })
   if (!resolvedSong) return
 
@@ -1527,7 +1528,12 @@ const refreshSlidesForSong = async (song: Song) => {
       slide.type === slideTypes.song &&
       (slide.songId === songId || isSameSong(slide.data as Song))
     ) {
-      updatedSlide = rebuildSongSlide(slide, resolvedSong)
+      const slideSong = await useSong(
+        { ...song },
+        slide.slideStyle?.linesPerSlide
+      )
+      if (!slideSong) continue
+      updatedSlide = rebuildSongSlide(slide, slideSong)
     } else if (slide.type === slideTypes.songSetlist) {
       const data = getSetlistData(slide)
       const itemMatches = (item: SongSetlistItem) =>

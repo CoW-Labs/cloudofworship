@@ -87,8 +87,12 @@ export default function useScheduleTemplates() {
         return createHymnSlide(hymn)
       }
 
-      case "song":
-        return createSongSlide(seed.song)
+      case "song": {
+        // Template songs ship pre-split; re-chunk at the current default so
+        // they match the linesPerSlide createSongSlide stamps on the slide.
+        const song = await useSong({ ...seed.song })
+        return createSongSlide(song || seed.song)
+      }
 
       case "song-setlist": {
         if (!seed.songs.length) return null

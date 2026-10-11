@@ -38,6 +38,7 @@ export const hasSlideChanged = (newSlide: Slide | null, oldSlide: Slide | null):
   if (newStyle?.textBold !== oldStyle?.textBold) return true;
   if (newStyle?.textOutlined !== oldStyle?.textOutlined) return true;
   if (newStyle?.textLinesBackground !== oldStyle?.textLinesBackground) return true;
+  if (newStyle?.autoFitLines !== oldStyle?.autoFitLines) return true;
   if (newStyle?.lettercase !== oldStyle?.lettercase) return true;
   if (newStyle?.lineSpacing !== oldStyle?.lineSpacing) return true;
   if (newStyle?.isMediaPlaying !== oldStyle?.isMediaPlaying) return true;

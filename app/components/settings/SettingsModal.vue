@@ -159,6 +159,13 @@ watch(
   }
 )
 
+// Tab switches made inside the open modal (the opening page is on OPEN_SETTINGS_MODAL)
+watch(activeTab, (page, previous) => {
+  if (settingsModalOpen.value && previous && page !== previous) {
+    usePosthogCapture("SETTINGS_TAB_SWITCHED", { page, from: previous })
+  }
+})
+
 // Watch for changes in settings and save
 watch(
   () => appStore.currentState.settings,

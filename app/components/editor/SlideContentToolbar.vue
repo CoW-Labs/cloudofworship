@@ -213,6 +213,34 @@
         @change="$emit('update-lines-per-slide', $event)"
       />
 
+      <!-- SLIDE CONTENT AUTO-FIT CONTROLS -->
+      <CowTooltip
+        text="Fit each line on one row"
+        v-if="
+          slide?.type === slideTypes?.song ||
+          slide?.type === slideTypes?.songSetlist ||
+          slide?.type === slideTypes?.hymn
+        "
+      >
+        <UButton
+          @click="
+            $emit('update-style', {
+              ...slide.slideStyle,
+              autoFitLines: !slide?.slideStyle?.autoFitLines,
+            })
+          "
+          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+          :class="{
+            'toolbar-toggle-active': slide?.slideStyle?.autoFitLines,
+          }"
+          :aria-pressed="Boolean(slide?.slideStyle?.autoFitLines)"
+          aria-label="Fit each line on one row"
+          icon="i-tabler-arrow-autofit-width"
+          variant="ghost"
+          color="gray"
+        />
+      </CowTooltip>
+
       <!-- SLIDE CONTENT LINE HEIGHT CONTROLS -->
       <CowTooltip
         v-if="
