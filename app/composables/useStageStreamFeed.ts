@@ -21,7 +21,7 @@ interface StageStreamSocket {
 }
 
 /**
- * Feeds `/stagestream/:schedule_id` from the operator console.
+ * Feeds `/stagestream/:code` from the operator console.
  *
  * The stage display needs more than the live slide — the next verse, the next
  * slide, the position in the schedule, the stage timer — and a viewer on a

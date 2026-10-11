@@ -68,10 +68,12 @@ import {
  */
 definePageMeta({
   layout: "stage",
+  middleware: "schedule-code",
 })
 
 const route = useRoute()
-const scheduleId = route.params.schedule_id as string
+// `/stagestream/:code`; the schedule-code middleware has already resolved it.
+const scheduleId = useScheduleCodeLookup().resolvedId(route.params.code)
 
 const state = shallowRef<StageStreamState>(emptyStageStreamState())
 const offsetMs = ref(0)
