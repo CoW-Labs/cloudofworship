@@ -472,7 +472,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
       })
 
       // Live slide feed — one-way, operator to the livestream viewers. This is
-      // the only way /livestream/:schedule_id learns which slide is on screen.
+      // the only way /livestream/:code learns which slide is on screen.
       socket.on('live-slide', (data) => {
         onMessage?.('live-slide', { action: 'live-slide', data })
       })

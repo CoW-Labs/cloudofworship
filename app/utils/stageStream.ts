@@ -10,7 +10,7 @@ import {
 } from "~/utils/stageView"
 
 /**
- * The stage display, sent over the socket to `/stagestream/:schedule_id`.
+ * The stage display, sent over the socket to `/stagestream/:code`.
  *
  * The console that owns the live output works the stage view out and sends the
  * finished text; the page on the band's phone or TV only draws it. That keeps

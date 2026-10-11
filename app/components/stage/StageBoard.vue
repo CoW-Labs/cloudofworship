@@ -94,7 +94,7 @@ import type { StagePanelView } from "~/utils/stageView"
 /**
  * The stage display's four panels — NOW, NEXT, the timer and the wall clock —
  * shared by the local stage window (`/stage`) and the streamed one
- * (`/stagestream/:schedule_id`), so a band sees the same screen either way.
+ * (`/stagestream/:code`), so a band sees the same screen either way.
  */
 defineProps<{
   now: StagePanelView

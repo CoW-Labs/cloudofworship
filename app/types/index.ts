@@ -138,6 +138,9 @@ export interface Schedule {
   name: string
   authorId: string
   editorIds: Array<User> // sorted in the order of most recent person to edit a Slide, with most recent person being the 0th index
+  // Short public handle issued by the API (absent until the schedule syncs).
+  // Used where the ObjectId would otherwise be shared; never a replacement for `_id`.
+  code?: string
   churchId: string
   lastUpdated?: string
   createdAt?: string

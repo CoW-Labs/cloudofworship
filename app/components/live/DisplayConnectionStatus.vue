@@ -30,8 +30,8 @@
 
 <script setup lang="ts">
 /**
- * Connection state for the public viewer pages — `/livestream/:schedule_id`
- * and `/stagestream/:schedule_id`. Everything on those screens arrives over the
+ * Connection state for the public viewer pages — `/livestream/:code`
+ * and `/stagestream/:code`. Everything on those screens arrives over the
  * network, so a dropped connection means what is showing may already be out of
  * date, and whoever is looking at it needs to know.
  *

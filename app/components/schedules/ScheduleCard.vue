@@ -35,6 +35,12 @@
           </UTooltip>
         </div>
         <span class="text-xs text-gray-500 mt-0.5 block"
+          ><template v-if="schedule?.code"
+            ><span
+              class="font-mono font-medium tracking-wider text-gray-600 dark:text-gray-300"
+              >{{ schedule.code }}</span
+            >
+            &middot; </template
           >Created
           {{ format(new Date(schedule?.updatedAt as string).getTime()) }}</span
         >
