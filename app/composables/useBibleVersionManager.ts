@@ -63,7 +63,7 @@ export const useBibleVersionManager = () => {
     bibleVersionLoading.value = bibleVersionId
     try {
       let bibleResponse = await useDetailedFetch(
-        `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/${bibleVersionId.toLowerCase()}.json`,
+        await bibleVersionAssetUrl(bibleVersionId),
         downloadProgress
       )
       bibleResponse = await bibleResponse.json()
