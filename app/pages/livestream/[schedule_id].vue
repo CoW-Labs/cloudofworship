@@ -157,18 +157,6 @@ const saveAllBackgroundVideos = async () => {
 
   downloadResource.value = "background videos"
 
-  // Download videos that aren't cached yet - using a map for URLs
-  const videoUrlMap: Record<number, string> = {
-    1: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-1.mp4?v=v1",
-    2: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-2.mp4?v=v1",
-    3: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-3.mp4?v=v1",
-    4: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-4.mp4?v=v1",
-    5: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-5.mp4?v=v1",
-    6: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-6.mp4?v=v1",
-    9: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-9.mp4?v=v1",
-    10: "https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-10.mp4?v=v1",
-  }
-
   const missingVideoIds = videoIds.filter(
     (id) => !savedKeys.has(`/video-bg-${id}.mp4`)
   )
@@ -186,7 +174,7 @@ const saveAllBackgroundVideos = async () => {
             groupId: `/video-bg-${id}.mp4`,
             category: "preset",
             kind: "video",
-            url: videoUrlMap[id]!,
+            url: await backgroundVideoAssetUrl(id),
             mimeType: "video/mp4",
             recoverable: true,
             onProgress: (fraction) => {
