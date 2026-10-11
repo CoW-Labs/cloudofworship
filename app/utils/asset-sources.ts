@@ -11,7 +11,23 @@ const CDN_BASE = "https://d37gopmfkl2m2z.cloudfront.net/open"
 const OUTAGE_FLAG: FeatureFlagKey = "aws-outage-assets"
 const FLAG_WAIT_MS = 3000
 
-const BUNDLED_BIBLE_VERSIONS = new Set(["kjv", "niv", "nkjv", "amp"])
+const BUNDLED_BIBLE_VERSIONS = new Set([
+  "kjv",
+  "niv",
+  "nkjv",
+  "amp",
+  "nlt",
+  "cev",
+  "nasb",
+  "asv",
+  "hcsb",
+  "rvr09",
+  "ybcv",
+  "biu",
+  "srk",
+  "pcm",
+  "al",
+])
 const BUNDLED_BG_VIDEO_IDS = new Set([1, 2, 3, 4, 5, 6])
 
 // Downloads start at app load, often before PostHog has its flags, so this
