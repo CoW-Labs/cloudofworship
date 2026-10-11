@@ -1,7 +1,7 @@
 <template>
   <section
     class="stage-panel relative flex min-h-0 flex-col rounded-[28px] border-2"
-    :class="toneClasses.border"
+    :class="[toneClasses.border, flush ? 'overflow-hidden' : '']"
   >
     <header
       v-if="$slots.header"
@@ -12,8 +12,13 @@
     </header>
 
     <div
-      class="min-h-0 flex-1 px-6 py-5 sm:px-8 sm:py-6"
-      :class="[toneClasses.text, label ? 'pb-12 sm:pb-14' : '']"
+      class="min-h-0 flex-1"
+      :class="[
+        toneClasses.text,
+        flush
+          ? ''
+          : ['px-6 py-5 sm:px-8 sm:py-6', label ? 'pb-12 sm:pb-14' : ''],
+      ]"
     >
       <slot />
     </div>
@@ -36,6 +41,8 @@ const props = withDefaults(
   defineProps<{
     /** Corner tab text. Omit for a panel with no tab. */
     label?: string
+    /** Body runs edge to edge with no padding, for a picture. */
+    flush?: boolean
     tone?: StageTone
   }>(),
   { tone: "muted" }

@@ -48,8 +48,27 @@
     <StageBoard
       :now="nowView"
       :next="nextView"
+      :now-slide="nowSlide"
+      :next-slide="nextSlide"
       :clear-banner="!isFullScreen && !isTauri"
     >
+      <!-- Only when something is wrong. A closed console looks exactly like a
+           quiet one otherwise, and the band reads on from words the room
+           stopped seeing. -->
+      <template v-if="presenceStatus !== 'connected'" #notice>
+        <div
+          class="flex max-w-full items-center gap-2.5 rounded-full border px-4 py-1.5 text-sm font-semibold sm:text-base"
+          :class="
+            presenceStatus === 'lost'
+              ? 'border-red-400/60 bg-red-950 text-red-100'
+              : 'border-amber-400/50 bg-amber-950 text-amber-100'
+          "
+          role="status"
+        >
+          <UIcon name="i-bx-wifi-off" class="h-4 w-4 shrink-0" dynamic />
+          <span class="truncate">{{ presenceMessage }}</span>
+        </div>
+      </template>
       <template #timer>
         <StageTimerPanel
           :slide="liveSlide"
@@ -76,7 +95,12 @@ import {
   exitFullscreenSafely,
   requestFullscreenSafely,
 } from "~/utils/browserSafety"
-import { stageNextView, stageNowView } from "~/utils/stageView"
+import {
+  stageNextView,
+  stageNextVisualSlide,
+  stageNowView,
+  stageNowVisualSlide,
+} from "~/utils/stageView"
 
 definePageMeta({
   layout: "stage",
@@ -153,6 +177,30 @@ const { nextContent, scheduleSlides } = useStageNextContent(
 )
 
 const nextView = computed(() => stageNextView(liveSlide.value, nextContent.value))
+
+// ── Slides with no words, drawn instead of described ───────────────────────
+const nowSlide = computed(() => stageNowVisualSlide(liveSlide.value))
+const nextSlide = computed(() =>
+  stageNextVisualSlide(liveSlide.value, nextContent.value, scheduleSlides.value)
+)
+
+// ── Is the operator console still there? ───────────────────────────────────
+const { status: presenceStatus, lastSeenAt } = useOperatorPresence()
+
+const presenceMessage = computed(() => {
+  if (presenceStatus.value === "waiting") {
+    return "Operator console isn't open on this computer"
+  }
+  const since = lastSeenAt.value
+    ? new Date(lastSeenAt.value).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : ""
+  return since
+    ? `Operator console closed at ${since}. This may not be what's on screen`
+    : "Operator console closed. This may not be what's on screen"
+})
 
 // ── Schedule position, shown alongside the timer ────────────────────────────
 // "Slide 4 of 12" has to count today's service, not every slide the session

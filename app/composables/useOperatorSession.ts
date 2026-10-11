@@ -186,6 +186,8 @@ export const useOperatorSession = () => {
     }
   })
 
+  let stopPresence: (() => void) | null = null
+
   onMounted(() => {
     if (appStore.currentState.activeSchedule) {
       connectSocket()
@@ -194,9 +196,14 @@ export const useOperatorSession = () => {
     // devices offering theirs. Started here so both operator routes get it on
     // the same terms as the socket itself.
     liveOutputControl.start()
+    // Lets a stage display on this computer tell a closed console from a
+    // quiet one.
+    stopPresence = announceOperatorPresence()
   })
 
   onBeforeUnmount(() => {
+    stopPresence?.()
+    stopPresence = null
     liveOutputControl.stop()
     disconnectSocket()
   })
