@@ -23,7 +23,7 @@
         type="button"
         class="auth-video__play"
         aria-label="Play the Cloud of Worship tour video"
-        @click="playing = true"
+        @click="play"
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
@@ -61,6 +61,11 @@ const POSTER_SRC = "/images/auth-video-poster.webp"
 const embedSrc = `https://www.youtube-nocookie.com/embed/${VIDEO_ID}?autoplay=1&rel=0&playsinline=1&modestbranding=1`
 
 const playing = ref(false)
+
+const play = () => {
+  playing.value = true
+  usePosthogCapture("SIGNUP_VIDEO_PLAYED", { video_id: VIDEO_ID })
+}
 
 const onKey = (e: KeyboardEvent) => {
   if (e.key === "Escape" && playing.value) playing.value = false

@@ -205,7 +205,8 @@ const getSongOrHymnObj = async () => {
     case slideTypes.song:
       // console.log(props.slide)
       const song = await useSong(
-        (props.slide?.data as Song) || props.slide?.songId!!
+        (props.slide?.data as Song) || props.slide?.songId!!,
+        props.slide?.slideStyle?.linesPerSlide
       )
       relatedData.value = song
       break
@@ -213,7 +214,10 @@ const getSongOrHymnObj = async () => {
       const setlistData = props.slide?.data as SongSetlistData | undefined
       const activeItem = setlistData?.songs?.[setlistData?.activeSongIndex || 0]
       relatedData.value = activeItem
-        ? await useSong(activeItem.song || activeItem.songId)
+        ? await useSong(
+            activeItem.song || activeItem.songId,
+            props.slide?.slideStyle?.linesPerSlide
+          )
         : {}
       break
     }

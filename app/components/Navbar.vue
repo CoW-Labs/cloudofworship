@@ -667,7 +667,9 @@ emitter?.on("close-modal", () => {
 emitter?.on("open-settings", (data) => {
   settingsModalOpen.value = true
   settingsPage.value = data
-  usePosthogCapture("OPEN_SETTINGS_MODAL")
+  usePosthogCapture("OPEN_SETTINGS_MODAL", {
+    page: data || "Slide Settings",
+  })
 })
 
 emitter?.on("open-shortcuts", (data) => {
