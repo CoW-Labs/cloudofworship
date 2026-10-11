@@ -24,8 +24,28 @@
       title="Available Versions"
       note="Saved versions work offline on this device."
     >
+      <template #actions>
+        <UInput
+          v-model="versionSearch"
+          placeholder="Search versions"
+          size="sm"
+          class="w-48 cow-search-input"
+          aria-label="Search Bible versions"
+        >
+          <template #leading>
+            <SearchIcon class="w-4 h-4 text-gray-400 dark:text-[#9aa3b2]" />
+          </template>
+        </UInput>
+      </template>
+
+      <p
+        v-if="!filteredBibleVersions.length"
+        class="px-1 py-3 text-xs text-gray-500 dark:text-[#9aa3b2]"
+      >
+        No versions match “{{ versionSearch.trim() }}”.
+      </p>
       <div
-        v-for="bibleVersion in bibleVersionOptions"
+        v-for="bibleVersion in filteredBibleVersions"
         :key="bibleVersion?.id"
         class="bible-version-card relative overflow-hidden rounded-2xl bg-white dark:bg-[#131a27] px-4 py-3 flex items-center justify-between gap-4"
       >
@@ -90,4 +110,17 @@ const {
 } = useBibleVersionManager()
 
 populateBibleVersionOptions()
+
+// Matches the abbreviation or the full name, so "yoruba", "ybcv" and
+// "reina" all find their version
+const versionSearch = ref("")
+const filteredBibleVersions = computed(() => {
+  const query = versionSearch.value.trim().toLowerCase()
+  if (!query) return bibleVersionOptions.value ?? []
+  return (bibleVersionOptions.value ?? []).filter(
+    (version) =>
+      version?.id?.toLowerCase().includes(query) ||
+      version?.name?.toLowerCase().includes(query)
+  )
+})
 </script>
