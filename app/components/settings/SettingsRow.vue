@@ -11,8 +11,8 @@
         {{ label }}
         <slot name="badge" />
       </p>
-      <p v-if="description" class="settings-row__description">
-        {{ description }}
+      <p v-if="description || $slots.description" class="settings-row__description">
+        <slot name="description">{{ description }}</slot>
       </p>
     </div>
 

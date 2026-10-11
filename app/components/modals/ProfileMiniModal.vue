@@ -29,7 +29,7 @@
       class="flex items-center gap-1.5 border-t border-gray-100 px-4 py-3 dark:border-white/[0.06]"
     >
       <UAvatar
-        :src="church?.logo"
+        :src="church?.logo ?? undefined"
         :text="church?.name?.[0]"
         size="2xs"
         class="shrink-0"
