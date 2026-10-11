@@ -4,11 +4,17 @@ import type { User } from "~/store/auth"
 export interface SubscriptionActiveDetails {
   id: string
   plan: string
-  status: "active" | "trialing" | "inactive" | "canceled"
+  status: "active" | "trialing" | "inactive" | "canceled" | "past-due"
   expiresAt: string | null
   lastPaidAt: string | null
   canceledAt: string | null
   paystackSubscriptionCode: string | null
+  // False for admin-provisioned plans and Paystack bank-transfer payments,
+  // which have no card on a provider subscription to change.
+  canUpdatePaymentMethod?: boolean
+  // Set while status is "past-due": Teams stays on until accessEndsAt, and the
+  // payment can be retried until retryEndsAt.
+  pastDue?: { accessEndsAt: string; retryEndsAt: string } | null
   amount: number | null
   currency: "NGN" | "USD" | null
   interval: "monthly" | "yearly" | null

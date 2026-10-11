@@ -249,6 +249,7 @@
 <script setup lang="ts">
 import type { PaymentPlan } from "~/composables/usePayment"
 import { gsap } from "gsap"
+import { useAuthStore } from "~/store/auth"
 
 const visible = ref(false)
 const selectedPlan = ref<PaymentPlan>("yearly")
@@ -471,6 +472,38 @@ watch(visible, (isVisible) => {
   useGlobalEmit(appWideActions.upgradeModalClosed)
 })
 
+const authStore = useAuthStore()
+
+/**
+ * A church whose renewal failed fixes it on its existing subscription
+ * (Subscription settings: Retry payment / Update payment method). A new
+ * checkout would leave the old subscription live at the provider, able to
+ * charge the church a second time.
+ */
+const sendToFixPayment = () => {
+  visible.value = false
+  emitter.emit("open-settings", "Subscription Settings")
+  usePosthogCapture("UPGRADE_REDIRECTED_PAST_DUE", { feature: lockedFeature.value })
+  useToast().add({
+    icon: "i-bx-error",
+    title: "Your last payment didn't go through",
+    description: "Retry it or update your card to get Teams back.",
+    color: "red",
+  })
+}
+
+const cachedPastDue = () =>
+  authStore.subscriptionDetails?.activeSubscription?.status === "past-due"
+
+/** Reads the subscription status fresh; the cached copy can be days old. */
+const fetchPastDue = async () => {
+  const { data } = await useAPIFetch("/billing/details")
+  const details = (data.value as any)?.data
+  if (!details) return cachedPastDue()
+  authStore.setSubscriptionDetails(details)
+  return details.activeSubscription?.status === "past-due"
+}
+
 onMounted(async () => {
   await detectCurrency()
   await fetchPlans()
@@ -478,8 +511,17 @@ onMounted(async () => {
   emitter.on(
     "show-upgrade-modal",
     (data?: { planCode?: string; planId?: string; feature?: string }) => {
-      visible.value = true
       lockedFeature.value = data?.feature
+      if (cachedPastDue()) {
+        sendToFixPayment()
+        return
+      }
+      // Open straight away, then confirm with a fresh read in the background.
+      fetchPastDue().then((pastDue) => {
+        if (pastDue && visible.value) sendToFixPayment()
+      })
+
+      visible.value = true
       // Signup deep links pick their own interval, so they sit outside the
       // billing-default experiment.
       billingDefaultVariant.value = "excluded"
@@ -561,6 +603,12 @@ const handleDismiss = () => {
 }
 
 const handleUpgrade = async () => {
+  // Last check before money moves: the background read may not have landed.
+  if (await fetchPastDue()) {
+    sendToFixPayment()
+    return
+  }
+
   const planDetails = getPlanByIntervalAndCurrency(
     selectedPlan.value,
     selectedCurrency.value

@@ -65,7 +65,11 @@
             </div>
           </div>
           <CowButton
-            v-if="subscriptionData?.subscriptionPlan === 'free' && !isFreeTrial"
+            v-if="
+              subscriptionData?.subscriptionPlan === 'free' &&
+              !isFreeTrial &&
+              !isPastDue
+            "
             variant="primary"
             size="2xs"
             class="!px-4 !py-2 text-xs shrink-0"
@@ -73,6 +77,75 @@
           >
             Upgrade to Teams
           </CowButton>
+        </div>
+      </div>
+
+      <!-- Payment Failed Banner -->
+      <div
+        v-if="isPastDue"
+        class="payment-failed-banner rounded-2xl bg-red-50 dark:bg-red-900/25 p-4 mb-4"
+        role="alert"
+      >
+        <div class="flex items-start gap-3">
+          <Icon
+            name="i-bx-error"
+            class="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0"
+          />
+          <div>
+            <h4 class="font-semibold text-sm text-red-800 dark:text-red-200">
+              Your payment didn't go through
+            </h4>
+            <p
+              v-if="pastDueKeepsTeams"
+              class="text-sm text-red-700 dark:text-red-300 mt-1"
+            >
+              Teams stays on until
+              {{ formatDate(subscriptionData?.activeSubscription?.pastDue?.accessEndsAt ?? null) }}.
+              Retry or update your card before then to keep it.
+            </p>
+            <p v-else class="text-sm text-red-700 dark:text-red-300 mt-1">
+              Your Teams features are paused. They come back as soon as a
+              payment succeeds<template
+                v-if="subscriptionData?.activeSubscription?.pastDue?.retryEndsAt"
+                >, if you fix it by
+                {{ formatDate(subscriptionData.activeSubscription.pastDue.retryEndsAt) }}</template
+              >.
+            </p>
+            <template
+              v-if="subscriptionData?.activeSubscription?.canUpdatePaymentMethod"
+            >
+              <div class="flex flex-wrap gap-2 mt-3">
+                <CowButton
+                  variant="danger"
+                  size="2xs"
+                  class="!px-3.5 !py-1.5 text-xs"
+                  :loading="retryingPayment"
+                  :disabled="openingPaymentMethod"
+                  @click="retryPayment"
+                >
+                  Retry payment
+                </CowButton>
+                <CowButton
+                  variant="secondary"
+                  size="2xs"
+                  class="!px-3.5 !py-1.5 text-xs"
+                  :loading="openingPaymentMethod"
+                  :disabled="retryingPayment"
+                  @click="updatePaymentMethod"
+                >
+                  Update payment method
+                </CowButton>
+              </div>
+              <!-- Paystack's card page only saves the card. Dodo's charges the
+                   overdue amount itself, so it needs no follow-up. -->
+              <p
+                v-if="subscriptionData.activeSubscription.paystackSubscriptionCode"
+                class="text-xs text-red-700/80 dark:text-red-300/80 mt-2"
+              >
+                Changed your card? Come back and tap Retry payment to charge it.
+              </p>
+            </template>
+          </div>
         </div>
       </div>
 
@@ -173,15 +246,27 @@
           v-if="subscriptionData.activeSubscription.status === 'active' || subscriptionData.activeSubscription.status === 'trialing'"
           class="mt-6"
         >
-          <CowButton
-            variant="danger"
-            size="2xs"
-            class="!px-3.5 !py-1.5 text-xs"
-            :loading="canceling"
-            @click="showCancelConfirm = true"
-          >
-            Cancel Subscription
-          </CowButton>
+          <div class="flex flex-wrap gap-2">
+            <CowButton
+              v-if="subscriptionData.activeSubscription.canUpdatePaymentMethod"
+              variant="secondary"
+              size="2xs"
+              class="!px-3.5 !py-1.5 text-xs"
+              :loading="openingPaymentMethod"
+              @click="updatePaymentMethod"
+            >
+              Update payment method
+            </CowButton>
+            <CowButton
+              variant="danger"
+              size="2xs"
+              class="!px-3.5 !py-1.5 text-xs"
+              :loading="canceling"
+              @click="showCancelConfirm = true"
+            >
+              Cancel Subscription
+            </CowButton>
+          </div>
           <p class="text-xs text-gray-500 dark:text-[#9aa3b2] mt-2">
             {{
               subscriptionData.activeSubscription.status === 'trialing'
@@ -351,6 +436,20 @@ const transactionsLoading = ref(true)
 
 const isFreeTrial = computed(() => subscriptionData.value?.isFreeTrial ?? false)
 
+// A failed renewal drops the church to the free plan but keeps the
+// subscription linked, so this must not depend on subscriptionPlan.
+const isPastDue = computed(
+  () => subscriptionData.value?.activeSubscription?.status === "past-due"
+)
+
+// For the first few days after a failed payment the church keeps Teams.
+const pastDueKeepsTeams = computed(
+  () =>
+    isPastDue.value &&
+    subscriptionData.value?.subscriptionPlan === "teams" &&
+    !!subscriptionData.value?.activeSubscription?.pastDue?.accessEndsAt
+)
+
 const currentPlanLabel = computed(() => {
   if (isFreeTrial.value) {
     return "Free Trial"
@@ -402,6 +501,7 @@ const getStatusColor = (status: string) => {
       return "amber"
     case "failed":
     case "reversed":
+    case "past-due":
       return "red"
     case "inactive":
       return "gray"
@@ -441,6 +541,19 @@ const fetchSubscriptionDetails = async (showLoader = true) => {
   // Cache the data in auth store
   if (newData) {
     authStore.setSubscriptionDetails(newData)
+
+    // The plan gates every Teams feature. A recovered payment (or a lapse)
+    // must reach those gates now, not on the next church refresh.
+    if (
+      authStore.church &&
+      newData.subscriptionPlan &&
+      authStore.church.subscriptionPlan !== newData.subscriptionPlan
+    ) {
+      authStore.setChurch({
+        ...authStore.church,
+        subscriptionPlan: newData.subscriptionPlan,
+      })
+    }
   }
 
   loading.value = false
@@ -499,7 +612,224 @@ const handleUpgrade = () => {
   emitter.emit("show-upgrade-modal")
 }
 
+/**
+ * Payment requests must never be sent offline: useAPIFetch queues offline
+ * POSTs and replays them on reconnect, which here would charge a card long
+ * after the customer gave up waiting.
+ */
+const ensureOnline = () => {
+  if (navigator.onLine) return true
+  toast.add({
+    color: "red",
+    title: "You're offline",
+    description: "Reconnect to the internet to manage your payment.",
+    icon: "i-bx-wifi-off",
+  })
+  return false
+}
+
+/**
+ * Opens a provider page. On the web, `pendingTab` is a tab opened inside the
+ * click: browsers block window.open once an await has run.
+ */
+const openProviderPage = async (url: string, pendingTab: Window | null) => {
+  if (useTauri().isTauri) {
+    await useOpenExternal(url)
+  } else if (pendingTab) {
+    pendingTab.opener = null
+    pendingTab.location.href = url
+  } else if (!window.open(url, "_blank", "noopener,noreferrer")) {
+    window.location.href = url
+  }
+}
+
+const RECOVERY_POLL_MS = 4000
+const RECOVERY_POLL_ATTEMPTS = 8
+let recoveryPoll: ReturnType<typeof setTimeout> | null = null
+
+const stopRecoveryPoll = () => {
+  if (recoveryPoll) clearTimeout(recoveryPoll)
+  recoveryPoll = null
+}
+
+/**
+ * A charge the provider is still processing restores access by webhook a few
+ * seconds later, so keep re-reading the status until it clears or we give up.
+ */
+const pollForRecovery = (attempt = 1) => {
+  stopRecoveryPoll()
+  recoveryPoll = setTimeout(async () => {
+    await fetchSubscriptionDetails(false)
+    if (!isPastDue.value) {
+      stopRecoveryPoll()
+      fetchTransactions()
+      toast.add({
+        color: "green",
+        title: "Payment successful",
+        description: "Your Teams features are back.",
+        icon: "i-bx-check-circle",
+      })
+      return
+    }
+    if (attempt < RECOVERY_POLL_ATTEMPTS) {
+      pollForRecovery(attempt + 1)
+      return
+    }
+    fetchTransactions()
+    toast.add({
+      color: "amber",
+      title: "Payment not confirmed yet",
+      description:
+        "If your card was declined, update your payment method and try again.",
+      icon: "i-bx-info-circle",
+    })
+  }, RECOVERY_POLL_MS)
+}
+
+const openingPaymentMethod = ref(false)
+// Set once the provider page is open, so returning to this window refreshes
+// the status (a successful charge restores access via webhook).
+const awaitingPaymentMethod = ref(false)
+
+const updatePaymentMethod = async () => {
+  if (!ensureOnline()) return
+  openingPaymentMethod.value = true
+
+  const pendingTab = useTauri().isTauri ? null : window.open("", "_blank")
+
+  const { data, error: linkError } = await useAPIFetch("/billing/payment-method", {
+    method: "POST",
+  })
+  openingPaymentMethod.value = false
+
+  const url = (data.value as any)?.data?.url as string | undefined
+  if (linkError.value || !url) {
+    pendingTab?.close()
+    toast.add({
+      color: "red",
+      title: "Couldn't open the payment page",
+      description:
+        (linkError.value as any)?.data?.message || "Please try again in a moment.",
+      icon: "i-bx-error",
+    })
+    return
+  }
+
+  awaitingPaymentMethod.value = true
+  await openProviderPage(url, pendingTab)
+}
+
+const refreshAfterPaymentMethod = () => {
+  if (!awaitingPaymentMethod.value || document.visibilityState !== "visible") return
+  awaitingPaymentMethod.value = false
+  fetchTransactions()
+  if (isPastDue.value) {
+    // Dodo charges the overdue amount when the new card is saved; give its
+    // webhook time to land.
+    fetchSubscriptionDetails(false).then(() => {
+      if (isPastDue.value) pollForRecovery()
+    })
+  } else {
+    fetchSubscriptionDetails(false)
+  }
+}
+
+const retryingPayment = ref(false)
+
+const retryPayment = async () => {
+  if (!ensureOnline()) return
+  retryingPayment.value = true
+  stopRecoveryPoll()
+
+  const { data, error: retryError } = await useAPIFetch("/billing/retry-payment", {
+    method: "POST",
+  })
+  retryingPayment.value = false
+
+  const result = (data.value as any)?.data as
+    | { status: "succeeded" | "pending" | "action_required" | "failed" | "nothing_due"; url?: string }
+    | undefined
+
+  // A decline comes back as a 402 with the bank's reason as the message.
+  if (retryError.value || !result) {
+    toast.add({
+      color: "red",
+      title: "Payment didn't go through",
+      description:
+        (retryError.value as any)?.data?.message ||
+        "Please try again, or update your payment method.",
+      icon: "i-bx-error",
+    })
+    fetchTransactions()
+    return
+  }
+
+  switch (result.status) {
+    case "succeeded":
+      await fetchSubscriptionDetails(false)
+      fetchTransactions()
+      toast.add({
+        color: "green",
+        title: "Payment successful",
+        description: "Your Teams features are back.",
+        icon: "i-bx-check-circle",
+      })
+      break
+    case "action_required":
+      if (result.url) {
+        awaitingPaymentMethod.value = true
+        await openProviderPage(result.url, null)
+      }
+      toast.add({
+        color: "amber",
+        title: "Confirm the payment with your bank",
+        description: "Finish the confirmation in the page that just opened.",
+        icon: "i-bx-lock",
+      })
+      break
+    case "pending":
+      toast.add({
+        color: "amber",
+        title: "Processing your payment",
+        description: "This usually takes a few seconds.",
+        icon: "i-bx-time-five",
+      })
+      pollForRecovery()
+      break
+    case "nothing_due":
+      await fetchSubscriptionDetails(false)
+      fetchTransactions()
+      if (isPastDue.value) {
+        // The provider has been paid but its webhook hasn't reached us yet.
+        toast.add({
+          color: "amber",
+          title: "Checking your payment",
+          description: "Your payment went through. Restoring your Teams features.",
+          icon: "i-bx-time-five",
+        })
+        pollForRecovery()
+      } else {
+        toast.add({
+          color: "green",
+          title: "You're all paid up",
+          description: "Your Teams features are active.",
+          icon: "i-bx-check-circle",
+        })
+      }
+      break
+  }
+}
+
+onBeforeUnmount(() => {
+  stopRecoveryPoll()
+  window.removeEventListener("focus", refreshAfterPaymentMethod)
+  document.removeEventListener("visibilitychange", refreshAfterPaymentMethod)
+})
+
 onMounted(() => {
+  window.addEventListener("focus", refreshAfterPaymentMethod)
+  document.addEventListener("visibilitychange", refreshAfterPaymentMethod)
+
   // Fetch subscription details
   // If cached data exists, fetch in background without loader
   // If no cached data, show loader
