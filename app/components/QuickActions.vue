@@ -609,8 +609,11 @@ const { quickSearchPromo: promoConfig } = useAppInfo()
 
 const quickSearchPromo = computed(() => {
   const promo = promoConfig.value
-  if (!promo?.enabled || !promo.title || !promo.action) return undefined
-  return promo
+  if (!promo?.enabled || !promo.title) return undefined
+  // A link promo only shows with an http(s) URL, so a bad value can never
+  // render a dead card or hand the OS a non-web scheme.
+  if (promo.actionType === "url") return isWebUrl(promo.url) ? promo : undefined
+  return promo.action ? promo : undefined
 })
 
 const handleChipClick = (action: string) => {
@@ -618,9 +621,16 @@ const handleChipClick = (action: string) => {
   useGlobalEmit(action)
 }
 
+const isWebUrl = (value?: string) => /^https?:\/\//i.test(value?.trim() ?? "")
+
 const handlePromoClick = () => {
-  const action = quickSearchPromo.value?.action
-  if (action) handleChipClick(action)
+  const promo = quickSearchPromo.value
+  if (!promo) return
+  if (promo.actionType === "url") {
+    useOpenExternal(promo.url!.trim())
+    return
+  }
+  if (promo.action) handleChipClick(promo.action)
 }
 
 // The online lyrics library is open to every plan for searching. A free

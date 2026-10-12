@@ -3,7 +3,10 @@ export interface AppInfoQuickSearchPromo {
   badge?: string
   title?: string
   description?: string
+  /** What a click does. Missing means "action" (older saved promos). */
+  actionType?: "action" | "url"
   action?: string
+  url?: string
 }
 
 export interface AppInfo {
