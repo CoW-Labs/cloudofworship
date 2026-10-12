@@ -581,7 +581,7 @@ export const quickActionsArr: QuickAction[] = [
     name: "Overlay Settings",
     desc: "Configure overlay position, size, and decorative theme",
     action: appWideActions.openSettings,
-    actionArg: "Overlay Settings",
+    actionArg: "Other Settings",
     meta: "overlay theme decorative position size text countdown time layout",
     searchableOnly: true,
     tier: "free",
