@@ -30,7 +30,7 @@
           v-model="searchInput"
           class="w-[100%] cow-search-input"
           @input="onSearchInput"
-          @input.capture="loading = true"
+          @input.capture="searching = true"
           @keyup.enter="null"
         >
           <template #leading>
@@ -47,7 +47,7 @@
         </CowButton>
       </div>
       <div
-        v-if="loading"
+        v-if="showSkeleton"
         class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-350px)]"
       >
         <CowSkeleton variant="block" :count="15" :height="80" />
@@ -315,7 +315,7 @@ const {
   deleteSong,
   deleteSlide,
   searchLibraryItems,
-  refreshLibrary,
+  refreshLibraryIfStale,
 } = useLibrary()
 
 const libraryTabs = [
@@ -332,6 +332,17 @@ const loadMoreSongs = () => {
   libraryEndIndex.value += 15
 }
 const searchedLibraryItems = ref<any[]>([])
+// Search is local (fuzzysort over IndexedDB), so it keeps its own flag rather
+// than touching `loading`, which tracks the network sync.
+const searching = ref(false)
+// The cached library renders straight away; the skeleton only covers a sync
+// when this device has nothing saved for the open tab yet.
+const showSkeleton = computed(() => {
+  if (searching.value) return true
+  const cached =
+    activeLibraryTab.value === 0 ? savedSongs.value : savedSlides.value
+  return loading.value && !cached?.length
+})
 const quickActions = ref<HTMLDivElement | null>(null)
 const focusedActionIndex = ref(0)
 const hasInteracted = ref(false)
@@ -412,23 +423,24 @@ const editSong = (song: Song) => {
 const performSearch = (query: string = "") => {
   if (!query || query.length < 2) {
     searchedLibraryItems.value = []
-    loading.value = false
+    searching.value = false
     return
   }
 
   const results = searchLibraryItems(query)
   searchedLibraryItems.value = results
-  loading.value = false
+  searching.value = false
 }
 
 const onSearchInput = useDebounceFn(() => {
-  loading.value = true
+  searching.value = true
   performSearch(searchInput.value)
 }, 500)
 
-// Refresh library when component is mounted
-onMounted(async () => {
-  await refreshLibrary()
+onMounted(() => {
+  // Re-sync in the background only if the last sync is stale; don't hold the
+  // keyboard handler below hostage to a slow network.
+  refreshLibraryIfStale()
 
   quickActions.value?.addEventListener("keydown", (e) => {
     if (e.defaultPrevented) {
