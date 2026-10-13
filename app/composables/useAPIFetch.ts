@@ -8,6 +8,12 @@ import { useRequestCounter } from "./useRequestCounter";
 
 const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+// Without a timeout, a GET on a lossy connection hangs until the browser gives
+// up (minutes) while useOnline() still reports online. ofetch retries a
+// timed-out GET once, so the worst case is twice this. Callers can pass their
+// own `timeout`.
+const DEFAULT_GET_TIMEOUT_MS = 20_000;
+
 type APIFetchResult<ResT = any, ErrorT = any> = {
   data: Ref<ResT | null | undefined>;
   error: Ref<ErrorT | null | undefined>;
@@ -230,7 +236,7 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
   const fetchPending = ref(false);
   const fetchStatus = ref<AsyncDataRequestStatus>("idle");
 
-  const fetchOptions = { ...options };
+  const fetchOptions = { timeout: DEFAULT_GET_TIMEOUT_MS, ...options };
   delete fetchOptions.key;
   delete fetchOptions.dedupe;
   delete fetchOptions.watch;
