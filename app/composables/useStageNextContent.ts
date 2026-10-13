@@ -158,21 +158,23 @@ export default function useStageNextContent(
    * null and the panel falls through to the next slide in the schedule.
    */
   const loadSongLocally = async (
-    source: Song | string | undefined
+    source: Song | string | undefined,
+    linesPerSlide?: number
   ): Promise<Song | null> => {
     if (!source) return null
     if (typeof source === "string" && !source.includes("-")) return null
     // `useSong` assigns the split verses back onto the object it is handed, so
     // hand it a copy — the live slide can be the store's own slide object.
     const input = typeof source === "string" ? source : { ...source }
-    return (await useSong(input as Song | string)) as Song | null
+    return (await useSong(input as Song | string, linesPerSlide)) as Song | null
   }
 
   const nextSongVerse = async (
     slide: Slide
   ): Promise<StageNextContent | null> => {
     const song = await loadSongLocally(
-      (slide.data as Song | undefined) || slide.songId
+      (slide.data as Song | undefined) || slide.songId,
+      slide.slideStyle?.linesPerSlide
     )
     if (!song) return null
 
@@ -202,7 +204,8 @@ export default function useStageNextContent(
     )
     const activeItem = songs[activeSongIndex]
     const activeSong = await loadSongLocally(
-      activeItem?.song || (activeItem?.songId as string)
+      activeItem?.song || (activeItem?.songId as string),
+      slide.slideStyle?.linesPerSlide
     )
 
     const verseIndex = Math.max(Number(activeItem?.verseIndex) || 0, 0)
@@ -220,7 +223,8 @@ export default function useStageNextContent(
     const upcomingItem = songs[activeSongIndex + 1]
     if (!upcomingItem) return null
     const upcomingSong = await loadSongLocally(
-      upcomingItem.song || upcomingItem.songId
+      upcomingItem.song || upcomingItem.songId,
+      slide.slideStyle?.linesPerSlide
     )
     const firstVerse = upcomingSong?.verses?.[0]?.trim()
     if (!firstVerse) return null

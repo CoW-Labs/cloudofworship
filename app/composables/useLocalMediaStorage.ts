@@ -13,6 +13,7 @@ import useMediaDownloadProgress from "~/composables/useMediaDownloadProgress"
 import { useTauri } from "~/composables/useTauri"
 import { useAppStore } from "~/store/app"
 import { MediaDownloadHttpError } from "~/utils/mediaDownloadErrors"
+import { mediaUrlCandidates } from "~/utils/mediaRouting"
 
 const MEDIA_ROOT = "cow-media/v1"
 const STORAGE_VERSION = 1 as const
@@ -824,13 +825,29 @@ export const createLocalMediaStorage = (
     return record
   }
 
-  const downloadToLocal = async (input: DownloadMediaInput) => {
-    let response: Response | null = await fetch(input.url, {
-      signal: input.signal,
-    })
-    if (!response.ok || !response.body) {
-      throw new MediaDownloadHttpError(response.status)
+  // Tries the new media store before the URL the media was saved with (see
+  // utils/mediaRouting). The saved URL's own failure is the one thrown, so the
+  // retry and forget decisions callers make stay what they were with one URL.
+  const fetchHostedMedia = async (url: string, signal?: AbortSignal) => {
+    let lastError: unknown
+    for (const candidate of mediaUrlCandidates(url)) {
+      try {
+        const response = await fetch(candidate, { signal })
+        if (response.ok && response.body) return { response, source: candidate }
+        response.body?.cancel().catch(() => {})
+        lastError = new MediaDownloadHttpError(response.status)
+      } catch (error) {
+        if (signal?.aborted) throw error
+        lastError = error
+      }
     }
+    throw lastError
+  }
+
+  const downloadToLocal = async (input: DownloadMediaInput) => {
+    const first = await fetchHostedMedia(input.url, input.signal)
+    let response: Response | null = first.response
+    const source = first.source
     const headerSize = Number(response.headers.get("content-length") || 0)
     const size = input.size || headerSize
     const responseMimeType =
@@ -842,7 +859,7 @@ export const createLocalMediaStorage = (
     const streamFactory = async () => {
       const activeResponse =
         response ||
-        (await fetch(input.url, {
+        (await fetch(source, {
           signal: input.signal,
         }))
       response = null

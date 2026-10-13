@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 /**
- * Shown on /livestream/:schedule_id when the server refuses the socket because
+ * Shown on /livestream/:code when the server refuses the socket because
  * the schedule's church is not on Teams.
  *
  * Deliberately not an upgrade wall. /mobile-upgrade opens the upgrade modal
@@ -44,7 +44,7 @@
  * Black rather than the app's surface colours: this renders on the same screen
  * the projection would have, and the rest of that route is already black.
  *
- * Also the wall for /stagestream/:schedule_id, the same gate on the same plan.
+ * Also the wall for /stagestream/:code, the same gate on the same plan.
  */
 withDefaults(
   defineProps<{

@@ -18,16 +18,14 @@ const addIdToReturnedSongs = (songs: Array<Song>) => {
  *
  * @param song
  * @param linesPerDisplay how many lyric lines make up one verse. Falls back to
- *   the app-wide default when omitted.
- * @param options `persistLinesPerSlide: false` chunks at the given value
- *   without promoting it to the app-wide default — for callers that chunk at a
- *   slide-scoped value (a setlist) and must not stomp the global setting.
+ *   the app-wide default when omitted. Callers chunking for an existing slide
+ *   pass the slide's own `slideStyle.linesPerSlide`. This never writes the
+ *   app-wide default: only Settings owns that.
  * @returns
  */
 const useSong = async (
   song: Song | string,
-  linesPerDisplay?: number,
-  options?: { persistLinesPerSlide?: boolean }
+  linesPerDisplay?: number
 ): Promise<Song | null> => {
   // console.log(linesPerDisplay)
   const toast = useToast()
@@ -38,9 +36,6 @@ const useSong = async (
     linesPerDisplay = appStore.currentState.settings.slideStyles.linesPerSlide
   }
   linesPerDisplay = Number(linesPerDisplay)
-  if (options?.persistLinesPerSlide !== false) {
-    appStore.setSlideStyles({ ...appStore.currentState.settings.slideStyles, linesPerSlide: linesPerDisplay })
-  }
 
   try {
     if (typeof song === 'string' && song?.includes('-')) {

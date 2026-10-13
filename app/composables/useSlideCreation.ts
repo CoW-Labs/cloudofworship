@@ -242,10 +242,14 @@ export default function useSlideCreation() {
     tempSlide.title = "Verse 1"
     const currentSongVerse = song.verses?.[0]?.trim() ?? ""
     const fontSize = useScreenFontSize(currentSongVerse as string)
+    // Stamped at creation like hymns and setlists, so this slide keeps its
+    // own chunking when the app-wide default changes later.
+    const linesPerSlide = appStore.currentState.settings.slideStyles.linesPerSlide
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
       fontSize: Number(fontSize),
       font: appStore.currentState.settings.defaultFont,
+      ...(linesPerSlide !== undefined && { linesPerSlide }),
     }
     tempSlide.data = song
     tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)

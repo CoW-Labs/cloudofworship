@@ -7,8 +7,8 @@ import { useAppStore } from "~/store/app"
  * Both operator routes — the desktop console (`/`) and the mobile route
  * (`/mobile`) — need the exact same thing: one Socket.IO connection scoped to
  * the active schedule, incoming slide events applied to the store, presence
- * kept current, the live slide fed to `/livestream/:schedule_id` viewers, and
- * the stage display fed to `/stagestream/:schedule_id` viewers.
+ * kept current, the live slide fed to `/livestream/:code` viewers, and
+ * the stage display fed to `/stagestream/:code` viewers.
  *
  * This lived inline in pages/index.vue until the mobile route needed it too.
  * Duplicating it would have been the worst outcome available: two connections
@@ -134,7 +134,7 @@ export const useOperatorSession = () => {
   }
 
   // Feed the slide that is currently on screen to livestream viewers. Nothing
-  // else broadcasts it, so /livestream/:schedule_id stays blank without this.
+  // else broadcasts it, so /livestream/:code stays blank without this.
   watch(
     () => appStore.currentState.liveSlideId,
     (liveSlideId) => {
@@ -186,6 +186,8 @@ export const useOperatorSession = () => {
     }
   })
 
+  let stopPresence: (() => void) | null = null
+
   onMounted(() => {
     if (appStore.currentState.activeSchedule) {
       connectSocket()
@@ -194,9 +196,14 @@ export const useOperatorSession = () => {
     // devices offering theirs. Started here so both operator routes get it on
     // the same terms as the socket itself.
     liveOutputControl.start()
+    // Lets a stage display on this computer tell a closed console from a
+    // quiet one.
+    stopPresence = announceOperatorPresence()
   })
 
   onBeforeUnmount(() => {
+    stopPresence?.()
+    stopPresence = null
     liveOutputControl.stop()
     disconnectSocket()
   })

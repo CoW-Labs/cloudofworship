@@ -10,7 +10,7 @@ import {
 } from "~/utils/stageView"
 
 /**
- * The stage display, sent over the socket to `/stagestream/:schedule_id`.
+ * The stage display, sent over the socket to `/stagestream/:code`.
  *
  * The console that owns the live output works the stage view out and sends the
  * finished text; the page on the band's phone or TV only draws it. That keeps
@@ -86,6 +86,11 @@ export const stageStreamCountdown = (
   }
 }
 
+// Left off entirely when there is no picture, so a text slide's state reads
+// exactly as it did before pictures were sent.
+const withImage = (view: StagePanelView, image?: string): StagePanelView =>
+  image ? { ...view, image } : view
+
 export const buildStageStreamState = (input: {
   slide: Slide | null | undefined
   next: StageNextContent | null | undefined
@@ -94,13 +99,15 @@ export const buildStageStreamState = (input: {
   timer: StageTimerState
   sentAt: number
   countdownObservedAt?: number
+  /** Cloud URLs for NOW and NEXT when they are pictures, not words. */
+  images?: { now: string; next: string }
 }): StageStreamState => ({
   version: STAGE_STREAM_VERSION,
   sentAt: input.sentAt,
   isLive: !!input.slide,
   slideName: input.slide?.name || "",
-  now: stageNowView(input.slide),
-  next: stageNextView(input.slide, input.next),
+  now: withImage(stageNowView(input.slide), input.images?.now),
+  next: withImage(stageNextView(input.slide, input.next), input.images?.next),
   position: input.position,
   count: input.count,
   countdown: stageStreamCountdown(
