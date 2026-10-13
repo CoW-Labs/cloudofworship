@@ -197,7 +197,8 @@ export default function useSlideNavigation() {
   ): Promise<Slide | null> => {
     const tempSlide = { ...slide }
     const song = await useSong(
-      (slide?.data as Song) || slide?.songId
+      (slide?.data as Song) || slide?.songId,
+      slide?.slideStyle?.linesPerSlide
     )
 
     if (song) {

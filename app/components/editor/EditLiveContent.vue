@@ -1632,10 +1632,6 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
 
   if (props.slide?.type === slideTypes.hymn) {
     if (!props.slide) return
-    appStore.setSlideStyles({
-      ...appStore.currentState.settings.slideStyles,
-      linesPerSlide,
-    })
     const hymn = await useHymn(props.slide.songId as string)
     if (!hymn) {
       useToast().add({
@@ -1680,10 +1676,6 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
   }
 
   if (props.slide?.type === slideTypes.songSetlist) {
-    appStore.setSlideStyles({
-      ...appStore.currentState.settings.slideStyles,
-      linesPerSlide,
-    })
     // The refresh chunks at the slide's own `linesPerSlide`, so the new value
     // has to be on the slide going in — and the slideStyle it hands back is
     // the one to emit, since it carries the re-measured font size too.
@@ -1730,7 +1722,11 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
   const previousVerseIndex = Number.isFinite(currentSongVerseNumber)
     ? currentSongVerseNumber - 1
     : 0
-  const tempSong: Song | null = await useSong(song, linesPerSlide)
+  // Hand it a copy: the slide's data is the store's own object.
+  const tempSong: Song | null = await useSong(
+    song && typeof song === "object" ? { ...song } : song,
+    linesPerSlide
+  )
   // console.log(tempSong)
   if (tempSong) {
     const activeVerseIndex = previousVerses.length
@@ -1756,6 +1752,7 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
     let fontSize = useScreenFontSize(currentSongVerse || "")
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
+      linesPerSlide,
       fontSize: Number(fontSize),
     }
     tempSlide.data = tempSong

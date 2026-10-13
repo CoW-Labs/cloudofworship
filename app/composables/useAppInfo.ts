@@ -1,9 +1,14 @@
+import { APP_INFO_CACHE_KEY, setMediaRouting } from "~/utils/mediaRouting"
+
 export interface AppInfoQuickSearchPromo {
   enabled?: boolean
   badge?: string
   title?: string
   description?: string
+  /** What a click does. Missing means "action" (older saved promos). */
+  actionType?: "action" | "url"
   action?: string
+  url?: string
 }
 
 export interface AppInfo {
@@ -16,9 +21,16 @@ export interface AppInfo {
    * Only an explicit `false` turns gating off — see `isPaywallEnabled`.
    */
   paywallEnabled?: boolean
+  /**
+   * Present only once church media has moved off AWS: hosted media is read
+   * from `mediaOrigin` first, under the same key as its legacy URL. See
+   * `utils/mediaRouting.ts`.
+   */
+  mediaOrigin?: string
+  legacyMediaOrigins?: string[]
 }
 
-const CACHE_KEY = "cow-app-info"
+const CACHE_KEY = APP_INFO_CACHE_KEY
 
 /**
  * Server-driven app configuration from `/app-config/info`.
@@ -42,6 +54,7 @@ export const useAppInfo = () => {
 
   const setAppInfo = (info: AppInfo) => {
     appInfo.value = info
+    setMediaRouting(info)
     if (!import.meta.client) return
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(info))

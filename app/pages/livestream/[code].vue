@@ -100,6 +100,8 @@ import type { Emitter } from "mitt"
 import type { BackgroundVideo, Slide } from "~/types"
 import { useAppStore } from "@/store/app"
 import { useOnline, until } from "@vueuse/core"
+definePageMeta({ middleware: "schedule-code" })
+
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const liveSlide = ref<Slide | null>(null)
@@ -107,6 +109,8 @@ const isFullScreen = ref(false)
 const downloadProgress = ref<string>("0")
 const downloadResource = ref<string>("")
 const route = useRoute()
+// `/livestream/:code`; the schedule-code middleware has already resolved it.
+const scheduleId = useScheduleCodeLookup().resolvedId(route.params.code)
 const loadingResources = ref<boolean>(true)
 const online = useOnline()
 const downloadStep = ref<number>(0)
@@ -308,7 +312,7 @@ const handleWebSocketMessage = async (parsedData: any) => {
 }
 
 const socketManager = useSocketIO({
-  scheduleId: route.params.schedule_id as string,
+  scheduleId,
   // Identifies this as the public viewer, which is what scopes the Teams gate
   // to this page. The operator console and /mobile stay ungated on every plan.
   client: "livestream",
@@ -326,7 +330,7 @@ const socketManager = useSocketIO({
     connectionStatus.value = "connected"
     loadingResources.value = false
     usePosthogCapture("LIVESTREAM_TIER_RESTRICTED", {
-      scheduleId: route.params.schedule_id,
+      scheduleId,
       reason: tierRestrictionReason.value,
     })
   },
@@ -334,13 +338,13 @@ const socketManager = useSocketIO({
     connectionStatus.value = "connected"
     showConnectionError.value = false
     usePosthogCapture("REMOTE_CONTROL_CONNECTED", {
-      scheduleId: route.params.schedule_id,
+      scheduleId,
     })
   },
   onDisconnected: () => {
     connectionStatus.value = "disconnected"
     usePosthogCapture("REMOTE_CONTROL_DISCONNECTED", {
-      scheduleId: route.params.schedule_id,
+      scheduleId,
     })
   },
   onError: (error) => {

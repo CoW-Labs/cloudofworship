@@ -119,7 +119,11 @@ export default function useChurch() {
       })
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to update church')
+        throw new Error(
+          (error.value as any)?.data?.message ||
+            error.value?.message ||
+            'Failed to update church'
+        )
       }
 
       const church = data.value as Church

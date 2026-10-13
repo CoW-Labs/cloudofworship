@@ -4,7 +4,8 @@
  * Strategy:
  *   1. If the trimmed query is a multi-word phrase AND it appears verbatim in
  *      the text, highlight the whole phrase as one block.
- *   2. Otherwise highlight each individual query word independently.
+ *   2. Otherwise highlight each run of consecutive matching query words as one
+ *      block, and any leftover single words independently.
  *
  * The input text is HTML-escaped before replacement so no injected HTML
  * from the query or the verse content can break the page.
@@ -33,15 +34,57 @@ export const highlightText = (text: string, query: string): string => {
     if (withPhrase !== escapedText) return withPhrase
   }
 
-  // ── Word-by-word fallback ──────────────────────────────────────────────
-  const words = trimmed
-    .split(/\s+/)
-    .filter((w) => w.length > 0)
-    .map(escapeRegex)
-  if (words.length === 0) return escapedText
+  // ── Consecutive-word runs ──────────────────────────────────────────────
+  // Two or more query words that sit next to each other in the text (and in
+  // the same order in the query) are highlighted as one block, so a line like
+  // "You are the One that we praise" reads as "[You are the One] that we
+  // [praise]" instead of every word lit up separately.
+  const tokenRe = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu
+  const queryTokens = trimmed.toLowerCase().match(tokenRe) || []
+  if (queryTokens.length === 0) return escapedText
+  const wordRe = new RegExp(`(${queryTokens.map(escapeRegex).join("|")})`, "gi")
+  const markWords = (segment: string) => escapeHtml(segment).replace(wordRe, mark)
+  const textTokens = [...text.matchAll(tokenRe)].map((m) => ({
+    word: m[0].toLowerCase(),
+    start: m.index as number,
+    end: (m.index as number) + m[0].length,
+  }))
 
-  const wordRe = new RegExp(`(${words.join("|")})`, "gi")
-  return escapedText.replace(wordRe, mark)
+  const runs: { start: number; end: number }[] = []
+  for (let i = 0; i < textTokens.length; ) {
+    let bestLen = 0
+    for (let s = 0; s < queryTokens.length; s++) {
+      let len = 0
+      while (
+        s + len < queryTokens.length &&
+        i + len < textTokens.length &&
+        textTokens[i + len]!.word === queryTokens[s + len] &&
+        // only join words on the same line
+        (len === 0 ||
+          !text.slice(textTokens[i + len - 1]!.end, textTokens[i + len]!.start).includes("\n"))
+      ) {
+        len++
+      }
+      if (len > bestLen) bestLen = len
+    }
+    if (bestLen >= 2) {
+      runs.push({ start: textTokens[i]!.start, end: textTokens[i + bestLen - 1]!.end })
+      i += bestLen
+    } else {
+      i++
+    }
+  }
+
+  // ── Build output: runs as one mark, everything else word-by-word ───────
+  let out = ""
+  let cursor = 0
+  for (const run of runs) {
+    out += markWords(text.slice(cursor, run.start))
+    out += mark(escapeHtml(text.slice(run.start, run.end)))
+    cursor = run.end
+  }
+  out += markWords(text.slice(cursor))
+  return out
 }
 
 const normaliseForMatch = (s: string) =>

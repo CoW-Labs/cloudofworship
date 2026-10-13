@@ -4,7 +4,11 @@ import { useAppStore } from "~/store/app"
 /**
  * A shareable viewer link for the active schedule, and copying it to the
  * clipboard. Both public viewer pages are addressed the same way —
- * `/<route>/:schedule_id` — and gated the same way, so they share this.
+ * `/<route>/:code` — and gated the same way, so they share this.
+ *
+ * The link carries the schedule's short code. A schedule that has not synced
+ * yet has none (the API issues it), so the link falls back to the id, which the
+ * viewer pages still accept.
  */
 const useScheduleViewerLink = (options: {
   route: string
@@ -29,7 +33,10 @@ const useScheduleViewerLink = (options: {
       /^https?:\/\//.test(origin) &&
       !/^https?:\/\/tauri\.localhost(?::\d+)?$/.test(origin)
     const viewerOrigin = isWebOrigin ? origin : runtimeConfig.public.APP_URL
-    return `${viewerOrigin.replace(/\/+$/, "")}/${options.route}/${currentState.value.activeSchedule?._id}`
+    return `${viewerOrigin.replace(/\/+$/, "")}/${options.route}/${
+      currentState.value.activeSchedule?.code ??
+      currentState.value.activeSchedule?._id
+    }`
   })
 
   const copy = async () => {
@@ -50,7 +57,7 @@ const useScheduleViewerLink = (options: {
 }
 
 /**
- * The public viewer link for the active schedule (`/livestream/:schedule_id`),
+ * The public viewer link for the active schedule (`/livestream/:code`),
  * and copying it to the clipboard.
  *
  * Lived inline in AppSection until the live-output panel needed the same action
@@ -106,7 +113,7 @@ export const useLivestreamLink = () => {
 }
 
 /**
- * The stage display link for the active schedule (`/stagestream/:schedule_id`)
+ * The stage display link for the active schedule (`/stagestream/:code`)
  * — for a band member's phone, a tablet on a music stand, or a TV away from
  * the operator's computer.
  *

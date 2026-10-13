@@ -68,7 +68,7 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-vimeo-video': 'teams',
   'open-invite-modal': 'teams',
   'livestream-url': 'teams',
-  // The stage display over the network (/stagestream/:schedule_id).
+  // The stage display over the network (/stagestream/:code).
   'stagestream-url': 'teams',
   'new-transcribe': 'teams',
   // The online song/lyrics library search ("Search song lyrics" → SongsList).

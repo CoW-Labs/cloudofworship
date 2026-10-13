@@ -2,13 +2,19 @@
   <main
     class="grid min-h-0 flex-1 gap-4 px-4 pb-4 sm:gap-6 sm:px-6 sm:pb-6"
     :class="[
-      LAYOUT_GRID[layout],
+      $slots.notice ? LAYOUT_GRID_WITH_NOTICE[layout] : LAYOUT_GRID[layout],
       // Room for the floating DisplayWindowBanner, which would otherwise sit
       // over the NOW and NEXT headers. Top padding is set only here so no
       // shorthand elsewhere can override it.
       clearBanner ? 'pt-[84px]' : 'pt-4 sm:pt-6',
     ]"
   >
+    <!-- A problem the band has to know about, on a row of its own so neither
+         the floating banner nor a panel can cover it. -->
+    <div v-if="$slots.notice" class="col-span-full flex justify-center">
+      <slot name="notice" />
+    </div>
+
     <!-- Every row or column given to a clock is taken from the words, so on a
          small screen the clocks move out of their way: stacked, they share the
          last row; short, they share a narrow column on the right. -->
@@ -16,6 +22,7 @@
       label="Now"
       tone="now"
       class="min-h-0"
+      :flush="!now.text && !!(nowSlide || now.image)"
       :class="PANEL_SPAN[layout]"
     >
       <template v-if="now.label" #header>
@@ -27,6 +34,11 @@
       </template>
 
       <StageAutoText v-if="now.text" :text="now.text" />
+      <StageSlidePreview
+        v-else-if="nowSlide || now.image"
+        :slide="nowSlide"
+        :image="now.image"
+      />
       <div
         v-else
         class="flex h-full flex-col items-center justify-center gap-3 text-center text-white/40"
@@ -40,6 +52,7 @@
       label="Next"
       tone="next"
       class="min-h-0"
+      :flush="!next.text && !!(nextSlide || next.image)"
       :class="PANEL_SPAN[layout]"
     >
       <template v-if="next.label" #header>
@@ -51,6 +64,11 @@
       </template>
 
       <StageAutoText v-if="next.text" :text="next.text" />
+      <StageSlidePreview
+        v-else-if="nextSlide || next.image"
+        :slide="nextSlide"
+        :image="next.image"
+      />
       <div
         v-else
         class="flex h-full flex-col items-center justify-center gap-3 text-center text-purple-300/40"
@@ -70,16 +88,24 @@
 
 <script setup lang="ts">
 import { useWindowSize } from "@vueuse/core"
+import type { Slide } from "~/types"
 import type { StagePanelView } from "~/utils/stageView"
 
 /**
  * The stage display's four panels — NOW, NEXT, the timer and the wall clock —
  * shared by the local stage window (`/stage`) and the streamed one
- * (`/stagestream/:schedule_id`), so a band sees the same screen either way.
+ * (`/stagestream/:code`), so a band sees the same screen either way.
  */
 defineProps<{
   now: StagePanelView
   next: StagePanelView
+  /**
+   * Slides with no words to show (media, presentation pages), drawn as the
+   * room sees them. Only the local stage window has the slides to pass; the
+   * streamed one draws the `image` on its panel views instead.
+   */
+  nowSlide?: Slide | null
+  nextSlide?: Slide | null
   /** The floating banner is showing (the window is not full screen yet). */
   clearBanner?: boolean
 }>()
@@ -96,6 +122,14 @@ const LAYOUT_GRID: Record<StageLayout, string> = {
   stacked: "grid-cols-2 grid-rows-[1fr_1fr_auto]",
   short: "grid-cols-[1fr_1fr_12rem] grid-rows-2",
   wide: "grid-cols-2 grid-rows-[1fr_minmax(110px,0.3fr)]",
+}
+
+// The same grids with a short row on top for the notice. Spelled out in full
+// rather than built, so Tailwind can see the class names.
+const LAYOUT_GRID_WITH_NOTICE: Record<StageLayout, string> = {
+  stacked: "grid-cols-2 grid-rows-[auto_1fr_1fr_auto]",
+  short: "grid-cols-[1fr_1fr_12rem] grid-rows-[auto_1fr_1fr]",
+  wide: "grid-cols-2 grid-rows-[auto_1fr_minmax(110px,0.3fr)]",
 }
 
 const PANEL_SPAN: Record<StageLayout, string> = {

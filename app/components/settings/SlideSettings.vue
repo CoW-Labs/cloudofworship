@@ -388,6 +388,14 @@ const MIN_FONT_SIZE = 50
 const lines = ref<number>(
   appStore.currentState.settings.slideStyles.linesPerSlide || 4
 )
+// Follow the store so the dropdown never shows a stale default (another
+// window can change it through pinia-shared-state).
+watch(
+  () => appStore.currentState.settings.slideStyles.linesPerSlide,
+  (value) => {
+    if (value) lines.value = value
+  }
+)
 const activePadding = ref<PaddingSide | "">("")
 const { currentState } = storeToRefs(appStore)
 

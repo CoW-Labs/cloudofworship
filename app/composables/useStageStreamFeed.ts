@@ -2,6 +2,12 @@ import type { Ref } from "vue"
 import { useAppStore } from "~/store/app"
 import type { Countdown, Slide } from "~/types"
 import useStageNextContent from "~/composables/useStageNextContent"
+import { toTransportSafeSlide } from "~/utils/mediaTransport"
+import {
+  stageNextVisualSlide,
+  stageNowVisualSlide,
+  stageSlideImageUrl,
+} from "~/utils/stageView"
 import {
   buildStageStreamState,
   isSameStageStream,
@@ -15,7 +21,7 @@ interface StageStreamSocket {
 }
 
 /**
- * Feeds `/stagestream/:schedule_id` from the operator console.
+ * Feeds `/stagestream/:code` from the operator console.
  *
  * The stage display needs more than the live slide — the next verse, the next
  * slide, the position in the schedule, the stage timer — and a viewer on a
@@ -57,6 +63,54 @@ export const useStageStreamFeed = (options: {
 
   const { nextContent, pending } = useStageNextContent(liveSlide, scheduleSlides)
 
+  // ── Pictures for slides with no words ─────────────────────────────────────
+  // Presentation pages and images go to the viewer as cloud URLs, the same
+  // ones the livestream sends. Media only on the operator's computer, and
+  // video, keep their placeholder.
+  const nowVisual = computed(() => stageNowVisualSlide(liveSlide.value))
+  const nextVisual = computed(() =>
+    stageNextVisualSlide(liveSlide.value, nextContent.value, scheduleSlides.value)
+  )
+  const images = ref({ now: "", next: "" })
+  const imagesPending = ref(false)
+  let imageToken = 0
+
+  const imageFor = async (slide: Slide | null) => {
+    if (!slide) return ""
+    try {
+      return stageSlideImageUrl(await toTransportSafeSlide(slide))
+    } catch (error) {
+      console.warn("Stage stream could not resolve a slide picture:", error)
+      return ""
+    }
+  }
+
+  watch(
+    () =>
+      [nowVisual.value, nextVisual.value].map((slide) =>
+        slide
+          ? [slide.id, slide.presentationPageIndex, slide.background].join("|")
+          : ""
+      ).join("||"),
+    async () => {
+      const token = ++imageToken
+      if (!nowVisual.value && !nextVisual.value) {
+        images.value = { now: "", next: "" }
+        imagesPending.value = false
+        return
+      }
+      imagesPending.value = true
+      const [now, next] = await Promise.all([
+        imageFor(nowVisual.value),
+        imageFor(nextVisual.value),
+      ])
+      if (token !== imageToken) return
+      images.value = { now, next }
+      imagesPending.value = false
+    },
+    { immediate: true }
+  )
+
   // "Slide 4 of 12" counts today's service. A live slide from another schedule
   // finds no index and reports 0, which the timer panel reads as "no position".
   const position = computed(() => {
@@ -86,7 +140,7 @@ export const useStageStreamFeed = (options: {
     // re-triggers the watcher below. Blank has no NEXT to wait for.
     if (
       !active.value ||
-      (liveSlide.value && pending.value) ||
+      (liveSlide.value && (pending.value || imagesPending.value)) ||
       !socket?.isConnected()
     ) {
       return
@@ -100,6 +154,7 @@ export const useStageStreamFeed = (options: {
       timer: appStore.currentState.stageTimer,
       sentAt: Date.now(),
       countdownObservedAt,
+      images: images.value,
     })
     if (isSameStageStream(lastSent, state)) return
     if (socket.sendStageState(state)) lastSent = state
@@ -118,6 +173,8 @@ export const useStageStreamFeed = (options: {
       liveSlide,
       nextContent,
       pending,
+      images,
+      imagesPending,
       position,
       () => scheduleSlides.value.length,
       () => appStore.currentState.stageTimer,

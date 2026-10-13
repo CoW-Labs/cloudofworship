@@ -1,6 +1,6 @@
 import type { Slide } from "~/types"
 import type { StageNextContent } from "~/composables/useStageNextContent"
-import { slideTypes } from "~/utils/constants"
+import { backgroundTypes, slideTypes } from "~/utils/constants"
 import { slideToPlainLabel, slideToPlainText } from "~/utils/slideText"
 
 /**
@@ -17,6 +17,92 @@ export interface StagePanelView {
   text: string
   placeholder: string
   icon: string
+  /**
+   * `/stagestream` only: a cloud URL for a slide with a picture instead of
+   * words (a presentation page, an image). The local window draws the slide
+   * itself from `stageVisualSlide` instead.
+   */
+  image?: string
+}
+
+/**
+ * An uploaded image. Audio slides also carry `backgroundType: image` (a stock
+ * photo behind the player), so the file's own type has to agree.
+ */
+const isImageMediaSlide = (slide: Slide) =>
+  slide.type === slideTypes.media &&
+  slide.backgroundType === backgroundTypes.image &&
+  (slide.data as { type?: string } | undefined)?.type === "image"
+
+/**
+ * Slides the stage draws as a picture, because they have no words to show:
+ * presentation pages and images. Video is left as a placeholder, since the
+ * preview would be a black box without playing it a second time.
+ */
+export const isStageVisualSlide = (slide?: Slide | null): slide is Slide =>
+  !!slide &&
+  (slide.type === slideTypes.presentation || isImageMediaSlide(slide))
+
+/** A presentation turned to `pageIndex`, with the background that page uses. */
+const atPresentationPage = (slide: Slide, pageIndex: number): Slide => ({
+  ...slide,
+  presentationPageIndex: pageIndex,
+  background:
+    slide.presentationObjects?.[pageIndex]?.imageUrl || slide.background,
+})
+
+/** What NOW should draw, when the live slide has no words. */
+export const stageNowVisualSlide = (live?: Slide | null) =>
+  isStageVisualSlide(live) ? live : null
+
+/**
+ * What NEXT should draw: the next page of the presentation on screen, or the
+ * next slide in the schedule when that is media or a presentation (which opens
+ * on its first page, whichever one it was left on).
+ */
+export const stageNextVisualSlide = (
+  live: Slide | null | undefined,
+  next: StageNextContent | null | undefined,
+  scheduleSlides: readonly Slide[]
+): Slide | null => {
+  if (!live || !next) return null
+
+  if (next.source === "verse") {
+    return live.type === slideTypes.presentation
+      ? atPresentationPage(live, (live.presentationPageIndex ?? 0) + 1)
+      : null
+  }
+
+  const index = scheduleSlides.findIndex((slide) => slide.id === live.id)
+  const upcoming = index === -1 ? null : scheduleSlides[index + 1]
+  if (!isStageVisualSlide(upcoming)) return null
+  return upcoming.type === slideTypes.presentation
+    ? atPresentationPage(upcoming, 0)
+    : upcoming
+}
+
+const isCloudUrl = (url: unknown): url is string =>
+  typeof url === "string" && /^https:\/\//i.test(url)
+
+/**
+ * The picture a stage viewer elsewhere can load for a slide: a presentation
+ * page or an image. Pass a transport-safe slide, whose URLs have already been
+ * swapped for cloud ones. Anything only on the operator's computer gets no
+ * picture and keeps its placeholder.
+ */
+export const stageSlideImageUrl = (slide?: Slide | null) => {
+  if (!slide) return ""
+  if (slide.type === slideTypes.presentation) {
+    const page =
+      slide.presentationObjects?.[slide.presentationPageIndex ?? 0]?.imageUrl
+    return isCloudUrl(page) ? page : ""
+  }
+  if (!isImageMediaSlide(slide)) return ""
+
+  const data = slide.data as { url?: string } | undefined
+  if (isCloudUrl(data?.url)) return data.url
+  if (isCloudUrl(slide.background)) return slide.background
+  return ""
 }
 
 export const stageNowView = (slide?: Slide | null): StagePanelView => {
@@ -28,6 +114,10 @@ export const stageNowView = (slide?: Slide | null): StagePanelView => {
   }
 
   if (!slide) return { ...view, placeholder: "Nothing is live yet" }
+
+  if (isImageMediaSlide(slide)) {
+    return { ...view, placeholder: slide.name || "Image", icon: "i-bx-image" }
+  }
 
   if (slide.type === slideTypes.media) {
     return { ...view, placeholder: "Media is playing", icon: "i-bx-play-circle" }

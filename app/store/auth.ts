@@ -16,6 +16,9 @@ export interface User {
   updatedAt: string
   churchId: string
   emailVerified?: boolean
+  // How the account was created. Google accounts have no password of their own
+  // and their email is owned by Google.
+  signupMethod?: 'standard' | 'google'
   subscription?: {
     plan: 'free' | 'teams'
     startDate: string
@@ -28,8 +31,12 @@ export interface Church {
   name: string
   type: string
   address: string
+  email?: string
   pastor: string
-  logo?: string
+  logo?: string | null
+  // True when an admin uploaded `logo`; false when it was derived from the
+  // church name. A rename keeps a custom logo.
+  logoIsCustom?: boolean
   branch?: string
   isNotAChurch?: boolean
   howYouFoundUs?: string
