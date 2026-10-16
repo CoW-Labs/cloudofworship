@@ -17,7 +17,9 @@
       />
     </div>
 
+    <!-- Some animations draw the heading themselves, with no block behind it. -->
     <CowDropdown
+      v-if="!getInterludeVariant(local.variant).drawsHeading"
       label="Text background"
       :model-value="textBackgroundLabels[local.textBackground]"
       :options="Object.values(textBackgroundLabels)"
@@ -76,7 +78,10 @@
 
 <script setup lang="ts">
 import type { InterludeSlideData, Slide } from "~/types"
-import { interludeVariants } from "~/utils/interlude/engine"
+import {
+  getInterludeVariant,
+  interludeVariants,
+} from "~/utils/interlude/engine"
 import { interludeModeKey } from "~/utils/interlude/context"
 
 type InterludeInput = Omit<InterludeSlideData, "id">

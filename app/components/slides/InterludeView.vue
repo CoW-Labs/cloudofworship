@@ -2,7 +2,7 @@
   <div
     ref="root"
     class="interlude-view"
-    :class="{ 'is-static': isStatic }"
+    :class="{ 'is-static': isStatic, 'canvas-heading': variant.drawsHeading }"
     :style="{ backgroundColor: variant.palettes[0].bg }"
   >
     <canvas ref="canvas" class="interlude-canvas" aria-hidden="true" />
@@ -14,7 +14,7 @@
       :key="i"
       :ref="(el) => (layers[i] = el as HTMLElement | null)"
       class="interlude-text"
-      :class="{ 'with-background': textBackgroundOn }"
+      :class="{ 'with-background': textBackgroundOn && !variant.drawsHeading }"
       :style="{
         '--ix-ink': palette.ink,
         '--ix-plate': palette.plate,
@@ -145,8 +145,12 @@ let textIn = 0
 let textOut: number | null = null
 const elapsed = () => (performance.now() - startedAt) / 1000
 
-const applyText = (T: number, S: FrameState, wipe: WipeState) => {
-  const head = textMotion(T, textIn, textOut, 0)
+const applyText = (
+  T: number,
+  S: FrameState,
+  wipe: WipeState,
+  head: ReturnType<typeof textMotion>
+) => {
   const sub = textMotion(T, textIn, textOut, TEXT_MOTION.subLag)
   const { punch, bob } = textPulse(S, wipe)
   const maxBlur = width * TEXT_MOTION.blur
@@ -182,19 +186,26 @@ const draw = (T: number) => {
   if (!ctx || !width || !height) return
   ctx.setTransform(density, 0, 0, density, 0, 0)
   if (isStatic.value) {
-    renderInterludeFrame(ctx, width, height, T, variant.value, 1)
+    renderInterludeFrame(ctx, width, height, T, variant.value, 1, {
+      text: heading.value,
+      amount: 1,
+    })
     return
   }
   const scrim = scrimAmount(T, textIn, textOut)
+  const head = textMotion(T, textIn, textOut, 0)
+  // A canvas-drawn heading follows the same enter and exit as the DOM one,
+  // read off its blur: 0 while settled, 1 when fully gone.
   const { S, wipe } = renderInterludeFrame(
     ctx,
     width,
     height,
     T,
     variant.value,
-    scrim
+    scrim,
+    { text: heading.value, amount: 1 - head.b }
   )
-  applyText(T, S, wipe)
+  applyText(T, S, wipe, head)
 }
 
 const frame = (ts: number) => {
@@ -233,6 +244,10 @@ const resize = () => {
     ? baseDensity * scale
     : baseDensity * scale * QUALITY_STEPS[quality]!
   el.dataset.quality = String(QUALITY_STEPS[quality])
+  // Read by the stylesheet, so static frames place the sub text too.
+  const offset = variant.value.subtitleOffset?.(height)
+  if (offset) el.style.setProperty("--ix-sub-offset", `${offset.toFixed(1)}px`)
+  else el.style.removeProperty("--ix-sub-offset")
   // Assigning a canvas size, even the same one, throws away its backing
   // store and allocates a new one. Mode flips (a hovered preview) would
   // churn a full-resolution buffer each time; every frame repaints the
@@ -267,6 +282,21 @@ const restart = () => {
   if (isStatic.value) draw(STATIC_FRAME_T)
 }
 
+// The canvas can only paint Unbounded once it has loaded. A still frame
+// drawn before then would keep the fallback face, so draw it again.
+const awaitHeadingFont = () => {
+  if (!variant.value.drawsHeading || !document.fonts) return
+  const font = "900 16px Unbounded"
+  if (document.fonts.check(font, heading.value)) return
+  document.fonts
+    .load(font, heading.value)
+    .then(() => {
+      if (isStatic.value) draw(STATIC_FRAME_T)
+    })
+    .catch(() => {})
+}
+watch(heading, awaitHeadingFont)
+
 // A new variant replays its intro so the operator sees what they picked.
 watch(
   () => data.value?.variant,
@@ -274,6 +304,7 @@ watch(
     // Variants can draw at different resolutions (renderScale).
     resize()
     restart()
+    awaitHeadingFont()
   }
 )
 // Going from a still frame to animated plays the intro from the start.
@@ -320,6 +351,7 @@ onMounted(() => {
   resize()
   if (mode.value === "preview") observeVisibility()
   start()
+  awaitHeadingFont()
 })
 
 onBeforeUnmount(() => {
@@ -389,6 +421,13 @@ onBeforeUnmount(() => {
   font-size: 2.2cqw;
   line-height: 1;
   letter-spacing: 0.01em;
+}
+.canvas-heading .interlude-heading {
+  display: none;
+}
+/* `translate` composes with the scale the animation sets on `transform`. */
+.canvas-heading .interlude-sub {
+  translate: 0 var(--ix-sub-offset, 0);
 }
 .interlude-chip {
   display: inline-block;
