@@ -27,15 +27,25 @@
       </div>
 
       <Transition name="fade-sm">
-        <NotFoundBanner
+        <div
           v-if="!isHymnAvailable"
-          icon="i-tabler-cloud-search"
-          sub="Can't find the Hymn you are looking for?"
-          action="new-song-search"
-          :query="searchInput"
-          action-text="Search in songs"
-          class="max-h-[140px]"
-        />
+          class="mt-1.5 flex items-center justify-between gap-3 px-2 py-1"
+        >
+          <span
+            class="flex min-w-0 items-center gap-2 text-sm text-gray-500 dark:text-[#9aa3b2]"
+          >
+            <UIcon name="i-tabler-cloud-search" class="h-4 w-4 shrink-0" />
+            <span class="leading-tight">Can't find the hymn?</span>
+          </span>
+          <CowButton
+            variant="secondary"
+            size="2xs"
+            class="!px-2.5 shrink-0 rounded-lg"
+            @click="useGlobalEmit(appWideActions.newSongSearch, searchInput)"
+          >
+            Search in songs
+          </CowButton>
+        </div>
       </Transition>
 
       <div
@@ -73,7 +83,7 @@
           class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-190px)]"
           :class="
             searchInput.length >= 4
-              ? 'max-h-[calc(100vh-350px)]'
+              ? 'max-h-[calc(100vh-240px)]'
               : 'max-h-[calc(100vh-190px)]'
           "
         >
@@ -105,13 +115,19 @@
 </template>
 <script setup lang="ts">
 import type { Hymn, QuickAction } from "~/types"
+import type { Emitter } from "mitt"
 import { useDebounceFn } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
 import SongsIcon from "~/components/svgs/SongsIcon.vue"
 const db = useIndexedDB()
 
+const props = defineProps<{
+  // A search to open on, e.g. from "See all hymn results" in quick search.
+  query?: string
+}>()
+
 const allHymns = ref<Hymn[]>([])
-const searchInput = ref<string>("")
+const searchInput = ref<string>(props.query || "")
 const loading = ref<boolean>(true)
 const hymns = ref<Hymn[]>()
 const focusedActionIndex = ref(0)
@@ -181,8 +197,13 @@ const turnToHymnAction = (hymn: Hymn): QuickAction => {
 const getAllHymns = async () => {
   const hymns = await db.bibleAndHymns.get("hymns")
   allHymns.value = (hymns?.data as unknown as Hymn[]) || []
-  getHymns()
+  getHymns(searchInput.value)
 }
+
+// The first session on a device mounts this before the hymn download lands.
+const emitter = useNuxtApp().$emitter as Emitter<any>
+emitter.on(appWideActions.hymnsUpdated, getAllHymns)
+onUnmounted(() => emitter.off(appWideActions.hymnsUpdated, getAllHymns))
 
 const getHymns = (query: string = "") => {
   if (query?.length >= 2 && allHymns.value?.length) {
