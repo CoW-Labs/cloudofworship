@@ -14,8 +14,9 @@
       class="come-up-1 flex-1 min-h-0 overflow-auto pb-16"
     >
       <AddSong
-        :key="songToEdit?._id || songToEdit?.id || 'new-song'"
+        :key="songToEdit?._id || songToEdit?.id || `new-song-${newSongTitle}`"
         :song="songToEdit"
+        :initial-title="newSongTitle"
         @go-home="page = ''"
       />
     </div>
@@ -287,6 +288,9 @@ import SongsIcon from "~/components/svgs/SongsIcon.vue"
 const props = defineProps<{
   page: string
   songToEdit?: Song
+  // Fills in the title of a blank add-song form, e.g. "Add 'x' as a new song"
+  // from quick search when the song wasn't found.
+  newSongTitle?: string
   // Bumped by every request to open this panel, so a repeat request lands even
   // when `page`/`songToEdit` are unchanged and the panel is already mounted.
   openToken?: number
@@ -326,6 +330,7 @@ const activeLibraryTab = ref<number>(0)
 const searchInput = ref<string>("")
 const page = ref<string>(props.page || "")
 const songToEdit = ref<Song | undefined>(props.songToEdit)
+const newSongTitle = ref<string>(props.newSongTitle || "")
 const libraryEndIndex = ref<number>(15)
 const loadMoreSongs = () => {
   if (libraryEndIndex.value >= (savedSongs.value?.length || 0)) return
@@ -397,8 +402,9 @@ watch(focusedActionIndex, async () => {
 
 // Watch page changes to reset song editing state
 watch(page, (newVal, oldVal) => {
-  if (oldVal === "add-song" && songToEdit.value) {
+  if (oldVal === "add-song") {
     songToEdit.value = undefined
+    newSongTitle.value = ""
   }
 })
 
@@ -409,6 +415,7 @@ watch(
   () => props.openToken,
   () => {
     songToEdit.value = props.songToEdit
+    newSongTitle.value = props.newSongTitle || ""
     page.value = props.page || ""
   }
 )

@@ -25,6 +25,10 @@ export const appWideActions = {
   newBible: 'new-bible',
   updateOrCreateBible: 'update-or-create-bible',
   newHymn: 'new-hymn',
+  // Opens the hymn panel with a search already typed in (the payload).
+  newHymnSearch: 'new-hymn-search',
+  // The hymn library in IndexedDB was replaced; anything holding a copy re-reads it.
+  hymnsUpdated: 'hymns-updated',
   newSong: 'new-song',
   newSongSearch: 'new-song-search',
   newSongSetlist: 'new-song-setlist',
@@ -189,7 +193,7 @@ export const quickActionsArr: QuickAction[] = [
     name: "Add Media",
     desc: "Display image, video or audio media",
     action: appWideActions.newMedia,
-    meta: "",
+    meta: "upload file photo picture audio music mp3 mp4",
     type: slideTypes.media,
     tier: "free",
     // type: slideTypes.text
@@ -353,7 +357,7 @@ export const quickActionsArr: QuickAction[] = [
     name: "Go Live",
     desc: "Open the live presentation window",
     action: appWideActions.goLive,
-    meta: "present display screen output start live window",
+    meta: "present display screen output start live window projector",
     searchableOnly: true,
     tier: "free",
   },

@@ -80,6 +80,7 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   'new-slide': 'free',
   'new-search-bible': 'free',
   'new-hymn': 'free',
+  'new-hymn-search': 'free',
   'new-media': 'free',
   'new-bible': 'free',
   'new-song': 'free', // creating a song slide from an already-owned song

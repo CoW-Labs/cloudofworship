@@ -12,6 +12,16 @@
       "autoPort": true
     },
     {
+      "name": "nuxt-dev-prod-api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && BASE_URL=https://api.cloudofworship.com/api/v1 exec npx nuxt dev --port $PORT"
+      ],
+      "port": 3020,
+      "autoPort": true
+    },
+    {
       "name": "nuxt-dev-local-api",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
