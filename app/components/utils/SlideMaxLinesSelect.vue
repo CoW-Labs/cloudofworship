@@ -5,6 +5,7 @@
       select-class="border-0 shadow-none outline-none text-center w-[120px] rounded-full bg-gray-100 dark:bg-[#222938] dark:text-white"
       size="md"
       :options="['1', '2', '3', '4', '5', '6']"
+      :popper="{ strategy: 'fixed' }"
       v-model.number="lines"
       variant="none"
       color="gray"
