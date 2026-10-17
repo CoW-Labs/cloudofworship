@@ -505,6 +505,9 @@
         </div>
       </template>
     </div>
+
+    <!-- REPORT AN ISSUE — faint until hovered so it never competes with the slide -->
+    <ReportIssueButton :slide="slide" class="absolute bottom-3 right-3 z-30" />
   </div>
 </template>
 
