@@ -64,7 +64,7 @@ def labels():
     data = json.load(open(OUT / "language-labels.json"))
     out = {}
     for r in data["songs"]:
-        if r["decision"] in ("confirmed", "needs review") and r["language"]:
+        if r["decision"] in ("confirmed", "A1 only", "needs review") and r["language"]:
             out[r["id"]] = (r["language"]["code"], r["language"]["name"], r["decision"])
     return out
 
@@ -91,7 +91,7 @@ def build():
     reqs = []
     for code, ss in sorted(groups.items()):
         n = sum(len(s["pairs"]) for s in ss)
-        if n < MIN_PAIRS:
+        if n < MIN_PAIRS or code in ("eng", "mul", "und"):  # no glossary for English, medleys or unknowns
             continue
         ids = {s["id"] for s in ss}
         lang_cands = [c for c in cands if ids & set(c["exampleSongs"])][:150]

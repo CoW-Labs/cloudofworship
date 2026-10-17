@@ -113,6 +113,11 @@ def pick(set_name, seed=20261017):
         return [s for s in songs("translation-worklist.json") if s["id"] not in done]
     if set_name == "glossary":
         return songs("glossary-sources.json")
+    if set_name == "glossary-pairs":  # only the glossary songs that yielded translation pairs (Task B)
+        import json
+        from common import OUT
+        keep = {s["id"] for s in json.load(open(OUT / "glossary-pairs.json"))["items"]}
+        return [s for s in songs("glossary-sources.json") if s["id"] in keep]
     raise SystemExit(f"unknown set {set_name}")
 
 
