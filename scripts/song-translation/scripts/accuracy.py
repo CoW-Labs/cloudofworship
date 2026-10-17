@@ -42,7 +42,7 @@ CLD3_TO_639_3 = {
     "af": "afr", "am": "amh", "ar": "ara", "bg": "bul", "bn": "ben", "ca": "cat", "ceb": "ceb", "co": "cos",
     "cs": "ces", "cy": "cym", "da": "dan", "de": "deu", "el": "ell", "en": "eng", "eo": "epo", "es": "spa",
     "et": "est", "eu": "eus", "fa": "fas", "fi": "fin", "fil": "fil", "fr": "fra", "fy": "fry", "ga": "gle",
-    "gd": "gla", "gl": "glg", "gu": "guj", "ha": "hau", "haw": "haw", "hi": "hin", "hmn": "hmn", "hr": "hrv",
+    "gd": "gla", "gl": "glg", "gu": "guj", "ha": "hau", "haw": "haw", "hi": "hin", "hi-Latn": "hin", "hmn": "hmn", "hr": "hrv",
     "ht": "hat", "hu": "hun", "hy": "hye", "id": "ind", "ig": "ibo", "is": "isl", "it": "ita", "iw": "heb",
     "ja": "jpn", "jv": "jav", "ka": "kat", "kk": "kaz", "km": "khm", "kn": "kan", "ko": "kor", "ku": "kur",
     "ky": "kir", "la": "lat", "lb": "ltz", "lo": "lao", "lt": "lit", "lv": "lav", "mg": "mlg", "mi": "mri",
