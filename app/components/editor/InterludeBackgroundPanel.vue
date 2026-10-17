@@ -50,7 +50,9 @@
             class="flex-1"
           />
         </div>
+        <!-- Some animations draw the heading themselves, with no block behind it. -->
         <CowDropdown
+          v-if="!getInterludeVariant(value).drawsHeading"
           label="Text background"
           size="sm"
           :model-value="textBackgroundLabels[draft.textBackground]"
@@ -116,7 +118,10 @@
 <script setup lang="ts">
 import { useMediaQuery } from "@vueuse/core"
 import type { InterludeSlideData, Slide } from "~/types"
-import { interludeVariants } from "~/utils/interlude/engine"
+import {
+  getInterludeVariant,
+  interludeVariants,
+} from "~/utils/interlude/engine"
 import { interludeModeKey } from "~/utils/interlude/context"
 import { defaultInterludeData } from "~/utils/interlude/slide"
 

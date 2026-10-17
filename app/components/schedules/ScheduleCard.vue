@@ -14,7 +14,11 @@
         :ui="{
           text: `text-[${scheduleAuthor?.theme}] dark:text-[${scheduleAuthor?.theme}] font-semibold`,
         }"
-        :class="`shrink-0 dark:border border-[${scheduleAuthor?.theme}] bg-[${scheduleAuthor?.theme}20] dark:bg-[${scheduleAuthor?.theme}20]`"
+        :class="
+          scheduleAuthor?.avatar
+            ? 'shrink-0 bg-transparent dark:bg-transparent'
+            : `shrink-0 dark:border border-[${scheduleAuthor?.theme}] bg-[${scheduleAuthor?.theme}20] dark:bg-[${scheduleAuthor?.theme}20]`
+        "
       />
       <div class="title-and-date min-w-0 text-start">
         <div class="title font-medium flex items-center gap-2 truncate">

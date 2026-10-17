@@ -243,6 +243,9 @@ export interface QuickAction {
   meta?: string
   tier?: 'free' | 'teams' // Subscription tier required for this action
   recentSearch?: boolean // Marks a recently opened item (e.g. recent Bible search), shows RecentClockIcon
+  // The payload only fills in the panel this action opens (a search query, a
+  // song title), so picking it is the preview step, not the commit step.
+  opensPanel?: boolean
 }
 
 export interface Scripture {
