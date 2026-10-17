@@ -16,6 +16,7 @@ export default function useSlides() {
   const authStore = useAuthStore()
   const toast = useToast()
   const online = useOnline()
+  const { requireSlideAccess } = useSubscription()
   const {
     goLive: goLiveOnControlledOutput,
     hasRemoteTarget,
@@ -49,6 +50,17 @@ export default function useSlides() {
     // Update only the changed slide. Replacing the full schedule array here
     // made every verse navigation re-filter and re-render unrelated slides.
     appStore.updateSlideInActiveSlides(updatedSlide)
+
+    // A Teams-only slide whose plan has lapsed stays editable but cannot be
+    // put on screen. One already live is left alone so a change of plan never
+    // cuts a service short.
+    if (
+      shouldUpdateLiveSlide &&
+      updatedSlide.id !== appStore.currentState.liveSlideId &&
+      !requireSlideAccess(updatedSlide)
+    ) {
+      return
+    }
 
     // While this device is driving another device's screen (a phone running
     // the mobile app, say), that device owns the projection and the local copy
