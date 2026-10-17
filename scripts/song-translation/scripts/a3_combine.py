@@ -1,11 +1,13 @@
 """Task A3: combine A1 (Claude) and A2 (GlotLID) into one decision per song.
 
   confirmed     A1 and A2 agree and A1 confidence is high or medium
+  A1 only       A2 cannot name A1's language at all, and A1 confidence is high
   needs review  they disagree, A1 is low, or one method is missing
   English only  A1 says the song is English apart from names and vocables (flag: may not need translating)
   not a song    A1 says it is a service card, announcement, reading, ...
 
-Usage: python -I scripts/a3_combine.py --sets review [trial glossary worklist-rest] [--a2 all]
+Usage: python -I scripts/a3_combine.py --sets review [trial glossary worklist-rest] [--a2 all|offline]
+  --a2 offline uses CLD3 + Lingua (accuracy.py free-lid) instead of GlotLID.
 Writes outputs/language-labels.json and outputs/language-disagreements.csv
 """
 import argparse
@@ -39,6 +41,27 @@ def same_language(a, b):
     return any(a in g and b in g for g in SAME)
 
 
+def offline_a2():
+    """A2 from the offline pair (CLD3 + Lingua, outputs/accuracy/free-lid.json), used while
+    GlotLID's Hugging Face download is blocked. Neither model knows Twi, Luganda,
+    Kinyarwanda, Kikuyu and many other African languages, so a song in one of those
+    cannot be confirmed by A2 at all; `covers` says whether it could have been."""
+    from accuracy import CLD3_COVERS
+    from lingua import Language
+    lingua_covers = {l.iso_code_639_3.name.lower() for l in Language.all()}
+    covered = CLD3_COVERS | lingua_covers
+
+    def covers(code):
+        return any(same_language(code, c) for c in covered) if code else True
+    data = json.load(open(OUT / "accuracy" / "free-lid.json"))
+    out = {}
+    for sid, r in data.items():
+        opts = [{"model": "cld3", "code": r["cld3"]["code"], "score": r["cld3"]["p"]},
+                {"model": "lingua", "code": r["lingua"]["code"], "score": r["lingua"]["p"]}]
+        out[sid] = {"options": opts, "input": r["input"], "covers": covers}
+    return out
+
+
 def first_lines(lyrics, n=2):
     return " / ".join([l for l in lines(lyrics) if l.strip()][:n])
 
@@ -60,7 +83,7 @@ def main():
         for r in load_jsonl(RAW / f"a1-{set_name}-results.jsonl"):
             for sid in members.get(r["custom_id"], []):
                 a1[sid] = r
-    a2 = {r["id"]: r for r in load_jsonl(RAW / f"a2-{a.a2}.jsonl")}
+    a2 = offline_a2() if a.a2 == "offline" else {r["id"]: r for r in load_jsonl(RAW / f"a2-{a.a2}.jsonl")}
 
     records, disagreements = [], []
     for sid, r1 in a1.items():
@@ -68,8 +91,11 @@ def main():
         o = r1.get("output")
         r2 = a2.get(sid)
         a1_code = o["primaryLanguage"]["code"] if o else None
+        if r2 and "options" in r2:  # offline pair: either model agreeing counts
+            r2["top"] = next((x for x in r2["options"] if same_language(a1_code, x["code"])), r2["options"][0])
         a2_code = r2["top"]["code"] if r2 else None
         agree = same_language(a1_code, a2_code)
+        covered = r2 is None or "covers" not in r2 or r2["covers"](a1_code)
         if not o:
             decision = "needs review"
             why = f"A1 {r1['status']}"
@@ -81,6 +107,8 @@ def main():
             decision, why = "needs review", "A2 missing"
         elif agree and o["confidence"] in ("high", "medium"):
             decision, why = "confirmed", ""
+        elif not covered and o["confidence"] == "high":
+            decision, why = "A1 only", "A2 models cannot name this language; A1 confidence high"
         else:
             decision = "needs review"
             why = "methods disagree" if not agree else "A1 confidence low"
@@ -88,7 +116,7 @@ def main():
             "id": sid, "title": s.get("title"), "artist": s.get("artist"), "source": s.get("source"),
             "previousLabel": s.get("currentLabel") or s.get("language"),
             "a1": o if o else {"status": r1["status"]},
-            "a2": r2["top"] if r2 else None, "a2Top3": r2["top3"] if r2 else None,
+            "a2": r2["top"] if r2 else None, "a2Top3": r2.get("top3", r2.get("options")) if r2 else None,
             "a2Input": r2["input"] if r2 else None,
             "decision": decision,
             "language": {"code": a1_code, "name": o["primaryLanguage"]["name"]} if o else None,
