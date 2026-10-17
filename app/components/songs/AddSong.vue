@@ -150,6 +150,8 @@ import type { Song } from "~/types"
 
 const props = defineProps<{
   song?: Song
+  // Title for a new song (ignored when editing `song`).
+  initialTitle?: string
 }>()
 
 const { saveSong } = useLibrary()
@@ -157,7 +159,7 @@ const { findSimilarSongs } = useSongs()
 const { searchArtists } = useArtistSearch()
 const loading = ref<boolean>(false)
 const artist = ref<string>(props.song?.artist || "")
-const title = ref<string>(props.song?.title || "")
+const title = ref<string>(props.song?.title || props.initialTitle || "")
 const lyrics = ref<string>(props.song?.lyrics || "")
 const isSongPublic = ref<boolean>(props.song?.isPublic || true)
 const similarSongs = ref<Song[]>([])

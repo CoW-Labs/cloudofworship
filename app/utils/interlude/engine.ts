@@ -78,6 +78,10 @@ export interface FrameState {
   enter: (delay: number, dur: number, ease?: (x: number) => number) => number
   osc: (k: number, phase?: number) => number
   spin: (k: number) => number
+  /** The slide heading, for variants that draw it themselves. */
+  text: string
+  /** How far that heading has entered: 0 hidden, 1 settled. */
+  heading: number
 }
 
 export interface WipeState {
@@ -102,6 +106,13 @@ export interface InterludeVariant {
    */
   renderScale?: number
   palettes: [InterludePalette, InterludePalette]
+  /**
+   * The canvas draws the heading itself, so the DOM heading is hidden, the
+   * centre scrim is skipped and the text background setting has no effect.
+   */
+  drawsHeading?: boolean
+  /** Moves the sub text this many pixels below centre, for a stage this tall. */
+  subtitleOffset?: (h: number) => number
   draw: (c: CanvasRenderingContext2D, S: FrameState, P: InterludePalette) => void
 }
 
@@ -120,6 +131,8 @@ export function frameState(T: number, w: number, h: number): FrameState {
     enter: (d, dur, ease = eOutExpo) => ease(clamp((T - d) / dur)),
     osc: (k, p = 0) => Math.sin(TAU * ((k * u) / LOOP + p)),
     spin: (k) => (TAU * k * u) / LOOP,
+    text: "",
+    heading: 1,
   }
 }
 
@@ -204,7 +217,7 @@ function renderScene(
   c.save()
   v.draw(c, S, P)
   c.restore()
-  if (scrim > 0.001) {
+  if (scrim > 0.001 && !v.drawsHeading) {
     const g = c.createRadialGradient(S.cx, S.cy, 0, S.cx, S.cy, S.m * 0.8)
     g.addColorStop(0, hexA(P.bg, 0.7 * scrim))
     g.addColorStop(1, hexA(P.bg, 0))
@@ -213,16 +226,25 @@ function renderScene(
   }
 }
 
-/** Draws one frame. The caller sets the device-pixel transform first. */
+/**
+ * Draws one frame. The caller sets the device-pixel transform first.
+ * `heading` is the heading text and how far it has entered, used only by
+ * variants that draw it themselves.
+ */
 export function renderInterludeFrame(
   c: CanvasRenderingContext2D,
   w: number,
   h: number,
   T: number,
   v: InterludeVariant,
-  scrim: number
+  scrim: number,
+  heading?: { text: string; amount: number }
 ) {
   const S = frameState(T, w, h)
+  if (heading) {
+    S.text = heading.text
+    S.heading = heading.amount
+  }
   const wipe = wipeState(T)
   renderScene(c, S, v.palettes[wipe.base], v, scrim)
   if (wipe.wp > 0) {
@@ -347,6 +369,187 @@ function flower(
   c.beginPath()
   c.arc(x, y, Math.max(0, size * 0.13 * e * (1 + 0.08 * S.kick)), 0, TAU)
   c.fill()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rolling Stone: the heading in big type, row after row
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ROLL = {
+  /** Font size as a fraction of the stage height. */
+  size: 0.25,
+  /** Assumed cap height as a fraction of the font size, for layout. */
+  cap: 0.73,
+  /** Row spacing in cap heights. */
+  pitch: 1.16,
+  /** Band padding above and below the caps, in cap heights. */
+  pad: 0.05,
+  /** Space between repeats, in font sizes. A sparkle sits in it. */
+  gap: 0.62,
+}
+
+/** Half the band's height, which is where the sub text sits below centre. */
+export const rollingBandEdge = (h: number) => {
+  const cap = Math.round(h * ROLL.size) * ROLL.cap
+  return cap / 2 + cap * ROLL.pad
+}
+
+/**
+ * The heading rasterised once per colour and size. Painting a few big
+ * strings of glyph outlines every frame is the costliest thing a canvas can
+ * do without GPU acceleration; copying a ready bitmap is cheap everywhere.
+ */
+interface TextStrip {
+  canvas: HTMLCanvasElement | OffscreenCanvas
+  width: number
+  ascent: number
+  /** Margin around the glyphs, in CSS pixels. */
+  margin: number
+}
+const strips = new Map<string, TextStrip>()
+// Two colours per palette; a little headroom for typing and resizing.
+const MAX_STRIPS = 8
+// Well inside every browser's canvas size limit.
+const MAX_STRIP_PX = 8192
+
+const newCanvas = (w: number, h: number) => {
+  if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(w, h)
+  const cv = document.createElement("canvas")
+  cv.width = w
+  cv.height = h
+  return cv
+}
+
+const setRollFont = (
+  c: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  font: string,
+  spacing: string
+) => {
+  c.font = font
+  // Not in every WebKit yet; the type just sets a little looser without it.
+  if ("letterSpacing" in c) c.letterSpacing = spacing
+  c.textAlign = "left"
+  c.textBaseline = "alphabetic"
+}
+
+/** A cached strip, or null while the font is loading or the text is huge. */
+function textStrip(
+  c: CanvasRenderingContext2D,
+  text: string,
+  font: string,
+  spacing: string,
+  color: string,
+  scale: number
+): TextStrip | null {
+  const key = `${font}|${spacing}|${color}|${scale}|${text}`
+  const hit = strips.get(key)
+  if (hit) {
+    // Most recently used goes last, so eviction takes the oldest.
+    strips.delete(key)
+    strips.set(key, hit)
+    return hit
+  }
+  // A strip drawn in the fallback font would stay wrong once Unbounded lands.
+  if (typeof document !== "undefined" && !document.fonts?.check(font, text))
+    return null
+  const m = c.measureText(text)
+  const margin = 2 / scale
+  const w = Math.ceil((m.width + margin * 2) * scale)
+  const h = Math.ceil(
+    (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent + margin * 2) *
+      scale
+  )
+  if (w > MAX_STRIP_PX || h > MAX_STRIP_PX) return null
+  const cv = newCanvas(w, h)
+  const x = cv.getContext("2d") as
+    | CanvasRenderingContext2D
+    | OffscreenCanvasRenderingContext2D
+    | null
+  if (!x) return null
+  x.scale(scale, scale)
+  setRollFont(x, font, spacing)
+  x.fillStyle = color
+  x.fillText(text, margin, margin + m.actualBoundingBoxAscent)
+  const strip = {
+    canvas: cv,
+    width: m.width,
+    ascent: m.actualBoundingBoxAscent,
+    margin,
+  }
+  strips.set(key, strip)
+  if (strips.size > MAX_STRIPS) strips.delete(strips.keys().next().value!)
+  return strip
+}
+
+/**
+ * Rows of the heading stacked to fill the frame. The middle row sits in a
+ * solid band and is the one people read; the rows around it alternate
+ * direction as texture. Offsets run on T, not u, so the text never jumps back
+ * at the loop seam, and every row lurches forward on each beat.
+ */
+function rollingRows(c: CanvasRenderingContext2D, S: FrameState, P: InterludePalette) {
+  const text = S.text.trim().toUpperCase()
+  if (!text) return
+  const fs = Math.round(S.h * ROLL.size)
+  const font = `900 ${fs}px Unbounded, Geist, sans-serif`
+  const spacing = `${(-fs * 0.025).toFixed(1)}px`
+  // The canvas only ever carries the device-pixel scale here.
+  const scale = c.getTransform().a
+  setRollFont(c, font, spacing)
+  const muted = textStrip(c, text, font, spacing, P.c[0]!, scale)
+  const width = muted?.width ?? c.measureText(text).width
+  const cap = fs * ROLL.cap
+  const gap = fs * ROLL.gap
+  const unit = width + gap
+  const pitch = cap * ROLL.pitch
+  const beat = S.T < INTRO ? 0 : (S.T - INTRO) / 2
+  const step = Math.floor(beat) + eOutExpo(beat % 1)
+  const spark = S.spin(0.5)
+
+  const row = (j: number, color: string, strip: TextStrip | null) => {
+    const hero = j === 0
+    const dir = j % 2 ? 1 : -1
+    const e = S.enter(0.05 + Math.abs(j) * 0.1, 1.5)
+    const off =
+      (hero ? 0.06 : 0.045) * S.w * S.T +
+      (hero ? 0.05 : 0.13) * S.w * step +
+      (1 - e) * S.w * 1.1
+    const y = S.cy + j * pitch
+    const base = y + cap / 2
+    const x0 = (((dir * off) % unit) + unit) % unit - unit
+    c.fillStyle = color
+    for (let x = x0; x < S.w; x += unit) {
+      if (strip)
+        c.drawImage(
+          strip.canvas,
+          x - strip.margin,
+          base - strip.ascent - strip.margin,
+          strip.canvas.width / scale,
+          strip.canvas.height / scale
+        )
+      else c.fillText(text, x, base)
+      star(c, x + width + gap / 2, y, cap * 0.2, 0.3, 4, spark)
+      c.fill()
+    }
+  }
+
+  const n = Math.ceil(S.h / 2 / pitch + 0.5)
+  for (let j = 1; j <= n; j++) {
+    row(-j, P.c[0]!, muted)
+    row(j, P.c[0]!, muted)
+  }
+  // The band opens from its centre line as the heading enters and shuts like
+  // a shutter when it leaves.
+  const half = rollingBandEdge(S.h) * S.heading * (1 + 0.035 * S.kick)
+  if (half < 0.5) return
+  c.fillStyle = P.c[1]!
+  c.fillRect(0, S.cy - half, S.w, half * 2)
+  c.save()
+  c.beginPath()
+  c.rect(0, S.cy - half, S.w, half * 2)
+  c.clip()
+  row(0, P.c[2]!, textStrip(c, text, font, spacing, P.c[2]!, scale))
+  c.restore()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -500,6 +703,39 @@ export const interludeVariants: InterludeVariant[] = [
         c.fill()
         c.restore()
       }
+    },
+  },
+  {
+    id: "rolling-stone",
+    name: "Rolling Stone",
+    symbol: "The heading in stacked rolling type",
+    best: "Series titles, welcome, conference breaks",
+    textBackground: false,
+    drawsHeading: true,
+    subtitleOffset: rollingBandEdge,
+    // c: muted rows, band, band text.
+    palettes: [
+      {
+        name: "Lilac Press",
+        bg: "#f3ecff",
+        c: ["#dcc9f5", "#7e22ce", "#ffffff"],
+        ink: "#ffffff",
+        plate: "#7e22ce",
+        chipBg: "#1b0a33",
+        chipInk: "#f3ecff",
+      },
+      {
+        name: "Midnight Press",
+        bg: "#1b0a33",
+        c: ["#3b1c66", "#c084fc", "#1b0a33"],
+        ink: "#1b0a33",
+        plate: "#c084fc",
+        chipBg: "#f3e8ff",
+        chipInk: "#1b0a33",
+      },
+    ],
+    draw(c, S, P) {
+      rollingRows(c, S, P)
     },
   },
   {

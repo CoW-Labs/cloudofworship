@@ -102,6 +102,11 @@ import { useAppStore } from "~/store/app"
 import fuzzysort from "fuzzysort"
 
 const db = useIndexedDB()
+
+const props = defineProps<{
+  // A search to open on, e.g. from "Search Bible text" in quick search.
+  query?: string
+}>()
 const appStore = useAppStore()
 const online = useOnline()
 const { checkFlag } = useFeatureFlags()
@@ -114,7 +119,7 @@ const {
 } = useScriptureSearch()
 
 const defaultBible = ref<BibleVerse[]>([])
-const searchInput = ref<string>("")
+const searchInput = ref<string>(props.query || "")
 const loading = ref<boolean>(false)
 const verses = ref<BibleVerse[]>()
 const focusedActionIndex = ref(0)
@@ -266,7 +271,7 @@ const getDefaultBible = async () => {
   if (!version) return
   const bible = await db.bibleAndHymns.get(version)
   defaultBible.value = (bible?.data as unknown as BibleVerse[]) || []
-  getVerses()
+  getVerses(searchInput.value)
 }
 
 const getVerses = (query: string = "") => {

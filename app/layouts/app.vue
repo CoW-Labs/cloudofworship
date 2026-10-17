@@ -415,6 +415,9 @@ const fetchHymns = async () => {
       await safeDBOperation((d) => d.bibleAndHymns.put(tempBibleVersion("hymns", hymns)))
       // The lookup index is built once per window from the old record
       invalidateHymnCache()
+      // Quick search and the hymn panel read their copy when they mount, which
+      // on a device's first session is before this download lands.
+      useGlobalEmit(appWideActions.hymnsUpdated)
     } else {
       setLoadingTask("hymns", "Hymns are already available offline.", 100)
     }

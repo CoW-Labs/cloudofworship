@@ -158,6 +158,7 @@ const actionIconComponentMap: Record<string, Component> = {
   "update-or-create-bible": BibleIcon,
   "new-search-bible": SearchIcon,
   "new-hymn": HymnIcon,
+  "new-hymn-search": HymnIcon,
   "new-transcribe": TranscribeSermonIcon,
   "add-song": AddSongIcon,
   "new-library": LibraryIcon,
@@ -492,8 +493,11 @@ const handleActionClick = () => {
   // Teams features with a panel open for a free church to try; the upgrade
   // modal waits for the step that delivers them. A card that carries its own
   // payload (e.g. "Start 5 minute countdown timer") creates on click, so the
-  // click is that step.
-  const gate = emitParameter.value ? requireFeatureAccess : openFeatureOrUpgrade
+  // click is that step — unless the payload only fills in the panel it opens.
+  const gate =
+    emitParameter.value && !props.action?.opensPanel
+      ? requireFeatureAccess
+      : openFeatureOrUpgrade
   if (!gate(actionName)) return
 
   // Execute the action normally
