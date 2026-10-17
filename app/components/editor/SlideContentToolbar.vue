@@ -2,460 +2,41 @@
   <div
     v-show="slide?.type !== slideTypes.presentation"
     class="editor-floating-toolbar absolute z-30 top-[46px] left-2 right-2 flex"
-    :class="containerOverflow"
   >
+    <!-- The pill is the scroller, so a toolbar wider than the slide keeps its
+         rounded ends and shadow and scrolls inside them. -->
     <div
-      class="content-toolbar-pill mx-auto shrink-0 flex items-center gap-1 bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
+      class="content-toolbar-pill relative mx-auto min-w-0 max-w-full bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5"
     >
-      <CowTooltip
-        v-if="isMediaFileButNotExternalMedia"
-        text="Background fill type"
-      >
-        <CowSelectMenu
-          v-model="backgroundFillType"
-          size="lg"
-          :select-class="`border-0 shadow-none outline-none text-center w-[140px] bg-gray-100 dark:bg-[#222938] dark:text-white rounded-full`"
-          variant="none"
-          color="gray"
-          clear-search-on-close
-          :ui-menu="{
-            width: 'w-[140px]',
-            input: 'text-xs',
-            empty: 'text-xs',
-            option: {
-              size: 'text-xs',
-            },
-          }"
-          :options="Object.values(backgroundFillTypes)"
-          @change="$emit('update-bg-fill-type', $event)"
-          @open="containerOverflow = ''"
-          @close="containerOverflow = 'overflow-x-auto'"
-        >
-          <template #label>
-            <IconWrapper name="i-mdi-arrow-expand-vertical" size="4">
-            </IconWrapper>
-            <span
-              v-if="backgroundFillType?.length"
-              class="truncate"
-              :class="useURLFriendlyString(backgroundFillType)"
-              >{{ backgroundFillType }}</span
-            >
-            <span v-else>Select fill type</span>
-          </template>
-        </CowSelectMenu>
-      </CowTooltip>
-
-      <!-- VIDEO MEDIA SLIDE OPTIONS -->
-      <template
-        v-if="
-        slide?.type === slideTypes.media &&
-        ((slide?.data as ExtendedFileT)?.type?.includes('video') ||
-          (slide?.data as ExtendedFileT)?.type?.includes('audio') ||
-          (slide?.data as any)?.type === 'youtube' ||
-          (slide?.data as any)?.type === 'vimeo')
-      "
-      >
-        <CowTooltip text="Mute / unmute media" :shortcut="shortcutIds.muteMedia">
-          <UButton
-            @click="
-              $emit('update-style', {
-                ...slide.slideStyle,
-                isMediaMuted: !slide.slideStyle?.isMediaMuted,
-              })
-            "
-            :class="[
-              'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
-            ]"
-            :icon="
-              slide.slideStyle?.isMediaMuted
-                ? 'i-tabler-volume'
-                : 'i-tabler-volume-off'
-            "
-            variant="ghost"
-            color="gray"
-            >{{ slide.slideStyle?.isMediaMuted ? "Unmute" : "Mute" }}</UButton
-          >
-        </CowTooltip>
-        <CowTooltip text="Repeat media">
-          <UButton
-            @click="
-              $emit('update-style', {
-                ...slide.slideStyle,
-                repeatMedia: !slide.slideStyle?.repeatMedia,
-              })
-            "
-            :class="[
-              'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
-              {
-                'toolbar-toggle-active': slide?.slideStyle?.repeatMedia,
-              },
-            ]"
-            :aria-pressed="Boolean(slide?.slideStyle?.repeatMedia)"
-            icon="i-tabler-repeat"
-            variant="ghost"
-            color="gray"
-            >Loop</UButton
-          >
-        </CowTooltip>
-        <CowTooltip
-          text="Play / pause media"
-          :shortcut="shortcutIds.playPauseMedia"
-        >
-          <UButton
-            @click="
-              $emit('update-style', {
-                ...slide.slideStyle,
-                isMediaPlaying: !slide.slideStyle?.isMediaPlaying,
-              })
-            "
-            :class="[
-              'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
-            ]"
-            variant="ghost"
-            color="gray"
-          >
-            <template #leading>
-              <PauseIcon
-                v-if="slide.slideStyle?.isMediaPlaying"
-                class="w-4 h-4"
-              />
-              <PlayIcon v-else class="w-4 h-4" />
-            </template>
-            {{ slide.slideStyle?.isMediaPlaying ? "Pause" : "Play" }}</UButton
-          >
-        </CowTooltip>
-        <CowTooltip text="Restart media">
-          <UButton
-            @click="
-              () => {
-                seekTime = 0
-                useGlobalEmit(appWideActions.mediaSeek, '0')
-                $emit('update-media-seek-position')
-              }
-            "
-            :class="[
-              'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
-            ]"
-            icon="i-tabler-skip-back"
-            variant="ghost"
-            color="gray"
-            >Restart</UButton
-          >
-        </CowTooltip>
-        <div
-          class="flex items-center gap-1 bg-gray-100 dark:bg-[#171d2b] rounded-md px-2"
-        >
-          <CowTooltip text="Seek to specific time">
-            <UInput
-              v-model="seekTime"
-              type="number"
-              placeholder="Seconds"
-              class="w-[80px]"
-              :ui="{
-                base: 'bg-transparent',
-                rounded: 'rounded-md',
-                size: { sm: 'text-xs' },
-              }"
-              size="sm"
-              min="0"
-              @keyup.enter="handleSeek"
-            />
-          </CowTooltip>
-          <CowTooltip text="Go to time">
-            <UButton
-              @click="handleSeek"
-              class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
-              icon="i-tabler-player-skip-forward"
-              variant="ghost"
-              color="gray"
-              size="xs"
-            />
-          </CowTooltip>
-        </div>
-      </template>
-      <FontSelect
-        v-if="
-          !(
-            slide?.type === slideTypes?.media ||
-            slide?.type === slideTypes?.presentation
-          )
-        "
-        size="lg"
-        :selected-font="slide?.slideStyle?.font"
-        class="min-w-[150px] top-[-4px]"
-        @open="containerOverflow = ''"
-        @close="containerOverflow = 'overflow-x-auto'"
-        @change="$emit('update-font', $event)"
-      />
-      <FontSizeSelect
-        v-if="
-          !(
-            slide?.type === slideTypes?.media ||
-            slide?.type === slideTypes?.presentation
-          )
-        "
-        :slide="slide"
-        data-tour="format-font-size"
-        @update-style="$emit('update-style', $event)"
-      />
-
-      <!-- SLIDE CONTENT LINE CONTROLS -->
-      <SlideMaxLinesSelect
-        v-if="
-          slide?.type === slideTypes?.song ||
-          slide?.type === slideTypes?.songSetlist ||
-          slide?.type === slideTypes?.hymn
-        "
-        :selected-line="slide?.slideStyle?.linesPerSlide"
-        class="min-w-[120px] top-[-4px]"
-        @open="containerOverflow = ''"
-        @close="containerOverflow = 'overflow-x-auto'"
-        @change="$emit('update-lines-per-slide', $event)"
-      />
-
-      <!-- SLIDE CONTENT AUTO-FIT CONTROLS -->
-      <CowTooltip
-        text="Fit each line on one row"
-        v-if="
-          slide?.type === slideTypes?.song ||
-          slide?.type === slideTypes?.songSetlist ||
-          slide?.type === slideTypes?.hymn
-        "
-      >
-        <UButton
-          @click="
-            $emit('update-style', {
-              ...slide.slideStyle,
-              autoFitLines: !slide?.slideStyle?.autoFitLines,
-            })
-          "
-          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
-          :class="{
-            'toolbar-toggle-active': slide?.slideStyle?.autoFitLines,
-          }"
-          :aria-pressed="Boolean(slide?.slideStyle?.autoFitLines)"
-          aria-label="Fit each line on one row"
-          icon="i-tabler-arrow-autofit-width"
-          variant="ghost"
-          color="gray"
-        />
-      </CowTooltip>
-
-      <!-- SLIDE CONTENT LINE HEIGHT CONTROLS -->
-      <CowTooltip
-        v-if="
-          !(
-            slide?.type === slideTypes.text ||
-            slide?.type === slideTypes.media ||
-            slide?.type === slideTypes.presentation
-          )
-        "
-        text="Set line spacing"
-      >
-        <CowSelectMenu
-          v-model="lineSpacing"
-          size="md"
-          :select-class="`h-10 border-0 shadow-none outline-none text-center w-[120px] bg-gray-100 dark:bg-[#222938] dark:text-white rounded-full`"
-          variant="none"
-          color="gray"
-          clear-search-on-close
-          :ui-menu="{
-            width: 'w-[140px]',
-            input: 'text-xs',
-            empty: 'text-xs',
-            option: {
-              size: 'text-xs',
-            },
-          }"
-          :options="Object.values(lineSpacingTypes)"
-          @change="
-            $emit('update-style', {
-              ...slide.slideStyle,
-              lineSpacing: $event,
-            })
-          "
-          @open="containerOverflow = ''"
-          @close="containerOverflow = 'overflow-x-auto'"
-        >
-          <template #option="{ option: lineSpacing }">
-            <span v-if="lineSpacing?.length" class="truncate capitalize">{{
-              lineSpacing
-            }}</span>
-          </template>
-          <template #label>
-            <ParagraphSpacingIcon class="w-4 h-4" />
-            <span v-if="lineSpacing?.length" class="truncate capitalize">{{
-              lineSpacing
-            }}</span>
-          </template>
-        </CowSelectMenu>
-      </CowTooltip>
-
-      <!-- SLIDE CONTENT CASE CONTROLS -->
-      <CowTooltip
-        text="Uppercase"
-        :shortcut="shortcutIds.slideUppercase"
-        v-if="
-          !(
-            slide?.type === slideTypes.text ||
-            slide?.type === slideTypes.media ||
-            slide?.type === slideTypes.presentation
-          )
-        "
-      >
-        <UButton
-          @click="
-            $emit('update-style', {
-              ...slide.slideStyle,
-              lettercase:
-                slide?.slideStyle?.lettercase === 'uppercase'
-                  ? ''
-                  : 'uppercase',
-            })
-          "
-          variant="ghost"
-          color="gray"
-          class="toolbar-icon-btn"
-          :class="{
-            'toolbar-toggle-active':
-              slide?.slideStyle?.lettercase === 'uppercase',
-          }"
-          :aria-pressed="slide?.slideStyle?.lettercase === 'uppercase'"
-        >
-          <LetterCaseIcon class="w-[18px] h-[18px]" />
-        </UButton>
-      </CowTooltip>
-
-      <!-- SLIDE CONTENT BOLD CONTROLS -->
-      <CowTooltip
-        text="Bold text"
-        :shortcut="shortcutIds.slideBold"
-        v-if="
-          !(
-            slide?.type === slideTypes.text ||
-            slide?.type === slideTypes.media ||
-            slide?.type === slideTypes.presentation
-          )
-        "
-      >
-        <UButton
-          @click="
-            $emit('update-style', {
-              ...slide.slideStyle,
-              textBold: !slide?.slideStyle?.textBold,
-            })
-          "
-          variant="ghost"
-          color="gray"
-          class="toolbar-icon-btn"
-          :class="{
-            'toolbar-toggle-active': slide?.slideStyle?.textBold,
-          }"
-          :aria-pressed="Boolean(slide?.slideStyle?.textBold)"
-        >
-          <BoldIcon class="w-[18px] h-[18px]" />
-        </UButton>
-      </CowTooltip>
-
-      <!-- SLIDE CONTENT LINE BACKGROUND CONTROLS -->
-      <CowTooltip
-        text="Line background"
-        :shortcut="shortcutIds.slideLineBackground"
-        v-if="
-          !(
-            slide?.type === slideTypes.media ||
-            slide?.type === slideTypes.presentation
-          )
-        "
-      >
-        <UButton
-          @click="
-            $emit('update-style', {
-              ...slide.slideStyle,
-              textLinesBackground: !slide?.slideStyle?.textLinesBackground,
-            })
-          "
-          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
-          :class="{
-            'toolbar-toggle-active': slide?.slideStyle?.textLinesBackground,
-          }"
-          :aria-pressed="Boolean(slide?.slideStyle?.textLinesBackground)"
-          variant="ghost"
-          color="gray"
-        >
-          <HighlightIcon class="w-5 h-5" />
-        </UButton>
-      </CowTooltip>
-
-      <!-- COUNTDOWN SLIDE CONTROLS -->
+    <div
+      ref="scrollStrip"
+      class="cow-scroll-strip cow-scroll-strip--bare overflow-x-auto rounded-full"
+    >
+      <!-- `relative` so the font and lines selects, which place their trigger
+           absolutely, scroll with the row instead of staying put. -->
       <div
-        v-if="slide?.type === slideTypes.countdown"
-        class="button-group bg-gray-100 dark:bg-[#171d2b] rounded-md mx-1 p-1 h-[36px] mt-[2px] flex items-center gap-1"
+        class="relative flex w-max items-center gap-1 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
       >
+        <!-- SLIDE CONTENT CASE CONTROLS -->
         <CowTooltip
-          :text="countdownIsPlaying ? 'Pause countdown' : 'Start countdown'"
-        >
-          <UButton
-            @click="useGlobalEmit(appWideActions.startCountdown, slide)"
-            class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
-            :class="{ 'toolbar-toggle-active': countdownIsPlaying }"
-            :aria-label="
-              countdownIsPlaying ? 'Pause countdown' : 'Start countdown'
-            "
-            :aria-pressed="countdownIsPlaying"
-            variant="ghost"
-            color="gray"
-          >
-            <PauseIcon v-if="countdownIsPlaying" class="w-5 h-5" />
-            <PlayIcon v-else class="w-5 h-5" />
-          </UButton>
-        </CowTooltip>
-        <CowTooltip text="Restart countdown">
-          <UButton
-            @click="useGlobalEmit(appWideActions.restartCountdown, slide)"
-            class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
-            icon="i-tabler-refresh"
-            variant="ghost"
-            color="gray"
-          />
-        </CowTooltip>
-      </div>
-
-      <!-- SLIDE CONTENT ALIGNMENT -->
-      <div
-        v-if="
-          !(
-            slide?.type === slideTypes?.media ||
-            slide?.type === slideTypes?.presentation
-          )
-        "
-        class="button-group rounded-md p-1 flex items-center gap-1"
-      >
-        <CowTooltip text="Align left" :shortcut="shortcutIds.slideAlignLeft">
-          <UButton
-            @click="
-              $emit('update-style', { ...slide.slideStyle, alignment: 'left' })
-            "
-            variant="ghost"
-            color="gray"
-            class="toolbar-icon-btn"
-            :class="{
-              'toolbar-toggle-active': slide?.slideStyle?.alignment === 'left',
-            }"
-            :aria-pressed="slide?.slideStyle?.alignment === 'left'"
-          >
-            <AlignLeftIcon class="w-5 h-5" />
-          </UButton>
-        </CowTooltip>
-        <CowTooltip
-          text="Align centre"
-          :shortcut="shortcutIds.slideAlignCenter"
+          text="Uppercase"
+          :shortcut="shortcutIds.slideUppercase"
+          v-if="
+            !(
+              slide?.type === slideTypes.text ||
+              slide?.type === slideTypes.media ||
+              slide?.type === slideTypes.presentation
+            )
+          "
         >
           <UButton
             @click="
               $emit('update-style', {
                 ...slide.slideStyle,
-                alignment: 'center',
+                lettercase:
+                  slide?.slideStyle?.lettercase === 'uppercase'
+                    ? ''
+                    : 'uppercase',
               })
             "
             variant="ghost"
@@ -463,67 +44,511 @@
             class="toolbar-icon-btn"
             :class="{
               'toolbar-toggle-active':
-                slide?.slideStyle?.alignment === 'center',
+                slide?.slideStyle?.lettercase === 'uppercase',
             }"
-            :aria-pressed="slide?.slideStyle?.alignment === 'center'"
+            :aria-pressed="slide?.slideStyle?.lettercase === 'uppercase'"
           >
-            <AlignCenterIcon class="w-5 h-5" />
+            <LetterCaseIcon class="w-[18px] h-[18px]" />
           </UButton>
         </CowTooltip>
+
+        <!-- SLIDE CONTENT BOLD CONTROLS -->
         <CowTooltip
-          text="Align right"
-          :shortcut="shortcutIds.slideAlignRight"
+          text="Bold text"
+          :shortcut="shortcutIds.slideBold"
+          v-if="
+            !(
+              slide?.type === slideTypes.text ||
+              slide?.type === slideTypes.media ||
+              slide?.type === slideTypes.presentation
+            )
+          "
         >
           <UButton
             @click="
-              $emit('update-style', { ...slide.slideStyle, alignment: 'right' })
+              $emit('update-style', {
+                ...slide.slideStyle,
+                textBold: !slide?.slideStyle?.textBold,
+              })
             "
             variant="ghost"
             color="gray"
             class="toolbar-icon-btn"
             :class="{
-              'toolbar-toggle-active': slide?.slideStyle?.alignment === 'right',
+              'toolbar-toggle-active': slide?.slideStyle?.textBold,
             }"
-            :aria-pressed="slide?.slideStyle?.alignment === 'right'"
+            :aria-pressed="Boolean(slide?.slideStyle?.textBold)"
           >
-            <AlignRightIcon class="w-5 h-5" />
+            <BoldIcon class="w-[18px] h-[18px]" />
           </UButton>
         </CowTooltip>
-      </div>
 
-      <!-- SONG CONTROLS -->
-      <div
-        v-if="
-          slide?.type === slideTypes.song ||
-          slide?.type === slideTypes.songSetlist
-        "
-        class="button-group song-controls bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 px-0 h-[36px] mt-[2px] flex items-center gap-1"
-      >
+        <!-- SLIDE CONTENT LINE BACKGROUND CONTROLS -->
         <CowTooltip
-          :text="
-            slide?.type === slideTypes.songSetlist
-              ? 'Refresh lyrics of the active song'
-              : 'Refresh song lyrics'
+          text="Line background"
+          :shortcut="shortcutIds.slideLineBackground"
+          v-if="
+            !(
+              slide?.type === slideTypes.media ||
+              slide?.type === slideTypes.presentation
+            )
           "
         >
           <UButton
-            :disabled="!refreshableSongId"
-            @click="refreshSongLyrics()"
-            :class="[
-              'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
-            ]"
+            @click="
+              $emit('update-style', {
+                ...slide.slideStyle,
+                textLinesBackground: !slide?.slideStyle?.textLinesBackground,
+              })
+            "
+            class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+            :class="{
+              'toolbar-toggle-active': slide?.slideStyle?.textLinesBackground,
+            }"
+            :aria-pressed="Boolean(slide?.slideStyle?.textLinesBackground)"
             variant="ghost"
             color="gray"
           >
-            <IconWrapper
-              size="5"
-              name="i-tabler-refresh"
-              :class="{ 'animate-spin': isLoading }"
-            />
-            Song</UButton
-          >
+            <HighlightIcon class="w-5 h-5" />
+          </UButton>
         </CowTooltip>
+
+        <!-- TEXT STYLE TOGGLES: kept together at the front of the strip -->
+        <!-- SLIDE CONTENT AUTO-FIT CONTROLS -->
+        <CowTooltip
+          text="Fit each line on one row"
+          v-if="
+            slide?.type === slideTypes?.song ||
+            slide?.type === slideTypes?.songSetlist ||
+            slide?.type === slideTypes?.hymn
+          "
+        >
+          <UButton
+            @click="
+              $emit('update-style', {
+                ...slide.slideStyle,
+                autoFitLines: !slide?.slideStyle?.autoFitLines,
+              })
+            "
+            class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+            :class="{
+              'toolbar-toggle-active': slide?.slideStyle?.autoFitLines,
+            }"
+            :aria-pressed="Boolean(slide?.slideStyle?.autoFitLines)"
+            aria-label="Fit each line on one row"
+            icon="i-tabler-arrow-autofit-width"
+            variant="ghost"
+            color="gray"
+          />
+        </CowTooltip>
+
+        <CowTooltip
+          v-if="isMediaFileButNotExternalMedia"
+          text="Background fill type"
+        >
+          <CowSelectMenu
+            v-model="backgroundFillType"
+            size="lg"
+            :select-class="`border-0 shadow-none outline-none text-center w-[140px] bg-gray-100 dark:bg-[#222938] dark:text-white rounded-full`"
+            variant="none"
+            color="gray"
+            clear-search-on-close
+            :popper="{ strategy: 'fixed' }"
+            :ui-menu="{
+              width: 'w-[140px]',
+              input: 'text-xs',
+              empty: 'text-xs',
+              option: {
+                size: 'text-xs',
+              },
+            }"
+            :options="Object.values(backgroundFillTypes)"
+            @change="$emit('update-bg-fill-type', $event)"
+          >
+            <template #label>
+              <IconWrapper name="i-mdi-arrow-expand-vertical" size="4">
+              </IconWrapper>
+              <span
+                v-if="backgroundFillType?.length"
+                class="truncate"
+                :class="useURLFriendlyString(backgroundFillType)"
+                >{{ backgroundFillType }}</span
+              >
+              <span v-else>Select fill type</span>
+            </template>
+          </CowSelectMenu>
+        </CowTooltip>
+
+        <!-- VIDEO MEDIA SLIDE OPTIONS -->
+        <template
+          v-if="
+        slide?.type === slideTypes.media &&
+        ((slide?.data as ExtendedFileT)?.type?.includes('video') ||
+          (slide?.data as ExtendedFileT)?.type?.includes('audio') ||
+          (slide?.data as any)?.type === 'youtube' ||
+          (slide?.data as any)?.type === 'vimeo')
+      "
+        >
+          <CowTooltip
+            text="Mute / unmute media"
+            :shortcut="shortcutIds.muteMedia"
+          >
+            <UButton
+              @click="
+                $emit('update-style', {
+                  ...slide.slideStyle,
+                  isMediaMuted: !slide.slideStyle?.isMediaMuted,
+                })
+              "
+              :class="[
+                'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+              ]"
+              :icon="
+                slide.slideStyle?.isMediaMuted
+                  ? 'i-tabler-volume'
+                  : 'i-tabler-volume-off'
+              "
+              variant="ghost"
+              color="gray"
+              >{{ slide.slideStyle?.isMediaMuted ? "Unmute" : "Mute" }}</UButton
+            >
+          </CowTooltip>
+          <CowTooltip text="Repeat media">
+            <UButton
+              @click="
+                $emit('update-style', {
+                  ...slide.slideStyle,
+                  repeatMedia: !slide.slideStyle?.repeatMedia,
+                })
+              "
+              :class="[
+                'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+                {
+                  'toolbar-toggle-active': slide?.slideStyle?.repeatMedia,
+                },
+              ]"
+              :aria-pressed="Boolean(slide?.slideStyle?.repeatMedia)"
+              icon="i-tabler-repeat"
+              variant="ghost"
+              color="gray"
+              >Loop</UButton
+            >
+          </CowTooltip>
+          <CowTooltip
+            text="Play / pause media"
+            :shortcut="shortcutIds.playPauseMedia"
+          >
+            <UButton
+              @click="
+                $emit('update-style', {
+                  ...slide.slideStyle,
+                  isMediaPlaying: !slide.slideStyle?.isMediaPlaying,
+                })
+              "
+              :class="[
+                'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+              ]"
+              variant="ghost"
+              color="gray"
+            >
+              <template #leading>
+                <PauseIcon
+                  v-if="slide.slideStyle?.isMediaPlaying"
+                  class="w-4 h-4"
+                />
+                <PlayIcon v-else class="w-4 h-4" />
+              </template>
+              {{ slide.slideStyle?.isMediaPlaying ? "Pause" : "Play" }}</UButton
+            >
+          </CowTooltip>
+          <CowTooltip text="Restart media">
+            <UButton
+              @click="
+                () => {
+                  seekTime = 0
+                  useGlobalEmit(appWideActions.mediaSeek, '0')
+                  $emit('update-media-seek-position')
+                }
+              "
+              :class="[
+                'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+              ]"
+              icon="i-tabler-skip-back"
+              variant="ghost"
+              color="gray"
+              >Restart</UButton
+            >
+          </CowTooltip>
+          <div
+            class="flex items-center gap-1 bg-gray-100 dark:bg-[#171d2b] rounded-md px-2"
+          >
+            <CowTooltip text="Seek to specific time">
+              <UInput
+                v-model="seekTime"
+                type="number"
+                placeholder="Seconds"
+                class="w-[80px]"
+                :ui="{
+                  base: 'bg-transparent',
+                  rounded: 'rounded-md',
+                  size: { sm: 'text-xs' },
+                }"
+                size="sm"
+                min="0"
+                @keyup.enter="handleSeek"
+              />
+            </CowTooltip>
+            <CowTooltip text="Go to time">
+              <UButton
+                @click="handleSeek"
+                class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
+                icon="i-tabler-player-skip-forward"
+                variant="ghost"
+                color="gray"
+                size="xs"
+              />
+            </CowTooltip>
+          </div>
+        </template>
+        <FontSizeSelect
+          v-if="
+            !(
+              slide?.type === slideTypes?.media ||
+              slide?.type === slideTypes?.presentation
+            )
+          "
+          :slide="slide"
+          data-tour="format-font-size"
+          @update-style="$emit('update-style', $event)"
+        />
+
+        <!-- SLIDE CONTENT LINE CONTROLS -->
+        <SlideMaxLinesSelect
+          v-if="
+            slide?.type === slideTypes?.song ||
+            slide?.type === slideTypes?.songSetlist ||
+            slide?.type === slideTypes?.hymn
+          "
+          :selected-line="slide?.slideStyle?.linesPerSlide"
+          class="min-w-[120px] top-[-4px]"
+          @change="$emit('update-lines-per-slide', $event)"
+        />
+
+        <FontSelect
+          v-if="
+            !(
+              slide?.type === slideTypes?.media ||
+              slide?.type === slideTypes?.presentation
+            )
+          "
+          size="lg"
+          :selected-font="slide?.slideStyle?.font"
+          class="min-w-[150px] top-[-4px]"
+          @change="$emit('update-font', $event)"
+        />
+
+        <!-- SLIDE CONTENT LINE HEIGHT CONTROLS -->
+        <CowTooltip
+          v-if="
+            !(
+              slide?.type === slideTypes.text ||
+              slide?.type === slideTypes.media ||
+              slide?.type === slideTypes.presentation
+            )
+          "
+          text="Set line spacing"
+        >
+          <CowSelectMenu
+            v-model="lineSpacing"
+            size="md"
+            :select-class="`h-10 border-0 shadow-none outline-none text-center w-[120px] bg-gray-100 dark:bg-[#222938] dark:text-white rounded-full`"
+            variant="none"
+            color="gray"
+            clear-search-on-close
+            :popper="{ strategy: 'fixed' }"
+            :ui-menu="{
+              width: 'w-[140px]',
+              input: 'text-xs',
+              empty: 'text-xs',
+              option: {
+                size: 'text-xs',
+              },
+            }"
+            :options="Object.values(lineSpacingTypes)"
+            @change="
+              $emit('update-style', {
+                ...slide.slideStyle,
+                lineSpacing: $event,
+              })
+            "
+          >
+            <template #option="{ option: lineSpacing }">
+              <span v-if="lineSpacing?.length" class="truncate capitalize">{{
+                lineSpacing
+              }}</span>
+            </template>
+            <template #label>
+              <ParagraphSpacingIcon class="w-4 h-4" />
+              <span v-if="lineSpacing?.length" class="truncate capitalize">{{
+                lineSpacing
+              }}</span>
+            </template>
+          </CowSelectMenu>
+        </CowTooltip>
+
+        <!-- COUNTDOWN SLIDE CONTROLS -->
+        <div
+          v-if="slide?.type === slideTypes.countdown"
+          class="button-group bg-gray-100 dark:bg-[#171d2b] rounded-md mx-1 p-1 h-[36px] mt-[2px] flex items-center gap-1"
+        >
+          <CowTooltip
+            :text="countdownIsPlaying ? 'Pause countdown' : 'Start countdown'"
+          >
+            <UButton
+              @click="useGlobalEmit(appWideActions.startCountdown, slide)"
+              class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
+              :class="{ 'toolbar-toggle-active': countdownIsPlaying }"
+              :aria-label="
+                countdownIsPlaying ? 'Pause countdown' : 'Start countdown'
+              "
+              :aria-pressed="countdownIsPlaying"
+              variant="ghost"
+              color="gray"
+            >
+              <PauseIcon v-if="countdownIsPlaying" class="w-5 h-5" />
+              <PlayIcon v-else class="w-5 h-5" />
+            </UButton>
+          </CowTooltip>
+          <CowTooltip text="Restart countdown">
+            <UButton
+              @click="useGlobalEmit(appWideActions.restartCountdown, slide)"
+              class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
+              icon="i-tabler-refresh"
+              variant="ghost"
+              color="gray"
+            />
+          </CowTooltip>
+        </div>
+
+        <!-- SLIDE CONTENT ALIGNMENT -->
+        <div
+          v-if="
+            !(
+              slide?.type === slideTypes?.media ||
+              slide?.type === slideTypes?.presentation
+            )
+          "
+          class="button-group rounded-md p-1 flex items-center gap-1"
+        >
+          <CowTooltip text="Align left" :shortcut="shortcutIds.slideAlignLeft">
+            <UButton
+              @click="
+                $emit('update-style', {
+                  ...slide.slideStyle,
+                  alignment: 'left',
+                })
+              "
+              variant="ghost"
+              color="gray"
+              class="toolbar-icon-btn"
+              :class="{
+                'toolbar-toggle-active':
+                  slide?.slideStyle?.alignment === 'left',
+              }"
+              :aria-pressed="slide?.slideStyle?.alignment === 'left'"
+            >
+              <AlignLeftIcon class="w-5 h-5" />
+            </UButton>
+          </CowTooltip>
+          <CowTooltip
+            text="Align centre"
+            :shortcut="shortcutIds.slideAlignCenter"
+          >
+            <UButton
+              @click="
+                $emit('update-style', {
+                  ...slide.slideStyle,
+                  alignment: 'center',
+                })
+              "
+              variant="ghost"
+              color="gray"
+              class="toolbar-icon-btn"
+              :class="{
+                'toolbar-toggle-active':
+                  slide?.slideStyle?.alignment === 'center',
+              }"
+              :aria-pressed="slide?.slideStyle?.alignment === 'center'"
+            >
+              <AlignCenterIcon class="w-5 h-5" />
+            </UButton>
+          </CowTooltip>
+          <CowTooltip
+            text="Align right"
+            :shortcut="shortcutIds.slideAlignRight"
+          >
+            <UButton
+              @click="
+                $emit('update-style', {
+                  ...slide.slideStyle,
+                  alignment: 'right',
+                })
+              "
+              variant="ghost"
+              color="gray"
+              class="toolbar-icon-btn"
+              :class="{
+                'toolbar-toggle-active':
+                  slide?.slideStyle?.alignment === 'right',
+              }"
+              :aria-pressed="slide?.slideStyle?.alignment === 'right'"
+            >
+              <AlignRightIcon class="w-5 h-5" />
+            </UButton>
+          </CowTooltip>
+        </div>
+
+        <!-- SONG CONTROLS -->
+        <div
+          v-if="
+            slide?.type === slideTypes.song ||
+            slide?.type === slideTypes.songSetlist
+          "
+          class="button-group song-controls bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 px-0 h-[36px] mt-[2px] flex items-center gap-1"
+        >
+          <CowTooltip
+            :text="
+              slide?.type === slideTypes.songSetlist
+                ? 'Refresh lyrics of the active song'
+                : 'Refresh song lyrics'
+            "
+          >
+            <UButton
+              :disabled="!refreshableSongId"
+              @click="refreshSongLyrics()"
+              :class="[
+                'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+              ]"
+              variant="ghost"
+              color="gray"
+            >
+              <IconWrapper
+                size="5"
+                name="i-tabler-refresh"
+                :class="{ 'animate-spin': isLoading }"
+              />
+              Song</UButton
+            >
+          </CowTooltip>
+        </div>
       </div>
+    </div>
+    <CowScrollFade
+      :start="fadeStart"
+      :end="fadeEnd"
+      color="var(--cow-toolbar-pill-bg)"
+      edge-class="rounded-full"
+    />
     </div>
   </div>
 </template>
@@ -536,6 +561,7 @@ import type {
   SongSetlistData,
 } from "~/types"
 import { appWideActions } from "~/utils/constants"
+import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 
 const props = defineProps<{
   slide: Slide
@@ -546,7 +572,8 @@ const backgroundFillType = ref<string>(
 )
 const lineSpacing = ref<string>(props.slide.slideStyle?.lineSpacing || "")
 const isLoading = ref<boolean>(false)
-const containerOverflow = ref<string>("overflow-x-auto")
+const scrollStrip = ref<HTMLElement | null>(null)
+const { start: fadeStart, end: fadeEnd } = useScrollEdgeFade(scrollStrip)
 const seekTime = ref<number>(0)
 
 const countdownIsPlaying = computed(
@@ -594,7 +621,9 @@ const refreshableSongId = computed(() => {
   if (props.slide?.type === slideTypes.songSetlist) {
     const data = props.slide?.data as SongSetlistData | undefined
     const activeItem = data?.songs?.[data?.activeSongIndex || 0]
-    return activeItem?.songId || activeItem?.song?._id || activeItem?.song?.id || ""
+    return (
+      activeItem?.songId || activeItem?.song?._id || activeItem?.song?.id || ""
+    )
   }
   return props.slide?.songId || ""
 })
@@ -704,7 +733,9 @@ onMounted(() => {
       emit("update-style", {
         ...props.slide.slideStyle,
         lettercase:
-          props.slide?.slideStyle?.lettercase === "uppercase" ? "" : "uppercase",
+          props.slide?.slideStyle?.lettercase === "uppercase"
+            ? ""
+            : "uppercase",
       })
       return true
     })

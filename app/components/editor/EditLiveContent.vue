@@ -3,7 +3,6 @@
     ref="editorRoot"
     data-cow-popover-boundary
     class="main relative h-full min-h-0 flex flex-col rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1"
-    :class="containerOverflow === 'overflow-x-auto' ? '' : 'overflow-hidden'"
     @dragenter="onBgDragEnter"
     @dragover="onBgDragOver"
     @dragleave="onBgDragLeave"
@@ -107,194 +106,205 @@
                `justify-end`: an overflowing end-justified flex row cannot
                scroll back past its start, which clipped the verse switch. The
                spacer shrinks to zero once the row overflows, so it scrolls. -->
-          <div
-            class="actions flex-1 flex items-center gap-1 min-w-0"
-            :class="containerOverflow"
-          >
-            <div class="hidden md:block flex-1 min-w-0" aria-hidden="true" />
-            <!-- VERSE SWITCH -->
-            <BibleVerseSwitch
-              v-if="
-                (slide?.type === slideTypes?.bible ||
-                  slide?.type === slideTypes?.hymn ||
-                  slide?.type === slideTypes?.song ||
-                  slide?.type === slideTypes?.songSetlist) &&
-                !isEmptySongSetlist
-              "
-              v-model="verse"
-              :slide="slide"
-              data-tour="verse-switch"
-              @previous-verse="handlePreviousVerse"
-              @next-verse="handleNextVerse"
-              @goto-verse="$emit('goto-verse', verse, selectedBibleVersion)"
-              @take-live="$emit('take-live')"
-              @predict="predictVerseInput($event as HTMLInputElement)"
-            />
-            <!-- Chapter verse list — revealed on hover of the verse switcher,
-               or while its input has focus. Must stay the immediate next
-               sibling of .verse-switch for the `+ .verse-preview` CSS to work. -->
-            <PreviewVerses
-              v-if="
-                (slide?.type === slideTypes.hymn ||
-                  slide?.type === slideTypes.song ||
-                  slide?.type === slideTypes.songSetlist ||
-                  slide?.type === slideTypes.bible) &&
-                !isEmptySongSetlist
-              "
-              class="preview-verses"
-              :slide="slide"
-              :verse="verse"
-              @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
-              @goto-song="goToSetlistSong"
-              @remove-song="removeSetlistSong"
-            />
-            <!-- Component to Auto complete Bible Books while typing -->
-            <BibleAutoComplete
-              v-if="slide?.type === slideTypes.bible && !verse?.includes(':')"
-              :verse="verse"
-              @goto-book="predictVerseInput(undefined, $event)"
-              @book-options="searchedBibleBookOptions = $event"
-            />
-
-            <!-- PAGE SWITCH — presentation slides -->
+          <!-- Strip and fades share one grid cell rather than a `relative`
+               wrapper: a positioned wrapper would become the containing block
+               of the verse / setlist-song picker, shrinking it from the full
+               editor width to this strip's. -->
+          <div class="flex-1 min-w-0 grid grid-cols-[minmax(0,1fr)]">
             <div
-              v-if="slide?.type === slideTypes.presentation"
-              class="page-switch button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
+              ref="actionsStrip"
+              class="actions cow-scroll-strip overflow-x-auto [grid-area:1/1] flex items-center gap-1 min-w-0"
             >
-              <CowTooltip
-                text="Previous page"
-                :shortcut="shortcutIds.previousVerse"
-              >
-                <UButton
-                  variant="ghost"
-                  color="gray"
-                  class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
-                  icon="i-bx-chevron-left"
-                  :disabled="(slide.presentationPageIndex ?? 0) <= 0"
-                  @click="handlePreviousPage"
-                />
-              </CowTooltip>
-              <span
-                class="text-xs font-medium px-1 text-gray-900 dark:text-[#d5dae3] min-w-[5ch] text-center"
-              >
-                {{ (slide.presentationPageIndex ?? 0) + 1 }} /
-                {{ slide.presentationObjects?.length ?? 1 }}
-              </span>
-              <CowTooltip text="Next page" :shortcut="shortcutIds.nextVerse">
-                <UButton
-                  variant="ghost"
-                  color="gray"
-                  class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
-                  icon="i-bx-chevron-right"
-                  :disabled="
-                    (slide.presentationPageIndex ?? 0) >=
-                    (slide.presentationObjects?.length ?? 1) - 1
-                  "
-                  @click="handleNextPage"
-                />
-              </CowTooltip>
-            </div>
-            <PreviewPages
-              v-if="slide?.type === slideTypes.presentation"
-              class="preview-pages"
-              :slide="slide"
-              @goto-page="handleGotoPage"
-            />
-            <BibleVersionSelect
-              v-if="slide?.type === slideTypes?.bible"
-              class="h-[34px] shrink-0"
-              data-tour="bible-version"
-              :bibleVersionInherited="selectedBibleVersion"
-              @open="containerOverflow = ''"
-              @close="containerOverflow = 'overflow-x-auto'"
-              @change="onUpdateBibleVersion($event)"
-            />
-            <!-- TABS: Scripture / Background / Layout -->
-            <div class="tabs flex items-center gap-1 shrink-0">
-              <template v-for="(tab, i) in visibleTabs" :key="tab.key">
-                <div
-                  v-if="i > 0"
-                  class="w-px h-4 bg-gray-200 dark:bg-white/10"
-                ></div>
-                <CoWPopover
-                  :open="activePanel === tab.key"
-                  :boundary="editorRoot"
-                  :max-width="
-                    tab.key === 'background'
-                      ? backgroundPopoverSize.width
-                      : tab.key === 'scripture'
-                      ? scripturePopoverSize.width
-                      : tab.key === 'interlude'
-                      ? interludePopoverSize.width
-                      : layoutPopoverSize.width
-                  "
-                  :max-height="
-                    tab.key === 'background'
-                      ? backgroundPopoverSize.height
-                      : tab.key === 'scripture'
-                      ? scripturePopoverSize.height
-                      : tab.key === 'interlude'
-                      ? interludePopoverSize.height
-                      : layoutPopoverSize.height
-                  "
-                  :boundary-overflow="120"
-                  panel-class="!rounded-[18px] !bg-[#f1f3f6] !shadow-none !ring-0 dark:!bg-[#131724]"
-                  @update:open="onPanelOpenChange(tab.key, $event)"
-                >
-                  <CowTooltip
-                    :text="tab.hint"
-                    :prevent="activePanel === tab.key"
-                  >
-                    <button
-                      type="button"
-                      class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
-                      :class="
-                        activePanel === tab.key
-                          ? 'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white'
-                          : 'text-gray-500 dark:text-[#a7afbd] hover:text-gray-900 dark:hover:text-white'
-                      "
-                    >
-                      {{ tab.label }}
-                    </button>
-                  </CowTooltip>
+              <div class="hidden md:block flex-1 min-w-0" aria-hidden="true" />
+              <!-- VERSE SWITCH -->
+              <BibleVerseSwitch
+                v-if="
+                  (slide?.type === slideTypes?.bible ||
+                    slide?.type === slideTypes?.hymn ||
+                    slide?.type === slideTypes?.song ||
+                    slide?.type === slideTypes?.songSetlist) &&
+                  !isEmptySongSetlist
+                "
+                v-model="verse"
+                :slide="slide"
+                data-tour="verse-switch"
+                @previous-verse="handlePreviousVerse"
+                @next-verse="handleNextVerse"
+                @goto-verse="$emit('goto-verse', verse, selectedBibleVersion)"
+                @take-live="$emit('take-live')"
+                @predict="predictVerseInput($event as HTMLInputElement)"
+              />
+              <!-- Chapter verse list — revealed on hover of the verse switcher,
+                 or while its input has focus. Must stay the immediate next
+                 sibling of .verse-switch for the `+ .verse-preview` CSS to work. -->
+              <PreviewVerses
+                v-if="
+                  (slide?.type === slideTypes.hymn ||
+                    slide?.type === slideTypes.song ||
+                    slide?.type === slideTypes.songSetlist ||
+                    slide?.type === slideTypes.bible) &&
+                  !isEmptySongSetlist
+                "
+                class="preview-verses"
+                :slide="slide"
+                :verse="verse"
+                @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
+                @goto-song="goToSetlistSong"
+                @remove-song="removeSetlistSong"
+              />
+              <!-- Component to Auto complete Bible Books while typing -->
+              <BibleAutoComplete
+                v-if="slide?.type === slideTypes.bible && !verse?.includes(':')"
+                :verse="verse"
+                @goto-book="predictVerseInput(undefined, $event)"
+                @book-options="searchedBibleBookOptions = $event"
+              />
 
-                  <template #panel>
-                    <div class="h-full w-full bg-[#f1f3f6] dark:bg-[#131724]">
-                      <GotoScripture
-                        v-if="tab.key === 'scripture'"
-                        :verse="verse"
-                        :version="selectedBibleVersion"
-                        @goto-verse="onScriptureGoto"
-                        @close="activePanel = null"
-                        @resize="scripturePopoverSize = $event"
-                      />
-                      <SlideBackgroundPanel
-                        v-else-if="tab.key === 'background'"
-                        :slide="slide"
-                        @select="onSelectBackground"
-                        @loading-change="onBgPanelLoading"
-                        @upload-files="onPanelUploadFiles"
-                        @resize="backgroundPopoverSize = $event"
-                        @close="activePanel = null"
-                      />
-                      <InterludeBackgroundPanel
-                        v-else-if="tab.key === 'interlude'"
-                        :slide="slide"
-                        @select="onSelectInterludeVariant"
-                        @save-texts="onSaveInterludeTexts"
-                        @resize="interludePopoverSize = $event"
-                        @close="activePanel = null"
-                      />
-                      <BibleThemeSelection
-                        v-else
-                        :value="slide?.slideStyle?.theme"
-                        @select="onSelectTheme"
-                        @resize="layoutPopoverSize = $event"
-                      />
-                    </div>
-                  </template>
-                </CoWPopover>
-              </template>
+              <!-- PAGE SWITCH — presentation slides -->
+              <div
+                v-if="slide?.type === slideTypes.presentation"
+                class="page-switch button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
+              >
+                <CowTooltip
+                  text="Previous page"
+                  :shortcut="shortcutIds.previousVerse"
+                >
+                  <UButton
+                    variant="ghost"
+                    color="gray"
+                    class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
+                    icon="i-bx-chevron-left"
+                    :disabled="(slide.presentationPageIndex ?? 0) <= 0"
+                    @click="handlePreviousPage"
+                  />
+                </CowTooltip>
+                <span
+                  class="text-xs font-medium px-1 text-gray-900 dark:text-[#d5dae3] min-w-[5ch] text-center"
+                >
+                  {{ (slide.presentationPageIndex ?? 0) + 1 }} /
+                  {{ slide.presentationObjects?.length ?? 1 }}
+                </span>
+                <CowTooltip text="Next page" :shortcut="shortcutIds.nextVerse">
+                  <UButton
+                    variant="ghost"
+                    color="gray"
+                    class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
+                    icon="i-bx-chevron-right"
+                    :disabled="
+                      (slide.presentationPageIndex ?? 0) >=
+                      (slide.presentationObjects?.length ?? 1) - 1
+                    "
+                    @click="handleNextPage"
+                  />
+                </CowTooltip>
+              </div>
+              <PreviewPages
+                v-if="slide?.type === slideTypes.presentation"
+                class="preview-pages"
+                :slide="slide"
+                @goto-page="handleGotoPage"
+              />
+              <BibleVersionSelect
+                v-if="slide?.type === slideTypes?.bible"
+                class="h-[34px] shrink-0"
+                data-tour="bible-version"
+                :bibleVersionInherited="selectedBibleVersion"
+                @change="onUpdateBibleVersion($event)"
+              />
+              <!-- TABS: Scripture / Background / Layout -->
+              <div class="tabs flex items-center gap-1 shrink-0">
+                <template v-for="(tab, i) in visibleTabs" :key="tab.key">
+                  <div
+                    v-if="i > 0"
+                    class="w-px h-4 bg-gray-200 dark:bg-white/10"
+                  ></div>
+                  <CoWPopover
+                    :open="activePanel === tab.key"
+                    :boundary="editorRoot"
+                    :max-width="
+                      tab.key === 'background'
+                        ? backgroundPopoverSize.width
+                        : tab.key === 'scripture'
+                        ? scripturePopoverSize.width
+                        : tab.key === 'interlude'
+                        ? interludePopoverSize.width
+                        : layoutPopoverSize.width
+                    "
+                    :max-height="
+                      tab.key === 'background'
+                        ? backgroundPopoverSize.height
+                        : tab.key === 'scripture'
+                        ? scripturePopoverSize.height
+                        : tab.key === 'interlude'
+                        ? interludePopoverSize.height
+                        : layoutPopoverSize.height
+                    "
+                    :boundary-overflow="120"
+                    panel-class="!rounded-[18px] !bg-[#f1f3f6] !shadow-none !ring-0 dark:!bg-[#131724]"
+                    @update:open="onPanelOpenChange(tab.key, $event)"
+                  >
+                    <CowTooltip
+                      :text="tab.hint"
+                      :prevent="activePanel === tab.key"
+                    >
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
+                        :class="
+                          activePanel === tab.key
+                            ? 'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white'
+                            : 'text-gray-500 dark:text-[#a7afbd] hover:text-gray-900 dark:hover:text-white'
+                        "
+                      >
+                        {{ tab.label }}
+                      </button>
+                    </CowTooltip>
+
+                    <template #panel>
+                      <div class="h-full w-full bg-[#f1f3f6] dark:bg-[#131724]">
+                        <GotoScripture
+                          v-if="tab.key === 'scripture'"
+                          :verse="verse"
+                          :version="selectedBibleVersion"
+                          @goto-verse="onScriptureGoto"
+                          @close="activePanel = null"
+                          @resize="scripturePopoverSize = $event"
+                        />
+                        <SlideBackgroundPanel
+                          v-else-if="tab.key === 'background'"
+                          :slide="slide"
+                          @select="onSelectBackground"
+                          @loading-change="onBgPanelLoading"
+                          @upload-files="onPanelUploadFiles"
+                          @resize="backgroundPopoverSize = $event"
+                          @close="activePanel = null"
+                        />
+                        <InterludeBackgroundPanel
+                          v-else-if="tab.key === 'interlude'"
+                          :slide="slide"
+                          @select="onSelectInterludeVariant"
+                          @save-texts="onSaveInterludeTexts"
+                          @resize="interludePopoverSize = $event"
+                          @close="activePanel = null"
+                        />
+                        <BibleThemeSelection
+                          v-else
+                          :value="slide?.slideStyle?.theme"
+                          @select="onSelectTheme"
+                          @resize="layoutPopoverSize = $event"
+                        />
+                      </div>
+                    </template>
+                  </CoWPopover>
+                </template>
+              </div>
+            </div>
+            <div class="[grid-area:1/1] relative pointer-events-none">
+              <CowScrollFade
+                :start="actionsFadeStart"
+                :end="actionsFadeEnd"
+                color="var(--cow-editor-bg)"
+              />
             </div>
           </div>
 
@@ -518,6 +528,7 @@ import CoWPopover from "~/components/cow/CoWPopover.vue"
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { asFontFamily } from "~/utils/fontFamily"
+import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 import { isSessionMediaUrl } from "~/utils/mediaTransport"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
@@ -843,7 +854,9 @@ watch(
 const slideContents = ref<Array<string>>([])
 const verse = ref<string>(props.slide?.title || "")
 const searchedBibleBookOptions = ref<string[]>([])
-const containerOverflow = ref<string>("overflow-x-auto")
+const actionsStrip = ref<HTMLElement | null>(null)
+const { start: actionsFadeStart, end: actionsFadeEnd } =
+  useScrollEdgeFade(actionsStrip)
 const selectedBibleVersion = ref<string>(
   appStore.currentState.settings.defaultBibleVersion
 )
