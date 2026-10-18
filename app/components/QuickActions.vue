@@ -2,8 +2,14 @@
   <AppSection
     heading="Quick Actions"
     :sub-heading="searchInput.length < 2 ? page?.replace('-', ' ') : 'Search'"
+    :trail="
+      searchInput.length < 2 && page === 'library' && libraryReviewing
+        ? 'Review song'
+        : undefined
+    "
     class="w-full relative overflow-hidden z-20"
     @header-click="searchInput.length < 2 ? (page = '') : (searchInput = '')"
+    @sub-header-click="libraryReviewing = false"
   >
     <!-- <Transition name="fade-sm" -->
     <!-- ACTIONS HOME SECTION -->
@@ -273,6 +279,7 @@
       :song-to-edit="librarySongToEdit"
       :new-song-title="libraryNewSongTitle"
       :open-token="libraryOpenToken"
+      v-model:reviewing="libraryReviewing"
       @close="page = ''"
     />
 
@@ -613,6 +620,8 @@ const libraryPage = ref<string>("")
 const librarySongToEdit = ref<Song | undefined>()
 const libraryNewSongTitle = ref<string>("")
 const libraryOpenToken = ref<number>(0)
+// The add-song form's review step: the breadcrumb's "Library" steps back to it.
+const libraryReviewing = ref<boolean>(false)
 // Which destination the countdown panel opens on: 0 live display, 1 stage.
 const countdownInitialTab = ref<number>(0)
 
@@ -1151,6 +1160,7 @@ onEmitter("add-song", (song?: Song | string) => {
   librarySongToEdit.value = song && !isNewTitle ? { ...song } : undefined
   libraryNewSongTitle.value = isNewTitle ? song : ""
   libraryPage.value = "add-song"
+  libraryReviewing.value = false
   // The library panel may already be open on its own page, in which case none
   // of the props above necessarily change — bump a token so it always reacts.
   libraryOpenToken.value++
@@ -2045,6 +2055,7 @@ watch(page, () => {
     libraryPage.value = ""
     librarySongToEdit.value = undefined
     libraryNewSongTitle.value = ""
+    libraryReviewing.value = false
   }
 })
 
