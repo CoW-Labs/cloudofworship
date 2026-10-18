@@ -42,6 +42,8 @@ const props = withDefaults(
     boundaryPadding?: number
     boundaryOverflow?: number
     panelClass?: string
+    /** Which side of the trigger the panel opens on. */
+    placement?: "bottom" | "top"
   }>(),
   {
     open: false,
@@ -52,6 +54,7 @@ const props = withDefaults(
     boundaryPadding: 8,
     boundaryOverflow: 0,
     panelClass: "",
+    placement: "bottom",
   }
 )
 
@@ -94,16 +97,29 @@ const updatePosition = () => {
   )
   const availableWidth = Math.max(0, maximumRight - minimumLeft)
   const width = Math.min(props.maxWidth, availableWidth)
-  const top = Math.max(
-    boundaryRect.top + props.boundaryPadding,
-    triggerRect.bottom + props.offset
-  )
-  const maximumBottom = Math.min(
-    viewportHeight - props.boundaryPadding,
-    boundaryRect.bottom + props.boundaryOverflow
-  )
-  const availableHeight = Math.max(0, maximumBottom - top)
-  const height = Math.min(props.maxHeight, availableHeight)
+  let top: number
+  let height: number
+  if (props.placement === "top") {
+    // Grow upward from just above the trigger, for triggers pinned to the
+    // bottom of the boundary.
+    const minimumTop = Math.max(
+      props.boundaryPadding,
+      boundaryRect.top - props.boundaryOverflow
+    )
+    const bottom = triggerRect.top - props.offset
+    height = Math.min(props.maxHeight, Math.max(0, bottom - minimumTop))
+    top = bottom - height
+  } else {
+    top = Math.max(
+      boundaryRect.top + props.boundaryPadding,
+      triggerRect.bottom + props.offset
+    )
+    const maximumBottom = Math.min(
+      viewportHeight - props.boundaryPadding,
+      boundaryRect.bottom + props.boundaryOverflow
+    )
+    height = Math.min(props.maxHeight, Math.max(0, maximumBottom - top))
+  }
   const preferredLeft = triggerRect.left + triggerRect.width / 2 - width / 2
   const maximumLeft = Math.max(minimumLeft, maximumRight - width)
   const left = Math.min(Math.max(preferredLeft, minimumLeft), maximumLeft)

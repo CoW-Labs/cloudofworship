@@ -2,22 +2,22 @@
   "name": "CoW Live",
   "short_name": "CoW",
   "description": "Cloud of Worship",
-  "theme_color": "#480000",
+  "theme_color": "#a855f7",
   "start_url": "/live",
   "display": "fullscreen",
   "icons": [
     {
-      "src": "/live-cloud-w-144.png",
+      "src": "/cloud-w-144.png",
       "sizes": "144x144",
       "type": "image/png"
     },
     {
-      "src": "/live-cloud-w-192.png",
+      "src": "/cloud-w-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/live-cloud-w-512.png",
+      "src": "/cloud-w-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }

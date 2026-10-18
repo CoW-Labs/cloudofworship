@@ -1,7 +1,8 @@
 import { useAuthStore } from '~/store/auth'
 import { useFeatureFlags } from '~/composables/useFeatureFlags'
 import { useAppInfo } from '~/composables/useAppInfo'
-import { appWideActions, quickActionsArr } from '~/utils/constants'
+import type { Slide } from '~/types'
+import { appWideActions, quickActionsArr, slideTypes } from '~/utils/constants'
 
 export type SubscriptionPlan = 'free' | 'teams'
 
@@ -274,6 +275,48 @@ export default function useSubscription() {
     return false
   }
 
+  /**
+   * The Teams action a slide was made with, or null for a slide that is free
+   * to project. A slide made while on Teams stays in the schedule after the
+   * plan lapses, so the gate has to look at the slide, not only at the button
+   * that created it.
+   */
+  const teamsActionForSlide = (slide: Slide | null | undefined): string | null => {
+    if (!slide) return null
+    switch (slide.type) {
+      case slideTypes.countdown:
+        return appWideActions.newCountdown
+      case slideTypes.time:
+        return appWideActions.newTimeSlide
+      case slideTypes.interlude:
+        return appWideActions.newInterlude
+      case slideTypes.media: {
+        const videoType = (slide.data as any)?.type
+        if (videoType === 'youtube') return appWideActions.newYouTubeVideo
+        if (videoType === 'vimeo') return appWideActions.newVimeoVideo
+        return null
+      }
+      default:
+        return null
+    }
+  }
+
+  /**
+   * Gate for taking an existing slide live. Shows the upgrade modal and returns
+   * false when the slide needs Teams and the church no longer has it.
+   */
+  const requireSlideAccess = (slide: Slide | null | undefined): boolean => {
+    const action = teamsActionForSlide(slide)
+    if (!action) return true
+    return requireFeatureAccess(action)
+  }
+
+  /** Same check as requireSlideAccess, without the upgrade modal. */
+  const hasAccessToSlide = (slide: Slide | null | undefined): boolean => {
+    const action = teamsActionForSlide(slide)
+    return !action || hasAccessToFeature(action)
+  }
+
   const showUpgradeFor = (actionName: string, stage: 'open' | 'commit') => {
     useGlobalEmit(appWideActions.showUpgradeModal, { feature: actionName })
     usePosthogCapture('TEAMS_FEATURE_BLOCKED', { feature: actionName, stage })
@@ -332,6 +375,8 @@ export default function useSubscription() {
     hasAccessToFeature,
     openFeatureOrUpgrade,
     requireFeatureAccess,
+    requireSlideAccess,
+    hasAccessToSlide,
     getStorageLimit,
     hasLapsedTeamsSubscription,
   }

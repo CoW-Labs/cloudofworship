@@ -16,6 +16,7 @@
       <AddSong
         :key="songToEdit?._id || songToEdit?.id || `new-song-${newSongTitle}`"
         :song="songToEdit"
+        v-model:reviewing="reviewing"
         :initial-title="newSongTitle"
         @go-home="page = ''"
       />
@@ -261,8 +262,10 @@
         </template>
       </template>
     </div>
+    <!-- The review step's only way on is adding the song; back is the
+         breadcrumb. -->
     <CowButton
-      v-if="activeLibraryTab === 0"
+      v-if="activeLibraryTab === 0 && !reviewing"
       :variant="page === 'add-song' ? 'secondary' : 'primary'"
       class="z-10 capitalize shadow-xl transition-all !absolute bottom-4 right-3 left-auto"
       :class="page === 'add-song' ? 'w-[200px]' : 'w-[150px]'"
@@ -295,6 +298,9 @@ const props = defineProps<{
   // when `page`/`songToEdit` are unchanged and the panel is already mounted.
   openToken?: number
 }>()
+
+// AddSong's review step, surfaced to the panel breadcrumb.
+const reviewing = defineModel<boolean>("reviewing", { default: false })
 
 const turnToLibrarySongAction = (song: Song): QuickAction => {
   const subtext =
@@ -405,6 +411,7 @@ watch(page, (newVal, oldVal) => {
   if (oldVal === "add-song") {
     songToEdit.value = undefined
     newSongTitle.value = ""
+    reviewing.value = false
   }
 })
 

@@ -4,6 +4,7 @@
       class="border-0 shadow-none"
       searchable
       searchable-placeholder="Search fonts"
+      :popper="{ strategy: 'fixed' }"
       select-class="border-0 shadow-none outline-none text-center rounded-full w-[120px] h-10 bg-gray-100 dark:bg-[#222938] text-gray-600 dark:text-[#a7afbd]"
       size="md"
       :options="fonts"

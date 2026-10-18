@@ -1142,3 +1142,65 @@ html.dark .cow-search-input input::placeholder {
 .sm-preview .bible-label-xlarge .scripture-label {
   font-size: 0.075vw !important;
 }
+
+/* Horizontal control strips (editor header and floating toolbars). Their edge
+   fades already say "more this way", so the scrollbar only needs to be
+   grabbable, not loud. The default one overlays the controls at ~15px tall.
+   Chromium and WebKit (including the Tauri webview) take the pseudo-elements
+   for an exact height; Firefox, which has none, gets the standard property. */
+.cow-scroll-strip::-webkit-scrollbar {
+  height: 4px;
+}
+.cow-scroll-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cow-scroll-strip::-webkit-scrollbar-thumb {
+  background-color: rgba(15, 23, 42, 0.18);
+  border-radius: 9999px;
+}
+.cow-scroll-strip::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(15, 23, 42, 0.32);
+}
+html.dark .cow-scroll-strip::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+html.dark .cow-scroll-strip::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+@supports not selector(::-webkit-scrollbar) {
+  .cow-scroll-strip {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
+  }
+  html.dark .cow-scroll-strip {
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  }
+}
+
+/* A strip whose scrollbar would sit inside a rounded pill (the floating
+   toolbars). Its fades and the wheel (useScrollEdgeFade) carry the scrolling. */
+.cow-scroll-strip--bare {
+  scrollbar-width: none;
+}
+.cow-scroll-strip--bare::-webkit-scrollbar {
+  display: none;
+}
+
+/* Backgrounds the scroll-strip edge fades (CowScrollFade) blend into. */
+:root {
+  --cow-toolbar-pill-bg: #ffffff;
+  --cow-editor-bg: #f1f3f6;
+}
+html.dark {
+  --cow-toolbar-pill-bg: #171d2b;
+  --cow-editor-bg: #222938;
+}
+
+/* A song's translation, under each lyric line (utils/songTranslation). It
+   inherits every bit of the lyric's formatting (size, weight, case, font,
+   spacing, shadow); only the colour differs. */
+.song-translation,
+.song-content .song-translation,
+.tiptap.live-content .song-translation {
+  color: #d9a4ff !important;
+}

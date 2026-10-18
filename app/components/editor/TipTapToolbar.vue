@@ -2,11 +2,19 @@
   <div
     v-if="isEditorReady"
     class="editor-floating-toolbar absolute z-10 top-[46px] left-2 right-2 flex"
-    :class="containerOverflow"
     @mousedown.capture="onToolbarMouseDown"
   >
+    <!-- The pill is the scroller, so a toolbar wider than the slide keeps its
+         rounded ends and shadow and scrolls inside them. -->
     <div
-      class="content-toolbar-pill mx-auto shrink-0 flex items-center gap-1 bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
+      class="content-toolbar-pill relative mx-auto min-w-0 max-w-full bg-white dark:bg-[#171d2b] rounded-full shadow-lg ring-1 ring-gray-200/70 dark:ring-white/5"
+    >
+    <div
+      ref="scrollStrip"
+      class="cow-scroll-strip cow-scroll-strip--bare overflow-x-auto rounded-full"
+    >
+    <div
+      class="relative flex w-max items-center gap-1 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
     >
       <CowTooltip text="Bold" shortcut="bold">
         <UButton
@@ -220,18 +228,28 @@
         />
       </CowTooltip>
     </div>
+    </div>
+    <CowScrollFade
+      :start="fadeStart"
+      :end="fadeEnd"
+      color="var(--cow-toolbar-pill-bg)"
+      edge-class="rounded-full"
+    />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { Editor } from "@tiptap/core"
 import { asFontFamily } from "~/utils/fontFamily"
+import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 
 const props = defineProps<{
   editor?: Editor
 }>()
 
-const containerOverflow = ref("overflow-x-auto")
+const scrollStrip = ref<HTMLElement | null>(null)
+const { start: fadeStart, end: fadeEnd } = useScrollEdgeFade(scrollStrip)
 const savedSelection = ref<{ from: number; to: number } | null>(null)
 const colorPaletteOpen = ref(false)
 const fontMenuOpen = ref(false)
@@ -347,19 +365,16 @@ const reassertSelection = () => {
 
 const onFontMenuOpen = () => {
   fontMenuOpen.value = true
-  containerOverflow.value = ""
 }
 
 const onFontMenuClose = () => {
   fontMenuOpen.value = false
-  containerOverflow.value = "overflow-x-auto"
   nextTick(() => requestAnimationFrame(reassertSelection))
 }
 
 const onColorPaletteOpenChange = (open: boolean) => {
   if (open) {
     saveSelection()
-    containerOverflow.value = ""
     return
   }
 

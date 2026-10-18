@@ -82,6 +82,8 @@ export default function useSlideCreation() {
         textLinesBackground:
           appStore.currentState.settings.slideStyles.textLinesBackground,
         backgroundFillType: appStore.currentState.settings.slideStyles.backgroundFillType,
+        // Only song, setlist and hymn slides read this (SlideContentByLayout).
+        autoFitLines: appStore.currentState.settings.slideStyles.autoFitLines,
       },
     }
     return tempSlide
