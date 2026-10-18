@@ -82,6 +82,7 @@
 </template>
 
 <script setup lang="ts">
+import { publicStylesheet } from "~/utils/publicStylesheet"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
@@ -236,8 +237,8 @@ useHead({
     { name: "robots", content: "noindex" },
   ],
   link: [
-    { rel: "stylesheet", href: "/css/fonts.css" },
-    { rel: "stylesheet", href: "/css/main.css" },
+    { rel: "stylesheet", href: publicStylesheet("/css/fonts.css") },
+    { rel: "stylesheet", href: publicStylesheet("/css/main.css") },
   ],
 })
 

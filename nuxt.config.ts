@@ -295,13 +295,13 @@ export default defineNuxtConfig({
         },
         {
           rel: "preload",
-          href: "/css/fonts.css",
+          href: `/css/fonts.css?v=${BUILD_ID}`,
           as: "style",
           onload: "this.onload=null;this.rel='stylesheet'"
         },
         {
           rel: "prefetch",
-          href: "/css/main.css",
+          href: `/css/main.css?v=${BUILD_ID}`,
           as: "style",
           onload: "this.onload=null;this.rel='stylesheet'"
         }
