@@ -145,6 +145,7 @@ const { refreshLibrary } = useLibrary()
 const { fetchPlans } = useSubscriptionPlans()
 const { fetchUserSettings } = useUserSettings()
 const ndiBroadcast = useNdiBroadcast()
+const youtubeStream = useYoutubeStream()
 let tauriLiveWindowCloseListenerBound = false
 
 const { currentState } = storeToRefs(appStore)
@@ -396,10 +397,15 @@ emitter.on("go-live", async () => {
     openWindows()
   }
 
+  // One flow: once the live window is up, also start the YouTube stream if the
+  // operator opted in and entered a key.
+  await startYoutubeForLiveWindow()
+
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
 
 emitter.on("close-live-window", async () => {
+  await youtubeStream.stop()
   await closeAllWindows()
   usePosthogCapture("CLOSE_LIVE_WINDOW_BUTTON_CLICKED")
 })
@@ -1043,6 +1049,59 @@ async function startNdiForLiveWindow() {
   }
 }
 
+// Mirrors startNdiForLiveWindow: when the operator has turned on "stream to
+// YouTube when I go live" and entered a key, start the YouTube broadcast once
+// the live window is open (the operator picks that window in the OS picker).
+async function startYoutubeForLiveWindow() {
+  const { isTauri } = useTauri()
+  if (!isTauri) return
+  if (!youtubeStream.streamOnGoLive.value) return
+  if (!youtubeStream.streamKey.value.trim()) return
+  // Give the freshly opened live window a moment to appear in the picker.
+  await new Promise((resolve) => setTimeout(resolve, 1200))
+  const status = await youtubeStream.start()
+  if (status.phase === "error" && youtubeStream.needsPicker.value) {
+    offerYoutubeWindowPicker(status.error)
+    return
+  }
+  if (status.phase === "error") showYoutubeStartError(status.error)
+}
+
+// The window picker needs its own click (and a retry after a wrong pick); this
+// toast's button provides it.
+function offerYoutubeWindowPicker(reason: string | null) {
+  useToast().add({
+    title: "Start the YouTube stream",
+    description:
+      reason ||
+      "Click below, then choose the “Cloud of Worship - Live Output” window (not the whole screen).",
+    icon: "i-bx-broadcast",
+    timeout: 0,
+    actions: [
+      {
+        label: "Choose live window",
+        click: () => {
+          void youtubeStream.start().then((retry) => {
+            if (retry.phase !== "error") return
+            // Wrong pick again (e.g. a whole screen): offer the picker again.
+            if (youtubeStream.needsPicker.value) offerYoutubeWindowPicker(retry.error)
+            else showYoutubeStartError(retry.error)
+          })
+        },
+      },
+    ],
+  })
+}
+
+function showYoutubeStartError(error: string | null) {
+  useToast().add({
+    title: "Live window opened, but YouTube streaming didn't start",
+    description: error || "Open Display Settings to check the stream.",
+    icon: "i-bx-info-circle",
+    color: "amber",
+  })
+}
+
 /**
  * Reattach a Tauri live window to this control-center session. This also
  * handles the refresh case, where the native window survives but `windowRefs`
@@ -1057,6 +1116,7 @@ async function trackTauriLiveWindow(liveWindow: any) {
     await liveWindow.once("tauri://close-requested", async () => {
       console.log("Live window closed")
       try {
+        await youtubeStream.stop()
         await ndiBroadcast.stop()
       } catch (error) {
         console.warn("NDI cleanup after live window close failed:", error)
