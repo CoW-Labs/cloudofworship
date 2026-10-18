@@ -405,6 +405,8 @@ interface TextStrip {
   ascent: number
   /** Margin around the glyphs, in CSS pixels. */
   margin: number
+  /** Bitmap pixels per CSS pixel; below the device scale for a huge heading. */
+  scale: number
 }
 const strips = new Map<string, TextStrip>()
 // Two colours per palette; a little headroom for typing and resizing.
@@ -432,7 +434,12 @@ const setRollFont = (
   c.textBaseline = "alphabetic"
 }
 
-/** A cached strip, or null while the font is loading or the text is huge. */
+/**
+ * A cached strip, or null while the font is loading. A heading too wide for
+ * MAX_STRIP_PX at the device scale (a long one on a 4K or HiDPI output) is
+ * rasterised at a lower scale and stretched when drawn: slightly soft type
+ * is far cheaper than painting glyph outlines for every copy on every frame.
+ */
 function textStrip(
   c: CanvasRenderingContext2D,
   text: string,
@@ -453,20 +460,25 @@ function textStrip(
   if (typeof document !== "undefined" && !document.fonts?.check(font, text))
     return null
   const m = c.measureText(text)
-  const margin = 2 / scale
-  const w = Math.ceil((m.width + margin * 2) * scale)
-  const h = Math.ceil(
-    (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent + margin * 2) *
-      scale
+  const textHeight = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent
+  // A 2-bitmap-pixel margin each side, kept inside the limit.
+  const fit = MAX_STRIP_PX - 4
+  const rasterScale = Math.min(
+    scale,
+    m.width > 0 ? fit / m.width : scale,
+    textHeight > 0 ? fit / textHeight : scale
   )
-  if (w > MAX_STRIP_PX || h > MAX_STRIP_PX) return null
+  if (!(rasterScale > 0)) return null
+  const margin = 2 / rasterScale
+  const w = Math.ceil((m.width + margin * 2) * rasterScale)
+  const h = Math.ceil((textHeight + margin * 2) * rasterScale)
   const cv = newCanvas(w, h)
   const x = cv.getContext("2d") as
     | CanvasRenderingContext2D
     | OffscreenCanvasRenderingContext2D
     | null
   if (!x) return null
-  x.scale(scale, scale)
+  x.scale(rasterScale, rasterScale)
   setRollFont(x, font, spacing)
   x.fillStyle = color
   x.fillText(text, margin, margin + m.actualBoundingBoxAscent)
@@ -475,6 +487,7 @@ function textStrip(
     width: m.width,
     ascent: m.actualBoundingBoxAscent,
     margin,
+    scale: rasterScale,
   }
   strips.set(key, strip)
   if (strips.size > MAX_STRIPS) strips.delete(strips.keys().next().value!)
@@ -524,8 +537,8 @@ function rollingRows(c: CanvasRenderingContext2D, S: FrameState, P: InterludePal
           strip.canvas,
           x - strip.margin,
           base - strip.ascent - strip.margin,
-          strip.canvas.width / scale,
-          strip.canvas.height / scale
+          strip.canvas.width / strip.scale,
+          strip.canvas.height / strip.scale
         )
       else c.fillText(text, x, base)
       star(c, x + width + gap / 2, y, cap * 0.2, 0.3, 4, spark)
