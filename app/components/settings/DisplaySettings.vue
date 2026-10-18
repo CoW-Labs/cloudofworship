@@ -241,6 +241,120 @@
     </SettingsGroup>
 
     <SettingsGroup
+      v-if="isTauri"
+      title="Stream to YouTube (beta)"
+      note="Broadcast your live output (slides/lyrics) and audio straight to YouTube Live. When you go live, choose the “Cloud of Worship - Live Output” window in the picker."
+    >
+      <SettingsRow
+        label="YouTube stream key"
+        description="From YouTube Studio → Create → Go Live → Stream settings. Stored on this device only."
+        stacked
+      >
+        <CowInput
+          v-model="youtubeStreamKey"
+          label="YouTube stream key"
+          type="password"
+          placeholder="xxxx-xxxx-xxxx-xxxx"
+          :disabled="youtubeIsStreaming"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Stream to YouTube when I go live"
+        description="When on, clicking Go Live opens the live window and starts the YouTube stream automatically — one action."
+      >
+        <CowToggle
+          bare
+          label="Stream to YouTube when I go live"
+          :model-value="youtubeStreamOnGoLive"
+          :disabled="youtubeIsStreaming"
+          @update:model-value="(on) => (youtubeStreamOnGoLive = on)"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Audio source"
+        description="Which audio goes to the broadcast — pick your mixer/soundboard input for clean sound, not the built-in mic."
+      >
+        <SettingsSelect
+          width="w-full sm:w-[240px]"
+          :options="youtubeAudioOptions"
+          :model-value="youtubeAudioLabel"
+          :disabled="youtubeIsStreaming"
+          @change="(label: string) => setYoutubeAudio(label)"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Send a test pattern instead"
+        description="Broadcasts color bars and a tone rather than your live output — handy to confirm the YouTube connection first."
+      >
+        <CowToggle
+          bare
+          label="Send a test pattern instead"
+          :model-value="youtubeSource === 'test'"
+          :disabled="youtubeIsStreaming"
+          @update:model-value="(on) => (youtubeSource = on ? 'test' : 'live-window')"
+        />
+      </SettingsRow>
+
+      <div
+        class="rounded-2xl bg-white dark:bg-[#131a27] ring-1 ring-gray-200 dark:ring-white/10 p-4"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2 min-w-0">
+            <span
+              class="w-2.5 h-2.5 rounded-full shrink-0"
+              :class="youtubePhaseDotClass"
+            />
+            <span class="text-sm font-semibold">{{ youtubePhaseLabel }}</span>
+          </div>
+          <Icon
+            v-if="youtubeBusy"
+            name="i-lucide-loader-2"
+            class="w-4 h-4 animate-spin text-primary-500"
+          />
+        </div>
+
+        <div
+          v-if="youtubeStatus.phase === 'reconnecting'"
+          class="mt-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 p-3 text-xs text-amber-800 dark:text-amber-200"
+        >
+          <p class="font-semibold">{{ youtubeStatus.error || "Reconnecting…" }}</p>
+        </div>
+        <div
+          v-else-if="youtubeStatus.phase === 'error' && youtubeStatus.error"
+          class="mt-4 rounded-xl bg-red-50 dark:bg-red-900/20 p-3 text-xs text-red-800 dark:text-red-200"
+        >
+          <p class="font-semibold">{{ youtubeStatus.error }}</p>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <CowButton
+            v-if="!youtubeIsStreaming"
+            size="2xs"
+            class="!px-3.5 !py-1.5 text-xs"
+            :loading="youtubeBusy"
+            :disabled="!youtubeStreamKey.trim()"
+            @click="startYoutube"
+          >
+            Go live
+          </CowButton>
+          <CowButton
+            v-else
+            variant="secondary"
+            size="2xs"
+            class="!px-3.5 !py-1.5 text-xs"
+            :loading="youtubeBusy"
+            @click="stopYoutube"
+          >
+            Stop streaming
+          </CowButton>
+        </div>
+      </div>
+    </SettingsGroup>
+
+    <SettingsGroup
       v-if="allScreens?.length"
       title="Secondary Screens"
       :note="secondaryScreensNote"
@@ -356,6 +470,74 @@ const {
   retry: retryNdiCommand,
   openCaptureSettings: openCaptureSettings,
 } = useNdiBroadcast()
+
+const {
+  status: youtubeStatus,
+  isInvoking: youtubeBusy,
+  isStreaming: youtubeIsStreaming,
+  streamKey: youtubeStreamKey,
+  source: youtubeSource,
+  streamOnGoLive: youtubeStreamOnGoLive,
+  audioDevices: youtubeAudioDevices,
+  audioDevice: youtubeAudioDevice,
+  initialize: initializeYoutube,
+  start: startYoutube,
+  stop: stopYoutube,
+} = useYoutubeStream()
+
+onMounted(() => {
+  initializeYoutube()
+})
+
+// The audio dropdown shows device *names*, but stores a tri-state value on
+// youtubeAudioDevice: null = default (first), "" = no audio, else a device index.
+const AUDIO_DEFAULT_LABEL = "Default (first available)"
+const AUDIO_NONE_LABEL = "No audio"
+
+const youtubeAudioOptions = computed(() => [
+  AUDIO_DEFAULT_LABEL,
+  ...youtubeAudioDevices.value.map((device) => device.name),
+  AUDIO_NONE_LABEL,
+])
+
+const youtubeAudioLabel = computed(() => {
+  if (youtubeAudioDevice.value === null) return AUDIO_DEFAULT_LABEL
+  if (youtubeAudioDevice.value === "") return AUDIO_NONE_LABEL
+  return (
+    youtubeAudioDevices.value.find(
+      (device) => device.index === youtubeAudioDevice.value
+    )?.name ?? AUDIO_DEFAULT_LABEL
+  )
+})
+
+const setYoutubeAudio = (label: string) => {
+  if (label === AUDIO_NONE_LABEL) {
+    youtubeAudioDevice.value = ""
+  } else if (label === AUDIO_DEFAULT_LABEL) {
+    youtubeAudioDevice.value = null
+  } else {
+    youtubeAudioDevice.value =
+      youtubeAudioDevices.value.find((device) => device.name === label)?.index ??
+      null
+  }
+}
+
+const youtubePhaseLabel = computed(
+  () =>
+    ({
+      idle: "Not streaming",
+      live: "Live on YouTube",
+      reconnecting: "Reconnecting…",
+      error: "Needs attention",
+    })[youtubeStatus.value.phase]
+)
+
+const youtubePhaseDotClass = computed(() => ({
+  "bg-gray-400": youtubeStatus.value.phase === "idle",
+  "bg-green-500": youtubeStatus.value.phase === "live",
+  "bg-amber-500 animate-pulse": youtubeStatus.value.phase === "reconnecting",
+  "bg-red-500": youtubeStatus.value.phase === "error",
+}))
 
 const ndiPhaseLabel = computed(() => {
   if (ndiStatus.value.stalled) return "Broadcasting last frame"
