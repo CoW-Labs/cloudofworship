@@ -104,8 +104,10 @@ export default function useScrollEdgeFade(
         observeChildren(node)
       }
       if (typeof MutationObserver !== "undefined") {
+        // Created once and reused for every strip `el` points at, so it reads
+        // the current strip rather than the one it was first created for.
         mutationObserver ??= new MutationObserver(() => {
-          observeChildren(node)
+          if (el.value) observeChildren(el.value)
           update()
         })
         mutationObserver.observe(node, { childList: true })
