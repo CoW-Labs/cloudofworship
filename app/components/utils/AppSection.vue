@@ -20,7 +20,24 @@
             </button>
           </UTooltip>
           <ArrowRightIcon class="w-3.5 h-3.5 text-primary shrink-0" />
+          <!-- A third crumb makes the middle one a way back too. -->
+          <template v-if="trail">
+            <UTooltip text="Go back">
+              <button
+                class="p-1 px-1.5 ml-0.5 rounded-md text-gray-600 dark:text-[#a7afbd] font-normal capitalize whitespace-nowrap hover:bg-gray-100 dark:hover:bg-[#222938] transition-colors"
+                @click="$emit('sub-header-click')"
+              >
+                {{ subHeading }}
+              </button>
+            </UTooltip>
+            <ArrowRightIcon class="w-3.5 h-3.5 text-primary shrink-0" />
+            <span
+              class="pl-2 text-gray-600 dark:text-[#a7afbd] font-normal truncate min-w-0 flex-1"
+              >{{ trail }}</span
+            >
+          </template>
           <span
+            v-else
             class="pl-2 text-gray-600 dark:text-[#a7afbd] font-normal capitalize truncate min-w-0 flex-1"
             >{{ subHeading }}</span
           >
@@ -190,6 +207,8 @@ import ArrowRightIcon from "~/components/svgs/ArrowRightIcon.vue"
 const props = defineProps({
   heading: String,
   subHeading: String,
+  // An optional third crumb after subHeading (e.g. "Review song").
+  trail: String,
   slotCtnStyles: String,
   headingStyles: String,
   secondaryButtons: Array as PropType<
