@@ -4,6 +4,7 @@ use tauri::{Manager, WindowEvent};
 
 mod ndi;
 mod desktop_update;
+mod stream;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -171,6 +172,7 @@ pub fn run() {
         app.deep_link().register_all()?;
       }
       app.manage(ndi::NdiBridge::new(app.handle().clone()));
+      app.manage(stream::StreamBridge::new(app.handle().clone()));
       app.manage(desktop_update::DesktopUpdateState::default());
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -190,6 +192,14 @@ pub fn run() {
           }
         });
       }
+      // Never let an FFmpeg stream outlive the app: stop it when the main
+      // window closes.
+      if window.label() == "main" && matches!(event, WindowEvent::Destroyed) {
+        let bridge = window.state::<stream::StreamBridge>().inner().clone();
+        tauri::async_runtime::spawn_blocking(move || {
+          bridge.stop_blocking();
+        });
+      }
     })
     .invoke_handler(tauri::generate_handler![
       media_storage_stats,
@@ -200,7 +210,12 @@ pub fn run() {
       ndi::ndi_start,
       ndi::ndi_stop,
       ndi::ndi_status,
-      ndi::ndi_open_capture_settings
+      ndi::ndi_open_capture_settings,
+      stream::stream_start,
+      stream::stream_stop,
+      stream::stream_status,
+      stream::stream_audio_devices,
+      stream::stream_feed
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
