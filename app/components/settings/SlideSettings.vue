@@ -68,6 +68,23 @@
         />
       </SettingsRow>
 
+      <SettingsRow label="Default line spacing">
+        <SettingsSelect
+          class="capitalize"
+          :options="Object.values(lineSpacingTypes)"
+          :model-value="
+            appStore.currentState.settings.slideStyles.lineSpacing ||
+            lineSpacingTypes.normal
+          "
+          @change="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              lineSpacing: $event,
+            })
+          "
+        />
+      </SettingsRow>
+
       <SettingsRow label="Uppercase text">
         <CowToggle
           bare
@@ -372,6 +389,23 @@
             </span>
           </template>
         </SettingsSelect>
+      </SettingsRow>
+
+      <SettingsRow
+        label="Fit each line on one row"
+        description="Shrinks song and hymn text so each lyric line stays on one row."
+      >
+        <CowToggle
+          bare
+          label="Fit each line on one row"
+          :model-value="Boolean(appStore.currentState.settings.slideStyles.autoFitLines)"
+          @update:model-value="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              autoFitLines: $event,
+            })
+          "
+        />
       </SettingsRow>
     </SettingsGroup>
   </div>

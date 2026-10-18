@@ -315,14 +315,41 @@ export const textMatchRank = (
   normalizedText: string,
   query: string
 ): 0 | 1 | 2 => {
+  const { phrase, words, scatteredWordsCount } = prepareTextQuery(query)
+  if (phrase.length < 3) return 2
+  if (normalizedText.includes(phrase)) return 0
+  if (!scatteredWordsCount) return 2
+  return words.every((word) => normalizedText.includes(word)) ? 1 : 2
+}
+
+// One search calls `textMatchRank` for every song and hymn with the same
+// query, so the query is folded once and reused until it changes.
+let preparedQuery: {
+  query: string
+  /** The folded query with its leading space, as `includes` looks for it. */
+  phrase: string
+  /** Each word with its leading space. */
+  words: string[]
+  /**
+   * Whether scattered words count at all: only when two of them carry
+   * meaning. "it", "is" and "well" turn up somewhere in most long lyrics,
+   * "love" and "enemies" don't.
+   */
+  scatteredWordsCount: boolean
+} | null = null
+
+const prepareTextQuery = (query: string) => {
+  if (preparedQuery?.query === query) return preparedQuery
   const normalizedQuery = normalizeSearchText(query).trim()
-  if (normalizedQuery.length < 3) return 2
-  if (normalizedText.includes(` ${normalizedQuery}`)) return 0
-  // Scattered words only count when two of them carry meaning: "it", "is" and
-  // "well" turn up somewhere in most long lyrics, "love" and "enemies" don't.
   const words = normalizedQuery.split(" ")
-  if (words.filter((word) => !STOP_WORDS.has(word)).length < 2) return 2
-  return words.every((word) => normalizedText.includes(` ${word}`)) ? 1 : 2
+  preparedQuery = {
+    query,
+    phrase: normalizedQuery.length < 3 ? "" : ` ${normalizedQuery}`,
+    words: words.map((word) => ` ${word}`),
+    scatteredWordsCount:
+      words.filter((word) => !STOP_WORDS.has(word)).length >= 2,
+  }
+  return preparedQuery
 }
 
 /**

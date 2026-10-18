@@ -162,6 +162,7 @@ import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
 import { reportSongSearchPick } from "~/composables/useSongSearchLog"
+import { isSongPending, setSongPending } from "~/composables/useSongs"
 import {
   enqueueCoalescedSlideShadowPut,
   enqueueSlideShadowWrite,
@@ -1257,19 +1258,38 @@ const { claimSong } = useSongs()
 const claimIfPreview = async (song: Song): Promise<Song | null> =>
   song?.isPreview ? await claimSong(song) : song
 
-emitter.on(appWideActions.newSongSetlist, async (song?: Song) => {
-  if (song) {
-    const claimed = await claimIfPreview(song)
-    if (!claimed) return
-    song = claimed
+// Spins the picked song's row (ActionCard) while `work` runs, so a slow claim
+// or slide build reads as "on its way" rather than a dead click. Not held
+// across the setlist question: that wait is the operator's, not ours.
+const whileSongPending = async <T>(
+  song: Song | undefined,
+  work: () => Promise<T>
+): Promise<T> => {
+  const songId = (song as any)?._id as string | undefined
+  setSongPending(songId, true)
+  try {
+    return await work()
+  } finally {
+    setSongPending(songId, false)
   }
-  reportSongSearchPick(song)
-  const resolvedSong = song ? await useSong(song) : undefined
-  const newSlide = await createSongSetlistSlide(resolvedSong || undefined)
-  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
-  broadcastSlideCreated(newSlide)
-  uploadOfflineSlides()
-})
+}
+
+emitter.on(appWideActions.newSongSetlist, (picked?: Song) =>
+  whileSongPending(picked, async () => {
+    let song = picked
+    if (song) {
+      const claimed = await claimIfPreview(song)
+      if (!claimed) return
+      song = claimed
+    }
+    reportSongSearchPick(song)
+    const resolvedSong = song ? await useSong(song) : undefined
+    const newSlide = await createSongSetlistSlide(resolvedSong || undefined)
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
+  })
+)
 
 const getRelevantSongSetlist = () => {
   if (activeSlide.value?.type === slideTypes.songSetlist) {
@@ -1302,10 +1322,14 @@ const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
 
 emitter.on("new-song", async (data: Song) => {
   if (data) {
-    const claimed = await claimIfPreview(data)
-    if (!claimed) return
-    reportSongSearchPick(claimed)
-    const song = await useSong(claimed)
+    // A second click on a row that is still spinning adds nothing.
+    if (isSongPending((data as any)?._id)) return
+    const song = await whileSongPending(data, async () => {
+      const claimed = await claimIfPreview(data)
+      if (!claimed) return null
+      reportSongSearchPick(claimed)
+      return await useSong(claimed)
+    })
     if (song) {
       const setlistSlide = getRelevantSongSetlist()
 
@@ -1321,7 +1345,7 @@ emitter.on("new-song", async (data: Song) => {
       if (!destination) return
 
       if (destination === "setlist") {
-        addSongToSetlist(setlistSlide, song)
+        whileSongPending(data, () => addSongToSetlist(setlistSlide, song))
       } else {
         addSongAsSeparateSlide(song)
       }

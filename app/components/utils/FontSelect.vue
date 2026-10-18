@@ -8,6 +8,7 @@
       :class="size === 'lg' ? 'top-[6px]' : 'top-[10px]'"
       searchable
       searchable-placeholder="Search fonts"
+      :popper="{ strategy: 'fixed' }"
       :select-class="`h-10 border-0 shadow-none outline-none text-center rounded-full bg-gray-100 dark:bg-[#222938] dark:text-white ${
         size === 'lg' ? 'w-[150px]' : 'w-[140px]'
       }`"

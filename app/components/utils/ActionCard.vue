@@ -14,6 +14,7 @@
       class="action-card flex items-center gap-3 transition-colors cursor-pointer text-left w-[100%]"
       :class="[
         { 'pointer-events-none opacity-30': isActionDisabled },
+        { 'pointer-events-none opacity-70': isFetchingSong },
         compact
           ? 'min-h-[54px] px-3 py-2.5 hover:bg-white/55 dark:hover:bg-[#2b3242]/60'
           : 'p-4 items-start rounded-lg hover:bg-white dark:hover:bg-[#2b3242]',
@@ -24,7 +25,12 @@
         class="icon-ctn relative shrink-0 text-gray-800 dark:text-[#a7afbd] group-hover:text-primary dark:group-hover:text-[#d5dae3] transition-colors"
         :class="compact ? '' : 'mt-0.5'"
       >
-        <component :is="iconOverride" v-if="iconOverride" class="w-5 h-5" />
+        <UIcon
+          v-if="isFetchingSong"
+          name="i-bx-loader-alt"
+          class="block w-5 h-5 animate-spin text-primary"
+        />
+        <component :is="iconOverride" v-else-if="iconOverride" class="w-5 h-5" />
         <RecentClockIcon v-else-if="action?.recentSearch" class="w-5 h-5" />
         <component
           :is="customIconComponent"
@@ -138,6 +144,7 @@ import TemplatesIcon from "~/components/svgs/TemplatesIcon.vue"
 import RecentClockIcon from "~/components/svgs/RecentClockIcon.vue"
 import TimeIcon from "~/components/svgs/TimeIcon.vue"
 import InterludeIcon from "~/components/svgs/InterludeIcon.vue"
+import { isSongPending } from "~/composables/useSongs"
 
 const props = defineProps<{
   action: QuickAction
@@ -180,6 +187,14 @@ const actionIconComponentMap: Record<string, Component> = {
   "new-schedules-list": SchedulesIcon,
   "open-settings": SettingsIcon,
 }
+
+// A picked song spins in place of its icon until it lands on the schedule
+// (PreviewContent marks it pending for the whole pick, claim included).
+const isFetchingSong = computed(
+  () =>
+    props.action?.type === slideTypes.song &&
+    isSongPending((props.action?.songData as any)?._id)
+)
 
 // A song found by its lyrics rather than its title shows the line it matched
 // in place of the artist, so the operator can see why it came back.
