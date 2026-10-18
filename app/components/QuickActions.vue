@@ -212,7 +212,7 @@
               (action.type === slideTypes.song ||
                 action.type === slideTypes.hymn)
             "
-            :highlight-query="searchInput"
+            :highlight-query="searchQuery"
             :data-action-index="index"
             :active="hasInteracted && index === focusedActionIndex"
             :class="{
@@ -222,7 +222,7 @@
             @mouseenter="onRowMouseEnter(index)"
           >
             <template #desc>
-              <span v-html="highlightText(action.desc ?? '', searchInput)" />
+              <span v-html="highlightText(action.desc ?? '', searchQuery)" />
             </template>
           </ActionCard>
         </template>
@@ -386,6 +386,20 @@ const props = withDefaults(
 
 const searchInputEl = ref<{ input: HTMLInputElement }>()
 const searchInput = ref<string>("")
+// What the results are ranked for. It follows the box, but while typing it
+// waits for a short pause: ranking reads every hymn and saved song's lyrics,
+// and an older laptop doing that on each keystroke makes the typing lag.
+// Showing or hiding the results (crossing two letters) lands at once, and so
+// does anything that acts on the results (arrows, Enter); see
+// `flushSearchTerm`.
+const SEARCH_RANK_DELAY_MS = 90
+const searchTerm = ref<string>("")
+let searchTermTimer: ReturnType<typeof setTimeout> | null = null
+const flushSearchTerm = () => {
+  if (searchTermTimer) clearTimeout(searchTermTimer)
+  searchTermTimer = null
+  searchTerm.value = searchInput.value
+}
 // Titles are not unique across sources. For example, the library, remote song
 // search, and hymn catalogue can all contain multiple entries named "Amazing
 // Grace". Give each action object a stable identity so Vue can move grouped
@@ -970,9 +984,9 @@ const currentQuickActions = computed(() => {
     : visibleActions.value
 })
 
-// The query as typed, minus the "/" shortcut prefix.
+// The query being searched, minus the "/" shortcut prefix.
 const searchQuery = computed(
-  () => searchInput.value?.replaceAll("/", "").trim() || ""
+  () => searchTerm.value?.replaceAll("/", "").trim() || ""
 )
 
 watch(searchInput, (value) => {
@@ -982,8 +996,15 @@ watch(searchInput, (value) => {
   }
   focusedActionIndex.value = 0
   hasInteracted.value = false
-  refreshRemoteResults()
+  if (value.length < 2 || searchTerm.value.length < 2) {
+    flushSearchTerm()
+    return
+  }
+  if (searchTermTimer) clearTimeout(searchTermTimer)
+  searchTermTimer = setTimeout(flushSearchTerm, SEARCH_RANK_DELAY_MS)
 })
+
+watch(searchTerm, () => refreshRemoteResults())
 
 // Changing scope changes which libraries are worth asking.
 watch(searchScope, () => {
@@ -1199,6 +1220,9 @@ onEmitter("new-presentation-from-pdf", () => {
 })
 
 const handleInputKeydown = (e: KeyboardEvent) => {
+  // Arrows and Enter act on the results, so they must be the results for
+  // what is in the box now, not for the query of a keystroke ago.
+  if (["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) flushSearchTerm()
   const currentActions = currentQuickActions.value
   const maxIndex = currentActions.length - 1
 
@@ -1311,6 +1335,7 @@ onUnmounted(() => {
   if (quickSearchSuggestionInterval)
     clearInterval(quickSearchSuggestionInterval)
   if (searchBlurTimeout) clearTimeout(searchBlurTimeout)
+  if (searchTermTimer) clearTimeout(searchTermTimer)
   document.removeEventListener("mousedown", handleOutsidePointerDown)
 })
 
@@ -1330,13 +1355,13 @@ const bibleChapterAndVerse = computed(() => {
   // / "John 3:5-6" resolve to chapter 3, verses 5-6 (useScripture understands
   // the "start-end" verse form) instead of silently dropping the range.
   const regex = /\b\d+\s*:\s*\d+(?:-\d+)?\b|\b\d+\s\d+(?:-\d+)?\b/g
-  const bibleBookFollowedByJustChapterMatch = searchInput.value
+  const bibleBookFollowedByJustChapterMatch = searchTerm.value
     ?.replace("/", "")
     .match(/\b\w+\s+\d+\b(?!\S)/g)
 
   if (
     bibleBookFollowedByJustChapterMatch?.[0] &&
-    !searchInput.value?.match(regex)
+    !searchTerm.value?.match(regex)
   ) {
     const standaloneChapter = Number(
       bibleBookFollowedByJustChapterMatch?.[0]?.split(" ")?.[1] || 1
@@ -1345,7 +1370,7 @@ const bibleChapterAndVerse = computed(() => {
     return `${standaloneChapter}:${verse}`
   }
 
-  const match = searchInput.value
+  const match = searchTerm.value
     ?.replace("/", "")
     .match(regex)?.[0]
     ?.replaceAll(" ", ":")
@@ -1354,13 +1379,14 @@ const bibleChapterAndVerse = computed(() => {
 
 // The book-name-only portion of the query once a chapter/verse has been
 // recognised (see `bibleChapterAndVerse` above) — e.g. "Psa 101" -> "Psa",
-// "Psa 127 24" -> "Psa", "Psa 27:4" -> "Psa". Reads off the live
-// `searchInput` rather than a frozen/debounced copy so it can't get stuck on
-// a stale value once a two-digit number appears anywhere in the query.
+// "Psa 127 24" -> "Psa", "Psa 27:4" -> "Psa". Reads off `searchTerm`, which
+// always catches up with the box, rather than a copy frozen on some earlier
+// query, so it can't get stuck on a stale value once a two-digit number
+// appears anywhere in the query.
 const bibleBookQuery = computed(() => {
   if (!bibleChapterAndVerse.value) return ""
   return (
-    searchInput.value
+    searchTerm.value
       ?.replaceAll("/", "")
       .replace(/\s*:\s*\d+(?:-\d+)?\s*$/, "")
       .replace(/(\s+\d+(?:-\d+)?){1,2}\s*$/, "")
@@ -1415,7 +1441,7 @@ watch(isBibleReferenceSearch, (isReference) => {
 // "start 30min timer" or "start 1h timer" typed into the search box,
 // so they can be surfaced as an instant-create countdown action.
 const timerCommandMatch = computed(() => {
-  const input = searchInput.value?.toLowerCase() || ""
+  const input = searchTerm.value?.toLowerCase() || ""
   if (!/\btimer\b|\bcountdown\b/.test(input)) return null
 
   const match = input.match(
@@ -1685,7 +1711,7 @@ const rankedSearchResults = computed((): QuickAction[] => {
 
   // A confirmed Bible reference search ("Psa 101", "Eph 3:20") already tells
   // us exactly what the user wants, so the global song/scripture library
-  // search (see the `searchInput` watcher below) is skipped entirely and
+  // search (see `refreshRemoteResults`) is skipped entirely and
   // there's nothing useful it could add — keep only the local book matches.
   if (!isBibleReferenceSearch.value) {
     // API-searched (global) songs, fetched alongside local library matches
@@ -1888,7 +1914,7 @@ const rankedSearchResults = computed((): QuickAction[] => {
   //
   // The matches only decide WHICH GROUP leads — see the group promotion
   // below — never get lifted out of their group on their own.
-  const bestMatchQuery = searchInput.value?.replaceAll("/", "").trim() ?? ""
+  const bestMatchQuery = searchQuery.value
 
   if (isBibleReferenceSearch.value || bestMatchQuery.length < 2) {
     return ordered
