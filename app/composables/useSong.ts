@@ -21,11 +21,14 @@ const addIdToReturnedSongs = (songs: Array<Song>) => {
  *   the app-wide default when omitted. Callers chunking for an existing slide
  *   pass the slide's own `slideStyle.linesPerSlide`. This never writes the
  *   app-wide default: only Settings owns that.
+ * @param options.silent skip the "Song not found" toast, for background lookups
+ *   the operator did not ask for
  * @returns
  */
 const useSong = async (
   song: Song | string,
-  linesPerDisplay?: number
+  linesPerDisplay?: number,
+  options: { silent?: boolean } = {}
 ): Promise<Song | null> => {
   // console.log(linesPerDisplay)
   const toast = useToast()
@@ -102,7 +105,9 @@ const useSong = async (
     return song
   } catch (err) {
     // console.log(err)
-    toast.add({ title: 'Song not found', icon: 'i-bx-music', color: 'red' })
+    if (!options.silent) {
+      toast.add({ title: 'Song not found', icon: 'i-bx-music', color: 'red' })
+    }
   }
   return null
 }

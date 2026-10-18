@@ -148,14 +148,14 @@
             @click="
               $emit('update-style', {
                 ...slide.slideStyle,
-                showTranslation: !slide?.slideStyle?.showTranslation,
+                showTranslation: !isTranslationShown(slide),
               })
             "
             class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
             :class="{
-              'toolbar-toggle-active': slide?.slideStyle?.showTranslation,
+              'toolbar-toggle-active': isTranslationShown(slide),
             }"
-            :aria-pressed="Boolean(slide?.slideStyle?.showTranslation)"
+            :aria-pressed="isTranslationShown(slide)"
             aria-label="Show translation"
             icon="i-ph-translate"
             variant="ghost"
@@ -583,7 +583,11 @@ import type {
 } from "~/types"
 import { appWideActions } from "~/utils/constants"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
-import { getSongTranslation, songOnSlide } from "~/utils/songTranslation"
+import {
+  getSongTranslation,
+  isTranslationShown,
+  songOnSlide,
+} from "~/utils/songTranslation"
 
 const props = defineProps<{
   slide: Slide

@@ -24,6 +24,13 @@ export const getSongTranslation = (
 }
 
 /**
+ * Whether a slide shows its song's translation. On by default: only a slide
+ * the operator switched off (`showTranslation: false`) hides it.
+ */
+export const isTranslationShown = (slide?: Slide | null) =>
+  slide?.slideStyle?.showTranslation !== false
+
+/**
  * Key a lyric line the way it reaches the slide. useSong cleans each line and
  * useSlideContent drops "[Refrain]", so the raw lyric and the rendered line
  * only match after the same clean-up.

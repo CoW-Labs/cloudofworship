@@ -280,6 +280,7 @@ import { useAppStore } from "~/store/app"
 import {
   buildTranslationLookup,
   getSongTranslation,
+  isTranslationShown,
   songOnSlide,
   withSongTranslation,
 } from "~/utils/songTranslation"
@@ -326,7 +327,7 @@ const lineBackgroundSelector =
 
 // The song's translation, keyed by lyric line, while the slide shows it.
 const translationLookup = computed(() => {
-  if (!props.slide?.slideStyle?.showTranslation) return null
+  if (!isTranslationShown(props.slide)) return null
   const song = songOnSlide(props.slide)
   const translation = getSongTranslation(song)
   return song && translation ? buildTranslationLookup(song, translation) : null
