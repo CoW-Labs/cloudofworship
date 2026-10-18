@@ -279,6 +279,14 @@ export default defineNuxtConfig({
       ],
       link: [
         {
+          // Declared rather than left to the browser's /favicon.ico guess: a
+          // page that links a manifest (/live, /livestream) otherwise gets its
+          // tab icon from the manifest's icons instead.
+          rel: "icon",
+          type: "image/x-icon",
+          href: "/favicon.ico",
+        },
+        {
           // Requests carry a Bearer header, not cookies, so they travel on the
           // anonymous connection pool — this must match or the socket is unused.
           rel: "preconnect",

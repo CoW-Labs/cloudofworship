@@ -6,117 +6,90 @@
     v-if="tierRestricted"
     :reason="tierRestrictionReason"
   />
-  <div
-    v-else-if="loadingResources"
-    class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 grid place-items-center dark:bg-gray-900"
-  >
-    <div class="wrapper flex flex-col gap-6">
-      <div class="logo flex items-center justify-center mb-6 gap-2">
-        <Logo class="w-[64px]" />
-        <h1 class="text-2xl font-semibold">Cloud of Worship</h1>
-      </div>
-      <div class="progress-wrapper text-center relative">
-        <UProgress
-          size="2xl"
-          class="text-center"
-          :value="parseInt(downloadProgress)"
-          :max="100"
-        />
-        <UProgress
-          v-show="downloadStep === 2"
-          size="2xl"
-          class="text-center absolute top-0 left-0 opacity-50"
-          color="white"
-        />
-        <UProgress
-          v-show="downloadStep === 4"
-          size="2xl"
-          class="text-center absolute top-0 left-0 opacity-50"
-          color="white"
-        />
-        <div
-          v-if="downloadStep !== 5"
-          class="text-md font-semibold w-[300px] flex items-center justify-between mt-4"
-        >
-          <span class="font-normal">
-            <div class="text-left">Loading {{ downloadResource }}</div>
-            <div class="opacity-50 text-left">
-              This might take a while
-            </div></span
+  <template v-else>
+    <!-- Same splash as the operator console (layouts/app.vue), so the hand-off
+         from the pre-hydration boot screen carries on instead of jumping to a
+         different loader. -->
+    <Transition name="fade-sm">
+      <div
+        v-if="loadingResources"
+        class="loading-ctn h-[100vh] w-[100vw] fixed inset-0 z-50 grid place-items-center bg-white px-6 text-[#131724] dark:bg-[#131724] dark:text-white"
+      >
+        <div class="wrapper flex w-full max-w-[324px] flex-col items-center">
+          <CoWSplashLogo class="w-[76px] shrink-0" />
+
+          <div
+            class="bar mt-[34px] h-1 w-full overflow-hidden rounded-full bg-[#e6e8ef] dark:bg-[#222838]"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="downloadProgress"
+            aria-label="Loading background videos"
           >
-          <span>{{ parseInt(downloadProgress) || 0 }}%</span>
-        </div>
-        <div
-          v-else
-          class="text-md font-semibold w-[300px] flex items-center justify-center mt-4"
-        >
-          <span class="font-normal">
-            {{ downloadResource }}
-          </span>
+            <div
+              class="h-full rounded-full bg-current transition-[width] duration-500 ease-out"
+              :style="{ width: `${Math.max(downloadProgress, 3)}%` }"
+            />
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-  <div
-    v-else
-    class="main max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
-    :id="currentState.liveSlideId?.toString()"
-  >
-    <DisplayConnectionStatus :status="connectionStatus" />
-
-    <!-- <div
-      v-if="!isFullScreen"
-      class="banner inset-0 bottom-auto h-[60px] flex items-center justify-center bg-primary-100 text-black text-center bg-opacity-70"
+    </Transition>
+    <div
+      v-if="!loadingResources"
+      class="main relative max-h-[100vh] overflow-hidden bg-black min-h-[100vh]"
+      :id="currentState.liveSlideId?.toString()"
+      @dblclick="toggleFullScreen"
     >
-      <div class="banner-text text-lg flex items-center gap-6">
-        <span
-          ><span class="font-bold">Double click</span> the display below to
-          toggle full screen and remove this banner</span
-        >
-        •
-        <span class="flex items-center gap-2 font-bold"
-          ><Logo class="w-[34px] mb-2" /> Cloud of Worship</span
-        >
-      </div>
-    </div> -->
+      <!-- No banner here, unlike /live: this page is mostly an OBS / vMix
+           browser source, which is never full screen, so any chrome drawn
+           over the output ends up in the church's stream. Double click and
+           the shortcut still toggle full screen for a plain browser tab. -->
+      <DisplayConnectionStatus :status="connectionStatus" />
 
-    <LiveProjectionOnly
-      v-if="liveSlide"
-      :content-visible="true"
-      :id="liveSlide?.id"
-      :full-screen="true"
-      :slide="liveSlide!!"
-      :slide-label="false"
-      :slide-styles="currentState.settings.slideStyles"
-      :audio-muted="
-          liveSlide?.slideStyle?.isMediaMuted!!
-        "
-    />
-    <AlertView />
-  </div>
+      <LiveProjectionOnly
+        v-if="liveSlide"
+        :content-visible="true"
+        :id="liveSlide?.id"
+        :full-screen="true"
+        :slide="liveSlide!!"
+        :slide-label="false"
+        :slide-styles="currentState.settings.slideStyles"
+        :audio-muted="
+            liveSlide?.slideStyle?.isMediaMuted!!
+          "
+      />
+      <AlertView />
+    </div>
+  </template>
 </template>
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import type { BackgroundVideo, Slide } from "~/types"
 import { useAppStore } from "@/store/app"
-import { useOnline, until } from "@vueuse/core"
-definePageMeta({ middleware: "schedule-code" })
+import { until } from "@vueuse/core"
+import {
+  exitFullscreenSafely,
+  requestFullscreenSafely,
+} from "~/utils/browserSafety"
+// The `live` layout is what loads /css/fonts.css and /css/main.css as real
+// stylesheets, as it does for /live. Without it this page only had the
+// global rel="prefetch" swap, which browsers without prefetch never apply.
+definePageMeta({ layout: "live", middleware: "schedule-code" })
 
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const liveSlide = ref<Slide | null>(null)
 const isFullScreen = ref(false)
-const downloadProgress = ref<string>("0")
-const downloadResource = ref<string>("")
+// 0–100 across every background video still to download.
+const downloadProgress = ref(0)
 const route = useRoute()
 // `/livestream/:code`; the schedule-code middleware has already resolved it.
 const scheduleId = useScheduleCodeLookup().resolvedId(route.params.code)
 const loadingResources = ref<boolean>(true)
-const online = useOnline()
-const downloadStep = ref<number>(0)
 const cachedVideosURLs = ref<BackgroundVideo[]>()
 const localMedia = useLocalMediaStorage()
-const { rehydrateSlideMedia, prefetchScheduleMedia } = useSlideMediaCache()
+const { rehydrateSlideMediaWithStatus, prefetchScheduleMedia } =
+  useSlideMediaCache()
 const connectionStatus = ref<
   "connecting" | "connected" | "disconnected" | "failed"
 >("connecting")
@@ -128,7 +101,7 @@ const tierRestricted = ref(false)
 const tierRestrictionReason = ref<"plan" | "quota">("plan")
 
 useHead({
-  title: "CoW Live",
+  title: "Livestream - Cloud of Worship",
   link: [
     {
       rel: "manifest",
@@ -145,12 +118,23 @@ const checkFullScreen = () => {
   }
 }
 
+const toggleFullScreen = () => {
+  if (document.fullscreenElement) {
+    exitFullscreenSafely()
+  } else {
+    requestFullscreenSafely(document.documentElement)
+  }
+}
+
+let cleanupShortcut: (() => void) | null = null
+
 onMounted(() => {
   window.addEventListener("fullscreenchange", checkFullScreen)
   window.addEventListener("webkitfullscreenchange", checkFullScreen)
   window.addEventListener("mozfullscreenchange", checkFullScreen)
   window.addEventListener("MSFullscreenChange", checkFullScreen)
   checkFullScreen()
+  cleanupShortcut = useRegisteredShortcut(shortcutIds.fullscreen, toggleFullScreen)
 })
 
 const saveAllBackgroundVideos = async () => {
@@ -159,11 +143,19 @@ const saveAllBackgroundVideos = async () => {
     (await localMedia.listRecords()).map((record) => record.key)
   )
 
-  downloadResource.value = "background videos"
-
   const missingVideoIds = videoIds.filter(
     (id) => !savedKeys.has(`/video-bg-${id}.mp4`)
   )
+  // Two download at once, so each reports its own fraction and the bar shows
+  // their sum. A failed video counts as done: it no longer holds the loader.
+  const fractions = new Map<number, number>()
+  const reportProgress = (id: number, fraction: number) => {
+    fractions.set(id, Math.min(Math.max(fraction, 0), 1))
+    const done = [...fractions.values()].reduce((sum, f) => sum + f, 0)
+    downloadProgress.value = Math.round(
+      (done / Math.max(missingVideoIds.length, 1)) * 100
+    )
+  }
 
   const batchSize = 2
   for (let i = 0; i < missingVideoIds.length; i += batchSize) {
@@ -182,13 +174,13 @@ const saveAllBackgroundVideos = async () => {
             mimeType: "video/mp4",
             recoverable: true,
             onProgress: (fraction) => {
-              if (Number.isFinite(fraction)) {
-                downloadProgress.value = (fraction * 100).toFixed(2)
-              }
+              if (Number.isFinite(fraction)) reportProgress(id, fraction)
             },
           })
         } catch (err) {
           console.warn(`Failed to download video-bg-${id}:`, err)
+        } finally {
+          reportProgress(id, 1)
         }
       })
     )
@@ -228,11 +220,69 @@ const resourcesReady = new Promise<void>((resolve) => {
   markResourcesReady = resolve
 })
 
-const localizeSlide = async (slide: Slide) => {
+// A download that fails (a weak connection at the start of a service) is
+// retried inside useSlideMediaCache; `onRecovered` hands back the slide once the
+// bytes land, so the media appears without waiting for the next slide change.
+const localizeSlide = async (
+  slide: Slide,
+  onRecovered?: (recovered: Slide) => void
+) => {
   await resourcesReady
-  return await rehydrateSlideMedia(updateBlobBackgroundURl({ ...slide }), {
-    allowDownload: true,
-  })
+  const { slide: localized } = await rehydrateSlideMediaWithStatus(
+    updateBlobBackgroundURl({ ...slide }),
+    { allowDownload: true, onRecovered }
+  )
+  return localized
+}
+
+// Recovered media only applies while that slide is still the one on screen.
+// Its URLs are taken but the current slide is kept, so a page or verse the
+// operator moved to during the download still wins.
+const withRecoveredMedia = (current: Slide, recovered: Slide): Slide => ({
+  ...current,
+  background:
+    recovered.type === slideTypes.presentation
+      ? recovered.presentationObjects?.[current.presentationPageIndex ?? 0]
+          ?.imageUrl || current.background
+      : recovered.background,
+  presentationObjects: recovered.presentationObjects,
+  data:
+    current.data && (recovered.data as any)?.url
+      ? ({
+          ...(current.data as any),
+          url: (recovered.data as any).url,
+        } as Slide["data"])
+      : current.data,
+})
+
+const applyRecoveredToLive = (recovered: Slide) => {
+  if (liveSlide.value?.id === recovered.id) {
+    liveSlide.value = withRecoveredMedia(liveSlide.value, recovered)
+  }
+}
+
+const applyRecoveredToOverlay = (recovered: Slide) => {
+  const overlay = appStore.currentState.activeOverlaySlide
+  if (overlay?.id === recovered.id) {
+    appStore.setActiveOverlaySlide(withRecoveredMedia(overlay, recovered))
+  }
+}
+
+// Media is downloaded before a slide is shown, so a slow slide can finish
+// after a quicker one sent later. As /live does with its broadcast timestamps,
+// only the newest message may land: `liveSeq` moves on each `live-slide`,
+// `updateSeq` orders edits to the slide on screen, `overlaySeq` the overlay.
+let liveSeq = 0
+let updateSeq = 0
+let overlaySeq = 0
+
+const showOverlaySlide = async (data: Slide | null) => {
+  const seq = ++overlaySeq
+  const slide = data
+    ? await localizeSlide({ ...data }, applyRecoveredToOverlay)
+    : null
+  if (seq !== overlaySeq) return
+  appStore.setActiveOverlaySlide(slide)
 }
 
 const handleWebSocketMessage = async (parsedData: any) => {
@@ -251,7 +301,14 @@ const handleWebSocketMessage = async (parsedData: any) => {
       // The operator changed what is on screen. This is the only thing that
       // seeds liveSlide — without it the page renders nothing at all.
       // A null payload means blank: clear the stream.
-      liveSlide.value = data ? await localizeSlide({ ...data }) : null
+      {
+        const seq = ++liveSeq
+        const slide = data
+          ? await localizeSlide({ ...data }, applyRecoveredToLive)
+          : null
+        if (seq !== liveSeq) break
+        liveSlide.value = slide
+      }
       break
     case "new-slide":
     case "slide-created":
@@ -265,15 +322,21 @@ const handleWebSocketMessage = async (parsedData: any) => {
         liveSlide.value?.id === data.id ||
         liveSlide.value?.id === data.slideId
       ) {
-        // Create a new object to trigger Vue reactivity
-        const slideData = await localizeSlide({ ...data })
-        liveSlide.value = { ...slideData }
+        // Dropped if the operator went to another slide, or a later edit
+        // landed, while this one's media was loading.
+        const live = liveSeq
+        const seq = ++updateSeq
+        const slideData = await localizeSlide({ ...data }, applyRecoveredToLive)
+        if (live === liveSeq && seq === updateSeq) {
+          // Create a new object to trigger Vue reactivity
+          liveSlide.value = { ...slideData }
+        }
       }
       if (
         appStore.currentState.activeOverlaySlide?.id === data.id ||
         appStore.currentState.activeOverlaySlide?.id === data.slideId
       ) {
-        appStore.setActiveOverlaySlide(await localizeSlide({ ...data }))
+        await showOverlaySlide(data)
       }
       break
     case "delete-slide":
@@ -283,7 +346,7 @@ const handleWebSocketMessage = async (parsedData: any) => {
         appStore.currentState.activeOverlaySlide?.id === data.id ||
         appStore.currentState.activeOverlaySlide?._id === data._id
       ) {
-        appStore.setActiveOverlaySlide(null)
+        await showOverlaySlide(null)
       }
       break
     case "add-alert":
@@ -299,10 +362,10 @@ const handleWebSocketMessage = async (parsedData: any) => {
       appStore.setActiveOverlay("")
       break
     case "show-slide-overlay":
-      appStore.setActiveOverlaySlide(await localizeSlide({ ...data }))
+      await showOverlaySlide(data)
       break
     case "remove-slide-overlay":
-      appStore.setActiveOverlaySlide(null)
+      await showOverlaySlide(null)
       break
     case "updated-slides":
       break
@@ -403,10 +466,7 @@ onBeforeMount(async () => {
     // until this runs no live slide renders, and the loader never clears.
     markResourcesReady()
 
-    // All computations completed
-    downloadStep.value = 5
-    downloadResource.value = "All resources downloaded."
-
+    downloadProgress.value = 100
     setTimeout(() => {
       loadingResources.value = false
     }, 100)
@@ -416,6 +476,7 @@ onBeforeMount(async () => {
 onBeforeUnmount(() => {
   // Clean up Socket.IO connection
   socketManager.disconnect()
+  cleanupShortcut?.()
 
   // Clean up fullscreen event listeners
   window.removeEventListener("fullscreenchange", checkFullScreen)
