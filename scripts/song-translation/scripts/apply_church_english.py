@@ -24,8 +24,9 @@ for sid, rec in d["songs"].items():
             l.setdefault("englishSource", "church" if "machineEnglish" in l else "machine")
     swapped += hit
     songs_hit += bool(hit)
-d["progress"]["lines using church English"] = swapped
-d["progress"]["songs with church English"] = songs_hit
+recs = [r for r in d["songs"].values() if r.get("status") == "translated"]
+d["progress"]["lines using church English"] = sum(l.get("englishSource") == "church" for r in recs for l in r["lines"])
+d["progress"]["songs with church English"] = sum(any(l.get("englishSource") == "church" for l in r["lines"]) for r in recs)
 json.dump(d, open(OUT / "translations.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 p1 = json.load(open(OUT / "translations-part1.json"))
 ids1 = set(p1["songs"])
