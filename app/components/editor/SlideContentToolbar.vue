@@ -142,6 +142,27 @@
           />
         </CowTooltip>
 
+        <!-- SONG TRANSLATION: only when the song on screen has one -->
+        <CowTooltip v-if="hasSongTranslation" text="Show translation">
+          <UButton
+            @click="
+              $emit('update-style', {
+                ...slide.slideStyle,
+                showTranslation: !slide?.slideStyle?.showTranslation,
+              })
+            "
+            class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+            :class="{
+              'toolbar-toggle-active': slide?.slideStyle?.showTranslation,
+            }"
+            :aria-pressed="Boolean(slide?.slideStyle?.showTranslation)"
+            aria-label="Show translation"
+            icon="i-ph-translate"
+            variant="ghost"
+            color="gray"
+          />
+        </CowTooltip>
+
         <CowTooltip
           v-if="isMediaFileButNotExternalMedia"
           text="Background fill type"
@@ -562,6 +583,7 @@ import type {
 } from "~/types"
 import { appWideActions } from "~/utils/constants"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
+import { getSongTranslation, songOnSlide } from "~/utils/songTranslation"
 
 const props = defineProps<{
   slide: Slide
@@ -613,6 +635,11 @@ watch(
       props.slide?.slideStyle?.backgroundFillType || "Fit"
   },
   { immediate: true }
+)
+
+// Lines translated for the song on screen (see utils/songTranslation).
+const hasSongTranslation = computed(() =>
+  Boolean(getSongTranslation(songOnSlide(props.slide)))
 )
 
 // A setlist slide holds several songs — refreshing acts on the one currently
