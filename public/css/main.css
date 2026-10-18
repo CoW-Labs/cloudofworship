@@ -1195,3 +1195,12 @@ html.dark {
   --cow-toolbar-pill-bg: #171d2b;
   --cow-editor-bg: #222938;
 }
+
+/* A song's translation, under each lyric line (utils/songTranslation). It
+   inherits every bit of the lyric's formatting (size, weight, case, font,
+   spacing, shadow); only the colour differs. */
+.song-translation,
+.song-content .song-translation,
+.tiptap.live-content .song-translation {
+  color: #d9a4ff !important;
+}

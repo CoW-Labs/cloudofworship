@@ -142,7 +142,12 @@ const scripture = computed(() =>
 
 const categories = computed(() => {
   if (song.value) {
-    return ["Lyrics are wrong", "Title or artist is wrong", GENERAL_CATEGORY]
+    return [
+      "Lyrics are wrong",
+      "Translation is wrong",
+      "Title or artist is wrong",
+      GENERAL_CATEGORY,
+    ]
   }
   if (hymn.value) {
     return ["Words are wrong", "Wrong hymn number or title", GENERAL_CATEGORY]

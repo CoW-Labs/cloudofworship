@@ -277,6 +277,12 @@
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+import {
+  buildTranslationLookup,
+  getSongTranslation,
+  songOnSlide,
+  withSongTranslation,
+} from "~/utils/songTranslation"
 import type { Countdown, Slide } from "~/types"
 import useTheme, { type BibleTheme } from "~/composables/useTheme"
 
@@ -318,7 +324,18 @@ const fullTextLayoutStyle = computed(() => {
 const lineBackgroundSelector =
   "p:not(.scripture-label):not(.song-label):not(.countdown-label):not(.copyright-content), h1, h2, h3, h4"
 
-const getSlideContentHtml = (content = "") => {
+// The song's translation, keyed by lyric line, while the slide shows it.
+const translationLookup = computed(() => {
+  if (!props.slide?.slideStyle?.showTranslation) return null
+  const song = songOnSlide(props.slide)
+  const translation = getSongTranslation(song)
+  return song && translation ? buildTranslationLookup(song, translation) : null
+})
+
+const getSlideContentHtml = (rawContent = "") => {
+  const content = translationLookup.value
+    ? withSongTranslation(rawContent, translationLookup.value)
+    : rawContent
   if (
     usesTipTapTextStyles.value ||
     !props.slide?.slideStyle?.textLinesBackground ||
@@ -529,6 +546,7 @@ watch(
     props.slide?.slideStyle?.textBold,
     props.slide?.slideStyle?.lettercase,
     props.slide?.slideStyle?.textLinesBackground,
+    props.slide?.slideStyle?.showTranslation,
   ],
   scheduleFit,
   { immediate: true }

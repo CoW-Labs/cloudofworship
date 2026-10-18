@@ -116,10 +116,6 @@ const useSong = async (
  * the chorus sections are considered; otherwise the whole song is.
  */
 
-// Structural markers ('Chorus', 'Chorus:', '[Verse 1]', '(Bridge)') — never a title.
-const SECTION_LABEL =
-  /^[\[\(]?\s*(pre[-\s]?chorus|chorus|refrain|verse|bridge|tag|intro|outro|interlude|instrumental|vamp|hook|ending|coda|solo)\b[^A-Za-z]*$/i
-
 // Wordless filler ('Oh oh oh', 'Yeah yeah') repeats a lot but makes a poor title.
 const FILLER_WORD = 'oh+|ooh+|woah+|whoa+|ah+|aah+|eh+|hey+|yeah+|yea+|la+|na+|mmm+|hmm+|mm+'
 const FILLER = new RegExp(`^(?:${FILLER_WORD})(?:[\\s,]+(?:${FILLER_WORD}))*$`, 'i')
