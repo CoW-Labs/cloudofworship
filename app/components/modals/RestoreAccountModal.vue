@@ -107,7 +107,7 @@ const story = [
     text: "Every operator on their own machine, so nobody has to lean over whoever is running the live screen?",
   },
   {
-    text: "Over 13,000 songs to search, with more added all the time?",
+    text: "Over 15,000 songs to search, with more added all the time?",
   },
   {
     text: "That's the communal effect that Teams gives your service unit.",
