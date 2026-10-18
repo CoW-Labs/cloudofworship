@@ -5,16 +5,17 @@
 </template>
 
 <script setup lang="ts">
+import { publicStylesheet } from "~/utils/publicStylesheet"
 useHead({
   title: "Cloud of Worship - Stage Display",
   link: [
     {
       rel: "stylesheet",
-      href: "/css/fonts.css",
+      href: publicStylesheet("/css/fonts.css"),
     },
     {
       rel: "stylesheet",
-      href: "/css/main.css",
+      href: publicStylesheet("/css/main.css"),
     },
   ],
 })

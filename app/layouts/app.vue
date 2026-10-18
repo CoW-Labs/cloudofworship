@@ -76,6 +76,7 @@
 </template>
 
 <script setup lang="ts">
+import { publicStylesheet } from "~/utils/publicStylesheet"
 import posthog from "posthog-js"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
@@ -102,7 +103,7 @@ import { stageTimerReading } from "~/utils/stageTimer"
 
 useHead({
   title: "Cloud of Worship",
-  link: [{ rel: "stylesheet", href: "/css/main.css" }],
+  link: [{ rel: "stylesheet", href: publicStylesheet("/css/main.css") }],
 })
 
 // Lock the document while the operator shell is mounted. The shell owns its own

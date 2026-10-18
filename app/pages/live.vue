@@ -68,6 +68,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { publicStylesheet } from "~/utils/publicStylesheet"
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
 import type { Slide } from "~/types"
@@ -189,11 +190,11 @@ useHead({
     },
     {
       rel: "stylesheet",
-      href: "/css/fonts.css",
+      href: publicStylesheet("/css/fonts.css"),
     },
     {
       rel: "stylesheet",
-      href: "/css/main.css",
+      href: publicStylesheet("/css/main.css"),
     },
   ],
 })
