@@ -552,6 +552,7 @@ import type {
   SongSetlistData,
 } from "~/types"
 import { escapePriority } from "~/composables/useEscapeKey"
+import { songOnSlide } from "~/utils/songTranslation"
 import {
   computeNextVerseLabel,
   computePreviousVerseLabel,
@@ -1589,7 +1590,10 @@ const onUpdateMediaSeek = (seekTime: number) => {
   }, 5000)
 }
 
-const onUpdateSongLyrics = async (song: Song) => {
+const onUpdateSongLyrics = async (
+  song: Song,
+  options: { keepFontSize?: boolean } = {}
+) => {
   // Defensive: the toolbar already filters failed lookups, but this handler is
   // wired to a template event and must not crash the editor on a null payload.
   if (!song) return
@@ -1626,10 +1630,12 @@ const onUpdateSongLyrics = async (song: Song) => {
   const currentSongVerse = song.verses?.[currentSongVerseNumber - 1]
 
   tempSlide.name = useSlideName(tempSlide)
-  let fontSize = useScreenFontSize(currentSongVerse || "")
-  tempSlide.slideStyle = {
-    ...tempSlide.slideStyle,
-    fontSize: Number(fontSize),
+  if (!options.keepFontSize) {
+    let fontSize = useScreenFontSize(currentSongVerse || "")
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: Number(fontSize),
+    }
   }
   tempSlide.data = song
   tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
@@ -1638,6 +1644,47 @@ const onUpdateSongLyrics = async (song: Song) => {
     : slideLayoutTypes.full_text
   emit("slide-update", tempSlide)
 }
+
+// Opening a song slide pulls the song again, so lyrics or translations fixed
+// since it was added show up without pressing Refresh. Quiet on purpose: no
+// toast when the lookup fails (offline), no font size reset, and no update at
+// all when nothing changed, so a click does not save or broadcast the slide.
+const songContentKey = (song?: Song | null) =>
+  song
+    ? JSON.stringify([song.title, song.lyrics, song.translations || []])
+    : ""
+
+watch(
+  () => props.slide?.id,
+  async (slideId) => {
+    const slide = props.slide
+    if (!slideId || !slide) return
+    if (slide.type !== slideTypes.song && slide.type !== slideTypes.songSetlist)
+      return
+
+    // A setlist refreshes the song it is showing, as the toolbar button does
+    const activeItem =
+      slide.type === slideTypes.songSetlist
+        ? setlistData.value.songs[setlistData.value.activeSongIndex]
+        : undefined
+    const songId =
+      slide.type === slideTypes.songSetlist
+        ? activeItem?.songId || activeItem?.song?._id || activeItem?.song?.id
+        : slide.songId
+    if (!songId) return
+
+    const song = await useSong(songId, slide.slideStyle?.linesPerSlide, {
+      silent: true,
+    })
+    // The operator may have moved to another slide while this was in flight
+    if (!song || props.slide?.id !== slideId) return
+    if (songContentKey(song) === songContentKey(songOnSlide(props.slide)))
+      return
+
+    await onUpdateSongLyrics(song, { keepFontSize: true })
+  },
+  { immediate: true }
+)
 
 const onUpdateSongLines = async (linesPerSlide: number) => {
   // Captured before anything re-chunks, so the active chunk can be re-pointed
