@@ -279,13 +279,18 @@
 import { useAppStore } from "~/store/app"
 import {
   buildTranslationLookup,
-  getSongTranslation,
   isTranslationShown,
+  getSongTranslation,
   songOnSlide,
   withSongTranslation,
 } from "~/utils/songTranslation"
 import type { Countdown, Slide } from "~/types"
 import useTheme, { type BibleTheme } from "~/composables/useTheme"
+import {
+  cancelLayoutJob,
+  scheduleLayoutJob,
+  type LayoutJob,
+} from "~/utils/layoutBatch"
 
 const props = defineProps<{
   slide: Slide
@@ -504,33 +509,57 @@ const measureLineWidths = (el: HTMLElement) => {
   return [...lines.values()].map((line) => line.right - line.left)
 }
 
-const fitToWidth = () => {
-  const el = autoFitEl.value
-  if (!el || !autoFitEnabled.value) {
+// The fit runs as a batched layout job (see utils/layoutBatch): every preview
+// on screen measures in the same frame, so opening or scrolling a schedule
+// lays the page out twice in all rather than twice per slide.
+let measuring: HTMLElement | null = null
+let available = 0
+let previousWhiteSpace = ""
+let widths: number[] = []
+
+const fitJob: LayoutJob = {
+  read: () => {
+    measuring = autoFitEnabled.value ? autoFitEl.value : null
+    available = measuring ? availableWidth(measuring) : 0
+    if (!available) measuring = null
+  },
+  write: () => {
+    if (!measuring) return
+    previousWhiteSpace = measuring.style.whiteSpace
+    measuring.style.whiteSpace = "nowrap"
+  },
+  measure: () => {
+    widths = measuring ? measureLineWidths(measuring) : []
+  },
+  finish: () => {
+    if (!measuring) return
+    measuring.style.whiteSpace = previousWhiteSpace
+    measuring = null
+    if (!widths.length) return
+
+    // Each line's width was measured at the current scale, so this is the
+    // scale that would make it exactly fill the row — the same answer
+    // whatever size the text is at now. 0.98 leaves room for subpixel
+    // rounding.
+    const scales = widths
+      .map((width) => autoFitScale.value * (available / width) * 0.98)
+      // Lines needing more than the floor are left to wrap (see above)
+      .filter((scale) => scale >= AUTO_FIT_MIN_SCALE)
+    const next = Math.min(1, ...scales)
+    // Ignore rounding-sized changes so a refit never nudges the text back and
+    // forth by a pixel.
+    if (Math.abs(next - autoFitScale.value) > 0.005) autoFitScale.value = next
+  },
+}
+
+const scheduleFit = () => {
+  if (!autoFitEl.value || !autoFitEnabled.value) {
+    cancelLayoutJob(fitJob)
     autoFitScale.value = 1
     return
   }
-  const available = availableWidth(el)
-  const previousWhiteSpace = el.style.whiteSpace
-  el.style.whiteSpace = "nowrap"
-  const widths = measureLineWidths(el)
-  el.style.whiteSpace = previousWhiteSpace
-  if (!available || !widths.length) return
-
-  // Each line's width was measured at the current scale, so this is the scale
-  // that would make it exactly fill the row — the same answer whatever size
-  // the text is at now. 0.98 leaves room for subpixel rounding.
-  const scales = widths
-    .map((width) => autoFitScale.value * (available / width) * 0.98)
-    // Lines needing more than the floor are left to wrap (see above)
-    .filter((scale) => scale >= AUTO_FIT_MIN_SCALE)
-  const next = Math.min(1, ...scales)
-  // Ignore rounding-sized changes so a refit never nudges the text back and
-  // forth by a pixel.
-  if (Math.abs(next - autoFitScale.value) > 0.005) autoFitScale.value = next
+  scheduleLayoutJob(fitJob)
 }
-
-const scheduleFit = () => nextTick(fitToWidth)
 
 watch(
   () => [
@@ -556,17 +585,23 @@ watch(
 // Refit when the slide's box changes size (a window resized, a panel dragged).
 // The box around the lyrics, never the lyrics themselves: those resize every
 // time a fit changes the font, and observing them looped. Late web fonts
-// change glyph widths too, so refit once they finish loading.
-watch(autoFitEl, (el, _old, onCleanup) => {
-  const parent = el?.parentElement
-  if (!parent || typeof ResizeObserver === "undefined") return
-  const observer = new ResizeObserver(() => scheduleFit())
-  observer.observe(parent)
-  onCleanup(() => observer.disconnect())
-})
+// change glyph widths too, so refit once they finish loading. Only slides with
+// auto-fit on are observed: every other preview would otherwise wake up on
+// each frame of a panel drag for nothing.
+watch(
+  () => [autoFitEl.value, autoFitEnabled.value] as const,
+  ([el, enabled], _old, onCleanup) => {
+    const parent = el?.parentElement
+    if (!enabled || !parent || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(() => scheduleFit())
+    observer.observe(parent)
+    onCleanup(() => observer.disconnect())
+  }
+)
 onMounted(() => {
   document.fonts?.ready.then(scheduleFit)
 })
+onBeforeUnmount(() => cancelLayoutJob(fitJob))
 </script>
 
 <style scoped>
