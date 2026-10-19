@@ -123,7 +123,7 @@
         @update:model-value="update({ fit: $event ? 'cover' : 'contain' })"
       />
       <CowToggle
-        label="Mirror"
+        label="Flip horizontally (mirror effect)"
         :model-value="modelValue.mirror"
         @update:model-value="update({ mirror: $event })"
       />

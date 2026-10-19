@@ -296,6 +296,7 @@
                           class="h-full overflow-y-auto p-3"
                         >
                           <CameraForm
+                            :ref="(el: any) => (cameraPanelContent = el?.$el ?? null)"
                             :model-value="cameraInput"
                             @update:model-value="patchCamera"
                           />
@@ -550,7 +551,7 @@
 </template>
 
 <script setup lang="ts">
-import { useOnline } from "@vueuse/core"
+import { useOnline, useResizeObserver } from "@vueuse/core"
 import { remapChunkIndex, splitVerseByLines } from "~/composables/useHymn"
 import CoWPopover from "~/components/cow/CoWPopover.vue"
 import type { Editor } from "@tiptap/core"
@@ -760,7 +761,14 @@ const backgroundPopoverSize = ref<PopoverSize>(
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const interludePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
-const cameraPopoverSize = ref<PopoverSize>({ width: 380, height: 420 })
+const cameraPopoverSize = ref<PopoverSize>({ width: 380, height: 260 })
+// The popover opens at the height it is given, so follow the camera form's
+// own height (the camera list arrives after it opens) plus the p-3 padding.
+const cameraPanelContent = ref<HTMLElement | null>(null)
+useResizeObserver(cameraPanelContent, ([entry]) => {
+  const height = entry?.target.getBoundingClientRect().height
+  if (height) cameraPopoverSize.value = { width: 380, height: Math.ceil(height) + 24 }
+})
 
 // Interlude slides hold a still frame in the editor so the operator's eye
 // stays on the schedule and live output. They animate, at the preview rate,
@@ -842,7 +850,7 @@ const visibleTabs = computed(() => {
   if (isCamera)
     tabs.push({
       key: "camera",
-      label: "Camera",
+      label: "Camera settings",
       hint: "Choose the camera and how it fills the screen",
     })
   if (isBible)
