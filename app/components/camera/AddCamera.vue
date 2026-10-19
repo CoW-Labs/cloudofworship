@@ -4,9 +4,7 @@
   <div class="add-camera-main">
     <div class="flex flex-col gap-4 px-1.5 pt-3">
       <p class="text-xs text-gray-500 dark:text-[#7d8695]">
-        Shows a webcam or capture card full screen on the Live Output. The feed
-        only appears on this computer's projector and NDI output; livestream
-        and stage screens show a "Camera is live" card.
+        Shows a webcam or capture card full screen on the Live Output.
       </p>
 
       <CameraForm v-model="form" show-preview />
