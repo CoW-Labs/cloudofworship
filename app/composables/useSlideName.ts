@@ -1,5 +1,6 @@
 import { useAppStore } from "~/store/app"
 import type {
+  CameraSlideData,
   Countdown,
   ExtendedFileT,
   InterludeSlideData,
@@ -9,6 +10,7 @@ import type {
   TimeSlideData,
 } from "~/types/index"
 import { slideLayoutTypes, slideTypes } from "~/utils/constants"
+import { cameraSlideName } from "~/utils/camera"
 
 const useSlideName = (slide: Slide) => {
   const appStore = useAppStore()
@@ -50,6 +52,8 @@ const useSlideName = (slide: Slide) => {
       return (slide?.data as TimeSlideData)?.label || "Live Time"
     case slideTypes.interlude:
       return (slide?.data as InterludeSlideData)?.heading?.trim() || "Interlude"
+    case slideTypes.camera:
+      return cameraSlideName(slide?.data as CameraSlideData | undefined)
     default:
       return `${slide?.title}`
   }

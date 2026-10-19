@@ -92,7 +92,7 @@ export interface Slide {
   hymnVerseIndex?: number // 0-based index of current hymn verse, used for chorus navigation
   hymnSubVerseIndex?: number // 0-based chunk index inside the current verse/chorus
   hymnSubVerseTotal?: number // total chunks in the current verse/chorus
-  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | InterludeSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
+  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | InterludeSlideData | CameraSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
   slideStyle?: SlideStyle
   saved?: boolean
   createdAt?: string
@@ -191,6 +191,20 @@ export interface InterludeSlideData {
   subtitle: string
   /** "auto" follows the variant's default. */
   textBackground: "auto" | "on" | "off"
+}
+
+/**
+ * A full-frame camera slide. Only the settings are stored: the stream itself is
+ * opened by the window that shows it (see useCameraStream) and never leaves it.
+ * Device IDs differ per origin, browser profile and between web and desktop, so
+ * the label is kept to find the same camera on another machine.
+ */
+export interface CameraSlideData {
+  id: string
+  deviceId: string
+  deviceLabel: string
+  fit: "cover" | "contain"
+  mirror: boolean
 }
 
 /**

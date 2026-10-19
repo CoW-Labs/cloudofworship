@@ -177,6 +177,7 @@ import {
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
+  CameraSlideData,
   Hymn,
   InterludeSlideData,
   Scripture,
@@ -193,6 +194,8 @@ import {
   toTransportSafePayload,
 } from "~/utils/mediaTransport"
 import { unavailableMediaCopy } from "~/utils/mediaCloudSync"
+import type { CameraSettings } from "~/utils/camera"
+import { postCameraPrewarm } from "~/composables/useCameraStream"
 import { isPdfPresentationFile } from "~/utils/presentationFile"
 import { appWideActions, MAX_PDF_FILE_SIZE } from "~/utils/constants"
 import {
@@ -275,6 +278,7 @@ const {
   createCountdownSlide,
   createTimeSlide,
   createInterludeSlide,
+  createCameraSlide,
   saveSlideToLib,
   duplicateSlide,
   duplicateSlideAsOverlay,
@@ -1018,6 +1022,18 @@ watch(
   }
 )
 
+// Selecting a camera slide usually means it goes live next. Let the projector
+// open the camera now, so going live does not wait on a cold start.
+watch(
+  () => activeSlide.value?.id,
+  (newId, oldId) => {
+    if (props.mobile || newId === oldId) return
+    const slide = activeSlide.value
+    if (slide?.type !== slideTypes.camera || !slide.data) return
+    postCameraPrewarm(slide.data as CameraSlideData)
+  }
+)
+
 const updateSlideGridMetrics = () => {
   const scrollEl = slidesScroll.value
   if (!scrollEl) return
@@ -1149,6 +1165,23 @@ emitter.on(
     // No payload is the Quick Actions panel opening, not a new slide.
     if (!data) return
     const newSlide = createInterludeSlide(data)
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
+  }
+)
+
+emitter.on(
+  appWideActions.newCamera,
+  (data?: CameraSettings | Slide | Slide[]) => {
+    // No payload is the Quick Actions panel opening, not a new slide.
+    if (!data) return
+    // A saved slide (from the library) is copied as it is.
+    const saved = Array.isArray(data) ? data[0] : "type" in data ? data : null
+    const newSlide = saved
+      ? duplicateSlide(saved as Slide)
+      : createCameraSlide(data as CameraSettings)
+    if (!newSlide) return
     makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
     broadcastSlideCreated(newSlide)
     uploadOfflineSlides()

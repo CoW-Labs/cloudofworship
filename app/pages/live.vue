@@ -61,6 +61,7 @@
       :slide-label="false"
       :slide-styles="currentState.settings.slideStyles"
       :audio-muted="mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!"
+      camera-mode="capture"
     />
     <!-- </Transition> -->
 
@@ -78,6 +79,9 @@ import type {
   SlideOverlayBroadcast,
 } from "~/composables/useBroadcastPost"
 import { resolveLiveSlideBroadcast } from "~/composables/useBroadcastPost"
+import useCameraStream, {
+  isCameraPrewarmBroadcast,
+} from "~/composables/useCameraStream"
 import { useAuthStore } from "~/store/auth"
 import {
   exitFullscreenSafely,
@@ -97,6 +101,7 @@ const isFullScreen = ref(false)
 const windowMenuOpen = ref(false)
 const windowMenuRef = ref<{ open: () => void; close: () => void } | null>(null)
 const { closeWindow } = useCloseDisplayWindow("live output")
+const { prewarm: prewarmCamera } = useCameraStream()
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
 const FPS = 10
@@ -296,6 +301,11 @@ onMounted(() => {
         typeof envelope.payload === "string"
           ? JSON.parse(envelope.payload)
           : envelope.payload
+
+      if (isCameraPrewarmBroadcast(payload)) {
+        prewarmCamera(payload.data)
+        return
+      }
 
       if (
         payload?.action === appWideActions.showSlideOverlay ||

@@ -144,6 +144,7 @@ import TemplatesIcon from "~/components/svgs/TemplatesIcon.vue"
 import RecentClockIcon from "~/components/svgs/RecentClockIcon.vue"
 import TimeIcon from "~/components/svgs/TimeIcon.vue"
 import InterludeIcon from "~/components/svgs/InterludeIcon.vue"
+import CameraIcon from "~/components/svgs/CameraIcon.vue"
 import { isSongPending } from "~/composables/useSongs"
 
 const props = defineProps<{
@@ -181,6 +182,7 @@ const actionIconComponentMap: Record<string, Component> = {
   "new-countdown": CountdownIcon,
   "new-time-slide": TimeIcon,
   "new-interlude": InterludeIcon,
+  "new-camera": CameraIcon,
   "new-presentation": PptIcon,
   "new-presentation-from-pdf": PdfIcon,
   "open-schedule-modal": SchedulesIcon,

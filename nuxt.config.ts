@@ -446,6 +446,8 @@ export default defineNuxtConfig({
         'bx:time',
         'bx:trash',
         'bx:user-plus',
+        'bx:video',
+        'bx:video-off',
         'bx:wifi-off',
         'bx:x',
         // Boxicons Solid (bxs)
