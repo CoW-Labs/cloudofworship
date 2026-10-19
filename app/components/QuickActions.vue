@@ -320,6 +320,13 @@
       @close="page = ''"
     />
 
+    <!-- CAMERA SECTION-->
+    <AddCamera
+      v-else-if="page === 'camera'"
+      class="fade-in-right h-full min-h-0 overflow-auto"
+      @close="page = ''"
+    />
+
     <!-- IMPORT SLIDES (PRESENTATION) SECTION-->
     <AddPresentation
       v-else-if="page === 'presentation'"
@@ -1208,6 +1215,11 @@ onEmitter(appWideActions.newStageCountdown, (data) => {
 // to the schedule (PreviewContent creates the slide).
 onEmitter(appWideActions.newInterlude, (data) => {
   if (!data) page.value = "interlude"
+})
+
+// Same rule as the interlude: no payload opens the camera panel.
+onEmitter(appWideActions.newCamera, (data) => {
+  if (!data) page.value = "camera"
 })
 
 // A payload means a deck is being imported, not that the panel should open.

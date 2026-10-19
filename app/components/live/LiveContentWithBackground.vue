@@ -24,6 +24,12 @@
       />
     </div>
 
+    <!-- CAMERA: thumbnails never open the camera -->
+    <CameraPlaceholder
+      v-if="slide?.type === slideTypes.camera"
+      :subtitle="(slide?.data as CameraSlideData)?.deviceLabel"
+    />
+
     <!-- EXTERNAL VIDEO PLACEHOLDER -->
     <div
       v-if="
@@ -66,7 +72,9 @@
       :slide="slide"
       :padding="{ top: 0, right: 0, bottom: 0, left: 0 }"
       :style="
-        slide?.type === slideTypes.media || slide?.type === slideTypes.presentation
+        slide?.type === slideTypes.media ||
+        slide?.type === slideTypes.presentation ||
+        slide?.type === slideTypes.camera
           ? ''
           : `backdrop-filter: blur(${slideStyles.blur}px) brightness(${slideStyles.brightness}%);`
       "
@@ -75,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Slide, SlideStyle } from "~/types"
+import type { CameraSlideData, Slide, SlideStyle } from "~/types"
 const appMounted = ref<boolean>(false)
 const foregroundContentVisible = ref<boolean>(true)
 

@@ -23,6 +23,37 @@
            playback survive slide changes (seek/play/pause/mute watchers depend
            on stable refs, and re-mounting a video would replay/flash it). -->
       <div class="absolute inset-0" style="z-index: 1">
+        <!-- CAMERA FEED -->
+        <!-- Follows `displayedSlide` so the camera stays up until the next
+             slide is ready (its background image preloaded) and then
+             crossfades with it, instead of cutting to black first. This layer
+             sits outside the crossfading face, so it is still one stream per
+             slide, not one per face. Only the projector (`capture`) and the
+             operator's preview open the camera; every other screen, including
+             the public livestream page that also renders full screen, gets a
+             placeholder. -->
+        <Transition :name="transitionName">
+          <div
+            v-if="displayedSlide?.type === slideTypes.camera"
+            :key="displayedSlide.id"
+            class="absolute inset-0"
+          >
+            <CameraFeed
+              v-if="opensCamera"
+              :data="displayedSlide.data as CameraSlideData"
+              :quality="cameraMode === 'capture' ? 'output' : 'preview'"
+            />
+            <CameraPlaceholder
+              v-else
+              :title="
+                fullScreen || cameraMode === 'preview' ? 'Camera is live' : 'Camera'
+              "
+              :subtitle="(displayedSlide.data as CameraSlideData)?.deviceLabel"
+              :size="fullScreen ? 'lg' : 'sm'"
+            />
+          </div>
+        </Transition>
+
         <!-- AUDIO BACKGROUND -->
         <audio
           v-if="fullScreen"
@@ -167,7 +198,9 @@
           style="z-index: 2"
         >
           <!-- BACKGROUND (image/solid/gradient, blurred for text slides) -->
+          <!-- A camera slide paints none, so the feed below shows through. -->
           <div
+            v-if="displayedSlide?.type !== slideTypes.camera"
             class="absolute inset-0 bg-no-repeat"
             :class="{
               'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
@@ -325,6 +358,9 @@
               :slide="slide"
               :slide-label="false"
               :slide-styles="slideStyles"
+              :camera-mode="
+                cameraMode === 'placeholder' ? 'placeholder' : 'preview'
+              "
             />
           </UCard>
         </UModal>
@@ -340,7 +376,13 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
-import type { ExtendedFileT, Slide, SlideStyle, ExternalVideo } from "~/types"
+import type {
+  CameraSlideData,
+  ExtendedFileT,
+  Slide,
+  SlideStyle,
+  ExternalVideo,
+} from "~/types"
 import {
   exitFullscreenSafely,
   requestFullscreenSafely,
@@ -348,6 +390,7 @@ import {
   safePlayMedia,
   safePostMessage,
 } from "~/utils/browserSafety"
+import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
 import {
   INTERLUDE_EXIT_MS,
   interludeExitKey,
@@ -366,15 +409,27 @@ const route = useRoute()
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["activate-fullscreen"])
 
-const props = defineProps<{
-  slide?: Slide | null
-  contentVisible: Boolean
-  fullScreen: Boolean
-  slideStyles: SlideStyle
-  audioMuted?: Boolean
-  slideLabel?: Boolean
-  fullScreenHeight?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    slide?: Slide | null
+    contentVisible: Boolean
+    fullScreen: Boolean
+    slideStyles: SlideStyle
+    audioMuted?: Boolean
+    slideLabel?: Boolean
+    fullScreenHeight?: string
+    /**
+     * Whether a camera slide opens the camera here. Explicit rather than read
+     * off `fullScreen`, because the public livestream page renders full screen
+     * too and must never turn on a viewer's camera.
+     * - `capture`: the /live projector window, at full resolution.
+     * - `preview`: the operator's Live Output thumbnail, at low resolution.
+     * - `placeholder`: everything else; draws a static card.
+     */
+    cameraMode?: "capture" | "preview" | "placeholder"
+  }>(),
+  { cameraMode: "placeholder" }
+)
 
 // Settings saved under an older, wider range can still hold an interval well
 // past what the settings slider allows, which would stall the projection on a
@@ -524,6 +579,13 @@ const displayedSlide = ref<Slide | null | undefined>(props.slide)
 provide(
   interludeModeKey,
   computed(() => (props.fullScreen ? "live" : "preview"))
+)
+// The operator's preview is skipped where only one page may hold the camera
+// (Safari's engine, the macOS app): opening it there would mute the projector.
+const opensCamera = computed(
+  () =>
+    props.cameraMode === "capture" ||
+    (props.cameraMode === "preview" && !cameraCaptureIsExclusive())
 )
 const labelLayerClass = computed(() =>
   displayedSlide.value?.type === slideTypes.interlude ? "z-20" : "z-10"

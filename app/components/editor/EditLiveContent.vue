@@ -228,6 +228,8 @@
                         ? scripturePopoverSize.width
                         : tab.key === 'interlude'
                         ? interludePopoverSize.width
+                        : tab.key === 'camera'
+                        ? cameraPopoverSize.width
                         : layoutPopoverSize.width
                     "
                     :max-height="
@@ -237,6 +239,8 @@
                         ? scripturePopoverSize.height
                         : tab.key === 'interlude'
                         ? interludePopoverSize.height
+                        : tab.key === 'camera'
+                        ? cameraPopoverSize.height
                         : layoutPopoverSize.height
                     "
                     :boundary-overflow="120"
@@ -287,6 +291,15 @@
                           @resize="interludePopoverSize = $event"
                           @close="activePanel = null"
                         />
+                        <div
+                          v-else-if="tab.key === 'camera'"
+                          class="h-full overflow-y-auto p-3"
+                        >
+                          <CameraForm
+                            :model-value="cameraInput"
+                            @update:model-value="patchCamera"
+                          />
+                        </div>
                         <BibleThemeSelection
                           v-else
                           :value="slide?.slideStyle?.theme"
@@ -357,7 +370,10 @@
       />
       <SlideContentToolbar
         v-else-if="
-          slide && !isEmptySongSetlist && slide.type !== slideTypes.interlude
+          slide &&
+          !isEmptySongSetlist &&
+          slide.type !== slideTypes.interlude &&
+          slide.type !== slideTypes.camera
         "
         :slide="slide"
         @update-style="onUpdateSlideStyle($event, false)"
@@ -432,6 +448,18 @@
             </template>
             {{ isTeamsPlan ? "Manage Storage" : "Upgrade to Teams" }}
           </CowButton>
+        </div>
+        <!-- CAMERA — the editor never opens the camera; the operator sees
+             the real feed in Live Output once the slide is live. -->
+        <div
+          v-else-if="slide.type === slideTypes.camera"
+          class="h-[100%] relative rounded-b-2xl overflow-hidden"
+        >
+          <CameraPlaceholder
+            size="lg"
+            :title="slide.name || 'Camera'"
+            subtitle="The feed shows on the Live Output"
+          />
         </div>
         <div
           v-else
@@ -541,7 +569,9 @@ import {
   defaultInterludeData,
 } from "~/utils/interlude/slide"
 import { interludeModeKey } from "~/utils/interlude/context"
+import { defaultCameraData, withCameraData, type CameraSettings } from "~/utils/camera"
 import type {
+  CameraSlideData,
   ExtendedFileT,
   ExternalVideo,
   InterludeSlideData,
@@ -716,7 +746,7 @@ const backgroundImageLoading = ref<boolean>(false)
 const backgroundVideoLoading = ref<boolean>(false)
 
 // Only one editor action popover can be open at a time.
-type PanelKey = "scripture" | "background" | "layout" | "interlude"
+type PanelKey = "scripture" | "background" | "layout" | "interlude" | "camera"
 type PopoverSize = { width: number; height: number }
 const activePanel = ref<PanelKey | null>(null)
 const getInitialBackgroundPopoverSize = (): PopoverSize =>
@@ -730,6 +760,7 @@ const backgroundPopoverSize = ref<PopoverSize>(
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const interludePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+const cameraPopoverSize = ref<PopoverSize>({ width: 380, height: 420 })
 
 // Interlude slides hold a still frame in the editor so the operator's eye
 // stays on the schedule and live output. They animate, at the preview rate,
@@ -765,6 +796,19 @@ const patchInterlude = (patch: Partial<InterludeSlideData>) => {
     })
   )
 }
+const cameraInput = computed<CameraSettings>(() => {
+  const { id: _id, ...input } = (props.slide?.data || {}) as CameraSlideData
+  return { ...defaultCameraData(), ...input }
+})
+
+// Saved through the usual slide-update path, so a projector showing this
+// slide picks up a new device and re-opens the camera on its own.
+const patchCamera = (next: CameraSettings) => {
+  if (props.slide?.type !== slideTypes.camera) return
+  const id = (props.slide.data as CameraSlideData | undefined)?.id
+  emit("slide-update", withCameraData(props.slide, { ...next, id: id || useID() }))
+}
+
 const onSelectInterludeVariant = (variant: string) =>
   patchInterlude({ variant })
 const onSaveInterludeTexts = (
@@ -781,10 +825,12 @@ const visibleTabs = computed(() => {
   const isAudio = (props.slide?.data as ExtendedFileT)?.type?.includes("audio")
   const isBible = props.slide?.type === slideTypes.bible
   const isInterlude = props.slide?.type === slideTypes.interlude
-  // An interlude paints its own background.
+  const isCamera = props.slide?.type === slideTypes.camera
+  // An interlude paints its own background, and a camera feed covers it.
   const showBackground =
     props.slide?.type !== slideTypes.presentation &&
     !isInterlude &&
+    !isCamera &&
     (props.slide?.type !== slideTypes.media || isAudio)
   const tabs: { key: PanelKey; label: string; hint: string }[] = []
   if (isInterlude)
@@ -792,6 +838,12 @@ const visibleTabs = computed(() => {
       key: "interlude",
       label: "Interlude",
       hint: "Change the animation, heading and sub text",
+    })
+  if (isCamera)
+    tabs.push({
+      key: "camera",
+      label: "Camera",
+      hint: "Choose the camera and how it fills the screen",
     })
   if (isBible)
     tabs.push({

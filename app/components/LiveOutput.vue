@@ -21,6 +21,7 @@
           :full-screen="false"
           :content-visible="true"
           :slide-styles="currentState.settings.slideStyles"
+          :camera-mode="mobile ? 'placeholder' : 'preview'"
           class="lg-preview w-full h-full"
         />
       </div>
