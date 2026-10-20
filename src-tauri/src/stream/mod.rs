@@ -4,14 +4,18 @@
 //! orchestration — process lifecycle, encoder settings, RTMP push, status — and
 //! is identical on every OS. The only per-OS piece is native capture *input*.
 //!
-//! Sources: `"screen"` captures the display (+ audio) natively; `"browser"` takes
-//! a recorded feed pushed from the webview (the live window's actual content,
-//! captured and recorded in the page, see `stream_feed`); any other value
+//! Sources: `"native-window"` captures the live output window itself by its
+//! window handle (macOS and Windows, see `window_capture`) plus an audio input —
+//! no picker;
+//! `"screen"` captures the display (+ audio) natively; `"browser"` takes a
+//! recorded feed pushed from the webview (the live window's content captured
+//! through the OS picker, see `stream_feed`), the fallback where native window
+//! capture isn't available; any other value
 //! streams a synthetic test pattern (color bars + tone), kept for quick
 //! debugging of the FFmpeg spawn → encode → RTMP → YouTube → stop pipeline.
 //!
-//! The browser feed runs as two FFmpeg processes, the same split the streaming
-//! server uses: an *encoder* reads the page's recording on stdin and emits
+//! Window and browser feeds run as two FFmpeg processes, the same split the streaming
+//! server uses: an *encoder* reads frames or the page's recording on stdin and emits
 //! MPEG-TS, and a *pusher* copies that TS to YouTube. Only the pusher talks to
 //! the network, so a dropped connection restarts just the pusher while the
 //! encoder (and the page's recording) keeps running — TS can be joined mid-way.
@@ -26,6 +30,9 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Emitter, State};
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+mod window_capture;
 
 /// YouTube's primary RTMP ingest. The stream key is appended as the last path
 /// segment, e.g. rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx-xxxx-xxxx.
@@ -110,8 +117,8 @@ struct Session {
   stopping: Arc<AtomicBool>,
   /// The reconnect supervisor thread.
   supervisor: Option<JoinHandle<()>>,
-  /// Browser-feed sessions only: the encoder process and its stdin, which
-  /// `stream_feed` writes the page's recording into.
+  /// Window/browser-feed sessions only: the encoder process and its stdin,
+  /// which the window capture or `stream_feed` writes into.
   feed: Option<Feed>,
 }
 
@@ -119,6 +126,8 @@ struct Feed {
   encoder: Child,
   input: Arc<Mutex<Option<ChildStdin>>>,
   forwarder: Option<JoinHandle<()>>,
+  /// Stops whatever produces the input (the native window capture).
+  stop_source: Option<Box<dyn FnOnce() + Send>>,
 }
 
 /// How a (re)spawn of the supervised process is done. Shared so reconnects run
@@ -166,7 +175,11 @@ impl StreamBridge {
     let url = format!("{YOUTUBE_INGEST_BASE}/{key}");
 
     if source == "browser" {
-      return self.start_browser_feed_locked(url);
+      self.start_feed_locked(url, browser_encoder_args())?;
+      return Ok(self.set_status(StreamPhase::Live, None));
+    }
+    if source == "native-window" {
+      return self.start_window_feed_locked(url, audio_device.as_deref());
     }
 
     // Resolve the whole FFmpeg command once (before tearing down any running
@@ -212,13 +225,79 @@ impl StreamBridge {
     Ok(self.set_status(StreamPhase::Live, None))
   }
 
-  /// Starts the encoder + pusher pair for a browser feed. The page then streams
-  /// its recording in via `feed`. Caller holds the operation lock.
-  fn start_browser_feed_locked(&self, url: String) -> Result<StreamStatus, String> {
+  /// Captures the live window natively and feeds its frames, with the chosen
+  /// audio input, through the encoder + pusher pair. Caller holds the
+  /// operation lock.
+  #[cfg(any(target_os = "macos", target_os = "windows"))]
+  fn start_window_feed_locked(
+    &self,
+    url: String,
+    audio: Option<&str>,
+  ) -> Result<StreamStatus, String> {
+    // Find the window and audio device before touching a running stream.
+    let target = window_capture::locate(&self.inner.app)?;
+    let audio = resolve_audio_device(audio)?;
+    self.start_feed_locked(url, window_encoder_args(target.width, target.height, audio))?;
+
+    let (input, stopping) = {
+      let session = self.inner.session.lock().unwrap_or_else(|p| p.into_inner());
+      let session = session.as_ref().expect("start_feed_locked stores a session");
+      let feed = session.feed.as_ref().expect("start_feed_locked stores a feed");
+      (feed.input.clone(), session.stopping.clone())
+    };
+    let fail: window_capture::FailHandler = {
+      let bridge = self.clone();
+      Arc::new(move |message| {
+        if stopping.swap(true, Ordering::AcqRel) {
+          return;
+        }
+        // Tear the whole session down (encoder, pusher, capture) from a fresh
+        // thread — the caller may be the capture's own pacer, which stop joins.
+        let bridge = bridge.clone();
+        std::thread::spawn(move || {
+          let _op = bridge.inner.operation.lock().unwrap_or_else(|p| p.into_inner());
+          bridge.stop_locked();
+          bridge.set_status(StreamPhase::Error, Some(message));
+        });
+      })
+    };
+    let capture = match window_capture::start(target, input, fail) {
+      Ok(capture) => capture,
+      Err(error) => {
+        self.stop_locked();
+        return Err(error);
+      }
+    };
+    if let Some(feed) = self
+      .inner
+      .session
+      .lock()
+      .unwrap_or_else(|p| p.into_inner())
+      .as_mut()
+      .and_then(|s| s.feed.as_mut())
+    {
+      feed.stop_source = Some(Box::new(move || capture.stop()));
+    }
+    Ok(self.set_status(StreamPhase::Live, None))
+  }
+
+  #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+  fn start_window_feed_locked(
+    &self,
+    _url: String,
+    _audio: Option<&str>,
+  ) -> Result<StreamStatus, String> {
+    Err("Native live window capture isn't available on this OS yet.".into())
+  }
+
+  /// Starts the encoder + pusher pair; the caller then writes the encoder's
+  /// input (window frames or the page's recording). Caller holds the operation
+  /// lock.
+  fn start_feed_locked(&self, url: String, encoder_args: Vec<String>) -> Result<(), String> {
     self.stop_locked();
 
-    let mut encoder = Command::new(ffmpeg_path())
-      .args(browser_encoder_args())
+    let mut encoder = ffmpeg_command()
+      .args(encoder_args)
       .stdin(Stdio::piped())
       .stdout(Stdio::piped())
       .stderr(Stdio::inherit())
@@ -234,7 +313,7 @@ impl StreamBridge {
       let pusher_input = pusher_input.clone();
       let args = pusher_args(&url);
       Arc::new(move || {
-        let mut child = Command::new(ffmpeg_path())
+        let mut child = ffmpeg_command()
           .args(&args)
           .stdin(Stdio::piped())
           .stdout(Stdio::null())
@@ -298,10 +377,9 @@ impl StreamBridge {
         child,
         stopping,
         supervisor,
-        feed: Some(Feed { encoder, input, forwarder }),
+        feed: Some(Feed { encoder, input, forwarder, stop_source: None }),
       });
-
-    Ok(self.set_status(StreamPhase::Live, None))
+    Ok(())
   }
 
   /// Writes one chunk of the page's recording into the encoder. Chunks must
@@ -451,11 +529,14 @@ impl StreamBridge {
       let _ = supervisor.join();
     }
     if let Some(mut feed) = session.feed.take() {
-      // Closing stdin lets the encoder finish; kill in case it's wedged. Its
-      // stdout then hits EOF and the forwarder exits.
-      feed.input.lock().unwrap_or_else(|p| p.into_inner()).take();
+      // Kill the encoder first: that fails any write blocked on its stdin, so
+      // the capture can stop. Its stdout then hits EOF and the forwarder exits.
       let _ = feed.encoder.kill();
       let _ = feed.encoder.wait();
+      if let Some(stop_source) = feed.stop_source.take() {
+        stop_source();
+      }
+      feed.input.lock().unwrap_or_else(|p| p.into_inner()).take();
       if let Some(forwarder) = feed.forwarder.take() {
         let _ = forwarder.join();
       }
@@ -468,7 +549,11 @@ impl StreamBridge {
 /// falling back to a bare PATH lookup. (M4 replaces this with a bundled
 /// FFmpeg sidecar so there's no dependency on the operator's machine.)
 fn ffmpeg_path() -> String {
-  for candidate in ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"] {
+  #[cfg(not(target_os = "windows"))]
+  let candidates = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"];
+  #[cfg(target_os = "windows")]
+  let candidates = [r"C:\ffmpeg\bin\ffmpeg.exe", r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"];
+  for candidate in candidates {
     if std::path::Path::new(candidate).exists() {
       return candidate.to_string();
     }
@@ -476,10 +561,23 @@ fn ffmpeg_path() -> String {
   "ffmpeg".to_string()
 }
 
+/// An FFmpeg command. On Windows it runs without flashing a console window.
+fn ffmpeg_command() -> Command {
+  #[allow(unused_mut)]
+  let mut command = Command::new(ffmpeg_path());
+  #[cfg(target_os = "windows")]
+  {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+  }
+  command
+}
+
 /// Spawns FFmpeg with output silenced except stderr, which is inherited to the
 /// dev console (`-loglevel warning` keeps the key-bearing URL banner out of it).
 fn spawn_ffmpeg(args: &[String]) -> std::io::Result<Child> {
-  Command::new(ffmpeg_path())
+  ffmpeg_command()
     .args(args)
     .stdin(Stdio::null())
     .stdout(Stdio::null())
@@ -523,11 +621,7 @@ fn screen_input_args(audio: Option<&str>) -> Result<Vec<String>, String> {
      System Settings → Privacy & Security → Screen Recording, then try again."
       .to_string()
   })?;
-  let audio_index = match audio {
-    Some("none") | Some("") => None,
-    Some(index) => Some(index.to_string()),
-    None => audio_devices.first().map(|d| d.index.clone()),
-  };
+  let audio_index = pick_audio(audio, &audio_devices);
   // avfoundation device spec is "video:audio"; drop the ":audio" half for
   // video-only.
   let device = match audio_index {
@@ -542,6 +636,81 @@ fn screen_input_args(audio: Option<&str>) -> Result<Vec<String>, String> {
   Ok(args)
 }
 
+/// The operator's audio choice as a device id (avfoundation index on macOS,
+/// DirectShow name on Windows): `Some("none")`/`Some("")` → no audio;
+/// `Some(id)` → that device; `None` → the first available input.
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+fn pick_audio(audio: Option<&str>, devices: &[AudioDevice]) -> Option<String> {
+  match audio {
+    Some("none") | Some("") => None,
+    Some(index) => Some(index.to_string()),
+    None => devices.first().map(|d| d.index.clone()),
+  }
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn resolve_audio_device(audio: Option<&str>) -> Result<Option<String>, String> {
+  if matches!(audio, Some("none") | Some("")) {
+    return Ok(None);
+  }
+  Ok(pick_audio(audio, &list_audio_devices()?))
+}
+
+/// The audio inputs the operator can choose from.
+fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
+  #[cfg(target_os = "macos")]
+  {
+    avfoundation_devices().map(|(_screen, audio)| audio)
+  }
+  #[cfg(target_os = "windows")]
+  {
+    dshow_audio_devices()
+  }
+  #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+  {
+    Ok(Vec::new())
+  }
+}
+
+/// FFmpeg input arguments for one audio device.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn audio_input_args(device: &str) -> Vec<String> {
+  #[cfg(target_os = "macos")]
+  let input = ["-f".to_string(), "avfoundation".to_string(), "-i".to_string(), format!(":{device}")];
+  #[cfg(target_os = "windows")]
+  let input = ["-f".to_string(), "dshow".to_string(), "-i".to_string(), format!("audio={device}")];
+  let mut args = ["-use_wallclock_as_timestamps", "1", "-thread_queue_size", "1024"]
+    .map(String::from)
+    .to_vec();
+  args.extend(input);
+  args
+}
+
+/// Enumerates DirectShow audio inputs. FFmpeg prints them to stderr, one per
+/// line as `"Device name" (audio)`; the name doubles as the device id.
+#[cfg(target_os = "windows")]
+fn dshow_audio_devices() -> Result<Vec<AudioDevice>, String> {
+  let output = ffmpeg_command()
+    .args(["-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"])
+    .output()
+    .map_err(|e| format!("Could not list audio devices via FFmpeg ({e})."))?;
+  Ok(parse_dshow_audio(&String::from_utf8_lossy(&output.stderr)))
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn parse_dshow_audio(text: &str) -> Vec<AudioDevice> {
+  text
+    .lines()
+    .filter(|line| line.trim_end().ends_with("(audio)"))
+    .filter_map(|line| {
+      let start = line.find('"')? + 1;
+      let end = start + line[start..].find('"')?;
+      let name = line[start..end].to_string();
+      Some(AudioDevice { index: name.clone(), name })
+    })
+    .collect()
+}
+
 #[cfg(not(target_os = "macos"))]
 fn screen_input_args(_audio: Option<&str>) -> Result<Vec<String>, String> {
   Err("Screen capture isn't wired up for this OS yet (that's milestone M3).".into())
@@ -552,7 +721,7 @@ fn screen_input_args(_audio: Option<&str>) -> Result<Vec<String>, String> {
 /// design, so we ignore the status and parse the output.
 #[cfg(target_os = "macos")]
 fn avfoundation_devices() -> Result<(Option<String>, Vec<AudioDevice>), String> {
-  let output = Command::new(ffmpeg_path())
+  let output = ffmpeg_command()
     .args(["-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""])
     .output()
     .map_err(|e| format!("Could not list capture devices via FFmpeg ({e})."))?;
@@ -642,6 +811,41 @@ fn browser_encoder_args() -> Vec<String> {
   args
 }
 
+/// Encoder for the native window feed: raw BGRA frames from the pacer on stdin
+/// plus, optionally, an audio input. Both inputs are stamped with the wall
+/// clock as they arrive so they line up despite separate clocks.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn window_encoder_args(width: u32, height: u32, audio: Option<String>) -> Vec<String> {
+  let mut args = [
+    "-hide_banner", "-loglevel", "warning",
+    "-use_wallclock_as_timestamps", "1", "-thread_queue_size", "64",
+    "-f", "rawvideo", "-pix_fmt", "bgra",
+  ]
+  .map(String::from)
+  .to_vec();
+  args.extend([
+    "-s".to_string(),
+    format!("{width}x{height}"),
+    "-framerate".to_string(),
+    "30".to_string(),
+    "-i".to_string(),
+    "pipe:0".to_string(),
+  ]);
+  if let Some(device) = &audio {
+    args.extend(audio_input_args(device));
+  }
+  args.extend(["-map", "0:v:0"].map(String::from));
+  if audio.is_some() {
+    args.extend(["-map", "1:a:0", "-af", "aresample=async=1000"].map(String::from));
+  }
+  args.extend(encode_args(true));
+  args.extend(
+    ["-bsf:v", "dump_extra=freq=keyframe", "-flush_packets", "1", "-f", "mpegts", "pipe:1"]
+      .map(String::from),
+  );
+  args
+}
+
 /// Pusher: copies the encoder's MPEG-TS to YouTube without re-encoding. This is
 /// the only process that touches the network, so it's the one the supervisor
 /// restarts on a connection drop.
@@ -691,19 +895,10 @@ pub async fn stream_start(
 }
 
 /// Lists the audio input devices the operator can pick from for the broadcast
-/// (e.g. a USB mixer/soundboard vs the built-in mic). Empty off macOS for now.
+/// (e.g. a USB mixer/soundboard vs the built-in mic).
 #[tauri::command]
 pub async fn stream_audio_devices() -> Result<Vec<AudioDevice>, String> {
-  tauri::async_runtime::spawn_blocking(|| {
-    #[cfg(target_os = "macos")]
-    {
-      avfoundation_devices().map(|(_screen, audio)| audio)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-      Ok(Vec::new())
-    }
-  })
+  tauri::async_runtime::spawn_blocking(list_audio_devices)
   .await
   .map_err(|e| format!("Listing audio devices failed: {e}"))?
 }
@@ -719,4 +914,20 @@ pub async fn stream_stop(state: State<'_, StreamBridge>) -> Result<StreamStatus,
 #[tauri::command]
 pub fn stream_status(state: State<'_, StreamBridge>) -> StreamStatus {
   state.status()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::parse_dshow_audio;
+
+  #[test]
+  fn parses_dshow_audio_devices() {
+    let listing = r#"[dshow @ 000001] "Integrated Camera" (video)
+[dshow @ 000001]   Alternative name "@device_pnp_\\?\usb"
+[dshow @ 000001] "Microphone (Realtek(R) Audio)" (audio)
+[dshow @ 000001] "Line In (Behringer UMC204HD)" (audio)
+"#;
+    let names: Vec<_> = parse_dshow_audio(listing).into_iter().map(|d| d.name).collect();
+    assert_eq!(names, ["Microphone (Realtek(R) Audio)", "Line In (Behringer UMC204HD)"]);
+  }
 }
