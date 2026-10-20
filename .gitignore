@@ -36,3 +36,6 @@ bible-json-converter.ts
 .vercel
 .env*
 bench-runs/
+
+# FFmpeg sidecar, fetched/built by scripts/fetch-ffmpeg.mjs
+src-tauri/binaries/ffmpeg-*
