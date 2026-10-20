@@ -87,6 +87,21 @@
               class="w-3.5 h-3.5"
             />
             End Live Session
+            <span
+              v-if="youtubeIsStreaming"
+              class="inline-flex items-center gap-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-white"
+              :title="
+                youtubeStatus.phase === 'reconnecting'
+                  ? 'YouTube connection lost — reconnecting'
+                  : 'Streaming to YouTube'
+              "
+            >
+              <span
+                class="h-1.5 w-1.5 rounded-full bg-white"
+                :class="youtubeStatus.phase === 'reconnecting' ? 'animate-pulse' : ''"
+              />
+              YouTube
+            </span>
           </CowButton>
 
           <button
@@ -246,16 +261,55 @@ const canOpenStageDisplay = computed(() =>
   hasAccessToFeature(appWideActions.openStageDisplay)
 )
 
+const { isTauri } = useTauri()
+const {
+  status: youtubeStatus,
+  isStreaming: youtubeIsStreaming,
+  streamOnGoLive: youtubeStreamOnGoLive,
+  hasStreamKey: youtubeHasKey,
+} = useYoutubeStream()
+
+// One-off "go live and stream": opens the live window and starts YouTube.
+// Without a key yet, take the operator to where they add one.
+const goLiveOnYoutube = () => {
+  if (props.isLiveWindowActive) return
+  secondaryActionPopoverOpen.value = false
+  if (!youtubeHasKey.value) {
+    useGlobalEmit(appWideActions.openSettings, "Display Settings")
+    return
+  }
+  useGlobalEmit(appWideActions.goLive, { youtube: true })
+}
+
 const goLiveMenuItems = computed(() => [
   {
     label: "Open live window",
-    desc: "Opens another browser window with the live display",
+    desc:
+      youtubeStreamOnGoLive.value && youtubeHasKey.value
+        ? "Opens the live display and streams it to YouTube"
+        : "Opens another browser window with the live display",
     icon: "",
     svgIcon: "GoLiveIcon",
     disabled: props.isLiveWindowActive,
     locked: false,
     onClick: () => useGlobalEmit(appWideActions.goLive),
   },
+  // Desktop only, and redundant once "Open live window" already streams.
+  ...(isTauri && !(youtubeStreamOnGoLive.value && youtubeHasKey.value)
+    ? [
+        {
+          label: "Go live on YouTube",
+          desc: youtubeHasKey.value
+            ? "Opens the live display and streams it to YouTube"
+            : "Add your stream key in Display Settings first",
+          icon: "i-ph-broadcast",
+          svgIcon: undefined,
+          disabled: props.isLiveWindowActive,
+          locked: false,
+          onClick: goLiveOnYoutube,
+        },
+      ]
+    : []),
   {
     label: "Open stage display",
     desc: "Opens the confidence monitor for musicians and speakers",

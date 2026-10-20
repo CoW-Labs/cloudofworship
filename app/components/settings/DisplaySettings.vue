@@ -243,7 +243,7 @@
     <SettingsGroup
       v-if="isTauri"
       title="Stream to YouTube (beta)"
-      note="Broadcast your live output (slides/lyrics) and audio straight to YouTube Live. When you go live, choose the “Cloud of Worship - Live Output” window in the picker."
+      note="Broadcast your live output (slides/lyrics) and audio straight to YouTube Live. Going live streams the live output window automatically."
     >
       <SettingsRow
         label="YouTube stream key"
@@ -346,7 +346,7 @@
             size="2xs"
             class="!px-3.5 !py-1.5 text-xs"
             :loading="youtubeBusy"
-            @click="stopYoutube"
+            @click="endYoutube"
           >
             Stop streaming
           </CowButton>
@@ -482,7 +482,7 @@ const {
   audioDevice: youtubeAudioDevice,
   initialize: initializeYoutube,
   start: startYoutube,
-  stop: stopYoutube,
+  end: endYoutube,
 } = useYoutubeStream()
 
 onMounted(() => {
