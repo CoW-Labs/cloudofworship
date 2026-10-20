@@ -4,11 +4,12 @@
 // module-shared reactive state (so the panel and any indicator stay in sync),
 // desktop-only, dynamic Tauri imports so it's a no-op in the plain web build.
 //
-// The "live-window" source captures the live output window's real content in
-// the page (getDisplayMedia — the OS window picker), records it together with
-// the chosen audio input (MediaRecorder) and streams the recording to Rust,
-// where FFmpeg encodes and pushes it to YouTube. Unlike a screen-region crop it
-// follows the window, not a spot on the screen, and works on every OS.
+// The "live-window" source captures the live output window's real content.
+// On macOS Rust captures it natively by window ID (no picker). Where that isn't
+// available yet, the page captures it instead (getDisplayMedia — the OS window
+// picker), records it with the chosen audio input (MediaRecorder) and streams
+// the recording to Rust. Either way FFmpeg encodes and pushes it to YouTube,
+// and the capture follows the window, not a spot on the screen.
 
 export type StreamPhase = "idle" | "live" | "reconnecting" | "error"
 export type StreamSource = "live-window" | "screen" | "test"
@@ -34,6 +35,25 @@ const messageOf = (error: unknown): string =>
 
 // One shared status listener across all callers (the event is app-wide).
 let sharedStatusListener: Promise<void> | null = null
+
+// The operator's stream setup survives restarts. It stays on this device only
+// (the settings panel says so) — never synced to the account.
+const SETTINGS_KEY = "cow-youtube-stream-settings"
+interface SavedSettings {
+  streamKey?: string
+  streamOnGoLive?: boolean
+  audioDevice?: string | null
+  source?: StreamSource
+}
+let settingsHydrated = false
+
+const readSavedSettings = (): SavedSettings => {
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") as SavedSettings
+  } catch {
+    return {}
+  }
+}
 
 // The running in-page capture (one per app), kept outside reactive state.
 interface Capture {
@@ -86,12 +106,39 @@ export const useYoutubeStream = () => {
   // click; the UI then shows a "choose the live window" button.
   const needsPicker = useState<boolean>("yt-stream-needs-picker", () => false)
 
+  if (isDesktop && !settingsHydrated) {
+    settingsHydrated = true
+    const saved = readSavedSettings()
+    if (typeof saved.streamKey === "string") streamKey.value = saved.streamKey
+    if (typeof saved.streamOnGoLive === "boolean") streamOnGoLive.value = saved.streamOnGoLive
+    if (saved.audioDevice !== undefined) audioDevice.value = saved.audioDevice
+    if (saved.source === "live-window" || saved.source === "test") source.value = saved.source
+    watch([streamKey, streamOnGoLive, audioDevice, source], () => {
+      try {
+        localStorage.setItem(
+          SETTINGS_KEY,
+          JSON.stringify({
+            streamKey: streamKey.value,
+            streamOnGoLive: streamOnGoLive.value,
+            audioDevice: audioDevice.value,
+            source: source.value,
+          } satisfies SavedSettings)
+        )
+      } catch {
+        // Storage can be unavailable; the settings then last for this session.
+      }
+    })
+  }
+
+  const hasStreamKey = computed(() => !!streamKey.value.trim())
+
   // Reconnecting still counts as an active session (show Stop, not Go live).
   const isStreaming = computed(
     () => status.value.phase === "live" || status.value.phase === "reconnecting"
   )
 
-  const invokeTauri = async <T>(command: string, args?: Record<string, unknown>) => {
+  // Raw bytes (a Uint8Array) are sent as a binary IPC body, not JSON.
+  const invokeTauri = async <T>(command: string, args?: Record<string, unknown> | Uint8Array) => {
     const { invoke } = await import("@tauri-apps/api/core")
     return invoke<T>(command, args)
   }
@@ -241,14 +288,29 @@ export const useYoutubeStream = () => {
         })
         .catch((error) => console.warn("YouTube feed chunk failed:", error))
     }
-    // The operator clicked "Stop sharing" in the macOS menu bar.
+    // The operator clicked "Stop sharing" in the OS: that ends the broadcast.
     video.getVideoTracks()[0]?.addEventListener("ended", () => {
-      if (capture?.recorder === recorder) void stop()
+      if (capture?.recorder === recorder) end()
     })
 
     capture = { recorder, tracks }
     recorder.start(250)
     return started
+  }
+
+  // Native capture by window ID; falls back to the in-page picker capture on
+  // systems where the backend doesn't support it yet.
+  const startNativeWindowCapture = async () => {
+    try {
+      return await invokeTauri<StreamStatus>("stream_start", {
+        streamKey: streamKey.value,
+        source: "native-window",
+        audioDevice: audioDevice.value,
+      })
+    } catch (error) {
+      if (!messageOf(error).includes("isn't available on this OS")) throw error
+      return startLiveWindowCapture()
+    }
   }
 
   const start = async () => {
@@ -257,7 +319,7 @@ export const useYoutubeStream = () => {
     try {
       stopCapture()
       if (source.value === "live-window") {
-        status.value = await startLiveWindowCapture()
+        status.value = await startNativeWindowCapture()
       } else {
         status.value = await invokeTauri<StreamStatus>("stream_start", {
           streamKey: streamKey.value,
@@ -289,11 +351,20 @@ export const useYoutubeStream = () => {
     return status.value
   }
 
+  // Ending the broadcast is one action for the operator: it closes the live
+  // window too, and closing the live window stops the stream (app layout).
+  // A test-pattern run has no window to close, so it just stops.
+  const end = () => {
+    if (source.value === "test") return void stop()
+    useGlobalEmit(appWideActions.closeLiveWindow)
+  }
+
   return {
     status: readonly(status),
     isInvoking: readonly(isInvoking),
     isStreaming,
     streamKey,
+    hasStreamKey,
     source,
     streamOnGoLive,
     audioDevices,
@@ -303,5 +374,6 @@ export const useYoutubeStream = () => {
     initialize,
     start,
     stop,
+    end,
   }
 }

@@ -146,6 +146,11 @@ const { fetchPlans } = useSubscriptionPlans()
 const { fetchUserSettings } = useUserSettings()
 const ndiBroadcast = useNdiBroadcast()
 const youtubeStream = useYoutubeStream()
+// Track stream status app-wide (not only while Display Settings is open), so
+// the Go Live controls always show whether YouTube is live.
+onMounted(() => youtubeStream.initialize())
+// Set while a "Go live on YouTube" request is opening the live window.
+let pendingYoutubeGoLive = false
 let tauriLiveWindowCloseListenerBound = false
 
 const { currentState } = storeToRefs(appStore)
@@ -388,8 +393,11 @@ emitter.on("selected-schedule", (schedule: Schedule) => {
   })
 })
 
-emitter.on("go-live", async () => {
+emitter.on("go-live", async (options?: { youtube?: boolean }) => {
   const { isTauri } = useTauri()
+  // "Go live on YouTube" in the Go Live menu streams this once; the settings
+  // toggle streams on every Go Live.
+  pendingYoutubeGoLive = options?.youtube === true
 
   if (isTauri) {
     await openTauriLiveWindow()
@@ -398,8 +406,9 @@ emitter.on("go-live", async () => {
   }
 
   // One flow: once the live window is up, also start the YouTube stream if the
-  // operator opted in and entered a key.
+  // operator asked for it and entered a key.
   await startYoutubeForLiveWindow()
+  pendingYoutubeGoLive = false
 
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
@@ -1051,14 +1060,20 @@ async function startNdiForLiveWindow() {
 
 // Mirrors startNdiForLiveWindow: when the operator has turned on "stream to
 // YouTube when I go live" and entered a key, start the YouTube broadcast once
-// the live window is open (the operator picks that window in the OS picker).
+// the live window is open (it is captured by window ID; see useYoutubeStream).
+function youtubeWillStreamOnGoLive() {
+  return (
+    useTauri().isTauri &&
+    (pendingYoutubeGoLive || youtubeStream.streamOnGoLive.value) &&
+    youtubeStream.hasStreamKey.value
+  )
+}
+
 async function startYoutubeForLiveWindow() {
-  const { isTauri } = useTauri()
-  if (!isTauri) return
-  if (!youtubeStream.streamOnGoLive.value) return
-  if (!youtubeStream.streamKey.value.trim()) return
-  // Give the freshly opened live window a moment to appear in the picker.
-  await new Promise((resolve) => setTimeout(resolve, 1200))
+  if (!youtubeWillStreamOnGoLive()) return
+  // Let the freshly opened live window finish its full-screen transition
+  // before capturing it, so the capture picks up its final shape.
+  await new Promise((resolve) => setTimeout(resolve, 2000))
   const status = await youtubeStream.start()
   if (status.phase === "error" && youtubeStream.needsPicker.value) {
     offerYoutubeWindowPicker(status.error)
@@ -1177,6 +1192,9 @@ async function openTauriLiveWindow() {
 
     if (existingLiveWindow) {
       await trackTauriLiveWindow(existingLiveWindow)
+      if (youtubeWillStreamOnGoLive()) {
+        await existingLiveWindow.setFullscreen(true).catch(console.error)
+      }
       await existingLiveWindow.setFocus()
       await startNdiForLiveWindow()
       return
@@ -1253,9 +1271,11 @@ async function openTauriLiveWindow() {
       }
     }
 
-    // Get fullscreen setting from store
+    // Get fullscreen setting from store. Streaming to YouTube always opens it
+    // full screen (on its own desktop), so the broadcast fills the frame.
     const isFullscreen =
-      appStore.currentState.settings.liveWindowFullscreen ?? true
+      (appStore.currentState.settings.liveWindowFullscreen ?? true) ||
+      youtubeWillStreamOnGoLive()
 
     // Window options are in logical units while monitors report physical
     // pixels, so a Retina/scaled projector needs the scale factor divided out —

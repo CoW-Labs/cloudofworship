@@ -70,6 +70,21 @@
               class="w-3.5 h-3.5"
             />
             End Live Session
+            <span
+              v-if="youtubeIsStreaming"
+              class="inline-flex items-center gap-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-white"
+              :title="
+                youtubeStatus.phase === 'reconnecting'
+                  ? 'YouTube connection lost — reconnecting'
+                  : 'Streaming to YouTube'
+              "
+            >
+              <span
+                class="h-1.5 w-1.5 rounded-full bg-white"
+                :class="youtubeStatus.phase === 'reconnecting' ? 'animate-pulse' : ''"
+              />
+              YouTube
+            </span>
           </CowButton>
 
           <button
@@ -141,10 +156,37 @@
                   <div class="pl-2">
                     <div class="text-sm">Open Live Window</div>
                     <div class="text-xs opacity-80">
-                      Opens another browser window with live display
+                      {{
+                        youtubeStreamOnGoLive && youtubeHasKey
+                          ? "Opens the live display and streams it to YouTube"
+                          : "Opens another browser window with live display"
+                      }}
                     </div>
                   </div>
                 </UButton>
+                <template v-if="isTauri && !(youtubeStreamOnGoLive && youtubeHasKey)">
+                  <div class="line border-b dark:border-[#202838]"></div>
+                  <UButton
+                    class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-[#222938]"
+                    :class="isLiveWindowActive ? 'opacity-50 cursor-not-allowed' : ''"
+                    color="black"
+                    variant="ghost"
+                    icon="i-bx-broadcast"
+                    size="sm"
+                    @click="goLiveOnYoutube"
+                  >
+                    <div class="pl-2">
+                      <div class="text-sm">Go live on YouTube</div>
+                      <div class="text-xs opacity-80">
+                        {{
+                          youtubeHasKey
+                            ? "Opens the live display and streams it to YouTube"
+                            : "Add your stream key in Display Settings first"
+                        }}
+                      </div>
+                    </div>
+                  </UButton>
+                </template>
                 <div class="line border-b dark:border-[#202838]"></div>
                 <UButton
                   class="text-left p-3 px-4 hover:bg-primary-100 dark:hover:bg-[#222938]"
@@ -200,7 +242,7 @@ import { appWideActions } from "~/utils/constants"
 import GoLiveIcon from "~/components/svgs/GoLiveIcon.vue"
 import ArrowRightIcon from "~/components/svgs/ArrowRightIcon.vue"
 
-defineProps({
+const props = defineProps({
   heading: String,
   subHeading: String,
   slotCtnStyles: String,
@@ -229,6 +271,26 @@ const secondaryActionPopoverOpen = ref(false)
 // disagree about the URL or the Teams gate.
 const { canUseLivestreamLink, isClipboardCopying, copyLivestreamURL } =
   useLivestreamLink()
+
+const { isTauri } = useTauri()
+const {
+  status: youtubeStatus,
+  isStreaming: youtubeIsStreaming,
+  streamOnGoLive: youtubeStreamOnGoLive,
+  hasStreamKey: youtubeHasKey,
+} = useYoutubeStream()
+
+// One-off "go live and stream": opens the live window and starts YouTube.
+// Without a key yet, take the operator to where they add one.
+const goLiveOnYoutube = () => {
+  if (props.isLiveWindowActive) return
+  secondaryActionPopoverOpen.value = false
+  if (!youtubeHasKey.value) {
+    useGlobalEmit(appWideActions.openSettings, "Display Settings")
+    return
+  }
+  useGlobalEmit(appWideActions.goLive, { youtube: true })
+}
 type CowButtonVariant = "primary" | "secondary" | "dark" | "danger"
 
 const getCowButtonVariant = (variant?: string): CowButtonVariant => {
