@@ -35,3 +35,6 @@ large_assets
 bible-json-converter.ts
 .vercel
 .env*
+
+# FFmpeg sidecar, fetched/built by scripts/fetch-ffmpeg.mjs
+src-tauri/binaries/ffmpeg-*

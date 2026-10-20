@@ -23,7 +23,7 @@
 use std::io::{Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -544,11 +544,19 @@ impl StreamBridge {
   }
 }
 
-/// Locates the FFmpeg binary. In `tauri dev` the app inherits the terminal PATH,
-/// but a bundled `.app` may not, so check the common install locations before
-/// falling back to a bare PATH lookup. (M4 replaces this with a bundled
-/// FFmpeg sidecar so there's no dependency on the operator's machine.)
+/// Locates the FFmpeg binary. The app bundles an LGPL FFmpeg as a sidecar
+/// (`bundle.externalBin`, fetched by scripts/fetch-ffmpeg.mjs), which Tauri
+/// places next to the app's executable — in dev builds too. If it's missing
+/// (e.g. a plain `cargo run`), fall back to a system install.
 fn ffmpeg_path() -> String {
+  let sidecar = if cfg!(target_os = "windows") { "ffmpeg.exe" } else { "ffmpeg" };
+  if let Some(bundled) = std::env::current_exe()
+    .ok()
+    .and_then(|exe| exe.parent().map(|dir| dir.join(sidecar)))
+    .filter(|path| path.is_file())
+  {
+    return bundled.to_string_lossy().into_owned();
+  }
   #[cfg(not(target_os = "windows"))]
   let candidates = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"];
   #[cfg(target_os = "windows")]
@@ -772,20 +780,67 @@ fn parse_device_line(line: &str) -> Option<(String, String)> {
 fn encode_args(constant_fps: bool) -> Vec<String> {
   let filter = if constant_fps { "fps=30,scale=-2:720" } else { "scale=-2:720" };
   let mut args = vec!["-vf".to_string(), filter.to_string()];
-  if cfg!(target_os = "macos") {
-    args.extend(["-c:v", "h264_videotoolbox"].map(String::from));
-  } else {
-    args.extend(["-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency"].map(String::from));
-  }
+  args.extend(video_encoder_args().iter().cloned());
   args.extend(
     [
       "-b:v", "2500k", "-maxrate", "2500k", "-bufsize", "5000k",
-      "-pix_fmt", "yuv420p", "-g", "60",
+      "-g", "60",
       "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
     ]
     .map(String::from),
   );
   args
+}
+
+/// H.264 encoders in order of preference, with their settings. The bundled
+/// FFmpeg is an LGPL build without libx264, so on Windows the first one that
+/// works on this machine wins: the GPU's encoder (NVIDIA, Intel, AMD), then
+/// Windows' own Media Foundation encoder, which every Windows 10+ PC has.
+/// libx264 stays last for a system FFmpeg that happens to include it. macOS
+/// always has VideoToolbox.
+#[cfg(not(target_os = "macos"))]
+const VIDEO_ENCODERS: &[&[&str]] = &[
+  &["-c:v", "h264_nvenc", "-preset", "p4", "-tune", "ll", "-rc", "cbr", "-pix_fmt", "yuv420p"],
+  &["-c:v", "h264_qsv", "-preset", "veryfast", "-pix_fmt", "nv12"],
+  &["-c:v", "h264_amf", "-usage", "lowlatency", "-rc", "cbr", "-pix_fmt", "nv12"],
+  &["-c:v", "h264_mf", "-rate_control", "cbr", "-scenario", "live_streaming", "-pix_fmt", "nv12"],
+  &["-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-pix_fmt", "yuv420p"],
+];
+
+/// The video encoder arguments for this machine, chosen once per run.
+fn video_encoder_args() -> &'static [String] {
+  static CHOSEN: OnceLock<Vec<String>> = OnceLock::new();
+  CHOSEN.get_or_init(|| {
+    #[cfg(target_os = "macos")]
+    {
+      ["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p"].map(String::from).to_vec()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+      let chosen = VIDEO_ENCODERS
+        .iter()
+        .find(|candidate| encoder_works(candidate))
+        .unwrap_or(&VIDEO_ENCODERS[VIDEO_ENCODERS.len() - 2]);
+      log::info!("stream video encoder: {}", chosen[1]);
+      chosen.iter().map(|arg| arg.to_string()).collect()
+    }
+  })
+}
+
+/// Encodes a few blank frames to see whether an encoder is usable here (the
+/// GPU encoders exist in every build but need the matching hardware).
+#[cfg(not(target_os = "macos"))]
+fn encoder_works(args: &[&str]) -> bool {
+  ffmpeg_command()
+    .args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=black:s=640x360:r=30"])
+    .args(["-frames:v", "10"])
+    .args(args)
+    .args(["-f", "null", "-"])
+    .stdin(Stdio::null())
+    .stdout(Stdio::null())
+    .stderr(Stdio::null())
+    .status()
+    .is_ok_and(|status| status.success())
 }
 
 /// Encoder for the browser feed: reads the page's MediaRecorder output (WebM or

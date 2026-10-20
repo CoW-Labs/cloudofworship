@@ -1,0 +1,31 @@
+FFmpeg
+======
+
+Cloud of Worship's desktop app includes FFmpeg (https://ffmpeg.org), which it
+uses to encode and send the live output to streaming services such as YouTube.
+FFmpeg runs as a separate program next to the app; Cloud of Worship does not
+modify it.
+
+FFmpeg is free software licensed under the GNU Lesser General Public License
+(LGPL) version 2.1 or later: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+The bundled build is LGPL-only: it is built without --enable-gpl or
+--enable-nonfree.
+
+Source code
+-----------
+macOS: FFmpeg 8.1.2, built from https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz
+with:
+  --disable-autodetect --disable-doc --disable-debug --disable-ffplay
+  --disable-ffprobe --enable-videotoolbox --enable-audiotoolbox
+  --enable-avfoundation --enable-coreimage --enable-securetransport
+  --enable-zlib --enable-pthreads
+
+Windows: the LGPL static build of the FFmpeg 8.1 release line from
+https://github.com/BtbN/FFmpeg-Builds (source and build scripts in that
+repository).
+
+The exact build steps are in scripts/fetch-ffmpeg.mjs in the Cloud of Worship
+source. To use a different FFmpeg build, replace the "ffmpeg" (macOS) or
+"ffmpeg.exe" (Windows) program next to the Cloud of Worship executable.
+
+"FFmpeg" is a trademark of Fabrice Bellard, originator of the FFmpeg project.

@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run generate"
+    "beforeDevCommand": "node scripts/fetch-ffmpeg.mjs && npm run dev",
+    "beforeBuildCommand": "node scripts/fetch-ffmpeg.mjs && npm run generate"
   },
   "app": {
     "windows": [
@@ -102,6 +102,10 @@
     "active": true,
     "targets": ["nsis", "dmg", "deb", "appimage"],
     "createUpdaterArtifacts": true,
+    "externalBin": ["binaries/ffmpeg"],
+    "resources": {
+      "licenses/ffmpeg.txt": "licenses/ffmpeg.txt"
+    },
     "macOS": {
       "entitlements": "entitlements.plist",
       "minimumSystemVersion": "13.0"
