@@ -16,62 +16,26 @@
           v-for="theme in bibleThemes"
           :key="theme.id"
           type="button"
-          class="theme-option min-w-0 rounded-xl bg-white/70 p-2 text-left ring-2 transition-colors dark:bg-[#222838]"
+          class="theme-option min-w-0 w-full rounded-xl p-2 flex flex-col gap-1.5 text-left transition-shadow bg-white dark:bg-[#131a27]"
           :class="
             selectedTheme === theme.id
-              ? 'bg-white ring-primary-300 dark:bg-[#2B3140] dark:ring-[#E8D1F8]'
-              : 'ring-transparent hover:bg-white dark:hover:bg-[#2B3140]'
+              ? 'ring-2 ring-primary-500'
+              : 'ring-1 ring-gray-200 dark:ring-white/10 hover:ring-gray-300 dark:hover:ring-white/20'
           "
           :aria-pressed="selectedTheme === theme.id"
           @click="selectTheme(theme.id)"
         >
-          <span class="block text-[12px] font-normal leading-4">
-            {{ theme.name }}
+          <BibleLayoutThumb :layout="theme.layout" />
+          <span class="min-w-0 px-0.5">
+            <span class="block truncate text-xs font-medium leading-4">
+              {{ theme.name }}
+            </span>
+            <span
+              class="block truncate text-[10px] leading-4 text-gray-500 dark:text-[#9BA3B2]"
+            >
+              {{ theme.description }}
+            </span>
           </span>
-          <p
-            class="truncate text-[10px] leading-4 text-gray-500 dark:text-[#9BA3B2]"
-          >
-            {{ theme.description }}
-          </p>
-
-          <div
-            class="theme-preview relative mt-1.5 h-[90px] w-full overflow-hidden rounded-lg bg-[#e4e8f0] dark:bg-[#171C29]"
-            :class="theme.preview"
-          >
-            <div
-              class="absolute inset-x-[9%] flex flex-col gap-2"
-              :class="theme.id === 'label-top' ? 'top-[39%]' : 'top-[12%]'"
-            >
-              <span
-                v-for="line in theme.id === 'label-background' ? 2 : 3"
-                :key="line"
-                class="h-2.5 rounded-full border border-black/[0.06] bg-[#d3d9e4] dark:border-white/[0.07] dark:bg-[#30394b]"
-              ></span>
-            </div>
-
-            <span
-              v-if="theme.id === 'label-top'"
-              class="absolute left-1/2 top-[12%] h-2.5 w-[43%] -translate-x-1/2 rounded-full border border-black/[0.06] bg-[#d3d9e4] dark:border-white/[0.07] dark:bg-[#30394b]"
-            ></span>
-
-            <span
-              v-else-if="theme.id === 'default' || theme.id === 'label-large'"
-              class="absolute bottom-[12%] left-1/2 -translate-x-1/2 rounded-full border border-black/[0.06] bg-[#d3d9e4] dark:border-white/[0.07] dark:bg-[#30394b]"
-              :class="
-                theme.id === 'label-large' ? 'h-5 w-[43%]' : 'h-2.5 w-[43%]'
-              "
-            ></span>
-
-            <div
-              v-else
-              class="absolute left-1/2 flex h-8 w-1/2 -translate-x-1/2 items-center justify-center rounded-full bg-[#cbd2df] dark:bg-[#0D0F1A]"
-              :class="theme.id === 'overlay' ? 'bottom-0' : 'bottom-[12%]'"
-            >
-              <span
-                class="h-2.5 w-[87%] rounded-full border border-black/[0.06] bg-[#d3d9e4] dark:border-white/[0.07] dark:bg-[#30394b]"
-              ></span>
-            </div>
-          </div>
         </button>
       </div>
     </div>
@@ -95,7 +59,8 @@ const emit = defineEmits<{
   (e: "resize", size: { width: number; height: number }): void
 }>()
 
-const panelSize = { width: 753, height: 330 }
+// Three 16:9 tiles a row, two rows.
+const panelSize = { width: 753, height: 395 }
 
 const { bibleThemes } = useTheme()
 
