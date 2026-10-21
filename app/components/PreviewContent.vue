@@ -63,6 +63,9 @@
         <div v-else-if="slides?.length > 0" class="virtual-slides-grid">
           <div :style="{ height: `${virtualTopSpacer}px` }" />
           <div ref="slidesGrid" class="grid slides-grid gap-3">
+            <!-- A slide pair is one card, keyed by its first member and
+                 showing the member this window is editing. Its later members
+                 are left out of `gridSlides`. -->
             <SlideCard
               v-for="{ slide, index } in virtualSlides"
               :key="slide.id"
@@ -70,36 +73,43 @@
                 slide.id,
                 slide.updatedAt,
                 slide.name,
-                activeSlide?.id === slide?.id,
+                isGridCardSelected(slide),
                 bulkSelectSlides,
                 bulkSelectedSlides.includes(slide?.id),
                 getSlideEditor(slide.id)?.userId,
                 currentState.activeOverlaySlide?.id === slide.id,
+                appStore.pairForSlide(slide.id),
+                gridCardSlide(slide).id,
+                gridCardSlide(slide).updatedAt,
               ]"
-              :slide="slide"
+              :slide="gridCardSlide(slide)"
+              :pair="appStore.pairForSlide(slide.id)"
               :live="false"
               :selectable="bulkSelectSlides"
               :id="slide?.id?.replace(/\d+/g, '')"
               :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
-              :editing-by="getSlideEditor(slide.id)"
+              :editing-by="getSlideEditor(gridCardSlide(slide).id)"
               grid-type
-              :selected="activeSlide?.id === slide?.id"
+              :selected="isGridCardSelected(slide)"
               @click="
                 bulkSelectSlides
                   ? null
-                  : makeSlideActive(slide, {
+                  : makeSlideActive(gridCardSlide(slide), {
                       goLive: false,
                       newlyCreated: false,
                     })
               "
-              @take-live="bulkSelectSlides ? null : handleTakeLiveAction(slide)"
+              @take-live="
+                bulkSelectSlides ? null : handleTakeLiveAction(gridCardSlide(slide))
+              "
+              @pair-drop="onGridPairDrop(slide, $event)"
               @duplicate="duplicatePreviewSlide"
               @duplicate-as-overlay="duplicatePreviewSlideAsOverlay"
               @show-overlay="showSlideOverlay"
               @clear-overlay="clearSlideOverlay"
               @delete="deleteSlide"
-              @save-slide="saveSlide(slide)"
-              @save-as-template="openSaveTemplateModal(slide)"
+              @save-slide="saveSlide(gridCardSlide(slide))"
+              @save-as-template="openSaveTemplateModal(gridCardSlide(slide))"
               @bulk-selected="addToSelectedSlides(slide?.id, $event)"
             />
           </div>
@@ -153,6 +163,14 @@
       v-model="showSaveTemplateModal"
       :slide="slideToSaveAsTemplate"
     />
+
+    <SlidePairPicker
+      :model-value="!!pairPicker"
+      :camera-id="pairPicker?.cameraId ?? null"
+      :pair-id="pairPicker?.pairId ?? null"
+      @update:model-value="(open: boolean) => { if (!open) pairPicker = null }"
+      @pick="onPairPicked"
+    />
   </div>
 </template>
 
@@ -198,6 +216,21 @@ import type { CameraSettings } from "~/utils/camera"
 import { postCameraPrewarm } from "~/composables/useCameraStream"
 import { isPdfPresentationFile } from "~/utils/presentationFile"
 import { appWideActions, MAX_PDF_FILE_SIZE } from "~/utils/constants"
+import {
+  canBePairTarget,
+  foldPairs,
+  isCameraSlide,
+  pairHasCamera,
+  pairRejection,
+} from "~/utils/slidePairs"
+import {
+  dropFromLivePair,
+  editingMemberOf,
+  holdMemberOffScreen,
+  releaseMemberOffScreen,
+  setEditingMember,
+  useSlidePairSync,
+} from "~/composables/useSlidePairs"
 import {
   getAPIErrorMessage,
   getAPIErrorStatus,
@@ -256,6 +289,17 @@ const {
   batchUpdateSlides,
 } = useSlides()
 const { hasRemoteTarget } = useLiveOutputControl()
+const {
+  createPair,
+  deletePair,
+  replaceMember,
+  keepPairTogether,
+  fetchSchedulePairs,
+  loadCachedPairs,
+  republishLivePair,
+} = useSlidePairs()
+// Pairs made offline go up as soon as the connection is back.
+useSlidePairSync()
 
 // Derived from the store rather than mirrored into a local ref. A ref captures
 // the array reference at setup time, and every store action that touches slides
@@ -873,6 +917,77 @@ const resolveScheduleMedia = async (scheduleId: string) => {
   }
 }
 
+// The bytes a slide cannot be shown without: a media file, or the current
+// presentation page. Missing inherited backgrounds never block a slide.
+const requiredMediaFor = (slide: Slide) => {
+  if (slide.type === slideTypes.media && !isExternalVideoSlide(slide)) {
+    return {
+      key: slide.id,
+      label:
+        (slide.data as ExtendedFileT)?.type === "video"
+          ? "Video"
+          : (slide.data as ExtendedFileT)?.type === "audio"
+          ? "Audio"
+          : "Image",
+      remoteUrl: firstRemoteMediaUrl(
+        (slide.data as ExtendedFileT)?.url,
+        slide.background,
+        slide.mediaCloudSync?.[slide.id]?.remoteUrl
+      ),
+    }
+  }
+  if (slide.type === slideTypes.presentation) {
+    const page = slide.presentationObjects?.[slide.presentationPageIndex ?? 0]
+    if (!page) return null
+    const key = `${slide.id}-page-${page.page}`
+    return {
+      key,
+      label: "Image",
+      remoteUrl: firstRemoteMediaUrl(
+        page.imageUrl,
+        slide.mediaCloudSync?.[key]?.remoteUrl
+      ),
+    }
+  }
+  return null
+}
+
+/**
+ * Why a slide cannot go on screen yet, as toast copy, or null when it can.
+ * Session URLs cannot cross into the live window, so its media needs either a
+ * durable local copy or a remote fallback.
+ */
+const missingMediaCopy = async (slide: Slide) => {
+  const requiredMedia = requiredMediaFor(slide)
+  if (!requiredMedia) return null
+  const hasLocalCopy = await projectionMediaStorage.getPlaybackUrl(
+    requiredMedia.key
+  )
+  const hasRemoteFallback = /^https?:\/\//.test(requiredMedia.remoteUrl || "")
+  if (hasLocalCopy || hasRemoteFallback) return null
+  const transfer =
+    transferFor(requiredMedia.key) ||
+    (slide.type === slideTypes.presentation ? transferFor(slide.id) : null)
+  return transfer?.status === "pending"
+    ? {
+        title: `${requiredMedia.label} is still being saved`,
+        description: "Wait for local storage to finish before taking it live.",
+      }
+    : transfer?.status === "failed"
+    ? {
+        title: `${requiredMedia.label} is not saved locally`,
+        description: "Retry or remove this media before taking it live.",
+      }
+    : unavailableMediaCopy(
+        slide.mediaCloudSync?.[requiredMedia.key],
+        requiredMedia.label
+      )
+}
+
+// How long a pair waits for its other slide's media before going live without
+// it. The slide that was taken live is never held back by its partner.
+const PARTNER_MEDIA_WAIT_MS = 2000
+
 const handleTakeLiveAction = async (slide: Slide) => {
   // When this device is driving another device's screen, that device projects
   // from its own copy of the media, so neither the download below nor the "not
@@ -888,87 +1003,70 @@ const handleTakeLiveAction = async (slide: Slide) => {
 
   // Resolving before broadcast keeps projection local-first: a slide that
   // arrived from a teammate still holds remote URLs until its bytes are pulled
-  // down here. Missing inherited backgrounds remain non-blocking; primary
-  // media is checked separately below so an unusable media slide cannot blank
-  // the live output.
-  if (bearsResolvableMedia(slide)) {
-    await prepareSlideMediaForProjection(slide, { allowDownload: true })
-    appStore.updateSlideInActiveSlides(slide)
+  // down here. A pair goes on screen whole, so its other member is prepared
+  // alongside, in parallel (a camera needs nothing).
+  const prepare = async (member: Slide) => {
+    await prepareSlideMediaForProjection(member, { allowDownload: true })
+    appStore.updateSlideInActiveSlides(member)
+  }
+  const pair = appStore.pairForSlide(slide.id)
+  if (pair) releaseMemberOffScreen(pair.id)
+  const partners = (pair?.slideIds ?? [])
+    .filter((memberId) => memberId !== slide.id)
+    .map((memberId) => appStore.activeSlidesById.get(memberId))
+    .filter((member): member is Slide => !!member)
+  const partnerPrep = partners.map((member) => ({
+    member,
+    done: bearsResolvableMedia(member)
+      ? prepare(member).then(
+          () => true,
+          () => false
+        )
+      : Promise.resolve(true),
+  }))
+  const startedAt = Date.now()
+
+  if (bearsResolvableMedia(slide)) await prepare(slide)
+
+  const mainProblem = await missingMediaCopy(slide)
+  if (mainProblem) {
+    toast.add({
+      title: mainProblem.title,
+      description: mainProblem.description,
+      icon: "i-bx-error",
+      color: "red",
+    })
+    return
   }
 
-  // Missing inherited backgrounds must not stop text-based slides from going
-  // live, but a media slide or the current presentation page has no usable
-  // output without its primary bytes. Session URLs cannot cross into the live
-  // window, so require either a durable local copy or a remote fallback.
-  const requiredMedia = (() => {
-    if (slide.type === slideTypes.media && !isExternalVideoSlide(slide)) {
-      return {
-        key: slide.id,
-        label:
-          (slide.data as ExtendedFileT)?.type === "video"
-            ? "Video"
-            : (slide.data as ExtendedFileT)?.type === "audio"
-            ? "Audio"
-            : "Image",
-        remoteUrl: firstRemoteMediaUrl(
-          (slide.data as ExtendedFileT)?.url,
-          slide.background,
-          slide.mediaCloudSync?.[slide.id]?.remoteUrl
-        ),
-      }
+  // A partner still downloading, or with nothing to show, waits off the screen
+  // and joins the pair once its media lands.
+  let heldPartner: { member: Slide; done: Promise<boolean> } | null = null
+  for (const prep of partnerPrep) {
+    const remaining = Math.max(0, PARTNER_MEDIA_WAIT_MS - (Date.now() - startedAt))
+    const ready = await Promise.race([
+      prep.done,
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), remaining)),
+    ])
+    if (!ready || (await missingMediaCopy(prep.member))) {
+      heldPartner = prep
+      break
     }
-    if (slide.type === slideTypes.presentation) {
-      const page = slide.presentationObjects?.[slide.presentationPageIndex ?? 0]
-      if (!page) return null
-      const key = `${slide.id}-page-${page.page}`
-      return {
-        key,
-        label: "Image",
-        remoteUrl: firstRemoteMediaUrl(
-          page.imageUrl,
-          slide.mediaCloudSync?.[key]?.remoteUrl
-        ),
-      }
-    }
-    return null
-  })()
-
-  if (requiredMedia) {
-    const hasLocalCopy = await projectionMediaStorage.getPlaybackUrl(
-      requiredMedia.key
-    )
-    const hasRemoteFallback = /^https?:\/\//.test(requiredMedia.remoteUrl || "")
-    if (!hasLocalCopy && !hasRemoteFallback) {
-      const transfer =
-        transferFor(requiredMedia.key) ||
-        (slide.type === slideTypes.presentation
-          ? transferFor(slide.id)
-          : null)
-      const copy =
-        transfer?.status === "pending"
-          ? {
-              title: `${requiredMedia.label} is still being saved`,
-              description:
-                "Wait for local storage to finish before taking it live.",
-            }
-          : transfer?.status === "failed"
-          ? {
-              title: `${requiredMedia.label} is not saved locally`,
-              description:
-                "Retry or remove this media before taking it live.",
-            }
-          : unavailableMediaCopy(
-              slide.mediaCloudSync?.[requiredMedia.key],
-              requiredMedia.label
-            )
-      toast.add({
-        title: copy.title,
-        description: copy.description,
-        icon: "i-bx-error",
-        color: "red",
-      })
-      return
-    }
+  }
+  if (pair && heldPartner) {
+    holdMemberOffScreen(pair.id, heldPartner.member.id)
+    toast.add({
+      icon: "i-tabler-layout-columns",
+      title: `${heldPartner.member.name || "The other slide"} isn't on this computer yet`,
+      description: "It joins the pair on screen as soon as its media is saved here.",
+      color: "amber",
+    })
+    const { member, done } = heldPartner
+    void done.then(async (ok) => {
+      if (!ok || (await missingMediaCopy(member))) return
+      if (!releaseMemberOffScreen(pair.id)) return
+      republishLivePair(pair.id)
+    })
   }
 
   if (slide.slideMode === "overlay") {
@@ -1078,8 +1176,33 @@ const onSlidesGridScroll = () => {
   )
 }
 
+// The grid's cards: a slide pair folds into one card, at the place of its
+// member that comes first in the schedule.
+const gridSlides = computed<readonly Slide[]>(() =>
+  appStore.activeSchedulePairs.length
+    ? foldPairs(slides.value, appStore.pairForSlide)
+    : slides.value
+)
+
+// What a card shows and acts on: the slide itself, or the member of its pair
+// this window is editing.
+const gridCardSlide = (slide: Slide): Slide => {
+  const pair = appStore.pairForSlide(slide.id)
+  if (!pair) return slide
+  const memberId = editingMemberOf(pair)
+  if (memberId === slide.id) return slide
+  return appStore.activeSlidesById.get(memberId) || slide
+}
+
+const isGridCardSelected = (slide: Slide) => {
+  const selectedId = activeSlide.value?.id
+  if (!selectedId) return false
+  const pair = appStore.pairForSlide(slide.id)
+  return pair ? pair.slideIds.includes(selectedId) : selectedId === slide.id
+}
+
 const totalSlideRows = computed(() => {
-  return Math.ceil((slides.value?.length || 0) / slideGridColumns.value)
+  return Math.ceil((gridSlides.value?.length || 0) / slideGridColumns.value)
 })
 
 const virtualStartRow = computed(() => {
@@ -1103,11 +1226,11 @@ const virtualEndRow = computed(() => {
 const virtualSlides = computed(() => {
   const startIndex = virtualStartRow.value * slideGridColumns.value
   const endIndex = Math.min(
-    slides.value?.length || 0,
+    gridSlides.value?.length || 0,
     virtualEndRow.value * slideGridColumns.value
   )
 
-  return (slides.value || [])
+  return (gridSlides.value || [])
     .slice(startIndex, endIndex)
     .map((slide, offset) => ({
       slide,
@@ -1129,7 +1252,11 @@ const scrollToSlide = (slideId?: string) => {
   const scrollEl = slidesScroll.value
   if (!scrollEl || !slideId) return
 
-  const slideIndex = slides.value.findIndex((slide) => slide.id === slideId)
+  // A pair member scrolls to its pair's card.
+  const pairId = appStore.pairForSlide(slideId)?.id
+  const slideIndex = gridSlides.value.findIndex((slide) =>
+    pairId ? appStore.pairForSlide(slide.id)?.id === pairId : slide.id === slideId
+  )
   if (slideIndex < 0) return
 
   const row = Math.floor(slideIndex / slideGridColumns.value)
@@ -1498,6 +1625,162 @@ emitter.on(appWideActions.addSong, () => {
   if (props.mobile) mobileEditorOpen.value = false
 })
 
+// ── Slide pairs ─────────────────────────────────────────────────────────────
+// Every pair holds a camera. Dropping a slide on a camera slide, or picking one
+// from the camera's "Start a pair", pairs the two with the camera as the main
+// slide. The grid, the schedule list and the picker all send this.
+//
+// `pairId` is set when the drop landed on a pair's card, or the picker is
+// changing a pair's slide (`replaceId` is then the slide to take out).
+emitter.on(
+  appWideActions.pairSlides,
+  async (data: {
+    targetId?: string
+    sourceId: string
+    pairId?: string
+    replaceId?: string
+  }) => {
+    const source = data?.sourceId
+      ? appStore.activeSlidesById.get(data.sourceId)
+      : undefined
+
+    const existing = data?.pairId
+      ? appStore.slidePairsById.get(data.pairId)
+      : undefined
+    if (existing) {
+      const members = existing.slideIds.map((id) => appStore.activeSlidesById.get(id))
+      const cameras = members.filter(isCameraSlide)
+      // A pair with one camera: the camera stays and the other slide goes.
+      // Two cameras: ambiguous, so the picker asks which one.
+      const outgoing =
+        data.replaceId ||
+        (cameras.length === 1
+          ? members.find((member) => member && !isCameraSlide(member))?.id
+          : undefined)
+      if (!outgoing) {
+        toast.add({
+          title: "This pair has two cameras",
+          description: "Use Change paired slide in a camera's ⋯ menu.",
+          icon: "i-tabler-layout-columns",
+          color: "amber",
+        })
+        return
+      }
+      const staying = members.find((member) => member && member.id !== outgoing)
+      if (!source || existing.slideIds.includes(source.id)) return
+      const rejection =
+        source.slideMode === "overlay"
+          ? "Overlay slides cannot be paired."
+          : appStore.pairForSlide(source.id)
+          ? "That slide is already in a pair. Unpair it first."
+          : !pairHasCamera([staying, source])
+          ? "A slide pair needs a camera slide."
+          : null
+      if (rejection) {
+        toast.add({ title: rejection, icon: "i-tabler-layout-columns", color: "amber" })
+        return
+      }
+      const pair = await replaceMember(existing.id, outgoing, source.id)
+      if (!pair) return
+      keepPairTogether(pair, staying!.id)
+      setEditingMember(pair.id, source.id)
+      makeSlideActive(source, { goLive: false, newlyCreated: false })
+      toast.add({
+        icon: "i-tabler-layout-columns",
+        title: "Pair updated",
+        description: `${source.name || "The slide"} is paired with ${staying?.name || "the camera"} now.`,
+      })
+      return
+    }
+
+    const target = data?.targetId
+      ? appStore.activeSlidesById.get(data.targetId)
+      : undefined
+    if (target && source && !canBePairTarget(target)) {
+      toast.add({
+        title: "Drop onto a camera slide to pair",
+        description: "Every slide pair has a camera in it.",
+        icon: "i-tabler-layout-columns",
+        color: "amber",
+      })
+      return
+    }
+    const rejection = pairRejection(target, source, appStore.pairForSlide)
+    if (rejection) {
+      toast.add({
+        title: rejection,
+        icon: "i-tabler-layout-columns",
+        color: "amber",
+      })
+      return
+    }
+
+    const pair = await createPair([target!, source!])
+    if (!pair) return
+    keepPairTogether(pair, target!.id)
+    setEditingMember(pair.id, target!.id)
+    makeSlideActive(target!, { goLive: false, newlyCreated: false })
+    toast.add({
+      icon: "i-tabler-layout-columns",
+      title: "Slides paired",
+      description: "Take the pair live to show both at once.",
+    })
+  }
+)
+
+emitter.on(appWideActions.unpairSlides, (pairId: string) => {
+  if (pairId) void deletePair(pairId)
+})
+
+// Picking a member loads it in the editor with its own controls. It is this
+// window's choice only: what is on screen and what Up/Down drives stay put.
+emitter.on(
+  appWideActions.setPairActiveMember,
+  (data: { pairId: string; slideId: string }) => {
+    const member = data?.slideId
+      ? appStore.activeSlidesById.get(data.slideId)
+      : undefined
+    const pair = data?.pairId ? appStore.slidePairsById.get(data.pairId) : undefined
+    if (!member || !pair?.slideIds.includes(member.id)) return
+    setEditingMember(pair.id, member.id)
+    makeSlideActive(member, { goLive: false, newlyCreated: false })
+  }
+)
+
+// "Start a pair" and "Change paired slide" from a camera's ⋯ menu.
+const pairPicker = ref<{ cameraId: string; pairId?: string } | null>(null)
+emitter.on(
+  appWideActions.startSlidePair,
+  (data: { cameraId: string; pairId?: string }) => {
+    if (data?.cameraId) pairPicker.value = { cameraId: data.cameraId, pairId: data.pairId }
+  }
+)
+const onPairPicked = (sourceId: string) => {
+  const picker = pairPicker.value
+  pairPicker.value = null
+  if (!picker) return
+  const pair = picker.pairId ? appStore.slidePairsById.get(picker.pairId) : undefined
+  useGlobalEmit(
+    appWideActions.pairSlides,
+    pair
+      ? {
+          pairId: pair.id,
+          sourceId,
+          replaceId: pair.slideIds.find((id) => id !== picker.cameraId),
+        }
+      : { targetId: picker.cameraId, sourceId }
+  )
+}
+
+const onGridPairDrop = (target: Slide, sourceId: string) => {
+  // Dropped on a pair's card: the card stands for the pair.
+  const pair = appStore.pairForSlide(target.id)
+  useGlobalEmit(
+    appWideActions.pairSlides,
+    pair ? { pairId: pair.id, sourceId } : { targetId: target.id, sourceId }
+  )
+}
+
 emitter.on(
   appWideActions.addSongSlideToSetlist,
   async (data: { setlistSlide: Slide; songSlide: Slide }) => {
@@ -1840,6 +2123,12 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
     return
   }
 
+  // Pairs ride alongside the slides. They hold no slide content, so they need
+  // none of the pending-edit care below and are fetched straight away.
+  fetchSchedulePairs(scheduleId).catch((error) =>
+    console.warn("Unable to refresh slide pairs:", error)
+  )
+
   const requestGeneration = ++networkRefreshGeneration
   const requestEditGeneration = slideEditGeneration
 
@@ -2076,6 +2365,7 @@ const loadSelectedScheduleSlides = async (schedule: Schedule | null) => {
   // A schedule without updatedAt has not reached the server yet.
   if (!schedule.updatedAt) {
     isLoadingSlides.value = false
+    void loadCachedPairs(scheduleId)
     await createSchedule(schedule)
     return
   }
@@ -2083,6 +2373,8 @@ const loadSelectedScheduleSlides = async (schedule: Schedule | null) => {
   if (!online.value) {
     isLoadingSlides.value = false
     appStore.setSlidesLoading(false)
+    // The pairs this device last saw for this schedule.
+    void loadCachedPairs(scheduleId)
     return
   }
 
@@ -2334,8 +2626,12 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     stopCountdown()
   }
 
-  // Clear live projection if the deleted slide is currently live
-  if (
+  // Clear live projection if the deleted slide is currently live. A member of
+  // the live pair dissolves the pair instead, and the other member stays on
+  // screen alone, so deleting the words never takes the camera off.
+  if (dropFromLivePair(clientSlideId)) {
+    // Handled.
+  } else if (
     appStore.currentState.liveSlideId === clientSlideId ||
     appStore.currentState.liveSlideId === tempSlide._id
   ) {

@@ -23,6 +23,12 @@ import { postCrossWindowNotification } from "~/composables/useBroadcastPost"
  */
 export type CameraQuality = "output" | "preview"
 
+/**
+ * How big a feed is drawn. `inset` is a small card (a slide pair's picture in
+ * picture), which 720p covers; everything else wants the full 1080p.
+ */
+export type CameraResolution = "full" | "inset"
+
 export type CameraErrorState =
   | "denied"
   | "in-use"
@@ -51,6 +57,11 @@ export interface CameraHandle {
    * clicking through cameras must not leave each one running).
    */
   release: (options?: { immediate?: boolean }) => void
+  /**
+   * What this holder needs. The shared stream runs at the most any holder
+   * needs, changed in place (no reopen, no black frame on the projector).
+   */
+  setResolution: (resolution: CameraResolution) => void
 }
 
 export class CameraStreamError extends Error {
@@ -83,6 +94,11 @@ const CAPTURE_CONSTRAINTS: MediaTrackConstraints = {
   frameRate: { ideal: 30, max: 30 },
 }
 
+const RESOLUTION_SIZE: Record<CameraResolution, MediaTrackConstraints> = {
+  full: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+  inset: { width: { ideal: 1280 }, height: { ideal: 720 } },
+}
+
 interface CacheEntry {
   key: string
   deviceId: string
@@ -92,6 +108,29 @@ interface CacheEntry {
   refs: number
   stopTimer: ReturnType<typeof setTimeout> | null
   endedCallbacks: Set<() => void>
+  /** Each holder's need; the stream runs at the largest. */
+  needs: Map<symbol, CameraResolution>
+  resolution: CameraResolution
+}
+
+/** Runs the stream at the most any holder needs. Best effort. */
+const applyResolution = (entry: CacheEntry) => {
+  const wanted: CameraResolution = [...entry.needs.values()].some(
+    (need) => need === "full"
+  )
+    ? "full"
+    : entry.needs.size
+    ? "inset"
+    : entry.resolution
+  if (wanted === entry.resolution) return
+  entry.resolution = wanted
+  const track = entry.stream?.getVideoTracks()[0]
+  if (!track?.applyConstraints) return
+  track
+    .applyConstraints({ ...track.getConstraints(), ...RESOLUTION_SIZE[wanted] })
+    .catch(() => {
+      // A camera that cannot switch keeps the size it has.
+    })
 }
 
 const cache = new Map<string, CacheEntry>()
@@ -214,6 +253,8 @@ const adoptStream = (stream: MediaStream, keepMs: number) => {
     refs: 0,
     stopTimer: null,
     endedCallbacks: new Set(),
+    needs: new Map(),
+    resolution: "full",
   }
   cache.set(key, entry)
   watchEnded(entry, stream)
@@ -316,10 +357,21 @@ const openStream = async (deviceId: string) => {
   }
 }
 
-const acquire = async (data: CameraSettingsInput): Promise<CameraHandle> => {
+/**
+ * `assignedOnly` refuses a stand-in: the slide's own camera or nothing. The
+ * editor's preview uses it, so a teammate editing on their own computer never
+ * sees their webcam passed off as the church's camera.
+ */
+const acquire = async (
+  data: CameraSettingsInput,
+  { assignedOnly = false }: { assignedOnly?: boolean } = {}
+): Promise<CameraHandle> => {
   if (!mediaDevices()?.getUserMedia) throw new CameraStreamError("unsupported")
 
   const resolved = await resolveDevice(data)
+  if (assignedOnly && resolved.match === "fallback") {
+    throw new CameraStreamError("missing")
+  }
   const key = cacheKey(resolved.deviceId)
 
   let entry = cache.get(key)
@@ -345,6 +397,8 @@ const acquire = async (data: CameraSettingsInput): Promise<CameraHandle> => {
       refs: 0,
       stopTimer: null,
       endedCallbacks: new Set(),
+      needs: new Map(),
+      resolution: "full",
     }
     entry = created
     cache.set(key, created)
@@ -372,10 +426,14 @@ const acquire = async (data: CameraSettingsInput): Promise<CameraHandle> => {
 
   let released = false
   const callbacks = new Set<() => void>()
+  const holder = Symbol("camera-holder")
+  current.needs.set(holder, "full")
   const release = ({ immediate = false }: { immediate?: boolean } = {}) => {
     if (released) return
     released = true
     callbacks.forEach((callback) => current.endedCallbacks.delete(callback))
+    current.needs.delete(holder)
+    if (current.needs.size) applyResolution(current)
     if (cache.get(key) !== current) return
     current.refs = Math.max(0, current.refs - 1)
     if (current.refs > 0) return
@@ -409,6 +467,11 @@ const acquire = async (data: CameraSettingsInput): Promise<CameraHandle> => {
       current.endedCallbacks.add(callback)
     },
     release,
+    setResolution: (resolution) => {
+      if (released) return
+      current.needs.set(holder, resolution)
+      applyResolution(current)
+    },
   }
 }
 

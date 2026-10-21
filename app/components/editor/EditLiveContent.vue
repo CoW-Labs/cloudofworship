@@ -230,6 +230,10 @@
                         ? interludePopoverSize.width
                         : tab.key === 'camera'
                         ? cameraPopoverSize.width
+                        : tab.key === 'pair'
+                        ? pairPopoverSize.width
+                        : tab.key === 'pairBackground'
+                        ? pairBackgroundPopoverSize.width
                         : layoutPopoverSize.width
                     "
                     :max-height="
@@ -241,6 +245,10 @@
                         ? interludePopoverSize.height
                         : tab.key === 'camera'
                         ? cameraPopoverSize.height
+                        : tab.key === 'pair'
+                        ? pairPopoverSize.height
+                        : tab.key === 'pairBackground'
+                        ? pairBackgroundPopoverSize.height
                         : layoutPopoverSize.height
                     "
                     :boundary-overflow="120"
@@ -291,6 +299,26 @@
                           @resize="interludePopoverSize = $event"
                           @close="activePanel = null"
                         />
+                        <!-- The pair's own backdrop. Writes to the pair only;
+                             the Background tab still edits this slide's. -->
+                        <SlideBackgroundPanel
+                          v-else-if="tab.key === 'pairBackground' && slidePair"
+                          :slide="pairBackgroundSlide"
+                          @select="onSelectPairBackground"
+                          @upload-files="onPairBackgroundUpload"
+                          @resize="pairBackgroundPopoverSize = $event"
+                          @close="activePanel = null"
+                        />
+                        <div
+                          v-else-if="tab.key === 'pair' && slidePair"
+                          class="h-full overflow-y-auto p-3"
+                        >
+                          <div
+                            :ref="(el: any) => (pairPanelContent = el ?? null)"
+                          >
+                            <SlidePairPanel :pair-id="slidePair.id" />
+                          </div>
+                        </div>
                         <div
                           v-else-if="tab.key === 'camera'"
                           class="h-full overflow-y-auto p-3"
@@ -329,6 +357,8 @@
                 ? isActiveOverlay
                   ? 'Clear overlay'
                   : 'Show overlay'
+                : slidePair
+                ? 'Take the pair live'
                 : 'Take slide live'
             "
             :shortcut="shortcutIds.promoteActiveSlide"
@@ -450,16 +480,29 @@
             {{ isTeamsPlan ? "Manage Storage" : "Upgrade to Teams" }}
           </CowButton>
         </div>
-        <!-- CAMERA — the editor never opens the camera; the operator sees
-             the real feed in Live Output once the slide is live. -->
+        <!-- CAMERA — the slide's own camera only, never a stand-in. Paused
+             where one page holds the camera at a time while a camera is on
+             the projector: opening it here would black out the projector. -->
         <div
           v-else-if="slide.type === slideTypes.camera"
           class="h-[100%] relative rounded-b-2xl overflow-hidden"
         >
+          <CameraFeed
+            v-if="editorCameraData?.deviceId && !editorCameraPaused"
+            :data="editorCameraData"
+            quality="preview"
+            assigned-only
+            :release-immediately="cameraIsExclusive"
+          />
           <CameraPlaceholder
+            v-else
             size="lg"
             :title="slide.name || 'Camera'"
-            subtitle="The feed shows on the Live Output"
+            :subtitle="
+              editorCameraPaused
+                ? 'Preview paused while a camera is on the projector'
+                : 'No camera selected'
+            "
           />
         </div>
         <div
@@ -584,6 +627,9 @@ import type {
 } from "~/types"
 import { escapePriority } from "~/composables/useEscapeKey"
 import { songOnSlide } from "~/utils/songTranslation"
+import { pairBackgroundOf } from "~/utils/slidePairs"
+import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
+import useCameraOnAir from "~/composables/useCameraOnAir"
 import {
   computeNextVerseLabel,
   computePreviousVerseLabel,
@@ -747,7 +793,14 @@ const backgroundImageLoading = ref<boolean>(false)
 const backgroundVideoLoading = ref<boolean>(false)
 
 // Only one editor action popover can be open at a time.
-type PanelKey = "scripture" | "background" | "layout" | "interlude" | "camera"
+type PanelKey =
+  | "scripture"
+  | "background"
+  | "layout"
+  | "interlude"
+  | "camera"
+  | "pair"
+  | "pairBackground"
 type PopoverSize = { width: number; height: number }
 const activePanel = ref<PanelKey | null>(null)
 const getInitialBackgroundPopoverSize = (): PopoverSize =>
@@ -762,6 +815,73 @@ const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const interludePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const cameraPopoverSize = ref<PopoverSize>({ width: 380, height: 260 })
+const pairPopoverSize = ref<PopoverSize>({ width: 380, height: 360 })
+// Sized to its content, as the camera panel is.
+const pairPanelContent = ref<HTMLElement | null>(null)
+useResizeObserver(pairPanelContent, ([entry]) => {
+  const height = entry?.target.getBoundingClientRect().height
+  if (height) pairPopoverSize.value = { width: 380, height: Math.ceil(height) + 24 }
+})
+
+// The slide pair this slide is in. Its tab switches member, layout and sound;
+// everything else in the editor is this member's own.
+const slidePair = computed(() => appStore.pairForSlide(props.slide?.id))
+
+// ── Camera preview ──────────────────────────────────────────────────────────
+const cameraIsExclusive = cameraCaptureIsExclusive()
+const cameraOnAir = useCameraOnAir()
+const editorCameraData = computed(() =>
+  props.slide?.type === slideTypes.camera
+    ? (props.slide.data as CameraSlideData | undefined) ?? null
+    : null
+)
+const editorCameraPaused = computed(
+  () => cameraIsExclusive && cameraOnAir.value
+)
+
+// ── Pair background ─────────────────────────────────────────────────────────
+// SlideBackgroundPanel reads a slide, so it is handed a stand-in carrying the
+// pair's background. Choices go to the pair and never touch this slide.
+const { updatePair } = useSlidePairs()
+const pairBackgroundPopoverSize = ref<PopoverSize>({ width: 753, height: 314 })
+const pairBackgroundSlide = computed(
+  () =>
+    ({
+      id: `pair-background-${slidePair.value?.id}`,
+      type: slideTypes.text,
+      ...pairBackgroundOf(slidePair.value),
+    }) as unknown as Slide
+)
+const onSelectPairBackground = (
+  backgroundType: string,
+  data:
+    | string
+    | { image: string; key?: string }
+    | { video: string; key?: string }
+) => {
+  const pair = slidePair.value
+  if (!pair) return
+  const isImage = typeof data !== "string" && "image" in data
+  const isVideo = typeof data !== "string" && "video" in data
+  void updatePair(pair.id, {
+    background:
+      typeof data === "string" ? data : isImage ? data.image : data.video,
+    backgroundType,
+    backgroundImageKey: isImage ? data.key ?? null : null,
+    backgroundVideoKey: isVideo ? data.key ?? null : null,
+  })
+  usePosthogCapture("SLIDE_PAIR_BACKGROUND_CHANGED", { backgroundType })
+}
+// A new upload is saved against a slide (its local copy and cloud upload are
+// keyed to one), so it goes through a slide's Background tab first and is then
+// pickable here from the library.
+const onPairBackgroundUpload = () => {
+  useToast().add({
+    icon: "i-bx-info-circle",
+    title: "Add the file from a slide's Background tab first",
+    description: "Then pick it here from your images or videos.",
+  })
+}
 // The popover opens at the height it is given, so follow the camera form's
 // own height (the camera list arrives after it opens) plus the p-3 padding.
 const cameraPanelContent = ref<HTMLElement | null>(null)
@@ -841,6 +961,18 @@ const visibleTabs = computed(() => {
     !isCamera &&
     (props.slide?.type !== slideTypes.media || isAudio)
   const tabs: { key: PanelKey; label: string; hint: string }[] = []
+  if (slidePair.value) {
+    tabs.push({
+      key: "pair",
+      label: "Pair settings",
+      hint: "Switch slide and layout for this slide pair",
+    })
+    tabs.push({
+      key: "pairBackground",
+      label: "Pair background",
+      hint: "What background is underneath both slides",
+    })
+  }
   if (isInterlude)
     tabs.push({
       key: "interlude",

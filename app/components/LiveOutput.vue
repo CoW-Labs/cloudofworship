@@ -15,15 +15,30 @@
       class="min-h-0 overflow-hidden rounded-2xl bg-black shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
     >
       <div class="relative w-full h-full flex items-center justify-center">
-        <LiveProjectionOnly
-          slide-label
-          :slide="liveSlide"
-          :full-screen="false"
-          :content-visible="true"
-          :slide-styles="currentState.settings.slideStyles"
-          :camera-mode="mobile ? 'placeholder' : 'preview'"
-          class="lg-preview w-full h-full"
-        />
+        <Transition name="cow-pair">
+          <LivePairProjection
+            v-if="livePairSlides"
+            slide-label
+            audio-muted
+            :slides="livePairSlides"
+            :full-screen="false"
+            :slide-styles="currentState.settings.slideStyles"
+            :camera-mode="mobile ? 'placeholder' : 'preview'"
+            class="lg-preview w-full h-full"
+          />
+        </Transition>
+        <Transition name="cow-single">
+          <LiveProjectionOnly
+            v-if="!livePairSlides"
+            slide-label
+            :slide="liveSlide"
+            :full-screen="false"
+            :content-visible="true"
+            :slide-styles="currentState.settings.slideStyles"
+            :camera-mode="mobile ? 'placeholder' : 'preview'"
+            class="lg-preview w-full h-full"
+          />
+        </Transition>
       </div>
     </div>
 
@@ -338,7 +353,8 @@
           :delay="150"
           :delay-on-touch-only="true"
           :touch-start-threshold="5"
-          @end="draggingSlide = null"
+          :move="onScheduleSortMove"
+          @end="onScheduleDragEnd"
         >
           <!-- SLIDE CARD (DUPLICATED FROM THE SLIDECARD.VUE, TO MAKE DRAGGABLE WORK AS IT COULD NOT WORK IN COMPONENT) -->
           <template #item="{ element: slide, index }">
@@ -354,47 +370,67 @@
                   slide?.id,
                   slide?.updatedAt,
                   slide?.name,
-                  liveSlide?.id === slide?.id,
+                  isScheduleSlideLive(slide),
+                  scheduleRowSlide(slide)?.id,
+                  dropTargetId === slide?.id,
                   currentState.activeOverlaySlide?.id === slide?.id,
                   ctrlOrMetaActive,
                   openActionsSlideId === slide?.id,
                 ]"
                 :class="{
-                  'bg-red-100 dark:bg-red-900': liveSlide?.id === slide?.id,
+                  'ring-2 ring-primary-400': dropTargetId === slide?.id,
+                  'bg-red-100 dark:bg-red-900': isScheduleSlideLive(slide),
                   'bg-cyan-100 dark:bg-cyan-950':
                     currentState.activeOverlaySlide?.id === slide?.id,
                 }"
                 @click="handleScheduleSlideAction(slide)"
                 @dblclick="editSlide(slide)"
-                @dragstart="draggingSlide = slide"
-                @dragover.prevent="
-                  slide?.type === slideTypes.songSetlist &&
-                    draggingSlide?.type === slideTypes.song
-                "
-                @drop.stop.prevent="handleDropOnSetlist(slide)"
+                @dragstart="onScheduleDragStart(slide)"
+                @dragover="onScheduleRowDragOver($event, slide)"
+                @drop.stop.prevent="handleDropOnScheduleSlide(slide)"
               >
+                <!-- Held over the middle of a camera row: letting go pairs. -->
+                <div
+                  v-if="dropTargetId === slide?.id && draggingSlide?.type !== slideTypes.song"
+                  class="absolute inset-0 z-10 flex items-center justify-center gap-1.5 rounded-lg bg-primary-600/60 text-white text-xs font-semibold pointer-events-none"
+                >
+                  <UIcon name="i-tabler-layout-columns" class="w-4 h-4" />
+                  {{ appStore.pairForSlide(slide?.id) ? "Drop to replace" : "Drop to pair" }}
+                </div>
+                <!-- A pair shows as one row, previewing the member this window
+                     is editing. -->
                 <DeferredSlidePreview
                   preview-class="slide-preview w-24 min-w-24 h-16 text-white overflow-hidden sm-preview relative"
-                  :slide="slide"
-                  :slide-label="slide?.name"
+                  :slide="scheduleRowSlide(slide)"
+                  :slide-label="scheduleRowSlide(slide)?.name"
                   :slide-styles="currentState.settings.slideStyles"
-                  :eager="liveSlide?.id === slide?.id"
+                  :eager="isScheduleSlideLive(slide)"
                 />
                 <div class="texts flex-col justify-between">
                   <h4
                     class="font-medium mt-2 overflow-hidden truncate w-40 2xl:w-56"
                   >
-                    {{ slide?.name }}
+                    {{ scheduleRowSlide(slide)?.name }}
                   </h4>
-                  <SlideChip
-                    :slide-type="slide?.type"
-                    :slide-mode="slide?.slideMode"
-                    class="mt-1"
-                  />
+                  <div class="flex items-center gap-1 mt-1">
+                    <SlideChip
+                      :slide-type="scheduleRowSlide(slide)?.type"
+                      :slide-mode="scheduleRowSlide(slide)?.slideMode"
+                    />
+                    <CowTooltip
+                      v-if="appStore.pairForSlide(slide?.id)"
+                      text="Slide pair: both slides go live together"
+                    >
+                      <UIcon
+                        name="i-tabler-layout-columns"
+                        class="w-4 h-4 text-primary-500"
+                      />
+                    </CowTooltip>
+                  </div>
                 </div>
                 <LiveSlideIndicator
                   :visible="
-                    slide.slideMode !== 'overlay' && liveSlide?.id === slide?.id
+                    slide.slideMode !== 'overlay' && isScheduleSlideLive(slide)
                   "
                   hide-text
                   class="mt-3 left-20 right-auto"
@@ -446,7 +482,7 @@
                         label="Are you sure you want to delete this slide? This action is not reversible"
                         @confirm="
                           () => {
-                            useGlobalEmit(appWideActions.deleteSlide, slide)
+                            useGlobalEmit(appWideActions.deleteSlide, scheduleRowSlide(slide))
                             close()
                           }
                         "
@@ -478,7 +514,7 @@
                       button-color="red"
                       header="Delete slide"
                       label="Are you sure you want to delete this slide? This action is not reversible"
-                      @confirm="useGlobalEmit(appWideActions.deleteSlide, slide)"
+                      @confirm="useGlobalEmit(appWideActions.deleteSlide, scheduleRowSlide(slide))"
                     >
                       <template #icon>
                         <DeleteIcon class="w-4 h-4" />
@@ -508,6 +544,14 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
 import type { Slide } from "~/types"
+import {
+  canBePairTarget,
+  continueAsSolo,
+  foldPairs,
+  isCameraSlide,
+  pairRejection,
+} from "~/utils/slidePairs"
+import { editingMemberOf, livePayloadForSlide } from "~/composables/useSlidePairs"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
 import { shortcutIds } from "~/utils/shortcuts"
 
@@ -545,9 +589,12 @@ const emit = defineEmits<{
 // `.actions` group is otherwise hover-only).
 const openActionsSlideId = ref<string | null>(null)
 
+// A pair's row stands for the member it previews, so that is the one the row's
+// edit and delete act on.
 const editSlide = (slide: Slide) => {
-  emit("edit-slide", slide)
-  useGlobalEmit(appWideActions.newActiveSlide, slide)
+  const target = scheduleRowSlide(slide)
+  emit("edit-slide", target)
+  useGlobalEmit(appWideActions.newActiveSlide, target)
 }
 
 const windowRefs = inject("windowRefs") as any[]
@@ -704,15 +751,10 @@ const broadcastSlideReorder = (slideOrder: string[]) => {
   }
 }
 
-// Build the lookup once per activeSlides mutation. The previous implementation
-// ran Array.find for every live-output id, turning each verse update into an
-// O(n²) schedule scan on larger services.
-const activeSlidesById = computed(
-  () =>
-    new Map(
-      appStore.activeSlides.map((slide) => [slide.id, slide] as const)
-    )
-)
+// Built once per activeSlides mutation, in the store. The previous
+// implementation ran Array.find for every live-output id, turning each verse
+// update into an O(n²) schedule scan on larger services.
+const activeSlidesById = computed(() => appStore.activeSlidesById)
 
 const liveSlide = computed(() =>
   currentState.value.liveSlideId
@@ -720,20 +762,91 @@ const liveSlide = computed(() =>
     : undefined
 )
 
+// What the thumbnail shows when a pair is on screen: the same payload the
+// projector gets, built from this device's slides so an edit shows here the
+// moment it is made.
+const livePairPayload = computed<Slide[] | null>(() => {
+  const live = liveSlide.value
+  if (!live) return null
+  const payload = livePayloadForSlide(live, { keepShape: true })
+  return Array.isArray(payload) ? payload : null
+})
+// The last pair shown. When one of its slides goes on alone (the pair was
+// unpaired, or its other slide deleted), the thumbnail carries on with that
+// slide in place, as the projector does, instead of being rebuilt.
+const lastLivePair = shallowRef<Slide[] | null>(null)
+watch(
+  livePairPayload,
+  (payload) => {
+    if (payload) lastLivePair.value = payload
+  },
+  { immediate: true }
+)
+watch(
+  () => liveSlide.value?.id,
+  (id) => {
+    if (lastLivePair.value && !lastLivePair.value.some((member) => member.id === id)) {
+      lastLivePair.value = null
+    }
+  }
+)
+const livePairSlides = computed<Slide[] | null>(
+  () =>
+    livePairPayload.value ??
+    continueAsSolo(lastLivePair.value, liveSlide.value)
+)
+
+// A pair is one row in the schedule, headed by its first member. The row
+// previews the member this window is editing, and is live while any member is.
+const scheduleRowSlide = (slide: Slide) => {
+  const pair = appStore.pairForSlide(slide?.id)
+  return pair ? activeSlidesById.value.get(editingMemberOf(pair)) || slide : slide
+}
+// A slide that went live alone and was paired since is still on screen alone,
+// and its pair's row is the live one.
+const isScheduleSlideLive = (slide: Slide) => {
+  const pair = appStore.pairForSlide(slide?.id)
+  if (pair) {
+    return (
+      currentState.value.livePairId === pair.id ||
+      pair.slideIds.includes(currentState.value.liveSlideId || "")
+    )
+  }
+  return liveSlide.value?.id === slide?.id
+}
+
 const liveOutputSlides = computed({
   get() {
     const tempSlides = (currentState.value.liveOutputSlidesId ?? [])
       .map((id) => activeSlidesById.value.get(id))
       .filter((slide): slide is Slide => Boolean(slide))
 
-    // Filter by current active schedule
-    return tempSlides.filter(
-      (slide) => slide.scheduleId === currentState.value?.activeSchedule?._id
+    // Filter by current active schedule. A pair is one row, at its first
+    // member's place in the schedule.
+    return foldPairs(
+      tempSlides.filter(
+        (slide) => slide.scheduleId === currentState.value?.activeSchedule?._id
+      ),
+      appStore.pairForSlide
     )
   },
   set(newVal) {
+    // The list folds a pair into its first member's row, so a reorder only
+    // moves that one. Put the other members back straight after it, or the
+    // setter would drop them from the schedule.
+    const expanded: Slide[] = []
+    newVal.forEach((slide) => {
+      expanded.push(slide)
+      appStore
+        .pairForSlide(slide.id)
+        ?.slideIds.filter((memberId) => memberId !== slide.id)
+        .forEach((memberId) => {
+          const member = activeSlidesById.value.get(memberId)
+          if (member) expanded.push(member)
+        })
+    })
     // Set Index for each slide
-    const tempSlides = [...newVal].map((slide, index) => ({
+    const tempSlides = expanded.map((slide, index) => ({
       ...slide,
       index,
     }))
@@ -750,10 +863,16 @@ const navigationSlides = computed(() =>
   liveOutputSlides.value.filter((slide) => slide.slideMode !== "overlay")
 )
 
+// The row that is live. A live pair's row is its first member, which need not
+// be the live (active) slide.
+const liveRowIndex = computed(() =>
+  navigationSlides.value.findIndex((slide: Slide) => isScheduleSlideLive(slide))
+)
+
 const nextSlide = computed(() => {
-  const liveSlideIndex = navigationSlides.value.findIndex(
-    (slide: Slide) => slide.id === currentState.value.liveSlideId
-  )
+  const liveSlideIndex = liveRowIndex.value
+  // Nothing live in this list: Down must not jump to the top of the schedule.
+  if (liveSlideIndex < 0) return undefined
   // const tempSlides = liveOutputSlidesId.value?.map((id) =>
   //   appStore.activeSlides.find((slide) => slide.id === id)
   // ) as Slide[]
@@ -764,9 +883,7 @@ const nextSlide = computed(() => {
 })
 
 const previousSlide = computed(() => {
-  const liveSlideIndex = navigationSlides.value.findIndex(
-    (slide: Slide) => slide.id === currentState.value?.liveSlideId
-  )
+  const liveSlideIndex = liveRowIndex.value
   // const tempSlides = liveOutputSlidesId.value?.map((id) =>
   //   appStore.activeSlides.find((slide) => slide.id === id)
   // ) as Slide[]
@@ -897,6 +1014,12 @@ const scheduleCardHint = (slide: Slide) => {
       ? "Click to clear overlay · Double-click to edit"
       : "Click to show overlay · Double-click to edit"
   }
+  if (appStore.pairForSlide(slide?.id)) {
+    return "Click to take the pair live · Double-click to edit"
+  }
+  if (canBePairTarget(slide)) {
+    return "Click to take live · Double-click to edit · Drop a slide here to pair it"
+  }
   return "Click to take live · Double-click to edit"
 }
 
@@ -905,24 +1028,113 @@ const handleScheduleSlideAction = (slide: Slide) => {
     toggleSlideOverlay(slide)
     return
   }
-  setLiveSlide(slide.id)
+  // A pair's row takes the pair live, driven by the slide that is not the
+  // camera (see projectLiveSlide).
+  setLiveSlide(scheduleRowSlide(slide).id)
 }
 
-const handleDropOnSetlist = (targetSlide: Slide) => {
+// The list is also sortable, and Sortable moves rows under the pointer as a
+// drag passes over them. Over the middle half of a row that would take the
+// dragged slide (a camera to pair with, or a setlist for a song), the row is
+// held still so the drop lands on it; over its top or bottom quarter the drag
+// reorders as usual, so a slide can still be moved past a camera.
+const dropTargetId = ref<string | null>(null)
+const onScheduleDragStart = (slide: Slide) => {
+  draggingSlide.value = slide
+  dropTargetId.value = null
+}
+
+const acceptsScheduleDrop = (target: Slide | undefined, source: Slide | null) => {
+  if (!target || !source || target.id === source.id) return false
+  if (target.type === slideTypes.songSetlist && source.type === slideTypes.song) {
+    return true
+  }
+  const pair = appStore.pairForSlide(target.id)
+  if (pair) {
+    // A pair with one camera: the dropped slide replaces the camera's partner.
+    const cameras = pair.slideIds.filter((id) =>
+      isCameraSlide(activeSlidesById.value.get(id))
+    )
+    return (
+      cameras.length === 1 &&
+      !pair.slideIds.includes(source.id) &&
+      source.slideMode !== "overlay" &&
+      !appStore.pairForSlide(source.id)
+    )
+  }
+  return canBePairTarget(target) && !pairRejection(target, source, appStore.pairForSlide)
+}
+
+const onScheduleSortMove = (
+  evt: {
+    related?: HTMLElement
+    relatedContext?: { element?: Slide }
+  },
+  originalEvent?: MouseEvent
+) => {
+  const target = evt.relatedContext?.element
+  if (acceptsScheduleDrop(target, draggingSlide.value) && evt.related && originalEvent) {
+    const box = evt.related.getBoundingClientRect()
+    const y = originalEvent.clientY - box.top
+    if (y > box.height * 0.25 && y < box.height * 0.75) {
+      dropTargetId.value = target!.id
+      return false
+    }
+  }
+  dropTargetId.value = null
+  return true
+}
+
+const onScheduleRowDragOver = (event: DragEvent, slide: Slide) => {
+  if (dropTargetId.value !== slide?.id) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "link"
+}
+
+const onScheduleDragEnd = () => {
+  draggingSlide.value = null
+  dropTargetId.value = null
+}
+
+const handleDropOnSetlist = (targetSlide: Slide, source: Slide) => {
   if (
     targetSlide?.type !== slideTypes.songSetlist ||
-    draggingSlide.value?.type !== slideTypes.song ||
-    draggingSlide.value.id === targetSlide.id
+    source.type !== slideTypes.song ||
+    source.id === targetSlide.id
   ) {
-    draggingSlide.value = null
-    return
+    return false
   }
 
   useGlobalEmit(appWideActions.addSongSlideToSetlist, {
     setlistSlide: targetSlide,
-    songSlide: draggingSlide.value,
+    songSlide: source,
   })
-  draggingSlide.value = null
+  return true
+}
+
+// A song dropped on a setlist joins it. A slide let go over the middle of a
+// camera row pairs with that camera; over a pair's row, it takes the place of
+// the camera's partner.
+const handleDropOnScheduleSlide = (targetSlide: Slide) => {
+  const source = draggingSlide.value
+  const heldOver = dropTargetId.value
+  onScheduleDragEnd()
+  if (!source || handleDropOnSetlist(targetSlide, source)) return
+  if (heldOver !== targetSlide.id || source.id === targetSlide.id) return
+  const pair = appStore.pairForSlide(targetSlide.id)
+  if (!pair) {
+    const rejection = pairRejection(targetSlide, source, appStore.pairForSlide)
+    if (rejection) {
+      toast.add({ title: rejection, icon: "i-tabler-layout-columns", color: "amber" })
+      return
+    }
+  }
+  useGlobalEmit(
+    appWideActions.pairSlides,
+    pair
+      ? { pairId: pair.id, sourceId: source.id }
+      : { targetId: targetSlide.id, sourceId: source.id }
+  )
 }
 </script>
 

@@ -2,13 +2,14 @@ import useIndexedDB, {
   type LiveProjectionRecord,
   type WorshipCloudDatabase,
 } from "~/composables/useIndexedDB"
-import type { Slide } from "~/types"
+import type { LivePayload, Slide } from "~/types"
 import { cloneDurableSlide } from "~/utils/durableSlide"
+import { isPairPayload, primaryLiveSlide } from "~/utils/slidePairs"
 
 export interface LiveProjectionRepository {
   getCurrent(): Promise<LiveProjectionRecord | undefined>
   putCurrent(
-    slide: Slide | null,
+    payload: LivePayload,
     revision: string,
     updatedAt: number
   ): Promise<LiveProjectionRecord>
@@ -30,7 +31,15 @@ export const isRestorableLiveProjection = (
   const now = options.now ?? Date.now()
   const maxAgeMs = options.maxAgeMs ?? LIVE_PROJECTION_RESTORE_MAX_AGE_MS
   if (now - record.updatedAt > maxAgeMs) return false
-  if (record.slideId !== options.expectedSlideId) return false
+  // A live pair answers to any of its members: the shared live slide id is its
+  // active member, which another window may have switched a beat earlier.
+  const memberIds = record.slides?.map((slide) => slide.id) ?? []
+  if (
+    record.slideId !== options.expectedSlideId &&
+    !(options.expectedSlideId && memberIds.includes(options.expectedSlideId))
+  ) {
+    return false
+  }
   if (!record.slideId) return record.slide === null
   if (!record.slide || record.slide.id !== record.slideId) return false
   if (options.churchId && record.churchId && record.churchId !== options.churchId) {
@@ -58,8 +67,13 @@ export const createLiveProjectionRepository = (
       return await db().liveProjection.get("current")
     },
 
-    async putCurrent(slide, revision, updatedAt) {
-      const prepared = await prepareSlide(slide)
+    async putCurrent(payload, revision, updatedAt) {
+      const members = isPairPayload(payload)
+        ? ((await Promise.all(payload.map(prepareSlide))) as Slide[])
+        : null
+      const prepared = members
+        ? primaryLiveSlide(members)
+        : await prepareSlide(payload as Slide | null)
       const record: LiveProjectionRecord = {
         id: "current",
         revision,
@@ -68,6 +82,7 @@ export const createLiveProjectionRepository = (
         churchId: prepared?.churchId || null,
         updatedAt,
         slide: prepared,
+        slides: members,
       }
       await db().liveProjection.put(record)
       return record

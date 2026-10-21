@@ -5,6 +5,8 @@ import { slideTypes } from "~/utils/constants"
 const useCameraOnAir = () => {
   const appStore = useAppStore()
   return computed(() => {
+    // Every slide pair holds a camera.
+    if (appStore.currentState.livePairId) return true
     const id = appStore.currentState.liveSlideId
     if (!id) return false
     return (

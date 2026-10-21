@@ -29,6 +29,8 @@
           {{
             status === "connecting"
               ? "Connecting camera…"
+              : assignedOnly && status === "missing"
+              ? "This slide's camera is not on this computer"
               : cameraErrorMessage(status)
           }}
         </p>
@@ -55,20 +57,28 @@ import useCameraStream, {
   type CameraErrorState,
   type CameraHandle,
   type CameraQuality,
+  type CameraResolution,
 } from "~/composables/useCameraStream"
 
-const props = defineProps<{
-  data?: CameraSlideData | null
-  quality: CameraQuality
-  /** Stop a camera as soon as this feed lets go of it (the camera picker). */
-  releaseImmediately?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    data?: CameraSlideData | null
+    quality: CameraQuality
+    /** Stop a camera as soon as this feed lets go of it (the camera picker). */
+    releaseImmediately?: boolean
+    /** How big this feed is drawn; a small inset asks the camera for less. */
+    resolution?: CameraResolution
+    /** Show the slide's own camera or nothing, never a stand-in (the editor). */
+    assignedOnly?: boolean
+  }>(),
+  { resolution: "full" }
+)
 
 const emit = defineEmits<{
   status: [status: "connecting" | "live" | CameraErrorState]
 }>()
 
-const { acquire, onCameraDevicesChange } = useCameraStream()
+const { acquire, listCameras, onCameraDevicesChange } = useCameraStream()
 
 const videoEl = ref<HTMLVideoElement | null>(null)
 const status = ref<"connecting" | "live" | CameraErrorState>("connecting")
@@ -112,6 +122,7 @@ const detach = () => {
 
 const attach = (next: CameraHandle) => {
   handle = next
+  next.setResolution(props.resolution)
   match.value = next.match
   resolvedLabel.value = next.deviceLabel
   const element = videoEl.value
@@ -158,7 +169,18 @@ const start = async () => {
   try {
     // Acquire before releasing the old handle, so a re-resolve that lands on
     // the same device reuses its stream instead of reopening it.
-    const next = await acquire(props.data)
+    let next: CameraHandle
+    try {
+      next = await acquire(props.data, { assignedOnly: props.assignedOnly })
+    } catch (error) {
+      // Before permission the camera list has no names, so the stored id was
+      // tried blind (ids differ between browsers and the desktop app). Ask
+      // for permission, which names the cameras, then look again by name.
+      if (!props.assignedOnly || cameraErrorState(error) !== "missing") throw error
+      await listCameras()
+      if (mine !== token) throw error
+      next = await acquire(props.data, { assignedOnly: true })
+    }
     previous?.release(releaseOptions())
     if (mine !== token) {
       next.release(releaseOptions())
@@ -176,6 +198,11 @@ const start = async () => {
 watch(
   () => [props.data?.deviceId, props.data?.deviceLabel],
   () => start()
+)
+
+watch(
+  () => props.resolution,
+  (resolution) => handle?.setResolution(resolution)
 )
 
 // A camera plugged back in recovers a failed feed, and the slide's own camera
