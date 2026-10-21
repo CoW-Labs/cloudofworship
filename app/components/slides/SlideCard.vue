@@ -6,9 +6,19 @@
     :id="slide?.id?.replace(/\d+/g, '')"
     :class="[
       selected ? 'border-black' : 'border-transparent',
-      { selectable: selectable },
+      {
+        selectable: selectable,
+        'pair-drop-target': isPairDropTarget,
+        'pair-drop-candidate': isPairCandidate && !isPairDropTarget,
+      },
     ]"
+    :draggable="!selectable"
     @contextmenu.prevent="moreActionsMenuRef?.open()"
+    @dragstart="onSlideDragStart"
+    @dragend="onSlideDragEnd"
+    @dragover="onSlideDragOver"
+    @dragleave="onSlideDragLeave"
+    @drop="onSlideDrop"
   >
     <CowTooltip
       :text="gridCardHint"
@@ -59,6 +69,16 @@
           />
         </div>
 
+        <!-- Dropping another slide on a camera pairs the two (or, on a pair's
+             card, puts it in place of the camera's partner). -->
+        <div
+          v-if="isPairDropTarget"
+          class="absolute inset-0 z-10 flex items-center justify-center bg-primary-600/60 text-white text-xs font-semibold gap-1.5 pointer-events-none"
+        >
+          <UIcon name="i-tabler-layout-columns" class="w-4 h-4" />
+          {{ pair ? "Drop to replace" : "Drop to pair" }}
+        </div>
+
         <!-- Editing indicator - avatar circle -->
         <div v-if="editingBy" class="absolute bottom-2 left-2 group/editing">
           <CowTooltip :text="`${editingBy.userName} is on this slide`">
@@ -82,6 +102,49 @@
         </div>
       </button>
     </CowTooltip>
+
+    <!-- SLIDE PAIR — the pair icon and one dot per member. The card previews
+         the member this window is editing; a dot switches to another, which
+         loads it in the editor with its own controls. What is on screen does
+         not change. -->
+    <div
+      v-if="pair"
+      class="pair-switcher absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-1 text-white"
+    >
+      <CowTooltip :text="pairHint">
+        <UIcon name="i-tabler-layout-columns" class="w-3.5 h-3.5" />
+      </CowTooltip>
+      <CowTooltip
+        v-for="(memberId, position) in pair.slideIds"
+        :key="memberId"
+        :text="memberLabel(memberId, position)"
+      >
+        <button
+          type="button"
+          class="block w-2 h-2 rounded-full transition"
+          :class="
+            editingMemberId === memberId
+              ? 'bg-white'
+              : 'bg-white/40 hover:bg-white/70'
+          "
+          :aria-label="memberLabel(memberId, position)"
+          :aria-pressed="editingMemberId === memberId"
+          @click.stop="
+            useGlobalEmit(appWideActions.setPairActiveMember, {
+              pairId: pair.id,
+              slideId: memberId,
+            })
+          "
+        />
+      </CowTooltip>
+      <CowTeamsPreviewNotice
+        v-if="!hasAccessToFeature(appWideActions.slidePair)"
+        variant="text"
+        title="Teams"
+        :feature="appWideActions.slidePair"
+        class="!text-[11px] [&_svg]:!w-3 [&_svg]:!h-3"
+      />
+    </div>
 
     <!-- Bottom gradient for action icon contrast -->
     <div
@@ -168,7 +231,15 @@
 
 <script setup lang="ts">
 import { appWideActions } from "~/utils/constants"
-import type { Slide } from "~/types"
+import type { Slide, SlidePair } from "~/types"
+import {
+  SLIDE_PAIR_LAYOUTS,
+  canBePairTarget,
+  isCameraSlide,
+  pairRejection,
+  pairRoles,
+} from "~/utils/slidePairs"
+import { draggingSlideId, editingMemberOf } from "~/composables/useSlidePairs"
 import { useAppStore } from "~/store/app"
 
 const appStore = useAppStore()
@@ -191,6 +262,8 @@ const props = defineProps<{
     avatar?: string
     theme?: string
   } | null // User currently editing this slide
+  /** Set when this card stands for a slide pair; `slide` is the member shown. */
+  pair?: SlidePair
 }>()
 
 const emit = defineEmits([
@@ -204,14 +277,120 @@ const emit = defineEmits([
   "bulk-selected",
   "click",
   "take-live",
+  "pair-drop",
 ])
+
+// ── Drag a slide onto a camera to pair them ─────────────────────────────────
+// A type of our own, so the grid's media-file drop (which looks for "Files")
+// and this never mistake one for the other. Only a camera takes a drop: every
+// pair has one. A pair's card takes one when it holds a single camera, and the
+// dropped slide replaces the camera's partner.
+const SLIDE_DRAG_TYPE = "application/x-cow-slide"
+const isPairDropTarget = ref(false)
+
+const isSlideDrag = (event: DragEvent) =>
+  Array.from(event.dataTransfer?.types || []).includes(SLIDE_DRAG_TYPE)
+
+const acceptsPairDrop = (sourceId: string | null) => {
+  if (!props.gridType || props.selectable || !sourceId) return false
+  const source = appStore.activeSlidesById.get(sourceId)
+  if (!source || sourceId === props.slide.id) return false
+  if (props.pair) {
+    if (props.pair.slideIds.includes(sourceId)) return false
+    const cameras = pairMembers.value.filter(isCameraSlide)
+    return (
+      cameras.length === 1 &&
+      source.slideMode !== "overlay" &&
+      !appStore.pairForSlide(sourceId)
+    )
+  }
+  return (
+    canBePairTarget(props.slide) &&
+    !pairRejection(props.slide, source, appStore.pairForSlide)
+  )
+}
+
+// Every card that would take the slide being dragged shows it, so the operator
+// can see where to let go before reaching it.
+const isPairCandidate = computed(() => acceptsPairDrop(draggingSlideId.value))
+
+const onSlideDragStart = (event: DragEvent) => {
+  if (!props.gridType || props.selectable || !event.dataTransfer) return
+  event.dataTransfer.setData(SLIDE_DRAG_TYPE, props.slide.id)
+  event.dataTransfer.effectAllowed = "link"
+  draggingSlideId.value = props.slide.id
+}
+
+// Fires on the dragged card however the drag ends: dropped, or let go.
+const onSlideDragEnd = () => {
+  draggingSlideId.value = null
+}
+
+const onSlideDragOver = (event: DragEvent) => {
+  if (!isSlideDrag(event) || !acceptsPairDrop(draggingSlideId.value)) return
+  // Only a card that would take it says so; every other card leaves the
+  // browser's no-drop cursor.
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "link"
+  isPairDropTarget.value = true
+}
+
+// Moving over the card's own children fires dragleave on the card first, so
+// only a leave to outside it clears the highlight.
+const onSlideDragLeave = (event: DragEvent) => {
+  const next = event.relatedTarget as Node | null
+  if (next && (event.currentTarget as HTMLElement).contains(next)) return
+  isPairDropTarget.value = false
+}
+
+const onSlideDrop = (event: DragEvent) => {
+  isPairDropTarget.value = false
+  if (!isSlideDrag(event)) return
+  event.preventDefault()
+  const sourceId =
+    event.dataTransfer?.getData(SLIDE_DRAG_TYPE) || draggingSlideId.value
+  draggingSlideId.value = null
+  if (!sourceId || !acceptsPairDrop(sourceId)) return
+  emit("pair-drop", sourceId)
+}
+
+const pairMembers = computed(() =>
+  (props.pair?.slideIds ?? [])
+    .map((id) => appStore.activeSlidesById.get(id))
+    .filter((slide): slide is Slide => !!slide)
+)
+
+const editingMemberId = computed(() =>
+  props.pair ? editingMemberOf(props.pair) : null
+)
+
+const memberLabel = (memberId: string, _position: number) => {
+  const member = appStore.activeSlidesById.get(memberId)
+  const role = isCameraSlide(member)
+    ? "Camera"
+    : pairRoles(pairMembers.value).frame?.id === memberId
+    ? "Picture"
+    : "Words"
+  return `${role}: ${member?.name || "Slide"}`
+}
+
+const pairHint = computed(() => {
+  const layout = SLIDE_PAIR_LAYOUTS.find(
+    (option) => option.value === props.pair?.layout
+  )
+  return `Slide pair, ${(layout?.label || "side by side").toLowerCase()}`
+})
 
 // The preview grid and the schedule list both use double-click, but for
 // opposite actions — spell out which is which so nobody has to discover it.
 const gridCardHint = computed(() =>
   props.slide?.slideMode === "overlay"
     ? "Click to preview · Double-click to show overlay"
-    : "Click to preview · Double-click to take live"
+    : props.pair
+    ? "Click to edit · Double-click to take the pair live"
+    : canBePairTarget(props.slide)
+    ? "Click to preview · Double-click to take live · Drop a slide here to pair it"
+    : "Click to preview · Double-click to take live · Drag onto a camera slide to pair"
 )
 
 // Every cache key this card's preview depends on. A media slide's own file is
@@ -332,6 +511,16 @@ html.dark .media-loading::after {
 
 .slide-card.selectable .actions {
   display: none;
+}
+
+.slide-card.pair-drop-target {
+  outline: 2px solid rgb(var(--color-primary-400));
+  outline-offset: 2px;
+}
+/* A camera that would take the slide being dragged. */
+.slide-card.pair-drop-candidate {
+  outline: 2px dashed rgb(var(--color-primary-400) / 0.7);
+  outline-offset: 2px;
 }
 
 /* On touch devices, always show actions since hover doesn't exist */

@@ -43,6 +43,14 @@ export const appWideActions = {
   addSong: 'add-song',
   songUpdated: 'song-updated',
   addSongSlideToSetlist: 'add-song-slide-to-setlist',
+  // Slide pairs: two slides on the live screen at once. `slidePair` is the
+  // tier key (see useSubscription); the rest are emitter events.
+  slidePair: 'slide-pair',
+  pairSlides: 'pair-slides',
+  unpairSlides: 'unpair-slides',
+  setPairActiveMember: 'set-pair-active-member',
+  // A camera's ⋯ menu: pick a slide to pair with it, or change its partner.
+  startSlidePair: 'start-slide-pair',
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
   newTimeSlide: 'new-time-slide',
