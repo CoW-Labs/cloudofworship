@@ -57,9 +57,9 @@ const usePowerpointToImage = async (file: File): Promise<PresentationObject[]> =
   }
 
   // Load PDF with PDF.js and render each page to a blob URL
-  const pdfjsLib = await import("pdfjs-dist")
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs")
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.mjs",
+    "pdfjs-dist/legacy/build/pdf.worker.mjs",
     import.meta.url
   ).toString()
 
