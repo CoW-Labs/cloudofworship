@@ -45,8 +45,8 @@
               >{{ schedule.code }}</span
             >
             &middot; </template
-          >Created
-          {{ format(new Date(schedule?.updatedAt as string).getTime()) }}</span
+          >Updated
+          {{ lastUpdatedLabel }}</span
         >
       </div>
     </div>
@@ -166,6 +166,14 @@ const commitRename = () => {
   if (!name || name === props.schedule?.name) return
   emit("rename", props.schedule, name)
 }
+
+// A schedule that has not synced yet has no `updatedAt`, only the `createdAt`
+// stamped when it was made locally.
+const lastUpdatedLabel = computed(() => {
+  const stamp = props.schedule?.updatedAt || props.schedule?.createdAt
+  const time = stamp ? new Date(stamp).getTime() : NaN
+  return Number.isNaN(time) ? "just now" : format(time)
+})
 
 const scheduleAuthor = computed(() => {
   if (props.schedule?.authorId) {
