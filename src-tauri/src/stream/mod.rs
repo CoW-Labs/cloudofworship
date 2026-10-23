@@ -867,13 +867,19 @@ fn browser_encoder_args() -> Vec<String> {
 }
 
 /// Encoder for the native window feed: raw BGRA frames from the pacer on stdin
-/// plus, optionally, an audio input. Both inputs are stamped with the wall
-/// clock as they arrive so they line up despite separate clocks.
+/// plus, optionally, an audio input.
+///
+/// Video frames are timed by their position in the pacer's steady 30fps
+/// schedule, not by when FFmpeg reads them. FFmpeg pauses reading any input
+/// that's more than 0.1s ahead of the others; with read-time stamps every
+/// paused frame came out even further ahead, which locked video at ~3fps.
+/// Audio keeps wall-clock stamps (device clocks are unrelated to ours); FFmpeg
+/// starts both inputs at zero, and `aresample=async` absorbs small drift.
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 fn window_encoder_args(width: u32, height: u32, audio: Option<String>) -> Vec<String> {
   let mut args = [
     "-hide_banner", "-loglevel", "warning",
-    "-use_wallclock_as_timestamps", "1", "-thread_queue_size", "64",
+    "-thread_queue_size", "64",
     "-f", "rawvideo", "-pix_fmt", "bgra",
   ]
   .map(String::from)

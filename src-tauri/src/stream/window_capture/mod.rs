@@ -12,7 +12,7 @@
 
 use std::io::Write;
 use std::process::ChildStdin;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -32,6 +32,10 @@ const LIVE_WINDOW_LABEL: &str = "live-output";
 const FRAME_INTERVAL: Duration = Duration::from_nanos(1_000_000_000 / 30);
 /// A healthy capture delivers its first frame almost immediately.
 const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
+/// How often the pacer logs capture/encoder health.
+const HEALTH_INTERVAL: Duration = Duration::from_secs(10);
+/// A frame write slower than this means the encoder or network is behind.
+const SLOW_WRITE: Duration = Duration::from_millis(100);
 
 /// The latest captured frame, tightly packed BGRA at the target size. Swapped
 /// as a whole so the pacer never holds the lock while writing to the pipe.
@@ -49,10 +53,13 @@ struct Sink {
   fail: FailHandler,
   /// The first few rejected callbacks, logged if no frame ever arrives.
   rejected: Arc<Mutex<Vec<String>>>,
+  /// New pictures received from the OS, for the health log.
+  published: AtomicU64,
 }
 
 impl Sink {
   fn publish(&self, frame: Vec<u8>) {
+    self.published.fetch_add(1, Ordering::Relaxed);
     *self.latest.lock().unwrap_or_else(|p| p.into_inner()) = Some(Arc::new(frame));
   }
 
@@ -113,6 +120,7 @@ pub fn start(
     stop: Arc::new(AtomicBool::new(false)),
     fail,
     rejected: Arc::new(Mutex::new(Vec::new())),
+    published: AtomicU64::new(0),
   });
   let native = platform::start(target.native, sink.clone())?;
   let stop = sink.stop.clone();
@@ -124,22 +132,20 @@ pub fn start(
 }
 
 /// Writes the latest frame every 1/30s on a fixed schedule (repeating it while
-/// the slide is static), so the encoder sees constant-rate video.
+/// the slide is static), so the encoder sees constant-rate video. The encoder
+/// times video by frame count, so after a stall the pacer catches up with
+/// back-to-back frames instead of skipping, keeping video in step with audio.
 fn pace(sink: &Sink, input: Arc<Mutex<Option<ChildStdin>>>) {
   let started = Instant::now();
   let mut next = started;
   let mut sent = 0u64;
+  let mut health = Health::new();
   while !sink.stop.load(Ordering::Acquire) {
     let now = Instant::now();
     if next > now {
       std::thread::sleep(next - now);
     }
     next += FRAME_INTERVAL;
-    // After a stall (e.g. the encoder blocked on a slow network), skip ahead
-    // rather than bursting stale frames.
-    if Instant::now() > next + FRAME_INTERVAL * 5 {
-      next = Instant::now();
-    }
 
     let frame = sink.latest.lock().unwrap_or_else(|p| p.into_inner()).clone();
     let Some(frame) = frame else {
@@ -158,13 +164,52 @@ fn pace(sink: &Sink, input: Arc<Mutex<Option<ChildStdin>>>) {
     };
     let mut slot = input.lock().unwrap_or_else(|p| p.into_inner());
     let Some(stdin) = slot.as_mut() else { return };
+    let writing = Instant::now();
     if stdin.write_all(&frame).is_err() {
       return;
     }
+    drop(slot);
+    health.record(sink, writing.elapsed());
     sent += 1;
     if sent == 1 {
       log::info!("live window capture: first frame after {:?}", started.elapsed());
     }
+  }
+}
+
+/// Logs, every few seconds, how many new pictures the window delivered (drops
+/// toward 0 if the OS stops painting it) and how many frame writes stalled
+/// (the encoder or the network falling behind).
+struct Health {
+  since: Instant,
+  published: u64,
+  sent: u64,
+  slow: u64,
+}
+
+impl Health {
+  fn new() -> Self {
+    Self { since: Instant::now(), published: 0, sent: 0, slow: 0 }
+  }
+
+  fn record(&mut self, sink: &Sink, write_time: Duration) {
+    self.sent += 1;
+    if write_time > SLOW_WRITE {
+      self.slow += 1;
+    }
+    let elapsed = self.since.elapsed();
+    if elapsed < HEALTH_INTERVAL {
+      return;
+    }
+    let published = sink.published.load(Ordering::Relaxed);
+    let seconds = elapsed.as_secs_f64();
+    log::info!(
+      "stream health: window {:.1} new fps, sent {:.1} fps, {} slow writes",
+      (published - self.published) as f64 / seconds,
+      self.sent as f64 / seconds,
+      self.slow
+    );
+    *self = Self { published, ..Self::new() };
   }
 }
 
