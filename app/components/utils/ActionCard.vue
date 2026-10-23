@@ -79,6 +79,12 @@
           <slot v-else name="desc">{{ action?.desc || "" }}</slot>
         </p>
       </div>
+      <UIcon
+        v-if="hasSongTranslation"
+        name="i-ph-translate"
+        class="shrink-0 ml-auto self-end w-4 h-4 text-primary"
+        title="Has a translation"
+      />
     </button>
 
     <div
@@ -146,6 +152,7 @@ import TimeIcon from "~/components/svgs/TimeIcon.vue"
 import InterludeIcon from "~/components/svgs/InterludeIcon.vue"
 import CameraIcon from "~/components/svgs/CameraIcon.vue"
 import { isSongPending } from "~/composables/useSongs"
+import { getSongTranslation } from "~/utils/songTranslation"
 
 const props = defineProps<{
   action: QuickAction
@@ -205,6 +212,14 @@ const matchedLine = computed(() =>
     ? props.action?.songData?.matchedLine || ""
     : ""
 )
+
+// A song with a translation says so. A full song carries its translations; a
+// preview (an unclaimed library song) carries only the languages they exist in.
+const hasSongTranslation = computed(() => {
+  if (props.action?.type !== slideTypes.song) return false
+  const song = props.action?.songData
+  return !!(getSongTranslation(song) || song?.translationLanguages?.length)
+})
 
 const customIconComponent = computed(
   () => actionIconComponentMap[props.action?.action || ""] || null
