@@ -8,6 +8,10 @@
           key="multiplayer-demo"
           v-bind="signupVisualState"
         />
+        <AuthVideoContainer
+          v-else-if="isSignup && showSignupVideo"
+          key="auth-video"
+        />
         <AuthCollageContainer v-else key="auth-collage" />
       </Transition>
     </div>
@@ -41,8 +45,16 @@ const signupVisualState = useSignupVisualState()
 const variant = computed(
   () => (route.meta.authVariant as "split" | "centered") || "split"
 )
+const isSignup = computed(() => route.path.startsWith("/signup"))
+const { isEnabled: signupVideoEnabled, isLoading: signupVideoLoading } =
+  useFeatureFlags("signup-video-layout")
+// Rolled out to everyone, so assume it's on until PostHog answers: otherwise a
+// first visit flashes the collage and then swaps it for the video.
+const showSignupVideo = computed(
+  () => signupVideoEnabled.value || signupVideoLoading.value
+)
 const showMultiplayerDemo = computed(
-  () => route.path.startsWith("/signup") && signupVisualState.value.step >= 3
+  () => isSignup.value && signupVisualState.value.step >= 3
 )
 
 const { handleGoogleSignIn: tauriGoogleSignIn } = useTauriGoogleAuth()
@@ -52,6 +64,22 @@ const handleGoogleSignIn = async (): Promise<UserCredential> => {
 }
 
 provide("handleGoogleSignIn", handleGoogleSignIn)
+
+// Desktop: the browser hands sign-in back through a cloudofworship:// link.
+const { isTauri } = useTauri()
+const { listenForLinks } = useDesktopSignin()
+let stopListeningForLinks: (() => void) | undefined
+
+onMounted(async () => {
+  if (!isTauri) return
+  try {
+    stopListeningForLinks = await listenForLinks()
+  } catch (error) {
+    console.error("Failed to listen for desktop sign-in links:", error)
+  }
+})
+
+onBeforeUnmount(() => stopListeningForLinks?.())
 </script>
 
 <style scoped>

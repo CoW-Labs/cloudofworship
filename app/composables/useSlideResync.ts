@@ -134,7 +134,7 @@ export const flushPendingSlides = async (): Promise<void> => {
       try {
         const { error } = await useAPIFetch(
           slideUpdatePath(churchId, slide.scheduleId, record.serverId!),
-          { method: "PUT", body: toSlideUpdatePayload(slide) }
+          { method: "PUT", body: await toSlideUpdatePayload(slide) }
         )
 
         if (!error?.value) {

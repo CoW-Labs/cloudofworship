@@ -68,6 +68,23 @@
         />
       </SettingsRow>
 
+      <SettingsRow label="Default line spacing">
+        <SettingsSelect
+          class="capitalize"
+          :options="Object.values(lineSpacingTypes)"
+          :model-value="
+            appStore.currentState.settings.slideStyles.lineSpacing ||
+            lineSpacingTypes.normal
+          "
+          @change="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              lineSpacing: $event,
+            })
+          "
+        />
+      </SettingsRow>
+
       <SettingsRow label="Uppercase text">
         <CowToggle
           bare
@@ -373,6 +390,23 @@
           </template>
         </SettingsSelect>
       </SettingsRow>
+
+      <SettingsRow
+        label="Fit each line on one row"
+        description="Shrinks song and hymn text so each lyric line stays on one row."
+      >
+        <CowToggle
+          bare
+          label="Fit each line on one row"
+          :model-value="Boolean(appStore.currentState.settings.slideStyles.autoFitLines)"
+          @update:model-value="
+            appStore.setSlideStyles({
+              ...appStore.currentState.settings.slideStyles,
+              autoFitLines: $event,
+            })
+          "
+        />
+      </SettingsRow>
     </SettingsGroup>
   </div>
 </template>
@@ -388,24 +422,30 @@ const MIN_FONT_SIZE = 50
 const lines = ref<number>(
   appStore.currentState.settings.slideStyles.linesPerSlide || 4
 )
+// Follow the store so the dropdown never shows a stale default (another
+// window can change it through pinia-shared-state).
+watch(
+  () => appStore.currentState.settings.slideStyles.linesPerSlide,
+  (value) => {
+    if (value) lines.value = value
+  }
+)
 const activePadding = ref<PaddingSide | "">("")
 const { currentState } = storeToRefs(appStore)
 
-// Teams subscription check
-const { requiresTeams, hasAccessToFeature } = useSubscription()
-const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
+// Teams subscription check. hasAccessToFeature already folds in the app-wide
+// paywall kill switch, so these are straight passthroughs now.
+const { requiresTeams, hasAccessToFeature, isPaywallEnabled } = useSubscription()
 const emitter = useNuxtApp().$emitter as any
 
 // Check access to premium features
-const hasAccessToSpaceManagement = computed(() => {
-  if (!isPremiumFeatureEnabled.value) return true
-  return hasAccessToFeature("space-management")
-})
+const hasAccessToSpaceManagement = computed(() =>
+  hasAccessToFeature("space-management")
+)
 
-const hasAccessToAnimations = computed(() => {
-  if (!isPremiumFeatureEnabled.value) return true
-  return hasAccessToFeature("animations-transitions")
-})
+const hasAccessToAnimations = computed(() =>
+  hasAccessToFeature("animations-transitions")
+)
 
 const verseTransitionStyleOptions = [
   { key: "off", label: "Off" },
@@ -414,9 +454,7 @@ const verseTransitionStyleOptions = [
 ]
 
 // Show teams badge if feature is locked
-const showTeamsBadge = computed(() => {
-  return isPremiumFeatureEnabled.value
-})
+const showTeamsBadge = computed(() => isPaywallEnabled.value)
 
 // Handle upgrade click
 const handleUpgradeClick = () => {

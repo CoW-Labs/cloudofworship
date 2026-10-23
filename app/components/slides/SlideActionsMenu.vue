@@ -143,6 +143,50 @@
       Save as Template
     </UButton>
 
+    <!-- Pairs need a camera, so a camera slide is where a pair starts: pick
+         the slide to show with it. In a pair, the same picker changes the
+         camera's partner. -->
+    <UButton
+      v-if="pairCameraId"
+      variant="ghost"
+      color="gray"
+      block
+      @click.stop.prevent="
+        () => {
+          useGlobalEmit(appWideActions.startSlidePair, {
+            cameraId: pairCameraId,
+            pairId: pair?.id,
+          })
+          close()
+        }
+      "
+    >
+      <template #leading>
+        <UIcon name="i-tabler-layout-columns" class="w-4 h-4" />
+      </template>
+      {{ pair ? "Change Paired Slide" : "Start a Pair" }}
+    </UButton>
+
+    <!-- Splits a slide pair back into two ordinary slides. Nothing is deleted,
+         so it needs no confirmation. -->
+    <UButton
+      v-if="pair"
+      variant="ghost"
+      color="gray"
+      block
+      @click.stop.prevent="
+        () => {
+          useGlobalEmit(appWideActions.unpairSlides, pair!.id)
+          close()
+        }
+      "
+    >
+      <template #leading>
+        <UIcon name="i-tabler-layout-columns" class="w-4 h-4" />
+      </template>
+      Unpair Slides
+    </UButton>
+
     <ConfirmDialog
       button-icon="i-tabler-trash"
       no-tooltip
@@ -177,8 +221,11 @@
 import { appWideActions } from "~/utils/constants"
 import type { Slide, Song, SongSetlistData } from "~/types"
 import { useAuthStore } from "~/store/auth"
+import { useAppStore } from "~/store/app"
+import { canBePairTarget, isCameraSlide } from "~/utils/slidePairs"
 
 const authStore = useAuthStore()
+const appStore = useAppStore()
 const { hasAccessToFeature } = useSubscription()
 const { getLibraryItem } = useLibrary()
 const { canDownloadMedia, downloadSlideMedia } = useSlideMediaDownload()
@@ -202,6 +249,20 @@ const menuRef = ref<{ open: () => void; close: () => void } | null>(null)
 defineExpose({
   open: () => menuRef.value?.open(),
   close: () => menuRef.value?.close(),
+})
+
+const pair = computed(() => appStore.pairForSlide(props.slide?.id))
+
+// The camera a pair starts from, or whose partner changes. On a pair's card
+// the menu may be showing the words, so the pair's camera stands in.
+const pairCameraId = computed(() => {
+  const current = pair.value
+  if (!current) return canBePairTarget(props.slide) ? props.slide.id : null
+  if (isCameraSlide(props.slide)) return props.slide.id
+  return (
+    current.slideIds.find((id) => isCameraSlide(appStore.activeSlidesById.get(id))) ??
+    null
+  )
 })
 
 const canDuplicateAsOverlay = computed(
@@ -300,7 +361,7 @@ const handleDownloadMediaClick = async () => {
 
 const handleSaveAsTemplateClick = () => {
   if (!hasAccessToFeature("new-templates")) {
-    useGlobalEmit("show-upgrade-modal")
+    useGlobalEmit("show-upgrade-modal", { feature: "new-templates" })
     usePosthogCapture("UPGRADE_PROMPT_SHOWN", {
       feature: "Slide Templates",
       location: "slide_card_template",

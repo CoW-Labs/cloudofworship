@@ -14,6 +14,7 @@
       class="action-card flex items-center gap-3 transition-colors cursor-pointer text-left w-[100%]"
       :class="[
         { 'pointer-events-none opacity-30': isActionDisabled },
+        { 'pointer-events-none opacity-70': isFetchingSong },
         compact
           ? 'min-h-[54px] px-3 py-2.5 hover:bg-white/55 dark:hover:bg-[#2b3242]/60'
           : 'p-4 items-start rounded-lg hover:bg-white dark:hover:bg-[#2b3242]',
@@ -24,7 +25,12 @@
         class="icon-ctn relative shrink-0 text-gray-800 dark:text-[#a7afbd] group-hover:text-primary dark:group-hover:text-[#d5dae3] transition-colors"
         :class="compact ? '' : 'mt-0.5'"
       >
-        <component :is="iconOverride" v-if="iconOverride" class="w-5 h-5" />
+        <UIcon
+          v-if="isFetchingSong"
+          name="i-bx-loader-alt"
+          class="block w-5 h-5 animate-spin text-primary"
+        />
+        <component :is="iconOverride" v-else-if="iconOverride" class="w-5 h-5" />
         <RecentClockIcon v-else-if="action?.recentSearch" class="w-5 h-5" />
         <component
           :is="customIconComponent"
@@ -61,13 +67,24 @@
           {{ action?.name || "" }}
         </h4>
         <p
-          v-if="!compact || showSubtext"
+          v-if="!compact || showSubtext || matchedLine"
           class="font-light mt-1 text-gray-500 dark:text-[#7d8695]"
           :class="compact ? 'text-xs mt-0.5 truncate' : 'text-xs'"
         >
-          <slot name="desc">{{ action?.desc || "" }}</slot>
+          <span
+            v-if="matchedLine"
+            class="italic"
+            v-html="highlightText(matchedLine, highlightQuery || '')"
+          />
+          <slot v-else name="desc">{{ action?.desc || "" }}</slot>
         </p>
       </div>
+      <UIcon
+        v-if="hasSongTranslation"
+        name="i-ph-translate"
+        class="shrink-0 ml-auto self-end w-4 h-4 text-primary"
+        title="Has a translation"
+      />
     </button>
 
     <div
@@ -89,13 +106,16 @@
         >
           <AppSection heading="Preview" :sub-heading="action?.name || ''">
             <div
+              ref="previewScrollEl"
               class="rounded-xl bg-gray-100 dark:bg-[#2b3242] max-h-[190px] overflow-y-auto"
             >
-              <p class="px-3 py-3 whitespace-pre-line">
-                {{
-                  previewContent ||
-                  (previewError ? "Preview unavailable" : "Loading...")
-                }}
+              <p
+                v-if="previewContent"
+                class="px-3 py-3 whitespace-pre-line"
+                v-html="previewHtml"
+              />
+              <p v-else class="px-3 py-3 whitespace-pre-line">
+                {{ previewError ? "Preview unavailable" : "Loading..." }}
               </p>
             </div>
           </AppSection>
@@ -129,6 +149,10 @@ import HymnIcon from "~/components/svgs/HymnIcon.vue"
 import TemplatesIcon from "~/components/svgs/TemplatesIcon.vue"
 import RecentClockIcon from "~/components/svgs/RecentClockIcon.vue"
 import TimeIcon from "~/components/svgs/TimeIcon.vue"
+import InterludeIcon from "~/components/svgs/InterludeIcon.vue"
+import CameraIcon from "~/components/svgs/CameraIcon.vue"
+import { isSongPending } from "~/composables/useSongs"
+import { getSongTranslation } from "~/utils/songTranslation"
 
 const props = defineProps<{
   action: QuickAction
@@ -137,6 +161,9 @@ const props = defineProps<{
   showSubtext?: boolean
   iconOverride?: Component
   active?: boolean
+  // Search query to highlight in the hover preview; the preview also scrolls
+  // to the first match so the operator can see where and how it matched.
+  highlightQuery?: string
 }>()
 
 // Maps an action name to a custom line-icon component. Actions without an entry
@@ -146,6 +173,7 @@ const actionIconComponentMap: Record<string, Component> = {
   "update-or-create-bible": BibleIcon,
   "new-search-bible": SearchIcon,
   "new-hymn": HymnIcon,
+  "new-hymn-search": HymnIcon,
   "new-transcribe": TranscribeSermonIcon,
   "add-song": AddSongIcon,
   "new-library": LibraryIcon,
@@ -160,12 +188,38 @@ const actionIconComponentMap: Record<string, Component> = {
   "new-alert": BannersAndAlertsIcon,
   "new-countdown": CountdownIcon,
   "new-time-slide": TimeIcon,
+  "new-interlude": InterludeIcon,
+  "new-camera": CameraIcon,
   "new-presentation": PptIcon,
   "new-presentation-from-pdf": PdfIcon,
   "open-schedule-modal": SchedulesIcon,
   "new-schedules-list": SchedulesIcon,
   "open-settings": SettingsIcon,
 }
+
+// A picked song spins in place of its icon until it lands on the schedule
+// (PreviewContent marks it pending for the whole pick, claim included).
+const isFetchingSong = computed(
+  () =>
+    props.action?.type === slideTypes.song &&
+    isSongPending((props.action?.songData as any)?._id)
+)
+
+// A song found by its lyrics rather than its title shows the line it matched
+// in place of the artist, so the operator can see why it came back.
+const matchedLine = computed(() =>
+  props.action?.type === slideTypes.song
+    ? props.action?.songData?.matchedLine || ""
+    : ""
+)
+
+// A song with a translation says so. A full song carries its translations; a
+// preview (an unclaimed library song) carries only the languages they exist in.
+const hasSongTranslation = computed(() => {
+  if (props.action?.type !== slideTypes.song) return false
+  const song = props.action?.songData
+  return !!(getSongTranslation(song) || song?.translationLanguages?.length)
+})
 
 const customIconComponent = computed(
   () => actionIconComponentMap[props.action?.action || ""] || null
@@ -179,6 +233,7 @@ const previewContent = ref("")
 const previewError = ref(false)
 const cardRow = ref<HTMLElement | null>(null)
 const previewEl = ref<HTMLElement | null>(null)
+const previewScrollEl = ref<HTMLElement | null>(null)
 const previewPosition = ref({ top: 0, left: 0 })
 const isCardHovered = ref(false)
 const isPreviewHovered = ref(false)
@@ -347,8 +402,50 @@ const fetchPreviewContent = async () => {
   }
 }
 
-watch(previewOpen, (open) => {
-  if (open) fetchPreviewContent()
+// Highlight the query throughout, and tag the line that matches it best so the
+// preview can scroll there rather than to the first stray common word.
+const previewHtml = computed(() => {
+  const query = props.highlightQuery || ""
+  const lines = previewContent.value.split("\n")
+  const best = findBestMatchLine(lines, query)
+  return lines
+    .map((line, i) => {
+      const html = highlightText(line, query)
+      return i === best ? `<span data-best-match>${html}</span>` : html
+    })
+    .join("\n")
+})
+
+// Centre the best-matching line in the preview's scroll area.
+const scrollPreviewToMatch = async () => {
+  await nextTick()
+  const container = previewScrollEl.value
+  if (!container) return
+  const bestLine = container.querySelector(
+    "[data-best-match]"
+  ) as HTMLElement | null
+  // A long single-line excerpt (a Bible verse) is one "line", so aim at the
+  // first highlight inside it rather than the start of the line.
+  const target = (bestLine?.querySelector("mark") ||
+    bestLine) as HTMLElement | null
+  if (!target) {
+    container.scrollTop = 0
+    return
+  }
+  const targetRect = target.getBoundingClientRect()
+  const offset = targetRect.top - container.getBoundingClientRect().top
+  container.scrollTop +=
+    offset - container.clientHeight / 2 + targetRect.height / 2
+}
+
+watch(previewOpen, async (open) => {
+  if (!open) return
+  await fetchPreviewContent()
+  scrollPreviewToMatch()
+})
+
+watch([previewContent, () => props.highlightQuery], () => {
+  if (previewOpen.value) scrollPreviewToMatch()
 })
 
 // The underlying action changed under this (reused) instance — drop the
@@ -360,9 +457,12 @@ watch(previewIdentity, () => {
   if (previewOpen.value) fetchPreviewContent()
 })
 
-const { requiresTeams, hasAccessToFeature } = useSubscription()
-const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
-const emitter = useNuxtApp().$emitter as any
+const {
+  requiresTeams,
+  hasAccessToFeature,
+  openFeatureOrUpgrade,
+  requireFeatureAccess,
+} = useSubscription()
 
 // Check if feature flag is enabled for this action
 const { checkFlag } = useFeatureFlags()
@@ -401,11 +501,15 @@ const emitParameter = computed(() => {
   }
 })
 
-// Show teams badge if the action requires teams subscription
+// Show teams badge if the action requires teams subscription.
+// `hasAccessToFeature` already returns true when the paywall is switched off
+// app-wide, so no separate kill-switch clause is needed here.
+// Hidden for now. Set SHOW_TEAMS_BADGE to true to bring the badge back.
+const SHOW_TEAMS_BADGE = false
 const showTeamsBadge = computed(() => {
   return (
+    SHOW_TEAMS_BADGE &&
     requiresTeams(props.action?.action || "") &&
-    isPremiumFeatureEnabled.value &&
     !hasAccessToFeature(props.action?.action || "")
   )
 })
@@ -418,15 +522,15 @@ const handleActionClick = () => {
     return
   }
 
-  // Check if user has access to this feature
-  if (!hasAccessToFeature(actionName) && isPremiumFeatureEnabled.value) {
-    // Show upgrade modal instead of executing the action
-    emitter.emit("show-upgrade-modal")
-    usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
-      feature: actionName,
-    })
-    return
-  }
+  // Teams features with a panel open for a free church to try; the upgrade
+  // modal waits for the step that delivers them. A card that carries its own
+  // payload (e.g. "Start 5 minute countdown timer") creates on click, so the
+  // click is that step — unless the payload only fills in the panel it opens.
+  const gate =
+    emitParameter.value && !props.action?.opensPanel
+      ? requireFeatureAccess
+      : openFeatureOrUpgrade
+  if (!gate(actionName)) return
 
   // Execute the action normally
   useGlobalEmit(

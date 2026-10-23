@@ -3,7 +3,6 @@
     ref="editorRoot"
     data-cow-popover-boundary
     class="main relative h-full min-h-0 flex flex-col rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1"
-    :class="containerOverflow === 'overflow-x-auto' ? '' : 'overflow-hidden'"
     @dragenter="onBgDragEnter"
     @dragover="onBgDragOver"
     @dragleave="onBgDragLeave"
@@ -103,186 +102,251 @@
                `.right-group` wrapper so it is a direct flex child: it takes the
                space between the slide name and Go Live and scrolls inside it.
 
-               `justify-end` is desktop-only on purpose. A flex container that
-               overflows cannot scroll back past its start when its content is
-               end-justified, so on a phone — where this strip always overflows
-               — it would open scrolled into its own middle with the first
-               control unreachable. -->
-          <div
-            class="actions flex-1 flex items-center gap-1 min-w-0 md:justify-end"
-            :class="containerOverflow"
-          >
-            <!-- VERSE SWITCH -->
-            <BibleVerseSwitch
-              v-if="
-                (slide?.type === slideTypes?.bible ||
-                  slide?.type === slideTypes?.hymn ||
-                  slide?.type === slideTypes?.song ||
-                  slide?.type === slideTypes?.songSetlist) &&
-                !isEmptySongSetlist
-              "
-              v-model="verse"
-              :slide="slide"
-              data-tour="verse-switch"
-              @previous-verse="handlePreviousVerse"
-              @next-verse="handleNextVerse"
-              @goto-verse="$emit('goto-verse', verse, selectedBibleVersion)"
-              @take-live="$emit('take-live')"
-              @predict="predictVerseInput($event as HTMLInputElement)"
-            />
-            <!-- Chapter verse list — revealed on hover of the verse switcher,
-               or while its input has focus. Must stay the immediate next
-               sibling of .verse-switch for the `+ .verse-preview` CSS to work. -->
-            <PreviewVerses
-              v-if="
-                (slide?.type === slideTypes.hymn ||
-                  slide?.type === slideTypes.song ||
-                  slide?.type === slideTypes.songSetlist ||
-                  slide?.type === slideTypes.bible) &&
-                !isEmptySongSetlist
-              "
-              class="preview-verses"
-              :slide="slide"
-              :verse="verse"
-              @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
-              @goto-song="goToSetlistSong"
-              @remove-song="removeSetlistSong"
-            />
-            <!-- Component to Auto complete Bible Books while typing -->
-            <BibleAutoComplete
-              v-if="slide?.type === slideTypes.bible && !verse?.includes(':')"
-              :verse="verse"
-              @goto-book="predictVerseInput(undefined, $event)"
-              @book-options="searchedBibleBookOptions = $event"
-            />
-
-            <!-- PAGE SWITCH — presentation slides -->
+               Controls are pushed right by a collapsing spacer, not
+               `justify-end`: an overflowing end-justified flex row cannot
+               scroll back past its start, which clipped the verse switch. The
+               spacer shrinks to zero once the row overflows, so it scrolls. -->
+          <!-- Strip and fades share one grid cell rather than a `relative`
+               wrapper: a positioned wrapper would become the containing block
+               of the verse / setlist-song picker, shrinking it from the full
+               editor width to this strip's. -->
+          <div class="flex-1 min-w-0 grid grid-cols-[minmax(0,1fr)]">
             <div
-              v-if="slide?.type === slideTypes.presentation"
-              class="page-switch button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
+              ref="actionsStrip"
+              class="actions cow-scroll-strip overflow-x-auto [grid-area:1/1] flex items-center gap-1 min-w-0"
             >
-              <CowTooltip
-                text="Previous page"
-                :shortcut="shortcutIds.previousVerse"
-              >
-                <UButton
-                  variant="ghost"
-                  color="gray"
-                  class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
-                  icon="i-bx-chevron-left"
-                  :disabled="(slide.presentationPageIndex ?? 0) <= 0"
-                  @click="handlePreviousPage"
-                />
-              </CowTooltip>
-              <span
-                class="text-xs font-medium px-1 text-gray-900 dark:text-[#d5dae3] min-w-[5ch] text-center"
-              >
-                {{ (slide.presentationPageIndex ?? 0) + 1 }} /
-                {{ slide.presentationObjects?.length ?? 1 }}
-              </span>
-              <CowTooltip text="Next page" :shortcut="shortcutIds.nextVerse">
-                <UButton
-                  variant="ghost"
-                  color="gray"
-                  class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
-                  icon="i-bx-chevron-right"
-                  :disabled="
-                    (slide.presentationPageIndex ?? 0) >=
-                    (slide.presentationObjects?.length ?? 1) - 1
-                  "
-                  @click="handleNextPage"
-                />
-              </CowTooltip>
-            </div>
-            <PreviewPages
-              v-if="slide?.type === slideTypes.presentation"
-              class="preview-pages"
-              :slide="slide"
-              @goto-page="handleGotoPage"
-            />
-            <BibleVersionSelect
-              v-if="slide?.type === slideTypes?.bible"
-              class="h-[34px] shrink-0"
-              data-tour="bible-version"
-              :bibleVersionInherited="selectedBibleVersion"
-              @open="containerOverflow = ''"
-              @close="containerOverflow = 'overflow-x-auto'"
-              @change="onUpdateBibleVersion($event)"
-            />
-            <!-- TABS: Scripture / Background / Layout -->
-            <div class="tabs flex items-center gap-1 shrink-0">
-              <template v-for="(tab, i) in visibleTabs" :key="tab.key">
-                <div
-                  v-if="i > 0"
-                  class="w-px h-4 bg-gray-200 dark:bg-white/10"
-                ></div>
-                <CoWPopover
-                  :open="activePanel === tab.key"
-                  :boundary="editorRoot"
-                  :max-width="
-                    tab.key === 'background'
-                      ? backgroundPopoverSize.width
-                      : tab.key === 'scripture'
-                      ? scripturePopoverSize.width
-                      : layoutPopoverSize.width
-                  "
-                  :max-height="
-                    tab.key === 'background'
-                      ? backgroundPopoverSize.height
-                      : tab.key === 'scripture'
-                      ? scripturePopoverSize.height
-                      : layoutPopoverSize.height
-                  "
-                  :boundary-overflow="120"
-                  panel-class="!rounded-[18px] !bg-[#f1f3f6] !shadow-none !ring-0 dark:!bg-[#131724]"
-                  @update:open="onPanelOpenChange(tab.key, $event)"
-                >
-                  <CowTooltip
-                    :text="tab.hint"
-                    :prevent="activePanel === tab.key"
-                  >
-                    <button
-                      type="button"
-                      class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
-                      :class="
-                        activePanel === tab.key
-                          ? 'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white'
-                          : 'text-gray-500 dark:text-[#a7afbd] hover:text-gray-900 dark:hover:text-white'
-                      "
-                    >
-                      {{ tab.label }}
-                    </button>
-                  </CowTooltip>
+              <div class="hidden md:block flex-1 min-w-0" aria-hidden="true" />
+              <!-- VERSE SWITCH -->
+              <BibleVerseSwitch
+                v-if="
+                  (slide?.type === slideTypes?.bible ||
+                    slide?.type === slideTypes?.hymn ||
+                    slide?.type === slideTypes?.song ||
+                    slide?.type === slideTypes?.songSetlist) &&
+                  !isEmptySongSetlist
+                "
+                v-model="verse"
+                :slide="slide"
+                data-tour="verse-switch"
+                @previous-verse="handlePreviousVerse"
+                @next-verse="handleNextVerse"
+                @goto-verse="$emit('goto-verse', verse, selectedBibleVersion)"
+                @take-live="$emit('take-live')"
+                @predict="predictVerseInput($event as HTMLInputElement)"
+              />
+              <!-- Chapter verse list — revealed on hover of the verse switcher,
+                 or while its input has focus. Must stay the immediate next
+                 sibling of .verse-switch for the `+ .verse-preview` CSS to work. -->
+              <PreviewVerses
+                v-if="
+                  (slide?.type === slideTypes.hymn ||
+                    slide?.type === slideTypes.song ||
+                    slide?.type === slideTypes.songSetlist ||
+                    slide?.type === slideTypes.bible) &&
+                  !isEmptySongSetlist
+                "
+                class="preview-verses"
+                :slide="slide"
+                :verse="verse"
+                @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
+                @goto-song="goToSetlistSong"
+                @remove-song="removeSetlistSong"
+              />
+              <!-- Component to Auto complete Bible Books while typing -->
+              <BibleAutoComplete
+                v-if="slide?.type === slideTypes.bible && !verse?.includes(':')"
+                :verse="verse"
+                @goto-book="predictVerseInput(undefined, $event)"
+                @book-options="searchedBibleBookOptions = $event"
+              />
 
-                  <template #panel>
-                    <div class="h-full w-full bg-[#f1f3f6] dark:bg-[#131724]">
-                      <GotoScripture
-                        v-if="tab.key === 'scripture'"
-                        :verse="verse"
-                        :version="selectedBibleVersion"
-                        @goto-verse="onScriptureGoto"
-                        @close="activePanel = null"
-                        @resize="scripturePopoverSize = $event"
-                      />
-                      <SlideBackgroundPanel
-                        v-else-if="tab.key === 'background'"
-                        :slide="slide"
-                        @select="onSelectBackground"
-                        @loading-change="onBgPanelLoading"
-                        @upload-files="onPanelUploadFiles"
-                        @resize="backgroundPopoverSize = $event"
-                        @close="activePanel = null"
-                      />
-                      <BibleThemeSelection
-                        v-else
-                        :value="slide?.slideStyle?.theme"
-                        @select="onSelectTheme"
-                        @resize="layoutPopoverSize = $event"
-                      />
-                    </div>
-                  </template>
-                </CoWPopover>
-              </template>
+              <!-- PAGE SWITCH — presentation slides -->
+              <div
+                v-if="slide?.type === slideTypes.presentation"
+                class="page-switch button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 flex items-center gap-1 h-[32px] px-1 pr-1 mr-0 relative"
+              >
+                <CowTooltip
+                  text="Previous page"
+                  :shortcut="shortcutIds.previousVerse"
+                >
+                  <UButton
+                    variant="ghost"
+                    color="gray"
+                    class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
+                    icon="i-bx-chevron-left"
+                    :disabled="(slide.presentationPageIndex ?? 0) <= 0"
+                    @click="handlePreviousPage"
+                  />
+                </CowTooltip>
+                <span
+                  class="text-xs font-medium px-1 text-gray-900 dark:text-[#d5dae3] min-w-[5ch] text-center"
+                >
+                  {{ (slide.presentationPageIndex ?? 0) + 1 }} /
+                  {{ slide.presentationObjects?.length ?? 1 }}
+                </span>
+                <CowTooltip text="Next page" :shortcut="shortcutIds.nextVerse">
+                  <UButton
+                    variant="ghost"
+                    color="gray"
+                    class="p-1 rounded-full text-gray-500 dark:text-[#7d8695]"
+                    icon="i-bx-chevron-right"
+                    :disabled="
+                      (slide.presentationPageIndex ?? 0) >=
+                      (slide.presentationObjects?.length ?? 1) - 1
+                    "
+                    @click="handleNextPage"
+                  />
+                </CowTooltip>
+              </div>
+              <PreviewPages
+                v-if="slide?.type === slideTypes.presentation"
+                class="preview-pages"
+                :slide="slide"
+                @goto-page="handleGotoPage"
+              />
+              <BibleVersionSelect
+                v-if="slide?.type === slideTypes?.bible"
+                class="h-[34px] shrink-0"
+                data-tour="bible-version"
+                :bibleVersionInherited="selectedBibleVersion"
+                @change="onUpdateBibleVersion($event)"
+              />
+              <!-- TABS: Scripture / Background / Layout -->
+              <div class="tabs flex items-center gap-1 shrink-0">
+                <template v-for="(tab, i) in visibleTabs" :key="tab.key">
+                  <div
+                    v-if="i > 0"
+                    class="w-px h-4 bg-gray-200 dark:bg-white/10"
+                  ></div>
+                  <CoWPopover
+                    :open="activePanel === tab.key"
+                    :boundary="editorRoot"
+                    :max-width="
+                      tab.key === 'background'
+                        ? backgroundPopoverSize.width
+                        : tab.key === 'scripture'
+                        ? scripturePopoverSize.width
+                        : tab.key === 'interlude'
+                        ? interludePopoverSize.width
+                        : tab.key === 'camera'
+                        ? cameraPopoverSize.width
+                        : tab.key === 'pair'
+                        ? pairPopoverSize.width
+                        : tab.key === 'pairBackground'
+                        ? pairBackgroundPopoverSize.width
+                        : layoutPopoverSize.width
+                    "
+                    :max-height="
+                      tab.key === 'background'
+                        ? backgroundPopoverSize.height
+                        : tab.key === 'scripture'
+                        ? scripturePopoverSize.height
+                        : tab.key === 'interlude'
+                        ? interludePopoverSize.height
+                        : tab.key === 'camera'
+                        ? cameraPopoverSize.height
+                        : tab.key === 'pair'
+                        ? pairPopoverSize.height
+                        : tab.key === 'pairBackground'
+                        ? pairBackgroundPopoverSize.height
+                        : layoutPopoverSize.height
+                    "
+                    :boundary-overflow="120"
+                    panel-class="!rounded-[18px] !bg-[#f1f3f6] !shadow-none !ring-0 dark:!bg-[#131724]"
+                    @update:open="onPanelOpenChange(tab.key, $event)"
+                  >
+                    <CowTooltip
+                      :text="tab.hint"
+                      :prevent="activePanel === tab.key"
+                    >
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
+                        :class="
+                          activePanel === tab.key
+                            ? 'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white'
+                            : 'text-gray-500 dark:text-[#a7afbd] hover:text-gray-900 dark:hover:text-white'
+                        "
+                      >
+                        {{ tab.label }}
+                      </button>
+                    </CowTooltip>
+
+                    <template #panel>
+                      <div class="h-full w-full bg-[#f1f3f6] dark:bg-[#131724]">
+                        <GotoScripture
+                          v-if="tab.key === 'scripture'"
+                          :verse="verse"
+                          :version="selectedBibleVersion"
+                          @goto-verse="onScriptureGoto"
+                          @close="activePanel = null"
+                          @resize="scripturePopoverSize = $event"
+                        />
+                        <SlideBackgroundPanel
+                          v-else-if="tab.key === 'background'"
+                          :slide="slide"
+                          @select="onSelectBackground"
+                          @loading-change="onBgPanelLoading"
+                          @upload-files="onPanelUploadFiles"
+                          @resize="backgroundPopoverSize = $event"
+                          @close="activePanel = null"
+                        />
+                        <InterludeBackgroundPanel
+                          v-else-if="tab.key === 'interlude'"
+                          :slide="slide"
+                          @select="onSelectInterludeVariant"
+                          @save-texts="onSaveInterludeTexts"
+                          @resize="interludePopoverSize = $event"
+                          @close="activePanel = null"
+                        />
+                        <!-- The pair's own backdrop. Writes to the pair only;
+                             the Background tab still edits this slide's. -->
+                        <SlideBackgroundPanel
+                          v-else-if="tab.key === 'pairBackground' && slidePair"
+                          :slide="pairBackgroundSlide"
+                          @select="onSelectPairBackground"
+                          @upload-files="onPairBackgroundUpload"
+                          @resize="pairBackgroundPopoverSize = $event"
+                          @close="activePanel = null"
+                        />
+                        <div
+                          v-else-if="tab.key === 'pair' && slidePair"
+                          class="h-full overflow-y-auto p-3"
+                        >
+                          <div
+                            :ref="(el: any) => (pairPanelContent = el ?? null)"
+                          >
+                            <SlidePairPanel :pair-id="slidePair.id" />
+                          </div>
+                        </div>
+                        <div
+                          v-else-if="tab.key === 'camera'"
+                          class="h-full overflow-y-auto p-3"
+                        >
+                          <CameraForm
+                            :ref="(el: any) => (cameraPanelContent = el?.$el ?? null)"
+                            :model-value="cameraInput"
+                            @update:model-value="patchCamera"
+                          />
+                        </div>
+                        <BibleThemeSelection
+                          v-else
+                          :value="slide?.slideStyle?.theme"
+                          @select="onSelectTheme"
+                          @resize="layoutPopoverSize = $event"
+                        />
+                      </div>
+                    </template>
+                  </CoWPopover>
+                </template>
+              </div>
+            </div>
+            <div class="[grid-area:1/1] relative pointer-events-none">
+              <CowScrollFade
+                :start="actionsFadeStart"
+                :end="actionsFadeEnd"
+                color="var(--cow-editor-bg)"
+              />
             </div>
           </div>
 
@@ -293,6 +357,8 @@
                 ? isActiveOverlay
                   ? 'Clear overlay'
                   : 'Show overlay'
+                : slidePair
+                ? 'Take the pair live'
                 : 'Take slide live'
             "
             :shortcut="shortcutIds.promoteActiveSlide"
@@ -334,7 +400,12 @@
         :editor="focusedEditor"
       />
       <SlideContentToolbar
-        v-else-if="slide && !isEmptySongSetlist"
+        v-else-if="
+          slide &&
+          !isEmptySongSetlist &&
+          slide.type !== slideTypes.interlude &&
+          slide.type !== slideTypes.camera
+        "
         :slide="slide"
         @update-style="onUpdateSlideStyle($event, false)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
@@ -408,6 +479,31 @@
             </template>
             {{ isTeamsPlan ? "Manage Storage" : "Upgrade to Teams" }}
           </CowButton>
+        </div>
+        <!-- CAMERA — the slide's own camera only, never a stand-in. Paused
+             where one page holds the camera at a time while a camera is on
+             the projector: opening it here would black out the projector. -->
+        <div
+          v-else-if="slide.type === slideTypes.camera"
+          class="h-[100%] relative rounded-b-2xl overflow-hidden"
+        >
+          <CameraFeed
+            v-if="editorCameraData?.deviceId && !editorCameraPaused"
+            :data="editorCameraData"
+            quality="preview"
+            assigned-only
+            :release-immediately="cameraIsExclusive"
+          />
+          <CameraPlaceholder
+            v-else
+            size="lg"
+            :title="slide.name || 'Camera'"
+            :subtitle="
+              editorCameraPaused
+                ? 'Preview paused while a camera is on the projector'
+                : 'No camera selected'
+            "
+          />
         </div>
         <div
           v-else
@@ -485,29 +581,44 @@
             :padding="editorPreviewPadding"
             :content-visible="true"
             class="static-slide-editor-preview z-10"
+            @mouseenter="previewHovered = true"
+            @mouseleave="previewHovered = false"
           />
         </div>
       </template>
     </div>
+
+    <!-- REPORT AN ISSUE — faint until hovered so it never competes with the slide -->
+    <ReportIssueButton :slide="slide" class="absolute bottom-3 right-3 z-30" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { useOnline } from "@vueuse/core"
+import { useOnline, useResizeObserver } from "@vueuse/core"
 import { remapChunkIndex, splitVerseByLines } from "~/composables/useHymn"
 import CoWPopover from "~/components/cow/CoWPopover.vue"
 import type { Editor } from "@tiptap/core"
 import type { Emitter } from "mitt"
 import { asFontFamily } from "~/utils/fontFamily"
+import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
+import { isSessionMediaUrl } from "~/utils/mediaTransport"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import {
   mediaCloudFailureReason,
   unavailableMediaCopy,
 } from "~/utils/mediaCloudSync"
+import {
+  withInterludeData,
+  defaultInterludeData,
+} from "~/utils/interlude/slide"
+import { interludeModeKey } from "~/utils/interlude/context"
+import { defaultCameraData, withCameraData, type CameraSettings } from "~/utils/camera"
 import type {
+  CameraSlideData,
   ExtendedFileT,
   ExternalVideo,
+  InterludeSlideData,
   MediaCloudSyncReason,
   Slide,
   SlideStyle,
@@ -515,6 +626,10 @@ import type {
   SongSetlistData,
 } from "~/types"
 import { escapePriority } from "~/composables/useEscapeKey"
+import { songOnSlide } from "~/utils/songTranslation"
+import { pairBackgroundOf } from "~/utils/slidePairs"
+import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
+import useCameraOnAir from "~/composables/useCameraOnAir"
 import {
   computeNextVerseLabel,
   computePreviousVerseLabel,
@@ -678,7 +793,14 @@ const backgroundImageLoading = ref<boolean>(false)
 const backgroundVideoLoading = ref<boolean>(false)
 
 // Only one editor action popover can be open at a time.
-type PanelKey = "scripture" | "background" | "layout"
+type PanelKey =
+  | "scripture"
+  | "background"
+  | "layout"
+  | "interlude"
+  | "camera"
+  | "pair"
+  | "pairBackground"
 type PopoverSize = { width: number; height: number }
 const activePanel = ref<PanelKey | null>(null)
 const getInitialBackgroundPopoverSize = (): PopoverSize =>
@@ -691,6 +813,138 @@ const backgroundPopoverSize = ref<PopoverSize>(
 )
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+const interludePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+const cameraPopoverSize = ref<PopoverSize>({ width: 380, height: 260 })
+const pairPopoverSize = ref<PopoverSize>({ width: 380, height: 360 })
+// Sized to its content, as the camera panel is.
+const pairPanelContent = ref<HTMLElement | null>(null)
+useResizeObserver(pairPanelContent, ([entry]) => {
+  const height = entry?.target.getBoundingClientRect().height
+  if (height) pairPopoverSize.value = { width: 380, height: Math.ceil(height) + 24 }
+})
+
+// The slide pair this slide is in. Its tab switches member, layout and sound;
+// everything else in the editor is this member's own.
+const slidePair = computed(() => appStore.pairForSlide(props.slide?.id))
+
+// ── Camera preview ──────────────────────────────────────────────────────────
+const cameraIsExclusive = cameraCaptureIsExclusive()
+const cameraOnAir = useCameraOnAir()
+const editorCameraData = computed(() =>
+  props.slide?.type === slideTypes.camera
+    ? (props.slide.data as CameraSlideData | undefined) ?? null
+    : null
+)
+const editorCameraPaused = computed(
+  () => cameraIsExclusive && cameraOnAir.value
+)
+
+// ── Pair background ─────────────────────────────────────────────────────────
+// SlideBackgroundPanel reads a slide, so it is handed a stand-in carrying the
+// pair's background. Choices go to the pair and never touch this slide.
+const { updatePair } = useSlidePairs()
+const pairBackgroundPopoverSize = ref<PopoverSize>({ width: 753, height: 314 })
+const pairBackgroundSlide = computed(
+  () =>
+    ({
+      id: `pair-background-${slidePair.value?.id}`,
+      type: slideTypes.text,
+      ...pairBackgroundOf(slidePair.value),
+    }) as unknown as Slide
+)
+const onSelectPairBackground = (
+  backgroundType: string,
+  data:
+    | string
+    | { image: string; key?: string }
+    | { video: string; key?: string }
+) => {
+  const pair = slidePair.value
+  if (!pair) return
+  const isImage = typeof data !== "string" && "image" in data
+  const isVideo = typeof data !== "string" && "video" in data
+  void updatePair(pair.id, {
+    background:
+      typeof data === "string" ? data : isImage ? data.image : data.video,
+    backgroundType,
+    backgroundImageKey: isImage ? data.key ?? null : null,
+    backgroundVideoKey: isVideo ? data.key ?? null : null,
+  })
+  usePosthogCapture("SLIDE_PAIR_BACKGROUND_CHANGED", { backgroundType })
+}
+// A new upload is saved against a slide (its local copy and cloud upload are
+// keyed to one), so it goes through a slide's Background tab first and is then
+// pickable here from the library.
+const onPairBackgroundUpload = () => {
+  useToast().add({
+    icon: "i-bx-info-circle",
+    title: "Add the file from a slide's Background tab first",
+    description: "Then pick it here from your images or videos.",
+  })
+}
+// The popover opens at the height it is given, so follow the camera form's
+// own height (the camera list arrives after it opens) plus the p-3 padding.
+const cameraPanelContent = ref<HTMLElement | null>(null)
+useResizeObserver(cameraPanelContent, ([entry]) => {
+  const height = entry?.target.getBoundingClientRect().height
+  if (height) cameraPopoverSize.value = { width: 380, height: Math.ceil(height) + 24 }
+})
+
+// Interlude slides hold a still frame in the editor so the operator's eye
+// stays on the schedule and live output. They animate, at the preview rate,
+// while hovered or while the interlude panel is open for picking a variant.
+// InterludeView already forces static under prefers-reduced-motion.
+const previewHovered = ref(false)
+provide(
+  interludeModeKey,
+  computed(() =>
+    previewHovered.value || activePanel.value === "interlude"
+      ? "preview"
+      : "static"
+  )
+)
+
+const interludeInput = computed(() => {
+  const { id: _id, ...input } = (props.slide?.data ||
+    {}) as InterludeSlideData
+  return { ...defaultInterludeData(), ...input }
+})
+
+// Each interlude panel section patches only its own fields; the rest of the
+// slide's data is carried over untouched.
+const patchInterlude = (patch: Partial<InterludeSlideData>) => {
+  if (props.slide?.type !== slideTypes.interlude) return
+  const id = (props.slide.data as InterludeSlideData | undefined)?.id
+  emit(
+    "slide-update",
+    withInterludeData(props.slide, {
+      ...interludeInput.value,
+      ...patch,
+      id: id || useID(),
+    })
+  )
+}
+const cameraInput = computed<CameraSettings>(() => {
+  const { id: _id, ...input } = (props.slide?.data || {}) as CameraSlideData
+  return { ...defaultCameraData(), ...input }
+})
+
+// Saved through the usual slide-update path, so a projector showing this
+// slide picks up a new device and re-opens the camera on its own.
+const patchCamera = (next: CameraSettings) => {
+  if (props.slide?.type !== slideTypes.camera) return
+  const id = (props.slide.data as CameraSlideData | undefined)?.id
+  emit("slide-update", withCameraData(props.slide, { ...next, id: id || useID() }))
+}
+
+const onSelectInterludeVariant = (variant: string) =>
+  patchInterlude({ variant })
+const onSaveInterludeTexts = (
+  texts: Pick<InterludeSlideData, "heading" | "subtitle" | "textBackground">
+) => {
+  patchInterlude(texts)
+  activePanel.value = null
+}
 
 // Toolbar tabs that toggle the overlay panels. Scripture/Layout are Bible-only;
 // Background mirrors the old "add background" visibility (hidden for presentation
@@ -698,10 +952,39 @@ const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const visibleTabs = computed(() => {
   const isAudio = (props.slide?.data as ExtendedFileT)?.type?.includes("audio")
   const isBible = props.slide?.type === slideTypes.bible
+  const isInterlude = props.slide?.type === slideTypes.interlude
+  const isCamera = props.slide?.type === slideTypes.camera
+  // An interlude paints its own background, and a camera feed covers it.
   const showBackground =
     props.slide?.type !== slideTypes.presentation &&
+    !isInterlude &&
+    !isCamera &&
     (props.slide?.type !== slideTypes.media || isAudio)
   const tabs: { key: PanelKey; label: string; hint: string }[] = []
+  if (slidePair.value) {
+    tabs.push({
+      key: "pair",
+      label: "Pair settings",
+      hint: "Switch slide and layout for this slide pair",
+    })
+    tabs.push({
+      key: "pairBackground",
+      label: "Pair background",
+      hint: "What background is underneath both slides",
+    })
+  }
+  if (isInterlude)
+    tabs.push({
+      key: "interlude",
+      label: "Interlude",
+      hint: "Change the animation, heading and sub text",
+    })
+  if (isCamera)
+    tabs.push({
+      key: "camera",
+      label: "Camera settings",
+      hint: "Choose the camera and how it fills the screen",
+    })
   if (isBible)
     tabs.push({
       key: "scripture",
@@ -764,7 +1047,9 @@ watch(
 const slideContents = ref<Array<string>>([])
 const verse = ref<string>(props.slide?.title || "")
 const searchedBibleBookOptions = ref<string[]>([])
-const containerOverflow = ref<string>("overflow-x-auto")
+const actionsStrip = ref<HTMLElement | null>(null)
+const { start: actionsFadeStart, end: actionsFadeEnd } =
+  useScrollEdgeFade(actionsStrip)
 const selectedBibleVersion = ref<string>(
   appStore.currentState.settings.defaultBibleVersion
 )
@@ -840,7 +1125,11 @@ const checkImageAvailability = async () => {
   if (!bg) return
 
   // If the background is already a remote URL, it's available everywhere
-  if (bg.startsWith("http://") || bg.startsWith("https://")) return
+  if (
+    (bg.startsWith("http://") || bg.startsWith("https://")) &&
+    !isSessionMediaUrl(bg)
+  )
+    return
 
   try {
     const localUrl = await localMedia.ensureLocal(slideId, {
@@ -1493,7 +1782,10 @@ const onUpdateMediaSeek = (seekTime: number) => {
   }, 5000)
 }
 
-const onUpdateSongLyrics = async (song: Song) => {
+const onUpdateSongLyrics = async (
+  song: Song,
+  options: { keepFontSize?: boolean } = {}
+) => {
   // Defensive: the toolbar already filters failed lookups, but this handler is
   // wired to a template event and must not crash the editor on a null payload.
   if (!song) return
@@ -1530,10 +1822,12 @@ const onUpdateSongLyrics = async (song: Song) => {
   const currentSongVerse = song.verses?.[currentSongVerseNumber - 1]
 
   tempSlide.name = useSlideName(tempSlide)
-  let fontSize = useScreenFontSize(currentSongVerse || "")
-  tempSlide.slideStyle = {
-    ...tempSlide.slideStyle,
-    fontSize: Number(fontSize),
+  if (!options.keepFontSize) {
+    let fontSize = useScreenFontSize(currentSongVerse || "")
+    tempSlide.slideStyle = {
+      ...tempSlide.slideStyle,
+      fontSize: Number(fontSize),
+    }
   }
   tempSlide.data = song
   tempSlide.contents = useSlideContent(tempSlide, song, currentSongVerse)
@@ -1542,6 +1836,47 @@ const onUpdateSongLyrics = async (song: Song) => {
     : slideLayoutTypes.full_text
   emit("slide-update", tempSlide)
 }
+
+// Opening a song slide pulls the song again, so lyrics or translations fixed
+// since it was added show up without pressing Refresh. Quiet on purpose: no
+// toast when the lookup fails (offline), no font size reset, and no update at
+// all when nothing changed, so a click does not save or broadcast the slide.
+const songContentKey = (song?: Song | null) =>
+  song
+    ? JSON.stringify([song.title, song.lyrics, song.translations || []])
+    : ""
+
+watch(
+  () => props.slide?.id,
+  async (slideId) => {
+    const slide = props.slide
+    if (!slideId || !slide) return
+    if (slide.type !== slideTypes.song && slide.type !== slideTypes.songSetlist)
+      return
+
+    // A setlist refreshes the song it is showing, as the toolbar button does
+    const activeItem =
+      slide.type === slideTypes.songSetlist
+        ? setlistData.value.songs[setlistData.value.activeSongIndex]
+        : undefined
+    const songId =
+      slide.type === slideTypes.songSetlist
+        ? activeItem?.songId || activeItem?.song?._id || activeItem?.song?.id
+        : slide.songId
+    if (!songId) return
+
+    const song = await useSong(songId, slide.slideStyle?.linesPerSlide, {
+      silent: true,
+    })
+    // The operator may have moved to another slide while this was in flight
+    if (!song || props.slide?.id !== slideId) return
+    if (songContentKey(song) === songContentKey(songOnSlide(props.slide)))
+      return
+
+    await onUpdateSongLyrics(song, { keepFontSize: true })
+  },
+  { immediate: true }
+)
 
 const onUpdateSongLines = async (linesPerSlide: number) => {
   // Captured before anything re-chunks, so the active chunk can be re-pointed
@@ -1552,10 +1887,6 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
 
   if (props.slide?.type === slideTypes.hymn) {
     if (!props.slide) return
-    appStore.setSlideStyles({
-      ...appStore.currentState.settings.slideStyles,
-      linesPerSlide,
-    })
     const hymn = await useHymn(props.slide.songId as string)
     if (!hymn) {
       useToast().add({
@@ -1600,10 +1931,6 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
   }
 
   if (props.slide?.type === slideTypes.songSetlist) {
-    appStore.setSlideStyles({
-      ...appStore.currentState.settings.slideStyles,
-      linesPerSlide,
-    })
     // The refresh chunks at the slide's own `linesPerSlide`, so the new value
     // has to be on the slide going in — and the slideStyle it hands back is
     // the one to emit, since it carries the re-measured font size too.
@@ -1650,7 +1977,11 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
   const previousVerseIndex = Number.isFinite(currentSongVerseNumber)
     ? currentSongVerseNumber - 1
     : 0
-  const tempSong: Song | null = await useSong(song, linesPerSlide)
+  // Hand it a copy: the slide's data is the store's own object.
+  const tempSong: Song | null = await useSong(
+    song && typeof song === "object" ? { ...song } : song,
+    linesPerSlide
+  )
   // console.log(tempSong)
   if (tempSong) {
     const activeVerseIndex = previousVerses.length
@@ -1676,6 +2007,7 @@ const onUpdateSongLines = async (linesPerSlide: number) => {
     let fontSize = useScreenFontSize(currentSongVerse || "")
     tempSlide.slideStyle = {
       ...tempSlide.slideStyle,
+      linesPerSlide,
       fontSize: Number(fontSize),
     }
     tempSlide.data = tempSong

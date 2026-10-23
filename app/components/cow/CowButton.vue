@@ -9,7 +9,7 @@
     :size="size"
     :ui="buttonUi"
     class="cow-button"
-    :class="`cow-button--${variant}`"
+    :class="[`cow-button--${variant}`, { 'cow-button--flat': flat }]"
     v-bind="$attrs"
   >
     <template v-if="$slots.leading" #leading>
@@ -33,6 +33,9 @@ const props = withDefaults(
     disabled?: boolean
     type?: "button" | "submit" | "reset"
     size?: "2xs" | "xs" | "sm" | "md" | "lg" | "xl"
+    // Solid fill, no ledge or drop shadow: for buttons inside a card that is
+    // already raised. A secondary one takes its own ledge colour as its fill.
+    flat?: boolean
   }>(),
   {
     variant: "primary",
@@ -134,6 +137,31 @@ const buttonUi = {
 .cow-button:disabled {
   transform: none !important;
 }
+
+/* Flat — a solid fill and nothing to press down into. */
+.cow-button--flat,
+.cow-button--flat:active:not(:disabled) {
+  transform: none;
+}
+
+.cow-button--flat.cow-button--secondary,
+.cow-button--flat.cow-button--secondary:active:not(:disabled) {
+  background-color: #e2e8f0 !important;
+  box-shadow: none;
+}
+
+.cow-button--flat.cow-button--secondary:hover {
+  background-color: #d8e0ea !important;
+}
+
+.cow-button--flat.cow-button--primary,
+.cow-button--flat.cow-button--dark,
+.cow-button--flat.cow-button--danger,
+.cow-button--flat.cow-button--primary:active:not(:disabled),
+.cow-button--flat.cow-button--dark:active:not(:disabled),
+.cow-button--flat.cow-button--danger:active:not(:disabled) {
+  box-shadow: none;
+}
 </style>
 
 <style>
@@ -151,5 +179,16 @@ html.dark .cow-button--secondary:hover {
 html.dark .cow-button--secondary:active:not(:disabled) {
   transform: translateY(3px);
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2), 0 1px 0 0 #0d1320;
+}
+
+html.dark .cow-button--flat.cow-button--secondary,
+html.dark .cow-button--flat.cow-button--secondary:active:not(:disabled) {
+  transform: none;
+  background-color: #0d1320 !important;
+  box-shadow: none;
+}
+
+html.dark .cow-button--flat.cow-button--secondary:hover {
+  background-color: #111a2b !important;
 }
 </style>

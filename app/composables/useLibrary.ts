@@ -7,6 +7,18 @@ import { useOnline } from '@vueuse/core'
 import fuzzysort from 'fuzzysort'
 import { safeDBGet } from './useIndexedDB'
 
+// Shared by every useLibrary() caller, so the startup refresh in the app layout
+// and each mount of the Library panel don't each re-download the catalog.
+const LIBRARY_REFRESH_MAX_AGE_MS = 5 * 60 * 1000
+const librarySyncedAt = { songs: 0, slides: 0 }
+let libraryRefreshInFlight: Promise<void> | null = null
+
+// Local-only songs being pushed to the catalog right now, and ones the server
+// has refused (400 id taken, 409 duplicate / possible duplicates). A refusal
+// won't change on retry, so those aren't re-posted on every sync this session.
+const songUploadsInFlight = new Set<string>()
+const songUploadsRejected = new Set<string>()
+
 export default function useLibrary() {
   const authStore = useAuthStore()
   const appStore = useAppStore()
@@ -169,6 +181,7 @@ export default function useLibrary() {
       ]
 
       await cacheSlidesInLibrary(mergedSlides)
+      librarySyncedAt.slides = Date.now()
 
       return mergedSlides
     } catch (error) {
@@ -190,21 +203,21 @@ export default function useLibrary() {
       const db = useIndexedDB()
 
       const librarySlides = slides.reduce<LibraryItem[]>((items, slide) => {
-          const cacheableSlide = toCacheableSlide(slide)
-          if (!cacheableSlide) return items
+        const cacheableSlide = toCacheableSlide(slide)
+        if (!cacheableSlide) return items
 
-          const slideId = cacheableSlide._id || cacheableSlide.id
-          if (!slideId) return items
+        const slideId = cacheableSlide._id || cacheableSlide.id
+        if (!slideId) return items
 
-          items.push({
-            id: slideId,
-            type: libraryTypes.slide,
-            content: cacheableSlide,
-            createdAt: cacheableSlide.createdAt || new Date().toISOString(),
-            updatedAt: cacheableSlide.updatedAt || new Date().toISOString(),
-          })
-          return items
-        }, [])
+        items.push({
+          id: slideId,
+          type: libraryTypes.slide,
+          content: cacheableSlide,
+          createdAt: cacheableSlide.createdAt || new Date().toISOString(),
+          updatedAt: cacheableSlide.updatedAt || new Date().toISOString(),
+        })
+        return items
+      }, [])
 
       // Replace all slide entries in a single transaction so the liveQuery only
       // emits once (after commit) and never observes the empty mid-state between
@@ -242,12 +255,13 @@ export default function useLibrary() {
   /**
    * Best-effort, silent upload of a single local-only song to the church
    * catalog. Failures — including the server's duplicate guard (409) — are
-   * swallowed; the caller keeps the local copy either way.
+   * swallowed; the caller keeps the local copy either way. A 4xx refusal is
+   * remembered so the song isn't re-posted on every sync.
    */
-  const uploadLocalSong = async (
-    song: Song,
-    churchId: string
-  ): Promise<boolean> => {
+  const uploadLocalSong = async (song: Song, churchId: string) => {
+    const songKey = song.id || song._id
+    if (!songKey) return
+    songUploadsInFlight.add(songKey)
     try {
       const { error } = await useAPIFetch(`/church/${churchId}/songs`, {
         method: 'POST',
@@ -256,13 +270,34 @@ export default function useLibrary() {
           createdBy: authStore.user?._id,
           churchId,
         },
-        key: `library-upload-song-${song.id || song._id}`,
+        key: `library-upload-song-${songKey}`,
       })
-      return !error.value
+      const err = error.value as any
+      const status = err?.response?.status || err?.statusCode || err?.status
+      if (status === 400 || status === 409) {
+        songUploadsRejected.add(songKey)
+      }
     } catch (error) {
       console.error('Error uploading local song to catalog:', error)
-      return false
+    } finally {
+      songUploadsInFlight.delete(songKey)
     }
+  }
+
+  // Fire-and-forget: the sync (and the Library skeleton) never waits on these.
+  // The next sync picks uploaded songs up from the catalog.
+  const uploadLocalOnlySongs = (songs: Song[], churchId: string) => {
+    if (!online.value) return
+    songs
+      .filter((song) => {
+        const songKey = song.id || song._id
+        return (
+          songKey &&
+          !songUploadsInFlight.has(songKey) &&
+          !songUploadsRejected.has(songKey)
+        )
+      })
+      .forEach((song) => void uploadLocalSong(song, churchId))
   }
 
   /**
@@ -289,6 +324,9 @@ export default function useLibrary() {
         {
           method: 'GET',
           key: 'get-library-church-songs',
+          // The whole catalog with lyrics; give a slow link longer than the
+          // default before giving up (the cached copy is on screen meanwhile).
+          timeout: 45_000,
         }
       )
 
@@ -310,19 +348,16 @@ export default function useLibrary() {
         .map((item) => item.content as Song)
         .filter((song) => (song.id || song._id) && !isSongInSet(song, remoteIds))
 
-      // Best-effort push of local-only songs up to the catalog (online only) so
-      // teammates see them too. The local copy is kept regardless of outcome.
-      if (online.value && localOnlySongs.length > 0) {
-        await Promise.allSettled(
-          localOnlySongs.map((song) => uploadLocalSong(song, churchId))
-        )
-      }
-
       // Merge: remote catalog is the source of truth, plus every local-only song
       // so offline / failed-upload songs survive the cache replacement.
       const mergedSongs = [...remoteSongs, ...localOnlySongs]
 
       await cacheSongsInLibrary(mergedSongs)
+      librarySyncedAt.songs = Date.now()
+
+      // Then push local-only songs up to the catalog in the background so
+      // teammates see them too. The local copy is kept regardless of outcome.
+      uploadLocalOnlySongs(localOnlySongs, churchId)
 
       return mergedSongs
     } catch (error) {
@@ -343,22 +378,22 @@ export default function useLibrary() {
       const db = useIndexedDB()
 
       const librarySongs = songs.reduce<LibraryItem[]>((items, song) => {
-          const cacheableSong = toCacheableSong(song)
-          if (!cacheableSong) return items
+        const cacheableSong = toCacheableSong(song)
+        if (!cacheableSong) return items
 
-          // Key on the client `id` so delete/lookup (which use song.id) keep working.
-          const songId = cacheableSong.id || cacheableSong._id
-          if (!songId) return items
+        // Key on the client `id` so delete/lookup (which use song.id) keep working.
+        const songId = cacheableSong.id || cacheableSong._id
+        if (!songId) return items
 
-          items.push({
-            id: songId,
-            type: libraryTypes.song,
-            content: cacheableSong,
-            createdAt: cacheableSong.createdAt || new Date().toISOString(),
-            updatedAt: cacheableSong.updatedAt || new Date().toISOString(),
-          })
-          return items
-        }, [])
+        items.push({
+          id: songId,
+          type: libraryTypes.song,
+          content: cacheableSong,
+          createdAt: cacheableSong.createdAt || new Date().toISOString(),
+          updatedAt: cacheableSong.updatedAt || new Date().toISOString(),
+        })
+        return items
+      }, [])
 
       // Replace all song entries in a single transaction so the liveQuery only
       // emits once (after commit) and never observes the empty mid-state between
@@ -396,7 +431,7 @@ export default function useLibrary() {
         .put(libraryItem)
         .catch((err) => console.error('Failed to add song to library:', err))
 
-      toast.add({ icon: 'i-bx-save', title: 'Song saved to Library' })
+      // toast.add({ icon: 'i-bx-save', title: 'Song saved to Library' })
       return libraryItem
     } catch (error) {
       console.error('Error saving song to library:', error)
@@ -579,9 +614,44 @@ export default function useLibrary() {
    * Songs and slides come from different backend sources (the church catalog
    * vs. the saved-slides collection), so fetch them in parallel.
    */
-  const refreshLibrary = async () => {
-    await Promise.all([fetchSavedSlides(), fetchSavedSongs()])
+  /**
+   * Re-sync saved songs and slides from the API. A refresh already running
+   * (from any caller) is joined rather than duplicated. Pass `ifOlderThanMs`
+   * to skip the network entirely when the last successful sync is recent —
+   * the cached copy in IndexedDB is shown either way.
+   */
+  const refreshLibrary = async (
+    { ifOlderThanMs }: { ifOlderThanMs?: number } = {}
+  ) => {
+    try {
+      if (libraryRefreshInFlight) {
+        await libraryRefreshInFlight
+        return
+      }
+
+      const lastSyncedAt = Math.min(librarySyncedAt.songs, librarySyncedAt.slides)
+      if (ifOlderThanMs !== undefined && Date.now() - lastSyncedAt < ifOlderThanMs) {
+        return
+      }
+
+      libraryRefreshInFlight = Promise.all([
+        fetchSavedSlides(),
+        fetchSavedSongs(),
+      ]).then(() => undefined)
+      try {
+        await libraryRefreshInFlight
+      } finally {
+        libraryRefreshInFlight = null
+      }
+    } finally {
+      // Joined and skipped refreshes never run this instance's fetchers, so
+      // clear its loading state here too.
+      loading.value = false
+    }
   }
+
+  const refreshLibraryIfStale = () =>
+    refreshLibrary({ ifOlderThanMs: LIBRARY_REFRESH_MAX_AGE_MS })
 
   return {
     loading,
@@ -600,5 +670,6 @@ export default function useLibrary() {
     getLibraryItem,
     isItemSaved,
     refreshLibrary,
+    refreshLibraryIfStale,
   }
 }

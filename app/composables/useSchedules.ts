@@ -36,7 +36,11 @@ export default function useSchedules() {
       })
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to create schedule')
+        // The API's own message explains the cases a user can act on — notably
+        // SCHEDULE_LIMIT, where the answer is to upgrade rather than retry.
+        // `message` alone is only the transport-level failure.
+        const reason = (error.value as any)?.data?.message
+        throw new Error(reason || error.value?.message || 'Failed to create schedule')
       }
 
       const createdSchedule = data.value as Schedule

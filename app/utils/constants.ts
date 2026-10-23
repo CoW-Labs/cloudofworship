@@ -10,6 +10,8 @@ export const slideTypes = {
   countdown: 'countdown',
   time: 'time',
   presentation: 'presentation',
+  interlude: 'interlude',
+  camera: 'camera',
   // sermon: 'sermon',
   // carousel: 'carousel',
 }
@@ -24,6 +26,10 @@ export const appWideActions = {
   newBible: 'new-bible',
   updateOrCreateBible: 'update-or-create-bible',
   newHymn: 'new-hymn',
+  // Opens the hymn panel with a search already typed in (the payload).
+  newHymnSearch: 'new-hymn-search',
+  // The hymn library in IndexedDB was replaced; anything holding a copy re-reads it.
+  hymnsUpdated: 'hymns-updated',
   newSong: 'new-song',
   newSongSearch: 'new-song-search',
   newSongSetlist: 'new-song-setlist',
@@ -37,9 +43,19 @@ export const appWideActions = {
   addSong: 'add-song',
   songUpdated: 'song-updated',
   addSongSlideToSetlist: 'add-song-slide-to-setlist',
+  // Slide pairs: two slides on the live screen at once. `slidePair` is the
+  // tier key (see useSubscription); the rest are emitter events.
+  slidePair: 'slide-pair',
+  pairSlides: 'pair-slides',
+  unpairSlides: 'unpair-slides',
+  setPairActiveMember: 'set-pair-active-member',
+  // A camera's ⋯ menu: pick a slide to pair with it, or change its partner.
+  startSlidePair: 'start-slide-pair',
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
   newTimeSlide: 'new-time-slide',
+  newInterlude: 'new-interlude',
+  newCamera: 'new-camera',
   showSlideOverlay: 'show-slide-overlay',
   removeSlideOverlay: 'remove-slide-overlay',
   newSearchBible: 'new-search-bible',
@@ -187,20 +203,21 @@ export const quickActionsArr: QuickAction[] = [
     name: "Add Media",
     desc: "Display image, video or audio media",
     action: appWideActions.newMedia,
-    meta: "",
+    meta: "upload file photo picture audio music mp3 mp4",
     type: slideTypes.media,
     tier: "free",
     // type: slideTypes.text
   },
-  {
-    icon: "i-bx-slideshow",
-    name: "Slide Templates",
-    desc: "Use pre-made, fancy slide templates",
-    action: appWideActions.newTemplates,
-    meta: "template preset saved design layout",
-    tier: "teams",
-    // type: slideTypes.text
-  },
+  // Slide templates are hidden for everyone for now.
+  // {
+  //   icon: "i-bx-slideshow",
+  //   name: "Slide Templates",
+  //   desc: "Use pre-made, fancy slide templates",
+  //   action: appWideActions.newTemplates,
+  //   meta: "template preset saved design layout",
+  //   tier: "teams",
+  //   // type: slideTypes.text
+  // },
   {
     icon: "i-bx-bell",
     name: "Add Banners/Alert",
@@ -240,6 +257,23 @@ export const quickActionsArr: QuickAction[] = [
     meta: "time clock live clock current time",
     type: slideTypes.time,
     tier: "teams",
+  },
+  {
+    icon: "i-ph-coffee",
+    name: "Add Interlude",
+    desc: "An animated break screen with a heading and sub text",
+    action: appWideActions.newInterlude,
+    meta: "interlude intermission break pause animated background welcome coffee fellowship selah we'll be right back",
+    type: slideTypes.interlude,
+    tier: "teams",
+  },
+  {
+    icon: "i-bx-video",
+    name: "Add Camera",
+    desc: "Show a webcam or capture card full screen",
+    action: appWideActions.newCamera,
+    meta: "camera webcam imag capture card live video feed preacher",
+    type: slideTypes.camera,
   },
   {
     icon: "i-mdi-youtube",
@@ -341,7 +375,7 @@ export const quickActionsArr: QuickAction[] = [
     name: "Go Live",
     desc: "Open the live presentation window",
     action: appWideActions.goLive,
-    meta: "present display screen output start live window",
+    meta: "present display screen output start live window projector",
     searchableOnly: true,
     tier: "free",
   },
@@ -352,7 +386,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.openStageDisplay,
     meta: "stage display confidence monitor musician speaker lyrics next verse timer foldback",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-timer",
@@ -379,7 +413,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.startStageTimer,
     meta: "stage timer start resume run stopwatch count up service sermon confidence monitor",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-pause-circle",
@@ -388,7 +422,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.stopStageTimer,
     meta: "stage timer stop pause hold stopwatch service sermon confidence monitor",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-arrow-counter-clockwise",
@@ -397,7 +431,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.restartStageTimer,
     meta: "stage timer restart reset zero again stopwatch service sermon confidence monitor",
     searchableOnly: true,
-    tier: "free",
+    tier: "teams",
   },
   {
     icon: "i-ph-presentation-chart-slash",
@@ -569,7 +603,7 @@ export const quickActionsArr: QuickAction[] = [
     name: "Overlay Settings",
     desc: "Configure overlay position, size, and decorative theme",
     action: appWideActions.openSettings,
-    actionArg: "Overlay Settings",
+    actionArg: "Other Settings",
     meta: "overlay theme decorative position size text countdown time layout",
     searchableOnly: true,
     tier: "free",
@@ -641,6 +675,10 @@ export const desktopOnlyActions: string[] = [
   appWideActions.clearStageCountdown,
   // Keyboard shortcuts reference. There is no physical keyboard to bind.
   appWideActions.openShortcutsModal,
+  // A camera slide picks a device attached to the machine that opens /live.
+  // A phone would list its own cameras, which the projector computer does not
+  // have.
+  appWideActions.newCamera,
   // Legacy PowerPoint import (already commented out of quickActionsArr). PDF
   // import stays available on mobile: it is the only way to create a
   // `presentation` slide, and every other slide type is reachable there.
@@ -654,6 +692,8 @@ export const slideLayoutTypes = {
   bible: 'bible',
   countdown: 'countdown',
   time: 'time',
+  interlude: 'interlude',
+  camera: 'camera',
   empty: 'empty',
 }
 

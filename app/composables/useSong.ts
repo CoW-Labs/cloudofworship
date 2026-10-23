@@ -18,16 +18,17 @@ const addIdToReturnedSongs = (songs: Array<Song>) => {
  *
  * @param song
  * @param linesPerDisplay how many lyric lines make up one verse. Falls back to
- *   the app-wide default when omitted.
- * @param options `persistLinesPerSlide: false` chunks at the given value
- *   without promoting it to the app-wide default — for callers that chunk at a
- *   slide-scoped value (a setlist) and must not stomp the global setting.
+ *   the app-wide default when omitted. Callers chunking for an existing slide
+ *   pass the slide's own `slideStyle.linesPerSlide`. This never writes the
+ *   app-wide default: only Settings owns that.
+ * @param options.silent skip the "Song not found" toast, for background lookups
+ *   the operator did not ask for
  * @returns
  */
 const useSong = async (
   song: Song | string,
   linesPerDisplay?: number,
-  options?: { persistLinesPerSlide?: boolean }
+  options: { silent?: boolean } = {}
 ): Promise<Song | null> => {
   // console.log(linesPerDisplay)
   const toast = useToast()
@@ -38,9 +39,6 @@ const useSong = async (
     linesPerDisplay = appStore.currentState.settings.slideStyles.linesPerSlide
   }
   linesPerDisplay = Number(linesPerDisplay)
-  if (options?.persistLinesPerSlide !== false) {
-    appStore.setSlideStyles({ ...appStore.currentState.settings.slideStyles, linesPerSlide: linesPerDisplay })
-  }
 
   try {
     if (typeof song === 'string' && song?.includes('-')) {
@@ -107,7 +105,9 @@ const useSong = async (
     return song
   } catch (err) {
     // console.log(err)
-    toast.add({ title: 'Song not found', icon: 'i-bx-music', color: 'red' })
+    if (!options.silent) {
+      toast.add({ title: 'Song not found', icon: 'i-bx-music', color: 'red' })
+    }
   }
   return null
 }
@@ -120,10 +120,6 @@ const useSong = async (
  * guess. When the lyrics label their sections ('Chorus', '[Pre-Chorus 2]') only
  * the chorus sections are considered; otherwise the whole song is.
  */
-
-// Structural markers ('Chorus', 'Chorus:', '[Verse 1]', '(Bridge)') — never a title.
-const SECTION_LABEL =
-  /^[\[\(]?\s*(pre[-\s]?chorus|chorus|refrain|verse|bridge|tag|intro|outro|interlude|instrumental|vamp|hook|ending|coda|solo)\b[^A-Za-z]*$/i
 
 // Wordless filler ('Oh oh oh', 'Yeah yeah') repeats a lot but makes a poor title.
 const FILLER_WORD = 'oh+|ooh+|woah+|whoa+|ah+|aah+|eh+|hey+|yeah+|yea+|la+|na+|mmm+|hmm+|mm+'

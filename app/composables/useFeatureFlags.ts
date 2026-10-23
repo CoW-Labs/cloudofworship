@@ -1,7 +1,22 @@
 import { PostHog } from "posthog-js"
-import { ref, onMounted } from "vue"
+import { ref, getCurrentScope, onScopeDispose } from "vue"
 
-export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "transcripts-free" | "ppt-conversion" | "allow-online-scripture-search-for-only-teams" | "force-sw-unregister" | "hide-free-trial-promotion" | "teams"
+/**
+ * NOTE: the paywall kill switch is deliberately NOT in here any more.
+ *
+ * It used to be the `teams` flag, and every paid gate read it. Flag SDKs
+ * return their default when they cannot reach their backend, so an operator
+ * who was offline — which this app supports on purpose — or behind a filter
+ * that blocked PostHog silently got the entire Teams tier. Anything that
+ * decides entitlement has to fail closed, so that switch now comes from our
+ * own API as `paywallEnabled` on /app-config/info (see useAppInfo), and the
+ * only thing that reads it is useSubscription. Do not gate a paid feature on
+ * a flag key.
+ *
+ * Flags below are rollout switches, where failing open is the correct and
+ * intended behaviour.
+ */
+export type FeatureFlagKey = "livestream-link" | "view-slide-templates" | "transcripts-feature" | "transcripts-free" | "ppt-conversion" | "allow-online-scripture-search-for-only-teams" | "force-sw-unregister" | "hide-free-trial-promotion" | "upgrade-modal-billing-default" | "discord-community" | "signup-video-layout"
 
 /**
  * Composable for managing PostHog feature flags
@@ -94,14 +109,31 @@ export const useFeatureFlags = (flagKey?: FeatureFlagKey) => {
     return result
   }
 
-  // Initialize on mount
-  onMounted(async () => {
-    if (posthog) {
-      await reloadFlags()
+  // Keep `isEnabled` in step for the one flag this caller asked about.
+  //
+  // PostHog fetches flags itself at init and on identify, and calls back at
+  // once when they're already loaded, so listening is enough. This used to
+  // reload flags on every mount, which sent a /flags request for each
+  // component using useSubscription (every action card), and registered hooks
+  // from plain function calls (claimSong) where there is no component at all.
+  if (flagKey) {
+    if (!posthog) {
+      // same localhost rule as checkFlag, so a flagged feature can be seen in dev
+      isEnabled.value = checkFlag(flagKey)
+      isLoading.value = false
+    } else if (getCurrentScope()) {
+      const stopListening = posthog.onFeatureFlags(() => {
+        isEnabled.value = checkFlag(flagKey)
+        isLoading.value = false
+      })
+      onScopeDispose(stopListening)
     } else {
+      isEnabled.value = checkFlag(flagKey)
       isLoading.value = false
     }
-  })
+  } else {
+    isLoading.value = false
+  }
 
   return {
     // State

@@ -13,6 +13,7 @@ import type {
   OverlaySettings,
   SlideBackgroundKey,
   StageTimerState,
+  SlidePair,
 } from "~/types/index"
 import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
@@ -104,6 +105,28 @@ export function toSlideArray(value: unknown): Slide[] {
   return Array.isArray(value) ? (value as Slide[]) : []
 }
 
+/** Field-by-field equality for pairs, ids compared in order. */
+function sameSlidePair(a: SlidePair, b: SlidePair): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof SlidePair>
+  for (const key of keys) {
+    const left = a[key]
+    const right = b[key]
+    if (Array.isArray(left) || Array.isArray(right)) {
+      if (
+        !Array.isArray(left) ||
+        !Array.isArray(right) ||
+        left.length !== right.length ||
+        left.some((value, i) => value !== right[i])
+      ) {
+        return false
+      }
+    } else if ((left ?? null) !== (right ?? null)) {
+      return false
+    }
+  }
+  return true
+}
+
 function ensureUniqueIds(slides: unknown): Slide[] {
   const seenIds = new Set()
   return toSlideArray(slides).filter((obj) => {
@@ -170,6 +193,8 @@ export const useAppStore = defineStore("app", {
         activeSlides: [], // Returns all slides on CoW
         liveOutputSlidesId: null,
         liveSlideId: null,
+        slidePairs: [],
+        livePairId: null,
         emitter: null,
         settings: {
           appVersion: "0.1.0",
@@ -273,6 +298,58 @@ export const useAppStore = defineStore("app", {
     activeScheduleSlides(): Slide[] {
       const scheduleId = this.currentState.activeSchedule?._id
       return scheduleId ? this.slidesBySchedule[scheduleId] || [] : []
+    },
+    // Every slide on this device by client id, for lookups that would
+    // otherwise scan the whole list once per card.
+    activeSlidesById(): Map<string, Slide> {
+      return new Map(this.activeSlides.map((slide) => [slide.id, slide] as const))
+    },
+    // The active schedule's pairs, plus any made offline and not saved yet
+    // (see setSlidePairs). A snapshot from before pairs existed has no key, so
+    // every read goes through this.
+    allSlidePairs: (state): SlidePair[] =>
+      Array.isArray(state.currentState.slidePairs) ? state.currentState.slidePairs : [],
+    activeSchedulePairs(): SlidePair[] {
+      const scheduleId = this.currentState.activeSchedule?._id
+      return scheduleId
+        ? this.allSlidePairs.filter((pair) => pair.scheduleId === scheduleId)
+        : []
+    },
+    slidePairsById(): Map<string, SlidePair> {
+      return new Map(this.allSlidePairs.map((pair) => [pair.id, pair] as const))
+    },
+    // Membership, keyed by slide id. Built from the pairs rather than from
+    // `slide.pairId`, so a slide is only treated as paired while its pair is
+    // actually here.
+    pairIdsBySlideId(): Map<string, string> {
+      const index = new Map<string, string>()
+      this.allSlidePairs.forEach((pair) =>
+        pair.slideIds.forEach((slideId) => index.set(slideId, pair.id))
+      )
+      return index
+    },
+    pairForSlide() {
+      return (slideId?: string | null): SlidePair | undefined => {
+        if (!slideId) return undefined
+        const pairId = this.pairIdsBySlideId.get(slideId)
+        return pairId ? this.slidePairsById.get(pairId) : undefined
+      }
+    },
+    livePair(): SlidePair | undefined {
+      const pairId = this.currentState.livePairId
+      return pairId ? this.slidePairsById.get(pairId) : undefined
+    },
+    /**
+     * Whether a slide is on screen: the single live slide, or any member of the
+     * live pair. Media controls key off this, so a pair's second video still
+     * answers play, pause and seek.
+     */
+    isSlideLive() {
+      return (slideId?: string | null): boolean => {
+        if (!slideId) return false
+        if (this.currentState.liveSlideId === slideId) return true
+        return !!this.livePair?.slideIds.includes(slideId)
+      }
     },
     bibleVersions: (state) => state.currentState.settings.bibleVersions,
     panelSize: (state) => (panel: PanelSizeKey) =>
@@ -395,6 +472,9 @@ export const useAppStore = defineStore("app", {
       enqueueSlideShadowWrite("remove slide", (repository) =>
         repository.deleteSlide(slide.scheduleId, slide.id)
       )
+      // The API dissolves a pair that loses a member; match it here so the
+      // other slide comes back as an ordinary card straight away.
+      this.detachSlidesFromPairs([slide.id])
       this.futureStates = []
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
@@ -440,6 +520,9 @@ export const useAppStore = defineStore("app", {
       this.currentState.liveOutputSlidesId = Array.from(
         new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
       )
+      // Slides arriving from the server, the cache or a teammate carry whatever
+      // pairId they were saved with; the pairs held here decide.
+      if (this.allSlidePairs.length) this.syncPairMembership()
       this.futureStates = []
     },
     // setActiveSlideId(slideId: string) {
@@ -450,6 +533,136 @@ export const useAppStore = defineStore("app", {
     },
     setLiveSlide(slide: string) {
       this.currentState.liveSlideId = slide
+      // Blank, or a slide outside the live pair, ends the pair on screen.
+      if (!slide || (this.livePair && !this.livePair.slideIds.includes(slide))) {
+        this.currentState.livePairId = null
+      }
+    },
+    /**
+     * Mirrors the live slide id from another window without deciding what is
+     * on screen. The /live window uses it: the operator owns `livePairId`,
+     * and a broadcast arriving before the shared state would otherwise end a
+     * pair it has not heard of yet.
+     */
+    mirrorLiveSlideId(slideId: string) {
+      if (this.currentState.liveSlideId !== slideId) {
+        this.currentState.liveSlideId = slideId
+      }
+    },
+    setLivePair(pairId: string | null) {
+      if ((this.currentState.livePairId ?? null) === pairId) return
+      this.currentState.livePairId = pairId
+    },
+    /**
+     * Installs the active schedule's pairs. Only that schedule's are held (the
+     * rest live in the IndexedDB cache, see useSlidePairs), so the state that
+     * is saved and shared between windows on every change stays small. Pairs
+     * made offline and not saved yet are kept whatever their schedule, so
+     * nothing is lost before they reach the server.
+     */
+    setSlidePairs(scheduleId: string, pairs: SlidePair[]) {
+      const incoming = pairs.filter((pair) => pair?.id && pair.scheduleId === scheduleId)
+      const incomingIds = new Set(incoming.map((pair) => pair.id))
+      this.currentState.slidePairs = [
+        ...this.allSlidePairs.filter(
+          (pair) => pair.pending && !incomingIds.has(pair.id)
+        ),
+        ...incoming,
+      ]
+      this.syncPairMembership()
+    },
+    upsertSlidePair(pair: SlidePair) {
+      if (!pair?.id) return
+      const pairs = [...this.allSlidePairs]
+      const index = pairs.findIndex((existing) => existing.id === pair.id)
+      // A replace takes a slide out as well as putting one in.
+      const touched = [...(pair.slideIds || []), ...(pairs[index]?.slideIds || [])]
+      if (index === -1) {
+        pairs.push(pair)
+      } else {
+        const merged = { ...pairs[index]!, ...pair }
+        // Socket echoes and no-op saves change nothing: skip the write, so
+        // nothing that reads the pairs re-renders.
+        if (sameSlidePair(pairs[index]!, merged)) return
+        pairs.splice(index, 1, merged)
+      }
+      this.currentState.slidePairs = pairs
+      this.syncPairMembership(touched)
+    },
+    removeSlidePair(pairId: string) {
+      const pair = this.slidePairsById.get(pairId)
+      if (!pair) return
+      this.currentState.slidePairs = this.allSlidePairs.filter(
+        (existing) => existing.id !== pairId
+      )
+      if (this.currentState.livePairId === pairId) {
+        this.currentState.livePairId = null
+      }
+      this.syncPairMembership(pair.slideIds)
+    },
+    /**
+     * Takes slides out of their pairs, as the API does when they are deleted.
+     * A pair left with one slide is dissolved and that slide goes back to
+     * being an ordinary slide.
+     */
+    detachSlidesFromPairs(slideIds: string[]) {
+      const removed = new Set(slideIds.filter(Boolean))
+      if (!removed.size) return
+      let changed = false
+      const pairs: SlidePair[] = []
+      this.allSlidePairs.forEach((pair) => {
+        if (!pair.slideIds.some((id) => removed.has(id))) {
+          pairs.push(pair)
+          return
+        }
+        changed = true
+        const remaining = pair.slideIds.filter((id) => !removed.has(id))
+        if (remaining.length < 2) {
+          if (this.currentState.livePairId === pair.id) {
+            this.currentState.livePairId = null
+          }
+          return
+        }
+        pairs.push({
+          ...pair,
+          slideIds: remaining,
+          activeSlideId: remaining.includes(pair.activeSlideId)
+            ? pair.activeSlideId
+            : remaining[0]!,
+          audioSlideId:
+            pair.audioSlideId && remaining.includes(pair.audioSlideId)
+              ? pair.audioSlideId
+              : null,
+          hiddenSlideId:
+            pair.hiddenSlideId && remaining.includes(pair.hiddenSlideId)
+              ? pair.hiddenSlideId
+              : null,
+        })
+      })
+      if (!changed) return
+      this.currentState.slidePairs = pairs
+      this.syncPairMembership()
+    },
+    /**
+     * Brings each slide's `pairId` in line with the pairs held here. The API
+     * owns the field and strips it from slide writes, so this is a view of the
+     * pairs, never a source of them: membership is always read through
+     * `pairForSlide`, and the cached slide records are left alone rather than
+     * risk overwriting a queued edit's sync state.
+     */
+    syncPairMembership(slideIds?: readonly string[]) {
+      const index = this.pairIdsBySlideId
+      // Given ids, only those slides can have changed membership.
+      const only = slideIds ? new Set(slideIds) : null
+      let changed = false
+      const nextSlides = this.activeSlides.map((slide) => {
+        if (only && !only.has(slide.id)) return slide
+        const pairId = index.get(slide.id) ?? null
+        if ((slide.pairId ?? null) === pairId) return slide
+        changed = true
+        return { ...slide, pairId }
+      })
+      if (changed) this.currentState.activeSlides = nextSlides
     },
     setEmitter(emitter: Emitter<Record<EventType, any>> | null) {
       this.currentState.emitter = emitter
@@ -818,7 +1031,7 @@ export const useAppStore = defineStore("app", {
         enabled: true,
       })
     },
-    setIntermissionSettings(payload: AppSettings["intermission"]) {
+    setBlankSettings(payload: AppSettings["intermission"]) {
       this.currentState.settings = {
         ...this.currentState.settings,
         intermission: {
@@ -844,6 +1057,8 @@ export const useAppStore = defineStore("app", {
       this.setActiveSlides([])
       this.setLiveOutputSlidesId([])
       this.setLiveSlide("")
+      this.currentState.slidePairs = []
+      this.currentState.livePairId = null
       this.setEmitter(null)
       this.setAppSettings({
         appVersion: this.currentState.settings.appVersion, // preserve current version to avoid re-triggering changelog
@@ -906,10 +1121,16 @@ export const useAppStore = defineStore("app", {
       // An undo/redo entry is a snapshot clone, and a snapshot that travelled
       // through a serializer no longer carries activeSlides. Restore the key
       // explicitly instead of letting `undefined` reach the readers.
+      // Pairs are server state, created and removed through the API, so an
+      // undo never brings back or takes away a pair: it would leave this
+      // device disagreeing with the server and every teammate.
       this.currentState = {
         ...state,
         activeSlides: toSlideArray(state?.activeSlides),
+        slidePairs: this.allSlidePairs,
+        livePairId: this.currentState.livePairId ?? null,
       }
+      this.syncPairMembership()
       const scheduleId = this.currentState.activeSchedule?._id
       if (scheduleId) {
         cancelPendingScheduleShadowPuts(scheduleId)
@@ -939,6 +1160,34 @@ export const useAppStore = defineStore("app", {
         this.pastStates.push(this.currentState)
         this.setCurrentState(this.futureStates.pop())
       }
+    },
+    /**
+     * Rewrites one slide in every undo/redo snapshot. A song added from a
+     * library preview goes onto the schedule before its claim answers, so a
+     * snapshot taken in between holds the preview, and undo would bring it
+     * back: without its full lyrics, or, when the claim was refused, as a slide
+     * the API reads as unlocking the song. `settle` returns the slide to keep
+     * in its place, or null to leave it out.
+     */
+    settleSlideInHistory(
+      slideId: string,
+      settle: (slide: Slide) => Slide | null
+    ) {
+      const rewrite = (states: AppState[]) =>
+        states.map((state) => {
+          const slides = toSlideArray(state?.activeSlides)
+          if (!slides.some((slide) => slide.id === slideId)) return state
+          return {
+            ...state,
+            activeSlides: slides.flatMap((slide) => {
+              if (slide.id !== slideId) return [slide]
+              const settled = settle(slide)
+              return settled ? [settled] : []
+            }),
+          }
+        })
+      this.pastStates = rewrite(this.pastStates)
+      this.futureStates = rewrite(this.futureStates)
     },
     refreshAppActionsStack() {
       this.pastStates = []

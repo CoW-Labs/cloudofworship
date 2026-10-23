@@ -1,5 +1,6 @@
 import type { Slide } from "~/types"
 import { backgroundTypes, slideTypes } from "~/utils/constants"
+import { toTransportSafeSlide } from "~/utils/mediaTransport"
 
 /**
  * Shared shape of a slide update sent to the API.
@@ -23,8 +24,11 @@ export const isMediaVideoSlide = (slide: Slide) =>
  * The API derives these from the route and the stored document, and rejects or
  * mis-stores them when they arrive in the body.
  */
-export const toSlideUpdatePayload = (slide: Slide) => {
-  const payload: Slide | any = { ...slide }
+export const toSlideUpdatePayload = async (slide: Slide) => {
+  // A rehydrated slide carries this device's playback URLs (blob:, and
+  // asset.localhost file paths on desktop). Sent as-is they replaced the CDN
+  // URLs on the server, and the media vanished for every other device.
+  const payload: Slide | any = await toTransportSafeSlide(slide)
   delete payload._id
   delete payload.id
   delete payload.churchId

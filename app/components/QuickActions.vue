@@ -2,8 +2,14 @@
   <AppSection
     heading="Quick Actions"
     :sub-heading="searchInput.length < 2 ? page?.replace('-', ' ') : 'Search'"
+    :trail="
+      searchInput.length < 2 && page === 'library' && libraryReviewing
+        ? 'Review song'
+        : undefined
+    "
     class="w-full relative overflow-hidden z-20"
     @header-click="searchInput.length < 2 ? (page = '') : (searchInput = '')"
+    @sub-header-click="libraryReviewing = false"
   >
     <!-- <Transition name="fade-sm" -->
     <!-- ACTIONS HOME SECTION -->
@@ -64,16 +70,25 @@
         v-if="isSearchFocused && searchInput.length < 2"
         class="quick-search-panel come-up-1 mt-3 rounded-2xl bg-white dark:bg-[#2b3242] p-3 mb-2"
       >
+        <!-- mousedown.prevent keeps focus in the search box, so picking a
+        scope doesn't blur it and close this panel. -->
         <div class="quick-filters flex flex-wrap gap-2">
           <button
             v-for="filter in quickFilters"
-            :key="filter.label"
-            class="quick-filter-chip flex items-center gap-1.5 text-sm rounded-full bg-gray-100 dark:bg-[#222938] px-3 py-1.5 text-gray-600 dark:text-[#9aa3b2] hover:bg-gray-200 dark:hover:bg-[#1d2433] transition-colors whitespace-nowrap"
-            @click="handleChipClick(filter.action)"
+            :key="filter.scope"
+            class="quick-filter-chip flex items-center gap-1.5 text-sm rounded-full px-3 py-1.5 transition-colors whitespace-nowrap"
+            :class="
+              searchScope === filter.scope
+                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                : 'bg-gray-100 dark:bg-[#222938] text-gray-600 dark:text-[#9aa3b2] hover:bg-gray-200 dark:hover:bg-[#1d2433]'
+            "
+            :aria-pressed="searchScope === filter.scope"
+            @mousedown.prevent
+            @click="toggleSearchScope(filter.scope)"
           >
             {{ filter.label }}
             <CloseIcon
-              v-if="filter.removable"
+              v-if="searchScope === filter.scope"
               class="w-5 h-5 rounded-full bg-gray-300 text-gray-900 dark:bg-gray-100 dark:text-gray-900 p-0.5"
             />
           </button>
@@ -120,6 +135,7 @@
           :key="getActionKey(action)"
           :action="action"
           compact
+          :highlight-query="searchInput"
           :data-action-index="index"
           :active="hasInteracted && index === focusedActionIndex"
           :class="{
@@ -137,6 +153,22 @@
         ref="actionsContainer"
         data-tour="quick-actions-list"
       >
+        <!-- The chips panel closes once typing starts, so the scope it set
+        stays visible (and removable) here. -->
+        <div v-if="activeScopeFilter" class="flex px-3 pt-2 pb-1">
+          <button
+            class="quick-filter-chip flex items-center gap-1.5 text-xs rounded-full bg-gray-900 text-white dark:bg-white dark:text-gray-900 pl-3 pr-1 py-1 whitespace-nowrap"
+            :aria-label="`Stop searching only ${activeScopeFilter.label}`"
+            @mousedown.prevent
+            @click="searchScope = null"
+          >
+            {{ activeScopeFilter.label }} only
+            <CloseIcon
+              class="w-4 h-4 rounded-full bg-gray-300 text-gray-900 dark:bg-gray-100 dark:text-gray-900 p-0.5"
+            />
+          </button>
+        </div>
+
         <div
           v-if="isSearchingRemote"
           class="flex items-center gap-1.5 px-3 py-2"
@@ -147,27 +179,53 @@
           >
         </div>
 
-        <ActionCard
+        <p
+          v-else-if="rankedSearchResults.length === 0"
+          class="px-3 py-2 text-xs text-gray-500 dark:text-[#7d8695]"
+        >
+          No matches for &ldquo;{{ searchQuery }}&rdquo;{{
+            activeScopeFilter
+              ? ` in ${activeScopeFilter.label.toLowerCase()}`
+              : ""
+          }}.
+        </p>
+
+        <template
           v-for="(action, index) in searchedActions"
           :key="getActionKey(action)"
-          :action="{
-            ...action,
-            bibleChapterAndVerse:
-              action?.bibleChapterAndVerse || bibleChapterAndVerse,
-          }"
-          compact
-          :data-action-index="index"
-          :active="hasInteracted && index === focusedActionIndex"
-          :class="{
-            'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
-          }"
-          @click="focusedActionIndex = index"
-          @mouseenter="onRowMouseEnter(index)"
         >
-          <template #desc>
-            <span v-html="highlightText(action.desc ?? '', searchInput)" />
-          </template>
-        </ActionCard>
+          <p
+            v-if="index === rankedSearchResults.length && index > 0"
+            class="px-3 pt-3 pb-1 text-[11px] uppercase tracking-wide text-gray-400 dark:text-[#7d8695]"
+          >
+            Not what you need?
+          </p>
+          <ActionCard
+            :action="{
+              ...action,
+              bibleChapterAndVerse:
+                action?.bibleChapterAndVerse || bibleChapterAndVerse,
+            }"
+            compact
+            :show-subtext="
+              !!action.desc &&
+              (action.type === slideTypes.song ||
+                action.type === slideTypes.hymn)
+            "
+            :highlight-query="searchQuery"
+            :data-action-index="index"
+            :active="hasInteracted && index === focusedActionIndex"
+            :class="{
+              'bg-white/70 dark:bg-[#2b3242]/70': index === focusedActionIndex,
+            }"
+            @click="focusedActionIndex = index"
+            @mouseenter="onRowMouseEnter(index)"
+          >
+            <template #desc>
+              <span v-html="highlightText(action.desc ?? '', searchQuery)" />
+            </template>
+          </ActionCard>
+        </template>
       </div>
     </div>
 
@@ -190,6 +248,7 @@
     <!-- HYMN SECTION -->
     <HymnList
       v-else-if="page === 'hymn'"
+      :query="hymnSearchQuery"
       class="fade-in-right h-full min-h-0 overflow-auto"
       @close="page = ''"
     />
@@ -207,6 +266,7 @@
     <!-- SEARCH BIBLE SECTION-->
     <SearchBibleList
       v-else-if="page === 'search-bible'"
+      :query="searchBibleQuery"
       class="fade-in-right h-full min-h-0 overflow-auto"
       @close="page = ''"
     />
@@ -217,7 +277,9 @@
       class="fade-in-right h-full min-h-0 overflow-auto"
       :page="libraryPage"
       :song-to-edit="librarySongToEdit"
+      :new-song-title="libraryNewSongTitle"
       :open-token="libraryOpenToken"
+      v-model:reviewing="libraryReviewing"
       @close="page = ''"
     />
 
@@ -251,6 +313,20 @@
       @close="page = ''"
     />
 
+    <!-- INTERLUDE SECTION-->
+    <AddInterlude
+      v-else-if="page === 'interlude'"
+      class="fade-in-right h-full min-h-0 overflow-auto"
+      @close="page = ''"
+    />
+
+    <!-- CAMERA SECTION-->
+    <AddCamera
+      v-else-if="page === 'camera'"
+      class="fade-in-right h-full min-h-0 overflow-auto"
+      @close="page = ''"
+    />
+
     <!-- IMPORT SLIDES (PRESENTATION) SECTION-->
     <AddPresentation
       v-else-if="page === 'presentation'"
@@ -277,12 +353,27 @@ import {
   isScriptureReferenceValidSync,
 } from "~/composables/useScripture"
 import { quickActionsArr, desktopOnlyActions } from "~/utils/constants"
+import {
+  ACTION_MATCH_SPREAD,
+  ACTION_MATCH_THRESHOLD,
+  CONTENT_NAME_THRESHOLD,
+  actionMatchStrength,
+  isSdaHymnalNumber,
+  namesActionExactly,
+  normalizeSearchText,
+  normalizeSongTitle,
+  parseHymnalNumberQuery,
+  resolveBibleBook,
+  sharesMeaningfulWord,
+  songTitleMatchRank,
+  textMatchRank,
+  titleHasNumber,
+} from "~/utils/quickSearch"
 import { escapePriority } from "~/composables/useEscapeKey"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
-const { hasAccessToFeature } = useSubscription()
-const { isEnabled: isPremiumFeatureEnabled } = useFeatureFlags("teams")
+const { openFeatureOrUpgrade, requireFeatureAccess } = useSubscription()
 const online = useOnline()
 const { savedSongs } = useLibrary()
 const { searchSongs } = useSongs()
@@ -300,9 +391,22 @@ const props = withDefaults(
   { mobile: false }
 )
 
-let searchInputBeforeTwoDigitNumbers = ""
 const searchInputEl = ref<{ input: HTMLInputElement }>()
 const searchInput = ref<string>("")
+// What the results are ranked for. It follows the box, but while typing it
+// waits for a short pause: ranking reads every hymn and saved song's lyrics,
+// and an older laptop doing that on each keystroke makes the typing lag.
+// Showing or hiding the results (crossing two letters) lands at once, and so
+// does anything that acts on the results (arrows, Enter); see
+// `flushSearchTerm`.
+const SEARCH_RANK_DELAY_MS = 90
+const searchTerm = ref<string>("")
+let searchTermTimer: ReturnType<typeof setTimeout> | null = null
+const flushSearchTerm = () => {
+  if (searchTermTimer) clearTimeout(searchTermTimer)
+  searchTermTimer = null
+  searchTerm.value = searchInput.value
+}
 // Titles are not unique across sources. For example, the library, remote song
 // search, and hymn catalogue can all contain multiple entries named "Amazing
 // Grace". Give each action object a stable identity so Vue can move grouped
@@ -322,6 +426,9 @@ const getActionKey = (action: QuickAction) => {
 // not on the idle home state.
 const isSearchFocused = ref(false)
 let searchBlurTimeout: ReturnType<typeof setTimeout> | null = null
+// Every suggestion is checked to land on what it promises: its action, verse
+// or song as the top result. Phrases that only described a wish ("kids pickup
+// alert", "Canva slides") taught operators that search doesn't work.
 const quickSearchSuggestionsByAction = {
   bible: [
     "Matt 28 19",
@@ -339,7 +446,6 @@ const quickSearchSuggestionsByAction = {
     "be still and know",
     "armor of God",
     "fruit of the spirit",
-    "great commission",
   ],
   hymns: [
     "Rock of Ages",
@@ -362,44 +468,33 @@ const quickSearchSuggestionsByAction = {
   songSetlists: [
     "song setlist",
     "worship set",
-    "Sunday praise set",
-    "communion songs",
-    "altar call songs",
     "opening worship set",
     "closing worship songs",
   ],
   textSlides: [
     "Create Text Slide",
-    "welcome slide",
-    "sermon title slide",
-    "offering announcement",
   ],
   media: [
     "image library",
     "Add Media",
     "upload video",
     "background image",
-    "sermon bumper",
     "audio file",
-    "motion background",
   ],
-  templates: [
-    "Slide Templates",
-    "lower third template",
-    "sermon notes template",
-    "announcement template",
-    "Bible verse template",
-    "minimal worship template",
-    "countdown template",
-  ],
+  // Slide templates are hidden for everyone for now.
+  // templates: [
+  //   "Slide Templates",
+  //   "lower third template",
+  //   "sermon notes template",
+  //   "announcement template",
+  //   "Bible verse template",
+  //   "minimal worship template",
+  //   "countdown template",
+  // ],
   alerts: [
     "Add Banners/Alert",
     "Remove Alert",
-    "prayer line alert",
-    "kids pickup alert",
     "offering banner",
-    "stream starting alert",
-    "service update banner",
   ],
   countdowns: ["Add Countdown Timer", "5 min timer", "30s timer"],
   times: ["Add Time Slide", "current time", "clock", "live clock"],
@@ -407,37 +502,20 @@ const quickSearchSuggestionsByAction = {
     "Add YouTube Video",
     "Add Vimeo Video",
     "YouTube worship video",
-    "sermon clip",
-    "testimony video",
-    "online announcement video",
-    "embed livestream",
   ],
   presentations: [
     "Import Slides",
-    "PowerPoint import",
     "PDF presentation",
-    "Google Slides import",
-    "Canva slides",
-    "sermon deck",
-    "guest speaker slides",
   ],
   library: [
     "My Library",
-    "saved songs",
-    "favorite slides",
-    "uploaded files",
     "personal media",
-    "reuse last Sunday",
-    "saved backgrounds",
   ],
   transcription: [
     "Transcribe Sermon",
     "sermon transcription",
     "auto Bible slides",
-    "microphone transcript",
     "audio to text",
-    "highlight scriptures",
-    "record message notes",
   ],
   liveControl: [
     "Go Live",
@@ -454,7 +532,6 @@ const quickSearchSuggestionsByAction = {
     "Refresh Slides",
     "Upload Offline Slides",
     "sync slides",
-    "reload schedule",
     "cloud backup",
     "offline uploads",
     "save to cloud",
@@ -485,8 +562,10 @@ const quickSearchSuggestions = Object.values(
   quickSearchSuggestionsByAction
 ).flat()
 const quickSearchSuggestionIndex = ref(0)
-const quickSearchPlaceholder = computed(
-  () => `Try "${quickSearchSuggestions[quickSearchSuggestionIndex.value]}"`
+const quickSearchPlaceholder = computed(() =>
+  activeScopeFilter.value
+    ? activeScopeFilter.value.placeholder
+    : `Try "${quickSearchSuggestions[quickSearchSuggestionIndex.value]}"`
 )
 let quickSearchSuggestionInterval: ReturnType<typeof setInterval> | null = null
 
@@ -502,6 +581,9 @@ const handleSearchBlur = () => {
   // chips that refocus the input re-open it via handleSearchFocus.
   searchBlurTimeout = setTimeout(() => {
     isSearchFocused.value = false
+    // Leaving an empty box ends the search session, scope included; with a
+    // query still in it the scope stays, shown above the results.
+    if (!searchInput.value) searchScope.value = null
   }, 150)
 }
 const focusedActionIndex = ref<number>(0)
@@ -533,6 +615,10 @@ const appStore = useAppStore()
 const page = ref<string>("") // song, search, bible, hymn...
 const songSearchQuery = ref<string>("")
 const bibleSearchQuery = ref<string>("")
+// Searches carried into the hymn and Bible-text panels by quick search's
+// "See all hymn results" / "Search Bible text" rows.
+const hymnSearchQuery = ref<string>("")
+const searchBibleQuery = ref<string>("")
 const hymns = ref<Hymn[]>([])
 const emitter = useNuxtApp().$emitter as Emitter<any>
 
@@ -553,18 +639,21 @@ onUnmounted(() => {
 })
 const libraryPage = ref<string>("")
 const librarySongToEdit = ref<Song | undefined>()
+const libraryNewSongTitle = ref<string>("")
 const libraryOpenToken = ref<number>(0)
+// The add-song form's review step: the breadcrumb's "Library" steps back to it.
+const libraryReviewing = ref<boolean>(false)
 // Which destination the countdown panel opens on: 0 live display, 1 stage.
 const countdownInitialTab = ref<number>(0)
 
 // Active Bible version, used to validate parsed references against the right
-// verse index (see the reference filter in `searchedActions`).
+// verse index (see the reference filter in `rankedSearchResults`).
 const defaultBibleVersion = computed(
   () => appStore.currentState.settings.defaultBibleVersion || "KJV"
 )
 
 // Bumped once the verse index for the active version has been built. Read inside
-// `searchedActions` so it re-runs and can drop impossible references (e.g. a
+// `rankedSearchResults` so it re-runs and can drop impossible references (e.g. a
 // verse that doesn't exist) as soon as the data needed to verify them is ready
 // — the chapter-level check works without it, this only refines it.
 const scriptureIndexReadyTick = ref(0)
@@ -582,16 +671,50 @@ const ensureScriptureIndex = async () => {
   scriptureIndexReadyTick.value++
 }
 
-// Persistent quick-filter chips shown in the home state. Visual shortcuts that
-// trigger existing actions; gated through the same subscription check as cards.
-const quickFilters: { label: string; action: string; removable?: boolean }[] = [
-  { label: "Bible", action: appWideActions.quickActionsFocus },
-  { label: "Song lyrics", action: appWideActions.quickActionsFocus },
-  { label: "Hymns", action: appWideActions.quickActionsFocus },
-  { label: "Library", action: appWideActions.quickActionsFocus },
-  { label: "Actions", action: appWideActions.quickActionsFocus },
-  { label: "More", action: appWideActions.quickActionsFocus },
+// Quick-filter chips shown while the search box is focused. Each one narrows
+// the search to a single kind of result, and that focus buys a longer list of
+// it (the scoped caps in `rankedSearchResults`). Library is the church's
+// saved songs.
+type SearchScope = "bible" | "song" | "hymn" | "library" | "action"
+const quickFilters: {
+  label: string
+  scope: SearchScope
+  placeholder: string
+}[] = [
+  {
+    label: "Bible",
+    scope: "bible",
+    placeholder: 'Search the Bible, e.g. "John 3:16"',
+  },
+  {
+    label: "Song lyrics",
+    scope: "song",
+    placeholder: "Search songs by title or lyrics",
+  },
+  {
+    label: "Hymns",
+    scope: "hymn",
+    placeholder: "Search hymns by title or first line",
+  },
+  {
+    label: "Library",
+    scope: "library",
+    placeholder: "Search your saved songs",
+  },
+  {
+    label: "Actions",
+    scope: "action",
+    placeholder: "Search actions and settings",
+  },
 ]
+const searchScope = ref<SearchScope | null>(null)
+const activeScopeFilter = computed(() =>
+  quickFilters.find((filter) => filter.scope === searchScope.value)
+)
+const toggleSearchScope = (scope: SearchScope) => {
+  searchScope.value = searchScope.value === scope ? null : scope
+  searchInputEl.value?.input?.focus()
+}
 
 // The promo card under the chips is server-driven: its copy, the action it
 // triggers and whether it appears at all come from `/app-config/info`, so it can
@@ -600,41 +723,37 @@ const { quickSearchPromo: promoConfig } = useAppInfo()
 
 const quickSearchPromo = computed(() => {
   const promo = promoConfig.value
-  if (!promo?.enabled || !promo.title || !promo.action) return undefined
-  return promo
+  if (!promo?.enabled || !promo.title) return undefined
+  // A link promo only shows with an http(s) URL, so a bad value can never
+  // render a dead card or hand the OS a non-web scheme.
+  if (promo.actionType === "url") return isWebUrl(promo.url) ? promo : undefined
+  return promo.action ? promo : undefined
 })
 
 const handleChipClick = (action: string) => {
-  if (!hasAccessToFeature(action) && isPremiumFeatureEnabled.value) {
-    emitter.emit("show-upgrade-modal")
-    usePosthogCapture("TEAMS_FEATURE_BLOCKED", { feature: action })
-    return
-  }
+  if (!openFeatureOrUpgrade(action)) return
   useGlobalEmit(action)
 }
 
+const isWebUrl = (value?: string) => /^https?:\/\//i.test(value?.trim() ?? "")
+
 const handlePromoClick = () => {
-  const action = quickSearchPromo.value?.action
-  if (action) handleChipClick(action)
+  const promo = quickSearchPromo.value
+  if (!promo) return
+  if (promo.actionType === "url") {
+    useOpenExternal(promo.url!.trim())
+    return
+  }
+  if (promo.action) handleChipClick(promo.action)
 }
 
-// The online lyrics library is Teams-only. Every route into the song search
-// page funnels through here (the "Search song lyrics" card, the "Search in
-// songs" banner in HymnList), so a free church gets the upgrade modal instead
-// of the search — while songs it already owns (personal library, "Add Song")
-// keep working, since those emit "new-song" with a payload.
-const canSearchSongLyrics = () =>
-  hasAccessToFeature(appWideActions.newSongSearch) ||
-  !isPremiumFeatureEnabled.value
-
-const ensureSongSearchAccess = () => {
-  if (canSearchSongLyrics()) return true
-  emitter.emit("show-upgrade-modal")
-  usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
-    feature: appWideActions.newSongSearch,
-  })
-  return false
-}
+// The online lyrics library is open to every plan for searching. A free
+// church gets catalogue songs back as previews (first verse, `isPreview`) and
+// spends one of its monthly library songs when it adds one (see claimSong in
+// useSongs). Every route into the song search page funnels through here (the
+// "Search song lyrics" card, the "Search in songs" banner in HymnList).
+const ensureSongSearchAccess = () =>
+  openFeatureOrUpgrade(appWideActions.newSongSearch)
 
 const getAllHymns = async () => {
   const allHymns = await db.bibleAndHymns.get("hymns")
@@ -643,13 +762,20 @@ const getAllHymns = async () => {
 }
 
 getAllHymns()
+// On a device's first session this panel mounts before the hymn download
+// lands, and would otherwise search an empty hymn list until a reload.
+onEmitter(appWideActions.hymnsUpdated, getAllHymns)
 
 // Turns a Song into a searchable quick action that creates a song slide when picked.
+// The subtext reads like the songs and library panels' rows, plus where the
+// song lives: three songs called "Grace" are otherwise three identical rows.
 const mapSongToAction = (song: Song, fromSaved: boolean): QuickAction => {
+  const byline =
+    song?.artist || (song?.author === "me" ? "compiled by me" : song?.author)
   return {
     icon: "i-bx-music",
     name: song?.title || "",
-    desc: song?.artist || song?.author || (fromSaved ? "saved song" : "song"),
+    desc: [byline, fromSaved ? "My Library" : ""].filter(Boolean).join(" · "),
     action: "new-song",
     meta: `${song?.artist || ""} ${song?.lyrics || ""}`,
     searchableOnly: true,
@@ -660,11 +786,13 @@ const mapSongToAction = (song: Song, fromSaved: boolean): QuickAction => {
 
 // Remote (global) song search results — always fetched alongside the local
 // library match so both sources are represented; duplicates and the 3+3 cap
-// are resolved when the song group is built in searchedActions. Gated behind
-// the Teams subscription like the rest of the online lyrics search (only
-// skipped when the paywall flag is actually enabled, matching hasAccessToFeature
-// usage elsewhere). Locally saved songs are unaffected — they stay free.
+// are resolved when the song group is built in rankedSearchResults. Open to every
+// plan: a free church's catalogue hits come back as previews, and adding one
+// spends a monthly library song (PreviewContent → claimSong).
 const remoteSongActions = ref<QuickAction[]>([])
+// The query `remoteSongActions` answered. While a newer one is in flight the
+// old results stay up, minus any the new query no longer matches.
+const remoteSongsQuery = ref("")
 const isSearchingRemoteSongs = ref(false)
 // Guards against out-of-order results when overlapping calls fire (e.g. fast
 // typing outpacing the debounce) — only the most recent call is allowed to
@@ -673,9 +801,8 @@ let remoteSongsRequestId = 0
 
 const fetchRemoteSongsIfNeeded = useDebounceFn(async (query: string) => {
   const requestId = ++remoteSongsRequestId
-  const songSearchAllowed = canSearchSongLyrics()
 
-  if (query.length < 2 || !songSearchAllowed) {
+  if (query.length < 2) {
     remoteSongActions.value = []
     isSearchingRemoteSongs.value = false
     return
@@ -683,11 +810,14 @@ const fetchRemoteSongsIfNeeded = useDebounceFn(async (query: string) => {
 
   isSearchingRemoteSongs.value = true
   try {
-    const results = await searchSongs(query, 6)
+    // Narrowed to songs, the list has room for more catalogue results.
+    const limit = searchScope.value === "song" ? 15 : 6
+    const results = await searchSongs(query, limit, "quick-actions")
     if (requestId !== remoteSongsRequestId) return
     remoteSongActions.value = (results || []).map((song) =>
       mapSongToAction(song, false)
     )
+    remoteSongsQuery.value = query
   } catch {
     if (requestId !== remoteSongsRequestId) return
     remoteSongActions.value = []
@@ -721,6 +851,8 @@ const mapScriptureToAction = (raw: any): QuickAction => {
 // song flow: honors the same online/Teams gate used by SearchBibleList.vue's
 // scripture search, and shares the "Searching global library…" indicator.
 const remoteBibleActions = ref<QuickAction[]>([])
+// The query `remoteBibleActions` answered (see `remoteSongsQuery`).
+const remoteBibleQuery = ref("")
 const isSearchingRemoteBible = ref(false)
 let remoteBibleRequestId = 0
 
@@ -747,6 +879,7 @@ const fetchRemoteBibleIfNeeded = useDebounceFn(async (query: string) => {
     remoteBibleActions.value = (payload?.results || []).map(
       mapScriptureToAction
     )
+    remoteBibleQuery.value = query
   } catch {
     if (requestId !== remoteBibleRequestId) return
     remoteBibleActions.value = []
@@ -782,7 +915,9 @@ const actions = computed(() => {
       return {
         icon: "i-bx-church",
         name: `${hymn.title}`,
-        desc: `verse and chorus included`,
+        // The author, as in the hymn panel: the catalogue holds several hymns
+        // of the same title ("Amazing Grace", "It Is Well with My Soul").
+        desc: hymn.author || "",
         action: "new-hymn",
         meta: `hymn ${hymn.meta}`,
         searchableOnly: true,
@@ -845,6 +980,8 @@ const visibleActions = computed(() => {
 watch(page, () => {
   if (page.value === "") {
     bibleSearchQuery.value = ""
+    hymnSearchQuery.value = ""
+    searchBibleQuery.value = ""
   }
 })
 
@@ -854,6 +991,11 @@ const currentQuickActions = computed(() => {
     : visibleActions.value
 })
 
+// The query being searched, minus the "/" shortcut prefix.
+const searchQuery = computed(
+  () => searchTerm.value?.replaceAll("/", "").trim() || ""
+)
+
 watch(searchInput, (value) => {
   if (value.startsWith("/") && value.length > 1) {
     searchInput.value = value.replaceAll("/", "")
@@ -861,26 +1003,82 @@ watch(searchInput, (value) => {
   }
   focusedActionIndex.value = 0
   hasInteracted.value = false
-  const query = value?.replaceAll("/", "").trim() || ""
+  if (value.length < 2 || searchTerm.value.length < 2) {
+    flushSearchTerm()
+    return
+  }
+  if (searchTermTimer) clearTimeout(searchTermTimer)
+  searchTermTimer = setTimeout(flushSearchTerm, SEARCH_RANK_DELAY_MS)
+})
 
-  // Clear stale results from the previous query immediately, rather than
-  // leaving them on screen until the new debounced fetch resolves. Bumping
-  // the request IDs also invalidates any in-flight requests for the old query.
+watch(searchTerm, () => refreshRemoteResults())
+
+// Changing scope changes which libraries are worth asking.
+watch(searchScope, () => {
+  focusedActionIndex.value = 0
+  hasInteracted.value = false
+  refreshRemoteResults()
+})
+
+function refreshRemoteResults() {
+  const query = searchQuery.value
+
+  // Bumping the request IDs invalidates any in-flight request for the old
+  // query. Its results stay on screen until the new ones land, so the list
+  // doesn't empty and refill on every keystroke; `rankedSearchResults` drops
+  // the ones the new query no longer matches.
   remoteSongsRequestId++
-  remoteSongActions.value = []
   isSearchingRemoteSongs.value = false
   remoteBibleRequestId++
-  remoteBibleActions.value = []
   isSearchingRemoteBible.value = false
+  const clearSongs = () => (remoteSongActions.value = [])
+  const clearBible = () => (remoteBibleActions.value = [])
 
   // A confirmed Bible reference search ("Psa 101", "Eph 3:20") already tells
   // us exactly which book/chapter/verse is wanted, so there's nothing the
   // global song/scripture library search could usefully add — skip it.
-  if (isBibleReferenceSearch.value) return
+  // Likewise a query that names one of the app's actions word for word
+  // ("dark mode", "add media"): it is a command, and asking the song and
+  // scripture libraries only buried the action under loose matches (and
+  // logged a song search nobody made).
+  const scope = searchScope.value
+  const namesAction =
+    !scope &&
+    validActions.value.some(
+      (action) =>
+        staticQuickActions.has(action) && namesActionExactly(action, query)
+    )
+  // A timer command ("5 min timer") is a command too.
+  if (
+    query.length < 2 ||
+    isBibleReferenceSearch.value ||
+    namesAction ||
+    timerQuickAction.value
+  ) {
+    clearSongs()
+    clearBible()
+    return
+  }
 
-  fetchRemoteSongsIfNeeded(query)
-  fetchRemoteBibleIfNeeded(query)
-})
+  // A scope only asks the library it covers; hymns, saved songs and actions
+  // are all local. A hymnal number only ever names a song.
+  const askSongs = !scope || scope === "song"
+  const askBible =
+    (!scope || scope === "bible") && !hymnalNumberQuery.value
+  if (!askSongs) clearSongs()
+  if (!askBible) clearBible()
+  // Flag the search as under way now rather than when the debounce fires, so
+  // the gap before it never reads as "No matches".
+  if (askSongs) {
+    isSearchingRemoteSongs.value = query.length >= 2
+    fetchRemoteSongsIfNeeded(query)
+  }
+  if (askBible) {
+    isSearchingRemoteBible.value =
+      query.length >= 3 && shouldSearchBibleOnline.value
+    fetchRemoteBibleIfNeeded(query)
+  }
+}
 
 watch(
   () => currentQuickActions.value.length,
@@ -928,6 +1126,11 @@ onEmitter("new-hymn", (data) => {
   }
 })
 
+onEmitter(appWideActions.newHymnSearch, (query?: string) => {
+  hymnSearchQuery.value = typeof query === "string" ? query : ""
+  page.value = "hymn"
+})
+
 onEmitter("new-media", (data) => {
   const fromSaved = data?.[0]?.fromSaved
   const fromDrop = data?.[0]?.fromDrop
@@ -944,7 +1147,8 @@ onEmitter("new-vimeo-video", () => {
   page.value = "vimeo"
 })
 
-onEmitter("new-search-bible", () => {
+onEmitter("new-search-bible", (query?: string) => {
+  searchBibleQuery.value = typeof query === "string" ? query : ""
   page.value = "search-bible"
 })
 
@@ -976,11 +1180,15 @@ onEmitter("remove-alert", () => {
   }
 })
 
-// A payload means an existing song is being edited (e.g. from a song slide's
-// "Edit song in library"); no payload opens a blank add-song form.
-onEmitter("add-song", (song?: Song) => {
-  librarySongToEdit.value = song ? { ...song } : undefined
+// A Song payload means an existing song is being edited (e.g. from a song
+// slide's "Edit song in library"); a string is the title for a new song (quick
+// search's "Add 'x' as a new song"); no payload opens a blank add-song form.
+onEmitter("add-song", (song?: Song | string) => {
+  const isNewTitle = typeof song === "string"
+  librarySongToEdit.value = song && !isNewTitle ? { ...song } : undefined
+  libraryNewSongTitle.value = isNewTitle ? song : ""
   libraryPage.value = "add-song"
+  libraryReviewing.value = false
   // The library panel may already be open on its own page, in which case none
   // of the props above necessarily change — bump a token so it always reacts.
   libraryOpenToken.value++
@@ -1003,6 +1211,17 @@ onEmitter(appWideActions.newStageCountdown, (data) => {
   }
 })
 
+// No payload opens the panel; a payload is a finished interlude on its way
+// to the schedule (PreviewContent creates the slide).
+onEmitter(appWideActions.newInterlude, (data) => {
+  if (!data) page.value = "interlude"
+})
+
+// Same rule as the interlude: no payload opens the camera panel.
+onEmitter(appWideActions.newCamera, (data) => {
+  if (!data) page.value = "camera"
+})
+
 // A payload means a deck is being imported, not that the panel should open.
 onEmitter("new-presentation", (data) => {
   if (!data) page.value = "presentation"
@@ -1013,6 +1232,9 @@ onEmitter("new-presentation-from-pdf", () => {
 })
 
 const handleInputKeydown = (e: KeyboardEvent) => {
+  // Arrows and Enter act on the results, so they must be the results for
+  // what is in the box now, not for the query of a keystroke ago.
+  if (["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) flushSearchTerm()
   const currentActions = currentQuickActions.value
   const maxIndex = currentActions.length - 1
 
@@ -1041,16 +1263,7 @@ const handleInputKeydown = (e: KeyboardEvent) => {
         focusedActionIndex.value
       ] as unknown as QuickAction
       if (action) {
-        const actionName = action?.action || ""
-        if (!hasAccessToFeature(actionName) && isPremiumFeatureEnabled.value) {
-          emitter.emit("show-upgrade-modal")
-          usePosthogCapture("TEAMS_FEATURE_BLOCKED", {
-            feature: actionName,
-          })
-          return
-        }
-        useGlobalEmit(
-          action?.action,
+        const payload =
           action?.type === slideTypes.bible
             ? `${action?.bibleBookIndex}:${
                 action?.bibleChapterAndVerse || bibleChapterAndVerse.value
@@ -1062,7 +1275,15 @@ const handleInputKeydown = (e: KeyboardEvent) => {
             : action?.type === slideTypes.countdown && action?.countdownData
             ? action?.countdownData
             : action?.actionArg || ""
-        )
+        // Same rule as ActionCard: an action carrying its payload creates
+        // straight away, so it is the commit step, not a preview — unless the
+        // payload only fills in the panel it opens.
+        const gate =
+          payload && !action?.opensPanel
+            ? requireFeatureAccess
+            : openFeatureOrUpgrade
+        if (!gate(action?.action || "")) return
+        useGlobalEmit(action?.action, payload)
       }
       break
     default:
@@ -1104,8 +1325,9 @@ useEscapeKey(
   () => {
     if (document.querySelector('[role="dialog"]')) return false
 
-    if (searchInput.value) {
+    if (searchInput.value || searchScope.value) {
       searchInput.value = ""
+      searchScope.value = null
       isSearchFocused.value = false
       searchInputEl.value?.input?.blur()
       return true
@@ -1125,21 +1347,33 @@ onUnmounted(() => {
   if (quickSearchSuggestionInterval)
     clearInterval(quickSearchSuggestionInterval)
   if (searchBlurTimeout) clearTimeout(searchBlurTimeout)
+  if (searchTermTimer) clearTimeout(searchTermTimer)
   document.removeEventListener("mousedown", handleOutsidePointerDown)
 })
 
+// "Hymn 23", "SDA 109", "#45": a hymnal number, matched against titles (see
+// `parseHymnalNumberQuery` for why not against the catalogue's own numbers).
+const hymnalNumberQuery = computed(() =>
+  parseHymnalNumberQuery(searchQuery.value)
+)
+
 const bibleChapterAndVerse = computed(() => {
+  // A hymnal number, or a search narrowed to anything but the Bible, has no
+  // Bible reference in it however chapter-shaped its number looks.
+  if (hymnalNumberQuery.value) return undefined
+  if (searchScope.value && searchScope.value !== "bible") return undefined
+
   // The optional `(?:-\d+)?` captures a verse range like "5-6" so "John 3 5-6"
   // / "John 3:5-6" resolve to chapter 3, verses 5-6 (useScripture understands
   // the "start-end" verse form) instead of silently dropping the range.
   const regex = /\b\d+\s*:\s*\d+(?:-\d+)?\b|\b\d+\s\d+(?:-\d+)?\b/g
-  const bibleBookFollowedByJustChapterMatch = searchInput.value
+  const bibleBookFollowedByJustChapterMatch = searchTerm.value
     ?.replace("/", "")
     .match(/\b\w+\s+\d+\b(?!\S)/g)
 
   if (
     bibleBookFollowedByJustChapterMatch?.[0] &&
-    !searchInput.value?.match(regex)
+    !searchTerm.value?.match(regex)
   ) {
     const standaloneChapter = Number(
       bibleBookFollowedByJustChapterMatch?.[0]?.split(" ")?.[1] || 1
@@ -1148,7 +1382,7 @@ const bibleChapterAndVerse = computed(() => {
     return `${standaloneChapter}:${verse}`
   }
 
-  const match = searchInput.value
+  const match = searchTerm.value
     ?.replace("/", "")
     .match(regex)?.[0]
     ?.replaceAll(" ", ":")
@@ -1157,13 +1391,14 @@ const bibleChapterAndVerse = computed(() => {
 
 // The book-name-only portion of the query once a chapter/verse has been
 // recognised (see `bibleChapterAndVerse` above) — e.g. "Psa 101" -> "Psa",
-// "Psa 127 24" -> "Psa", "Psa 27:4" -> "Psa". Reads off the live
-// `searchInput` rather than a frozen/debounced copy so it can't get stuck on
-// a stale value once a two-digit number appears anywhere in the query.
+// "Psa 127 24" -> "Psa", "Psa 27:4" -> "Psa". Reads off `searchTerm`, which
+// always catches up with the box, rather than a copy frozen on some earlier
+// query, so it can't get stuck on a stale value once a two-digit number
+// appears anywhere in the query.
 const bibleBookQuery = computed(() => {
   if (!bibleChapterAndVerse.value) return ""
   return (
-    searchInput.value
+    searchTerm.value
       ?.replaceAll("/", "")
       .replace(/\s*:\s*\d+(?:-\d+)?\s*$/, "")
       .replace(/(\s+\d+(?:-\d+)?){1,2}\s*$/, "")
@@ -1184,8 +1419,18 @@ const bibleBookActions = computed(() =>
   )
 )
 
+// The one book a reference names by a known abbreviation or a prefix only it
+// has ("jn 3 16", "1 cor 13", "lament 3"). Without this, "jn" fell to
+// fuzzysort, which scored it too weakly to count as a book and let Jonah tie
+// with John.
+const referenceBookIndex = computed(() => {
+  if (!bibleChapterAndVerse.value || !bibleBookQuery.value) return null
+  return resolveBibleBook(bibleBookQuery.value)
+})
+
 const isBibleReferenceSearch = computed(() => {
   if (!bibleChapterAndVerse.value || !bibleBookQuery.value) return false
+  if (referenceBookIndex.value) return true
   const bookMatches = fuzzysort.go(
     bibleBookQuery.value,
     bibleBookActions.value,
@@ -1208,7 +1453,7 @@ watch(isBibleReferenceSearch, (isReference) => {
 // "start 30min timer" or "start 1h timer" typed into the search box,
 // so they can be surfaced as an instant-create countdown action.
 const timerCommandMatch = computed(() => {
-  const input = searchInput.value?.toLowerCase() || ""
+  const input = searchTerm.value?.toLowerCase() || ""
   if (!/\btimer\b|\bcountdown\b/.test(input)) return null
 
   const match = input.match(
@@ -1288,47 +1533,161 @@ const stageTimerQuickAction = computed((): QuickAction | null => {
 // survives the `.filter()` in `validActions`.
 const staticQuickActions = new Set<QuickAction>(quickActionsArr)
 
-const searchedActions = computed(() => {
-  const twoDigitNumbers = searchInput.value
-    ?.replace("/", "")
-    ?.match(/\b\d{2}\b/g)
+// The app's own runnable actions that the query describes, best first. Judged
+// by whole words (see `actionMatchStrength`) instead of fuzzysort, whose
+// letters-in-order rule matched "love your enemies" to "Open Stage Display"
+// and put it above the verse the operator was after.
+const matchedStaticActions = computed(() => {
+  const scored = validActions.value
+    .filter((action) => staticQuickActions.has(action))
+    .map((action) => ({
+      action,
+      strength: actionMatchStrength(action, searchQuery.value),
+    }))
+    .filter(({ strength }) => strength >= ACTION_MATCH_THRESHOLD)
+  const best = Math.max(0, ...scored.map(({ strength }) => strength))
+  return scored
+    .filter(({ strength }) => strength >= best - ACTION_MATCH_SPREAD)
+    .sort((a, b) => b.strength - a.strength)
+    .map(({ action }) => action)
+})
 
-  // Stop search if input includes two digit number
-  if (!twoDigitNumbers) {
-    searchInputBeforeTwoDigitNumbers = searchInput.value
+// Songs and hymns a typed hymnal number points at: for "SDA 109" the SDA
+// Hymnal's own hymn 109 first, then titles carrying the number ("Hymn 23",
+// "CCC Hymn 238"), those that also name the hymnal ("SDA") ahead.
+const hymnalNumberMatches = (actions: QuickAction[]) => {
+  const hymnal = hymnalNumberQuery.value
+  if (!hymnal) return []
+  const asksSda = hymnal.prefix.startsWith("sda")
+  const isSdaEntry = (action: QuickAction) =>
+    asksSda &&
+    action.type === slideTypes.hymn &&
+    isSdaHymnalNumber(action.desc, hymnal.number)
+  const hymnalWords = hymnal.prefix
+    .split(/\s+/)
+    .filter((word) => word && !word.startsWith("hymn"))
+  const rank = (action: QuickAction) =>
+    isSdaEntry(action)
+      ? 0
+      : hymnalWords.some((word) => action.name.toLowerCase().includes(word))
+      ? 1
+      : 2
+  return actions
+    .filter(
+      (action) =>
+        !staticQuickActions.has(action) &&
+        (action.type === slideTypes.song || action.type === slideTypes.hymn) &&
+        (titleHasNumber(action.name, hymnal.number) || isSdaEntry(action))
+    )
+    .sort((a, b) => rank(a) - rank(b))
+}
+
+// Lyrics, artist, a hymn's first line or a verse's text, folded once per
+// result for `textMatchRank` (a saved song's lyrics run to thousands of
+// characters, and this runs on every keystroke).
+const searchTextCache = new WeakMap<QuickAction, string>()
+const searchTextFor = (action: QuickAction) => {
+  let text = searchTextCache.get(action)
+  if (text === undefined) {
+    text = normalizeSearchText(action.meta)
+    searchTextCache.set(action, text)
   }
+  return text
+}
 
-  const colonIndex = searchInputBeforeTwoDigitNumbers?.indexOf(":")
-  const searchInputBeforeColon =
-    colonIndex === -1
-      ? searchInputBeforeTwoDigitNumbers
-      : searchInputBeforeTwoDigitNumbers?.substring(0, colonIndex)
+// Songs, hymns, books and verses that answer a query, best first: titles by
+// fuzzysort (so a dropped letter still finds "Amazing Grace"), then texts
+// holding the query as a phrase, then texts holding all of its words.
+const matchContent = (
+  query: string,
+  actions: QuickAction[],
+  { nameThreshold = CONTENT_NAME_THRESHOLD, withText = true } = {}
+): QuickAction[] => {
+  const byName = fuzzysort
+    .go(query, actions, { key: "name", threshold: nameThreshold })
+    .map((result) => result.obj as QuickAction)
+  if (!withText) return byName
 
+  const named = new Set(byName)
+  const phrase: QuickAction[] = []
+  const allWords: QuickAction[] = []
+  for (const action of actions) {
+    if (named.has(action)) continue
+    const rank = textMatchRank(searchTextFor(action), query)
+    if (rank === 0) phrase.push(action)
+    else if (rank === 1) allWords.push(action)
+  }
+  return [...byName, ...phrase, ...allWords]
+}
+
+// Whether a result belongs to the scope a chip narrowed the search to.
+const isInSearchScope = (action: QuickAction) => {
+  const isStatic = staticQuickActions.has(action)
+  switch (searchScope.value) {
+    case "bible":
+      return !isStatic && action.type === slideTypes.bible
+    case "song":
+      return !isStatic && action.type === slideTypes.song
+    case "hymn":
+      return !isStatic && action.type === slideTypes.hymn
+    case "library":
+      return !!action.songData?.fromSaved
+    case "action":
+      return isStatic
+    default:
+      return true
+  }
+}
+
+const rankedSearchResults = computed((): QuickAction[] => {
+  // A half-typed verse ("John 3:") is matched on the part before its colon.
   // Once a chapter/verse has been recognised, match book names on their own
   // (see `bibleBookQuery`) instead of throwing the chapter/verse digits into
   // the fuzzy search too — otherwise that either fails to match any book once
   // the numbers are something fuzzysort can't line up against a book name
   // (e.g. "Psa 103" matched nothing) or spuriously matches unrelated books
   // whose letters happen to fuzzy-match the digits (e.g. "Psa 101" matching
-  // "Ephesians"). `bibleBookQuery` reads off the live `searchInput` rather
-  // than the frozen `searchInputBeforeColon` above — that freeze exists to
-  // stop the search from flickering while a verse's digits are still being
-  // typed, but once a full chapter/verse has been parsed out there's nothing
-  // left to protect against, and using the frozen copy can leave this stuck
-  // on a stale (even empty) value once a two-digit number appears anywhere.
+  // "Ephesians"). This used to freeze on the last query without a two-digit
+  // number, to stop a verse's digits flickering the list; with references
+  // parsed above that guarded nothing, and it searched "10,000 Reasons" as
+  // "1" (or as whatever was searched before, when pasted). Narrowed to songs,
+  // hymns, the library or actions, a colon is just part of the title.
+  const colonIndex = searchQuery.value.indexOf(":")
+  const isNonBibleScope = !!searchScope.value && searchScope.value !== "bible"
   const searchInputForMatch = bibleChapterAndVerse.value
     ? bibleBookQuery.value
-    : searchInputBeforeColon
+    : isNonBibleScope || colonIndex === -1
+    ? searchQuery.value
+    : searchQuery.value.substring(0, colonIndex)
 
-  let results: any = fuzzysort.go(searchInputForMatch, validActions.value, {
-    keys: ["name", "desc", "meta"],
-    // Once we're confident this is an actual Bible reference (see
-    // `isBibleReferenceSearch`), only keep genuine book-name matches instead
-    // of every loose fuzzy match — a 3-letter book abbreviation like "Psa"
-    // would otherwise also weakly match plenty of unrelated songs/hymns.
-    ...(isBibleReferenceSearch.value ? { threshold: -1000 } : {}),
-  })
-  results = results?.map((result: Fuzzysort.Result | any) => result.obj)
+  let results: any
+  if (referenceBookIndex.value) {
+    // An abbreviation or unique prefix already named the book.
+    results = bibleBookActions.value.filter(
+      (action) => Number(action.bibleBookIndex) === referenceBookIndex.value
+    )
+  } else if (hymnalNumberQuery.value) {
+    results = hymnalNumberMatches(validActions.value)
+  } else {
+    const content = validActions.value.filter(
+      (action) => !staticQuickActions.has(action)
+    )
+    // The app's own actions are matched on whole words (see
+    // `matchedStaticActions`), library content by `matchContent`. Once we're
+    // confident this is an actual Bible reference (see
+    // `isBibleReferenceSearch`), only genuine book-name matches count — a
+    // 3-letter book abbreviation like "Psa" would otherwise also weakly match
+    // plenty of unrelated songs/hymns.
+    results = isBibleReferenceSearch.value
+      ? matchContent(searchInputForMatch, content, {
+          nameThreshold: -1000,
+          withText: false,
+        })
+      : [
+          ...matchedStaticActions.value,
+          ...matchContent(searchInputForMatch, content),
+        ]
+  }
   results = results.filter((action: QuickAction) => action?.name)
 
   // Drop Bible references whose parsed chapter/verse can't exist in the active
@@ -1364,19 +1723,36 @@ const searchedActions = computed(() => {
 
   // A confirmed Bible reference search ("Psa 101", "Eph 3:20") already tells
   // us exactly what the user wants, so the global song/scripture library
-  // search (see the `searchInput` watcher below) is skipped entirely and
+  // search (see `refreshRemoteResults`) is skipped entirely and
   // there's nothing useful it could add — keep only the local book matches.
   if (!isBibleReferenceSearch.value) {
     // API-searched (global) songs, fetched alongside local library matches
     // (see fetchRemoteSongsIfNeeded)
-    if (remoteSongActions.value.length > 0) {
-      results = results.concat(remoteSongActions.value)
+    // Results still answering an older query keep only what this one
+    // matches; see `remoteSongsQuery`.
+    const remoteSongs =
+      remoteSongsQuery.value === searchQuery.value
+        ? remoteSongActions.value
+        : matchContent(searchQuery.value, remoteSongActions.value)
+    if (remoteSongs.length > 0) {
+      results = results.concat(
+        hymnalNumberQuery.value
+          ? hymnalNumberMatches(remoteSongs)
+          : remoteSongs
+      )
     }
 
     // API-searched (global) Bible verses, fetched alongside local book
     // matches (see fetchRemoteBibleIfNeeded)
-    if (remoteBibleActions.value.length > 0) {
-      results = results.concat(remoteBibleActions.value)
+    const remoteVerses = (
+      remoteBibleQuery.value === searchQuery.value
+        ? remoteBibleActions.value
+        : matchContent(searchQuery.value, remoteBibleActions.value)
+    ).filter((verse) =>
+      sharesMeaningfulWord(searchTextFor(verse), searchQuery.value)
+    )
+    if (remoteVerses.length > 0 && !hymnalNumberQuery.value) {
+      results = results.concat(remoteVerses)
     }
   }
 
@@ -1404,7 +1780,10 @@ const searchedActions = computed(() => {
     })
   }
 
-  if (timerQuickAction.value) {
+  results = results.filter(isInSearchScope)
+
+  const timerInScope = !searchScope.value || searchScope.value === "action"
+  if (timerQuickAction.value && timerInScope) {
     results = [
       timerQuickAction.value,
       ...(!props.mobile && stageTimerQuickAction.value
@@ -1422,6 +1801,7 @@ const searchedActions = computed(() => {
   // API (6 total), skipping API songs that duplicate an already-shown
   // library song (matched on title + artist/author).
   const groupedResults = new Map<string, QuickAction[]>()
+  const songCap = searchScope.value ? 15 : 3
   let localSongCount = 0
   let remoteSongCount = 0
   const seenSongKeys = new Set<string>()
@@ -1454,10 +1834,10 @@ const searchedActions = computed(() => {
       const key = songKey(action?.songData)
       if (seenSongKeys.has(key)) continue
       if (action?.songData?.fromSaved) {
-        if (localSongCount >= 3) continue
+        if (localSongCount >= songCap) continue
         localSongCount += 1
       } else {
-        if (remoteSongCount >= 3) continue
+        if (remoteSongCount >= songCap) continue
         remoteSongCount += 1
       }
       seenSongKeys.add(key)
@@ -1468,7 +1848,14 @@ const searchedActions = computed(() => {
 
     if (!groupedResults.has(groupKey)) groupedResults.set(groupKey, [])
     const group = groupedResults.get(groupKey) as QuickAction[]
-    const cap = groupKey === "settings" ? 3 : groupKey === "action" ? 8 : 4
+    // Narrowed to one kind of result, the list can afford to run long.
+    const cap = searchScope.value
+      ? 30
+      : groupKey === "settings"
+      ? 3
+      : groupKey === "action"
+      ? 8
+      : 4
     if (group.length < cap) group.push(action)
   }
 
@@ -1477,20 +1864,13 @@ const searchedActions = computed(() => {
   // ("Praise Him") would sit above the API's exact hit ("Praise"). Within the
   // song group, lift exact title matches to the front; the sort is stable, so
   // library-before-API is kept among equals.
+  // "Good and Loved" finds "Good & Loved", and "Promises by Maverick City"
+  // finds "Promises" by that artist (see `songTitleMatchRank`).
   const songGroup = groupedResults.get(slideTypes.song)
   if (songGroup && songGroup.length > 1) {
-    const normalize = (value?: string) =>
-      (value || "")
-        .toLowerCase()
-        .replace(/\s*[([]?\b(ft\.?|feat\.?|featuring)\b.*$/, "")
-        .replace(/[^a-z0-9]+/g, " ")
-        .trim()
-    const songQuery = normalize(searchInput.value)
-    if (songQuery) {
-      const isExact = (action: QuickAction) =>
-        normalize(action?.songData?.title) === songQuery ? 0 : 1
-      songGroup.sort((a, b) => isExact(a) - isExact(b))
-    }
+    const rank = (action: QuickAction) =>
+      songTitleMatchRank(action?.songData, searchQuery.value)
+    songGroup.sort((a, b) => rank(a) - rank(b))
   }
 
   // Enforce a fixed reading order for the well-known groups — all runnable
@@ -1535,8 +1915,9 @@ const searchedActions = computed(() => {
   // above "Display Bible". So, independently of the grouping, fuzzy-match the
   // query against the *name* alone and pin the best few on top. fuzzysort
   // catches exact, full-substring AND close matches (a typo or a dropped
-  // word), and its -1000 threshold (the same cutoff used for Bible-book
-  // matching above) keeps those while dropping unrelated noise. The pinned
+  // word), and `CONTENT_NAME_THRESHOLD` (the cutoff content titles are
+  // matched with) keeps those, one-letter typos included ("amazng grace"),
+  // while dropping unrelated noise. The pinned
   // ones are kept in their existing grouped order rather than raw fuzzysort
   // score, so when both an action and some content match ("bible" →
   // "Display Bible" vs a song titled "Bible Studies") the action still leads.
@@ -1545,7 +1926,7 @@ const searchedActions = computed(() => {
   //
   // The matches only decide WHICH GROUP leads — see the group promotion
   // below — never get lifted out of their group on their own.
-  const bestMatchQuery = searchInput.value?.replaceAll("/", "").trim() ?? ""
+  const bestMatchQuery = searchQuery.value
 
   if (isBibleReferenceSearch.value || bestMatchQuery.length < 2) {
     return ordered
@@ -1562,11 +1943,36 @@ const searchedActions = computed(() => {
   // A parsed timer command ("start 5 min timer") is an explicit instant-create
   // intent — keep it at the very top rather than in the last-ranked countdown
   // group.
-  if (timerQuickAction.value) pin(timerQuickAction.value)
+  if (timerQuickAction.value && timerInScope) pin(timerQuickAction.value)
+
+  // Then exact names: an action called what was typed ("Go Live"), then a
+  // song titled it. A song's exact title can fail the fuzzy name match below
+  // ("Good and Loved" against "Good & Loved"), and without a pin the Bible
+  // group, which reads ahead of songs, would lead with loose verse matches.
+  const typedName = normalizeSongTitle(bestMatchQuery)
+  for (const action of ordered) {
+    if (
+      staticQuickActions.has(action) &&
+      normalizeSongTitle(action.name) === typedName
+    ) {
+      pin(action)
+    }
+  }
+  for (const action of ordered) {
+    if (
+      action.type === slideTypes.song &&
+      songTitleMatchRank(action.songData, bestMatchQuery) < 2
+    ) {
+      pin(action)
+    }
+  }
 
   const closeNameMatches = new Set(
     fuzzysort
-      .go(bestMatchQuery, ordered, { key: "name", threshold: -1000 })
+      .go(bestMatchQuery, ordered, {
+        key: "name",
+        threshold: CONTENT_NAME_THRESHOLD,
+      })
       .map((result) => result.obj as QuickAction)
   )
   for (const action of ordered) {
@@ -1610,6 +2016,75 @@ const searchedActions = computed(() => {
   ])
 })
 
+// Ways forward that close every search, shown under "Not what you need?": the
+// groups above are capped at a handful of rows, and a search can come back
+// empty, so each library gets a row that opens its own panel with the query
+// already typed in — plus adding the song, since a church whose search failed
+// often goes on to create that very song. Only the rows the scope covers are
+// offered. None for a Bible reference or a timer, which are exact already.
+const fallbackActions = computed((): QuickAction[] => {
+  const query = searchQuery.value
+  if (query.length < 2 || isBibleReferenceSearch.value) return []
+  if (timerQuickAction.value) return []
+
+  const scope = searchScope.value
+  const offers = (...scopes: SearchScope[]) =>
+    !scope || scopes.includes(scope)
+  const quoted = `“${query}”`
+  const rows: QuickAction[] = []
+
+  if (offers("song")) {
+    rows.push({
+      icon: "i-bx-music",
+      name: `See all song results for ${quoted}`,
+      desc: "Search the full song library",
+      action: appWideActions.newSongSearch,
+      actionArg: query,
+      opensPanel: true,
+    })
+  }
+  // A hymnal number means nothing to the hymn panel or the Bible text search.
+  if (offers("hymn") && !hymnalNumberQuery.value) {
+    rows.push({
+      icon: "i-bx-church",
+      name: `See all hymn results for ${quoted}`,
+      desc: "Search every hymn",
+      action: appWideActions.newHymnSearch,
+      actionArg: query,
+      opensPanel: true,
+    })
+  }
+  if (offers("bible") && !hymnalNumberQuery.value) {
+    rows.push({
+      icon: "i-bx-search",
+      name: `Search Bible text for ${quoted}`,
+      desc: "Find verses containing these words",
+      action: appWideActions.newSearchBible,
+      actionArg: query,
+      opensPanel: true,
+    })
+  }
+  if (offers("song", "library")) {
+    rows.push({
+      icon: "i-bx-plus",
+      name: `Add ${quoted} as a new song`,
+      desc: "Save it to your library",
+      action: appWideActions.addSong,
+      actionArg: query,
+      opensPanel: true,
+    })
+  }
+  // Mobile hides actions a phone can't carry out; keep these rows in step.
+  return rows.filter(
+    (row) => !(props.mobile && desktopOnlyActions.includes(row.action))
+  )
+})
+
+const searchedActions = computed(() => [
+  ...rankedSearchResults.value,
+  ...fallbackActions.value,
+])
+
 watch(page, () => {
   focusedActionIndex.value = 0
   hasInteracted.value = false
@@ -1617,6 +2092,8 @@ watch(page, () => {
   if (page.value === "") {
     libraryPage.value = ""
     librarySongToEdit.value = undefined
+    libraryNewSongTitle.value = ""
+    libraryReviewing.value = false
   }
 })
 

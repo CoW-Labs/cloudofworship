@@ -1,6 +1,13 @@
 import { useAuthStore } from '~/store/auth'
 import type { User, Church } from '~/store/auth'
 
+export type AccountCallResult = {
+  ok: boolean
+  message?: string
+  code?: string
+  data?: unknown
+}
+
 export default function useUser() {
   const authStore = useAuthStore()
   const toast = useToast()
@@ -26,7 +33,11 @@ export default function useUser() {
       })
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to update profile')
+        throw new Error(
+          (error.value as any)?.data?.message ||
+            error.value?.message ||
+            'Failed to update profile'
+        )
       }
 
       const updatedUser = data.value as unknown as User
@@ -101,7 +112,10 @@ export default function useUser() {
       )
 
       if (error.value) {
-        throw new Error(error.value?.message || 'Failed to send invitations')
+        // `data.error` carries the API's own explanation (e.g. the Teams seat
+        // limit); `message` is only the transport-level failure.
+        const reason = (error.value as any)?.data?.error
+        throw new Error(reason || error.value?.message || 'Failed to send invitations')
       }
 
       toast.add({
@@ -116,7 +130,7 @@ export default function useUser() {
       console.error('Error sending email invitations:', error)
       toast.add({
         icon: 'i-bx-error',
-        title: 'Error sending email',
+        title: error?.message || 'Error sending email',
         description: error.message,
         color: 'red',
       })
@@ -163,47 +177,87 @@ export default function useUser() {
   }
 
   /**
+   * The three account-security calls below report back instead of toasting a
+   * failure: the profile panel shows the API's own reason (wrong current
+   * password, address already in use...) on the field it belongs to.
+   */
+  const accountCall = async (
+    path: string,
+    method: 'PUT' | 'POST',
+    body: Record<string, unknown>
+  ): Promise<AccountCallResult> => {
+    loading.value = true
+    try {
+      // A fresh key per call: useFetch caches by key, and a retry after a
+      // wrong password must hit the API again.
+      const { data, error } = await useAPIFetch(path, {
+        method,
+        body,
+        key: `${path}-${Date.now()}`,
+      })
+
+      if (error.value) {
+        const apiError = (error.value as any)?.data
+        return {
+          ok: false,
+          message:
+            apiError?.message || error.value?.message || 'Something went wrong',
+          code: apiError?.code,
+        }
+      }
+      return { ok: true, data: data.value }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * Change user password
    */
   const changePassword = async (
     currentPassword: string,
     newPassword: string
-  ): Promise<boolean> => {
-    try {
-      loading.value = true
-
-      const { data, error } = await useAPIFetch('/user/change-password', {
-        method: 'PUT',
-        body: {
-          currentPassword,
-          newPassword,
-        },
-        key: 'change-password',
-      })
-
-      if (error.value) {
-        throw new Error(error.value?.message || 'Failed to change password')
-      }
-
+  ): Promise<AccountCallResult> => {
+    const result = await accountCall('/user/change-password', 'PUT', {
+      currentPassword,
+      newPassword,
+    })
+    if (result.ok) {
       toast.add({
         icon: 'i-bx-check-circle',
         title: 'Password changed successfully',
         color: 'green',
       })
-
-      return true
-    } catch (error: any) {
-      console.error('Error changing password:', error)
-      toast.add({
-        icon: 'i-bx-error',
-        title: 'Failed to change password',
-        description: error.message,
-        color: 'red',
-      })
-      return false
-    } finally {
-      loading.value = false
     }
+    return result
+  }
+
+  /**
+   * Step 1 of changing a verified email: emails a code to the new address.
+   */
+  const requestEmailChange = (newEmail: string, currentPassword: string) =>
+    accountCall('/user/email-change/request', 'POST', {
+      newEmail,
+      currentPassword,
+    })
+
+  /**
+   * Step 2: the code proves the new inbox; on success the stored user is
+   * replaced with the updated one.
+   */
+  const confirmEmailChange = async (token: string) => {
+    const result = await accountCall('/user/email-change/confirm', 'POST', {
+      token,
+    })
+    if (result.ok) {
+      authStore.setUser(result.data as unknown as User)
+      toast.add({
+        icon: 'i-bx-check-circle',
+        title: 'Email updated',
+        color: 'green',
+      })
+    }
+    return result
   }
 
   /**
@@ -258,6 +312,8 @@ export default function useUser() {
     sendEmailInvitations,
     deleteUser,
     changePassword,
+    requestEmailChange,
+    confirmEmailChange,
     getCurrentUser,
     updatePreferences,
   }

@@ -196,7 +196,7 @@ export const useUserSettings = () => {
           )
         )
       )
-      const safeIntermission = await toTransportSafeMediaSetting(
+      const safeBlank = await toTransportSafeMediaSetting(
         settingsToSave.intermission
       )
 
@@ -221,7 +221,7 @@ export const useUserSettings = () => {
           settingsToSave.transcriptionVoiceBibleVersionCommands ?? true,
         transitionInterval: settingsToSave.transitionInterval,
         alertLimit: settingsToSave.alertLimit,
-        intermission: safeIntermission,
+        intermission: safeBlank,
       }
 
       // Use unique key with timestamp to prevent caching

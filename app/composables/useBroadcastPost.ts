@@ -1,6 +1,7 @@
-import type { Slide } from "~/types"
+import type { LivePayload, Slide } from "~/types"
 import { isSessionMediaUrl } from "~/utils/mediaTransport"
 import { useLiveProjectionRepository } from "~/composables/useLiveProjectionRepository"
+import { isPairPayload, primaryLiveSlide } from "~/utils/slidePairs"
 
 export const LIVE_CHANNEL_NAME = "cow-live-channel"
 
@@ -21,7 +22,10 @@ export type SlideOverlayBroadcast = {
 export type LiveSlideChangedNotification = {
   kind: "live-slide-changed"
   revision: string
+  /** The live slide, or a live pair's active member. */
   slideId: string | null
+  /** Every slide on screen; more than one while a slide pair is live. */
+  slideIds?: string[]
 }
 
 export const isLiveSlideChangedNotification = (
@@ -32,21 +36,25 @@ export const isLiveSlideChangedNotification = (
   (payload as LiveSlideChangedNotification).kind === "live-slide-changed" &&
   typeof (payload as LiveSlideChangedNotification).revision === "string"
 
+/**
+ * What a live-slide message puts on screen. `payload` is the whole thing: one
+ * slide, a slide pair's members, or null. `slide` is the one a single-slide
+ * reader follows, which for a pair is its active member, so the stage display
+ * keeps treating the slide the operator is driving as NOW.
+ */
 export const resolveLiveSlideBroadcast = async (payload: unknown) => {
   if (!isLiveSlideChangedNotification(payload)) {
-    return {
-      matched: payload === null || isSlidePayload(payload),
-      slide: (payload === null || isSlidePayload(payload)
-        ? payload
-        : null) as Slide | null,
-    }
+    const matched = payload === null || isLivePayload(payload)
+    const live = (matched ? payload : null) as LivePayload
+    return { matched, payload: live, slide: primaryLiveSlide(live) }
   }
 
   const record = await useLiveProjectionRepository().getCurrent()
   if (!record || record.revision !== payload.revision) {
-    return { matched: false, slide: null as Slide | null }
+    return { matched: false, payload: null as LivePayload, slide: null as Slide | null }
   }
-  return { matched: true, slide: record.slide }
+  const live: LivePayload = record.slides?.length ? record.slides : record.slide
+  return { matched: true, payload: live, slide: record.slide }
 }
 
 const messageId = () =>
@@ -109,17 +117,24 @@ const isSlidePayload = (payload: unknown): payload is Slide =>
   typeof (payload as Slide).id === "string" &&
   typeof (payload as Slide).scheduleId === "string"
 
+/** One slide, or the members of a slide pair. */
+const isLivePayload = (payload: unknown): payload is Slide | Slide[] =>
+  isPairPayload(payload)
+    ? (payload as unknown[]).every(isSlidePayload)
+    : isSlidePayload(payload)
+
 let liveProjectionWriteTail: Promise<void> = Promise.resolve()
 
 const useBroadcastPost = <T>(payload: T) => {
   // Overlay messages are already small and do not represent the primary live
   // slide, so they stay on the direct channel.
-  if (payload !== null && !isSlidePayload(payload)) {
+  if (payload !== null && !isLivePayload(payload)) {
     postCrossWindowNotification(payload)
     return
   }
 
-  const slide = (payload === null ? null : payload) as Slide | null
+  const live = payload as LivePayload
+  const slide = primaryLiveSlide(live)
   const revision = messageId()
   const timestamp = Date.now()
 
@@ -134,7 +149,7 @@ const useBroadcastPost = <T>(payload: T) => {
     .then(async () => {
       try {
         await useLiveProjectionRepository().putCurrent(
-          slide,
+          live,
           revision,
           timestamp
         )
@@ -143,6 +158,9 @@ const useBroadcastPost = <T>(payload: T) => {
             kind: "live-slide-changed",
             revision,
             slideId: slide?.id || null,
+            ...(isPairPayload(live)
+              ? { slideIds: live.map((member) => member.id) }
+              : {}),
           },
           revision,
           timestamp
@@ -152,7 +170,7 @@ const useBroadcastPost = <T>(payload: T) => {
           "Unable to persist live projection, sending legacy payload:",
           error
         )
-        postEnvelope(slide, revision, timestamp)
+        postEnvelope(live, revision, timestamp)
       }
     })
 }

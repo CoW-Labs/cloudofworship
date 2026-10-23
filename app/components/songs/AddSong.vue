@@ -1,9 +1,93 @@
 <template>
   <div class="add-song-main my-4 mt-0">
     <h2 class="font-semibold text-md mb-4">
-      {{ song ? "Edit song" : "Add a song" }}
+      {{ reviewing ? "Review song" : song ? "Edit song" : "Add a song" }}
     </h2>
-    <form class="flex flex-col gap-3">
+
+    <!-- REVIEW: each sung line with its translation under it, as a slide will
+         show it. Back to the form is the breadcrumb (or Escape). -->
+    <div v-if="reviewing" class="come-up-1 flex flex-col gap-3">
+      <div class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] px-4 py-3">
+        <p class="font-medium truncate">{{ title }}</p>
+        <p class="text-xs text-gray-500 dark:text-[#9aa3b2] truncate">
+          {{ artist
+          }}<template v-if="songLanguageCode">
+            &middot; Sung in {{ languageName(songLanguageCode) }}</template
+          >
+        </p>
+      </div>
+
+      <UTabs
+        v-if="reviewTranslations.length > 1"
+        v-model="reviewTabIndex"
+        :items="reviewTranslations.map((t) => ({ label: t.name }))"
+      />
+
+      <div
+        v-if="activeReview && (activeReview.missing || activeReview.extra)"
+        class="rounded-md bg-primary-50 dark:bg-primary-900/40 p-3 text-sm text-primary-600 dark:text-primary-300"
+      >
+        <template v-if="activeReview.extra">
+          {{ activeReview.extra }}
+          {{ activeReview.extra === 1 ? "translated line has" : "translated lines have" }}
+          no sung line to go under. Go back and remove
+          {{ activeReview.extra === 1 ? "it" : "them" }}, or check for a line
+          that was split in two.
+        </template>
+        <template v-else>
+          {{ activeReview.missing }}
+          {{ activeReview.missing === 1 ? "sung line has" : "sung lines have" }}
+          no translation yet. They will show without one.
+        </template>
+      </div>
+
+      <div
+        class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] px-4 py-3 flex flex-col gap-4"
+      >
+        <div
+          v-for="(stanza, stanzaIndex) in reviewStanzas"
+          :key="stanzaIndex"
+          class="flex flex-col gap-2"
+        >
+          <template v-for="line in stanza" :key="line.index">
+            <p
+              v-if="line.isLabel"
+              class="text-[11px] uppercase tracking-wide text-gray-400 dark:text-[#7d8695]"
+            >
+              {{ line.text }}
+            </p>
+            <div v-else>
+              <p class="text-sm text-gray-800 dark:text-white">
+                {{ line.text }}
+              </p>
+              <p
+                v-if="line.translation"
+                class="text-sm text-primary-600 dark:text-[#d9a4ff]"
+              >
+                {{ line.translation }}
+              </p>
+              <p v-else class="text-xs italic text-gray-400 dark:text-[#7d8695]">
+                No translation
+              </p>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <CowButton
+        variant="primary"
+        block
+        size="lg"
+        class="mt-4"
+        :disabled="reviewTranslations.some((t) => t.extra)"
+        :loading="loading"
+        @click="addSong()"
+      >
+        {{ song ? "Edit Song" : "Add Song" }}
+      </CowButton>
+    </div>
+
+    <form v-else class="flex flex-col gap-3">
       <div>
         <CowInput v-model="title" label="Title" />
         <Transition name="suggesting-title">
@@ -99,17 +183,17 @@
         </div>
 
         <!-- Shown only after a near-dup blocked the submit (warn-don't-block) -->
-        <CowButton
-          v-if="canForce"
-          variant="secondary"
-          block
-          size="sm"
-          class="mt-2"
-          :loading="loading"
-          @click="addAnyway"
-        >
-          None of these — add anyway
-        </CowButton>
+        <div v-if="canForce" ref="addAnywayEl" class="mt-2">
+          <CowButton
+            variant="secondary"
+            block
+            size="sm"
+            :loading="loading"
+            @click="addAnyway"
+          >
+            None of these — add anyway
+          </CowButton>
+        </div>
       </div>
 
       <Hint>
@@ -123,12 +207,126 @@
         autoresize
         @blur="suggestTitleFromLyrics"
       />
+
+      <CowAccordion
+        :items="[
+          {
+            label: 'Language & translations',
+            description: languageSummary,
+            slot: 'translations',
+            defaultOpen: !!(songLanguage || translationDrafts.length),
+          },
+        ]"
+      >
+        <template #translations>
+          <div class="flex flex-col gap-3">
+            <CowInputMenu
+              v-model="songLanguage"
+              label="Sung in"
+              :options="songLanguageOptions"
+              placeholder="Start typing a language"
+              :error="showLanguageErrors ? songLanguageError : ''"
+            >
+              <template #option-empty="{ query }">
+                No language called &ldquo;{{ query }}&rdquo;
+              </template>
+            </CowInputMenu>
+
+            <div
+              v-for="(draft, draftIndex) in translationDrafts"
+              :key="draft.key"
+              class="flex flex-col gap-2"
+            >
+              <CowInputMenu
+                v-model="draft.language"
+                label="Translated into"
+                :options="translationLanguageOptions"
+                placeholder="Start typing a language"
+                :error="showLanguageErrors ? translationErrors[draftIndex] : ''"
+              >
+                <template #option-empty="{ query }">
+                  No language called &ldquo;{{ query }}&rdquo;
+                </template>
+              </CowInputMenu>
+              <CowTextarea
+                v-model="draft.text"
+                :label="
+                  languageCode(draft.language)
+                    ? `${languageName(languageCode(draft.language))} translation`
+                    : 'Translation'
+                "
+                :rows="8"
+                autoresize
+              />
+              <p class="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                One line for each sung line, in the same order. Blank lines and
+                labels like &ldquo;Chorus&rdquo; are skipped. Type
+                &ldquo;{{ UNTRANSLATED_LINE }}&rdquo; to leave a line out.
+              </p>
+              <CowButton
+                variant="danger"
+                size="sm"
+                block
+                flat
+                @click="translationDrafts.splice(draftIndex, 1)"
+              >
+                Remove translation
+              </CowButton>
+            </div>
+
+            <CowButton
+              v-if="translationDrafts.length < MAX_TRANSLATIONS"
+              variant="secondary"
+              size="sm"
+              block
+              flat
+              @click="addTranslationDraft"
+            >
+              <template #leading><PlusIcon class="w-4 h-4" /></template>
+              {{ translationDrafts.length ? "Add another translation" : "Add a translation" }}
+            </CowButton>
+          </div>
+        </template>
+      </CowAccordion>
+
       <CowToggle
         v-model="isSongPublic"
         label="Share this song with other users?"
       />
 
+      <div
+        v-if="bracketTranslation"
+        class="rounded-md bg-primary-50 dark:bg-primary-900/40 p-3 text-sm text-primary-600 dark:text-primary-300"
+      >
+        These lyrics have English translations written in brackets. Review the
+        song to move them out of the lyrics and into an English translation.
+      </div>
+
+      <!-- A translation is checked line by line before it is saved, so
+           reviewing leads and adding straight away steps back. -->
+      <div v-if="hasTranslation && !bracketTranslation" class="mt-4 flex gap-3">
+        <CowButton
+          variant="secondary"
+          size="lg"
+          class="flex-1"
+          :disabled="!(artist && title && lyrics)"
+          :loading="loading"
+          @click="addSong()"
+        >
+          {{ song ? "Edit Song" : "Add Song" }}
+        </CowButton>
+        <CowButton
+          variant="primary"
+          size="lg"
+          class="flex-1"
+          :disabled="!(artist && title && lyrics)"
+          @click="reviewSong"
+        >
+          Review Song
+        </CowButton>
+      </div>
       <CowButton
+        v-else
         variant="primary"
         block
         size="lg"
@@ -137,19 +335,23 @@
         :loading="loading"
         @click="addSong()"
       >
-        {{ song ? "Edit Song" : "Add Song" }}
+        {{
+          bracketTranslation ? "Review Song" : song ? "Edit Song" : "Add Song"
+        }}
       </CowButton>
     </form>
   </div>
 </template>
 <script setup lang="ts">
-import { watchDebounced, useOnline } from "@vueuse/core"
+import { refDebounced, watchDebounced, useOnline } from "@vueuse/core"
 import { useAuthStore } from "~/store/auth"
 import { useSuggestedSongTitle } from "~/composables/useSong"
-import type { Song } from "~/types"
+import type { Song, SongTranslation } from "~/types"
 
 const props = defineProps<{
   song?: Song
+  // Title for a new song (ignored when editing `song`).
+  initialTitle?: string
 }>()
 
 const { saveSong } = useLibrary()
@@ -157,7 +359,7 @@ const { findSimilarSongs } = useSongs()
 const { searchArtists } = useArtistSearch()
 const loading = ref<boolean>(false)
 const artist = ref<string>(props.song?.artist || "")
-const title = ref<string>(props.song?.title || "")
+const title = ref<string>(props.song?.title || props.initialTitle || "")
 const lyrics = ref<string>(props.song?.lyrics || "")
 const isSongPublic = ref<boolean>(props.song?.isPublic || true)
 const similarSongs = ref<Song[]>([])
@@ -166,8 +368,236 @@ const expandedId = ref<string>("")
 const canForce = ref<boolean>(false)
 const toast = useToast()
 const emit = defineEmits(["go-home"])
+// The review step. A model so the panel breadcrumb can show it and step back.
+const reviewing = defineModel<boolean>("reviewing", { default: false })
 const authStore = useAuthStore()
 const online = useOnline()
+
+// LANGUAGE & TRANSLATIONS
+// The API allows 8 translations a song, one per language.
+const MAX_TRANSLATIONS = 8
+
+interface TranslationDraft {
+  key: number
+  language: string // the name as typed or picked
+  text: string // one line per sung line, see translationToText
+  original?: SongTranslation // the stored translation this was opened from
+  originalText?: string // `text` as first opened, to tell an untouched one
+}
+
+let draftKey = 0
+const songLanguage = ref<string>(languageName(props.song?.lang))
+const translationDrafts = ref<TranslationDraft[]>(
+  (props.song?.translations || []).map((translation) => ({
+    key: draftKey++,
+    language: languageName(translation.lang),
+    text: translationToText(props.song?.lyrics || "", translation.lines),
+    originalText: translationToText(props.song?.lyrics || "", translation.lines),
+    original: translation,
+  }))
+)
+// Language errors wait for a submit, so half-typed names don't flag mid-word.
+const showLanguageErrors = ref<boolean>(false)
+
+const songLanguageOptions = SONG_LANGUAGES.map((language) => language.name)
+const translationLanguageOptions = SONG_LANGUAGES.filter(
+  (language) => language.code !== "mul"
+).map((language) => language.name)
+
+const songLanguageCode = computed(() => languageCode(songLanguage.value))
+
+const songLanguageError = computed(() =>
+  songLanguage.value.trim() && !songLanguageCode.value
+    ? "Pick a language from the list"
+    : ""
+)
+
+const translationErrors = computed(() =>
+  translationDrafts.value.map((draft, index) => {
+    const code = languageCode(draft.language)
+    if (!draft.language.trim()) {
+      return draft.text.trim() ? "Pick the language this is in" : ""
+    }
+    if (!code) return "Pick a language from the list"
+    if (code === songLanguageCode.value) {
+      return "The song is already sung in this language"
+    }
+    const firstWithCode = translationDrafts.value.findIndex(
+      (other) => languageCode(other.language) === code
+    )
+    if (firstWithCode !== index) return "There is already a translation into this language"
+    return ""
+  })
+)
+
+const hasLanguageErrors = computed(
+  () => !!songLanguageError.value || translationErrors.value.some(Boolean)
+)
+
+const hasTranslation = computed(() =>
+  translationDrafts.value.some((draft) => draft.text.trim())
+)
+
+const languageSummary = computed(() => {
+  const parts: string[] = []
+  if (songLanguageCode.value) {
+    parts.push(`Sung in ${languageName(songLanguageCode.value)}`)
+  }
+  const translated = translationDrafts.value
+    .filter((draft) => draft.text.trim() && languageCode(draft.language))
+    .map((draft) => languageName(languageCode(draft.language)))
+  if (translated.length) parts.push(`${translated.join(", ")} translation`)
+  return parts.join(" · ") || "Optional"
+})
+
+// English translations typed into the lyrics in brackets. They are moved into
+// an English translation when the song is reviewed. Left alone when the song
+// is sung in English (the brackets are then echoes, not translations), when an
+// English translation is already written, or when there is no room for one.
+const findBracketTranslation = (text: string) => {
+  if (songLanguageCode.value === "eng") return null
+  const english = translationDrafts.value.find(
+    (draft) => languageCode(draft.language) === "eng"
+  )
+  if (english?.text.trim()) return null
+  if (!english && translationDrafts.value.length >= MAX_TRANSLATIONS) return null
+  return extractBracketTranslation(text)
+}
+
+// The notice and button follow the lyrics once typing pauses, not on every
+// keystroke: a long pasted song takes a moment to scan. What the buttons do is
+// decided from the lyrics as they are at the click, so a click straight after
+// a paste never acts on a scan that is behind.
+const settledLyrics = refDebounced(lyrics, 300)
+const bracketTranslation = computed(() =>
+  findBracketTranslation(settledLyrics.value)
+)
+
+/** Moves the bracketed English into a translation. Says whether there was any. */
+const applyBracketTranslation = () => {
+  const found = findBracketTranslation(lyrics.value)
+  if (!found) return false
+  lyrics.value = found.lyrics
+  const english = translationDrafts.value.find(
+    (draft) => languageCode(draft.language) === "eng"
+  )
+  if (english) english.text = found.text
+  else {
+    translationDrafts.value.push({
+      key: draftKey++,
+      language: languageName("eng"),
+      text: found.text,
+    })
+  }
+  return true
+}
+
+const addTranslationDraft = () => {
+  const taken = translationDrafts.value.map((draft) =>
+    languageCode(draft.language)
+  )
+  // English first: it's the translation churches ask for most.
+  const suggested = ["eng", "fra"].find(
+    (code) => code !== songLanguageCode.value && !taken.includes(code)
+  )
+  translationDrafts.value.push({
+    key: draftKey++,
+    language: languageName(suggested),
+    text: "",
+  })
+}
+
+// The translations as the API stores them, laid out against the current
+// lyrics. One nobody touched, on lyrics nobody touched, is kept as stored,
+// down to its source, model and review status.
+const reviewTranslations = computed(() =>
+  translationDrafts.value
+    .filter((draft) => draft.text.trim() && languageCode(draft.language))
+    .map((draft) => {
+      const code = languageCode(draft.language)
+      const { lines, missing, extra } = alignTranslation(lyrics.value, draft.text)
+      const original = draft.original
+      const unchanged =
+        original?.lang === code &&
+        draft.text === draft.originalText &&
+        lyrics.value === props.song?.lyrics
+      const translation: SongTranslation = unchanged
+        ? original!
+        : {
+            lang: code,
+            lines,
+            source: "human",
+            status: "ok",
+            updatedAt: new Date().toISOString(),
+          }
+      return { name: languageName(code), translation, missing, extra }
+    })
+)
+
+const reviewTabIndex = ref<number>(0)
+const activeReview = computed(
+  () =>
+    reviewTranslations.value[reviewTabIndex.value] ||
+    reviewTranslations.value[0]
+)
+
+// The lyrics split into the verses they are written in, each line carrying
+// the active translation's line.
+const reviewStanzas = computed(() => {
+  const lines = activeReview.value?.translation.lines || []
+  const stanzas: {
+    index: number
+    text: string
+    translation: string
+    isLabel: boolean
+  }[][] = [[]]
+  lyrics.value.split(/\r?\n/).forEach((raw, index) => {
+    const text = raw.replaceAll("[force-verse-break]", "").trim()
+    if (!text) {
+      if (stanzas[stanzas.length - 1]!.length) stanzas.push([])
+      return
+    }
+    stanzas[stanzas.length - 1]!.push({
+      index,
+      text,
+      translation: lines[index] || "",
+      isLabel: SECTION_LABEL.test(text),
+    })
+  })
+  return stanzas.filter((stanza) => stanza.length)
+})
+
+const languageFieldsValid = () => {
+  if (!hasLanguageErrors.value) return true
+  showLanguageErrors.value = true
+  toast.add({
+    icon: "i-bx-error",
+    title: "Check the song's languages",
+    description: "One of the languages isn't one we know yet.",
+  })
+  return false
+}
+
+const reviewSong = () => {
+  if (!languageFieldsValid()) return
+  const hadBrackets = applyBracketTranslation()
+  // Land on the English tab when that is the translation just pulled out.
+  const english = reviewTranslations.value.findIndex(
+    (t) => t.translation.lang === "eng"
+  )
+  reviewTabIndex.value = hadBrackets && english >= 0 ? english : 0
+  reviewing.value = true
+}
+
+// Escape steps back from the review to the form before it leaves the panel.
+useEscapeKey(
+  () => {
+    if (!reviewing.value) return false
+    reviewing.value = false
+    return true
+  },
+  { priority: escapePriority.panel }
+)
 
 // Surface existing matches as the user types title/artist/lyrics (debounced) —
 // lyrics are the strongest signal — so they can reuse a song instead of creating
@@ -218,10 +648,29 @@ const useExistingSong = (existing: Song) => {
   emit("go-home")
 }
 
+// The submit button sits below the lyrics, so the offer to add anyway appears
+// off-screen. Bring it into view so the user sees their next step.
+const addAnywayEl = ref<HTMLElement | null>(null)
+watch(canForce, async (value) => {
+  if (!value) return
+  await nextTick()
+  addAnywayEl.value?.scrollIntoView({ behavior: "smooth", block: "center" })
+})
+
 // "Add anyway" — re-submit past the near-duplicate warning.
 const addAnyway = () => addSong(true)
 
 const addSong = async (force = false) => {
+  // Bracketed translations are split out in the review, never saved as lyrics.
+  if (findBracketTranslation(lyrics.value)) return reviewSong()
+  if (!languageFieldsValid()) return
+  if (reviewTranslations.value.some((t) => t.extra)) {
+    // More translated lines than sung lines can't be stored; the review shows
+    // which lines ran over.
+    reviewTabIndex.value = reviewTranslations.value.findIndex((t) => t.extra)
+    reviewing.value = true
+    return
+  }
   const songId =
     props?.song?.id || useURLFriendlyString(`${title.value} ${artist.value}`)
   const song: Song = {
@@ -238,6 +687,22 @@ const addSong = async (force = false) => {
   }
   // Verses are derived from lyrics on demand — a stale copy would outlive the edit.
   delete song.verses
+
+  // Naming the language is what confirms it; one left as it was keeps its status.
+  const lang = songLanguageCode.value
+  if (lang) {
+    song.lang = lang
+    song.langStatus =
+      lang === props.song?.lang && props.song?.langStatus
+        ? props.song.langStatus
+        : "confirmed"
+  } else {
+    delete song.lang
+    delete song.langStatus
+  }
+  const translations = reviewTranslations.value.map((t) => t.translation)
+  if (translations.length) song.translations = translations
+  else delete song.translations
 
   loading.value = true
   try {
@@ -266,13 +731,15 @@ const addSong = async (force = false) => {
     const outcome = await uploadSongToAPI(song, force)
     if (outcome.ok) {
       await saveSong(song)
-      toast.add({ icon: "i-bx-check", title: "Song added" })
+      // toast.add({ icon: "i-bx-check", title: "Song added" })
       emit("go-home")
     } else if (outcome.duplicates?.length) {
       // Keep the form open, show the matches, and offer "add anyway" for a
       // near-duplicate (exact duplicates aren't force-able — reuse instead).
       similarSongs.value = outcome.duplicates
       canForce.value = outcome.canForce ?? false
+      // The matches show on the form, not the review.
+      reviewing.value = false
       toast.add({
         icon: "i-bx-error",
         title: canForce.value

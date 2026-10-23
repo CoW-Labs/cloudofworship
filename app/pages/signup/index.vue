@@ -1,5 +1,6 @@
 <template>
-  <div class="w-full">
+  <DesktopSigninPending v-if="desktopSignin.pending.value" />
+  <div v-else class="w-full">
     <!-- HEADER -->
     <div
       :key="`head-${step}`"
@@ -41,21 +42,17 @@
       @submit.prevent="handleStep1"
     >
       <CowButton
-        v-if="!isTauri"
         variant="secondary"
         block
         type="button"
         :loading="googleLoading"
-        @click="() => handleGoogleSignUp()"
+        @click="() => (isTauri ? desktopSignin.start('signup') : handleGoogleSignUp())"
       >
         <GoogleIcon class="w-5 h-5" />
         Sign up with Google
       </CowButton>
 
-      <div
-        v-if="!isTauri"
-        class="flex items-center gap-4 my-1 text-gray-500 text-sm"
-      >
+      <div class="flex items-center gap-4 my-1 text-gray-500 text-sm">
         <span class="h-px flex-1 bg-gray-200 dark:bg-gray-700/70" />
         Or
         <span class="h-px flex-1 bg-gray-200 dark:bg-gray-700/70" />
@@ -306,6 +303,8 @@ const { isTauri } = useTauri()
 const authStore = useAuthStore()
 const googleSignIn = inject("handleGoogleSignIn") as () => Promise<any>
 const { checkRedirectResult } = useTauriGoogleAuth()
+// Desktop signs up with Google through the browser.
+const desktopSignin = useDesktopSignin()
 const { user } = storeToRefs(authStore)
 const { sendEmailInvitations } = useUser()
 const { initUTMTracking, getUTMParams } = useUTMParams()

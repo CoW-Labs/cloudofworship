@@ -63,6 +63,9 @@
         <div v-else-if="slides?.length > 0" class="virtual-slides-grid">
           <div :style="{ height: `${virtualTopSpacer}px` }" />
           <div ref="slidesGrid" class="grid slides-grid gap-3">
+            <!-- A slide pair is one card, keyed by its first member and
+                 showing the member this window is editing. Its later members
+                 are left out of `gridSlides`. -->
             <SlideCard
               v-for="{ slide, index } in virtualSlides"
               :key="slide.id"
@@ -70,36 +73,43 @@
                 slide.id,
                 slide.updatedAt,
                 slide.name,
-                activeSlide?.id === slide?.id,
+                isGridCardSelected(slide),
                 bulkSelectSlides,
                 bulkSelectedSlides.includes(slide?.id),
                 getSlideEditor(slide.id)?.userId,
                 currentState.activeOverlaySlide?.id === slide.id,
+                appStore.pairForSlide(slide.id),
+                gridCardSlide(slide).id,
+                gridCardSlide(slide).updatedAt,
               ]"
-              :slide="slide"
+              :slide="gridCardSlide(slide)"
+              :pair="appStore.pairForSlide(slide.id)"
               :live="false"
               :selectable="bulkSelectSlides"
               :id="slide?.id?.replace(/\d+/g, '')"
               :checkbox-selected="bulkSelectedSlides.includes(slide?.id)"
-              :editing-by="getSlideEditor(slide.id)"
+              :editing-by="getSlideEditor(gridCardSlide(slide).id)"
               grid-type
-              :selected="activeSlide?.id === slide?.id"
+              :selected="isGridCardSelected(slide)"
               @click="
                 bulkSelectSlides
                   ? null
-                  : makeSlideActive(slide, {
+                  : makeSlideActive(gridCardSlide(slide), {
                       goLive: false,
                       newlyCreated: false,
                     })
               "
-              @take-live="bulkSelectSlides ? null : handleTakeLiveAction(slide)"
+              @take-live="
+                bulkSelectSlides ? null : handleTakeLiveAction(gridCardSlide(slide))
+              "
+              @pair-drop="onGridPairDrop(slide, $event)"
               @duplicate="duplicatePreviewSlide"
               @duplicate-as-overlay="duplicatePreviewSlideAsOverlay"
               @show-overlay="showSlideOverlay"
               @clear-overlay="clearSlideOverlay"
               @delete="deleteSlide"
-              @save-slide="saveSlide(slide)"
-              @save-as-template="openSaveTemplateModal(slide)"
+              @save-slide="saveSlide(gridCardSlide(slide))"
+              @save-as-template="openSaveTemplateModal(gridCardSlide(slide))"
               @bulk-selected="addToSelectedSlides(slide?.id, $event)"
             />
           </div>
@@ -153,6 +163,14 @@
       v-model="showSaveTemplateModal"
       :slide="slideToSaveAsTemplate"
     />
+
+    <SlidePairPicker
+      :model-value="!!pairPicker"
+      :camera-id="pairPicker?.cameraId ?? null"
+      :pair-id="pairPicker?.pairId ?? null"
+      @update:model-value="(open: boolean) => { if (!open) pairPicker = null }"
+      @pick="onPairPicked"
+    />
   </div>
 </template>
 
@@ -161,6 +179,8 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
+import { reportSongSearchPick } from "~/composables/useSongSearchLog"
+import { isSongPending, setSongPending } from "~/composables/useSongs"
 import {
   enqueueCoalescedSlideShadowPut,
   enqueueSlideShadowWrite,
@@ -172,10 +192,12 @@ import {
   mergeServerAndPendingScheduleSlides,
   replaceScheduleSlidesInCorpus,
 } from "~/composables/useScheduleSlideHydration"
-import { useAppStore } from "~/store/app"
+import { toSlideArray, useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
+  CameraSlideData,
   Hymn,
+  InterludeSlideData,
   Scripture,
   Slide,
   Song,
@@ -190,8 +212,25 @@ import {
   toTransportSafePayload,
 } from "~/utils/mediaTransport"
 import { unavailableMediaCopy } from "~/utils/mediaCloudSync"
+import type { CameraSettings } from "~/utils/camera"
+import { postCameraPrewarm } from "~/composables/useCameraStream"
 import { isPdfPresentationFile } from "~/utils/presentationFile"
 import { appWideActions, MAX_PDF_FILE_SIZE } from "~/utils/constants"
+import {
+  canBePairTarget,
+  foldPairs,
+  isCameraSlide,
+  pairHasCamera,
+  pairRejection,
+} from "~/utils/slidePairs"
+import {
+  dropFromLivePair,
+  editingMemberOf,
+  holdMemberOffScreen,
+  releaseMemberOffScreen,
+  setEditingMember,
+  useSlidePairSync,
+} from "~/composables/useSlidePairs"
 import {
   getAPIErrorMessage,
   getAPIErrorStatus,
@@ -250,6 +289,17 @@ const {
   batchUpdateSlides,
 } = useSlides()
 const { hasRemoteTarget } = useLiveOutputControl()
+const {
+  createPair,
+  deletePair,
+  replaceMember,
+  keepPairTogether,
+  fetchSchedulePairs,
+  loadCachedPairs,
+  republishLivePair,
+} = useSlidePairs()
+// Pairs made offline go up as soon as the connection is back.
+useSlidePairSync()
 
 // Derived from the store rather than mirrored into a local ref. A ref captures
 // the array reference at setup time, and every store action that touches slides
@@ -271,13 +321,19 @@ const {
   createPresentationSlide,
   createCountdownSlide,
   createTimeSlide,
+  createInterludeSlide,
+  createCameraSlide,
   saveSlideToLib,
   duplicateSlide,
   duplicateSlideAsOverlay,
 } = useSlideCreation()
 const { gotoVerse } = useSlideNavigation()
-const { appendSongToSetlist, getSetlistData, refreshSongSetlistSlide } =
-  useSongSetlist()
+const {
+  appendSongToSetlist,
+  getSetlistData,
+  refreshSongSetlistSlide,
+  removeSongFromSetlist,
+} = useSongSetlist()
 const { askSongDestination } = useSongDestinationPrompt()
 
 // Online status for conditional API/WS calls
@@ -865,6 +921,77 @@ const resolveScheduleMedia = async (scheduleId: string) => {
   }
 }
 
+// The bytes a slide cannot be shown without: a media file, or the current
+// presentation page. Missing inherited backgrounds never block a slide.
+const requiredMediaFor = (slide: Slide) => {
+  if (slide.type === slideTypes.media && !isExternalVideoSlide(slide)) {
+    return {
+      key: slide.id,
+      label:
+        (slide.data as ExtendedFileT)?.type === "video"
+          ? "Video"
+          : (slide.data as ExtendedFileT)?.type === "audio"
+          ? "Audio"
+          : "Image",
+      remoteUrl: firstRemoteMediaUrl(
+        (slide.data as ExtendedFileT)?.url,
+        slide.background,
+        slide.mediaCloudSync?.[slide.id]?.remoteUrl
+      ),
+    }
+  }
+  if (slide.type === slideTypes.presentation) {
+    const page = slide.presentationObjects?.[slide.presentationPageIndex ?? 0]
+    if (!page) return null
+    const key = `${slide.id}-page-${page.page}`
+    return {
+      key,
+      label: "Image",
+      remoteUrl: firstRemoteMediaUrl(
+        page.imageUrl,
+        slide.mediaCloudSync?.[key]?.remoteUrl
+      ),
+    }
+  }
+  return null
+}
+
+/**
+ * Why a slide cannot go on screen yet, as toast copy, or null when it can.
+ * Session URLs cannot cross into the live window, so its media needs either a
+ * durable local copy or a remote fallback.
+ */
+const missingMediaCopy = async (slide: Slide) => {
+  const requiredMedia = requiredMediaFor(slide)
+  if (!requiredMedia) return null
+  const hasLocalCopy = await projectionMediaStorage.getPlaybackUrl(
+    requiredMedia.key
+  )
+  const hasRemoteFallback = /^https?:\/\//.test(requiredMedia.remoteUrl || "")
+  if (hasLocalCopy || hasRemoteFallback) return null
+  const transfer =
+    transferFor(requiredMedia.key) ||
+    (slide.type === slideTypes.presentation ? transferFor(slide.id) : null)
+  return transfer?.status === "pending"
+    ? {
+        title: `${requiredMedia.label} is still being saved`,
+        description: "Wait for local storage to finish before taking it live.",
+      }
+    : transfer?.status === "failed"
+    ? {
+        title: `${requiredMedia.label} is not saved locally`,
+        description: "Retry or remove this media before taking it live.",
+      }
+    : unavailableMediaCopy(
+        slide.mediaCloudSync?.[requiredMedia.key],
+        requiredMedia.label
+      )
+}
+
+// How long a pair waits for its other slide's media before going live without
+// it. The slide that was taken live is never held back by its partner.
+const PARTNER_MEDIA_WAIT_MS = 2000
+
 const handleTakeLiveAction = async (slide: Slide) => {
   // When this device is driving another device's screen, that device projects
   // from its own copy of the media, so neither the download below nor the "not
@@ -880,87 +1007,70 @@ const handleTakeLiveAction = async (slide: Slide) => {
 
   // Resolving before broadcast keeps projection local-first: a slide that
   // arrived from a teammate still holds remote URLs until its bytes are pulled
-  // down here. Missing inherited backgrounds remain non-blocking; primary
-  // media is checked separately below so an unusable media slide cannot blank
-  // the live output.
-  if (bearsResolvableMedia(slide)) {
-    await prepareSlideMediaForProjection(slide, { allowDownload: true })
-    appStore.updateSlideInActiveSlides(slide)
+  // down here. A pair goes on screen whole, so its other member is prepared
+  // alongside, in parallel (a camera needs nothing).
+  const prepare = async (member: Slide) => {
+    await prepareSlideMediaForProjection(member, { allowDownload: true })
+    appStore.updateSlideInActiveSlides(member)
+  }
+  const pair = appStore.pairForSlide(slide.id)
+  if (pair) releaseMemberOffScreen(pair.id)
+  const partners = (pair?.slideIds ?? [])
+    .filter((memberId) => memberId !== slide.id)
+    .map((memberId) => appStore.activeSlidesById.get(memberId))
+    .filter((member): member is Slide => !!member)
+  const partnerPrep = partners.map((member) => ({
+    member,
+    done: bearsResolvableMedia(member)
+      ? prepare(member).then(
+          () => true,
+          () => false
+        )
+      : Promise.resolve(true),
+  }))
+  const startedAt = Date.now()
+
+  if (bearsResolvableMedia(slide)) await prepare(slide)
+
+  const mainProblem = await missingMediaCopy(slide)
+  if (mainProblem) {
+    toast.add({
+      title: mainProblem.title,
+      description: mainProblem.description,
+      icon: "i-bx-error",
+      color: "red",
+    })
+    return
   }
 
-  // Missing inherited backgrounds must not stop text-based slides from going
-  // live, but a media slide or the current presentation page has no usable
-  // output without its primary bytes. Session URLs cannot cross into the live
-  // window, so require either a durable local copy or a remote fallback.
-  const requiredMedia = (() => {
-    if (slide.type === slideTypes.media && !isExternalVideoSlide(slide)) {
-      return {
-        key: slide.id,
-        label:
-          (slide.data as ExtendedFileT)?.type === "video"
-            ? "Video"
-            : (slide.data as ExtendedFileT)?.type === "audio"
-            ? "Audio"
-            : "Image",
-        remoteUrl: firstRemoteMediaUrl(
-          (slide.data as ExtendedFileT)?.url,
-          slide.background,
-          slide.mediaCloudSync?.[slide.id]?.remoteUrl
-        ),
-      }
+  // A partner still downloading, or with nothing to show, waits off the screen
+  // and joins the pair once its media lands.
+  let heldPartner: { member: Slide; done: Promise<boolean> } | null = null
+  for (const prep of partnerPrep) {
+    const remaining = Math.max(0, PARTNER_MEDIA_WAIT_MS - (Date.now() - startedAt))
+    const ready = await Promise.race([
+      prep.done,
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), remaining)),
+    ])
+    if (!ready || (await missingMediaCopy(prep.member))) {
+      heldPartner = prep
+      break
     }
-    if (slide.type === slideTypes.presentation) {
-      const page = slide.presentationObjects?.[slide.presentationPageIndex ?? 0]
-      if (!page) return null
-      const key = `${slide.id}-page-${page.page}`
-      return {
-        key,
-        label: "Image",
-        remoteUrl: firstRemoteMediaUrl(
-          page.imageUrl,
-          slide.mediaCloudSync?.[key]?.remoteUrl
-        ),
-      }
-    }
-    return null
-  })()
-
-  if (requiredMedia) {
-    const hasLocalCopy = await projectionMediaStorage.getPlaybackUrl(
-      requiredMedia.key
-    )
-    const hasRemoteFallback = /^https?:\/\//.test(requiredMedia.remoteUrl || "")
-    if (!hasLocalCopy && !hasRemoteFallback) {
-      const transfer =
-        transferFor(requiredMedia.key) ||
-        (slide.type === slideTypes.presentation
-          ? transferFor(slide.id)
-          : null)
-      const copy =
-        transfer?.status === "pending"
-          ? {
-              title: `${requiredMedia.label} is still being saved`,
-              description:
-                "Wait for local storage to finish before taking it live.",
-            }
-          : transfer?.status === "failed"
-          ? {
-              title: `${requiredMedia.label} is not saved locally`,
-              description:
-                "Retry or remove this media before taking it live.",
-            }
-          : unavailableMediaCopy(
-              slide.mediaCloudSync?.[requiredMedia.key],
-              requiredMedia.label
-            )
-      toast.add({
-        title: copy.title,
-        description: copy.description,
-        icon: "i-bx-error",
-        color: "red",
-      })
-      return
-    }
+  }
+  if (pair && heldPartner) {
+    holdMemberOffScreen(pair.id, heldPartner.member.id)
+    toast.add({
+      icon: "i-tabler-layout-columns",
+      title: `${heldPartner.member.name || "The other slide"} isn't on this computer yet`,
+      description: "It joins the pair on screen as soon as its media is saved here.",
+      color: "amber",
+    })
+    const { member, done } = heldPartner
+    void done.then(async (ok) => {
+      if (!ok || (await missingMediaCopy(member))) return
+      if (!releaseMemberOffScreen(pair.id)) return
+      republishLivePair(pair.id)
+    })
   }
 
   if (slide.slideMode === "overlay") {
@@ -1014,6 +1124,18 @@ watch(
   }
 )
 
+// Selecting a camera slide usually means it goes live next. Let the projector
+// open the camera now, so going live does not wait on a cold start.
+watch(
+  () => activeSlide.value?.id,
+  (newId, oldId) => {
+    if (props.mobile || newId === oldId) return
+    const slide = activeSlide.value
+    if (slide?.type !== slideTypes.camera || !slide.data) return
+    postCameraPrewarm(slide.data as CameraSlideData)
+  }
+)
+
 const updateSlideGridMetrics = () => {
   const scrollEl = slidesScroll.value
   if (!scrollEl) return
@@ -1058,8 +1180,33 @@ const onSlidesGridScroll = () => {
   )
 }
 
+// The grid's cards: a slide pair folds into one card, at the place of its
+// member that comes first in the schedule.
+const gridSlides = computed<readonly Slide[]>(() =>
+  appStore.activeSchedulePairs.length
+    ? foldPairs(slides.value, appStore.pairForSlide)
+    : slides.value
+)
+
+// What a card shows and acts on: the slide itself, or the member of its pair
+// this window is editing.
+const gridCardSlide = (slide: Slide): Slide => {
+  const pair = appStore.pairForSlide(slide.id)
+  if (!pair) return slide
+  const memberId = editingMemberOf(pair)
+  if (memberId === slide.id) return slide
+  return appStore.activeSlidesById.get(memberId) || slide
+}
+
+const isGridCardSelected = (slide: Slide) => {
+  const selectedId = activeSlide.value?.id
+  if (!selectedId) return false
+  const pair = appStore.pairForSlide(slide.id)
+  return pair ? pair.slideIds.includes(selectedId) : selectedId === slide.id
+}
+
 const totalSlideRows = computed(() => {
-  return Math.ceil((slides.value?.length || 0) / slideGridColumns.value)
+  return Math.ceil((gridSlides.value?.length || 0) / slideGridColumns.value)
 })
 
 const virtualStartRow = computed(() => {
@@ -1083,11 +1230,11 @@ const virtualEndRow = computed(() => {
 const virtualSlides = computed(() => {
   const startIndex = virtualStartRow.value * slideGridColumns.value
   const endIndex = Math.min(
-    slides.value?.length || 0,
+    gridSlides.value?.length || 0,
     virtualEndRow.value * slideGridColumns.value
   )
 
-  return (slides.value || [])
+  return (gridSlides.value || [])
     .slice(startIndex, endIndex)
     .map((slide, offset) => ({
       slide,
@@ -1109,7 +1256,11 @@ const scrollToSlide = (slideId?: string) => {
   const scrollEl = slidesScroll.value
   if (!scrollEl || !slideId) return
 
-  const slideIndex = slides.value.findIndex((slide) => slide.id === slideId)
+  // A pair member scrolls to its pair's card.
+  const pairId = appStore.pairForSlide(slideId)?.id
+  const slideIndex = gridSlides.value.findIndex((slide) =>
+    pairId ? appStore.pairForSlide(slide.id)?.id === pairId : slide.id === slideId
+  )
   if (slideIndex < 0) return
 
   const row = Math.floor(slideIndex / slideGridColumns.value)
@@ -1138,6 +1289,35 @@ emitter.on(appWideActions.newTimeSlide, () => {
   broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
 })
+
+emitter.on(
+  appWideActions.newInterlude,
+  (data?: Omit<InterludeSlideData, "id">) => {
+    // No payload is the Quick Actions panel opening, not a new slide.
+    if (!data) return
+    const newSlide = createInterludeSlide(data)
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
+  }
+)
+
+emitter.on(
+  appWideActions.newCamera,
+  (data?: CameraSettings | Slide | Slide[]) => {
+    // No payload is the Quick Actions panel opening, not a new slide.
+    if (!data) return
+    // A saved slide (from the library) is copied as it is.
+    const saved = Array.isArray(data) ? data[0] : "type" in data ? data : null
+    const newSlide = saved
+      ? duplicateSlide(saved as Slide)
+      : createCameraSlide(data as CameraSettings)
+    if (!newSlide) return
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
+  }
+)
 
 emitter.on("new-text", (slide: Slide[] | Slide) => {
   let newSlide: Slide | null
@@ -1234,13 +1414,50 @@ emitter.on("new-hymn", async (data: string) => {
   }
 })
 
-emitter.on(appWideActions.newSongSetlist, async (song?: Song) => {
-  const resolvedSong = song ? await useSong(song) : undefined
-  const newSlide = await createSongSetlistSlide(resolvedSong || undefined)
-  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
-  broadcastSlideCreated(newSlide)
-  uploadOfflineSlides()
-})
+// A free church's library search results are previews (first verse only).
+// Turning one into a slide claims it first: that spends one of the month's
+// library songs and returns the full lyrics, or opens the upgrade modal and
+// returns null when none are left. Everything else passes straight through.
+const { claimSong } = useSongs()
+const { songsLeft } = useUsageQuotas()
+const claimIfPreview = async (song: Song): Promise<Song | null> =>
+  song?.isPreview ? await claimSong(song) : song
+
+// Spins the picked song's row (ActionCard) while `work` runs, so a slow claim
+// or slide build reads as "on its way" rather than a dead click. Not held
+// across the setlist question: that wait is the operator's, not ours.
+const whileSongPending = async <T>(
+  song: Song | undefined,
+  work: () => Promise<T>
+): Promise<T> => {
+  const songId = (song as any)?._id as string | undefined
+  setSongPending(songId, true)
+  try {
+    return await work()
+  } finally {
+    setSongPending(songId, false)
+  }
+}
+
+emitter.on(appWideActions.newSongSetlist, (picked?: Song) =>
+  whileSongPending(picked, async () => {
+    if (picked?.isPreview && navigator.onLine && songsLeft.value !== 0) {
+      return await addPreviewSetlistThenClaim(picked)
+    }
+    let song = picked
+    if (song) {
+      const claimed = await claimIfPreview(song)
+      if (!claimed) return
+      song = claimed
+    }
+    reportSongSearchPick(song)
+    const resolvedSong = song ? await useSong(song) : undefined
+    const newSlide = await createSongSetlistSlide(resolvedSong || undefined)
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
+  })
+)
 
 const getRelevantSongSetlist = () => {
   if (activeSlide.value?.type === slideTypes.songSetlist) {
@@ -1255,6 +1472,204 @@ const addSongAsSeparateSlide = (song: Song) => {
   saveSlide(newSlide)
   broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
+}
+
+// A library result is a preview until it is claimed, and the claim is a round
+// trip. Rather than make the operator wait on it, the slide goes onto the
+// schedule at once from the preview verse and the claim fills in the rest
+// (`data` is what verse navigation reads) a moment later.
+//
+// The slide is not saved or broadcast until the claim lands. If the claim is
+// refused (quota, daily ceiling, error) the slide is dropped again: the API
+// treats a song one of the church's slides uses as already unlocked, so a
+// slide left behind would hand the full lyrics over without spending a claim.
+const addPreviewSongThenClaim = async (picked: Song) => {
+  const preview = await useSong({ ...picked })
+  if (!preview) return
+  reportSongSearchPick(picked)
+
+  const slide = createSongSlide(preview)
+  const previewContents = JSON.stringify(slide.contents)
+  makeSlideActive(slide, { goLive: false, newlyCreated: true })
+
+  const claimed = await claimSong(picked)
+  if (!claimed) {
+    await deleteSlide(slide.id, false)
+    appStore.settleSlideInHistory(slide.id, () => null)
+    return
+  }
+
+  const current = slides.value.find((item) => item.id === slide.id)
+  const full = await useSong(
+    { ...claimed },
+    (current || slide).slideStyle?.linesPerSlide
+  )
+  // Undo snapshots taken while the claim was out hold the preview's song.
+  if (full) {
+    appStore.settleSlideInHistory(slide.id, (old) => ({ ...old, data: full }))
+  }
+  // Deleted while the claim was out: nothing else to fill in.
+  if (!current) return
+
+  const updated: Slide = { ...current, data: full || current.data }
+  // Replace what is on the slide only if it is still what the preview made.
+  // The preview's opening verse is normally the song's own, and an edit made
+  // in the meantime wins over it.
+  const openingVerse = full?.verses?.[0]?.trim()
+  if (
+    openingVerse &&
+    current.title === "Verse 1" &&
+    JSON.stringify(current.contents) === previewContents
+  ) {
+    const contents = useSlideContent(updated, full as Song, openingVerse)
+    if (JSON.stringify(contents) !== previewContents) {
+      updated.contents = contents
+      updated.slideStyle = {
+        ...updated.slideStyle,
+        fontSize: Number(useScreenFontSize(openingVerse)),
+      }
+    }
+  }
+
+  appStore.updateSlideInActiveSlides(updated)
+  if (activeSlide.value?.id === updated.id) activeSlide.value = updated
+  if (appStore.currentState.liveSlideId === updated.id) {
+    updateLiveOutput(updated)
+  }
+
+  saveSlide(updated)
+  if (updated._id) {
+    // Something else already uploaded it while the claim was out.
+    updateSlideOnline(updated)
+  } else {
+    broadcastSlideCreated(updated)
+    uploadOfflineSlides()
+  }
+}
+
+// Where a preview song sits in a setlist, found by id because the operator may
+// have moved it while the claim was out. -1 when it is not there (any more).
+const previewItemIndex = (slide: Slide, songKey: string) =>
+  getSetlistData(slide).songs.findIndex(
+    (item) => item.songId === songKey && item.song?.isPreview
+  )
+
+// One version of a setlist with its preview song settled: the full song in
+// its place, or the item taken out again when the claim was refused (the
+// setlist slide carries its active song's id as `songId`, which the API reads
+// as "this church already uses the song").
+const settleSetlistVersion = async (
+  slide: Slide,
+  songKey: string,
+  claimed: Song | null
+): Promise<Slide> => {
+  const index = previewItemIndex(slide, songKey)
+  if (index < 0) return slide
+  const data = getSetlistData(slide)
+  if (!claimed) return (await removeSongFromSetlist(slide, index)) || slide
+  return await refreshSongSetlistSlide(
+    {
+      ...slide,
+      data: {
+        ...data,
+        songs: data.songs.map((item, i) =>
+          i === index ? { ...item, song: claimed } : item
+        ),
+      },
+    },
+    { activeSongIndex: data.activeSongIndex }
+  )
+}
+
+// Undo snapshots taken while the claim was out hold the setlist with the
+// preview in it, and undo would bring that back. Snapshots share slide
+// objects, so each distinct version is settled once.
+const settleSetlistHistory = async (
+  slideId: string,
+  songKey: string,
+  claimed: Song | null
+) => {
+  const versions = new Map<Slide, Slide>()
+  for (const state of [...appStore.pastStates, ...appStore.futureStates]) {
+    for (const slide of toSlideArray(state?.activeSlides)) {
+      if (slide.id !== slideId || versions.has(slide)) continue
+      if (previewItemIndex(slide, songKey) < 0) continue
+      versions.set(slide, await settleSetlistVersion(slide, songKey, claimed))
+    }
+  }
+  if (!versions.size) return
+  appStore.settleSlideInHistory(slideId, (slide) => versions.get(slide) ?? slide)
+}
+
+// Settles a preview song sitting in a setlist once its claim has answered,
+// on the schedule and in the undo history.
+const settlePreviewInSetlist = async (
+  slideId: string,
+  picked: Song,
+  claimed: Song | null
+): Promise<Slide | null> => {
+  const songKey = (picked as any)._id || picked.id
+  await settleSetlistHistory(slideId, songKey, claimed)
+
+  const current = slides.value.find((item) => item.id === slideId)
+  if (!current) return null
+  const updated = await settleSetlistVersion(current, songKey, claimed)
+  if (updated === current) return current
+
+  appStore.updateSlideInActiveSlides(updated)
+  if (activeSlide.value?.id === updated.id) activeSlide.value = updated
+  if (appStore.currentState.liveSlideId === updated.id) {
+    updateLiveOutput(updated)
+  }
+  return updated
+}
+
+// Same idea as addPreviewSongThenClaim, for a song going into a setlist that
+// already exists. The edit stays local until the claim lands.
+const addPreviewSongToSetlistThenClaim = async (
+  picked: Song,
+  setlistSlide: Slide
+) => {
+  const withPreview = await appendSongToSetlist(setlistSlide, { ...picked })
+  if (!withPreview) return
+  reportSongSearchPick(picked)
+
+  appStore.updateSlideInActiveSlides(withPreview)
+  makeSlideActive(withPreview, { goLive: false, newlyCreated: false })
+  updateLiveOutput(withPreview)
+  toast.add({
+    icon: "i-lucide-list-music",
+    title: `${picked.title} added to setlist`,
+  })
+
+  const claimed = await claimSong(picked)
+  const settled = await settlePreviewInSetlist(withPreview.id, picked, claimed)
+  if (settled) updateSlideOnline(settled)
+}
+
+// A brand new setlist opened with a library song: the setlist appears at once
+// and is saved only once the claim lands (dropped again if it is refused).
+const addPreviewSetlistThenClaim = async (picked: Song) => {
+  const preview = await useSong({ ...picked })
+  const newSlide = await createSongSetlistSlide(preview || undefined)
+  reportSongSearchPick(picked)
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+
+  const claimed = await claimSong(picked)
+  if (!claimed) {
+    await deleteSlide(newSlide.id, false)
+    appStore.settleSlideInHistory(newSlide.id, () => null)
+    return
+  }
+
+  const settled = await settlePreviewInSetlist(newSlide.id, picked, claimed)
+  if (!settled) return
+  if (settled._id) {
+    updateSlideOnline(settled)
+  } else {
+    broadcastSlideCreated(settled)
+    uploadOfflineSlides()
+  }
 }
 
 const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
@@ -1273,7 +1688,36 @@ const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
 
 emitter.on("new-song", async (data: Song) => {
   if (data) {
-    const song = await useSong(data)
+    // A second click on a row that is still spinning adds nothing.
+    if (isSongPending((data as any)?._id)) return
+
+    // Straight onto the schedule, claim in the background. Where the song
+    // goes is still asked first (instant, and skipped when the operator ticked
+    // "don't ask again"), so closing the prompt never spends a claim. Not
+    // offline (the claim cannot run) or with the allowance known to be spent:
+    // those claim first, so a song already claimed still works and a refusal
+    // shows its modal without a slide appearing and vanishing.
+    if (data.isPreview && navigator.onLine && songsLeft.value !== 0) {
+      let destination: "setlist" | "separate" | null = "separate"
+      if (getRelevantSongSetlist()) destination = await askSongDestination(data)
+      if (!destination) return
+      // Looked up again: the prompt can stay open for a while.
+      const target =
+        destination === "setlist" ? getRelevantSongSetlist() : undefined
+      await whileSongPending(data, () =>
+        target
+          ? addPreviewSongToSetlistThenClaim(data, target)
+          : addPreviewSongThenClaim(data)
+      )
+      return
+    }
+
+    const song = await whileSongPending(data, async () => {
+      const claimed = await claimIfPreview(data)
+      if (!claimed) return null
+      reportSongSearchPick(claimed)
+      return await useSong(claimed)
+    })
     if (song) {
       const setlistSlide = getRelevantSongSetlist()
 
@@ -1289,7 +1733,7 @@ emitter.on("new-song", async (data: Song) => {
       if (!destination) return
 
       if (destination === "setlist") {
-        addSongToSetlist(setlistSlide, song)
+        whileSongPending(data, () => addSongToSetlist(setlistSlide, song))
       } else {
         addSongAsSeparateSlide(song)
       }
@@ -1409,6 +1853,162 @@ emitter.on(appWideActions.addSong, () => {
   if (props.mobile) mobileEditorOpen.value = false
 })
 
+// ── Slide pairs ─────────────────────────────────────────────────────────────
+// Every pair holds a camera. Dropping a slide on a camera slide, or picking one
+// from the camera's "Start a pair", pairs the two with the camera as the main
+// slide. The grid, the schedule list and the picker all send this.
+//
+// `pairId` is set when the drop landed on a pair's card, or the picker is
+// changing a pair's slide (`replaceId` is then the slide to take out).
+emitter.on(
+  appWideActions.pairSlides,
+  async (data: {
+    targetId?: string
+    sourceId: string
+    pairId?: string
+    replaceId?: string
+  }) => {
+    const source = data?.sourceId
+      ? appStore.activeSlidesById.get(data.sourceId)
+      : undefined
+
+    const existing = data?.pairId
+      ? appStore.slidePairsById.get(data.pairId)
+      : undefined
+    if (existing) {
+      const members = existing.slideIds.map((id) => appStore.activeSlidesById.get(id))
+      const cameras = members.filter(isCameraSlide)
+      // A pair with one camera: the camera stays and the other slide goes.
+      // Two cameras: ambiguous, so the picker asks which one.
+      const outgoing =
+        data.replaceId ||
+        (cameras.length === 1
+          ? members.find((member) => member && !isCameraSlide(member))?.id
+          : undefined)
+      if (!outgoing) {
+        toast.add({
+          title: "This pair has two cameras",
+          description: "Use Change paired slide in a camera's ⋯ menu.",
+          icon: "i-tabler-layout-columns",
+          color: "amber",
+        })
+        return
+      }
+      const staying = members.find((member) => member && member.id !== outgoing)
+      if (!source || existing.slideIds.includes(source.id)) return
+      const rejection =
+        source.slideMode === "overlay"
+          ? "Overlay slides cannot be paired."
+          : appStore.pairForSlide(source.id)
+          ? "That slide is already in a pair. Unpair it first."
+          : !pairHasCamera([staying, source])
+          ? "A slide pair needs a camera slide."
+          : null
+      if (rejection) {
+        toast.add({ title: rejection, icon: "i-tabler-layout-columns", color: "amber" })
+        return
+      }
+      const pair = await replaceMember(existing.id, outgoing, source.id)
+      if (!pair) return
+      keepPairTogether(pair, staying!.id)
+      setEditingMember(pair.id, source.id)
+      makeSlideActive(source, { goLive: false, newlyCreated: false })
+      toast.add({
+        icon: "i-tabler-layout-columns",
+        title: "Pair updated",
+        description: `${source.name || "The slide"} is paired with ${staying?.name || "the camera"} now.`,
+      })
+      return
+    }
+
+    const target = data?.targetId
+      ? appStore.activeSlidesById.get(data.targetId)
+      : undefined
+    if (target && source && !canBePairTarget(target)) {
+      toast.add({
+        title: "Drop onto a camera slide to pair",
+        description: "Every slide pair has a camera in it.",
+        icon: "i-tabler-layout-columns",
+        color: "amber",
+      })
+      return
+    }
+    const rejection = pairRejection(target, source, appStore.pairForSlide)
+    if (rejection) {
+      toast.add({
+        title: rejection,
+        icon: "i-tabler-layout-columns",
+        color: "amber",
+      })
+      return
+    }
+
+    const pair = await createPair([target!, source!])
+    if (!pair) return
+    keepPairTogether(pair, target!.id)
+    setEditingMember(pair.id, target!.id)
+    makeSlideActive(target!, { goLive: false, newlyCreated: false })
+    toast.add({
+      icon: "i-tabler-layout-columns",
+      title: "Slides paired",
+      description: "Take the pair live to show both at once.",
+    })
+  }
+)
+
+emitter.on(appWideActions.unpairSlides, (pairId: string) => {
+  if (pairId) void deletePair(pairId)
+})
+
+// Picking a member loads it in the editor with its own controls. It is this
+// window's choice only: what is on screen and what Up/Down drives stay put.
+emitter.on(
+  appWideActions.setPairActiveMember,
+  (data: { pairId: string; slideId: string }) => {
+    const member = data?.slideId
+      ? appStore.activeSlidesById.get(data.slideId)
+      : undefined
+    const pair = data?.pairId ? appStore.slidePairsById.get(data.pairId) : undefined
+    if (!member || !pair?.slideIds.includes(member.id)) return
+    setEditingMember(pair.id, member.id)
+    makeSlideActive(member, { goLive: false, newlyCreated: false })
+  }
+)
+
+// "Start a pair" and "Change paired slide" from a camera's ⋯ menu.
+const pairPicker = ref<{ cameraId: string; pairId?: string } | null>(null)
+emitter.on(
+  appWideActions.startSlidePair,
+  (data: { cameraId: string; pairId?: string }) => {
+    if (data?.cameraId) pairPicker.value = { cameraId: data.cameraId, pairId: data.pairId }
+  }
+)
+const onPairPicked = (sourceId: string) => {
+  const picker = pairPicker.value
+  pairPicker.value = null
+  if (!picker) return
+  const pair = picker.pairId ? appStore.slidePairsById.get(picker.pairId) : undefined
+  useGlobalEmit(
+    appWideActions.pairSlides,
+    pair
+      ? {
+          pairId: pair.id,
+          sourceId,
+          replaceId: pair.slideIds.find((id) => id !== picker.cameraId),
+        }
+      : { targetId: picker.cameraId, sourceId }
+  )
+}
+
+const onGridPairDrop = (target: Slide, sourceId: string) => {
+  // Dropped on a pair's card: the card stands for the pair.
+  const pair = appStore.pairForSlide(target.id)
+  useGlobalEmit(
+    appWideActions.pairSlides,
+    pair ? { pairId: pair.id, sourceId } : { targetId: target.id, sourceId }
+  )
+}
+
 emitter.on(
   appWideActions.addSongSlideToSetlist,
   async (data: { setlistSlide: Slide; songSlide: Slide }) => {
@@ -1481,7 +2081,8 @@ const refreshSlidesForSong = async (song: Song) => {
   const songId = song?._id || song?.id
   if (!songId) return
 
-  // Re-derive verses from the edited lyrics once, then reuse for every slide.
+  // Re-derive verses from the edited lyrics once for setlists (which re-chunk
+  // at their own linesPerSlide anyway); song slides re-chunk at their own value.
   const resolvedSong = await useSong({ ...song })
   if (!resolvedSong) return
 
@@ -1495,7 +2096,12 @@ const refreshSlidesForSong = async (song: Song) => {
       slide.type === slideTypes.song &&
       (slide.songId === songId || isSameSong(slide.data as Song))
     ) {
-      updatedSlide = rebuildSongSlide(slide, resolvedSong)
+      const slideSong = await useSong(
+        { ...song },
+        slide.slideStyle?.linesPerSlide
+      )
+      if (!slideSong) continue
+      updatedSlide = rebuildSongSlide(slide, slideSong)
     } else if (slide.type === slideTypes.songSetlist) {
       const data = getSetlistData(slide)
       const itemMatches = (item: SongSetlistItem) =>
@@ -1546,6 +2152,53 @@ emitter.on("refresh-slides", () => {
   retrieveSlidesOnline(appStore.currentState.activeSchedule?._id!!).catch(
     (error) => console.warn("Unable to refresh schedule slides:", error)
   )
+})
+
+// Teammates keep editing the schedule while the operator is away, and the
+// realtime socket may have dropped events in the meantime (browsers throttle
+// and freeze hidden tabs). Coming back reconciles with the server. "Away" is
+// either the page being hidden (tab switch, minimise) or the window losing
+// focus — the desktop app has no tabs, and its window often stays visible
+// beside other apps, so visibility alone would rarely fire there. Quick
+// alt-tabs are skipped so the grid does not churn.
+const RETURN_REFRESH_AFTER_MS = 15_000
+let awaySince: number | null =
+  document.visibilityState === "hidden" || !document.hasFocus()
+    ? Date.now()
+    : null
+
+const markAway = () => {
+  awaySince ??= Date.now()
+}
+const markBack = () => {
+  if (awaySince === null) return
+  const awayFor = Date.now() - awaySince
+  awaySince = null
+  if (awayFor < RETURN_REFRESH_AFTER_MS) return
+  const scheduleId = appStore.currentState.activeSchedule?._id
+  if (!scheduleId) return
+  retrieveSlidesOnline(scheduleId).catch((error) =>
+    console.warn("Unable to refresh schedule slides on return:", error)
+  )
+}
+const onVisibilityChange = () => {
+  if (document.visibilityState === "hidden") markAway()
+  else if (document.hasFocus()) markBack()
+}
+const onWindowBlur = () => {
+  // Focus moving into an embedded iframe (e.g. a video in the live preview)
+  // blurs the window without the operator leaving the app.
+  setTimeout(() => {
+    if (document.activeElement?.tagName !== "IFRAME") markAway()
+  })
+}
+document.addEventListener("visibilitychange", onVisibilityChange)
+window.addEventListener("blur", onWindowBlur)
+window.addEventListener("focus", markBack)
+onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", onVisibilityChange)
+  window.removeEventListener("blur", onWindowBlur)
+  window.removeEventListener("focus", markBack)
 })
 
 emitter.on("upload-offline-slides", () => {
@@ -1697,6 +2350,12 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
   if (!online.value || !scheduleId || !authStore.user?.churchId) {
     return
   }
+
+  // Pairs ride alongside the slides. They hold no slide content, so they need
+  // none of the pending-edit care below and are fetched straight away.
+  fetchSchedulePairs(scheduleId).catch((error) =>
+    console.warn("Unable to refresh slide pairs:", error)
+  )
 
   const requestGeneration = ++networkRefreshGeneration
   const requestEditGeneration = slideEditGeneration
@@ -1934,6 +2593,7 @@ const loadSelectedScheduleSlides = async (schedule: Schedule | null) => {
   // A schedule without updatedAt has not reached the server yet.
   if (!schedule.updatedAt) {
     isLoadingSlides.value = false
+    void loadCachedPairs(scheduleId)
     await createSchedule(schedule)
     return
   }
@@ -1941,6 +2601,8 @@ const loadSelectedScheduleSlides = async (schedule: Schedule | null) => {
   if (!online.value) {
     isLoadingSlides.value = false
     appStore.setSlidesLoading(false)
+    // The pairs this device last saw for this schedule.
+    void loadCachedPairs(scheduleId)
     return
   }
 
@@ -2053,7 +2715,7 @@ const persistSlideOnline = useThrottleFn(
         slideUpdatePath(activeChurchId, slide.scheduleId, slide._id),
         {
           method: "PUT",
-          body: toSlideUpdatePayload(slide),
+          body: await toSlideUpdatePayload(slide),
         }
       ))
     } catch (err) {
@@ -2192,8 +2854,12 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     stopCountdown()
   }
 
-  // Clear live projection if the deleted slide is currently live
-  if (
+  // Clear live projection if the deleted slide is currently live. A member of
+  // the live pair dissolves the pair instead, and the other member stays on
+  // screen alone, so deleting the words never takes the camera off.
+  if (dropFromLivePair(clientSlideId)) {
+    // Handled.
+  } else if (
     appStore.currentState.liveSlideId === clientSlideId ||
     appStore.currentState.liveSlideId === tempSlide._id
   ) {

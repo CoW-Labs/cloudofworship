@@ -1,5 +1,74 @@
 import { useAuthStore } from '~/store/auth'
 import type { Song } from '~/types'
+import { rememberSongSearch } from './useSongSearchLog'
+import { safeDBOperation } from './useIndexedDB'
+
+/**
+ * Library songs this device has already claimed, kept in IndexedDB's `cached`
+ * table so picking one again goes straight onto the schedule with no claim
+ * round trip, online or not. The claim would release it again for free anyway
+ * (a song claimed once stays the church's on Free, and Teams only counts
+ * different songs), so skipping it costs the church nothing.
+ *
+ * A copy is used only while its `updatedAt` matches the search result being
+ * picked, which the server sent moments ago: a song edited since the claim
+ * goes through the claim again and the copy is replaced. Database scripts
+ * that change lyrics must move `updatedAt` too, or a stale copy still matches.
+ *
+ * Keyed by church as well as song: a device shared by two churches must not
+ * hand one church a song only the other claimed. Bump the version to drop
+ * every copy at once.
+ */
+const CLAIMED_SONG_CACHE_VERSION = 1
+const claimedSongKey = (churchId: string, songId: string) =>
+  `claimed-song:v${CLAIMED_SONG_CACHE_VERSION}:${churchId}:${songId}`
+
+const readClaimedSong = async (
+  churchId: string,
+  preview: Song
+): Promise<Song | null> => {
+  const songId = (preview as any)?._id
+  if (!songId || !preview.updatedAt) return null
+  const record = (await safeDBOperation((db) =>
+    db.cached.get(claimedSongKey(churchId, songId))
+  )) as { content?: Song } | undefined
+  const song = record?.content
+  return song?.lyrics && song.updatedAt === preview.updatedAt ? song : null
+}
+
+const writeClaimedSong = (churchId: string, song: Song) => {
+  const songId = (song as any)?._id
+  if (!songId) return
+  const now = new Date().toISOString()
+  // Not awaited: a failed write only costs the next pick a claim.
+  safeDBOperation((db) =>
+    db.cached.put({
+      id: claimedSongKey(churchId, songId),
+      content: song,
+      createdAt: now,
+      updatedAt: now,
+    } as any)
+  )
+}
+
+// Songs picked but not yet on the schedule, by id. Song rows read it to show a
+// spinner from the click until the slide exists (see ActionCard), whatever
+// the wait turns out to be: the claim, the local copy, building the slide.
+const pendingSongIds = ref(new Set<string>())
+
+export const isSongPending = (songId?: string) =>
+  !!songId && pendingSongIds.value.has(songId)
+
+export const setSongPending = (songId: string | undefined, pending: boolean) => {
+  if (!songId) return
+  const next = new Set(pendingSongIds.value)
+  if (pending) next.add(songId)
+  else next.delete(songId)
+  pendingSongIds.value = next
+}
+
+// Claims on the wire, by id. Not reactive: only the double-click guard reads it.
+const claimsInFlight = new Set<string>()
 
 export default function useSongs() {
   const authStore = useAuthStore()
@@ -13,7 +82,11 @@ export default function useSongs() {
   /**
    * Search songs by query
    */
-  const searchSongs = async (query: string = '', limit: number = 20): Promise<Song[]> => {
+  const searchSongs = async (
+    query: string = '',
+    limit: number = 20,
+    source?: 'songs-list' | 'quick-actions'
+  ): Promise<Song[]> => {
     try {
       loading.value = true
 
@@ -22,10 +95,10 @@ export default function useSongs() {
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/songs?search=${encodeURIComponent(
           query
-        )}&limit=${limit}`,
+        )}&limit=${limit}${source ? `&source=${source}` : ''}`,
         {
           method: 'GET',
-          key: `search-songs-${query}`,
+          key: `search-songs-${source}-${limit}-${query}`,
         }
       )
 
@@ -41,6 +114,7 @@ export default function useSongs() {
         })
       )
 
+      rememberSongSearch((data.value as any)?.data?.search_id, songsData)
       songs.value = songsData
       return songsData
     } catch (error: any) {
@@ -106,6 +180,7 @@ export default function useSongs() {
       }
 
       const songsData = (data.value as Song[]) || []
+      rememberSongSearch((data.value as any)?.data?.search_id, songsData)
       songs.value = songsData
       return songsData
     } catch (error: any) {
@@ -178,6 +253,81 @@ export default function useSongs() {
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * Releases the full lyrics of a library song a free church is about to use.
+   *
+   * A free church's search returns library songs as previews (first verse,
+   * `isPreview: true`). Turning one into a slide goes through here, which
+   * spends one of the month's library songs server-side and returns the whole
+   * song. Out of songs (429 SONG_QUOTA) opens the upgrade modal and resolves
+   * null, so the caller simply does not create the slide.
+   *
+   * A song this device already claimed comes from the local copy instead (see
+   * readClaimedSong), and a song still being claimed resolves null so a
+   * double click cannot add it twice.
+   *
+   * Never queued offline: a retried claim would spend a song later for a slide
+   * that was never made.
+   */
+  const claimSong = async (song: Song): Promise<Song | null> => {
+    const songId = (song as any)?._id
+    // Read at call time: PreviewContent creates this composable at setup,
+    // possibly before the signed-in user has loaded.
+    const claimChurchId = authStore.user?.churchId
+    if (!songId || !claimChurchId) return null
+
+    const cached = await readClaimedSong(claimChurchId, song)
+    if (cached) return { ...song, ...cached, isPreview: false } as Song
+
+    // A second click while the first claim is still out would add the song
+    // twice once both land.
+    if (claimsInFlight.has(songId)) return null
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.add({
+        icon: 'i-bx-wifi-off',
+        title: 'Library songs need a connection',
+        description: 'Reconnect to add this song. Your own saved songs still work offline.',
+        color: 'amber',
+      })
+      return null
+    }
+
+    claimsInFlight.add(songId)
+    const { data, error } = await useAPIFetch(
+      `/church/${claimChurchId}/songs/${songId}/claim`,
+      { method: 'POST' }
+    ).finally(() => claimsInFlight.delete(songId))
+
+    if (error.value) {
+      const body = (error.value as any)?.data
+      if (body?.code === 'SONG_QUOTA') {
+        useUsageQuotas().setSongsUsed(body.used)
+        useGlobalEmit(appWideActions.showUpgradeModal, {
+          feature: appWideActions.newSongSearch,
+        })
+        usePosthogCapture('SONG_QUOTA_REACHED', { used: body.used, limit: body.limit })
+        return null
+      }
+      toast.add({
+        icon: 'i-bx-error',
+        title: "Couldn't add this song",
+        description: body?.msg || body?.message || (error.value as any)?.message,
+        color: 'red',
+      })
+      return null
+    }
+
+    // The count moved (or not, for a song already added this month); re-read
+    // it rather than guess.
+    useUsageQuotas().refresh()
+
+    const full = (data.value as any)?.data as Song
+    if (!full) return null
+    writeClaimedSong(claimChurchId, full)
+    return { ...song, ...full, isPreview: false } as Song
   }
 
   /**
@@ -365,6 +515,7 @@ export default function useSongs() {
     loading,
     songs,
     searchSongs,
+    claimSong,
     findSimilarSongs,
     getAllSongs,
     getSongsCount,

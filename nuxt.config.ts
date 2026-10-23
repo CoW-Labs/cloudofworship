@@ -279,6 +279,14 @@ export default defineNuxtConfig({
       ],
       link: [
         {
+          // Declared rather than left to the browser's /favicon.ico guess: a
+          // page that links a manifest (/live, /livestream) otherwise gets its
+          // tab icon from the manifest's icons instead.
+          rel: "icon",
+          type: "image/x-icon",
+          href: "/favicon.ico",
+        },
+        {
           // Requests carry a Bearer header, not cookies, so they travel on the
           // anonymous connection pool — this must match or the socket is unused.
           rel: "preconnect",
@@ -287,13 +295,13 @@ export default defineNuxtConfig({
         },
         {
           rel: "preload",
-          href: "/css/fonts.css",
+          href: `/css/fonts.css?v=${BUILD_ID}`,
           as: "style",
           onload: "this.onload=null;this.rel='stylesheet'"
         },
         {
           rel: "prefetch",
-          href: "/css/main.css",
+          href: `/css/main.css?v=${BUILD_ID}`,
           as: "style",
           onload: "this.onload=null;this.rel='stylesheet'"
         }
@@ -340,8 +348,8 @@ export default defineNuxtConfig({
       BASE_URL: process.env.BASE_URL || "https://api.cloudofworship.com/api/v1",
       NODE_ENV: process.env.NODE_ENV || "production",
       DEV_TOKEN: process.env.DEV_ACCESS_TOKEN || "",
-      GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID || "",
-      GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET || "",
+      // Where the desktop app sends the operator to sign in (useDesktopSignin).
+      APP_URL: process.env.APP_URL || "https://app.cloudofworship.com",
       PAYSTACK_PUBLIC_KEY: process.env.PAYSTACK_PUBLIC_KEY,
       // Baked into the client bundle so a tab can recognise its own build in
       // `/version.json`.
@@ -438,6 +446,9 @@ export default defineNuxtConfig({
         'bx:time',
         'bx:trash',
         'bx:user-plus',
+        'bx:video',
+        'bx:video-off',
+        'bx:wifi-off',
         'bx:x',
         // Boxicons Solid (bxs)
         'bxs:heart',
@@ -462,6 +473,11 @@ export default defineNuxtConfig({
         'bi:text-left',
         'bi:text-right',
         // Tabler Icons
+        'tabler:arrow-autofit-width',
+        // Slide pairs
+        'tabler:layout-columns',
+        'tabler:arrows-exchange',
+        'tabler:picture-in-picture',
         'tabler:cloud-off',
         'tabler:cloud-search',
         'tabler:device-desktop-plus',

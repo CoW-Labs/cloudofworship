@@ -2,6 +2,7 @@ import { useAppStore } from "~/store/app"
 import type {
   Countdown,
   Hymn,
+  InterludeSlideData,
   Scripture,
   Slide,
   Song,
@@ -17,7 +18,7 @@ import type {
  */
 const useSlideContent = (
   slide: Slide,
-  data: Scripture | Hymn | Song | Countdown | TimeSlideData,
+  data: Scripture | Hymn | Song | Countdown | TimeSlideData | InterludeSlideData,
   nextVerse: string = ""
 ) => {
   const appStore = useAppStore()
@@ -104,6 +105,20 @@ const useSlideContent = (
           ? `<p class="countdown-label" style="line-height: 1;">${data.label}</p>`
           : "",
       ]
+    // The slide draws itself from `data`. These plain-text contents are what
+    // search, the stage display and anything else reading `contents` sees.
+    case slideTypes.interlude: {
+      data = data as InterludeSlideData
+      const escape = (s = "") =>
+        s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      return [
+        `<h1>${escape(data?.heading)}</h1>`,
+        data?.subtitle ? `<p>${escape(data.subtitle)}</p>` : "",
+      ]
+    }
+    // A camera slide is the feed alone; there is no text layer.
+    case slideTypes.camera:
+      return ["", ""]
   }
 
   return ["", ""]

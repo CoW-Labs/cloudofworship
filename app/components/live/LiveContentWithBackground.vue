@@ -24,6 +24,12 @@
       />
     </div>
 
+    <!-- CAMERA: thumbnails never open the camera -->
+    <CameraPlaceholder
+      v-if="slide?.type === slideTypes.camera"
+      :subtitle="(slide?.data as CameraSlideData)?.deviceLabel"
+    />
+
     <!-- EXTERNAL VIDEO PLACEHOLDER -->
     <div
       v-if="
@@ -43,16 +49,21 @@
       </div>
     </div>
 
-    <!-- VIDEO BACKGROUND -->
+    <!-- VIDEO BACKGROUND — mounted only for video backgrounds. Every thumbnail
+         used to carry a hidden <video>, even image slides (fed the image URL),
+         and each one is a media player of its own. Thumbnails never play, so
+         `metadata` loads just enough for the first frame instead of letting
+         WebKit (Safari, the macOS desktop app) buffer the whole file. -->
     <BackgroundVideo
-      v-show="
+      v-if="
         slide?.backgroundType === backgroundTypes.video &&
         (slide?.data as ExternalVideo)?.type !== 'youtube' &&
         (slide?.data as ExternalVideo)?.type !== 'vimeo'
       "
       :source="slide?.background"
       :repeat="slide?.slideStyle?.repeatMedia ?? false"
-      :visible="slide?.backgroundType === backgroundTypes.video"
+      :visible="true"
+      preload="metadata"
     />
 
     <!-- MAIN FOREGROUND CONTENT -->
@@ -61,7 +72,9 @@
       :slide="slide"
       :padding="{ top: 0, right: 0, bottom: 0, left: 0 }"
       :style="
-        slide?.type === slideTypes.media || slide?.type === slideTypes.presentation
+        slide?.type === slideTypes.media ||
+        slide?.type === slideTypes.presentation ||
+        slide?.type === slideTypes.camera
           ? ''
           : `backdrop-filter: blur(${slideStyles.blur}px) brightness(${slideStyles.brightness}%);`
       "
@@ -70,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Slide, SlideStyle } from "~/types"
+import type { CameraSlideData, Slide, SlideStyle } from "~/types"
 const appMounted = ref<boolean>(false)
 const foregroundContentVisible = ref<boolean>(true)
 

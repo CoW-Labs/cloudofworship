@@ -4,7 +4,7 @@
       <p
         class="flex items-baseline gap-2 font-extrabold tabular-nums leading-none text-white"
       >
-        <span class="text-[clamp(2rem,7vh,4.5rem)]">{{ time }}</span>
+        <span class="text-[clamp(1.25rem,min(7vh,6vw),4.5rem)]">{{ time }}</span>
         <span class="text-[clamp(0.9rem,2.5vh,1.5rem)] text-white/60">{{
           meridiem
         }}</span>

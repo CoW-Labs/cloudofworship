@@ -4,6 +4,7 @@
       class="w-full max-w-full border-0 shadow-none"
       searchable
       searchable-placeholder="Search name or abbreviation"
+      :popper="{ strategy: 'fixed' }"
       select-class="h-[34px] w-full min-w-0 overflow-hidden bg-white dark:bg-[#171d2b] border-0 shadow-none outline-none rounded-full font-semibold text-gray-900 dark:text-white text-left pl-3 justify-between"
       size="xs"
       :options="bibleVersionSelectOptions"

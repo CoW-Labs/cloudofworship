@@ -14,7 +14,11 @@
         :ui="{
           text: `text-[${scheduleAuthor?.theme}] dark:text-[${scheduleAuthor?.theme}] font-semibold`,
         }"
-        :class="`shrink-0 dark:border border-[${scheduleAuthor?.theme}] bg-[${scheduleAuthor?.theme}20] dark:bg-[${scheduleAuthor?.theme}20]`"
+        :class="
+          scheduleAuthor?.avatar
+            ? 'shrink-0 bg-transparent dark:bg-transparent'
+            : `shrink-0 dark:border border-[${scheduleAuthor?.theme}] bg-[${scheduleAuthor?.theme}20] dark:bg-[${scheduleAuthor?.theme}20]`
+        "
       />
       <div class="title-and-date min-w-0 text-start">
         <div class="title font-medium flex items-center gap-2 truncate">
@@ -35,8 +39,14 @@
           </UTooltip>
         </div>
         <span class="text-xs text-gray-500 mt-0.5 block"
-          >Created
-          {{ format(new Date(schedule?.updatedAt as string).getTime()) }}</span
+          ><template v-if="schedule?.code"
+            ><span
+              class="font-mono font-medium tracking-wider text-gray-600 dark:text-gray-300"
+              >{{ schedule.code }}</span
+            >
+            &middot; </template
+          >Updated
+          {{ lastUpdatedLabel }}</span
         >
       </div>
     </div>
@@ -156,6 +166,14 @@ const commitRename = () => {
   if (!name || name === props.schedule?.name) return
   emit("rename", props.schedule, name)
 }
+
+// A schedule that has not synced yet has no `updatedAt`, only the `createdAt`
+// stamped when it was made locally.
+const lastUpdatedLabel = computed(() => {
+  const stamp = props.schedule?.updatedAt || props.schedule?.createdAt
+  const time = stamp ? new Date(stamp).getTime() : NaN
+  return Number.isNaN(time) ? "just now" : format(time)
+})
 
 const scheduleAuthor = computed(() => {
   if (props.schedule?.authorId) {

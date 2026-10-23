@@ -35,7 +35,8 @@ export const useSubscriptionPlans = () => {
 
   // Allow local testing by setting currency in localStorage
   const getTestCurrency = (): 'NGN' | 'USD' | null => {
-    if (process.client) {
+    // Dev builds only: in production this would let anyone pick the NGN price.
+    if (process.client && import.meta.dev) {
       try {
         const testCurrency = localStorage.getItem('test_currency')
         if (testCurrency === 'NGN' || testCurrency === 'USD') {
@@ -80,82 +81,55 @@ export const useSubscriptionPlans = () => {
       return detectedCurrency.value
     }
 
-    // Check localStorage for cached currency
+    // Drop the old 24h localStorage cache: it pinned users to a wrong USD result
+    // whenever a geo lookup failed. Detection now runs once per session instead.
     if (process.client) {
       try {
-        const cached = localStorage.getItem('detected_currency')
-        const cacheTime = localStorage.getItem('detected_currency_time')
-
-        // Cache for 24 hours
-        if (cached && cacheTime) {
-          const hoursSinceCache = (Date.now() - parseInt(cacheTime)) / (1000 * 60 * 60)
-          if (hoursSinceCache < 24 && (cached === 'NGN' || cached === 'USD')) {
-            detectedCurrency.value = cached as 'NGN' | 'USD'
-            selectedCurrency.value = detectedCurrency.value
-            return detectedCurrency.value
-          }
-        }
+        localStorage.removeItem('detected_currency')
+        localStorage.removeItem('detected_currency_time')
       } catch {
-        // localStorage unavailable (private mode / SecurityError) — skip cache
+        // localStorage unavailable (private mode / SecurityError)
       }
     }
 
     isDetectingCurrency.value = true
 
     try {
-      // Try multiple detection services for reliability
-      let currency: 'NGN' | 'USD' = 'USD' // Default fallback
-
-      // Only Nigeria is billed in NGN (Paystack). Everywhere else pays in USD via Dodo,
-      // whose checkout accepts international cards.
-      const countriesForNGN = ['NG']
-
+      // The API reads Cloudflare's CF-IPCountry header, which is far more
+      // reliable than client-side lookups and can't be altered by the visitor.
+      let countryCode: string | undefined
+      let detectionMethod = 'cloudflare_ip_country'
       try {
-        // Try ipapi.co first (free, reliable)
-        const response = await fetch('https://ipapi.co/json/')
-        const data = await response.json()
-
-        if (countriesForNGN.includes(data.country_code)) {
-          currency = 'NGN'
-        } else {
-          currency = 'USD'
-        }
+        const { data } = await useAPIFetch<{ country: string | null; currency: 'NGN' | 'USD' }>('/app-config/geo', {
+          key: `billing-geo-${Date.now()}`,
+        })
+        countryCode = data.value?.country ?? undefined
       } catch (err) {
-        console.warn('Primary currency detection failed, trying fallback:', err)
+        console.warn('Currency detection via API failed:', err)
+      }
 
+      // Only when Cloudflare has no country: browser timezone (Nigeria is
+      // Africa/Lagos), so a failed lookup doesn't push Nigerians onto USD.
+      if (!countryCode) {
+        detectionMethod = 'timezone'
         try {
-          // Fallback to ip-api.com
-          const response = await fetch('https://ip-api.com/json/')
-          const data = await response.json()
-
-          if (countriesForNGN.includes(data.countryCode)) {
-            currency = 'NGN'
-          } else {
-            currency = 'USD'
+          if (Intl.DateTimeFormat().resolvedOptions().timeZone === 'Africa/Lagos') {
+            countryCode = 'NG'
           }
-        } catch (fallbackErr) {
-          console.warn('Fallback currency detection failed, using default USD:', fallbackErr)
-          // Keep default USD
-        }
-      }
-
-      // Cache the detected currency
-      if (process.client) {
-        try {
-          localStorage.setItem('detected_currency', currency)
-          localStorage.setItem('detected_currency_time', Date.now().toString())
         } catch {
-          // localStorage unavailable (private mode / SecurityError) — skip caching
+          // Intl unavailable — keep default USD
         }
       }
 
+      // Only Nigeria is billed in NGN (Paystack). Everywhere else pays in USD via Dodo.
+      const currency: 'NGN' | 'USD' = countryCode === 'NG' ? 'NGN' : 'USD'
       detectedCurrency.value = currency
       selectedCurrency.value = currency
 
       // Track detection
       usePosthogCapture('CURRENCY_AUTO_DETECTED', {
         detectedCurrency: currency,
-        method: 'ip_location'
+        method: detectionMethod
       })
 
       return currency

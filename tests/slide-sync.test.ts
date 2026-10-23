@@ -30,8 +30,8 @@ describe("slide sync helpers", () => {
     )
   })
 
-  it("removes route-owned fields and clears stale video keys", () => {
-    const payload = toSlideUpdatePayload(slide())
+  it("removes route-owned fields and clears stale video keys", async () => {
+    const payload = await toSlideUpdatePayload(slide())
 
     expect(payload).not.toHaveProperty("_id")
     expect(payload).not.toHaveProperty("id")
@@ -44,7 +44,7 @@ describe("slide sync helpers", () => {
     })
   })
 
-  it("preserves video keys and identifies media video slides", () => {
+  it("preserves video keys and identifies media video slides", async () => {
     const video = slide({
       type: "media",
       backgroundType: "video",
@@ -52,7 +52,7 @@ describe("slide sync helpers", () => {
     })
 
     expect(isMediaVideoSlide(video)).toBe(true)
-    expect(toSlideUpdatePayload(video)).toMatchObject({
+    expect(await toSlideUpdatePayload(video)).toMatchObject({
       backgroundVideoKey: "video-key",
     })
     expect(isMediaVideoSlide(slide({ backgroundType: "video" }))).toBe(false)

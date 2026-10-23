@@ -2,6 +2,8 @@ import { io, Socket } from "socket.io-client"
 import { useAuthStore } from "~/store/auth"
 import { useOnline } from "@vueuse/core"
 import { watch, onUnmounted, ref } from "vue"
+import { getLiveSourceId } from "~/utils/socketSource"
+import type { LivePayload, SlidePair } from "~/types"
 
 interface SocketIOOptions {
   scheduleId: string
@@ -16,11 +18,13 @@ interface SocketIOOptions {
   onMaxRetriesReached?: () => void
   onTierRestricted?: (data: TierRestriction) => void
   /**
-   * Names this connection to the server. Only the public livestream viewer sets
-   * it ("livestream"), and it is what scopes the Teams gate to that page — the
-   * operator surfaces stay ungated on every plan. See the API's socketio/index.
+   * Names this connection to the server. Only the public viewers set it — the
+   * livestream ("livestream") and the stage display ("stagestream") — and it is
+   * what scopes the Teams gate to those pages and puts them in rooms of their
+   * own. The operator surfaces stay ungated on every plan. See the API's
+   * socketio/index.
    */
-  client?: "livestream"
+  client?: "livestream" | "stagestream"
   onOnlineUsersChanged?: (users: OnlineUser[]) => void
   onUserJoined?: (user: OnlineUser) => void
   onUserLeft?: (userId: string, userName: string) => void
@@ -34,6 +38,10 @@ interface SocketIOOptions {
 export interface TierRestriction {
   feature?: string
   plan?: string
+  /** "quota" when a free church has used its livestream sessions. */
+  reason?: "plan" | "quota"
+  used?: number
+  limit?: number
   message?: string
 }
 
@@ -60,6 +68,11 @@ export interface SlideEditLock {
 // always forwards to whatever socket is live right now, so `nuxtApp.$socketio`
 // never points at a dead socket.
 let activeSocket: Socket | null = null
+
+// One source per operator tab, stable through reconnects and page reloads.
+// The server also binds ownership to one active socket, since duplicating a
+// browser tab can copy its sessionStorage along with this id.
+const liveSourceId = getLiveSourceId()
 
 // Methods callers reach for on `$socketio`. Without a live socket the proxy has
 // nothing to forward to, and returning `undefined` turned every one of these
@@ -292,6 +305,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
         // live-output host/request events against the selected schedule.
         auth: {
           token: getToken() || undefined,
+          ...(!client ? { liveSourceId } : {}),
         },
         // Start with polling first (more reliable behind proxies/load balancers)
         // then upgrade to websocket
@@ -428,6 +442,19 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('reorder-slides', { action: 'reorder-slides', data })
       })
 
+      // Slide pair events
+      socket.on('slide-pair-created', (data) => {
+        onMessage?.('slide-pair-created', { action: 'slide-pair-created', data })
+      })
+
+      socket.on('slide-pair-updated', (data) => {
+        onMessage?.('slide-pair-updated', { action: 'slide-pair-updated', data })
+      })
+
+      socket.on('slide-pair-deleted', (data) => {
+        onMessage?.('slide-pair-deleted', { action: 'slide-pair-deleted', data })
+      })
+
       // Slide locking events
       socket.on('slide-locked', (data) => {
         onMessage?.('slide-locked', { action: 'slide-locked', data })
@@ -459,9 +486,20 @@ export const useSocketIO = (options: SocketIOOptions) => {
       })
 
       // Live slide feed — one-way, operator to the livestream viewers. This is
-      // the only way /livestream/:schedule_id learns which slide is on screen.
+      // the only way /livestream/:code learns which slide is on screen.
       socket.on('live-slide', (data) => {
         onMessage?.('live-slide', { action: 'live-slide', data })
+      })
+
+      // Stage display feed. Viewers receive the owning console's worked-out
+      // stage view; consoles are told how many viewers are watching, so they
+      // only do that work while somebody is. See useStageStreamFeed.
+      socket.on('stage-state', (data) => {
+        onMessage?.('stage-state', { action: 'stage-state', data })
+      })
+
+      socket.on('stage-viewers', (data) => {
+        onMessage?.('stage-viewers', { action: 'stage-viewers', data })
       })
 
       // Live output control — a phone driving the machine with the projector.
@@ -601,10 +639,36 @@ export const useSocketIO = (options: SocketIOOptions) => {
   }
 
   /**
-   * Broadcast the slide currently on screen to livestream viewers
+   * Broadcast what is on screen to livestream viewers: one slide, a slide
+   * pair's members as an array, or null for blank.
    */
-  const sendLiveSlide = (slide: any) => {
-    return emit('live-slide', slide)
+  const sendLiveSlide = (payload: LivePayload) => {
+    return emit('live-slide', payload)
+  }
+
+  /**
+   * Slide pair events. Senders tag `tabId` so their own echo is ignored.
+   */
+  const sendSlidePairCreated = (pair: SlidePair, tabId?: string) => {
+    return emit('create-slide-pair', { pair, tabId })
+  }
+
+  const sendSlidePairUpdated = (pair: SlidePair, tabId?: string) => {
+    return emit('update-slide-pair', { pair, tabId })
+  }
+
+  const sendSlidePairDeleted = (
+    pair: Pick<SlidePair, 'id' | 'slideIds'>,
+    tabId?: string
+  ) => {
+    return emit('delete-slide-pair', { pairId: pair.id, slideIds: pair.slideIds, tabId })
+  }
+
+  /**
+   * Send the worked-out stage display to `/stagestream` viewers
+   */
+  const sendStageState = (state: unknown) => {
+    return emit('stage-state', state)
   }
 
   /**
@@ -695,6 +759,10 @@ export const useSocketIO = (options: SocketIOOptions) => {
     sendSlideUpdated,
     sendSlideDeleted,
     sendLiveSlide,
+    sendSlidePairCreated,
+    sendSlidePairUpdated,
+    sendSlidePairDeleted,
+    sendStageState,
     sendBatchSlidesCreated,
     sendBatchSlidesUpdated,
     sendBatchSlidesDeleted,

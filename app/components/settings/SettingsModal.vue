@@ -88,14 +88,12 @@
                   v-else-if="activeTab === 'Slide Settings'"
                   @select-active-tab="activeTab = $event"
                 />
-                <!-- OVERLAY SETTINGS -->
-                <OverlaySettings v-else-if="activeTab === 'Overlay Settings'" />
                 <!-- BACKGROUND SETTINGS -->
                 <BackgroundSettings
                   v-else-if="activeTab === 'Slide Background Settings'"
                 />
                 <!-- BLANK SETTINGS -->
-                <IntermissionSettings
+                <BlankSettings
                   v-else-if="activeTab === 'Blank Settings'"
                 />
                 <!-- BIBLE SLIDE SETTINGS -->
@@ -135,7 +133,6 @@ const tabs = [
   { name: "Display Settings", active: false },
   { name: "Microphone Settings", active: false },
   { name: "Slide Settings", active: false },
-  { name: "Overlay Settings", active: false },
   { name: "Slide Background Settings", active: false },
   { name: "Blank Settings", active: false },
   { name: "Bible Slide Settings", active: false },
@@ -158,6 +155,13 @@ watch(
     }
   }
 )
+
+// Tab switches made inside the open modal (the opening page is on OPEN_SETTINGS_MODAL)
+watch(activeTab, (page, previous) => {
+  if (settingsModalOpen.value && previous && page !== previous) {
+    usePosthogCapture("SETTINGS_TAB_SWITCHED", { page, from: previous })
+  }
+})
 
 // Watch for changes in settings and save
 watch(

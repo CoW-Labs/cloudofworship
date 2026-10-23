@@ -39,7 +39,6 @@ useHead({
   ],
 })
 import { useAppStore } from "~/store/app"
-import { useAuthStore } from "~/store/auth"
 import { until } from "@vueuse/core"
 import { computed, ref } from "vue"
 
@@ -124,11 +123,7 @@ useOperatorSession()
  * a slow (or failed) church fetch doesn't swallow the link entirely.
  */
 const openUpgradeFromDeeplink = async (planId?: string) => {
-  const authStore = useAuthStore()
-  const { isTeamsPlan } = useSubscription()
-  const isPlanKnown = computed(
-    () => !!authStore.church && authStore.church._id === authStore.user?.churchId
-  )
+  const { isTeamsPlan, isPlanKnown } = useSubscription()
 
   await Promise.all([
     // UpgradePlanModal only registers its emitter listener after it has
@@ -189,6 +184,18 @@ onMounted(async () => {
     router.replace({ query: restQuery })
 
     openUpgradeFromDeeplink(deeplinkPlanId)
+  }
+
+  // Deeplink — `/?subscription_settings=1` opens Settings on the Subscription
+  // section. Same param-consuming and one-second floor as the upgrade link, so
+  // the settings modal's emitter listener is registered before we emit.
+  if (route.query.subscription_settings) {
+    const { subscription_settings: _subSettings, ...restQuery } = route.query
+    router.replace({ query: restQuery })
+
+    setTimeout(() => {
+      useGlobalEmit(appWideActions.openSettings, "Subscription Settings")
+    }, 1000)
   }
 
   // Check for pending plan_id from signup flow

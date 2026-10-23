@@ -13,6 +13,12 @@
       </template>
     </UTabs> -->
 
+    <CowTeamsPreviewNotice
+      v-if="!hasAccessToFeature('new-templates')"
+      feature="new-templates"
+      class="mb-2"
+    />
+
     <!-- Superadmin Info Banner -->
     <div
       v-if="authStore.user?.role === 'superadmin'"
@@ -137,6 +143,7 @@ const emit = defineEmits(["close"])
 const toast = useToast()
 const templateStore = useTemplateStore()
 const authStore = useAuthStore()
+const { hasAccessToFeature, requireFeatureAccess } = useSubscription()
 const { fetchTemplates } = useTemplates()
 
 const categoryTabs = [
@@ -202,6 +209,8 @@ const onSearchInput = useDebounceFn(() => {
 
 // Use template - emit event similar to saved slides
 const useTemplate = (template: Template) => {
+  if (!requireFeatureAccess("new-templates")) return
+
   const slide = template.slideId as Slide
 
   if (!slide) {

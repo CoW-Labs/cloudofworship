@@ -1,5 +1,10 @@
 <template>
   <div class="add-song-main mb-4">
+    <CowTeamsPreviewNotice
+      v-if="!hasAccessToFeature(destination.action)"
+      :feature="destination.action"
+      class="mt-3"
+    />
     <!-- Same countdown, two destinations: the congregation's screen (a slide in
          the schedule) or the stage display alone (a clock only the band and
          speaker see). The form below is shared; only where it lands changes. -->
@@ -98,6 +103,7 @@ const props = defineProps<{
 }>()
 
 const appStore = useAppStore()
+const { hasAccessToFeature, requireFeatureAccess } = useSubscription()
 
 // No icons: the quick actions panel is only ~340px wide by default, and an
 // icon pushes "Stage Display" into an ellipsis.
@@ -157,6 +163,7 @@ const hasDuration = computed(() => useTimeStringToMilli(duration.value) > 0)
 
 const createCountdown = async () => {
   if (!hasDuration.value) return
+  if (!requireFeatureAccess(destination.value.action)) return
 
   const countdown: Countdown = {
     id: useID(),

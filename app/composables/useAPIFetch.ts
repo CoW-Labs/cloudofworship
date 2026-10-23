@@ -4,9 +4,14 @@ import { useOnline } from "@vueuse/core";
 import { useAuthStore } from "~/store/auth";
 import { useAppStore } from "~/store/app";
 import { useOnlineStatus } from "./useOnlineStatus";
-import { useRequestCounter } from "./useRequestCounter";
 
 const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+// Without a timeout, a GET on a lossy connection hangs until the browser gives
+// up (minutes) while useOnline() still reports online. ofetch retries a
+// timed-out GET once, so the worst case is twice this. Callers can pass their
+// own `timeout`.
+const DEFAULT_GET_TIMEOUT_MS = 20_000;
 
 type APIFetchResult<ResT = any, ErrorT = any> = {
   data: Ref<ResT | null | undefined>;
@@ -51,15 +56,6 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
     ...(config.public.NODE_ENV === 'development' ? { "x-dev-token": config.public.DEV_TOKEN } : {})
   };
 
-  const { getDelayPromise } = useRequestCounter();
-
-  const executeWithDelay = async () => {
-    const delay = getDelayPromise();
-    if (delay) {
-      await delay;
-    }
-  };
-
   const handleRequestError = (error: any) => {
     appStore.setSlidesLoading(false);
     console.error(`[${method}] "${path}": <no response> ${error?.message}`);
@@ -101,10 +97,6 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
     delete retryOptions.onRequestError;
     delete retryOptions.onResponseError;
     return retryOptions;
-  };
-
-  options.onRequest = async () => {
-    await executeWithDelay();
   };
 
   options.onRequestError = ({ error }: { error: any }) => {
@@ -189,7 +181,6 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
       const mutationOptions = getRetryOptions();
 
       try {
-        await executeWithDelay();
         data.value = await $fetch<ResT>(path as string, mutationOptions);
         status.value = "success";
       } catch (err: any) {
@@ -230,7 +221,7 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
   const fetchPending = ref(false);
   const fetchStatus = ref<AsyncDataRequestStatus>("idle");
 
-  const fetchOptions = { ...options };
+  const fetchOptions = { timeout: DEFAULT_GET_TIMEOUT_MS, ...options };
   delete fetchOptions.key;
   delete fetchOptions.dedupe;
   delete fetchOptions.watch;

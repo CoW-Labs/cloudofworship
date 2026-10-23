@@ -171,11 +171,6 @@ const saveTemplate = async () => {
 
     if (template) {
       templateStore.addTemplate(template)
-      toast.add({
-        icon: "i-bx-check",
-        title: "Template saved successfully",
-        color: "green",
-      })
 
       // Reset form
       templateData.value = {

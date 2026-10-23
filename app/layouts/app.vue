@@ -18,21 +18,10 @@
     <FullScreenLoader v-if="fullScreenLoading" />
     <ClientOnly>
       <Transition name="fade-sm">
-        <div
+        <OfflineNotification
           v-show="isOfflineToastOpen"
-          class="ctn fixed z-50 right-4 bottom-4"
-          role="alert"
-          aria-labelledby="toast-message"
-        >
-          <NotFoundBanner
-            icon="i-tabler-cloud-off"
-            sub="You are offline"
-            desc="CoW will save your work until an internet connection returns."
-            action="close-offline-toast"
-            action-text="Ok, got it."
-            is-wider
-          />
-        </div>
+          @close="isOfflineToastOpen = false"
+        />
       </Transition>
       <Transition name="fade-sm">
         <UpdateNotification />
@@ -76,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import { publicStylesheet } from "~/utils/publicStylesheet"
 import posthog from "posthog-js"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
@@ -102,7 +92,7 @@ import { stageTimerReading } from "~/utils/stageTimer"
 
 useHead({
   title: "Cloud of Worship",
-  link: [{ rel: "stylesheet", href: "/css/main.css" }],
+  link: [{ rel: "stylesheet", href: publicStylesheet("/css/main.css") }],
 })
 
 // Lock the document while the operator shell is mounted. The shell owns its own
@@ -311,6 +301,72 @@ const fetchChurch = async () => {
   }
 }
 
+/**
+ * Keep the cached subscription plan fresh while the app is open.
+ *
+ * Every paid gate reads the plan out of persisted state, and that copy is only
+ * trusted for PLAN_GRACE_PERIOD_MS after the API last confirmed it. Boot alone
+ * is not enough: an operator leaves this window open across a whole service,
+ * and often across an upgrade they just paid for on their phone. Refreshing on
+ * focus, and when the connection comes back, picks up an upgrade and a
+ * downgrade alike — without putting a network call on the gate itself, which
+ * would break the app for the offline services we support.
+ *
+ * Throttled, because focus fires on every alt-tab between this window and the
+ * live output, which during a service is constant.
+ */
+const PLAN_REVALIDATE_INTERVAL_MS = 5 * 60 * 1000
+// Seeded at setup so the boot fetch counts as the first confirmation.
+let lastPlanRevalidateAt = Date.now()
+
+const revalidateChurchPlan = () => {
+  if (!online.value) return
+  if (!authStore.user?.churchId) return
+  if (Date.now() - lastPlanRevalidateAt < PLAN_REVALIDATE_INTERVAL_MS) return
+
+  lastPlanRevalidateAt = Date.now()
+  fetchChurch()
+}
+
+onMounted(() => {
+  window.addEventListener("focus", revalidateChurchPlan)
+})
+onUnmounted(() => {
+  window.removeEventListener("focus", revalidateChurchPlan)
+})
+
+watch(online, (isOnline) => {
+  // Coming back from a dropout is the other moment the cached plan is most
+  // likely to be out of date.
+  if (isOnline) revalidateChurchPlan()
+})
+
+// Media that was saved on this device but never reached the cloud (a dropped
+// upload, or added offline) is re-uploaded when the connection returns and
+// whenever a schedule finishes loading. A short delay keeps it out of the way
+// of the loads that matter first.
+const { retryActiveScheduleUploads } = useCloudUploadRetry()
+let cloudRetryTimer: ReturnType<typeof setTimeout> | undefined
+const scheduleCloudRetry = () => {
+  clearTimeout(cloudRetryTimer)
+  cloudRetryTimer = setTimeout(() => {
+    if (!online.value) return
+    retryActiveScheduleUploads().catch((err) =>
+      console.error("Cloud upload retry sweep failed:", err)
+    )
+  }, 5000)
+}
+watch(online, (isOnline) => {
+  if (isOnline) scheduleCloudRetry()
+})
+watch(
+  () => appStore.currentState.slidesLoading,
+  (loading, wasLoading) => {
+    if (wasLoading && !loading) scheduleCloudRetry()
+  }
+)
+onUnmounted(() => clearTimeout(cloudRetryTimer))
+
 const fetchHymns = async () => {
   if (!online.value) {
     setLoadingTask(
@@ -355,6 +411,9 @@ const fetchHymns = async () => {
       await safeDBOperation((d) => d.bibleAndHymns.put(tempBibleVersion("hymns", hymns)))
       // The lookup index is built once per window from the old record
       invalidateHymnCache()
+      // Quick search and the hymn panel read their copy when they mount, which
+      // on a device's first session is before this download lands.
+      useGlobalEmit(appWideActions.hymnsUpdated)
     } else {
       setLoadingTask("hymns", "Hymns are already available offline.", 100)
     }
@@ -566,7 +625,7 @@ const saveAllBackgroundVideos = async (options?: { wait?: boolean }) => {
   const downloadMissingVideos = async () => {
     const downloadVideo = async (id: number) => {
       try {
-        const url = `https://d37gopmfkl2m2z.cloudfront.net/open/bg-videos/video-bg-${id}.mp4`
+        const url = await backgroundVideoAssetUrl(id)
         await localMedia.downloadToLocal({
           key: `/video-bg-${id}.mp4`,
           groupId: `/video-bg-${id}.mp4`,
@@ -741,7 +800,7 @@ const downloadEssentialResources = async () => {
         if (!tempBible) {
           try {
             let kjvBible = await useDetailedFetch(
-              `https://d37gopmfkl2m2z.cloudfront.net/open/bible-versions/kjv.json`,
+              await bibleVersionAssetUrl("KJV"),
               downloadProgress
             )
             kjvBible = await kjvBible.json()
@@ -891,10 +950,10 @@ const forgetSettingsBackgroundKey = (
     return
   }
 
-  const intermission = appStore.currentState.settings.intermission
-  appStore.setIntermissionSettings({
-    ...intermission,
-    mode: intermission?.mode || "default",
+  const blank = appStore.currentState.settings.intermission
+  appStore.setBlankSettings({
+    ...blank,
+    mode: blank?.mode || "default",
     backgroundImageKey: null,
   })
 }
@@ -958,14 +1017,14 @@ const retrieveAllMediaFilesFromDB = async () => {
     if (url) defaultBackground.background = url
   }
 
-  const intermission = appStore.currentState.settings.intermission
-  if (intermission?.backgroundImageKey) {
+  const blank = appStore.currentState.settings.intermission
+  if (blank?.backgroundImageKey) {
     const url = await ensureSettingsBackgroundLocal(
       "intermission",
-      intermission.backgroundImageKey,
-      intermission.background
+      blank.backgroundImageKey,
+      blank.background
     )
-    if (url) intermission.background = url
+    if (url) blank.background = url
   }
 
   // For active slides - use Promise.all instead of forEach
@@ -1128,6 +1187,8 @@ async function trackTauriLiveWindow(liveWindow: any) {
 
   tauriLiveWindowCloseListenerBound = true
   try {
+    // A JS listener on close-requested makes Tauri hold the close and wait for
+    // JS to finish it, so the window has to be destroyed here or it stays open.
     await liveWindow.once("tauri://close-requested", async () => {
       console.log("Live window closed")
       try {
@@ -1138,6 +1199,9 @@ async function trackTauriLiveWindow(liveWindow: any) {
       } finally {
         windowRefs.value = []
         tauriLiveWindowCloseListenerBound = false
+        await liveWindow.destroy().catch((error: unknown) => {
+          console.warn("Failed to destroy the live window:", error)
+        })
       }
     })
   } catch (error) {

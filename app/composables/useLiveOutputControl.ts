@@ -2,6 +2,7 @@ import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { resolveLiveOutputDestination } from "~/utils/liveOutputRouting"
+import { projectLiveSlide } from "~/composables/useSlidePairs"
 
 /**
  * Driving one device's live output from another — specifically, a phone on
@@ -140,6 +141,7 @@ let ackTimer: ReturnType<typeof setTimeout> | null = null
 export const useLiveOutputControl = () => {
   const appStore = useAppStore()
   const authStore = useAuthStore()
+  const { requireSlideAccess, hasAccessToSlide } = useSubscription()
   const toast = useToast()
 
   // Shared by every caller in this window.
@@ -272,9 +274,9 @@ export const useLiveOutputControl = () => {
    * schedule has always run, so a remote request and a local click cannot
    * diverge.
    */
+  // A slide in a pair goes on screen with the rest of its pair.
   const applyLiveSlideLocally = (slide: Slide) => {
-    useBroadcastPost(slide)
-    appStore.setLiveSlide(slide.id)
+    projectLiveSlide(slide)
   }
 
   const applyBlankLocally = () => {
@@ -308,6 +310,10 @@ export const useLiveOutputControl = () => {
     // local storage, so the wire payload would not necessarily render here.
     const slide = findSlide(request.slideId)
     if (!slide || slide.slideMode === "overlay") return
+    // The controller gates too, but this device owns the screen and its own
+    // plan reading, so it never projects a Teams slide it cannot vouch for.
+    // No modal here: the person at this screen did not ask for it.
+    if (!hasAccessToSlide(slide)) return
     applyLiveSlideLocally(slide)
   }
 
@@ -474,6 +480,9 @@ export const useLiveOutputControl = () => {
     const slide = findSlide(slideId)
     if (!slide) return
     if (slide.slideMode === "overlay") return
+    // A slide made on Teams stays in the schedule after the plan lapses, but
+    // it no longer goes live.
+    if (!requireSlideAccess(slide)) return
 
     const destination = resolveLiveOutputDestination(
       hasRemoteTarget.value,

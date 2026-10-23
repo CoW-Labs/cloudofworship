@@ -2,8 +2,9 @@ import { useDebounceFn, useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
-import { toTransportSafeSlide } from "~/utils/mediaTransport"
+import { isSessionMediaUrl, toTransportSafeSlide } from "~/utils/mediaTransport"
 import { enqueueSlideShadowWrite } from "~/composables/useSlideRepository"
+import { projectLiveSlide } from "~/composables/useSlidePairs"
 import {
   getAPIErrorMessage,
   isForbiddenError,
@@ -16,6 +17,7 @@ export default function useSlides() {
   const authStore = useAuthStore()
   const toast = useToast()
   const online = useOnline()
+  const { requireSlideAccess } = useSubscription()
   const {
     goLive: goLiveOnControlledOutput,
     hasRemoteTarget,
@@ -42,13 +44,25 @@ export default function useSlides() {
   }
 
   const updateLiveOutput = (updatedSlide: Slide, options?: { forceGoLive: boolean }) => {
-    const shouldUpdateLiveSlide =
-      updatedSlide.id === appStore.currentState.liveSlideId ||
-      options?.forceGoLive
+    // Any member of the live pair is on screen, not only the active one.
+    const isOnScreen = appStore.isSlideLive(updatedSlide.id)
+    const shouldUpdateLiveSlide = isOnScreen || options?.forceGoLive
 
     // Update only the changed slide. Replacing the full schedule array here
     // made every verse navigation re-filter and re-render unrelated slides.
     appStore.updateSlideInActiveSlides(updatedSlide)
+
+    // A Teams-only slide whose plan has lapsed stays editable but cannot be
+    // put on screen. One already live is left alone so a change of plan never
+    // cuts a service short. A paired slide is gated as a pair (see
+    // teamsActionForSlide), so a free church can build one but not project it.
+    if (
+      shouldUpdateLiveSlide &&
+      !isOnScreen &&
+      !requireSlideAccess(updatedSlide)
+    ) {
+      return
+    }
 
     // While this device is driving another device's screen (a phone running
     // the mobile app, say), that device owns the projection and the local copy
@@ -63,15 +77,11 @@ export default function useSlides() {
     }
 
     if (shouldUpdateLiveSlide) {
-      // Same-slide verse changes already have the correct live id. Avoid a
-      // second Pinia mutation, persistence pass, and shared-state broadcast.
-      if (appStore.currentState.liveSlideId !== updatedSlide.id) {
-        appStore.setLiveSlide(updatedSlide.id)
-      }
-
-      // Send immediately after the targeted local update. The channel applies
-      // one serialization boundary so Vue reactive proxies remain clone-safe.
-      useBroadcastPost(updatedSlide)
+      // Same-slide verse changes already have the correct live id, and
+      // projectLiveSlide skips the Pinia write when nothing moved. A slide in a
+      // pair goes on screen with the rest of its pair; an edit to either
+      // member re-sends the pair with only that member changed.
+      projectLiveSlide(updatedSlide, { keepShape: !options?.forceGoLive })
 
       // Local-first: if this slide's media is still a remote URL on this device
       // (e.g. a teammate's slide received via socket that idle-prefetch hasn't
@@ -97,16 +107,19 @@ export default function useSlides() {
    * the slide again.
    */
   const republishLiveSlide = (slideId: string) => {
-    if (!slideId || appStore.currentState.liveSlideId !== slideId) return
+    if (!slideId || !appStore.isSlideLive(slideId)) return
     const slide = appStore.activeSlides.find(
       (candidate) => candidate.id === slideId
     )
-    if (slide) useBroadcastPost(slide)
+    if (slide) projectLiveSlide(slide, { keepShape: true })
   }
 
   const localizeLiveSlideMedia = (liveSlide: Slide) => {
     const bg = liveSlide.background
-    const isRemote = !!bg && (bg.startsWith("http://") || bg.startsWith("https://"))
+    const isRemote =
+      !!bg &&
+      (bg.startsWith("http://") || bg.startsWith("https://")) &&
+      !isSessionMediaUrl(bg)
     const bearsMedia =
       liveSlide.type === slideTypes.media ||
       liveSlide.type === slideTypes.presentation ||
@@ -119,8 +132,8 @@ export default function useSlides() {
         // Nothing was localized (no local/remote copy available) — leave as-is.
         if (rehydrated.background === bg) return
         appStore.updateSlideInActiveSlides(rehydrated)
-        if (appStore.currentState.liveSlideId === rehydrated.id) {
-          useBroadcastPost(rehydrated)
+        if (appStore.isSlideLive(rehydrated.id)) {
+          projectLiveSlide(rehydrated, { keepShape: true })
         }
       })
       .catch((err) => console.warn("Go-live media localize failed:", err))
@@ -365,9 +378,13 @@ export default function useSlides() {
   }
 
   /**
-   * Update a single slide online
+   * Update a single slide online. Pass `transportSlide` when the caller has
+   * already built the network-safe copy (e.g. to reuse it for a socket event).
    */
-  const updateSlide = async (slide: Slide): Promise<Slide | null> => {
+  const updateSlide = async (
+    slide: Slide,
+    transportSlide?: Slide
+  ): Promise<Slide | null> => {
     if (!online.value) {
       console.warn('Cannot update slide while offline')
       return null
@@ -386,13 +403,13 @@ export default function useSlides() {
       }
 
       loading.value = true
-      const transportSlide = await toTransportSafeSlide(slide)
+      const body = transportSlide || (await toTransportSafeSlide(slide))
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/${slide._id}`,
         {
           method: 'PUT',
-          body: transportSlide,
+          body,
           key: `update-slide-${slide._id}`,
         }
       )
