@@ -1161,6 +1161,34 @@ export const useAppStore = defineStore("app", {
         this.setCurrentState(this.futureStates.pop())
       }
     },
+    /**
+     * Rewrites one slide in every undo/redo snapshot. A song added from a
+     * library preview goes onto the schedule before its claim answers, so a
+     * snapshot taken in between holds the preview, and undo would bring it
+     * back: without its full lyrics, or, when the claim was refused, as a slide
+     * the API reads as unlocking the song. `settle` returns the slide to keep
+     * in its place, or null to leave it out.
+     */
+    settleSlideInHistory(
+      slideId: string,
+      settle: (slide: Slide) => Slide | null
+    ) {
+      const rewrite = (states: AppState[]) =>
+        states.map((state) => {
+          const slides = toSlideArray(state?.activeSlides)
+          if (!slides.some((slide) => slide.id === slideId)) return state
+          return {
+            ...state,
+            activeSlides: slides.flatMap((slide) => {
+              if (slide.id !== slideId) return [slide]
+              const settled = settle(slide)
+              return settled ? [settled] : []
+            }),
+          }
+        })
+      this.pastStates = rewrite(this.pastStates)
+      this.futureStates = rewrite(this.futureStates)
+    },
     refreshAppActionsStack() {
       this.pastStates = []
       this.futureStates = []
