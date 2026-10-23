@@ -375,6 +375,8 @@ import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
 const { openFeatureOrUpgrade, requireFeatureAccess } = useSubscription()
 const online = useOnline()
+// Rollout switch: the camera action is only offered while the flag is on.
+const { isEnabled: cameraSlideEnabled } = useFeatureFlags("camera-slide")
 const { savedSongs } = useLibrary()
 const { searchSongs } = useSongs()
 
@@ -939,6 +941,8 @@ const validActions = computed(() => {
     // fuzzy search results too — otherwise typing "go live" on a phone would
     // still surface an action that cannot do anything.
     if (props.mobile && desktopOnlyActions.includes(action.action)) return false
+    if (action.featureFlag === "camera-slide" && !cameraSlideEnabled.value)
+      return false
     return true
   })
 })

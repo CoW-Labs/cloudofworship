@@ -274,6 +274,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newCamera,
     meta: "camera webcam imag capture card live video feed preacher",
     type: slideTypes.camera,
+    featureFlag: 'camera-slide',
   },
   {
     icon: "i-mdi-youtube",
