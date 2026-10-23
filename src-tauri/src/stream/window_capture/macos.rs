@@ -27,6 +27,7 @@ pub(super) fn locate(app: &AppHandle) -> Result<Target, String> {
     .get_webview_window(LIVE_WINDOW_LABEL)
     .ok_or("Open the live output window first, then go live.")?;
   let number = appkit_window_number(&window)? as u32;
+  keep_rendering_when_hidden(&window);
 
   let content = SCShareableContent::create()
     .with_on_screen_windows_only(false)
@@ -144,6 +145,25 @@ pub(super) fn start(window: SCWindow, sink: Arc<Sink>) -> Result<SCStream, Strin
 
 pub(super) fn stop(stream: SCStream) {
   let _ = stream.stop_capture();
+}
+
+/// WebKit stops painting a window it thinks nobody can see (covered, or full
+/// screen on another desktop). Static slides survive that, but a playing video
+/// freezes in the stream. This opts the live window out of WebKit's occlusion
+/// detection (a WebKit SPI, so it's checked before use).
+fn keep_rendering_when_hidden(window: &tauri::WebviewWindow) {
+  let result = window.with_webview(|webview| {
+    let view = unsafe { &*(webview.inner() as *const AnyObject) };
+    let selector = objc2::sel!(_setWindowOcclusionDetectionEnabled:);
+    let supported: bool = unsafe { objc2::msg_send![view, respondsToSelector: selector] };
+    if supported {
+      let _: () = unsafe { objc2::msg_send![view, _setWindowOcclusionDetectionEnabled: false] };
+    }
+    log::info!("live window keeps rendering when hidden: {supported}");
+  });
+  if let Err(e) = result {
+    log::warn!("could not reach the live window's web view ({e})");
+  }
 }
 
 fn appkit_window_number(window: &tauri::WebviewWindow) -> Result<isize, String> {

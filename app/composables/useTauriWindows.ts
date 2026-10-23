@@ -1,3 +1,4 @@
+import type { BackgroundThrottlingPolicy } from '@tauri-apps/api/window'
 import { useAppStore } from '~/store/app'
 
 /**
@@ -131,6 +132,9 @@ export const useTauriWindows = () => {
         y: targetMonitor.position.y / scale,
         width: targetMonitor.size.width / scale,
         height: targetMonitor.size.height / scale,
+        // Keep playing videos and animations at full speed while the window
+        // sits on another desktop: the YouTube stream captures it (macOS 14+).
+        backgroundThrottling: 'disabled' as BackgroundThrottlingPolicy,
       })
 
       return new Promise((resolve, reject) => {
