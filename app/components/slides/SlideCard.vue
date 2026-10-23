@@ -22,13 +22,13 @@
   >
     <CowTooltip
       :text="gridCardHint"
-      :prevent="selectable"
+      :prevent="selectable || isBeingDragged"
       :open-delay="700"
       class="w-full h-full"
     >
       <button
         :class="[
-          'w-full h-full transition-all text-left',
+          'w-full h-full transition-all text-left rounded-lg overflow-hidden',
           { 'opacity-70 ': selectable },
         ]"
         @click="$emit('click')"
@@ -77,6 +77,12 @@
         >
           <UIcon name="i-tabler-layout-columns" class="w-4 h-4" />
           {{ pair ? "Drop to replace" : "Drop to pair" }}
+        </div>
+
+        <!-- While this card is being dragged it says where to take it. -->
+        <div v-if="isBeingDragged" :class="DRAG_HINT_CLASS">
+          <UIcon name="i-tabler-layout-columns" class="w-4 h-4 shrink-0" />
+          {{ DRAG_HINT }}
         </div>
 
         <!-- Editing indicator - avatar circle -->
@@ -312,12 +318,78 @@ const acceptsPairDrop = (sourceId: string | null) => {
 
 // Every card that would take the slide being dragged shows it, so the operator
 // can see where to let go before reaching it.
+const isBeingDragged = computed(
+  () => !!props.slide?.id && draggingSlideId.value === props.slide.id
+)
 const isPairCandidate = computed(() => acceptsPairDrop(draggingSlideId.value))
+
+// Shown on the card while it is dragged, and on the drag image itself.
+const DRAG_HINT = "Drop onto a camera slide to create a pair"
+const DRAG_HINT_CLASS =
+  "absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/70 px-3 text-center text-white text-xs font-semibold gap-1.5 pointer-events-none"
+
+// Copies the thumbnail for the drag image. A copied <video> or <iframe> would
+// start loading its source all over again (and a camera's stream doesn't copy
+// at all), and a copied <canvas> comes out blank, so each becomes a canvas
+// holding the frame on screen now. An iframe can't be drawn and stays black.
+const DRAG_MEDIA = new Set(["VIDEO", "CANVAS", "IFRAME"])
+const copyForDragImage = (node: Node): Node => {
+  if (!(node instanceof HTMLElement) || !DRAG_MEDIA.has(node.tagName)) {
+    const copy = node.cloneNode(false)
+    node.childNodes.forEach((child) => copy.appendChild(copyForDragImage(child)))
+    return copy
+  }
+  const still = document.createElement("canvas")
+  for (const { name, value } of Array.from(node.attributes)) {
+    if (name !== "src") still.setAttribute(name, value)
+  }
+  still.style.backgroundColor = "black"
+  const frame =
+    node instanceof HTMLVideoElement
+      ? { source: node, width: node.videoWidth, height: node.videoHeight }
+      : node instanceof HTMLCanvasElement
+        ? { source: node, width: node.width, height: node.height }
+        : null
+  if (frame?.width && frame.height) {
+    still.width = frame.width
+    still.height = frame.height
+    still.getContext("2d")?.drawImage(frame.source, 0, 0)
+  }
+  return still
+}
 
 const onSlideDragStart = (event: DragEvent) => {
   if (!props.gridType || props.selectable || !event.dataTransfer) return
   event.dataTransfer.setData(SLIDE_DRAG_TYPE, props.slide.id)
   event.dataTransfer.effectAllowed = "link"
+  // The browser snapshots the whole card for the drag image, which would drag
+  // an open tooltip along with it, and it ignores the card's rounded clipping.
+  // Snapshot a rounded copy of just the thumbnail instead.
+  const thumb = (event.currentTarget as HTMLElement).querySelector("button")
+  if (thumb) {
+    const rect = thumb.getBoundingClientRect()
+    const ghost = document.createElement("div")
+    ghost.className = "rounded-lg overflow-hidden bg-black relative"
+    Object.assign(ghost.style, {
+      position: "fixed",
+      top: "-1000px",
+      left: "0",
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+    })
+    ghost.appendChild(copyForDragImage(thumb))
+    const hint = document.createElement("div")
+    hint.className = DRAG_HINT_CLASS
+    hint.textContent = DRAG_HINT
+    ghost.appendChild(hint)
+    document.body.appendChild(ghost)
+    event.dataTransfer.setDragImage(
+      ghost,
+      event.clientX - rect.left,
+      event.clientY - rect.top
+    )
+    setTimeout(() => ghost.remove(), 0)
+  }
   draggingSlideId.value = props.slide.id
 }
 

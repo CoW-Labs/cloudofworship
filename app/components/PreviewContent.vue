@@ -192,7 +192,7 @@ import {
   mergeServerAndPendingScheduleSlides,
   replaceScheduleSlidesInCorpus,
 } from "~/composables/useScheduleSlideHydration"
-import { useAppStore } from "~/store/app"
+import { toSlideArray, useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
   CameraSlideData,
@@ -328,8 +328,12 @@ const {
   duplicateSlideAsOverlay,
 } = useSlideCreation()
 const { gotoVerse } = useSlideNavigation()
-const { appendSongToSetlist, getSetlistData, refreshSongSetlistSlide } =
-  useSongSetlist()
+const {
+  appendSongToSetlist,
+  getSetlistData,
+  refreshSongSetlistSlide,
+  removeSongFromSetlist,
+} = useSongSetlist()
 const { askSongDestination } = useSongDestinationPrompt()
 
 // Online status for conditional API/WS calls
@@ -1415,6 +1419,7 @@ emitter.on("new-hymn", async (data: string) => {
 // library songs and returns the full lyrics, or opens the upgrade modal and
 // returns null when none are left. Everything else passes straight through.
 const { claimSong } = useSongs()
+const { songsLeft } = useUsageQuotas()
 const claimIfPreview = async (song: Song): Promise<Song | null> =>
   song?.isPreview ? await claimSong(song) : song
 
@@ -1436,6 +1441,9 @@ const whileSongPending = async <T>(
 
 emitter.on(appWideActions.newSongSetlist, (picked?: Song) =>
   whileSongPending(picked, async () => {
+    if (picked?.isPreview && navigator.onLine && songsLeft.value !== 0) {
+      return await addPreviewSetlistThenClaim(picked)
+    }
     let song = picked
     if (song) {
       const claimed = await claimIfPreview(song)
@@ -1466,6 +1474,204 @@ const addSongAsSeparateSlide = (song: Song) => {
   uploadOfflineSlides()
 }
 
+// A library result is a preview until it is claimed, and the claim is a round
+// trip. Rather than make the operator wait on it, the slide goes onto the
+// schedule at once from the preview verse and the claim fills in the rest
+// (`data` is what verse navigation reads) a moment later.
+//
+// The slide is not saved or broadcast until the claim lands. If the claim is
+// refused (quota, daily ceiling, error) the slide is dropped again: the API
+// treats a song one of the church's slides uses as already unlocked, so a
+// slide left behind would hand the full lyrics over without spending a claim.
+const addPreviewSongThenClaim = async (picked: Song) => {
+  const preview = await useSong({ ...picked })
+  if (!preview) return
+  reportSongSearchPick(picked)
+
+  const slide = createSongSlide(preview)
+  const previewContents = JSON.stringify(slide.contents)
+  makeSlideActive(slide, { goLive: false, newlyCreated: true })
+
+  const claimed = await claimSong(picked)
+  if (!claimed) {
+    await deleteSlide(slide.id, false)
+    appStore.settleSlideInHistory(slide.id, () => null)
+    return
+  }
+
+  const current = slides.value.find((item) => item.id === slide.id)
+  const full = await useSong(
+    { ...claimed },
+    (current || slide).slideStyle?.linesPerSlide
+  )
+  // Undo snapshots taken while the claim was out hold the preview's song.
+  if (full) {
+    appStore.settleSlideInHistory(slide.id, (old) => ({ ...old, data: full }))
+  }
+  // Deleted while the claim was out: nothing else to fill in.
+  if (!current) return
+
+  const updated: Slide = { ...current, data: full || current.data }
+  // Replace what is on the slide only if it is still what the preview made.
+  // The preview's opening verse is normally the song's own, and an edit made
+  // in the meantime wins over it.
+  const openingVerse = full?.verses?.[0]?.trim()
+  if (
+    openingVerse &&
+    current.title === "Verse 1" &&
+    JSON.stringify(current.contents) === previewContents
+  ) {
+    const contents = useSlideContent(updated, full as Song, openingVerse)
+    if (JSON.stringify(contents) !== previewContents) {
+      updated.contents = contents
+      updated.slideStyle = {
+        ...updated.slideStyle,
+        fontSize: Number(useScreenFontSize(openingVerse)),
+      }
+    }
+  }
+
+  appStore.updateSlideInActiveSlides(updated)
+  if (activeSlide.value?.id === updated.id) activeSlide.value = updated
+  if (appStore.currentState.liveSlideId === updated.id) {
+    updateLiveOutput(updated)
+  }
+
+  saveSlide(updated)
+  if (updated._id) {
+    // Something else already uploaded it while the claim was out.
+    updateSlideOnline(updated)
+  } else {
+    broadcastSlideCreated(updated)
+    uploadOfflineSlides()
+  }
+}
+
+// Where a preview song sits in a setlist, found by id because the operator may
+// have moved it while the claim was out. -1 when it is not there (any more).
+const previewItemIndex = (slide: Slide, songKey: string) =>
+  getSetlistData(slide).songs.findIndex(
+    (item) => item.songId === songKey && item.song?.isPreview
+  )
+
+// One version of a setlist with its preview song settled: the full song in
+// its place, or the item taken out again when the claim was refused (the
+// setlist slide carries its active song's id as `songId`, which the API reads
+// as "this church already uses the song").
+const settleSetlistVersion = async (
+  slide: Slide,
+  songKey: string,
+  claimed: Song | null
+): Promise<Slide> => {
+  const index = previewItemIndex(slide, songKey)
+  if (index < 0) return slide
+  const data = getSetlistData(slide)
+  if (!claimed) return (await removeSongFromSetlist(slide, index)) || slide
+  return await refreshSongSetlistSlide(
+    {
+      ...slide,
+      data: {
+        ...data,
+        songs: data.songs.map((item, i) =>
+          i === index ? { ...item, song: claimed } : item
+        ),
+      },
+    },
+    { activeSongIndex: data.activeSongIndex }
+  )
+}
+
+// Undo snapshots taken while the claim was out hold the setlist with the
+// preview in it, and undo would bring that back. Snapshots share slide
+// objects, so each distinct version is settled once.
+const settleSetlistHistory = async (
+  slideId: string,
+  songKey: string,
+  claimed: Song | null
+) => {
+  const versions = new Map<Slide, Slide>()
+  for (const state of [...appStore.pastStates, ...appStore.futureStates]) {
+    for (const slide of toSlideArray(state?.activeSlides)) {
+      if (slide.id !== slideId || versions.has(slide)) continue
+      if (previewItemIndex(slide, songKey) < 0) continue
+      versions.set(slide, await settleSetlistVersion(slide, songKey, claimed))
+    }
+  }
+  if (!versions.size) return
+  appStore.settleSlideInHistory(slideId, (slide) => versions.get(slide) ?? slide)
+}
+
+// Settles a preview song sitting in a setlist once its claim has answered,
+// on the schedule and in the undo history.
+const settlePreviewInSetlist = async (
+  slideId: string,
+  picked: Song,
+  claimed: Song | null
+): Promise<Slide | null> => {
+  const songKey = (picked as any)._id || picked.id
+  await settleSetlistHistory(slideId, songKey, claimed)
+
+  const current = slides.value.find((item) => item.id === slideId)
+  if (!current) return null
+  const updated = await settleSetlistVersion(current, songKey, claimed)
+  if (updated === current) return current
+
+  appStore.updateSlideInActiveSlides(updated)
+  if (activeSlide.value?.id === updated.id) activeSlide.value = updated
+  if (appStore.currentState.liveSlideId === updated.id) {
+    updateLiveOutput(updated)
+  }
+  return updated
+}
+
+// Same idea as addPreviewSongThenClaim, for a song going into a setlist that
+// already exists. The edit stays local until the claim lands.
+const addPreviewSongToSetlistThenClaim = async (
+  picked: Song,
+  setlistSlide: Slide
+) => {
+  const withPreview = await appendSongToSetlist(setlistSlide, { ...picked })
+  if (!withPreview) return
+  reportSongSearchPick(picked)
+
+  appStore.updateSlideInActiveSlides(withPreview)
+  makeSlideActive(withPreview, { goLive: false, newlyCreated: false })
+  updateLiveOutput(withPreview)
+  toast.add({
+    icon: "i-lucide-list-music",
+    title: `${picked.title} added to setlist`,
+  })
+
+  const claimed = await claimSong(picked)
+  const settled = await settlePreviewInSetlist(withPreview.id, picked, claimed)
+  if (settled) updateSlideOnline(settled)
+}
+
+// A brand new setlist opened with a library song: the setlist appears at once
+// and is saved only once the claim lands (dropped again if it is refused).
+const addPreviewSetlistThenClaim = async (picked: Song) => {
+  const preview = await useSong({ ...picked })
+  const newSlide = await createSongSetlistSlide(preview || undefined)
+  reportSongSearchPick(picked)
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+
+  const claimed = await claimSong(picked)
+  if (!claimed) {
+    await deleteSlide(newSlide.id, false)
+    appStore.settleSlideInHistory(newSlide.id, () => null)
+    return
+  }
+
+  const settled = await settlePreviewInSetlist(newSlide.id, picked, claimed)
+  if (!settled) return
+  if (settled._id) {
+    updateSlideOnline(settled)
+  } else {
+    broadcastSlideCreated(settled)
+    uploadOfflineSlides()
+  }
+}
+
 const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
   const updatedSlide = await appendSongToSetlist(setlistSlide, song)
   if (!updatedSlide) return
@@ -1484,6 +1690,28 @@ emitter.on("new-song", async (data: Song) => {
   if (data) {
     // A second click on a row that is still spinning adds nothing.
     if (isSongPending((data as any)?._id)) return
+
+    // Straight onto the schedule, claim in the background. Where the song
+    // goes is still asked first (instant, and skipped when the operator ticked
+    // "don't ask again"), so closing the prompt never spends a claim. Not
+    // offline (the claim cannot run) or with the allowance known to be spent:
+    // those claim first, so a song already claimed still works and a refusal
+    // shows its modal without a slide appearing and vanishing.
+    if (data.isPreview && navigator.onLine && songsLeft.value !== 0) {
+      let destination: "setlist" | "separate" | null = "separate"
+      if (getRelevantSongSetlist()) destination = await askSongDestination(data)
+      if (!destination) return
+      // Looked up again: the prompt can stay open for a while.
+      const target =
+        destination === "setlist" ? getRelevantSongSetlist() : undefined
+      await whileSongPending(data, () =>
+        target
+          ? addPreviewSongToSetlistThenClaim(data, target)
+          : addPreviewSongThenClaim(data)
+      )
+      return
+    }
+
     const song = await whileSongPending(data, async () => {
       const claimed = await claimIfPreview(data)
       if (!claimed) return null
