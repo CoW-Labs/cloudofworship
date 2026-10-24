@@ -116,6 +116,9 @@ const useSlideContent = (
         data?.subtitle ? `<p>${escape(data.subtitle)}</p>` : "",
       ]
     }
+    // A camera slide is the feed alone; there is no text layer.
+    case slideTypes.camera:
+      return ["", ""]
   }
 
   return ["", ""]

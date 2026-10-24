@@ -7,6 +7,13 @@ import {
   enqueueCoalescedSlideShadowPut,
   enqueueSlideShadowWrite,
 } from "~/composables/useSlideRepository"
+import {
+  drivenMemberOf,
+  dropFromLivePair,
+  normalizePair,
+  projectLiveSlide,
+} from "~/composables/useSlidePairs"
+import { livePairChanged } from "~/utils/slidePairs"
 
 interface RealtimeSlidesOptions {
   onSlideCreated?: (slide: Slide, createdByName: string) => void
@@ -58,6 +65,8 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   }
 
   const clearLiveSlideIfDeleted = (slide: Slide) => {
+    // A member of the live pair: the other member stays on screen alone.
+    if (dropFromLivePair(slide.id)) return
     if (slideMatchesId(slide, appStore.currentState.liveSlideId)) {
       appStore.setLiveSlide("")
       useBroadcastPost(null)
@@ -172,9 +181,10 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             })
             options.onSlideUpdated?.(mergedSlide, data.updatedByName)
 
-            // If slide is live, update the live output
-            if (appStore.currentState.liveSlideId === mergedSlide.id) {
-              useBroadcastPost(mergedSlide)
+            // If slide is live, update the live output. A member of the live
+            // pair re-sends the whole pair with that member changed.
+            if (appStore.isSlideLive(mergedSlide.id)) {
+              projectLiveSlide(mergedSlide, { keepShape: true })
             }
             if (appStore.currentState.activeOverlaySlide?.id === mergedSlide.id) {
               const overlaySlide = applyOverlaySettings(mergedSlide)
@@ -287,6 +297,38 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           options.onBatchSlidesDeleted?.(data.slideIds, data.deletedByName)
         }
         break
+
+      case 'slide-pair-created':
+      case 'slide-pair-updated': {
+        if (data?.tabId === tabSessionId) return
+        const pair = normalizePair(data?.pair)
+        if (!pair) return
+        const previous = appStore.slidePairsById.get(pair.id)
+        const wasLive = appStore.currentState.livePairId === pair.id
+        appStore.upsertSlidePair(pair)
+        // A teammate changed how the live pair shows (layout, hidden member,
+        // microphone, order, members or backdrop): show it here too. Which
+        // member a teammate is editing is theirs alone and never sent.
+        if (wasLive && previous && livePairChanged(previous, pair)) {
+          const driven = appStore.activeSlidesById.get(drivenMemberOf(pair))
+          if (driven) projectLiveSlide(driven)
+        }
+        break
+      }
+
+      case 'slide-pair-deleted': {
+        if (data?.tabId === tabSessionId) return
+        const pairId = data?.pairId
+        if (!pairId) return
+        const pair = appStore.slidePairsById.get(pairId)
+        const wasLive = appStore.currentState.livePairId === pairId
+        const driven = pair
+          ? appStore.activeSlidesById.get(drivenMemberOf(pair))
+          : undefined
+        appStore.removeSlidePair(pairId)
+        if (wasLive && driven) projectLiveSlide(driven)
+        break
+      }
 
       case 'show-slide-overlay': {
         if (data?.tabId === tabSessionId) return

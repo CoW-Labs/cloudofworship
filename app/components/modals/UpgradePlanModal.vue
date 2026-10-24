@@ -340,6 +340,11 @@ const FEATURE_UPGRADE_COPY: Record<
     description:
       "Fill the moments between songs with an animated break screen.",
   },
+  [appWideActions.slidePair]: {
+    title: "Slide pairs are part of Teams",
+    description:
+      "Put a camera beside the scripture, or over the lyrics.",
+  },
 }
 // Sibling actions that share a feature's copy.
 FEATURE_UPGRADE_COPY["new-stage-countdown"] =

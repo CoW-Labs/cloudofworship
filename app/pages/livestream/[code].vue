@@ -46,25 +46,40 @@
            the shortcut still toggle full screen for a plain browser tab. -->
       <DisplayConnectionStatus :status="connectionStatus" />
 
-      <LiveProjectionOnly
-        v-if="liveSlide"
-        :content-visible="true"
-        :id="liveSlide?.id"
-        :full-screen="true"
-        :slide="liveSlide!!"
-        :slide-label="false"
-        :slide-styles="currentState.settings.slideStyles"
-        :audio-muted="
-            liveSlide?.slideStyle?.isMediaMuted!!
-          "
-      />
+      <Transition name="cow-pair">
+        <LivePairProjection
+          v-if="livePairSlides"
+          :slides="livePairSlides"
+          :full-screen="true"
+          :slide-styles="currentState.settings.slideStyles"
+        />
+      </Transition>
+      <Transition name="cow-single">
+        <LiveProjectionOnly
+          v-if="!livePairSlides && liveSlide"
+          :content-visible="true"
+          :id="liveSlide?.id"
+          :full-screen="true"
+          :slide="liveSlide!!"
+          :slide-label="false"
+          :slide-styles="currentState.settings.slideStyles"
+          :audio-muted="
+              liveSlide?.slideStyle?.isMediaMuted!!
+            "
+        />
+      </Transition>
       <AlertView />
     </div>
   </template>
 </template>
 <script setup lang="ts">
 import type { Emitter } from "mitt"
-import type { BackgroundVideo, Slide } from "~/types"
+import type { BackgroundVideo, LivePayload, Slide } from "~/types"
+import {
+  continueAsSolo,
+  isPairPayload,
+  patchLivePayload,
+} from "~/utils/slidePairs"
 import { useAppStore } from "@/store/app"
 import { until } from "@vueuse/core"
 import {
@@ -78,7 +93,23 @@ definePageMeta({ layout: "live", middleware: "schedule-code" })
 
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
-const liveSlide = ref<Slide | null>(null)
+// What is on screen: one slide, a slide pair's members, or null for blank.
+const livePayload = ref<LivePayload>(null)
+const liveSlide = computed<Slide | null>(() =>
+  isPairPayload(livePayload.value) ? null : livePayload.value
+)
+const livePairSlides = computed<Slide[] | null>(() =>
+  isPairPayload(livePayload.value) ? livePayload.value : null
+)
+const onScreenSlide = (slideId?: string | null) =>
+  slideId
+    ? (isPairPayload(livePayload.value)
+        ? livePayload.value
+        : livePayload.value
+        ? [livePayload.value]
+        : []
+      ).find((slide) => slide.id === slideId)
+    : undefined
 const isFullScreen = ref(false)
 // 0–100 across every background video still to download.
 const downloadProgress = ref(0)
@@ -256,8 +287,12 @@ const withRecoveredMedia = (current: Slide, recovered: Slide): Slide => ({
 })
 
 const applyRecoveredToLive = (recovered: Slide) => {
-  if (liveSlide.value?.id === recovered.id) {
-    liveSlide.value = withRecoveredMedia(liveSlide.value, recovered)
+  const current = onScreenSlide(recovered.id)
+  if (current) {
+    livePayload.value = patchLivePayload(
+      livePayload.value,
+      withRecoveredMedia(current, recovered)
+    )
   }
 }
 
@@ -301,13 +336,25 @@ const handleWebSocketMessage = async (parsedData: any) => {
       // The operator changed what is on screen. This is the only thing that
       // seeds liveSlide — without it the page renders nothing at all.
       // A null payload means blank: clear the stream.
+      // A slide pair arrives as its members' array, each localised on its own.
       {
         const seq = ++liveSeq
-        const slide = data
+        const payload: LivePayload = isPairPayload(data)
+          ? await Promise.all(
+              (data as Slide[]).map((member) =>
+                localizeSlide({ ...member }, applyRecoveredToLive)
+              )
+            )
+          : data
           ? await localizeSlide({ ...data }, applyRecoveredToLive)
           : null
         if (seq !== liveSeq) break
-        liveSlide.value = slide
+        // One of the pair's own slides going on alone carries on in the
+        // pair's place, so its video keeps playing (see continueAsSolo).
+        livePayload.value =
+          isPairPayload(livePayload.value) && payload && !isPairPayload(payload)
+            ? continueAsSolo(livePayload.value, payload) ?? payload
+            : payload
       }
       break
     case "new-slide":
@@ -318,10 +365,9 @@ const handleWebSocketMessage = async (parsedData: any) => {
     case "slide-updated":
       // Update the livestream slide when any edit is made to the current live slide
       // This ensures real-time updates for content changes, not just live slide selections
-      if (
-        liveSlide.value?.id === data.id ||
-        liveSlide.value?.id === data.slideId
-      ) {
+      // Inside a live pair only the edited member changes; the other keeps
+      // playing.
+      if (onScreenSlide(data.id) || onScreenSlide(data.slideId)) {
         // Dropped if the operator went to another slide, or a later edit
         // landed, while this one's media was loading.
         const live = liveSeq
@@ -329,7 +375,10 @@ const handleWebSocketMessage = async (parsedData: any) => {
         const slideData = await localizeSlide({ ...data }, applyRecoveredToLive)
         if (live === liveSeq && seq === updateSeq) {
           // Create a new object to trigger Vue reactivity
-          liveSlide.value = { ...slideData }
+          livePayload.value = patchLivePayload(livePayload.value, {
+            ...slideData,
+            id: slideData.id || data.slideId,
+          })
         }
       }
       if (

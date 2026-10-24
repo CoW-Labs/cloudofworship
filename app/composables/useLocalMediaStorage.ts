@@ -13,6 +13,7 @@ import useMediaDownloadProgress from "~/composables/useMediaDownloadProgress"
 import { useTauri } from "~/composables/useTauri"
 import { useAppStore } from "~/store/app"
 import { MediaDownloadHttpError } from "~/utils/mediaDownloadErrors"
+import { fetchHostedMediaCors } from "~/utils/fetchHostedMedia"
 import { mediaUrlCandidates } from "~/utils/mediaRouting"
 
 const MEDIA_ROOT = "cow-media/v1"
@@ -832,7 +833,7 @@ export const createLocalMediaStorage = (
     let lastError: unknown
     for (const candidate of mediaUrlCandidates(url)) {
       try {
-        const response = await fetch(candidate, { signal })
+        const response = await fetchHostedMediaCors(candidate, { signal })
         if (response.ok && response.body) return { response, source: candidate }
         response.body?.cancel().catch(() => {})
         lastError = new MediaDownloadHttpError(response.status)
@@ -859,7 +860,7 @@ export const createLocalMediaStorage = (
     const streamFactory = async () => {
       const activeResponse =
         response ||
-        (await fetch(source, {
+        (await fetchHostedMediaCors(source, {
           signal: input.signal,
         }))
       response = null

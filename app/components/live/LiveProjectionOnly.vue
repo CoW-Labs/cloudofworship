@@ -1,28 +1,64 @@
 <template>
   <div
-    class="live-output-ctn w-[100%] min-h-[220px] relative"
+    class="live-output-ctn w-[100%] relative"
     :class="{
       'no-animations': currentState.settings.microAnimations === false,
+      'h-full min-h-0': embedded,
+      'min-h-[220px]': !embedded,
     }"
     :style="`--cow-transition-duration: ${
       currentState.settings.animations ? transitionDuration : 0
     }s`"
   >
     <div
-      class="live-output w-[100%] min-h-[220px] relative overflow-hidden bg-black"
-      :class="
-        isLivePageFullScreen
+      class="live-output w-[100%] relative overflow-hidden"
+      :class="[
+        hideBackground ? 'bg-transparent' : 'bg-black',
+        embedded ? 'h-full min-h-0' : 'min-h-[220px]',
+        isLivePageFullScreen || embedded
           ? 'rounded-none border-0'
-          : 'rounded-2xl border dark:border-none'
-      "
+          : 'rounded-2xl border dark:border-none',
+      ]"
       v-if="contentVisible"
-      @dblclick="activateFullScreen()"
+      @dblclick="!embedded && activateFullScreen()"
     >
       <!-- PERSISTENT MEDIA LAYER -->
       <!-- Kept OUTSIDE the crossfade so the video/audio/iframe refs and their
            playback survive slide changes (seek/play/pause/mute watchers depend
            on stable refs, and re-mounting a video would replay/flash it). -->
       <div class="absolute inset-0" style="z-index: 1">
+        <!-- CAMERA FEED -->
+        <!-- Follows `displayedSlide` so the camera stays up until the next
+             slide is ready (its background image preloaded) and then
+             crossfades with it, instead of cutting to black first. This layer
+             sits outside the crossfading face, so it is still one stream per
+             slide, not one per face. Only the projector (`capture`) and the
+             operator's preview open the camera; every other screen, including
+             the public livestream page that also renders full screen, gets a
+             placeholder. -->
+        <Transition :name="transitionName">
+          <div
+            v-if="displayedSlide?.type === slideTypes.camera"
+            :key="displayedSlide.id"
+            class="absolute inset-0"
+          >
+            <CameraFeed
+              v-if="opensCamera"
+              :data="cameraData"
+              :quality="cameraMode === 'capture' ? 'output' : 'preview'"
+              :resolution="cameraResolution"
+            />
+            <CameraPlaceholder
+              v-else
+              :title="
+                fullScreen || cameraMode === 'preview' ? 'Camera is live' : 'Camera'
+              "
+              :subtitle="(displayedSlide.data as CameraSlideData)?.deviceLabel"
+              :size="fullScreen ? 'lg' : 'sm'"
+            />
+          </div>
+        </Transition>
+
         <!-- AUDIO BACKGROUND -->
         <audio
           v-if="fullScreen"
@@ -53,8 +89,9 @@
               (slide?.data as any)?.type === 'vimeo')
           "
           ref="iframe"
-          :src="getEmbedUrl(slide?.data as any)"
+          :src="embedSrc"
           class="h-[100%] w-[100%] absolute inset-0"
+          @load="sendEmbedMute()"
           frameborder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowfullscreen
@@ -81,8 +118,11 @@
         </div>
 
         <!-- VIDEO BACKGROUND -->
+        <!-- A pair's caption layout leaves the words' own background out
+             (`hideBackground`): the element goes, rather than decoding a
+             video nobody sees. -->
         <video
-          v-if="fullScreen"
+          v-if="fullScreen && !hideBackground"
           ref="video"
           v-show="
             slide?.backgroundType === backgroundTypes.video &&
@@ -117,6 +157,7 @@
               'object-center bg-fixed bg-stretch object-fill':
                 slide?.slideStyle?.backgroundFillType ===
                 backgroundFillTypes.stretch,
+              '!object-cover !object-center': fillMedia,
             },
           ]"
           crossorigin="anonymous"
@@ -148,6 +189,7 @@
               'object-center bg-fixed bg-stretch object-fill':
                 slide?.slideStyle?.backgroundFillType ===
                 backgroundFillTypes.stretch,
+              '!object-cover !object-center': fillMedia,
             },
           ]"
           crossorigin="anonymous"
@@ -167,10 +209,15 @@
           style="z-index: 2"
         >
           <!-- BACKGROUND (image/solid/gradient, blurred for text slides) -->
+          <!-- A camera slide paints none, so the feed below shows through. -->
           <div
+            v-if="displayedSlide?.type !== slideTypes.camera && !hideBackground"
             class="absolute inset-0 bg-no-repeat"
             :class="{
-              'h-[100vh] rounded-none border-none min-h-[100%]': fullScreen,
+              'h-[100vh] rounded-none border-none min-h-[100%]':
+                fullScreen && !embedded,
+              'h-full rounded-none border-none min-h-[100%]':
+                fullScreen && embedded,
               'h-[88vh] rounded-none border-none min-h-[100%]':
                 fullScreenHeight,
               'bg-cover': displayedSlide?.type !== slideTypes.media,
@@ -189,6 +236,7 @@
               'bg-center bg-stretch':
                 displayedSlide?.slideStyle?.backgroundFillType ===
                 backgroundFillTypes.stretch,
+              '!bg-cover !bg-center': fillMedia,
             }"
             :style="backgroundStyles"
           ></div>
@@ -196,13 +244,13 @@
           <!-- An interlude paints an opaque canvas, so its label has to sit
                above the content instead of showing through it. -->
           <div
-            v-if="!fullScreen || slideLabel"
+            v-if="(!fullScreen && !embedded) || slideLabel"
             class="overlay-gradient absolute inset-0"
             :class="labelLayerClass"
           ></div>
 
           <div
-            v-if="!fullScreen || slideLabel"
+            v-if="(!fullScreen && !embedded) || slideLabel"
             class="heading p-3 absolute inset-0"
             :class="labelLayerClass"
           >
@@ -219,13 +267,24 @@
 
           <!-- MAIN FOREGROUND CONTENT -->
           <LiveContent
+            ref="liveContent"
             :key="displayedSlide?._id"
             :content-visible="true"
             :slide="displayedSlide"
             class="relative z-10"
-            :class="fullScreen ? 'h-screen' : 'min-h-[220px] rounded-2xl'"
+            :class="[
+              embedded
+                ? 'h-full'
+                : fullScreen
+                ? 'h-screen'
+                : 'min-h-[220px] rounded-2xl',
+              { 'pair-text-shadow': textShadow, 'pair-fit-text': fitText },
+            ]"
+            :style="fitStyle"
             :padding="
-              fullScreen
+              fitText
+                ? FIT_TEXT_PADDING
+                : fullScreen
                 ? {
                     top: computePadding(
                       currentState.settings.slideStyles.windowPadding?.top
@@ -251,9 +310,9 @@
           key="blank"
           class="slide-face blank-face relative flex items-center justify-center bg-transparent"
           :class="{
-            'h-[100vh]': fullScreen,
+            'h-[100vh]': fullScreen && !embedded,
             'h-[88vh]': fullScreenHeight,
-            'h-full': !fullScreen && !fullScreenHeight,
+            'h-full': embedded || (!fullScreen && !fullScreenHeight),
           }"
           style="z-index: 2"
         >
@@ -276,13 +335,14 @@
       <!-- End of SLIDE FACE -->
 
       <OverlaySlideView
+        v-if="!hideGlobalLayers"
         :size="fullScreen ? '' : 'sm'"
         :dynamic-background="
           displayedSlide?.backgroundType === backgroundTypes.video
         "
       />
 
-      <template v-if="!fullScreen">
+      <template v-if="!fullScreen && !embedded">
         <UTooltip
           class="absolute bottom-3 right-3 z-10"
           text="Expand preview"
@@ -325,14 +385,19 @@
               :slide="slide"
               :slide-label="false"
               :slide-styles="slideStyles"
+              :camera-mode="
+                cameraMode === 'placeholder' ? 'placeholder' : 'preview'
+              "
             />
           </UCard>
         </UModal>
       </template>
-      <AlertView :size="fullScreen ? '' : 'sm'" />
-      <FallingSnowView
-        v-if="fullScreen && currentState.activeOverlay === 'falling-snow'"
-      />
+      <template v-if="!hideGlobalLayers">
+        <AlertView :size="fullScreen ? '' : 'sm'" />
+        <FallingSnowView
+          v-if="fullScreen && currentState.activeOverlay === 'falling-snow'"
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -340,7 +405,13 @@
 <script setup lang="ts">
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
-import type { ExtendedFileT, Slide, SlideStyle, ExternalVideo } from "~/types"
+import type {
+  CameraSlideData,
+  ExtendedFileT,
+  Slide,
+  SlideStyle,
+  ExternalVideo,
+} from "~/types"
 import {
   exitFullscreenSafely,
   requestFullscreenSafely,
@@ -348,6 +419,13 @@ import {
   safePlayMedia,
   safePostMessage,
 } from "~/utils/browserSafety"
+import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
+import type { Ref } from "vue"
+import {
+  adoptMedia,
+  mediaHandoffKey,
+  releaseMedia,
+} from "~/composables/useMediaHandoff"
 import {
   INTERLUDE_EXIT_MS,
   interludeExitKey,
@@ -366,15 +444,55 @@ const route = useRoute()
 const { currentState } = storeToRefs(appStore)
 const emit = defineEmits(["activate-fullscreen"])
 
-const props = defineProps<{
-  slide?: Slide | null
-  contentVisible: Boolean
-  fullScreen: Boolean
-  slideStyles: SlideStyle
-  audioMuted?: Boolean
-  slideLabel?: Boolean
-  fullScreenHeight?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    slide?: Slide | null
+    contentVisible: Boolean
+    fullScreen: Boolean
+    slideStyles: SlideStyle
+    audioMuted?: Boolean
+    slideLabel?: Boolean
+    fullScreenHeight?: string
+    /**
+     * Whether a camera slide opens the camera here. Explicit rather than read
+     * off `fullScreen`, because the public livestream page renders full screen
+     * too and must never turn on a viewer's camera.
+     * - `capture`: the /live projector window, at full resolution.
+     * - `preview`: the operator's Live Output thumbnail, at low resolution.
+     * - `placeholder`: everything else; draws a static card.
+     */
+    cameraMode?: "capture" | "preview" | "placeholder"
+    /**
+     * Rendered as one region of a slide pair (LivePairProjection): sized by
+     * its parent instead of the viewport, and without the double-click full
+     * screen, which the pair's container owns.
+     */
+    embedded?: boolean
+    /**
+     * Leave out the overlay, alert and snow layers. A slide pair draws them
+     * once over the whole screen rather than once per member.
+     */
+    hideGlobalLayers?: boolean
+    /**
+     * Slide pairs only. Leave out the slide's own background (image, colour or
+     * video), so the slide's words sit straight over what is behind them.
+     */
+    hideBackground?: boolean
+    /**
+     * Slide pairs only. Lay the words out for a short box rather than a whole
+     * screen: no window padding, and scaled down until they fit its height.
+     * The slide's saved font size is untouched.
+     */
+    fitText?: boolean
+    /** Slide pairs only. A soft shadow behind the words. */
+    textShadow?: boolean
+    /** Slide pairs only. Media and camera fill the region (cover), cropping. */
+    fillMedia?: boolean
+    /** Slide pairs only. A camera drawn as a small inset asks for 720p. */
+    cameraResolution?: "full" | "inset"
+  }>(),
+  { cameraMode: "placeholder", cameraResolution: "full" }
+)
 
 // Settings saved under an older, wider range can still hold an interval well
 // past what the settings slider allows, which would stall the projection on a
@@ -519,11 +637,200 @@ onBeforeUnmount(() => {
 // Same-slide edits share this object's reactivity and update in place.
 const displayedSlide = ref<Slide | null | undefined>(props.slide)
 
+// A pair's frame fills its card, so a camera there covers rather than letter-
+// boxes. A copy for this render only; the slide's own setting is kept.
+const cameraData = computed(() => {
+  const data = displayedSlide.value?.data as CameraSlideData | undefined
+  return props.fillMedia && data ? { ...data, fit: "cover" as const } : data
+})
+
+// ── Fit text to a short box (slide pairs) ───────────────────────────────────
+// Text sizes are in cqw of the projection box, set per element by the slide
+// and its theme, so a parent font-size cannot shrink them. Instead the text is
+// laid out on a wider, taller canvas (1/s of the box) and scaled by s back into
+// it: the words wrap across the box's whole width first and only shrink as
+// much as its height needs. cqw still measures the box, so the canvas growing
+// does not grow the type. The measure is capped at FIT_TEXT_MAX_WIDTH of the
+// box as seen, so a long verse does not run edge to edge.
+const FIT_TEXT_PADDING = { top: 1.5, right: 4, bottom: 1.5, left: 4 }
+const FIT_TEXT_MAX_WIDTH = 85 // % of the box, as it appears on screen
+const FIT_MIN_SCALE = 0.3
+const liveContent = ref<{ $el?: HTMLElement } | null>(null)
+const fitScale = ref(1)
+
+const fitStyleFor = (scale: number) => ({
+  width: `${100 / scale}%`,
+  height: `${100 / scale}%`,
+  // A string either way: assigning undefined to a style property is ignored
+  // and would leave a trial scale behind.
+  transform: scale < 1 ? `scale(${scale})` : "none",
+  transformOrigin: "0 0",
+  "--pair-fit-max-width": `calc(${FIT_TEXT_MAX_WIDTH}cqw / ${scale})`,
+})
+const fitStyle = computed(() =>
+  props.fitText ? fitStyleFor(fitScale.value) : undefined
+)
+
+/** Height the words need on the canvas, as laid out (transforms ignored). */
+const naturalHeight = (ctn: HTMLElement) => {
+  const style = getComputedStyle(ctn)
+  const children = Array.from(ctn.children) as HTMLElement[]
+  const gap = parseFloat(style.rowGap || "0") || 0
+  return (
+    children.reduce((sum, child) => sum + child.offsetHeight, 0) +
+    gap * Math.max(0, children.length - 1) +
+    (parseFloat(style.paddingTop) || 0) +
+    (parseFloat(style.paddingBottom) || 0)
+  )
+}
+
+/**
+ * What the fit depends on: the words, the box and the fonts. Digits count as
+ * one shape, so a countdown or clock ticking over (4:59 to 4:58) is the same
+ * fit and costs nothing; the slide's style is in it because a font size change
+ * re-wraps the words with the same text.
+ */
+let lastFitKey = ""
+const fitKeyFor = (ctn: HTMLElement, box: HTMLElement) =>
+  [
+    (ctn.textContent || "").replace(/\d/g, "0"),
+    box.clientWidth,
+    box.clientHeight,
+    document.fonts?.status,
+    props.slide?.layout,
+    JSON.stringify(props.slide?.slideStyle ?? null),
+  ].join("|")
+
+/**
+ * The largest scale at which the words, wrapped at that scale's width, fit
+ * the box's height. Wider wrapping means fewer lines, so the fit is not a
+ * single ratio; a short binary search settles it. Each trial writes the
+ * canvas size straight onto the element and reads the layout back (a forced
+ * layout), then the answer is committed once through `fitScale`. The last
+ * answer is tried first, so new words of a similar length settle in two or
+ * three trials rather than nine.
+ */
+const measureFit = () => {
+  const el = liveContent.value?.$el
+  if (!props.fitText || !el) {
+    fitScale.value = 1
+    return
+  }
+  const ctn = el.querySelector?.(".slide-layout-ctn") as HTMLElement | null
+  const box = el.parentElement as HTMLElement | null
+  const boxHeight = box?.clientHeight || 0
+  if (!ctn || !box || !boxHeight) return
+  const key = fitKeyFor(ctn, box)
+  if (key === lastFitKey) return
+  lastFitKey = key
+
+  const fits = (scale: number) => {
+    Object.assign(el.style, fitStyleFor(scale))
+    el.style.setProperty("--pair-fit-max-width", fitStyleFor(scale)["--pair-fit-max-width"])
+    return naturalHeight(ctn) <= boxHeight / scale + 0.5
+  }
+  const search = (low: number, high: number, steps: number) => {
+    let best = low
+    for (let step = 0; step < steps; step++) {
+      const mid = (low + high) / 2
+      if (fits(mid)) {
+        best = mid
+        low = mid
+      } else {
+        high = mid
+      }
+    }
+    return best
+  }
+
+  const last = fitScale.value
+  let best: number
+  if (fits(1)) {
+    best = 1
+  } else if (last < 1 && fits(last)) {
+    best = fits(Math.min(1, last * 1.03)) ? search(last, 1, 6) : last
+  } else if (last < 1) {
+    best = search(FIT_MIN_SCALE, last, 6)
+  } else {
+    best = search(FIT_MIN_SCALE, 1, 8)
+  }
+  // Hand the inline styles back to Vue, which re-applies the settled scale.
+  Object.assign(el.style, fitStyleFor(fitScale.value))
+  el.style.setProperty(
+    "--pair-fit-max-width",
+    fitStyleFor(fitScale.value)["--pair-fit-max-width"]
+  )
+  // Ignore sub-pixel jitter so a re-measure never sets off another.
+  if (Math.abs(best - fitScale.value) > 0.005) fitScale.value = best
+}
+
+// Every trigger (the box resizing, the words changing, fonts landing) asks
+// for one measure on the next frame, however many arrive in it.
+let fitFrame = 0
+const scheduleFit = ({ force = false }: { force?: boolean } = {}) => {
+  if (force) lastFitKey = ""
+  if (fitFrame) return
+  fitFrame = requestAnimationFrame(() => {
+    fitFrame = 0
+    measureFit()
+  })
+}
+
+let fitObserver: ResizeObserver | null = null
+let fitMutations: MutationObserver | null = null
+const stopFitWatching = () => {
+  fitObserver?.disconnect()
+  fitMutations?.disconnect()
+  fitObserver = fitMutations = null
+  if (fitFrame) cancelAnimationFrame(fitFrame)
+  fitFrame = 0
+}
+watch(
+  () => [props.fitText, liveContent.value?.$el] as const,
+  ([fit, el]) => {
+    stopFitWatching()
+    fitScale.value = 1
+    lastFitKey = ""
+    if (!fit || !el?.parentElement) return
+    // Re-measure when the box resizes (layout change, window resize) or the
+    // words change (verse navigation swaps the text in the same element).
+    // The box is watched rather than the canvas, which this resizes itself.
+    // The words themselves are watched too: a web font landing re-wraps them
+    // with no resize of the box and no change to the markup.
+    fitObserver = new ResizeObserver(() => scheduleFit())
+    const observeWords = () => {
+      fitObserver?.disconnect()
+      fitObserver?.observe(el.parentElement!)
+      el.querySelectorAll(".slide-layout-ctn > *").forEach((child) =>
+        fitObserver?.observe(child)
+      )
+    }
+    observeWords()
+    fitMutations = new MutationObserver((records) => {
+      // New elements need watching too; a text change alone does not.
+      if (records.some((record) => record.type === "childList")) observeWords()
+      scheduleFit()
+    })
+    fitMutations.observe(el, { childList: true, subtree: true, characterData: true })
+    scheduleFit()
+    document.fonts?.ready.then(() => scheduleFit({ force: true }))
+  },
+  { flush: "post" }
+)
+onBeforeUnmount(stopFitWatching)
+
 // Interlude slides animate here: at full rate on the projector, at the
 // preview rate in the operator's live output panel.
 provide(
   interludeModeKey,
   computed(() => (props.fullScreen ? "live" : "preview"))
+)
+// The operator's preview is skipped where only one page may hold the camera
+// (Safari's engine, the macOS app): opening it there would mute the projector.
+const opensCamera = computed(
+  () =>
+    props.cameraMode === "capture" ||
+    (props.cameraMode === "preview" && !cameraCaptureIsExclusive())
 )
 const labelLayerClass = computed(() =>
   displayedSlide.value?.type === slideTypes.interlude ? "z-20" : "z-10"
@@ -539,7 +846,32 @@ const isLivePageFullScreen = computed(
   () => props.fullScreen && route.path === "/live"
 )
 
-const getEmbedUrl = (data: ExternalVideo): string => {
+// The embedded player's address, worked out once per video and loop setting.
+// Its sound is changed through the player's API (see sendEmbedMute), never by
+// a new address, which would reload the video from the start.
+const embedKey = computed(() => {
+  const data = props.slide?.data as ExternalVideo | undefined
+  if (
+    !props.fullScreen ||
+    props.slide?.type !== slideTypes.media ||
+    (data?.type !== "youtube" && data?.type !== "vimeo")
+  ) {
+    return ""
+  }
+  const shouldLoop =
+    props.slide?.type !== slideTypes.media || !!props.slide?.slideStyle?.repeatMedia
+  return `${props.slide.id}|${data.url}|${shouldLoop}`
+})
+const embedSrc = ref("")
+watch(
+  embedKey,
+  (key) => {
+    embedSrc.value = key ? getEmbedUrl(props.slide!.data as ExternalVideo) : ""
+  },
+  { immediate: true }
+)
+
+function getEmbedUrl(data: ExternalVideo): string {
   const isMuted =
     props.audioMuted ||
     (!props.fullScreen ? true : props.slide?.slideStyle?.isMediaMuted)
@@ -719,7 +1051,7 @@ watch(
       if (
         !appMounted.value ||
         !slide?.id ||
-        slide.id !== currentState.value?.liveSlideId
+        !appStore.isSlideLive(slide.id)
       ) {
         return
       }
@@ -780,7 +1112,7 @@ watch(
       if (
         !appMounted.value ||
         !slide?.id ||
-        slide.id !== currentState.value?.liveSlideId
+        !appStore.isSlideLive(slide.id)
       ) {
         return
       }
@@ -848,53 +1180,74 @@ watch(
   }
 )
 
-// Separate watcher for media mute/unmute control
-watch(
-  () => props.slide?.slideStyle?.isMediaMuted,
-  (isMuted, wasMuted) => {
-    if (!props.fullScreen || isMuted === wasMuted || isMuted === undefined) {
-      return
-    }
-
-    try {
-      const slide = props.slide
-      if (
-        !appMounted.value ||
-        !slide?.id ||
-        slide.id !== currentState.value?.liveSlideId
-      ) {
-        return
-      }
-
-      const isExternalVideo =
-        (slide.data as any)?.type === "youtube" ||
-        (slide.data as any)?.type === "vimeo"
-
-      if (isExternalVideo && iframe.value) {
-        const videoData = slide.data as ExternalVideo
-        if (videoData.type === "youtube") {
-          const muteFunc = isMuted ? "mute" : "unMute"
-          safePostMessage(
-            iframe.value.contentWindow,
-            JSON.stringify({ event: "command", func: muteFunc, args: [] }),
-            "*"
-          )
-        } else if (videoData.type === "vimeo") {
-          safePostMessage(
-            iframe.value.contentWindow,
-            JSON.stringify({
-              method: "setVolume",
-              value: isMuted ? 0 : 1,
-            }),
-            "*"
-          )
-        }
-      }
-    } catch (err) {
-      console.error("Error controlling media mute:", err)
-    }
-  }
+// Mute and unmute an embedded YouTube or Vimeo player. Its address is fixed
+// per video (see embedSrc), so this is the only way its sound changes: from
+// the slide's own mute, or from a slide pair handing its sound to the other
+// member (`audioMuted`). Re-sent when the player loads, since a command sent
+// before it is ready is dropped.
+const effectiveMuted = computed(
+  () =>
+    props.audioMuted ||
+    !props.fullScreen ||
+    !!props.slide?.slideStyle?.isMediaMuted
 )
+const sendEmbedMute = () => {
+  const data = props.slide?.data as ExternalVideo | undefined
+  const target = iframe.value?.contentWindow
+  if (!target || (data?.type !== "youtube" && data?.type !== "vimeo")) return
+  try {
+    if (data.type === "youtube") {
+      safePostMessage(
+        target,
+        JSON.stringify({
+          event: "command",
+          func: effectiveMuted.value ? "mute" : "unMute",
+          args: [],
+        }),
+        "*"
+      )
+    } else {
+      safePostMessage(
+        target,
+        JSON.stringify({ method: "setVolume", value: effectiveMuted.value ? 0 : 1 }),
+        "*"
+      )
+    }
+  } catch (err) {
+    console.error("Error controlling media mute:", err)
+  }
+}
+watch(effectiveMuted, (muted, wasMuted) => {
+  if (muted !== wasMuted) sendEmbedMute()
+})
+
+// Hand a playing video or audio file over to whichever element shows this
+// slide next, so moving between a single slide and a pair (or hiding a pair
+// member and showing it again) carries on where it was. See useMediaHandoff.
+const watchMediaHandoff = (
+  el: Ref<HTMLMediaElement | null>,
+  kind: "video" | "audio"
+) => {
+  watch(
+    [() => props.slide?.id, el] as const,
+    ([slideId, current], previous) => {
+      const [previousId, previousEl] = previous ?? []
+      if (previousId && previousEl) {
+        releaseMedia(mediaHandoffKey(previousId, kind), previousEl)
+      }
+      if (slideId && current) adoptMedia(mediaHandoffKey(slideId, kind), current)
+    },
+    { immediate: true, flush: "post" }
+  )
+  onBeforeUnmount(() => {
+    const slideId = props.slide?.id
+    if (slideId && el.value) {
+      releaseMedia(mediaHandoffKey(slideId, kind), el.value, { keepPosition: true })
+    }
+  })
+}
+watchMediaHandoff(video, "video")
+watchMediaHandoff(audio, "audio")
 
 onMounted(() => {
   appMounted.value = true
@@ -923,3 +1276,54 @@ const activateFullScreen = () => {
   }
 }
 </script>
+
+<style scoped>
+/* Slide pairs only (caption, lower third): the words' measure is capped at a
+   share of the box as seen, and centred in it. See measureFit. */
+/* The fit writes trial sizes onto this canvas and reads the layout straight
+   back, so none of it may be transitioned (the global .tiptap.live-content
+   rule transitions everything): a read would return the old size and the
+   search would settle on the wrong scale, leaving lines spilling out of the
+   box. It also kept the words re-wrapping every frame for half a second. */
+.pair-fit-text {
+  transition: none !important;
+}
+/* The operator's live preview (.lg-preview in main.css) gives the words a
+   196px minimum height, meant for a whole slide. A caption or lower third is
+   far shorter, so that floor pushed the words below the box. The fit sizes
+   the canvas itself. */
+.pair-fit-text :deep(.slide-layout-ctn) {
+  min-height: 0;
+}
+.pair-fit-text :deep(.slide-layout-ctn > *) {
+  max-width: var(--pair-fit-max-width, 100%);
+  margin-inline: auto;
+}
+
+/* Slide pairs only (the caption layout): words straight over a picture. */
+.pair-text-shadow :deep(*) {
+  text-shadow: 0 0.12cqw 0.6cqw rgba(0, 0, 0, 0.55),
+    0 0 0.2cqw rgba(0, 0, 0, 0.35);
+}
+</style>
+
+<style>
+/* Leaving for a slide pair. Pages mount a single slide inside
+   <Transition name="cow-single">, so when a pair takes its place it fades out
+   over the entering pair instead of the screen cutting to black first. Its
+   length follows the slide transition setting (0 with animations off). */
+.cow-single-leave-active {
+  position: absolute !important;
+  inset: 0;
+  z-index: 5;
+  transition: opacity var(--cow-transition-duration, 0.3s) cubic-bezier(0.4, 0, 0.7, 0.2);
+}
+.cow-single-leave-to {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cow-single-leave-active {
+    transition: none;
+  }
+}
+</style>

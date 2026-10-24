@@ -41,10 +41,10 @@
       v-if="!isFullScreen && !isTauri"
       floating
       label="Live Output"
-      :active="!!mostUpdatedLiveSlide"
-      :shortcut="mostUpdatedLiveSlide ? undefined : ''"
+      :active="!!primarySlide"
+      :shortcut="primarySlide ? undefined : ''"
       :hint="
-        mostUpdatedLiveSlide
+        primarySlide
           ? 'the display to go full screen and hide this bar'
           : 'Select a slide from the schedule to show it here'
       "
@@ -53,15 +53,32 @@
     <!-- :content-visible="liveSlide?.id === liveSlideId" -->
     <!-- Using motionless slides to test bug with Bible Slides not moving to next slide in live view -->
     <!-- <Transition class="fade"> -->
-    <LiveProjectionOnly
-      :content-visible="true"
-      :id="currentState.liveSlideId"
-      :full-screen="true"
-      :slide="mostUpdatedLiveSlide"
-      :slide-label="false"
-      :slide-styles="currentState.settings.slideStyles"
-      :audio-muted="mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!"
-    />
+    <!-- A pair animates out over whatever replaces it (see LivePairProjection). -->
+    <Transition name="cow-pair">
+      <LivePairProjection
+        v-if="livePairSlides"
+        :id="currentState.liveSlideId"
+        :slides="livePairSlides"
+        :full-screen="true"
+        :slide-styles="currentState.settings.slideStyles"
+        camera-mode="capture"
+      />
+    </Transition>
+    <!-- A single slide fades out over a pair taking its place, instead of
+         cutting to black first. -->
+    <Transition name="cow-single">
+      <LiveProjectionOnly
+        v-if="!livePairSlides"
+        :content-visible="true"
+        :id="currentState.liveSlideId"
+        :full-screen="true"
+        :slide="mostUpdatedLiveSlide"
+        :slide-label="false"
+        :slide-styles="currentState.settings.slideStyles"
+        :audio-muted="mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!"
+        camera-mode="capture"
+      />
+    </Transition>
     <!-- </Transition> -->
 
     <AlertView />
@@ -71,13 +88,23 @@
 import { publicStylesheet } from "~/utils/publicStylesheet"
 import type { Emitter } from "mitt"
 import { useAppStore } from "@/store/app"
-import type { Slide } from "~/types"
+import type { LivePayload, Slide } from "~/types"
 import type {
   LiveBroadcastEnvelope,
   LiveSlideChangedNotification,
   SlideOverlayBroadcast,
 } from "~/composables/useBroadcastPost"
 import { resolveLiveSlideBroadcast } from "~/composables/useBroadcastPost"
+import {
+  continueAsSolo,
+  isPairPayload,
+  liveSlideIds,
+  patchLivePayload,
+  primaryLiveSlide,
+} from "~/utils/slidePairs"
+import useCameraStream, {
+  isCameraPrewarmBroadcast,
+} from "~/composables/useCameraStream"
 import { useAuthStore } from "~/store/auth"
 import {
   exitFullscreenSafely,
@@ -97,10 +124,20 @@ const isFullScreen = ref(false)
 const windowMenuOpen = ref(false)
 const windowMenuRef = ref<{ open: () => void; close: () => void } | null>(null)
 const { closeWindow } = useCloseDisplayWindow("live output")
+const { prewarm: prewarmCamera } = useCameraStream()
 const mediaRecorder = ref<MediaRecorder | null>(null)
 const mediaRecorderInterval = ref()
 const FPS = 10
-const mostUpdatedLiveSlide = ref<Slide | null>(null)
+// What is on screen: one slide, a slide pair's members, or null for blank.
+const livePayload = ref<LivePayload>(null)
+const mostUpdatedLiveSlide = computed<Slide | null>(() =>
+  isPairPayload(livePayload.value) ? null : livePayload.value
+)
+const livePairSlides = computed<Slide[] | null>(() =>
+  isPairPayload(livePayload.value) ? livePayload.value : null
+)
+/** The live slide, or the pair's active member: what the banner and store follow. */
+const primarySlide = computed(() => primaryLiveSlide(livePayload.value))
 const lastBroadcastTs = ref(0)
 const lastOverlayBroadcastTs = ref(0)
 
@@ -247,20 +284,20 @@ onMounted(() => {
         churchId: authStore.user?.churchId,
       })
     ) {
-      mostUpdatedLiveSlide.value = projected.slide
-      if (
-        projected.slideId &&
-        appStore.currentState.liveSlideId !== projected.slideId
-      ) {
-        appStore.setLiveSlide(projected.slideId)
-      } else if (!projected.slideId && appStore.currentState.liveSlideId) {
+      livePayload.value = projected.slides?.length
+        ? projected.slides
+        : projected.slide
+      // The operator owns which pair is live; this window only mirrors the id.
+      if (projected.slideId) {
+        appStore.mirrorLiveSlideId(projected.slideId)
+      } else if (appStore.currentState.liveSlideId) {
         appStore.setLiveSlide("")
       }
       return
     }
     // Never resurrect a schedule slide when the projected record is missing,
     // expired, from another church, or disagrees with the shared live slide id.
-    if (!expectedSlideId) mostUpdatedLiveSlide.value = null
+    if (!expectedSlideId) livePayload.value = null
   }
 
   // Initialize the slide display
@@ -284,6 +321,7 @@ onMounted(() => {
       const envelope = (typeof data === "string" ? JSON.parse(data) : data) as
         | LiveBroadcastEnvelope<
             | Slide
+            | Slide[]
             | null
             | string
             | SlideOverlayBroadcast
@@ -296,6 +334,11 @@ onMounted(() => {
         typeof envelope.payload === "string"
           ? JSON.parse(envelope.payload)
           : envelope.payload
+
+      if (isCameraPrewarmBroadcast(payload)) {
+        prewarmCamera(payload.data)
+        return
+      }
 
       if (
         payload?.action === appWideActions.showSlideOverlay ||
@@ -322,68 +365,83 @@ onMounted(() => {
       // resolved and displayed while this one was waiting.
       if (envelope.ts < lastBroadcastTs.value) return
       lastBroadcastTs.value = envelope.ts
-      const parsed = resolved.slide
+      const parsed = resolved.payload
 
       // null broadcast means the live slide was deleted — blank the projection
       if (parsed === null) {
-        mostUpdatedLiveSlide.value = null
+        livePayload.value = null
         // Keep the shared store in agreement so a reloading operator window
         // doesn't adopt a stale liveSlideId from this tab via pinia-shared-state.
         if (appStore.currentState.liveSlideId) appStore.setLiveSlide("")
         return
       }
 
-      const updatedSlide = parsed as Slide
+      // A slide pair arrives as its members' array. Each member is localised
+      // on its own, exactly as a single slide is.
+      const incoming = isPairPayload(parsed) ? parsed : [parsed as Slide]
+      const primary = primaryLiveSlide(parsed)!
 
       // Mirror the projected slide id into the shared store. The broadcast
       // channel drives the projection, but the operator window derives its
       // live output preview from currentState.liveSlideId — and on reload it
       // re-adopts state from this /live tab. Without this, that value goes
       // stale here and the operator shows "No Live Slide" after a reload.
-      if (updatedSlide?.id && appStore.currentState.liveSlideId !== updatedSlide.id) {
-        appStore.setLiveSlide(updatedSlide.id)
-      }
+      // Only the id: the operator decides which pair is live, and the shared
+      // state saying so may land after this broadcast.
+      if (primary?.id) appStore.mirrorLiveSlideId(primary.id)
 
       // Track slide presentation
       usePosthogCapture("SLIDE_PRESENTED_LIVE", {
-        slideType: updatedSlide?.type,
-        slideLayout: updatedSlide?.layout,
-        slideId: updatedSlide?.id,
+        slideType: primary?.type,
+        slideLayout: primary?.layout,
+        slideId: primary?.id,
+        ...(isPairPayload(parsed)
+          ? { pairLayout: primary?.livePair?.layout, pairSize: parsed.length }
+          : {}),
       })
 
       // For media-bearing slides, swap in a local object URL so the projection
       // never depends on the operator tab's blob: URL (which dies when that tab
       // closes). Use the cached localized URL when we've already resolved this
       // source; otherwise rehydrate asynchronously below.
-      let pendingRehydrateSig: string | null = null
-      if (slideNeedsLocalMedia(updatedSlide)) {
-        const sig = mediaSignature(updatedSlide)
+      const pendingRehydrate: { slide: Slide; sig: string }[] = []
+      incoming.forEach((slide) => {
+        if (!slideNeedsLocalMedia(slide)) return
+        const sig = mediaSignature(slide)
         const cached = localizedLiveMedia.get(sig)
         if (cached) {
-          applyLocalizedMedia(updatedSlide, cached)
+          applyLocalizedMedia(slide, cached)
         } else {
-          pendingRehydrateSig = sig
+          pendingRehydrate.push({ slide, sig })
         }
-      }
+      })
 
-      // Check if this is just a content update within the same slide
-      const isSameSlide = mostUpdatedLiveSlide.value?.id === updatedSlide.id
+      // Check if this is just a content update within the same slide (or the
+      // same pair): same ids in the same order. One of the pair's own slides
+      // going on alone carries on in the pair's place (see continueAsSolo),
+      // so its video or camera is not rebuilt.
+      const stageFor = (current: LivePayload) =>
+        isPairPayload(current) && !isPairPayload(parsed)
+          ? continueAsSolo(current, parsed as Slide) ?? parsed
+          : parsed
+      const isSameSlide =
+        liveSlideIds(livePayload.value).join("|") ===
+        liveSlideIds(stageFor(livePayload.value)).join("|")
 
       if (isSameSlide) {
         // For same-slide updates (verse changes), update immediately without requestAnimationFrame
         // This prevents jitter when moving between verses
-        mostUpdatedLiveSlide.value = updatedSlide
+        livePayload.value = stageFor(livePayload.value)
       } else {
         // For different slides, use requestAnimationFrame to batch visual updates
         requestAnimationFrame(() => {
-          mostUpdatedLiveSlide.value = updatedSlide
+          livePayload.value = stageFor(livePayload.value)
         })
       }
 
       // First time we've seen this media source: ensure a local copy exists in
       // this window (download once if needed), then re-apply with the local URL.
-      if (pendingRehydrateSig) {
-        const sig = pendingRehydrateSig
+      pendingRehydrate.forEach(({ slide: updatedSlide, sig }) => {
         // `cacheable` is false while any page/background is still only in the
         // cloud. Caching a half-resolved slide — what a weak connection at
         // service start produces — pinned the broken URLs for the rest of the
@@ -400,12 +458,16 @@ onMounted(() => {
           if (cacheable) localizedLiveMedia.set(sig, localized)
           // Re-apply onto whatever is on screen now rather than adopting
           // `rehydrated` wholesale — the operator may have paged ahead while
-          // the download ran, and that newer page index must win.
-          const current = mostUpdatedLiveSlide.value
-          if (current?.id === rehydrated.id) {
-            const next = { ...current }
+          // the download ran, and that newer page index must win. Inside a
+          // pair only the matching member changes.
+          const current = livePayload.value
+          const onScreen = (isPairPayload(current) ? current : [current]).find(
+            (slide) => slide?.id === rehydrated.id
+          )
+          if (onScreen) {
+            const next = { ...onScreen }
             applyLocalizedMedia(next, localized)
-            mostUpdatedLiveSlide.value = next
+            livePayload.value = patchLivePayload(current, next)
           }
         }
 
@@ -419,7 +481,7 @@ onMounted(() => {
           .catch((err) =>
             console.warn("Live media rehydrate failed:", err)
           )
-      }
+      })
     } catch (error) {
       console.error("Failed to parse broadcast message:", error)
     }

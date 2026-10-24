@@ -11,6 +11,7 @@ export const slideTypes = {
   time: 'time',
   presentation: 'presentation',
   interlude: 'interlude',
+  camera: 'camera',
   // sermon: 'sermon',
   // carousel: 'carousel',
 }
@@ -42,10 +43,19 @@ export const appWideActions = {
   addSong: 'add-song',
   songUpdated: 'song-updated',
   addSongSlideToSetlist: 'add-song-slide-to-setlist',
+  // Slide pairs: two slides on the live screen at once. `slidePair` is the
+  // tier key (see useSubscription); the rest are emitter events.
+  slidePair: 'slide-pair',
+  pairSlides: 'pair-slides',
+  unpairSlides: 'unpair-slides',
+  setPairActiveMember: 'set-pair-active-member',
+  // A camera's ⋯ menu: pick a slide to pair with it, or change its partner.
+  startSlidePair: 'start-slide-pair',
   removeAlert: 'remove-alert',
   newCountdown: 'new-countdown',
   newTimeSlide: 'new-time-slide',
   newInterlude: 'new-interlude',
+  newCamera: 'new-camera',
   showSlideOverlay: 'show-slide-overlay',
   removeSlideOverlay: 'remove-slide-overlay',
   newSearchBible: 'new-search-bible',
@@ -256,6 +266,14 @@ export const quickActionsArr: QuickAction[] = [
     meta: "interlude intermission break pause animated background welcome coffee fellowship selah we'll be right back",
     type: slideTypes.interlude,
     tier: "teams",
+  },
+  {
+    icon: "i-bx-video",
+    name: "Add Camera",
+    desc: "Show a webcam or capture card full screen",
+    action: appWideActions.newCamera,
+    meta: "camera webcam imag capture card live video feed preacher",
+    type: slideTypes.camera,
   },
   {
     icon: "i-mdi-youtube",
@@ -657,6 +675,10 @@ export const desktopOnlyActions: string[] = [
   appWideActions.clearStageCountdown,
   // Keyboard shortcuts reference. There is no physical keyboard to bind.
   appWideActions.openShortcutsModal,
+  // A camera slide picks a device attached to the machine that opens /live.
+  // A phone would list its own cameras, which the projector computer does not
+  // have.
+  appWideActions.newCamera,
   // Legacy PowerPoint import (already commented out of quickActionsArr). PDF
   // import stays available on mobile: it is the only way to create a
   // `presentation` slide, and every other slide type is reachable there.
@@ -671,6 +693,7 @@ export const slideLayoutTypes = {
   countdown: 'countdown',
   time: 'time',
   interlude: 'interlude',
+  camera: 'camera',
   empty: 'empty',
 }
 
