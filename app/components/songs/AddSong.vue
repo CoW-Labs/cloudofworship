@@ -294,9 +294,17 @@
         label="Share this song with other users?"
       />
 
+      <div
+        v-if="bracketTranslation"
+        class="rounded-md bg-primary-50 dark:bg-primary-900/40 p-3 text-sm text-primary-600 dark:text-primary-300"
+      >
+        These lyrics have English translations written in brackets. Review the
+        song to move them out of the lyrics and into an English translation.
+      </div>
+
       <!-- A translation is checked line by line before it is saved, so
            reviewing leads and adding straight away steps back. -->
-      <div v-if="hasTranslation" class="mt-4 flex gap-3">
+      <div v-if="hasTranslation && !bracketTranslation" class="mt-4 flex gap-3">
         <CowButton
           variant="secondary"
           size="lg"
@@ -327,13 +335,15 @@
         :loading="loading"
         @click="addSong()"
       >
-        {{ song ? "Edit Song" : "Add Song" }}
+        {{
+          bracketTranslation ? "Review Song" : song ? "Edit Song" : "Add Song"
+        }}
       </CowButton>
     </form>
   </div>
 </template>
 <script setup lang="ts">
-import { watchDebounced, useOnline } from "@vueuse/core"
+import { refDebounced, watchDebounced, useOnline } from "@vueuse/core"
 import { useAuthStore } from "~/store/auth"
 import { useSuggestedSongTitle } from "~/composables/useSong"
 import type { Song, SongTranslation } from "~/types"
@@ -440,6 +450,48 @@ const languageSummary = computed(() => {
   return parts.join(" · ") || "Optional"
 })
 
+// English translations typed into the lyrics in brackets. They are moved into
+// an English translation when the song is reviewed. Left alone when the song
+// is sung in English (the brackets are then echoes, not translations), when an
+// English translation is already written, or when there is no room for one.
+const findBracketTranslation = (text: string) => {
+  if (songLanguageCode.value === "eng") return null
+  const english = translationDrafts.value.find(
+    (draft) => languageCode(draft.language) === "eng"
+  )
+  if (english?.text.trim()) return null
+  if (!english && translationDrafts.value.length >= MAX_TRANSLATIONS) return null
+  return extractBracketTranslation(text)
+}
+
+// The notice and button follow the lyrics once typing pauses, not on every
+// keystroke: a long pasted song takes a moment to scan. What the buttons do is
+// decided from the lyrics as they are at the click, so a click straight after
+// a paste never acts on a scan that is behind.
+const settledLyrics = refDebounced(lyrics, 300)
+const bracketTranslation = computed(() =>
+  findBracketTranslation(settledLyrics.value)
+)
+
+/** Moves the bracketed English into a translation. Says whether there was any. */
+const applyBracketTranslation = () => {
+  const found = findBracketTranslation(lyrics.value)
+  if (!found) return false
+  lyrics.value = found.lyrics
+  const english = translationDrafts.value.find(
+    (draft) => languageCode(draft.language) === "eng"
+  )
+  if (english) english.text = found.text
+  else {
+    translationDrafts.value.push({
+      key: draftKey++,
+      language: languageName("eng"),
+      text: found.text,
+    })
+  }
+  return true
+}
+
 const addTranslationDraft = () => {
   const taken = translationDrafts.value.map((draft) =>
     languageCode(draft.language)
@@ -528,7 +580,12 @@ const languageFieldsValid = () => {
 
 const reviewSong = () => {
   if (!languageFieldsValid()) return
-  reviewTabIndex.value = 0
+  const hadBrackets = applyBracketTranslation()
+  // Land on the English tab when that is the translation just pulled out.
+  const english = reviewTranslations.value.findIndex(
+    (t) => t.translation.lang === "eng"
+  )
+  reviewTabIndex.value = hadBrackets && english >= 0 ? english : 0
   reviewing.value = true
 }
 
@@ -604,6 +661,8 @@ watch(canForce, async (value) => {
 const addAnyway = () => addSong(true)
 
 const addSong = async (force = false) => {
+  // Bracketed translations are split out in the review, never saved as lyrics.
+  if (findBracketTranslation(lyrics.value)) return reviewSong()
   if (!languageFieldsValid()) return
   if (reviewTranslations.value.some((t) => t.extra)) {
     // More translated lines than sung lines can't be stored; the review shows

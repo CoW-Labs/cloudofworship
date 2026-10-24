@@ -1,5 +1,6 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
+import { livePayloadForSlide } from "~/composables/useSlidePairs"
 
 /**
  * The realtime session shared by every operator surface.
@@ -135,9 +136,28 @@ export const useOperatorSession = () => {
 
   // Feed the slide that is currently on screen to livestream viewers. Nothing
   // else broadcasts it, so /livestream/:code stays blank without this.
+  //
+  // A live slide pair goes out as its members' array. Its layout, hidden
+  // member, microphone, order and backdrop are part of what is on screen, so
+  // changing any re-sends it; member content edits travel as `update-slide`,
+  // as for a single slide. Which member the operator is editing is not.
+  const livePairSignature = computed(() => {
+    const pair = appStore.livePair
+    return pair
+      ? [
+          pair.id,
+          pair.layout,
+          pair.audioSlideId ?? "",
+          pair.hiddenSlideId ?? "",
+          pair.slideIds.join(","),
+          pair.backgroundType ?? "",
+          pair.background ?? "",
+        ].join("|")
+      : ""
+  })
   watch(
-    () => appStore.currentState.liveSlideId,
-    (liveSlideId) => {
+    () => [appStore.currentState.liveSlideId, livePairSignature.value] as const,
+    ([liveSlideId]) => {
       if (!socketInstance.value?.isConnected()) return
 
       // While this device is driving another device's output, that device is
@@ -155,11 +175,11 @@ export const useOperatorSession = () => {
         return
       }
 
-      const liveSlide = appStore.activeSlides.find(
-        (slide) => slide.id === liveSlideId
-      )
+      const liveSlide = appStore.activeSlidesById.get(liveSlideId)
       if (liveSlide) {
-        socketInstance.value.sendLiveSlide(liveSlide)
+        socketInstance.value.sendLiveSlide(
+          livePayloadForSlide(liveSlide, { keepShape: true })
+        )
       }
     }
   )

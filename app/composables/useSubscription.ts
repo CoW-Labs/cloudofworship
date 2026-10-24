@@ -1,4 +1,5 @@
 import { useAuthStore } from '~/store/auth'
+import { useAppStore } from '~/store/app'
 import { useFeatureFlags } from '~/composables/useFeatureFlags'
 import { useAppInfo } from '~/composables/useAppInfo'
 import type { Slide } from '~/types'
@@ -76,6 +77,9 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   // Only the *search* is gated: 'new-song' below stays free so a church can
   // still play songs it saved itself (personal library, "Add Song").
   'new-song-search': 'teams',
+  // Two slides on the live screen at once. Building a pair is the preview;
+  // taking one live is the commit.
+  [appWideActions.slidePair]: 'teams',
 
   // Free tier features
   'new-slide': 'free',
@@ -120,6 +124,7 @@ export const PREVIEWABLE_ACTIONS: ReadonlySet<string> = new Set([
   'new-vimeo-video',
   appWideActions.newSongSearch,
   appWideActions.newTranscribe,
+  appWideActions.slidePair,
 ])
 
 export default function useSubscription() {
@@ -283,6 +288,10 @@ export default function useSubscription() {
    */
   const teamsActionForSlide = (slide: Slide | null | undefined): string | null => {
     if (!slide) return null
+    // A paired slide goes live as a pair, so a lapsed plan cannot project it
+    // even when the slide on its own would be free. Membership is read from
+    // the pairs, which `slide.pairId` can lag.
+    if (useAppStore().pairForSlide(slide.id)) return appWideActions.slidePair
     switch (slide.type) {
       case slideTypes.countdown:
         return appWideActions.newCountdown

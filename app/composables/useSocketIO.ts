@@ -3,6 +3,7 @@ import { useAuthStore } from "~/store/auth"
 import { useOnline } from "@vueuse/core"
 import { watch, onUnmounted, ref } from "vue"
 import { getLiveSourceId } from "~/utils/socketSource"
+import type { LivePayload, SlidePair } from "~/types"
 
 interface SocketIOOptions {
   scheduleId: string
@@ -441,6 +442,19 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('reorder-slides', { action: 'reorder-slides', data })
       })
 
+      // Slide pair events
+      socket.on('slide-pair-created', (data) => {
+        onMessage?.('slide-pair-created', { action: 'slide-pair-created', data })
+      })
+
+      socket.on('slide-pair-updated', (data) => {
+        onMessage?.('slide-pair-updated', { action: 'slide-pair-updated', data })
+      })
+
+      socket.on('slide-pair-deleted', (data) => {
+        onMessage?.('slide-pair-deleted', { action: 'slide-pair-deleted', data })
+      })
+
       // Slide locking events
       socket.on('slide-locked', (data) => {
         onMessage?.('slide-locked', { action: 'slide-locked', data })
@@ -625,10 +639,29 @@ export const useSocketIO = (options: SocketIOOptions) => {
   }
 
   /**
-   * Broadcast the slide currently on screen to livestream viewers
+   * Broadcast what is on screen to livestream viewers: one slide, a slide
+   * pair's members as an array, or null for blank.
    */
-  const sendLiveSlide = (slide: any) => {
-    return emit('live-slide', slide)
+  const sendLiveSlide = (payload: LivePayload) => {
+    return emit('live-slide', payload)
+  }
+
+  /**
+   * Slide pair events. Senders tag `tabId` so their own echo is ignored.
+   */
+  const sendSlidePairCreated = (pair: SlidePair, tabId?: string) => {
+    return emit('create-slide-pair', { pair, tabId })
+  }
+
+  const sendSlidePairUpdated = (pair: SlidePair, tabId?: string) => {
+    return emit('update-slide-pair', { pair, tabId })
+  }
+
+  const sendSlidePairDeleted = (
+    pair: Pick<SlidePair, 'id' | 'slideIds'>,
+    tabId?: string
+  ) => {
+    return emit('delete-slide-pair', { pairId: pair.id, slideIds: pair.slideIds, tabId })
   }
 
   /**
@@ -726,6 +759,9 @@ export const useSocketIO = (options: SocketIOOptions) => {
     sendSlideUpdated,
     sendSlideDeleted,
     sendLiveSlide,
+    sendSlidePairCreated,
+    sendSlidePairUpdated,
+    sendSlidePairDeleted,
     sendStageState,
     sendBatchSlidesCreated,
     sendBatchSlidesUpdated,

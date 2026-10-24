@@ -63,7 +63,10 @@ export interface LiveProjectionRecord {
   scheduleId: string | null
   churchId: string | null
   updatedAt: number
+  /** The live slide, or a live slide pair's active member. */
   slide: Slide | null
+  /** A live slide pair's members in pair order; absent for a single slide. */
+  slides?: Slide[] | null
 }
 
 

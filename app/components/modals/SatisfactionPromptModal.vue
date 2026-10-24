@@ -1,6 +1,7 @@
 <template>
   <UModal
     v-model="visible"
+    prevent-close
     :ui="{
       width: 'sm:max-w-[420px]',
       background: '',

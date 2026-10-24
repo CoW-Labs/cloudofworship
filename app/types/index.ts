@@ -92,7 +92,7 @@ export interface Slide {
   hymnVerseIndex?: number // 0-based index of current hymn verse, used for chorus navigation
   hymnSubVerseIndex?: number // 0-based chunk index inside the current verse/chorus
   hymnSubVerseTotal?: number // total chunks in the current verse/chorus
-  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | InterludeSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
+  data?: Song | Scripture | Hymn | Countdown | TimeSlideData | InterludeSlideData | CameraSlideData | ExtendedFileT | SongSetlistData // for song/bible/hymn/file/setlist, Object mapped to Slide only on client
   slideStyle?: SlideStyle
   saved?: boolean
   createdAt?: string
@@ -102,7 +102,90 @@ export interface Slide {
   slideMode?: "slide" | "overlay"
   /** Per-asset upload history, safe to persist and share across devices. */
   mediaCloudSync?: Record<string, MediaCloudSyncRecord>
+  /** The slide pair this slide belongs to. Written only by the slide-pair API. */
+  pairId?: string | null
+  /**
+   * Client-only. Stamped on each member when a pair is projected, so every
+   * receiver (live window, livestream, stage) can lay the pair out and pick its
+   * audio without looking the pair up. Never persisted.
+   */
+  livePair?: LivePairStamp
 }
+
+export type SlidePairLayout =
+  | "side-by-side"
+  | "picture-in-picture"
+  | "caption"
+  | "lower-third"
+
+/**
+ * A slide pair's own backdrop, the same shape as a slide's background. It
+ * shows behind the side-by-side layout. Never copied onto a member slide.
+ */
+export interface SlidePairBackground {
+  background?: string | null
+  backgroundType?: string | null
+  backgroundImageKey?: string | null
+  backgroundVideoKey?: string | null
+}
+
+/**
+ * Two slides shown on the live screen at once, at least one of them a camera.
+ * Each member keeps its own content, style and background; the pair only
+ * records which slides it groups and how they show. `slideIds` is ordered: index 0 is the main slide (left, or
+ * full screen in picture-in-picture), index 1 the second (right, or the inset).
+ */
+export interface SlidePair extends SlidePairBackground {
+  _id?: string
+  id: string
+  scheduleId: string
+  churchId?: string
+  userId?: string
+  slideIds: string[]
+  /**
+   * Set once, at creation. Which member is driven is worked out from the
+   * slides (see drivenMemberId), and which one the editor shows is per
+   * window (see useSlidePairs), so neither writes here.
+   */
+  activeSlideId: string
+  layout: SlidePairLayout
+  /**
+   * The camera whose microphone plays through the output, or null for none.
+   * Off unless the operator turns it on: a room microphone sent to speakers in
+   * the same room howls. A member's own media sound is not affected.
+   */
+  audioSlideId: string | null
+  /** A member taken off the screen for now; the other fills it. One at most. */
+  hiddenSlideId?: string | null
+  createdAt?: string
+  updatedAt?: string
+  /**
+   * Client-only. Made offline and not on the server yet; saved by
+   * useSlidePairs once the connection and its slides are back. Never sent.
+   */
+  pending?: boolean
+}
+
+export interface LivePairStamp extends SlidePairBackground {
+  pairId: string
+  layout: SlidePairLayout
+  /** The camera whose microphone plays, or null. */
+  audioSlideId: string | null
+  hiddenSlideId?: string | null
+  /**
+   * The driven member: the one Up/Down, media controls and the stage display
+   * follow (see drivenMemberId). For a member carrying on alone after its
+   * pair ended, that member.
+   */
+  activeSlideId: string
+  position: number
+}
+
+/**
+ * What is on screen. One slide means a single slide is live; an array means a
+ * slide pair is live, one slide per member in pair order; null is blank.
+ */
+export type LivePayload = Slide | Slide[] | null
 
 export interface Template {
   _id: string
@@ -191,6 +274,20 @@ export interface InterludeSlideData {
   subtitle: string
   /** "auto" follows the variant's default. */
   textBackground: "auto" | "on" | "off"
+}
+
+/**
+ * A full-frame camera slide. Only the settings are stored: the stream itself is
+ * opened by the window that shows it (see useCameraStream) and never leaves it.
+ * Device IDs differ per origin, browser profile and between web and desktop, so
+ * the label is kept to find the same camera on another machine.
+ */
+export interface CameraSlideData {
+  id: string
+  deviceId: string
+  deviceLabel: string
+  fit: "cover" | "contain"
+  mirror: boolean
 }
 
 /**
@@ -552,6 +649,14 @@ export interface AppState {
   activeSlides: Array<Slide> // Returns all slides on CoW
   liveOutputSlidesId: Array<string> | null
   liveSlideId: string | null
+  /** Slide pairs in the active schedule. */
+  slidePairs: Array<SlidePair>
+  /**
+   * The pair on screen, or null. While a pair is live `liveSlideId` keeps the
+   * id of its active member, so everything that follows a single live slide
+   * (Up/Down navigation, remote control, the stage feed) keeps working.
+   */
+  livePairId: string | null
   emitter: Emitter<Record<EventType, any>> | null
   settings: AppSettings
   backgroundVideos: Array<BackgroundVideo>

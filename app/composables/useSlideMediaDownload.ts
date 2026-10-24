@@ -1,4 +1,5 @@
 import type { ExtendedFileT, Slide } from "~/types"
+import { fetchHostedMediaCors } from "~/utils/fetchHostedMedia"
 
 /**
  * Saves the media a slide is built from to the user's own machine — the
@@ -105,7 +106,7 @@ export default function useSlideMediaDownload() {
     const url = sourceUrlFor(slide)
     if (!url) throw new Error("This slide has no media file attached")
 
-    const response = await fetch(url)
+    const response = await fetchHostedMediaCors(url)
     if (!response.ok) throw new Error(`Media request failed (${response.status})`)
     return await response.blob()
   }

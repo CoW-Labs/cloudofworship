@@ -5,6 +5,10 @@
 	<!-- Allow microphone access -->
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
+
+	<!-- Allow camera access (camera slides) -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
 	
 	<!-- Network access for the app -->
 	<key>com.apple.security.network.client</key>

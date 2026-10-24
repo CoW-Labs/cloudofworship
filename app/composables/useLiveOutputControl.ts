@@ -2,6 +2,7 @@ import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { resolveLiveOutputDestination } from "~/utils/liveOutputRouting"
+import { projectLiveSlide } from "~/composables/useSlidePairs"
 
 /**
  * Driving one device's live output from another — specifically, a phone on
@@ -273,9 +274,9 @@ export const useLiveOutputControl = () => {
    * schedule has always run, so a remote request and a local click cannot
    * diverge.
    */
+  // A slide in a pair goes on screen with the rest of its pair.
   const applyLiveSlideLocally = (slide: Slide) => {
-    useBroadcastPost(slide)
-    appStore.setLiveSlide(slide.id)
+    projectLiveSlide(slide)
   }
 
   const applyBlankLocally = () => {

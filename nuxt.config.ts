@@ -446,6 +446,8 @@ export default defineNuxtConfig({
         'bx:time',
         'bx:trash',
         'bx:user-plus',
+        'bx:video',
+        'bx:video-off',
         'bx:wifi-off',
         'bx:x',
         // Boxicons Solid (bxs)
@@ -472,6 +474,10 @@ export default defineNuxtConfig({
         'bi:text-right',
         // Tabler Icons
         'tabler:arrow-autofit-width',
+        // Slide pairs
+        'tabler:layout-columns',
+        'tabler:arrows-exchange',
+        'tabler:picture-in-picture',
         'tabler:cloud-off',
         'tabler:cloud-search',
         'tabler:device-desktop-plus',

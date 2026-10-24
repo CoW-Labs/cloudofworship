@@ -14,6 +14,7 @@ import type {
   InterludeSlideData,
 } from "~/types"
 import { withInterludeData } from "~/utils/interlude/slide"
+import { withCameraData, type CameraSettings } from "~/utils/camera"
 import { tabSessionId } from "./useRealtimeSlides"
 import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
 
@@ -944,6 +945,18 @@ export default function useSlideCreation() {
     return withInterludeData(tempSlide, { id: useID(), ...input })
   }
 
+  const createCameraSlide = (input: CameraSettings): Slide => {
+    const tempSlide = { ...preSlideCreation() }
+    tempSlide.layout = slideLayoutTypes.camera
+    tempSlide.type = slideTypes.camera
+    tempSlide.slideMode = "slide"
+    usePosthogCapture("NEW_CAMERA_SLIDE_CREATED", {
+      fit: input.fit,
+      mirror: input.mirror,
+    })
+    return withCameraData(tempSlide, { id: useID(), ...input })
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Library
   // ─────────────────────────────────────────────────────────────────────────
@@ -1001,6 +1014,7 @@ export default function useSlideCreation() {
     createCountdownSlide,
     createTimeSlide,
     createInterludeSlide,
+    createCameraSlide,
     createPresentationSlide,
     saveSlideToLib,
     duplicateSlide,

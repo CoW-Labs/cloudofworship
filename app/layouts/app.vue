@@ -18,21 +18,10 @@
     <FullScreenLoader v-if="fullScreenLoading" />
     <ClientOnly>
       <Transition name="fade-sm">
-        <div
+        <OfflineNotification
           v-show="isOfflineToastOpen"
-          class="ctn fixed z-50 right-4 bottom-4"
-          role="alert"
-          aria-labelledby="toast-message"
-        >
-          <NotFoundBanner
-            icon="i-tabler-cloud-off"
-            sub="You are offline"
-            desc="CoW will save your work until an internet connection returns."
-            action="close-offline-toast"
-            action-text="Ok, got it."
-            is-wider
-          />
-        </div>
+          @close="isOfflineToastOpen = false"
+        />
       </Transition>
       <Transition name="fade-sm">
         <UpdateNotification />

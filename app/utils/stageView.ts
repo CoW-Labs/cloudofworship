@@ -123,6 +123,12 @@ export const stageNowView = (slide?: Slide | null): StagePanelView => {
     return { ...view, placeholder: "Media is playing", icon: "i-bx-play-circle" }
   }
 
+  // The feed only exists on the projector machine; stage screens may be on
+  // another device entirely, so they say so rather than open a camera.
+  if (slide.type === slideTypes.camera) {
+    return { ...view, placeholder: "Camera is live", icon: "i-bx-video" }
+  }
+
   if (slide.type === slideTypes.presentation) {
     const pages = slide.presentationObjects?.length || 0
     const page = (slide.presentationPageIndex ?? 0) + 1
