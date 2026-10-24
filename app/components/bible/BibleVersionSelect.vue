@@ -139,5 +139,10 @@ watch(bibleVersion, (newValue, oldValue) => {
    to be applied here. */
 .bible-version-menu {
   z-index: 40 !important;
+  /* The library's default width is "w-full", which tail-merges in after our
+     min-w-[280px] the same way. Under the fixed popper (see :popper above)
+     "100%" resolves against the viewport instead of the 100px wrapper, so the
+     menu spanned the whole screen. Pin the width explicitly. */
+  width: 280px !important;
 }
 </style>
