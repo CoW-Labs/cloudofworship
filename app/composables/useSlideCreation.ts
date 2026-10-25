@@ -725,6 +725,8 @@ export default function useSlideCreation() {
           try {
             const blobResponse = await fetch(obj.imageUrl)
             const blob = await blobResponse.blob()
+            const mimeType = blob.type || "image/jpeg"
+            const extension = mimeType === "image/png" ? "png" : "jpg"
 
             // 2a — Persist to the platform media store.
             await localMedia.saveBlob({
@@ -733,8 +735,8 @@ export default function useSlideCreation() {
               category: "presentation-page",
               kind: "image",
               blob,
-              mimeType: "image/png",
-              originalName: `${fileName}-page-${obj.page}.png`,
+              mimeType,
+              originalName: `${fileName}-page-${obj.page}.${extension}`,
               recoverable: false,
               userInitiated: true,
               onProgress: (fraction) =>
