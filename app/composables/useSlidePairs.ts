@@ -539,8 +539,8 @@ export default function useSlidePairs() {
   }
 
   /**
-   * Reverses the pair's order. Roles follow slide type first, so this is what
-   * decides which slide is the picture when both slides, or neither, are one.
+   * Reverses the pair's order. A camera always takes the frame, so this only
+   * changes the screen for two cameras, where the first is the frame.
    */
   const swapPair = (pairId: string) => {
     const pair = appStore.slidePairsById.get(pairId)

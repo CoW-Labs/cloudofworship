@@ -1,36 +1,46 @@
 <template>
-  <UModal v-model="isOpen" :ui="{ width: 'sm:max-w-md' }">
-    <UCard
-      :ui="{
-        body: { padding: 'px-3 py-3 sm:px-3' },
-        header: { padding: 'px-4 py-3 sm:px-4' },
-      }"
+  <UModal
+    v-model="isOpen"
+    :ui="{
+      base: 'w-[94vw] max-w-[480px] sm:w-auto sm:min-w-[480px] max-h-[88dvh] flex flex-col',
+      background: 'bg-transparent dark:bg-transparent',
+      ring: '',
+      rounded: 'rounded-2xl',
+      shadow: 'shadow-none',
+      overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
+    }"
+  >
+    <AppSection
+      :heading="`${replacing ? 'Change paired slide' : 'Pair with'} ${
+        camera?.name || 'camera'
+      }`"
+      heading-styles="text-lg font-semibold"
+      class="min-h-0 flex-1"
     >
-      <template #header>
-        <div class="flex items-center justify-between gap-3">
-          <h3 class="text-base font-semibold truncate">
-            {{ replacing ? "Change paired slide" : "Pair with" }}
-            {{ camera?.name || "camera" }}
-          </h3>
-          <UButton
-            color="gray"
-            variant="ghost"
-            aria-label="Close"
-            @click="isOpen = false"
-          >
-            <template #leading><CloseIcon class="w-5 h-5" /></template>
-          </UButton>
-        </div>
+      <template #actions>
+        <button
+          type="button"
+          aria-label="Close"
+          class="grid h-8 w-8 place-items-center rounded-md leading-none hover:bg-gray-100 dark:hover:bg-[#222938] transition-colors"
+          @click="isOpen = false"
+        >
+          <UIcon
+            name="i-lucide-x"
+            class="block h-5 w-5 -translate-y-px text-gray-600 dark:text-[#a7afbd]"
+          />
+        </button>
       </template>
 
-      <div class="flex flex-col gap-3">
+      <div
+        class="min-h-0 flex-1 flex flex-col gap-3 rounded-2xl bg-gray-50 dark:bg-[#1b212e] p-3 sm:p-4"
+      >
         <CowTeamsPreviewNotice
           v-if="!hasAccessToFeature(appWideActions.slidePair)"
           :feature="appWideActions.slidePair"
         />
         <CowInput v-model="query" label="Search slides" size="sm" />
 
-        <div class="max-h-[55vh] overflow-y-auto -mx-1 px-1">
+        <div class="min-h-0 max-h-[55vh] overflow-y-auto -mx-1 px-1">
           <p
             v-if="!rows.length"
             class="py-6 text-center text-sm text-gray-500 dark:text-[#9aa3b2]"
@@ -70,7 +80,7 @@
           </button>
         </div>
       </div>
-    </UCard>
+    </AppSection>
   </UModal>
 </template>
 

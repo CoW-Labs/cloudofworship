@@ -151,6 +151,7 @@
                 @goto-verse="$emit('goto-verse', $event, selectedBibleVersion)"
                 @goto-song="goToSetlistSong"
                 @remove-song="removeSetlistSong"
+                @reorder-songs="reorderSetlistSongs"
               />
               <!-- Component to Auto complete Bible Books while typing -->
               <BibleAutoComplete
@@ -624,6 +625,7 @@ import type {
   SlideStyle,
   Song,
   SongSetlistData,
+  SongSetlistItem,
 } from "~/types"
 import { escapePriority } from "~/composables/useEscapeKey"
 import { songOnSlide } from "~/utils/songTranslation"
@@ -1054,8 +1056,12 @@ const selectedBibleVersion = ref<string>(
   appStore.currentState.settings.defaultBibleVersion
 )
 const shortcutCleanups: Array<() => void> = []
-const { getSetlistData, refreshSongSetlistSlide, removeSongFromSetlist } =
-  useSongSetlist()
+const {
+  getSetlistData,
+  refreshSongSetlistSlide,
+  removeSongFromSetlist,
+  reorderSetlistSongs: reorderSongsInSetlist,
+} = useSongSetlist()
 
 watch(
   () => props.slide,
@@ -1470,6 +1476,12 @@ const goToSetlistSong = async (songIndex: number) => {
     verseIndex: item?.verseIndex || 0,
   })
   emit("slide-update", updatedSlide)
+}
+
+const reorderSetlistSongs = async (songs: SongSetlistItem[]) => {
+  if (!props.slide) return
+  const updatedSlide = await reorderSongsInSetlist(props.slide, songs)
+  if (updatedSlide) emit("slide-update", updatedSlide)
 }
 
 const removeSetlistSong = async (songIndex: number) => {
