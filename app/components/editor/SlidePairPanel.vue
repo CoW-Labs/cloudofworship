@@ -69,8 +69,8 @@
           </button>
         </div>
       </div>
-      <!-- Roles follow slide type: a camera, video, image or PDF is the
-           picture. Two of a kind fall back to pair order, which this flips. -->
+      <!-- The camera always takes the camera's place. Two cameras follow
+           pair order, which this flips. -->
       <CowButton
         v-if="canSwap"
         variant="secondary"
@@ -79,17 +79,13 @@
         @click="swapPair(pair.id)"
       >
         <UIcon name="i-tabler-arrows-exchange" class="w-3.5 h-3.5" />
-        {{ cameraCount === 2 ? "Swap the cameras" : "Swap picture and words" }}
+        Swap the cameras
       </CowButton>
     </section>
 
-    <!-- LAYOUT — with one slide hidden the other fills the screen, so no
-         layout applies until it is shown again. -->
-    <section
-      class="flex flex-col gap-2 transition-opacity"
-      :class="{ 'opacity-40 pointer-events-none select-none': layoutLocked }"
-      :aria-disabled="layoutLocked"
-    >
+    <!-- LAYOUT — can be changed while a slide is hidden; it applies once
+         that slide is shown again. -->
+    <section class="flex flex-col gap-2">
       <h4 class="text-xs font-semibold text-gray-700 dark:text-[#c3cad6]">
         Layout
       </h4>
@@ -104,7 +100,6 @@
             class="w-full rounded-xl p-2 flex flex-col gap-1.5 text-left transition-shadow bg-white dark:bg-[#131a27]"
             :class="optionRing(pair.layout === layout.value)"
             :aria-pressed="pair.layout === layout.value"
-            :disabled="layoutLocked"
             @click="setLayout(layout.value)"
           >
             <SlidePairLayoutThumb :layout="layout.value" />
@@ -136,7 +131,6 @@ import { appWideActions } from "~/utils/constants"
 import {
   SLIDE_PAIR_LAYOUTS,
   isCameraSlide,
-  isVisualSlide,
 } from "~/utils/slidePairs"
 
 /**
@@ -156,8 +150,6 @@ const isHidden = (member: Slide) => pair.value?.hiddenSlideId === member.id
 
 const pair = computed(() => appStore.slidePairsById.get(props.pairId))
 
-const layoutLocked = computed(() => !!pair.value?.hiddenSlideId)
-
 const members = computed<Slide[]>(() =>
   (pair.value?.slideIds ?? [])
     .map((id) => appStore.activeSlidesById.get(id))
@@ -169,11 +161,8 @@ const editingMemberId = computed(() =>
 )
 
 const cameraCount = computed(() => members.value.filter(isCameraSlide).length)
-// Type decides the roles when one slide is a picture and the other is not, so
-// a swap would change nothing there.
-const canSwap = computed(
-  () => isVisualSlide(members.value[0]) === isVisualSlide(members.value[1])
-)
+// The camera always takes the frame, so only two cameras have an order to swap.
+const canSwap = computed(() => cameraCount.value === 2)
 
 const optionRing = (selected: boolean) =>
   selected
@@ -181,7 +170,7 @@ const optionRing = (selected: boolean) =>
     : "ring-1 ring-gray-200 dark:ring-white/10 hover:ring-gray-300 dark:hover:ring-white/20"
 
 const setLayout = (layout: SlidePairLayout) => {
-  if (!pair.value || layoutLocked.value || pair.value.layout === layout) return
+  if (!pair.value || pair.value.layout === layout) return
   void updatePair(pair.value.id, { layout })
   usePosthogCapture("SLIDE_PAIR_LAYOUT_CHANGED", { layout })
 }

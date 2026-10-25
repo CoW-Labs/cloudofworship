@@ -10,7 +10,9 @@
     <UButton
       v-if="
         slide.slideMode !== 'overlay' &&
-        (slide.type === slideTypes.text || slide.type === slideTypes.bible)
+        (slide.type === slideTypes.text ||
+          slide.type === slideTypes.bible ||
+          slide.type === slideTypes.interlude)
       "
       variant="ghost"
       color="gray"
@@ -70,7 +72,9 @@
         slide?.slideMode !== 'overlay' &&
         (slide?.type === slideTypes.text ||
           slide?.type === slideTypes.media ||
-          slide?.type === slideTypes.hymn)
+          slide?.type === slideTypes.hymn ||
+          slide?.type === slideTypes.interlude ||
+          slide?.type === slideTypes.presentation)
       "
       button-icon="i-bx-save"
       no-tooltip

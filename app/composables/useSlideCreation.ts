@@ -17,6 +17,7 @@ import { withInterludeData } from "~/utils/interlude/slide"
 import { withCameraData, type CameraSettings } from "~/utils/camera"
 import { tabSessionId } from "./useRealtimeSlides"
 import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
+import { isSessionMediaUrl, toTransportSafeSlide } from "~/utils/mediaTransport"
 
 /**
  * Composable for creating different types of slides
@@ -119,6 +120,10 @@ export default function useSlideCreation() {
     const tempSlide = { ...slideToDuplicate }
     delete tempSlide._id
     tempSlide.id = useObjectID()
+    // An interlude's data carries its own id, so the copy gets a fresh one.
+    if (tempSlide.type === slideTypes.interlude && tempSlide.data) {
+      tempSlide.data = { ...(tempSlide.data as InterludeSlideData), id: useID() }
+    }
     usePosthogCapture("SLIDE_DUPLICATED")
     return tempSlide
   }
@@ -691,10 +696,14 @@ export default function useSlideCreation() {
    * └─────────────────────────────────────────────────────────┘
    *
    * NOTE: The caller must NOT emit its own socket event.
+   *
+   * `reuseHostedPages` is for a deck from the library: its pages are already in
+   * the cloud, so they are kept on this device but not uploaded a second time.
    */
   const createPresentationSlide = (
     fileName: string,
-    presentationObjects: PresentationObject[]
+    presentationObjects: PresentationObject[],
+    options?: { reuseHostedPages?: boolean }
   ): Slide => {
     // ── Step 1 — build slide object synchronously ─────────────────────────
     const tempSlide = { ...preSlideCreation() }
@@ -722,8 +731,17 @@ export default function useSlideCreation() {
         let cloudFailedPages = 0
         const remotePageUrls = new Map<number, string>()
         for (const obj of presentationObjects) {
+          const hostedUrl =
+            options?.reuseHostedPages &&
+            /^https?:\/\//.test(obj.imageUrl ?? "") &&
+            !isSessionMediaUrl(obj.imageUrl)
+              ? obj.imageUrl
+              : null
           try {
             const blobResponse = await fetch(obj.imageUrl)
+            if (!blobResponse.ok) {
+              throw new Error(`Page ${obj.page} fetch failed: ${blobResponse.status}`)
+            }
             const blob = await blobResponse.blob()
             const mimeType = blob.type || "image/jpeg"
             const extension = mimeType === "image/png" ? "png" : "jpg"
@@ -752,7 +770,13 @@ export default function useSlideCreation() {
 
             // 2b — Upload to cloud (every plan, up to its storage quota — the
             // server rejects with a quota error once exceeded).
-            if (navigator.onLine) {
+            if (hostedUrl) {
+              remotePageUrls.set(obj.page, hostedUrl)
+              await localMedia.setCloudSyncState(
+                `${tempSlide.id}-page-${obj.page}`,
+                { groupId: tempSlide.id, status: "uploaded", remoteUrl: hostedUrl }
+              )
+            } else if (navigator.onLine) {
               try {
                 const uploaded = await useUploadImage(blob)
                 remotePageUrls.set(obj.page, uploaded.file.url)
@@ -791,8 +815,15 @@ export default function useSlideCreation() {
               )
             }
           } catch (err) {
-            localSaveFailed = true
-            console.error(`Failed to process presentation page ${obj.page}:`, err)
+            if (hostedUrl) {
+              // The page is still safe in the cloud, so the deck is still
+              // created; this device fetches the page when it is shown.
+              remotePageUrls.set(obj.page, hostedUrl)
+              console.warn(`Presentation page ${obj.page} kept in the cloud only:`, err)
+            } else {
+              localSaveFailed = true
+              console.error(`Failed to process presentation page ${obj.page}:`, err)
+            }
           }
         }
         if (localSaveFailed) {
@@ -964,7 +995,7 @@ export default function useSlideCreation() {
   // ─────────────────────────────────────────────────────────────────────────
 
   const saveSlideToLib = async (item: Slide): Promise<void> => {
-    const tempItem = { ...item }
+    let tempItem = { ...item }
     let tempSong = { ...tempItem?.data } as Song
 
     if (tempItem.type === slideTypes.hymn) {
@@ -993,6 +1024,24 @@ export default function useSlideCreation() {
       await saveSong(tempSong)
     } else {
       delete (tempItem?.data as ExtendedFileT)?.blob
+      // Pages shown from this device's cache are device URLs; the library copy
+      // needs the hosted ones so it opens on every device. A page that has not
+      // reached the cloud yet would be saved blank, so wait for it.
+      if (tempItem.type === slideTypes.presentation) {
+        tempItem = await toTransportSafeSlide(tempItem)
+        const pages = tempItem.presentationObjects ?? []
+        if (!pages.length || pages.some((obj) => !obj.imageUrl)) {
+          toast.add({
+            title: "This presentation is still uploading",
+            description:
+              "Save it to your library once every page has reached the cloud.",
+            icon: "i-bx-cloud",
+            color: "amber",
+          })
+          return
+        }
+        tempItem.background = pages[0]?.imageUrl ?? tempItem.background
+      }
       await saveSlideToLibrary(tempItem)
       saveSlideOnline(tempItem)
     }

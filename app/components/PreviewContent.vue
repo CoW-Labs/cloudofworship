@@ -1292,10 +1292,15 @@ emitter.on(appWideActions.newTimeSlide, () => {
 
 emitter.on(
   appWideActions.newInterlude,
-  (data?: Omit<InterludeSlideData, "id">) => {
+  (data?: Omit<InterludeSlideData, "id"> | Slide | Slide[]) => {
     // No payload is the Quick Actions panel opening, not a new slide.
     if (!data) return
-    const newSlide = createInterludeSlide(data)
+    // A saved slide (from the library) is copied as it is.
+    const saved = Array.isArray(data) ? data[0] : "type" in data ? data : null
+    const newSlide = saved
+      ? duplicateSlide(saved as Slide)
+      : createInterludeSlide(data as Omit<InterludeSlideData, "id">)
+    if (!newSlide) return
     makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
     broadcastSlideCreated(newSlide)
     uploadOfflineSlides()
@@ -1776,16 +1781,36 @@ emitter.on("new-media", async (data: ExtendedFileT[]) => {
 
 emitter.on(
   "new-presentation",
-  async (data: {
-    fileName?: string
-    presentationObjects?: PresentationObject[]
-    fromImport?: boolean
-  }) => {
+  async (
+    payload:
+      | {
+          fileName?: string
+          presentationObjects?: PresentationObject[]
+          fromImport?: boolean
+        }
+      | Slide[]
+  ) => {
+    // A saved slide (from the library) is rebuilt from its pages, so the copy
+    // gets its own id and local page storage, but points at the pages already
+    // in the cloud instead of uploading them again.
+    const saved = Array.isArray(payload) ? payload[0] : null
+    const data = saved
+      ? {
+          // createPresentationSlide strips an extension, so give it one.
+          fileName: `${saved.name || "Presentation"}.pdf`,
+          // Copies: the pages are rewritten to this device's URLs, which must
+          // not reach the library item they came from.
+          presentationObjects: saved.presentationObjects?.map((obj) => ({
+            ...obj,
+          })),
+        }
+      : (payload as Exclude<typeof payload, Slide[]>)
     if (!data?.presentationObjects?.length || !data.fileName) return
 
     const newSlide = createPresentationSlide(
       data.fileName,
-      data.presentationObjects
+      data.presentationObjects,
+      { reuseHostedPages: !!saved }
     )
 
     appStore.appendActiveSlide(newSlide)
