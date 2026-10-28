@@ -2,6 +2,9 @@ import { useAuthStore } from "~/store/auth"
 import type { PresentationObject } from "~/types"
 import { isPdfPresentationFile } from "~/utils/presentationFile"
 
+const MAX_PAGE_EDGE_PX = 1920
+const PAGE_JPEG_QUALITY = 0.9
+
 /**
  * Converts a PPT/PPTX or PDF file to an array of PresentationObjects.
  *
@@ -69,20 +72,34 @@ const usePowerpointToImage = async (file: File): Promise<PresentationObject[]> =
 
   for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
     const page = await pdfDoc.getPage(pageNum)
-    const viewport = page.getViewport({ scale: 1.5 })
+    // 1.5x keeps small pages (Letter, A4) sharp; big ones (Canva's 1440pt
+    // slides) are held to a 1080p projector's long edge instead of 2160px.
+    const { width, height } = page.getViewport({ scale: 1 })
+    const scale = Math.min(1.5, MAX_PAGE_EDGE_PX / Math.max(width, height))
+    const viewport = page.getViewport({ scale })
 
     const canvas = document.createElement("canvas")
     canvas.width = viewport.width
     canvas.height = viewport.height
     const ctx = canvas.getContext("2d")!
+    // JPEG has no alpha: paint white so a page without its own background
+    // doesn't come out black.
+    ctx.fillStyle = "#ffffff"
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     await page.render({ canvasContext: ctx, viewport, canvas }).promise
 
+    // JPEG, not PNG: a photo-heavy page as PNG ran past 1 MB and the upload
+    // was refused, while the same page as JPEG is a few hundred KB.
     const imageUrl = await new Promise<string>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) return reject(new Error(`Failed to render page ${pageNum}`))
-        resolve(URL.createObjectURL(blob))
-      }, "image/png")
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error(`Failed to render page ${pageNum}`))
+          resolve(URL.createObjectURL(blob))
+        },
+        "image/jpeg",
+        PAGE_JPEG_QUALITY
+      )
     })
 
     presentationObjects.push({ page: pageNum, imageUrl })

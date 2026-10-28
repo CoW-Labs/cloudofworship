@@ -257,14 +257,18 @@
           v-if="presenceUsers.length > 0"
           class="online-users-ctn relative z-30 -mr-5 flex items-center gap-1"
         >
+          <!-- Each face sits on top of the one to its left, the same way the
+               account avatar sits on top of the last face, so the whole row
+               overlaps in one direction. -->
           <div class="flex -space-x-2">
             <UPopover
               v-for="(onlineUser, index) in presenceUsers"
               :key="onlineUser.userId"
               mode="click"
               class="relative transition-all duration-200 ease-out hover:z-50"
-              :style="{ zIndex: presenceUsers.length - index }"
+              :style="{ zIndex: index + 1 }"
               :ui="{
+                trigger: 'flex',
                 ring: 'ring-0',
                 rounded: 'rounded-xl',
                 shadow:
@@ -294,10 +298,9 @@
                         : undefined
                     "
                     size="sm"
-                    class="ring-2 transition-all duration-200 cursor-pointer hover:scale-110"
+                    class="transition-all duration-200 cursor-pointer hover:scale-110"
                     :class="{ 'grayscale opacity-50': !online }"
                     :style="{
-                      '--tw-ring-color': onlineUser?.theme || '#6366f1',
                       backgroundColor: onlineUser?.theme || '#6366f1',
                       color: !onlineUser.avatar
                         ? onlineUser?.theme || '#6366f1'
@@ -348,10 +351,15 @@
              wrapper's stacking context, so the wrapper is what has to clear the
              mobile route's sheets (z-30 inline tabs, z-40 slide editor). At
              z-30 the account menu opened *behind* whichever one was on screen. -->
+        <!-- trigger: 'flex' on this and the presence popovers: Nuxt UI's
+             default trigger is inline-flex, which sits on a text baseline and
+             gains a descender's worth of space below the avatar, pushing it
+             off centre by a different amount in each popover. -->
         <UPopover
           mode="click"
           class="relative z-50"
           :ui="{
+            trigger: 'flex',
             ring: 'ring-0',
             rounded: 'rounded-xl',
             shadow:

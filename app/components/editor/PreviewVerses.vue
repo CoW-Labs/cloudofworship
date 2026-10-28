@@ -7,20 +7,30 @@
       v-if="slide?.type === slideTypes.songSetlist"
       class="sticky top-0 z-10 flex gap-2 overflow-x-auto bg-gray-100 dark:bg-[#171d2b] px-4 py-3 border-b border-gray-200 dark:border-[#2b3344]"
     >
+      <!-- Drag a song to reorder the setlist; the active song stays active. -->
+      <CowDraggable
+        :model-value="songOrder"
+        item-key="id"
+        class="flex gap-2"
+        :animation="200"
+        ghost-class="opacity-50"
+        :delay="150"
+        :delay-on-touch-only="true"
+        @update:model-value="reorderSongs"
+      >
+        <template #item="{ element: item, index }">
       <div
-        v-for="(item, index) in setlistData.songs"
-        :key="item.id"
         role="button"
         tabindex="0"
         class="group relative min-w-[150px] max-w-[210px] rounded-md border border-transparent px-3 py-2 pr-9 text-left transition-all cursor-pointer outline-none text-black dark:text-white"
         :class="
-          index === setlistData.activeSongIndex
+          item.id === activeSongId
             ? 'bg-gray-200 dark:bg-[#2b3242] shadow-sm ring-2 ring-primary-300 dark:ring-primary-500/50'
             : 'bg-gray-100 dark:bg-[#171d2b] hover:bg-gray-200 dark:hover:bg-[#2b3242] focus:bg-gray-200 dark:focus:bg-[#2b3242]'
         "
-        @click="$emit('goto-song', index)"
-        @keydown.enter.prevent="$emit('goto-song', index)"
-        @keydown.space.prevent="$emit('goto-song', index)"
+        @click="$emit('goto-song', savedSongIndex(item))"
+        @keydown.enter.prevent="$emit('goto-song', savedSongIndex(item))"
+        @keydown.space.prevent="$emit('goto-song', savedSongIndex(item))"
       >
         <p class="truncate text-sm font-bold leading-tight">
           {{ item.song?.title || `Song ${index + 1}` }}
@@ -39,10 +49,12 @@
             variant="ghost"
             color="gray"
             class="h-8 w-8 p-0 grid place-items-center hover:bg-gray-200 dark:hover:bg-[#333c4e]"
-            @click.stop="$emit('remove-song', index)"
+            @click.stop="$emit('remove-song', savedSongIndex(item))"
           />
         </div>
       </div>
+        </template>
+      </CowDraggable>
     </div>
 
     <!-- Bible verses -->
@@ -146,11 +158,18 @@ import type {
   BibleVerse,
   Song,
   SongSetlistData,
+  SongSetlistItem,
 } from "~/types"
 
 const props = defineProps<{
   slide: Slide
   verse: string
+}>()
+const emit = defineEmits<{
+  (e: "goto-verse", verse: string): void
+  (e: "goto-song", index: number): void
+  (e: "remove-song", index: number): void
+  (e: "reorder-songs", songs: SongSetlistItem[]): void
 }>()
 
 const allChapterVerses = ref<BibleVerse[]>()
@@ -164,6 +183,28 @@ const setlistData = computed<SongSetlistData>(() => {
     activeSongIndex: data?.activeSongIndex || 0,
   }
 })
+
+// The order on screen. A drop shows here at once, while the reorder is still
+// being saved; the saved setlist replaces it as soon as it arrives.
+const songOrder = ref<SongSetlistItem[]>([])
+watch(
+  () => setlistData.value.songs,
+  (songs) => {
+    songOrder.value = [...songs]
+  },
+  { immediate: true }
+)
+const activeSongId = computed(
+  () => setlistData.value.songs[setlistData.value.activeSongIndex]?.id
+)
+// Clicks name a song by its place in the saved setlist, which a pending
+// reorder has not changed yet.
+const savedSongIndex = (item: SongSetlistItem) =>
+  setlistData.value.songs.findIndex((song) => song.id === item.id)
+const reorderSongs = (songs: SongSetlistItem[]) => {
+  songOrder.value = songs
+  emit("reorder-songs", songs)
+}
 
 // Build hymn verses list with chorus after Verse 1
 const hymnVersesWithChorus = computed(() => {

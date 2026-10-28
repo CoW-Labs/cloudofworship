@@ -170,6 +170,26 @@ export default function useSongSetlist() {
     })
   }
 
+  /**
+   * Puts a setlist's songs in a new order. The song that was active stays
+   * active, wherever it moved to.
+   */
+  const reorderSetlistSongs = async (
+    slide: Slide,
+    songs: SongSetlistItem[]
+  ): Promise<Slide | null> => {
+    const data = getSetlistData(slide)
+    const activeId = data.songs[data.activeSongIndex]?.id
+    const activeSongIndex = Math.max(
+      songs.findIndex((item) => item.id === activeId),
+      0
+    )
+    return await refreshSongSetlistSlide({
+      ...slide,
+      data: { songs: [...songs], activeSongIndex },
+    })
+  }
+
   const navigateSongSetlist = async (
     slide: Slide,
     direction: "next" | "previous"
@@ -242,6 +262,7 @@ export default function useSongSetlist() {
     refreshSongSetlistSlide,
     appendSongToSetlist,
     removeSongFromSetlist,
+    reorderSetlistSongs,
     navigateSongSetlist,
   }
 }

@@ -148,36 +148,20 @@ export const foldPairs = <T extends Slide>(
 export const PAIR_CARD_COLOUR = "#46215F"
 
 /**
- * Slides that are a picture: they go in the pair's frame. Audio is a sound
- * with artwork, not a picture, so it reads as text-side.
- */
-export const isVisualSlide = (slide: Slide | undefined) => {
-  if (!slide) return false
-  if (slide.type === slideTypes.camera || slide.type === slideTypes.presentation) {
-    return true
-  }
-  if (slide.type === slideTypes.media) {
-    return (slide.data as ExtendedFileT | undefined)?.type !== "audio"
-  }
-  return false
-}
-
-/**
- * Which member is the picture (`frame`) and which the words (`text`). A
- * visual slide beside a non-visual one is the frame whatever the order; with
- * two of a kind, pair order decides and the second slide is the frame. Swap
- * in the Pair panel reorders the pair for that case.
+ * Which member takes the camera's place (`frame`: left in side-by-side, the
+ * small card in picture-in-picture, full screen under a caption) and which the
+ * other's (`text`). The camera always takes the frame, whatever the other
+ * slide is. With two cameras, the one that was in the pair first does.
  */
 export const pairRoles = <T extends Slide>(
   slides: readonly T[]
 ): { frame: T | undefined; text: T | undefined } => {
   const [first, second] = slides
-  if (isVisualSlide(first) && !isVisualSlide(second)) {
-    return { frame: first, text: second }
+  if (!isCameraSlide(first) && isCameraSlide(second)) {
+    return { frame: second, text: first }
   }
-  return { frame: second, text: first }
+  return { frame: first, text: second }
 }
-
 
 /**
  * Who is heard in a pair. A media file's own sound plays unless it is muted in
