@@ -10,7 +10,7 @@ import type { LocalMediaFileRecord, PresentationObject } from "~/types"
  *   key:          `${slideId}-page-${page}`
  *   groupId:      slideId
  *   category:     "presentation-page"
- *   originalName: `${fileName}-page-${page}.png`
+ *   originalName: `${fileName}-page-${page}.jpg` (.png for older decks)
  *
  * so a deck is exactly one groupId, and its pages are recovered by parsing the
  * page number back off each key.
