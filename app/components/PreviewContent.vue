@@ -721,11 +721,13 @@ const makeSlideActive = (
   options?: {
     goLive: boolean
     newlyCreated: boolean
+    // Where in `appStore.activeSlides` a new slide goes; the end when omitted.
+    position?: number
   }
 ) => {
   activeSlide.value = slide
   if (options?.newlyCreated) {
-    appStore.appendActiveSlide(slide)
+    appStore.appendActiveSlide(slide, options.position)
     // Lets the mobile route dismiss the Quick Actions sheet the slide was
     // created from, so it does not stay stacked over the editor.
     if (props.mobile) emit("slide-created")
@@ -762,7 +764,36 @@ const duplicatePreviewSlide = (slide: Slide) => {
   const newSlide = duplicateSlide(slide)
   if (!newSlide) return
 
-  makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+  // The copy goes straight after its source, or after the source's whole pair,
+  // and the schedule is renumbered there and then. It used to be appended
+  // carrying the source's index, so it sat at the end of the grid until the
+  // next refresh sorted by index and pulled it back beside the source.
+  const anchorIds = appStore.pairForSlide(slide.id)?.slideIds ?? [slide.id]
+  const scheduleSlides = [...slides.value]
+  const at =
+    Math.max(
+      ...anchorIds.map((id) => scheduleSlides.findIndex((s) => s.id === id))
+    ) + 1
+  if (at === 0) {
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    uploadOfflineSlides()
+    return
+  }
+
+  newSlide.index = at
+  const anchorId = scheduleSlides[at - 1]!.id
+  const position = appStore.activeSlides.findIndex((s) => s.id === anchorId) + 1
+  const ordered = [
+    ...scheduleSlides.slice(0, at),
+    newSlide,
+    ...scheduleSlides.slice(at),
+  ].map((s, index) => (s.index === index ? s : { ...s, index }))
+  const unchanged = new Set(scheduleSlides)
+  const renumbered = ordered.filter((s) => s._id && !unchanged.has(s))
+
+  makeSlideActive(newSlide, { goLive: false, newlyCreated: true, position })
+  appStore.replaceScheduleActiveSlides(ordered)
+  if (renumbered.length && online.value) batchUpdateSlides(renumbered)
   uploadOfflineSlides()
 }
 
@@ -2340,21 +2371,45 @@ const uploadOfflineSlides = async () => {
         duplicateIds
       )
 
-      // Update the store: replace matching slides so they now carry _id
-      const currentSlides = [...appStore.activeSlides]
-      const reconciledMap = new Map(reconciledSlides.map((s) => [s.id, s]))
-      const updatedSlides = currentSlides.map((slide) =>
-        reconciledMap.has(slide.id) ? reconciledMap.get(slide.id)! : slide
+      // Only the server _id comes back from the upload. A slide edited while
+      // the request was in flight (a copy renamed straight after duplicating
+      // it) is newer than the snapshot that was sent, so the store keeps that
+      // edit and gains the _id. Writing the snapshot back reverted the grid,
+      // the schedule and, through the selection watcher, the editor, and the
+      // edit was never saved because it was made before the slide had an _id.
+      const currentById = new Map(
+        appStore.activeSlides.map((slide) => [slide.id, slide] as const)
       )
-      appStore.setActiveSlides(updatedSlides)
+      const editedDuringUpload: Slide[] = []
+      const savedSlides = reconciledSlides.map((reconciled) => {
+        const current = currentById.get(reconciled.id)
+        const sent = offlineSlides.find((slide) => slide.id === reconciled.id)
+        if (!current || !reconciled._id || current.updatedAt === sent?.updatedAt) {
+          return reconciled
+        }
+        const merged = { ...current, _id: reconciled._id }
+        editedDuringUpload.push(merged)
+        return merged
+      })
+      const savedById = new Map(savedSlides.map((s) => [s.id, s]))
+      appStore.setActiveSlides(
+        appStore.activeSlides.map((slide) => savedById.get(slide.id) ?? slide)
+      )
       enqueueSlideShadowWrite("reconcile uploaded slides", (repository) =>
-        repository.putSlides(reconciledSlides, { syncState: "synced" })
+        repository.putSlides(
+          savedSlides.filter((slide) => !editedDuringUpload.includes(slide)),
+          { syncState: "synced" }
+        )
       )
+      editedDuringUpload.forEach((slide) => {
+        enqueueCoalescedSlideShadowPut(slide, { syncState: "pending" })
+        persistSlideOnline(slide, true)
+      })
 
       // Broadcast newly created slides via WebSocket after successful upload
       if (inserted.length > 0) {
         broadcastSlideUpdate("batch-create-slides", {
-          slides: reconciledSlides,
+          slides: savedSlides,
         })
       }
     }
