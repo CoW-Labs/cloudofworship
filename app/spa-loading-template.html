@@ -4,12 +4,11 @@
     --boot-bg: #ffffff;
     --boot-fg: #131724;
     --boot-track: #e6e8ef;
-    /* The two tones swap between themes: on dark the mark is white and the
-       cross carries the brand purple; on light the mark is purple and the
-       cross takes the progress bar's unfilled track colour, so it reads as a
-       near-white cross cut into the mark. */
+    /* On light the mark is purple, on dark it is white. The cross is a hole
+       through to the page background either way, with the brand purple glow
+       behind it. */
     --boot-logo: #a855f7;
-    --boot-cross: var(--boot-track);
+    --boot-glow-strength: 0.28;
   }
 
   html,
@@ -35,81 +34,67 @@
   }
 
   /*
-   * The cross lives in the mark's negative space: a stem in the gap between
-   * the two halves, and a bar in the gap beneath the caps. It draws itself
-   * first, then the four pieces slide in on top and mask it down to exactly
-   * that gap, so the cross glows through the finished logo.
-   *
-   * The glow is a separate, statically blurred copy whose opacity animates —
-   * the blur radius never changes, so it rasterises once rather than
-   * repainting every frame.
+   * The mark starts as one whole cloud. A cut draws down and across it, then
+   * widens past the gaps between the four pieces, so what is left is the logo
+   * with the cross showing the background through it. The cut is stroked in
+   * the page background and clipped to the cloud's outline, so every end of
+   * the cross finishes on the cloud's edge. Its final width (13) is the gap
+   * plus a corner radius on each side, which uncovers the rounded corners of
+   * the pieces underneath.
    *
    * CoWSplashLogo.vue replays this same sequence once Nuxt mounts, picking up
    * from window.__cowBootAt so the handoff between the two boot screens is
-   * seamless instead of restarting the draw.
+   * seamless instead of restarting the cut.
    */
   .mark {
     display: block;
     width: 76px;
     height: auto;
-    /* let the cross glow bleed past the viewBox */
+    /* let the glow bleed past the viewBox */
     overflow: visible;
     color: var(--boot-logo);
   }
 
-  .mark .cross,
-  .mark .cross-glow {
-    stroke: var(--boot-cross);
+  .mark .glow-stop {
+    stop-color: #a855f7;
+    stop-opacity: var(--boot-glow-strength);
+  }
+
+  .mark .glow-edge {
+    stop-opacity: 0;
+  }
+
+  /* fade the cloud as one layer, so the pieces never show through it */
+  .mark .cloud {
+    opacity: 0;
+    animation: cloud-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .mark .cut {
+    stroke: var(--boot-bg);
     stroke-linecap: butt;
   }
 
-  /* stroke widths match the gaps in the mark exactly */
   .mark .stem {
-    stroke-width: 3.647;
-    stroke-dasharray: 45;
-    stroke-dashoffset: 45;
-    animation: cross-draw 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    stroke-width: 0.7;
+    stroke-dasharray: 50;
+    stroke-dashoffset: 50;
+    animation: cut-draw 0.4s cubic-bezier(0.5, 0, 0.2, 1) 0.35s forwards,
+      cut-open 0.6s cubic-bezier(0.3, 0, 0.2, 1) 0.85s forwards;
   }
 
   .mark .arm {
-    stroke-width: 3.679;
-    stroke-dasharray: 13;
-    stroke-dashoffset: 13;
-    animation: cross-draw 0.28s cubic-bezier(0.4, 0, 0.2, 1) 0.26s forwards;
+    stroke-width: 0.7;
+    stroke-dasharray: 23;
+    stroke-dashoffset: 23;
+    animation: cut-draw 0.26s cubic-bezier(0.3, 0, 0.2, 1) 0.62s forwards,
+      cut-open 0.6s cubic-bezier(0.3, 0, 0.2, 1) 0.85s forwards;
   }
 
-  .mark .cross-glow {
+  .mark .glow {
     opacity: 0;
-    filter: blur(2px);
-    animation: glow-in 0.6s ease-out 1.05s forwards,
-      glow-pulse 2.6s ease-in-out 1.65s infinite;
-  }
-
-  .mark .piece {
-    opacity: 0;
-    transform-box: view-box;
-    transform-origin: 50% 50%;
-    animation: piece-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.48s forwards;
-  }
-
-  .mark .body-left {
-    --tx: -10px;
-  }
-
-  .mark .body-right {
-    --tx: 10px;
-  }
-
-  .mark .cap-left {
-    --tx: -7px;
-    --ty: -7px;
-    animation-delay: 0.58s;
-  }
-
-  .mark .cap-right {
-    --tx: 7px;
-    --ty: -7px;
-    animation-delay: 0.64s;
+    animation: glow-in 0.6s ease-out 1.3s forwards,
+      glow-pulse 2.6s ease-in-out 1.9s infinite;
   }
 
   .bar {
@@ -136,7 +121,7 @@
       --boot-fg: #ffffff;
       --boot-track: #222838;
       --boot-logo: #ffffff;
-      --boot-cross: #a855f7;
+      --boot-glow-strength: 0.5;
     }
   }
 
@@ -147,7 +132,7 @@
     --boot-fg: #131724;
     --boot-track: #e6e8ef;
     --boot-logo: #a855f7;
-    --boot-cross: var(--boot-track);
+    --boot-glow-strength: 0.28;
   }
 
   :root[data-boot-theme="dark"] {
@@ -155,39 +140,46 @@
     --boot-fg: #ffffff;
     --boot-track: #222838;
     --boot-logo: #ffffff;
-    --boot-cross: #a855f7;
+    --boot-glow-strength: 0.5;
   }
 
-  @keyframes cross-draw {
+  @keyframes cloud-in {
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes cut-draw {
     to {
       stroke-dashoffset: 0;
     }
   }
 
-  @keyframes piece-in {
+  @keyframes cut-open {
     0% {
-      opacity: 0;
-      transform: translate(var(--tx, 0px), var(--ty, 0px));
+      stroke-width: 0.7;
+    }
+    40% {
+      stroke-width: 3.6;
     }
     100% {
-      opacity: 1;
-      transform: translate(0px, 0px);
+      stroke-width: 13;
     }
   }
 
   @keyframes glow-in {
     to {
-      opacity: 0.55;
+      opacity: 0.7;
     }
   }
 
   @keyframes glow-pulse {
     0%,
     100% {
-      opacity: 0.55;
+      opacity: 0.7;
     }
     50% {
-      opacity: 0.9;
+      opacity: 1;
     }
   }
 
@@ -207,25 +199,26 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .mark .cloud,
     .mark .stem,
     .mark .arm,
-    .mark .cross-glow,
-    .mark .piece,
+    .mark .glow,
     .bar span {
       animation: none;
+    }
+
+    .mark .cloud {
+      opacity: 1;
     }
 
     .mark .stem,
     .mark .arm {
       stroke-dashoffset: 0;
+      stroke-width: 13;
     }
 
-    .mark .cross-glow {
-      opacity: 0.55;
-    }
-
-    .mark .piece {
-      opacity: 1;
+    .mark .glow {
+      opacity: 0.7;
     }
 
     .bar span {
@@ -251,43 +244,42 @@
 <main class="boot" aria-label="Cloud of Worship is loading">
   <svg
     class="mark"
-    viewBox="682 356.75 76 60"
+    viewBox="-5.845 3.686 74.04 58.45"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="Cloud of Worship"
   >
-    <g class="cross-glow" aria-hidden="true">
-      <line class="stem" x1="719.855" y1="363" x2="719.855" y2="407.5" />
-      <line class="arm" x1="719.855" y1="370.185" x2="707.5" y2="370.185" />
-      <line class="arm" x1="719.855" y1="370.185" x2="732.5" y2="370.185" />
-    </g>
-    <g class="cross">
-      <line class="stem" x1="719.855" y1="363" x2="719.855" y2="407.5" />
-      <line class="arm arm-left" x1="719.855" y1="370.185" x2="707.5" y2="370.185" />
-      <line class="arm arm-right" x1="719.855" y1="370.185" x2="732.5" y2="370.185" />
-    </g>
+    <defs>
+      <clipPath id="cow-boot-cloud"><path d="M47.4082 18.5693C49.8241 22.1233 51.0327 26.2379 51.0312 30.9141C54.2914 31.318 56.9967 32.8203 59.1475 35.4209C61.2982 38.0215 62.3729 41.062 62.3711 44.543C62.3711 48.329 61.1311 51.548 58.6514 54.1992C57.9809 54.916 57.2708 55.5348 56.5225 56.0576H7.83887C6.68045 55.3499 5.59165 54.4654 4.57324 53.4023C1.5265 50.2221 0.00189004 46.3349 0 41.7412C0 37.804 1.11045 34.2959 3.33105 31.2168C5.55181 28.1376 8.45784 26.1687 12.0488 25.3105C12.6857 22.8066 13.6666 20.5597 14.9902 18.5693A20.03 20.03 0 0 1 18.0391 14.9834C18.3915 14.655 18.7572 14.3365 19.1367 14.0283C22.168 11.5671 25.5449 10.1587 29.2676 9.80273A20.03 20.03 0 0 1 32.8203 9.77539C37.237 10.1148 41.0837 11.8505 44.3623 14.9834A20.03 20.03 0 0 1 47.4082 18.5693Z" /></clipPath>
+      <radialGradient id="cow-boot-glow">
+        <stop offset="0" class="glow-stop" />
+        <stop offset="1" class="glow-stop glow-edge" />
+      </radialGradient>
+    </defs>
 
-    <path
-      class="piece body-left"
-      d="M713.593 372.024C716.044 372.024 718.031 374.03 718.031 376.503V406.013C718.031 408.486 716.044 410.491 713.593 410.491H696.043C694.855 409.765 693.737 408.858 692.692 407.768C689.566 404.504 688.002 400.515 688 395.802C688 391.761 689.14 388.162 691.419 385.002C693.698 381.842 696.679 379.822 700.364 378.941C701.018 376.372 702.025 374.067 703.383 372.024H713.593Z"
-      fill="currentColor"
-    />
-    <path
-      class="piece body-right"
-      d="M736.647 372.024C739.126 375.671 740.366 379.893 740.364 384.69C743.71 385.105 746.486 386.647 748.693 389.315C750.9 391.984 752.003 395.105 752.001 398.677C752.001 402.562 750.728 405.865 748.184 408.585C747.496 409.32 746.768 409.955 746 410.491H726.116C723.665 410.491 721.678 408.486 721.678 406.013V376.503C721.678 374.03 723.665 372.024 726.116 372.024H736.647Z"
-      fill="currentColor"
-    />
-    <path
-      class="piece cap-left"
-      d="M718.031 363.866C718.031 366.34 716.044 368.345 713.593 368.345H706.512C706.873 368.008 707.247 367.68 707.637 367.364C710.747 364.839 714.212 363.395 718.031 363.029V363.866Z"
-      fill="currentColor"
-    />
-    <path
-      class="piece cap-right"
-      d="M721.678 363C726.21 363.348 730.157 365.13 733.521 368.345H726.116C723.665 368.345 721.678 366.34 721.678 363.866V363Z"
-      fill="currentColor"
-    />
+    <circle class="glow" cx="31.044" cy="24.8" r="30" fill="url(#cow-boot-glow)" />
+    <g class="cloud">
+      <path class="whole" fill="currentColor" d="M47.4082 18.5693C49.8241 22.1233 51.0327 26.2379 51.0312 30.9141C54.2914 31.318 56.9967 32.8203 59.1475 35.4209C61.2982 38.0215 62.3729 41.062 62.3711 44.543C62.3711 48.329 61.1311 51.548 58.6514 54.1992C57.9809 54.916 57.2708 55.5348 56.5225 56.0576H7.83887C6.68045 55.3499 5.59165 54.4654 4.57324 53.4023C1.5265 50.2221 0.00189004 46.3349 0 41.7412C0 37.804 1.11045 34.2959 3.33105 31.2168C5.55181 28.1376 8.45784 26.1687 12.0488 25.3105C12.6857 22.8066 13.6666 20.5597 14.9902 18.5693A20.03 20.03 0 0 1 18.0391 14.9834C18.3915 14.655 18.7572 14.3365 19.1367 14.0283C22.168 11.5671 25.5449 10.1587 29.2676 9.80273A20.03 20.03 0 0 1 32.8203 9.77539C37.237 10.1148 41.0837 11.8505 44.3623 14.9834A20.03 20.03 0 0 1 47.4082 18.5693Z" />
+      <g class="cut" clip-path="url(#cow-boot-cloud)">
+        <line class="stem" x1="31.044" y1="8" x2="31.044" y2="58" />
+        <line class="arm" x1="31.044" y1="16.776" x2="8" y2="16.776" />
+        <line class="arm" x1="31.044" y1="16.776" x2="54" y2="16.776" />
+      </g>
+      <circle
+        class="glow"
+        cx="31.044"
+        cy="24.8"
+        r="30"
+        fill="url(#cow-boot-glow)"
+        clip-path="url(#cow-boot-cloud)"
+      />
+
+      <path class="piece" fill="currentColor" d="M24.9414 18.5693C27.3305 18.5693 29.2676 20.5241 29.2676 22.9346V51.6934C29.2676 54.1038 27.3304 56.0576 24.9414 56.0576H7.83887C6.68045 55.3499 5.59165 54.4654 4.57324 53.4023C1.5265 50.2221 0.00189004 46.3349 0 41.7412C9.03507e-05 37.804 1.11045 34.2959 3.33105 31.2168C5.55181 28.1376 8.45784 26.1687 12.0488 25.3105C12.6857 22.8066 13.6666 20.5597 14.9902 18.5693H24.9414Z" />
+      <path class="piece" fill="currentColor" d="M47.4082 18.5693C49.8241 22.1233 51.0327 26.2379 51.0312 30.9141C54.2914 31.318 56.9967 32.8203 59.1475 35.4209C61.2982 38.0215 62.3729 41.062 62.3711 44.543C62.3711 48.329 61.1311 51.548 58.6514 54.1992C57.9809 54.916 57.2708 55.5348 56.5225 56.0576H37.1465C34.7575 56.0576 32.8203 54.1038 32.8203 51.6934V22.9346C32.8203 20.5241 34.7575 18.5694 37.1465 18.5693H47.4082Z" />
+      <path class="piece" fill="currentColor" d="M29.2676 10.6191C29.2676 13.0296 27.3305 14.9834 24.9414 14.9834H18.0391C18.3915 14.655 18.7572 14.3365 19.1367 14.0283C22.168 11.5671 25.5449 10.1587 29.2676 9.80273V10.6191Z" />
+      <path class="piece" fill="currentColor" d="M32.8203 9.77539C37.237 10.1148 41.0837 11.8505 44.3623 14.9834H37.1465C34.7575 14.9834 32.8203 13.0296 32.8203 10.6191V9.77539Z" />
+    </g>
   </svg>
 
   <div class="bar" aria-hidden="true"><span></span></div>
