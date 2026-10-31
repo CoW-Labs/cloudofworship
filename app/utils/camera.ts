@@ -8,6 +8,8 @@ export const defaultCameraData = (): CameraSettings => ({
   deviceLabel: "",
   fit: "cover",
   mirror: false,
+  effect: "none",
+  echoDirection: "right",
 })
 
 export const cameraSlideName = (data?: Pick<CameraSlideData, "deviceLabel">) => {

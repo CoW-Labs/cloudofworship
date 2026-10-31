@@ -288,7 +288,18 @@ export interface CameraSlideData {
   deviceLabel: string
   fit: "cover" | "contain"
   mirror: boolean
+  /** A look drawn over the feed. Absent on slides made before effects. */
+  effect?: CameraEffect
+  /** Which side of the screen the echo trails toward. */
+  echoDirection?: "left" | "right"
 }
+
+/**
+ * `echo` repeats the picture in fading copies to one side, with a red/cyan
+ * fringe, the stage-concert look. Copies are blended "lighten", so they show
+ * over dark backgrounds and vanish over bright ones.
+ */
+export type CameraEffect = "none" | "echo"
 
 /**
  * What the stage display's clock is doing: counting up for the service, or
