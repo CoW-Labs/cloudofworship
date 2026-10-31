@@ -343,6 +343,20 @@ export interface QuickAction {
   // The payload only fills in the panel this action opens (a search query, a
   // song title), so picking it is the preview step, not the commit step.
   opensPanel?: boolean
+  // ISO date the action shipped. It carries a "NEW" badge for a while after.
+  newSince?: string
+  // Shown once, the first time a new action is opened.
+  intro?: QuickActionIntro
+}
+
+export interface QuickActionIntro {
+  title: string
+  description: string
+  points?: { title: string; body: string }[]
+  cta?: string
+  // Key of the looping hero animation in INTRO_ANIMATIONS
+  // (app/utils/introAnimations.ts).
+  animation?: string
 }
 
 export interface Scripture {

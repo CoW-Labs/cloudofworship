@@ -13,7 +13,7 @@
   >
     <!-- Mirrors the onboarding tour's welcome card (OnboardingTour.vue). -->
     <div
-      class="rounded-2xl bg-white dark:bg-[#1b2233] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.35)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.6)]"
+      class="overflow-hidden rounded-2xl bg-white dark:bg-[#1b2233] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.35)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.6)]"
     >
       <div class="flex items-center justify-between gap-4 pt-3.5 pb-3 pl-5 pr-4">
         <span
@@ -30,41 +30,68 @@
         </button>
       </div>
 
-      <div
-        class="mx-3 mb-3 p-6 rounded-[14px] bg-[#f1f3f6] dark:bg-[#232b3d] max-h-[72vh] overflow-y-auto"
-      >
-        <!-- Hero media -->
-        <video
-          v-if="heroVideo"
-          class="block w-full aspect-video object-cover rounded-[10px] mb-5 bg-black"
-          :src="heroVideo"
-          autoplay
-          loop
-          muted
-          playsinline
-        />
-        <img
-          v-else-if="heroImage"
-          class="block w-full aspect-video object-cover rounded-[10px] mb-5 bg-black"
-          :src="heroImage"
-          :alt="title"
-        />
-
-        <h2
-          class="text-[30px] font-bold leading-[1.2] tracking-[-0.01em] text-slate-900 dark:text-white"
+      <!-- Hero and body scroll together, so a tall intro never hides the CTA
+      behind the hero. -->
+      <div class="max-h-[80vh] overflow-y-auto">
+        <!-- The `hero` slot (an animated illustration) runs the full width of
+        the modal, outside the padded body. It is a picture, not a control:
+        nothing in it takes the pointer or can be selected. -->
+        <div
+          v-if="$slots.hero"
+          class="pointer-events-none select-none"
+          inert
         >
-          {{ title }}
-        </h2>
-
-        <!-- Content slot for custom body -->
-        <div class="mt-3 text-[15px] leading-[1.55] text-gray-600 dark:text-[#cfd5e1]">
-          <slot>
-            <p>{{ description }}</p>
-          </slot>
+          <slot name="hero" />
         </div>
 
-        <div class="flex flex-wrap items-center justify-end gap-3 mt-7">
-          <CowButton @click="dismiss">{{ cta }}</CowButton>
+        <div
+          class="mx-3 mb-3 p-6 rounded-[14px] bg-[#f1f3f6] dark:bg-[#232b3d]"
+          :class="{ 'mt-3': $slots.hero }"
+        >
+          <video
+            v-if="heroVideo"
+            class="block w-full aspect-video object-cover rounded-[10px] mb-5 bg-black"
+            :src="heroVideo"
+            autoplay
+            loop
+            muted
+            playsinline
+          />
+          <img
+            v-else-if="heroImage"
+            class="block w-full aspect-video object-cover rounded-[10px] mb-5 bg-black"
+            :src="heroImage"
+            :alt="title"
+          />
+
+          <h2
+            class="text-[30px] font-bold leading-[1.2] tracking-[-0.01em] text-slate-900 dark:text-white"
+          >
+            {{ title }}
+          </h2>
+
+          <!-- Content slot for custom body -->
+          <div class="mt-3 text-[15px] leading-[1.55] text-gray-600 dark:text-[#cfd5e1]">
+            <slot>
+              <div class="flex flex-col gap-3 text-sm leading-relaxed">
+                <p>{{ description }}</p>
+                <div
+                  v-for="point in points"
+                  :key="point.title"
+                  class="bg-white dark:bg-[#1b2233] rounded-2xl p-3"
+                >
+                  <p class="font-semibold text-gray-900 dark:text-white mb-1">
+                    {{ point.title }}
+                  </p>
+                  <p>{{ point.body }}</p>
+                </div>
+              </div>
+            </slot>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-end gap-3 mt-7">
+            <CowButton @click="handleCta">{{ cta }}</CowButton>
+          </div>
         </div>
       </div>
     </div>
@@ -74,14 +101,14 @@
 <script setup lang="ts">
 import CloseIcon from "~/components/svgs/CloseIcon.vue"
 
-const STORAGE_KEY = "cow_seen_feature_intros"
-
 const props = withDefaults(
   defineProps<{
     featureKey: string
     title: string
     eyebrow?: string
     description?: string
+    // Short cards under the description: a step or a rule each.
+    points?: { title: string; body: string }[]
     heroImage?: string
     heroVideo?: string
     cta?: string
@@ -89,47 +116,26 @@ const props = withDefaults(
   {
     eyebrow: "New feature",
     description: "",
+    points: () => [],
     heroImage: "",
     heroVideo: "",
     cta: "Got it",
   }
 )
 
+const emit = defineEmits<{
+  // The CTA was pressed, as opposed to closing with the X.
+  cta: []
+}>()
+
 const visible = ref(false)
 
-/**
- * Read already-seen feature keys from localStorage.
- */
-const getSeenFeatures = (): string[] => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-/**
- * Persist a feature key as seen.
- */
-const markAsSeen = (key: string) => {
-  const seen = getSeenFeatures()
-  if (!seen.includes(key)) {
-    seen.push(key)
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(seen))
-    } catch {
-      // Ignore storage failures (e.g. private mode, quota, SecurityError).
-    }
-  }
-}
+const { hasSeen, markSeen } = useFeatureIntros()
 
 /**
  * Check if this feature has already been introduced.
  */
-const hasBeenSeen = (): boolean => {
-  return getSeenFeatures().includes(props.featureKey)
-}
+const hasBeenSeen = (): boolean => hasSeen(props.featureKey)
 
 /**
  * Show the modal (if the feature hasn't been seen yet).
@@ -142,11 +148,19 @@ const show = (): boolean => {
 }
 
 /**
- * Dismiss and persist.
+ * Dismiss. However it closes (X, CTA, Escape, the overlay), it has been seen.
  */
 const dismiss = () => {
   visible.value = false
-  markAsSeen(props.featureKey)
+}
+
+watch(visible, (open) => {
+  if (!open) markSeen(props.featureKey)
+})
+
+const handleCta = () => {
+  dismiss()
+  emit("cta")
 }
 
 defineExpose({ show, hasBeenSeen })

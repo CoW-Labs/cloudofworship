@@ -266,6 +266,23 @@ export const quickActionsArr: QuickAction[] = [
     meta: "interlude intermission break pause animated background welcome coffee fellowship selah we'll be right back",
     type: slideTypes.interlude,
     tier: "teams",
+    newSince: "2026-09-29",
+    intro: {
+      title: "Interludes",
+      animation: "interlude",
+      description:
+        "An animated break screen for a welcome, offering or pause.",
+      points: [
+        {
+          title: "Pick a style",
+          body: "Choose one of the animated designs.",
+        },
+        {
+          title: "Add your words",
+          body: "Type a heading and sub text, then go live.",
+        },
+      ],
+    },
   },
   {
     icon: "i-bx-video",
@@ -275,6 +292,23 @@ export const quickActionsArr: QuickAction[] = [
     meta: "camera webcam imag capture card live video feed preacher",
     type: slideTypes.camera,
     featureFlag: 'camera-slide',
+    newSince: "2026-10-20",
+    intro: {
+      title: "Camera slides",
+      animation: "camera",
+      description:
+        "Show a webcam or capture card on the screen.",
+      points: [
+        {
+          title: "Choose your camera",
+          body: "Any camera connected to this computer works.",
+        },
+        {
+          title: "Plays on the live screen",
+          body: "Your schedule shows a \"Camera is live\" card.",
+        },
+      ],
+    },
   },
   {
     icon: "i-mdi-youtube",

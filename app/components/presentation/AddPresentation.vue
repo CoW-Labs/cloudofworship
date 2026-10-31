@@ -146,44 +146,12 @@
           : 'presentation-import-pdf'
       "
       title="Import Slides"
+      :description="intro.description"
+      :points="intro.points"
     >
-      <div
-        class="flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed"
-      >
-        <p v-if="fileType === 'pdf'">
-          Import PDF files directly into Cloud of Worship. Each page becomes an
-          image slide you can present right away, no uploads required, processed
-          instantly on your device.
-        </p>
-        <p v-else>
-          Import PowerPoint files directly into Cloud of Worship. Each slide
-          becomes an image you can present right away.
-        </p>
-
-        <div
-          v-if="fileType === 'pdf'"
-          class="bg-white dark:bg-[#1b2233] rounded-2xl p-3"
-        >
-          <p class="font-semibold text-gray-900 dark:text-white mb-1">
-            Works with any presentation app
-          </p>
-          <p>
-            You can export as PDF from
-            <span class="font-semibold">Canva, PowerPoint, Google Slides</span>,
-            and most other presentation apps.
-          </p>
-        </div>
-
-        <div v-else class="bg-white dark:bg-[#1b2233] rounded-2xl p-3">
-          <p class="font-semibold text-gray-900 dark:text-white mb-1">
-            Best results with .pptx
-          </p>
-          <p>
-            Save your file as <span class="font-semibold">.pptx</span> from
-            PowerPoint or Google Slides for the smoothest import experience.
-          </p>
-        </div>
-      </div>
+      <template v-if="fileType === 'pdf'" #hero>
+        <PdfImportIntroAnimation />
+      </template>
     </FeatureIntroductionModal>
   </div>
 </template>
@@ -216,6 +184,29 @@ const featureIntroModal = ref<{
 } | null>(null)
 
 const isPptEnabled = computed(() => checkFlag("ppt-conversion"))
+
+const intro = computed(() =>
+  props.fileType === "pdf"
+    ? {
+        description: "Turn a PDF into slides, one per page.",
+        points: [
+          {
+            title: "Works with any app",
+            body: "Export as PDF from Canva, PowerPoint or Google Slides.",
+          },
+          {
+            title: "Open it again",
+            body: "Recent Slides keeps the decks you import.",
+          },
+        ],
+      }
+    : {
+        description: "Turn a PowerPoint file into slides.",
+        points: [
+          { title: "Use .pptx", body: "Save as .pptx for the best results." },
+        ],
+      }
+)
 
 const acceptedFileTypes = computed(() => {
   if (props.fileType === "ppt" && isPptEnabled.value) {
