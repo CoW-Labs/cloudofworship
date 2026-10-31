@@ -753,3 +753,18 @@ export const useLiveOutputControl = () => {
  */
 export const useLocalOutputPresence = () =>
   useState<boolean>("live-output-window-present", () => false)
+
+/**
+ * Whether what this window shows is actually reaching a screen: it owns a live
+ * output window, or (on a phone) it drives another device's. Read from the
+ * shared state rather than through useLiveOutputControl, so the LIVE pill can
+ * ask cheaply from every schedule row.
+ */
+export const useOutputOnAir = () => {
+  const hasLocalOutput = useLocalOutputPresence()
+  const targetHostId = useState<string | null>(
+    "live-output-target-host",
+    () => null
+  )
+  return computed(() => hasLocalOutput.value || !!targetHostId.value)
+}

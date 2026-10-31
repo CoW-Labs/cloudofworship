@@ -18,7 +18,7 @@ import { livePairChanged } from "~/utils/slidePairs"
 interface RealtimeSlidesOptions {
   onSlideCreated?: (slide: Slide, createdByName: string) => void
   onSlideUpdated?: (slide: Slide, updatedByName: string) => void
-  onSlideDeleted?: (slideId: string, deletedByName: string) => void
+  onSlideDeleted?: (slide: Slide, deletedByName: string) => void
   onBatchSlidesCreated?: (slides: Slide[], createdByName: string) => void
   onBatchSlidesUpdated?: (slides: Slide[], updatedByName: string) => void
   onBatchSlidesDeleted?: (slideIds: string[], deletedByName: string) => void
@@ -209,7 +209,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             clearLiveSlideIfDeleted(slideToRemove)
             clearOverlaySlideIfDeleted(slideToRemove)
             appStore.removeActiveSlide(slideToRemove)
-            options.onSlideDeleted?.(slideId, data.deletedByName)
+            options.onSlideDeleted?.(slideToRemove, data.deletedByName)
           }
         }
         break

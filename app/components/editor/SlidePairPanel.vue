@@ -10,64 +10,29 @@
       <h4 class="text-xs font-semibold text-gray-700 dark:text-[#c3cad6]">
         Choose slide to edit
       </h4>
-      <!-- Each card: the eye takes that slide off the screen (or puts it
-           back), the rest of the card opens it in the editor. Two buttons side
-           by side rather than one inside the other. -->
+      <!-- Showing or hiding a member is on the editor toolbar
+           (SlidePairVisibility); a hidden member is dimmed here. -->
       <div class="grid grid-cols-2 gap-2">
-        <div
-          v-for="member in members"
+        <button
+          v-for="(member, index) in members"
           :key="member.id"
-          class="min-w-0 rounded-xl flex items-center transition-shadow bg-white dark:bg-[#131a27]"
+          type="button"
+          class="min-w-0 rounded-xl px-3 py-2.5 text-left transition-shadow bg-white dark:bg-[#131a27]"
           :class="optionRing(editingMemberId === member.id)"
+          @click="
+            useGlobalEmit(appWideActions.setPairActiveMember, {
+              pairId: pair.id,
+              slideId: member.id,
+            })
+          "
         >
-          <CowTooltip
-            :text="
-              isHidden(member)
-                ? 'Show on screen'
-                : 'Hide from screen; the other slide fills it'
-            "
-          >
-            <button
-              type="button"
-              class="ml-1.5 p-1.5 shrink-0 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-white/10"
-              :class="
-                isHidden(member)
-                  ? 'text-gray-400 dark:text-[#6f7889]'
-                  : 'text-gray-700 dark:text-[#d5dae3] hover:text-gray-900 dark:hover:text-white'
-              "
-              :aria-label="
-                isHidden(member)
-                  ? `Show ${member.name} on screen`
-                  : `Hide ${member.name} from screen`
-              "
-              :aria-pressed="isHidden(member)"
-              @click="toggleHidden(pair.id, member.id)"
-            >
-              <EyeIcon :off="isHidden(member)" class="w-5 h-5" />
-            </button>
-          </CowTooltip>
           <span
-            class="w-px h-5 mx-1.5 shrink-0 bg-gray-200 dark:bg-white/10"
-            aria-hidden="true"
-          />
-          <button
-            type="button"
-            class="flex-1 min-w-0 pr-3 py-2.5 text-left"
-            @click="
-              useGlobalEmit(appWideActions.setPairActiveMember, {
-                pairId: pair.id,
-                slideId: member.id,
-              })
-            "
+            class="block text-sm font-medium truncate"
+            :class="{ 'opacity-50': isHidden(member) }"
           >
-            <span
-              class="block text-sm font-medium truncate"
-              :class="{ 'opacity-50': isHidden(member) }"
-            >
-              {{ member.name }}
-            </span>
-          </button>
-        </div>
+            {{ index + 1 }}. {{ member.name }}
+          </span>
+        </button>
       </div>
       <!-- The camera always takes the camera's place. Two cameras follow
            pair order, which this flips. -->
@@ -143,7 +108,7 @@ const props = defineProps<{ pairId: string }>()
 
 const appStore = useAppStore()
 const { hasAccessToFeature } = useSubscription()
-const { updatePair, swapPair, toggleHidden } = useSlidePairs()
+const { updatePair, swapPair } = useSlidePairs()
 
 // One member at most is off the screen; see useSlidePairs.toggleHidden.
 const isHidden = (member: Slide) => pair.value?.hiddenSlideId === member.id

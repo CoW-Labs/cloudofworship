@@ -44,7 +44,8 @@ export const appWideActions = {
   songUpdated: 'song-updated',
   addSongSlideToSetlist: 'add-song-slide-to-setlist',
   // Slide pairs: two slides on the live screen at once. `slidePair` is the
-  // tier key (see useSubscription); the rest are emitter events.
+  // tier key (see useSubscription) and the "Create Slide Pair" quick action;
+  // the rest are emitter events.
   slidePair: 'slide-pair',
   pairSlides: 'pair-slides',
   unpairSlides: 'unpair-slides',
@@ -266,6 +267,23 @@ export const quickActionsArr: QuickAction[] = [
     meta: "interlude intermission break pause animated background welcome coffee fellowship selah we'll be right back",
     type: slideTypes.interlude,
     tier: "teams",
+    newSince: "2026-09-29",
+    intro: {
+      title: "Interludes",
+      animation: "interlude",
+      description:
+        "An animated break screen for a welcome, offering or pause.",
+      points: [
+        {
+          title: "Pick a style",
+          body: "Choose one of the animated designs.",
+        },
+        {
+          title: "Add your words",
+          body: "Type a heading and sub text, then go live.",
+        },
+      ],
+    },
   },
   {
     icon: "i-bx-video",
@@ -275,6 +293,50 @@ export const quickActionsArr: QuickAction[] = [
     meta: "camera webcam imag capture card live video feed preacher",
     type: slideTypes.camera,
     featureFlag: 'camera-slide',
+    newSince: "2026-10-20",
+    intro: {
+      title: "Camera slides",
+      animation: "camera",
+      description:
+        "Show a webcam or capture card on the screen.",
+      points: [
+        {
+          title: "Choose your camera",
+          body: "Any camera connected to this computer works.",
+        },
+        {
+          title: "Plays on the live screen",
+          body: "Your schedule shows a \"Camera is live\" card.",
+        },
+      ],
+    },
+  },
+  {
+    icon: "i-tabler-layout-columns",
+    name: "Create Slide Pair",
+    desc: "Show a camera and another slide on screen together",
+    action: appWideActions.slidePair,
+    meta: "pair slide pair split screen side by side picture in picture pip lower third caption two slides both camera preacher scripture lyrics overlay combine layout dual multi view",
+    type: slideTypes.camera,
+    featureFlag: 'camera-slide',
+    tier: "teams",
+    newSince: "2026-10-31",
+    intro: {
+      title: "Slide pairs",
+      animation: "slide-pair",
+      description:
+        "Show a camera and another slide on screen together.",
+      points: [
+        {
+          title: "Start with a camera",
+          body: "Pair it with a verse, lyrics or another camera.",
+        },
+        {
+          title: "Pick a layout",
+          body: "Side by side, picture in picture, caption or lower third.",
+        },
+      ],
+    },
   },
   {
     icon: "i-mdi-youtube",

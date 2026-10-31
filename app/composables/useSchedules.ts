@@ -94,12 +94,10 @@ export default function useSchedules() {
         appStore.currentState.schedules
       )
 
-      // Sort by updated date
-      mergedSchedules?.sort((a, b) => {
-        const dateA = new Date(a?.updatedAt || a?.createdAt || 0)
-        const dateB = new Date(b?.updatedAt || b?.createdAt || 0)
-        return dateB?.getTime() - dateA?.getTime()
-      })
+      // Most recently worked on first
+      mergedSchedules?.sort(
+        (a, b) => (scheduleActivityTime(b) || 0) - (scheduleActivityTime(a) || 0)
+      )
 
       // Sort by sync status (unsynced first)
       mergedSchedules?.sort((a, b) => {

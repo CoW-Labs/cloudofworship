@@ -62,9 +62,15 @@
         </h4>
         <h4
           v-else
-          class="font-medium text-sm text-gray-800 dark:text-[#a7afbd] truncate"
+          class="flex items-center gap-1.5 font-medium text-sm text-gray-800 dark:text-[#a7afbd]"
         >
-          {{ action?.name || "" }}
+          <span class="truncate">{{ action?.name || "" }}</span>
+          <span
+            v-if="showNewBadge"
+            class="shrink-0 text-[9px] font-bold leading-none tracking-wide bg-primary-500 text-white rounded px-1.5 py-[3px]"
+          >
+            NEW
+          </span>
         </h4>
         <p
           v-if="!compact || showSubtext || matchedLine"
@@ -514,13 +520,24 @@ const showTeamsBadge = computed(() => {
   )
 })
 
-const handleActionClick = () => {
-  const actionName = props.action?.action || ""
+// Recently shipped actions carry a "NEW" badge (see `newSince`).
+const { isActionNew, introduceThen } = useFeatureIntros()
+const showNewBadge = computed(
+  () => !isActionDisabled.value && isActionNew(props.action)
+)
 
+const handleActionClick = () => {
   // Check if action is disabled due to feature flag or unreleased status
   if (isActionDisabled.value) {
     return
   }
+
+  // A new action introduces itself first; trying it carries on from here.
+  introduceThen(props.action, runAction)
+}
+
+const runAction = () => {
+  const actionName = props.action?.action || ""
 
   // Teams features with a panel open for a free church to try; the upgrade
   // modal waits for the step that delivers them. A card that carries its own

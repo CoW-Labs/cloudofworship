@@ -24,6 +24,10 @@ export default defineNuxtRouteMiddleware((to, from) => {
   const hasSession = Boolean(token || authStore.user?._id)
 
   if (!hasSession && !isPublicPath && !isAuthPath && to.path !== "/verify") {
+    // /login drops the query, so a schedule link is held until sign-in ends on "/".
+    if (to.path === "/" && isScheduleId(to.query.schedule)) {
+      rememberScheduleLink(to.query.schedule)
+    }
     return navigateTo('/login')
   }
 

@@ -112,6 +112,7 @@
                 }"
                 @delete="deleteSchedule($event)"
                 @duplicate="duplicateSchedule($event)"
+                @copy-link="copyScheduleLink"
                 @rename="renameSchedule"
               />
             </div>
@@ -145,6 +146,7 @@ const props = defineProps<{
 const visible = ref<boolean>(props.visible)
 const toast = useToast()
 const copied = ref<boolean>(false)
+const { copyScheduleLink } = useScheduleLink()
 
 // Key of the template currently being created ('blank' or a preset key), used to
 // show a per-tile loading state and block concurrent creations.
