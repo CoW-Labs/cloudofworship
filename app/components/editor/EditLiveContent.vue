@@ -212,6 +212,7 @@
                 :bibleVersionInherited="selectedBibleVersion"
                 @change="onUpdateBibleVersion($event)"
               />
+              <SlidePairVisibility v-if="slidePair" :pair-id="slidePair.id" />
               <!-- TABS: Scripture / Background / Layout -->
               <div class="tabs flex items-center gap-1 shrink-0">
                 <template v-for="(tab, i) in visibleTabs" :key="tab.key">
@@ -232,9 +233,7 @@
                         : tab.key === 'camera'
                         ? cameraPopoverSize.width
                         : tab.key === 'pair'
-                        ? pairPopoverSize.width
-                        : tab.key === 'pairBackground'
-                        ? pairBackgroundPopoverSize.width
+                        ? pairSectionSize.width
                         : layoutPopoverSize.width
                     "
                     :max-height="
@@ -247,9 +246,7 @@
                         : tab.key === 'camera'
                         ? cameraPopoverSize.height
                         : tab.key === 'pair'
-                        ? pairPopoverSize.height
-                        : tab.key === 'pairBackground'
-                        ? pairBackgroundPopoverSize.height
+                        ? pairSectionSize.height
                         : layoutPopoverSize.height
                     "
                     :boundary-overflow="120"
@@ -300,25 +297,37 @@
                           @resize="interludePopoverSize = $event"
                           @close="activePanel = null"
                         />
-                        <!-- The pair's own backdrop. Writes to the pair only;
-                             the Background tab still edits this slide's. -->
-                        <SlideBackgroundPanel
-                          v-else-if="tab.key === 'pairBackground' && slidePair"
-                          :slide="pairBackgroundSlide"
-                          @select="onSelectPairBackground"
-                          @upload-files="onPairBackgroundUpload"
-                          @resize="pairBackgroundPopoverSize = $event"
-                          @close="activePanel = null"
-                        />
                         <div
                           v-else-if="tab.key === 'pair' && slidePair"
-                          class="h-full overflow-y-auto p-3"
+                          class="h-full flex flex-col"
                         >
                           <div
-                            :ref="(el: any) => (pairPanelContent = el ?? null)"
+                            class="shrink-0 px-3 pt-3"
+                            :style="{ height: `${PAIR_TABS_HEIGHT}px` }"
                           >
-                            <SlidePairPanel :pair-id="slidePair.id" />
+                            <UTabs v-model="pairSection" :items="pairSections" />
                           </div>
+                          <div
+                            v-if="pairSection === 0"
+                            class="flex-1 min-h-0 overflow-y-auto px-3 pb-3 pt-5"
+                          >
+                            <div
+                              :ref="(el: any) => (pairPanelContent = el ?? null)"
+                            >
+                              <SlidePairPanel :pair-id="slidePair.id" />
+                            </div>
+                          </div>
+                          <!-- The pair's own backdrop. Writes to the pair only;
+                               the Background tab still edits this slide's. -->
+                          <SlideBackgroundPanel
+                            v-else
+                            class="flex-1 min-h-0 mt-4"
+                            :slide="pairBackgroundSlide"
+                            @select="onSelectPairBackground"
+                            @upload-files="onPairBackgroundUpload"
+                            @resize="pairBackgroundPopoverSize = $event"
+                            @close="activePanel = null"
+                          />
                         </div>
                         <div
                           v-else-if="tab.key === 'camera'"
@@ -802,7 +811,6 @@ type PanelKey =
   | "interlude"
   | "camera"
   | "pair"
-  | "pairBackground"
 type PopoverSize = { width: number; height: number }
 const activePanel = ref<PanelKey | null>(null)
 const getInitialBackgroundPopoverSize = (): PopoverSize =>
@@ -822,7 +830,8 @@ const pairPopoverSize = ref<PopoverSize>({ width: 380, height: 360 })
 const pairPanelContent = ref<HTMLElement | null>(null)
 useResizeObserver(pairPanelContent, ([entry]) => {
   const height = entry?.target.getBoundingClientRect().height
-  if (height) pairPopoverSize.value = { width: 380, height: Math.ceil(height) + 24 }
+  // Plus the pt-5 / pb-3 padding under the section switch.
+  if (height) pairPopoverSize.value = { width: 380, height: Math.ceil(height) + 32 }
 })
 
 // The slide pair this slide is in. Its tab switches member, layout and sound;
@@ -877,6 +886,26 @@ const onSelectPairBackground = (
 // A new upload is saved against a slide (its local copy and cloud upload are
 // keyed to one), so it goes through a slide's Background tab first and is then
 // pickable here from the library.
+// Pair settings holds both: Layout (SlidePairPanel) and Pair background, behind
+// a tab switch. The popover takes the open section's size plus the switch.
+const PAIR_TABS_HEIGHT = 52
+const pairSections = [{ label: "Layout" }, { label: "Pair background" }]
+const pairSection = ref(0)
+watch(
+  () => slidePair.value?.id,
+  () => (pairSection.value = 0)
+)
+const pairSectionSize = computed<PopoverSize>(() => {
+  // The background section sits mt-4 below the switch.
+  const size =
+    pairSection.value === 0
+      ? pairPopoverSize.value
+      : {
+          width: pairBackgroundPopoverSize.value.width,
+          height: pairBackgroundPopoverSize.value.height + 16,
+        }
+  return { width: size.width, height: size.height + PAIR_TABS_HEIGHT }
+})
 const onPairBackgroundUpload = () => {
   useToast().add({
     icon: "i-bx-info-circle",
@@ -967,12 +996,7 @@ const visibleTabs = computed(() => {
     tabs.push({
       key: "pair",
       label: "Pair settings",
-      hint: "Switch slide and layout for this slide pair",
-    })
-    tabs.push({
-      key: "pairBackground",
-      label: "Pair background",
-      hint: "What background is underneath both slides",
+      hint: "Switch slide, layout and background for this slide pair",
     })
   }
   if (isInterlude)
