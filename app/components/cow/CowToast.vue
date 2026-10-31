@@ -333,6 +333,18 @@ onBeforeUnmount(() => {
 .cow-toast.is-behind :deep(.cow-toast__body) {
   opacity: 0;
 }
+/* Only that edge shows, so a tucked toast skips the blur and holds its
+   smoke still. Each blurred pane is its own pass, redone whenever what is
+   under it moves (the Live Output panel sits right there), and three stacked
+   toasts were three. Fanned out, they get both back. */
+.cow-toast.is-behind {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.cow-toast.is-behind .cow-toast__smoke::before,
+.cow-toast.is-behind .cow-toast__smoke::after {
+  animation-play-state: paused;
+}
 
 /* Tint pooling in the bottom corners, each drifting its own way, over a
    band that runs from the tint at the rim to a pale wash and then clear. */
@@ -356,7 +368,10 @@ onBeforeUnmount(() => {
 .cow-toast__smoke::after {
   content: "";
   inset: 0 -12px;
-  animation: cow-toast-smoke 7s ease-in-out infinite alternate;
+  /* One drift there and back, then still. A toast that stays up (a page
+     upload warning, the reload prompt) kept the glass redrawing every frame
+     for as long as it was open, all service on a slow connection. */
+  animation: cow-toast-smoke 7s ease-in-out 2 alternate both;
 }
 .cow-toast__smoke::before {
   background: radial-gradient(
