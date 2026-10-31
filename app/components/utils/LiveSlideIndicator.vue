@@ -3,7 +3,10 @@
     <div
       v-if="visible"
       class="live-indicator absolute top-0 right-0"
-      :class="hideText ? 'live-indicator--dot' : 'live-indicator--pill'"
+      :class="[
+        hideText ? 'live-indicator--dot' : 'live-indicator--pill',
+        { 'live-indicator--idle': !onAir },
+      ]"
     >
       <span class="live-indicator__dot"></span>
       <span v-if="!hideText" class="live-indicator__label">LIVE</span>
@@ -11,10 +14,21 @@
   </Transition>
 </template>
 <script setup lang="ts">
+import { useOutputOnAir } from "~/composables/useLiveOutputControl"
+
 defineProps({
   visible: Boolean,
   hideText: Boolean,
 })
+
+// Grey and still until the output really reaches a screen. The operator's
+// views only mark which slide would show; /live, /stage and the livestream are
+// the screen itself.
+const route = useRoute()
+const outputOnAir = useOutputOnAir()
+const onAir = computed(
+  () => !["/", "/mobile"].includes(route.path) || outputOnAir.value
+)
 </script>
 <style scoped>
 .live-indicator {
@@ -64,6 +78,19 @@ defineProps({
   border-radius: inherit;
   background: #f04438;
   animation: live-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.live-indicator--idle {
+  color: #98a2b3;
+}
+
+.live-indicator--idle .live-indicator__dot {
+  background: #98a2b3;
+}
+
+.live-indicator--idle .live-indicator__dot::after {
+  animation: none;
+  opacity: 0;
 }
 
 @keyframes live-ping {
