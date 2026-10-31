@@ -329,6 +329,17 @@ onUnmounted(() => {
   window.removeEventListener("focus", revalidateChurchPlan)
 })
 
+// Schedule links: opened from the URL during boot, or pasted into the app (the
+// desktop app has no address bar, so pasting is how a link gets in there).
+const { takeOpeningScheduleLink, resolveLinkedSchedule, onSchedulePaste } =
+  useScheduleLink()
+onMounted(() => {
+  window.addEventListener("paste", onSchedulePaste)
+})
+onUnmounted(() => {
+  window.removeEventListener("paste", onSchedulePaste)
+})
+
 watch(online, (isOnline) => {
   // Coming back from a dropout is the other moment the cached plan is most
   // likely to be out of date.
@@ -752,6 +763,24 @@ const downloadEssentialResources = async () => {
     await retrieveSchedules()
   }
 
+  // A schedule link (`/?schedule=<id>`) opens that schedule instead of the one
+  // last used on this device. The list was just fetched, so this is a lookup,
+  // and it lands before the workspace shows so the old schedule never flashes.
+  const linkedScheduleId = takeOpeningScheduleLink()
+  if (linkedScheduleId) {
+    const linkedSchedule = await resolveLinkedSchedule(linkedScheduleId, {
+      refresh: false,
+    })
+    if (linkedSchedule) {
+      appStore.setActiveSchedule(linkedSchedule)
+      usePosthogCapture("SCHEDULE_OPENED_FROM_LINK", {
+        scheduleId: linkedSchedule._id,
+        scheduleName: linkedSchedule.name,
+        source: "url",
+      })
+    }
+  }
+
   setLoadingTask("ready", "Opening your workspace.", 100)
   loadingResources.value = false
 
@@ -906,11 +935,10 @@ const retrieveSchedules = async () => {
     appStore.currentState.schedules
   )
 
-  mergedSchedules?.sort((scheduleA, scheduleB) => {
-    const dateA = new Date(scheduleA?.updatedAt)
-    const dateB = new Date(scheduleB?.updatedAt)
-    return dateB?.getTime() - dateA?.getTime()
-  })
+  mergedSchedules?.sort(
+    (scheduleA, scheduleB) =>
+      (scheduleActivityTime(scheduleB) || 0) - (scheduleActivityTime(scheduleA) || 0)
+  )
   appStore.setSchedules(mergedSchedules)
   setLoadingTask("schedules", "Schedules and slides are ready.", 100)
 }

@@ -5,7 +5,7 @@
     />
     <NuxtLayout :app-version="appVersion">
       <NuxtPage />
-      <UNotifications>
+      <CowToast>
         <template #title="{ title }">
           <img
             v-if="title === 'Still not convinced?'"
@@ -23,7 +23,7 @@
         <template #description="{ description }">
           <span class="leading-5 text-md" v-html="description" />
         </template>
-      </UNotifications>
+      </CowToast>
     </NuxtLayout>
   </div>
 </template>

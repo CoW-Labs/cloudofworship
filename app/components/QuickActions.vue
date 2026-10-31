@@ -341,6 +341,22 @@
       @close="page = ''"
     />
     <!-- </Transition> -->
+
+    <!-- One intro for whichever new action was opened first time round;
+    trying it runs the action the operator picked. -->
+    <FeatureIntroductionModal
+      ref="actionIntroModal"
+      :feature-key="actionIntro ? quickActionIntroKey(actionIntro.action) : ''"
+      :title="actionIntro?.action.intro?.title || ''"
+      :description="actionIntro?.action.intro?.description"
+      :points="actionIntro?.action.intro?.points"
+      :cta="actionIntro?.action.intro?.cta || 'Try it'"
+      @cta="actionIntro?.run()"
+    >
+      <template v-if="introAnimation" #hero>
+        <component :is="introAnimation" />
+      </template>
+    </FeatureIntroductionModal>
   </AppSection>
 </template>
 
@@ -370,10 +386,36 @@ import {
   titleHasNumber,
 } from "~/utils/quickSearch"
 import { escapePriority } from "~/composables/useEscapeKey"
+import { quickActionIntroKey } from "~/composables/useFeatureIntros"
+import { INTRO_ANIMATIONS } from "~/utils/introAnimations"
 import { useDebounceFn, useOnline } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
 const { openFeatureOrUpgrade, requireFeatureAccess } = useSubscription()
+
+// New actions (ActionCard clicks and Enter here) wait on their intro, which
+// this panel hosts for both the desktop operator view and /mobile.
+const {
+  introduceThen,
+  pendingIntro: actionIntro,
+  introHosts,
+} = useFeatureIntros()
+const actionIntroModal = ref<{ show: () => boolean } | null>(null)
+const introAnimation = computed(() => {
+  const key = actionIntro.value?.action.intro?.animation
+  return key ? INTRO_ANIMATIONS[key] : undefined
+})
+watch(actionIntro, async (intro) => {
+  if (!intro) return
+  await nextTick()
+  // Seen on another surface since the click was queued: just run it.
+  if (!actionIntroModal.value?.show()) intro.run()
+})
+onMounted(() => introHosts.value++)
+onUnmounted(() => {
+  introHosts.value--
+  actionIntro.value = null
+})
 const online = useOnline()
 // Rollout switch: the camera action is only offered while the flag is on.
 const { isEnabled: cameraSlideEnabled } = useFeatureFlags("camera-slide")
@@ -1286,8 +1328,10 @@ const handleInputKeydown = (e: KeyboardEvent) => {
           payload && !action?.opensPanel
             ? requireFeatureAccess
             : openFeatureOrUpgrade
-        if (!gate(action?.action || "")) return
-        useGlobalEmit(action?.action, payload)
+        introduceThen(action, () => {
+          if (!gate(action?.action || "")) return
+          useGlobalEmit(action?.action, payload)
+        })
       }
       break
     default:

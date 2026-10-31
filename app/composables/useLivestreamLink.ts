@@ -26,14 +26,10 @@ const useScheduleViewerLink = (options: {
 
   const url = computed(() => {
     if (typeof window === "undefined") return ""
-    const { origin } = window.location
-    // Packaged desktop origins only exist on this machine. Browser previews
-    // and localhost development retain their own web origin.
-    const isWebOrigin =
-      /^https?:\/\//.test(origin) &&
-      !/^https?:\/\/tauri\.localhost(?::\d+)?$/.test(origin)
-    const viewerOrigin = isWebOrigin ? origin : runtimeConfig.public.APP_URL
-    return `${viewerOrigin.replace(/\/+$/, "")}/${options.route}/${
+    const viewerOrigin = shareableAppOrigin(
+      runtimeConfig.public.APP_URL as string
+    )
+    return `${viewerOrigin}/${options.route}/${
       currentState.value.activeSchedule?.code ??
       currentState.value.activeSchedule?._id
     }`

@@ -1,5 +1,6 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
+import type { Slide } from "~/types"
 import { livePayloadForSlide } from "~/composables/useSlidePairs"
 
 /**
@@ -20,6 +21,23 @@ import { livePayloadForSlide } from "~/composables/useSlidePairs"
  * Connects on mount (when a schedule is active), reconnects when the active
  * schedule changes, and disconnects on unmount. Callers do not manage any of it.
  */
+/**
+ * Names slides for a teammate toast: `"Amazing Grace"`, `"Amazing Grace" and
+ * "John 3:16"`, or `"Amazing Grace" and 4 other slides`. Unnamed slides fall
+ * back to "a slide" / "N slides".
+ */
+const describeSlides = (slides: Slide[]): string => {
+  const names = slides.map((s) => s.name?.trim()).filter(Boolean) as string[]
+  if (names.length !== slides.length || !names.length) {
+    return slides.length === 1 ? "a slide" : `${slides.length} slides`
+  }
+  const [first, second] = names.map((n) => `"${n}"`)
+  if (names.length === 1) return first!
+  if (names.length === 2) return `${first} and ${second}`
+  const others = names.length - 1
+  return `${first} and ${others} other slides`
+}
+
 export const useOperatorSession = () => {
   const appStore = useAppStore()
   const toast = useToast()
@@ -39,9 +57,17 @@ export const useOperatorSession = () => {
     onSlideUpdated: () => {
       // Silent update - no toast for every update to avoid noise
     },
-    onSlideDeleted: (slideId, deletedByName) => {
+    onSlideCreated: (slide, createdByName) => {
       toast.add({
-        title: `${deletedByName} deleted a slide`,
+        title: `${createdByName} added ${describeSlides([slide])}`,
+        icon: "i-tabler-plus",
+        color: "blue",
+        timeout: 3000,
+      })
+    },
+    onSlideDeleted: (slide, deletedByName) => {
+      toast.add({
+        title: `${deletedByName} deleted ${describeSlides([slide])}`,
         icon: "i-tabler-trash",
         color: "amber",
         timeout: 3000,
@@ -49,7 +75,7 @@ export const useOperatorSession = () => {
     },
     onBatchSlidesCreated: (slides, createdByName) => {
       toast.add({
-        title: `${createdByName} added ${slides.length} slides`,
+        title: `${createdByName} added ${describeSlides(slides)}`,
         icon: "i-tabler-plus",
         color: "blue",
         timeout: 3000,
