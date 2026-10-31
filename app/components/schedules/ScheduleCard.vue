@@ -167,11 +167,8 @@ const commitRename = () => {
   emit("rename", props.schedule, name)
 }
 
-// A schedule that has not synced yet has no `updatedAt`, only the `createdAt`
-// stamped when it was made locally.
 const lastUpdatedLabel = computed(() => {
-  const stamp = props.schedule?.updatedAt || props.schedule?.createdAt
-  const time = stamp ? new Date(stamp).getTime() : NaN
+  const time = scheduleActivityTime(props.schedule)
   return Number.isNaN(time) ? "just now" : format(time)
 })
 
