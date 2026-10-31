@@ -14,6 +14,21 @@
       :style="data?.mirror ? 'transform: scaleX(-1)' : ''"
     ></video>
 
+    <!-- The echo effect, drawn from the video above (which keeps playing
+         underneath). Hidden until its first frame, so where WebGL is missing
+         the plain feed shows instead. -->
+    <canvas
+      v-if="echoEnabled"
+      ref="echoEl"
+      class="absolute inset-0 h-full w-full"
+      :class="[
+        data?.fit === 'contain' ? 'object-contain' : 'object-cover',
+        { invisible: status !== 'live' || !echoDrawing },
+      ]"
+      :style="data?.mirror ? 'transform: scaleX(-1)' : ''"
+      aria-hidden="true"
+    ></canvas>
+
     <!-- The projector stays plain black on failure: the operator sees the
          reason in their Live Output preview instead of the congregation. -->
     <template v-if="quality === 'preview'">
@@ -49,6 +64,7 @@
 <script setup lang="ts">
 import type { CameraSlideData } from "~/types"
 import CameraIcon from "~/components/svgs/CameraIcon.vue"
+import useCameraEcho from "~/composables/useCameraEcho"
 import useCameraStream, {
   cameraCaptureIsExclusive,
   cameraErrorMessage,
@@ -86,6 +102,18 @@ const match = ref<CameraDeviceMatch>("exact")
 const resolvedLabel = ref("")
 
 watch(status, (value) => emit("status", value), { immediate: true })
+
+const echoEl = ref<HTMLCanvasElement | null>(null)
+const echoEnabled = computed(() => props.data?.effect === "echo")
+const { drawing: echoDrawing } = useCameraEcho(
+  videoEl,
+  echoEl,
+  computed(() => ({
+    enabled: echoEnabled.value,
+    direction: props.data?.echoDirection ?? "right",
+    mirrored: !!props.data?.mirror,
+  }))
+)
 
 let handle: CameraHandle | null = null
 let token = 0
