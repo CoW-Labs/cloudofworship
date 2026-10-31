@@ -44,7 +44,8 @@ export const appWideActions = {
   songUpdated: 'song-updated',
   addSongSlideToSetlist: 'add-song-slide-to-setlist',
   // Slide pairs: two slides on the live screen at once. `slidePair` is the
-  // tier key (see useSubscription); the rest are emitter events.
+  // tier key (see useSubscription) and the "Create Slide Pair" quick action;
+  // the rest are emitter events.
   slidePair: 'slide-pair',
   pairSlides: 'pair-slides',
   unpairSlides: 'unpair-slides',
@@ -306,6 +307,33 @@ export const quickActionsArr: QuickAction[] = [
         {
           title: "Plays on the live screen",
           body: "Your schedule shows a \"Camera is live\" card.",
+        },
+      ],
+    },
+  },
+  {
+    icon: "i-tabler-layout-columns",
+    name: "Create Slide Pair",
+    desc: "Show a camera and another slide on screen together",
+    action: appWideActions.slidePair,
+    meta: "pair slide pair split screen side by side picture in picture pip lower third caption two slides both camera preacher scripture lyrics overlay combine layout dual multi view",
+    type: slideTypes.camera,
+    featureFlag: 'camera-slide',
+    tier: "teams",
+    newSince: "2026-10-31",
+    intro: {
+      title: "Slide pairs",
+      animation: "slide-pair",
+      description:
+        "Show a camera and another slide on screen together.",
+      points: [
+        {
+          title: "Start with a camera",
+          body: "Pair it with a verse, lyrics or another camera.",
+        },
+        {
+          title: "Pick a layout",
+          body: "Side by side, picture in picture, caption or lower third.",
         },
       ],
     },
