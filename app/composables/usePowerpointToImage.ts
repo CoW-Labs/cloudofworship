@@ -66,43 +66,58 @@ const usePowerpointToImage = async (file: File): Promise<PresentationObject[]> =
     import.meta.url
   ).toString()
 
-  const pdfDoc = await pdfjsLib.getDocument({ data: pdfArrayBuffer }).promise
-  const totalPages = pdfDoc.numPages
+  // Each document gets its own pdf.js worker thread, which only stops on
+  // destroy(). Without it every import kept a thread and the whole parsed file
+  // in memory for the rest of the session.
+  const loadingTask = pdfjsLib.getDocument({ data: pdfArrayBuffer })
   const presentationObjects: PresentationObject[] = []
 
-  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-    const page = await pdfDoc.getPage(pageNum)
-    // 1.5x keeps small pages (Letter, A4) sharp; big ones (Canva's 1440pt
-    // slides) are held to a 1080p projector's long edge instead of 2160px.
-    const { width, height } = page.getViewport({ scale: 1 })
-    const scale = Math.min(1.5, MAX_PAGE_EDGE_PX / Math.max(width, height))
-    const viewport = page.getViewport({ scale })
+  try {
+    const pdfDoc = await loadingTask.promise
+    const totalPages = pdfDoc.numPages
 
-    const canvas = document.createElement("canvas")
-    canvas.width = viewport.width
-    canvas.height = viewport.height
-    const ctx = canvas.getContext("2d")!
-    // JPEG has no alpha: paint white so a page without its own background
-    // doesn't come out black.
-    ctx.fillStyle = "#ffffff"
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum)
+      // 1.5x keeps small pages (Letter, A4) sharp; big ones (Canva's 1440pt
+      // slides) are held to a 1080p projector's long edge instead of 2160px.
+      const { width, height } = page.getViewport({ scale: 1 })
+      const scale = Math.min(1.5, MAX_PAGE_EDGE_PX / Math.max(width, height))
+      const viewport = page.getViewport({ scale })
 
-    await page.render({ canvasContext: ctx, viewport, canvas }).promise
+      const canvas = document.createElement("canvas")
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+      const ctx = canvas.getContext("2d")!
+      // JPEG has no alpha: paint white so a page without its own background
+      // doesn't come out black.
+      ctx.fillStyle = "#ffffff"
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // JPEG, not PNG: a photo-heavy page as PNG ran past 1 MB and the upload
-    // was refused, while the same page as JPEG is a few hundred KB.
-    const imageUrl = await new Promise<string>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return reject(new Error(`Failed to render page ${pageNum}`))
-          resolve(URL.createObjectURL(blob))
-        },
-        "image/jpeg",
-        PAGE_JPEG_QUALITY
-      )
-    })
+      await page.render({ canvasContext: ctx, viewport, canvas }).promise
 
-    presentationObjects.push({ page: pageNum, imageUrl })
+      // JPEG, not PNG: a photo-heavy page as PNG ran past 1 MB and the upload
+      // was refused, while the same page as JPEG is a few hundred KB.
+      const imageUrl = await new Promise<string>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error(`Failed to render page ${pageNum}`))
+            resolve(URL.createObjectURL(blob))
+          },
+          "image/jpeg",
+          PAGE_JPEG_QUALITY
+        )
+      })
+
+      presentationObjects.push({ page: pageNum, imageUrl })
+
+      // Let go of the page's parsed data and the canvas's pixels (up to 8 MB a
+      // page) now, not whenever garbage collection gets round to a long deck.
+      page.cleanup()
+      canvas.width = 0
+      canvas.height = 0
+    }
+  } finally {
+    await loadingTask.destroy().catch(() => {})
   }
 
   return presentationObjects
