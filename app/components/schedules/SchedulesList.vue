@@ -49,6 +49,7 @@
             @select="selectSchedule"
             @delete="deleteSchedule($event)"
             @duplicate="duplicateSchedule($event)"
+            @copy-link="copyScheduleLink"
           />
         </RecycleScroller>
       </div>
@@ -68,6 +69,7 @@ const emit = defineEmits(["close"])
 
 const searchInput = ref<string>("")
 const duplicatingScheduleId = ref<string>("")
+const { copyScheduleLink } = useScheduleLink()
 
 const allSchedules = computed(() => {
   return (

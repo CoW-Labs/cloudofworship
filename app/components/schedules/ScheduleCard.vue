@@ -89,6 +89,22 @@
             <template #leading><CopyIcon class="w-4 h-4" /></template>
             Duplicate
           </UButton>
+          <UButton
+            variant="ghost"
+            color="gray"
+            block
+            @click.stop.prevent="
+              () => {
+                $emit('copyLink', schedule)
+                close()
+              }
+            "
+          >
+            <template #leading
+              ><UIcon name="i-lucide-link" class="w-4 h-4"
+            /></template>
+            Copy link
+          </UButton>
           <ConfirmDialog
             button-label="Delete"
             button-icon="i-bx-trash"
@@ -126,6 +142,7 @@ const emit = defineEmits<{
   select: [schedule: Schedule]
   delete: [scheduleId: string]
   duplicate: [schedule: Schedule]
+  copyLink: [schedule: Schedule]
   rename: [schedule: Schedule, name: string]
 }>()
 
