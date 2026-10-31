@@ -666,6 +666,15 @@ onMounted(() => {
   }
 })
 
+// A schedule link opened on a fresh device sets the schedule while the picker
+// is up for want of one, so it has nothing left to ask.
+watch(
+  () => currentState.value?.activeSchedule?._id,
+  (scheduleId, previousId) => {
+    if (scheduleId && !previousId) scheduleModalVisible.value = false
+  }
+)
+
 const emitter = (useNuxtApp().$emitter || appStore.currentState.emitter) as
   | Emitter<any>
   | undefined

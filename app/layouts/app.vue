@@ -329,6 +329,17 @@ onUnmounted(() => {
   window.removeEventListener("focus", revalidateChurchPlan)
 })
 
+// Schedule links: opened from the URL during boot, or pasted into the app (the
+// desktop app has no address bar, so pasting is how a link gets in there).
+const { takeOpeningScheduleLink, resolveLinkedSchedule, onSchedulePaste } =
+  useScheduleLink()
+onMounted(() => {
+  window.addEventListener("paste", onSchedulePaste)
+})
+onUnmounted(() => {
+  window.removeEventListener("paste", onSchedulePaste)
+})
+
 watch(online, (isOnline) => {
   // Coming back from a dropout is the other moment the cached plan is most
   // likely to be out of date.
@@ -750,6 +761,24 @@ const downloadEssentialResources = async () => {
   } else {
     setLoadingTask("startup", "Offline: using saved account and app settings.", 100)
     await retrieveSchedules()
+  }
+
+  // A schedule link (`/?schedule=<id>`) opens that schedule instead of the one
+  // last used on this device. The list was just fetched, so this is a lookup,
+  // and it lands before the workspace shows so the old schedule never flashes.
+  const linkedScheduleId = takeOpeningScheduleLink()
+  if (linkedScheduleId) {
+    const linkedSchedule = await resolveLinkedSchedule(linkedScheduleId, {
+      refresh: false,
+    })
+    if (linkedSchedule) {
+      appStore.setActiveSchedule(linkedSchedule)
+      usePosthogCapture("SCHEDULE_OPENED_FROM_LINK", {
+        scheduleId: linkedSchedule._id,
+        scheduleName: linkedSchedule.name,
+        source: "url",
+      })
+    }
   }
 
   setLoadingTask("ready", "Opening your workspace.", 100)
