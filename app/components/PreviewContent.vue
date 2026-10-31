@@ -2039,6 +2039,28 @@ emitter.on(
     if (data?.cameraId) pairPicker.value = { cameraId: data.cameraId, pairId: data.pairId }
   }
 )
+// "Create Slide Pair" from Quick Actions. A pair starts from a camera: the
+// selected slide when it is an unpaired camera, else the first one in the
+// schedule (the picker names it). No camera yet opens the Add Camera panel,
+// except on a phone, which cannot add one (see desktopOnlyActions).
+emitter.on(appWideActions.slidePair, () => {
+  const candidates = slides.value.filter(
+    (slide) => canBePairTarget(slide) && !appStore.pairForSlide(slide.id)
+  )
+  const camera =
+    candidates.find((slide) => slide.id === activeSlide.value?.id) ??
+    candidates[0]
+  if (camera) {
+    pairPicker.value = { cameraId: camera.id }
+    return
+  }
+  toast.add({
+    icon: "i-tabler-layout-columns",
+    title: "Add a camera slide first",
+    description: "Every slide pair has a camera in it.",
+  })
+  if (!props.mobile) useGlobalEmit(appWideActions.newCamera)
+})
 const onPairPicked = (sourceId: string) => {
   const picker = pairPicker.value
   pairPicker.value = null
