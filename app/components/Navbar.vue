@@ -18,12 +18,14 @@
         >
           Cloud of Worship
         </h1>
-        <span
+        <button
           v-if="isTeamsPlan"
-          class="shrink-0 rounded-md bg-primary-500/10 px-1.5 py-0.5 text-xs font-semibold text-primary-600 dark:text-primary-400 short:text-[10px]"
+          type="button"
+          class="shrink-0 rounded-md bg-primary-500/10 hover:bg-primary-500/20 transition-colors px-1.5 py-0.5 text-xs font-semibold text-primary-600 dark:text-primary-400 short:text-[10px]"
+          @click="toast.add({ ...pickBadgeTip(), icon: 'i-tabler-bulb' })"
         >
           Teams
-        </span>
+        </button>
 
         <!-- ACCOUNT ATTENTION CHIP — only for churches that had Teams and lost it -->
         <CowTooltip
@@ -415,6 +417,7 @@ const restoreModalVisible = ref(false)
 
 // Subscription check
 const { hasAccessToFeature, hasLapsedTeamsSubscription, isTeamsPlan } = useSubscription()
+const toast = useToast()
 
 const { isUpdateReady } = useAppUpdater()
 // Web has no card: the chip reloads straight away. Desktop opens the card,
