@@ -127,6 +127,26 @@
         :model-value="modelValue.mirror"
         @update:model-value="update({ mirror: $event })"
       />
+      <CowToggle
+        label="Echo effect"
+        true-label="On (fading copies trail the picture)"
+        false-label="Off"
+        :model-value="modelValue.effect === 'echo'"
+        @update:model-value="update({ effect: $event ? 'echo' : 'none' })"
+      />
+      <template v-if="modelValue.effect === 'echo'">
+        <CowDropdown
+          label="Echo direction"
+          size="sm"
+          :model-value="echoDirectionLabels[modelValue.echoDirection ?? 'right']"
+          :options="Object.values(echoDirectionLabels)"
+          @update:model-value="onEchoDirection"
+        />
+        <p class="text-[11px] leading-snug text-gray-500 dark:text-[#9aa3b2]">
+          Works best with a well-lit person against a dark stage. Copies show
+          over dark areas and fade into bright ones.
+        </p>
+      </template>
     </div>
   </div>
 </template>
@@ -206,6 +226,13 @@ const deniedHelp = computed(() =>
     ? "Allow Cloud of Worship to use the camera in your system privacy settings, then click Refresh."
     : "Allow camera access for this site in your browser's address bar, then click Refresh."
 )
+
+const echoDirectionLabels = {
+  right: "Trail to the right",
+  left: "Trail to the left",
+} as const
+const onEchoDirection = (label: string) =>
+  update({ echoDirection: label === echoDirectionLabels.left ? "left" : "right" })
 
 const select = (camera: MediaDeviceInfo) =>
   update({ deviceId: camera.deviceId, deviceLabel: camera.label })
