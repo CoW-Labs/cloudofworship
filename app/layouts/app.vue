@@ -906,11 +906,10 @@ const retrieveSchedules = async () => {
     appStore.currentState.schedules
   )
 
-  mergedSchedules?.sort((scheduleA, scheduleB) => {
-    const dateA = new Date(scheduleA?.updatedAt)
-    const dateB = new Date(scheduleB?.updatedAt)
-    return dateB?.getTime() - dateA?.getTime()
-  })
+  mergedSchedules?.sort(
+    (scheduleA, scheduleB) =>
+      (scheduleActivityTime(scheduleB) || 0) - (scheduleActivityTime(scheduleA) || 0)
+  )
   appStore.setSchedules(mergedSchedules)
   setLoadingTask("schedules", "Schedules and slides are ready.", 100)
 }
