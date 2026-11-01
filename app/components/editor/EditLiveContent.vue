@@ -294,6 +294,7 @@
                           :slide="slide"
                           @select="onSelectInterludeVariant"
                           @save-texts="onSaveInterludeTexts"
+                          @save-style="patchInterlude"
                           @resize="interludePopoverSize = $event"
                           @close="activePanel = null"
                         />

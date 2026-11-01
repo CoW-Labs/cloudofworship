@@ -82,6 +82,8 @@ export interface FrameState {
   text: string
   /** How far that heading has entered: 0 hidden, 1 settled. */
   heading: number
+  /** Artwork size relative to the variant's own, from the slide's Size. */
+  k: number
 }
 
 export interface WipeState {
@@ -111,12 +113,20 @@ export interface InterludeVariant {
    * centre scrim is skipped and the text background setting has no effect.
    */
   drawsHeading?: boolean
-  /** Moves the sub text this many pixels below centre, for a stage this tall. */
-  subtitleOffset?: (h: number) => number
+  /**
+   * Moves the sub text this many pixels below centre, for a stage this tall
+   * at artwork size k.
+   */
+  subtitleOffset?: (h: number, k: number) => number
   draw: (c: CanvasRenderingContext2D, S: FrameState, P: InterludePalette) => void
 }
 
-export function frameState(T: number, w: number, h: number): FrameState {
+export function frameState(
+  T: number,
+  w: number,
+  h: number,
+  k = 1
+): FrameState {
   const u = T < INTRO ? T - INTRO : (T - INTRO) % LOOP
   return {
     T,
@@ -133,6 +143,7 @@ export function frameState(T: number, w: number, h: number): FrameState {
     spin: (k) => (TAU * k * u) / LOOP,
     text: "",
     heading: 1,
+    k,
   }
 }
 
@@ -229,7 +240,7 @@ function renderScene(
 /**
  * Draws one frame. The caller sets the device-pixel transform first.
  * `heading` is the heading text and how far it has entered, used only by
- * variants that draw it themselves.
+ * variants that draw it themselves. `k` is the artwork size.
  */
 export function renderInterludeFrame(
   c: CanvasRenderingContext2D,
@@ -238,16 +249,19 @@ export function renderInterludeFrame(
   T: number,
   v: InterludeVariant,
   scrim: number,
-  heading?: { text: string; amount: number }
+  heading?: { text: string; amount: number },
+  k = 1
 ) {
-  const S = frameState(T, w, h)
+  const S = frameState(T, w, h, k)
   if (heading) {
     S.text = heading.text
     S.heading = heading.amount
   }
   const wipe = wipeState(T)
   renderScene(c, S, v.palettes[wipe.base], v, scrim)
-  if (wipe.wp > 0) {
+  // A single-palette slide keeps the beat but has nothing to wipe to, so it
+  // skips the second full render.
+  if (wipe.wp > 0 && v.palettes[0] !== v.palettes[1]) {
     c.save()
     c.beginPath()
     c.arc(S.cx, S.cy, wipeRadius(wipe.wp, S), 0, TAU)
@@ -389,8 +403,8 @@ const ROLL = {
 }
 
 /** Half the band's height, which is where the sub text sits below centre. */
-export const rollingBandEdge = (h: number) => {
-  const cap = Math.round(h * ROLL.size) * ROLL.cap
+export const rollingBandEdge = (h: number, k = 1) => {
+  const cap = Math.round(h * ROLL.size * k) * ROLL.cap
   return cap / 2 + cap * ROLL.pad
 }
 
@@ -503,7 +517,7 @@ function textStrip(
 function rollingRows(c: CanvasRenderingContext2D, S: FrameState, P: InterludePalette) {
   const text = S.text.trim().toUpperCase()
   if (!text) return
-  const fs = Math.round(S.h * ROLL.size)
+  const fs = Math.round(S.h * ROLL.size * S.k)
   const font = `900 ${fs}px Unbounded, Geist, sans-serif`
   const spacing = `${(-fs * 0.025).toFixed(1)}px`
   // The canvas only ever carries the device-pixel scale here.
@@ -553,7 +567,7 @@ function rollingRows(c: CanvasRenderingContext2D, S: FrameState, P: InterludePal
   }
   // The band opens from its centre line as the heading enters and shuts like
   // a shutter when it leaves.
-  const half = rollingBandEdge(S.h) * S.heading * (1 + 0.035 * S.kick)
+  const half = rollingBandEdge(S.h, S.k) * S.heading * (1 + 0.035 * S.kick)
   if (half < 0.5) return
   c.fillStyle = P.c[1]!
   c.fillRect(0, S.cy - half, S.w, half * 2)
@@ -611,8 +625,11 @@ export const interludeVariants: InterludeVariant[] = [
       c.fillStyle = gl
       c.fillRect(0, 0, S.w, S.h)
 
-      const cols = 15
+      // Larger means fewer, bigger crosses. Smaller shrinks them on the same
+      // grid, so no size draws more shapes per frame than the default.
+      const cols = Math.round(15 / Math.max(1, S.k))
       const cw = S.w / cols
+      const shrink = Math.min(1, S.k)
       const rh = cw * 1.3
       const rows = Math.ceil(S.h / rh) + 2
       const oy = (S.h - rows * rh) / 2
@@ -639,7 +656,7 @@ export const interludeVariants: InterludeVariant[] = [
           )
           const crest = Math.pow(0.5 + 0.5 * Math.sin(d * 9 - S.spin(1)), 3)
           const sz =
-            rh * 0.74 * clear * (0.78 + 0.22 * crest) * e * (1 + 0.04 * S.kick)
+            rh * 0.74 * shrink * clear * (0.78 + 0.22 * crest) * e * (1 + 0.04 * S.kick)
           const t = sz * 0.19
           c.save()
           c.translate(x, y - rh * 0.07 * crest)
@@ -692,12 +709,13 @@ export const interludeVariants: InterludeVariant[] = [
         const k = i / (n - 1)
         const e = S.enter(0.05 + k * span * 0.05, 1.3)
         if (e <= 0.001) continue
-        const size = S.D * (1.05 - k * 0.92) * e * (1 + 0.03 * S.kick * (1 - k))
+        const size =
+          S.D * S.k * (1.05 - k * 0.92) * e * (1 + 0.03 * S.kick * (1 - k))
         const ang =
           -(1 - e) * Math.PI * 1.25 +
           k * span * (0.075 + 0.045 * S.osc(1)) +
           S.spin(0.25)
-        const off = S.m * 0.028 * k * span * e
+        const off = S.m * S.k * 0.028 * k * span * e
         const h = size / 2
         c.save()
         c.translate(
@@ -792,8 +810,8 @@ export const interludeVariants: InterludeVariant[] = [
       spec.forEach(([segs, sp], i) => {
         const e = S.enter(0.05 + i * 0.08, 1.3)
         if (e <= 0.001) return
-        const r = S.m * (0.3 + i * 0.105) * (1 + 0.02 * S.kick)
-        const lw = S.m * 0.058
+        const r = S.m * S.k * (0.3 + i * 0.105) * (1 + 0.02 * S.kick)
+        const lw = S.m * S.k * 0.058
         const fill = (0.55 + 0.25 * S.osc(1, i * 0.13)) * e
         const base = S.spin(sp) + i * 0.7 + (1 - e) * sp * 2
         c.strokeStyle = P.c[i % P.c.length]!
@@ -855,7 +873,8 @@ export const interludeVariants: InterludeVariant[] = [
         layers.push({ i, z: (((i / N + flow) % 1) + 1) % 1 })
       layers.sort((a, b) => b.z - a.z)
       for (const { i, z } of layers) {
-        const R = S.D * 0.9 * Math.pow(z, 2.1) * open * (1 + 0.04 * S.kick * z)
+        const R =
+          S.D * S.k * 0.9 * Math.pow(z, 2.1) * open * (1 + 0.04 * S.kick * z)
         if (R < 1) continue
         const n1 = lerp(0.35, 6, 0.5 + 0.5 * S.osc(1, z * 0.5))
         // The outermost shape fades out before it wraps back to the centre.
@@ -904,10 +923,12 @@ export const interludeVariants: InterludeVariant[] = [
       },
     ],
     draw(c, S, P) {
-      const n = 10
+      // Thinner ribbons need a few more to keep the frame covered, capped so
+      // the smallest sizes don't keep adding strokes.
+      const n = Math.round(10 / Math.max(0.8, S.k))
       const span = S.D * 1.1
-      const lw = S.h * 0.16
-      const gap = S.h * 0.13
+      const lw = S.h * S.k * 0.16
+      const gap = S.h * S.k * 0.13
       c.translate(S.cx, S.cy)
       c.rotate(-0.32)
       c.lineCap = "round"
@@ -916,7 +937,8 @@ export const interludeVariants: InterludeVariant[] = [
         const e = S.enter(0.05 + i * 0.06, 1.1)
         if (e <= 0.001) continue
         const y0 = (i - (n - 1) / 2) * gap
-        const amp = S.h * (0.07 + 0.03 * S.osc(1, i * 0.1)) * (1 + 0.25 * S.kick)
+        const amp =
+          S.h * S.k * (0.07 + 0.03 * S.osc(1, i * 0.1)) * (1 + 0.25 * S.kick)
         const ph = S.spin(1) + i * 0.55
         const x0 = -span / 2
         const x1 = x0 + span * e
@@ -958,9 +980,10 @@ export const interludeVariants: InterludeVariant[] = [
       },
     ],
     draw(c, S, P) {
-      flower(c, S, P, S.w * 0.12, S.h * 0.94, S.m * 0.98, 1, 0)
-      flower(c, S, P, S.w * 0.9, S.h * 0.08, S.m * 0.64, -1, 0.25)
-      flower(c, S, P, S.w * 0.86, S.h * 0.9, S.m * 0.28, 1, 0.45)
+      const m = S.m * S.k
+      flower(c, S, P, S.w * 0.12, S.h * 0.94, m * 0.98, 1, 0)
+      flower(c, S, P, S.w * 0.9, S.h * 0.08, m * 0.64, -1, 0.25)
+      flower(c, S, P, S.w * 0.86, S.h * 0.9, m * 0.28, 1, 0.45)
     },
   },
   {
@@ -997,7 +1020,7 @@ export const interludeVariants: InterludeVariant[] = [
         const k = i / (n - 1)
         const e = S.enter(0.1 + i * 0.07, 1, eOutBack)
         if (e <= 0.001) continue
-        const R = S.D * 0.58 * (1 - k * 0.86) * e * (1 + 0.035 * S.kick)
+        const R = S.D * S.k * 0.58 * (1 - k * 0.86) * e * (1 + 0.035 * S.kick)
         const dir = i % 2 ? 1 : -1
         star(
           c,
@@ -1044,7 +1067,9 @@ export const interludeVariants: InterludeVariant[] = [
       },
     ],
     draw(c, S, P) {
-      const cols = 40
+      // Larger means fewer, bigger dots. Smaller shrinks the dots on the same
+      // grid instead of adding over a thousand more to every frame.
+      const cols = Math.round(40 / Math.max(1, S.k))
       const sp = S.w / cols
       const rows = Math.ceil(S.h / sp) + 1
       const oy = (S.h - rows * sp) / 2
@@ -1061,7 +1086,7 @@ export const interludeVariants: InterludeVariant[] = [
       // The same for every dot in a frame, so worked out once, not ~2,000 times.
       const spin3 = S.spin(3)
       const spin2 = S.spin(2)
-      const dotSize = sp * 0.64 * (1 + 0.15 * S.kick)
+      const dotSize = sp * 0.64 * Math.min(1, S.k) * (1 + 0.15 * S.kick)
       const layer = (col: string, dx: number, dy: number, ph: number) => {
         c.fillStyle = col
         c.beginPath()
@@ -1094,6 +1119,201 @@ export const interludeVariants: InterludeVariant[] = [
 ]
 
 export const DEFAULT_INTERLUDE_VARIANT = interludeVariants[0]!.id
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-slide style. Everything here runs once when the slide's settings
+// change, never per frame: colours become a ready palette, size and speed
+// are plain numbers the frame already multiplies by.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Artwork size and speed, as multipliers of the variant's own. */
+export const INTERLUDE_SIZE = { min: 0.5, max: 1.5, default: 1 }
+export const INTERLUDE_SPEED = { min: 0.3, max: 2, default: 1 }
+/** "mix" plays both palettes; "light" / "dark" hold just one. */
+export type InterludeTone = "mix" | "light" | "dark"
+
+/** A stored multiplier, clamped to its range (or the default if missing). */
+export const interludeScale = (
+  value: unknown,
+  range: { min: number; max: number; default: number }
+) =>
+  typeof value === "number" && isFinite(value)
+    ? clamp(value, range.min, range.max)
+    : range.default
+
+type HSL = [number, number, number]
+
+const toHsl = (hex: string): HSL => {
+  const n = parseInt(hex.slice(1), 16)
+  const r = ((n >> 16) & 255) / 255
+  const g = ((n >> 8) & 255) / 255
+  const b = (n & 255) / 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  if (max === min) return [0, 0, l]
+  const d = max - min
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  const h =
+    max === r
+      ? (g - b) / d + (g < b ? 6 : 0)
+      : max === g
+        ? (b - r) / d + 2
+        : (r - g) / d + 4
+  return [h / 6, s, l]
+}
+
+const fromHsl = ([h, s, l]: HSL) => {
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12
+    const a = s * Math.min(l, 1 - l)
+    const v = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))
+    return Math.round(v * 255)
+      .toString(16)
+      .padStart(2, "0")
+  }
+  return `#${f(0)}${f(8)}${f(4)}`
+}
+
+/** WCAG relative luminance. */
+const luminance = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16)
+  const ch = (v: number) => {
+    const x = v / 255
+    return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4)
+  }
+  return (
+    0.2126 * ch((n >> 16) & 255) +
+    0.7152 * ch((n >> 8) & 255) +
+    0.0722 * ch(n & 255)
+  )
+}
+
+const contrast = (a: string, b: string) => {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p)
+  return (x! + 0.05) / (y! + 0.05)
+}
+
+const isHex = (v: unknown): v is string =>
+  typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v)
+
+/**
+ * A partner for the slide's colour: the hue a little past a third of the
+ * wheel away (purple gives gold, blue gives rose), at a saturation that
+ * still reads against it. A grey colour gets a grey partner.
+ */
+const partnerColor = (hex: string) => {
+  const [h, s, l] = toHsl(hex)
+  if (s < 0.12) return hex
+  return fromHsl([(h + 0.375) % 1, Math.max(s, 0.6), l])
+}
+
+const mapPalette = (
+  p: InterludePalette,
+  fn: (hex: string, role: "a" | "b") => string
+): InterludePalette => ({
+  ...p,
+  bg: fn(p.bg, "a"),
+  c: p.c.map((x, i) => fn(x, i % 2 ? "b" : "a")),
+  ink: fn(p.ink, "a"),
+  plate: fn(p.plate, "a"),
+  chipBg: fn(p.chipBg, "b"),
+  chipInk: fn(p.chipInk, "a"),
+  glow: p.glow && fn(p.glow, "a"),
+})
+
+/**
+ * Light for dark and dark for light, keeping hue and saturation, so a
+ * palette keeps its contrast the other way round.
+ */
+const flipPalette = (p: InterludePalette): InterludePalette => ({
+  ...mapPalette(p, (hex) => {
+    const [h, s, l] = toHsl(hex)
+    return fromHsl([h, s, 1 - l])
+  }),
+  blend:
+    p.blend === "multiply" ? "screen" : p.blend === "screen" ? "multiply" : p.blend,
+})
+
+/**
+ * Recolours a palette into the slide's colours. Each colour takes the hue
+ * and saturation of its role's colour and keeps its own lightness, so the
+ * artwork keeps its light and shade (muted rows stay near the background,
+ * text stays readable). Near-greys stay grey, so white text stays white.
+ */
+const tintPalette = (
+  p: InterludePalette,
+  roles: { a: string; b: string },
+  drawsHeading?: boolean
+): InterludePalette => {
+  const a = toHsl(roles.a)
+  const b = toHsl(roles.b)
+  const out = mapPalette(p, (hex, role) => {
+    const [, s, l] = toHsl(hex)
+    const [uh, us] = role === "a" ? a : b
+    return fromHsl([uh, s < 0.12 ? s : us, l])
+  })
+  // Hues differ in brightness at the same lightness (yellow versus blue), so
+  // fall back to plain light or dark text where the tint lost its contrast.
+  const readable = (ink: string, under: string) =>
+    contrast(ink, under) >= 3
+      ? ink
+      : contrast("#ffffff", under) >= contrast("#111111", under)
+        ? "#ffffff"
+        : "#111111"
+  out.ink = readable(out.ink, out.plate)
+  out.chipInk = readable(out.chipInk, out.chipBg)
+  // A canvas-drawn heading reads as c[2] on the c[1] band (Rolling Stone).
+  if (drawsHeading && out.c.length > 2)
+    out.c[2] = readable(out.c[2]!, out.c[1]!)
+  return out
+}
+
+/**
+ * The variant with the slide's tone and colours applied. Returns the variant
+ * itself when nothing is customised. With one tone both palette slots hold
+ * the same object, which tells the renderer to skip the drop wipe.
+ */
+export function customizeInterludeVariant(
+  v: InterludeVariant,
+  opts: { tone?: InterludeTone; color?: string | null }
+): InterludeVariant {
+  const tone = opts.tone ?? "mix"
+  const primary = isHex(opts.color) ? opts.color : null
+  if (tone === "mix" && !primary) return v
+  let [first, second] = v.palettes
+  if (tone !== "mix") {
+    // Variants differ in which palette is the lighter one, and some have two
+    // dark ones, so pick by lightness and flip only when the pick is clearly
+    // on the wrong side (a mid-tone like Selah's blue stays as drawn).
+    const [light, dark] =
+      toHsl(first.bg)[2] >= toHsl(second.bg)[2]
+        ? [first, second]
+        : [second, first]
+    const pick = tone === "light" ? light : dark
+    const l = toHsl(pick.bg)[2]
+    first = second =
+      (tone === "light" ? l < 0.35 : l > 0.65) ? flipPalette(pick) : pick
+  }
+  if (primary) {
+    const colors = { primary, secondary: partnerColor(primary) }
+    const single = first === second
+    first = tintPalette(
+      first,
+      { a: colors.primary, b: colors.secondary },
+      v.drawsHeading
+    )
+    // The drop swaps the roles, so the loop still changes colour.
+    second = single
+      ? first
+      : tintPalette(
+          second,
+          { a: colors.secondary, b: colors.primary },
+          v.drawsHeading
+        )
+  }
+  return { ...v, palettes: [first, second] }
+}
 
 export const getInterludeVariant = (id?: string): InterludeVariant =>
   interludeVariants.find((v) => v.id === id) || interludeVariants[0]!

@@ -274,6 +274,17 @@ export interface InterludeSlideData {
   subtitle: string
   /** "auto" follows the variant's default. */
   textBackground: "auto" | "on" | "off"
+  /**
+   * Tints the animation from one colour (its partner colour is derived);
+   * null keeps the variant's own colours.
+   */
+  color?: string | null
+  /** "mix" plays both palettes; "light" / "dark" hold one. Default "mix". */
+  tone?: "mix" | "light" | "dark"
+  /** Artwork size multiplier, 0.5 to 1.5. Default 1. */
+  size?: number
+  /** Animation speed multiplier, 0.3 to 2. Default 1. */
+  speed?: number
 }
 
 /**
