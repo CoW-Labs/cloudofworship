@@ -1,15 +1,24 @@
 import type { Ref } from "vue"
-import type { CameraEchoSettings } from "~/types"
+import type { CameraEchoSettings, LightLeakSettings } from "~/types"
 import { createEchoRenderer, type EchoRenderer } from "~/utils/cameraEcho"
+import {
+  createLightLeakRenderer,
+  type LightLeakRenderer,
+} from "~/utils/cameraLightLeak"
 import {
   latestPersonMask,
   personSegmenterState,
   refreshPersonMask,
 } from "~/utils/personSegmenter"
 
-export interface CameraEchoOptions {
-  /** The echo's settings, or null for no effect. */
-  settings: CameraEchoSettings | null
+/** The effect to draw and its settings. */
+export type CameraEffectDraw =
+  | { kind: "main-character-echo"; settings: CameraEchoSettings }
+  | { kind: "light-leak"; settings: LightLeakSettings }
+
+export interface CameraEffectOptions {
+  /** The effect, or null for none. */
+  effect: CameraEffectDraw | null
   /** Whether the feed is flipped by CSS. */
   mirrored: boolean
   /**
@@ -25,23 +34,31 @@ type FrameCallbackVideo = HTMLVideoElement & {
 }
 
 /**
- * Draws the "Main character echo" from `video` into `canvas` once per camera
- * frame, asking the person detector for a fresh outline as it goes (it skips
- * the request when it is busy or the last outline is recent enough).
+ * Draws the camera slide's effect from `video` into `canvas` once per camera
+ * frame. For an echo that copies people it asks the person detector for a
+ * fresh outline as it goes (the detector skips the request when it is busy or
+ * the last outline is recent enough).
  *
- * `drawing` turns true once a frame is on the canvas, so the caller can hold
- * the canvas hidden until then and keep showing the plain video wherever WebGL
- * is missing or the context is lost. The video keeps playing underneath: a
+ * `drawing` is true while the canvas holds the current frame, so the caller
+ * can hide the canvas otherwise and show the plain video: before the first
+ * frame, wherever WebGL is missing or the context is lost, and while the
+ * effect has nothing to add (between light leak bursts). The video keeps
+ * playing underneath: a
  * hidden video is not composited, and the per-frame callback stops firing.
+ *
+ * A renderer gives its WebGL context back when it is done, which leaves its
+ * canvas unable to draw again, so the caller gives each effect its own canvas
+ * (a `:key` on the effect).
  */
-export default function useCameraEcho(
+export default function useCameraEffect(
   video: Ref<HTMLVideoElement | null>,
   canvas: Ref<HTMLCanvasElement | null>,
-  options: Ref<CameraEchoOptions>
+  options: Ref<CameraEffectOptions>
 ) {
   const drawing = ref(false)
 
-  let renderer: EchoRenderer | null = null
+  let renderer: EchoRenderer | LightLeakRenderer | null = null
+  let rendererKind: CameraEffectDraw["kind"] | null = null
   let renderCanvas: HTMLCanvasElement | null = null
   let frameHandle: number | null = null
   let rafHandle: number | null = null
@@ -73,26 +90,35 @@ export default function useCameraEcho(
     }
     renderer?.dispose()
     renderer = null
+    rendererKind = null
     renderCanvas = null
     drawing.value = false
   }
 
-  const ensureRenderer = (target: HTMLCanvasElement) => {
-    if (renderer && renderCanvas === target) return renderer
+  const ensureRenderer = (
+    target: HTMLCanvasElement,
+    kind: CameraEffectDraw["kind"]
+  ) => {
+    if (renderer && renderCanvas === target && rendererKind === kind) {
+      return renderer
+    }
     teardown()
     renderCanvas = target
+    rendererKind = kind
     target.addEventListener("webglcontextlost", onContextLost)
     target.addEventListener("webglcontextrestored", onContextRestored)
-    renderer = createEchoRenderer(target)
+    renderer =
+      kind === "light-leak"
+        ? createLightLeakRenderer(target)
+        : createEchoRenderer(target)
     return renderer
   }
 
-  const tick = () => {
-    frameHandle = null
-    rafHandle = null
-    const element = video.value
-    const { settings, mirrored, detectionIntervalMs } = options.value
-    if (!renderer || !element || !settings) return
+  const drawEcho = (
+    element: HTMLVideoElement,
+    settings: CameraEchoSettings
+  ) => {
+    const { mirrored, detectionIntervalMs } = options.value
     let drawSettings = settings
     let mask = null
     if (settings.subject === "people") {
@@ -108,11 +134,25 @@ export default function useCameraEcho(
         void refreshPersonMask(element, key, detectionIntervalMs)
       }
     }
-    const drew = renderer.draw(element, {
+    return (renderer as EchoRenderer).draw(element, {
       settings: drawSettings,
       mirrored,
       mask,
     })
+  }
+
+  const tick = () => {
+    frameHandle = null
+    rafHandle = null
+    const element = video.value
+    const { effect } = options.value
+    if (!renderer || !element || !effect || effect.kind !== rendererKind) return
+    const drew =
+      effect.kind === "light-leak"
+        ? (renderer as LightLeakRenderer).draw(element, {
+            settings: effect.settings,
+          })
+        : drawEcho(element, effect.settings)
     if (drew !== drawing.value) drawing.value = drew
     schedule(element)
   }
@@ -133,11 +173,12 @@ export default function useCameraEcho(
     cancelLoop()
     const element = video.value
     const target = canvas.value
-    if (!options.value.settings || !element || !target) {
+    const effect = options.value.effect
+    if (!effect || !element || !target) {
       teardown()
       return
     }
-    if (!ensureRenderer(target)) {
+    if (!ensureRenderer(target, effect.kind)) {
       drawing.value = false
       return
     }
@@ -156,9 +197,11 @@ export default function useCameraEcho(
     { immediate: true }
   )
 
-  watch([video, canvas, () => !!options.value.settings], () => restart(), {
-    flush: "post",
-  })
+  watch(
+    [video, canvas, () => options.value.effect?.kind ?? null],
+    () => restart(),
+    { flush: "post" }
+  )
 
   onMounted(restart)
 

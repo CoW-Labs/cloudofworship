@@ -20,123 +20,78 @@
         <!-- CAMERA EFFECTS: a camera slide has no text, so these are all its
              toolbar shows. -->
         <template v-if="isCamera">
-          <CowTooltip text="Camera effect" :prevent="effectMenuOpen">
-            <CowSelectMenu
-              :model-value="cameraEffectLabel(cameraEffect)"
-              size="md"
-              :select-class="`h-10 border-0 shadow-none outline-none text-center w-[236px] bg-gray-100 dark:bg-[#222938] dark:text-white rounded-full`"
-              variant="none"
-              color="gray"
-              :popper="{ strategy: 'fixed' }"
-              :ui-menu="{
-                width: 'w-[236px]',
-                input: 'text-xs',
-                empty: 'text-xs',
-                option: {
-                  size: 'text-xs',
-                },
-              }"
-              :options="cameraEffects.map((item) => item.label)"
-              @update:model-value="onSelectEffect"
-              @open="effectMenuOpen = true"
-              @close="effectMenuOpen = false"
-            >
-              <template #label>
-                <IconWrapper name="i-tabler-sparkles" size="4" />
-                <span class="truncate">{{
-                  cameraEffectLabel(cameraEffect)
-                }}</span>
-              </template>
-            </CowSelectMenu>
-          </CowTooltip>
-
-          <template v-if="echoActive">
-            <!-- What gets copied -->
-            <div class="button-group rounded-md p-1 flex items-center gap-1">
-              <CowTooltip text="Copy only the people">
-                <UButton
-                  @click="patchEcho({ subject: 'people' })"
-                  variant="ghost"
-                  color="gray"
-                  class="toolbar-icon-btn"
-                  :class="{
-                    'toolbar-toggle-active': echoSettings.subject === 'people',
-                  }"
-                  :aria-pressed="echoSettings.subject === 'people'"
-                  aria-label="Copy only the people"
-                  icon="i-tabler-user"
-                />
-              </CowTooltip>
-              <CowTooltip text="Copy the whole picture">
-                <UButton
-                  @click="patchEcho({ subject: 'whole' })"
-                  variant="ghost"
-                  color="gray"
-                  class="toolbar-icon-btn"
-                  :class="{
-                    'toolbar-toggle-active': echoSettings.subject === 'whole',
-                  }"
-                  :aria-pressed="echoSettings.subject === 'whole'"
-                  aria-label="Copy the whole picture"
-                  icon="i-tabler-photo"
-                />
-              </CowTooltip>
-            </div>
-
-            <!-- Which side the copies go -->
-            <div class="button-group rounded-md p-1 flex items-center gap-1">
-              <CowTooltip
-                v-for="side in echoSides"
-                :key="side.value"
-                :text="side.label"
+          <UPopover
+            v-model:open="effectMenuOpen"
+            mode="click"
+            :popper="{ placement: 'bottom-start', strategy: 'fixed' }"
+            :ui="{
+              ring: 'ring-0',
+              background: 'bg-transparent',
+              shadow: 'shadow-xl',
+              rounded: 'rounded-2xl',
+            }"
+          >
+            <CowTooltip text="Camera effect" :prevent="effectMenuOpen">
+              <UButton
+                class="h-10 w-[236px] justify-between rounded-full bg-gray-100 px-4 text-xs text-gray-800 hover:bg-gray-200 dark:bg-[#222938] dark:text-white dark:hover:bg-[#2b3242]"
+                variant="ghost"
+                color="gray"
+                :aria-expanded="effectMenuOpen"
               >
-                <UButton
-                  @click="patchEcho({ direction: side.value })"
-                  variant="ghost"
-                  color="gray"
-                  class="toolbar-icon-btn"
-                  :class="{
-                    'toolbar-toggle-active':
-                      echoSettings.direction === side.value,
-                  }"
-                  :aria-pressed="echoSettings.direction === side.value"
-                  :aria-label="side.label"
-                  :icon="side.icon"
-                />
-              </CowTooltip>
-            </div>
+                <span class="flex min-w-0 items-center gap-2">
+                  <IconWrapper name="i-tabler-sparkles" size="4" />
+                  <span class="truncate">{{
+                    cameraEffectLabel(cameraEffect)
+                  }}</span>
+                </span>
+                <IconWrapper name="i-tabler-chevron-down" size="4" />
+              </UButton>
+            </CowTooltip>
+            <template #panel>
+              <CameraEffectPicker
+                :model-value="cameraEffect"
+                @select="onSelectEffect"
+              />
+            </template>
+          </UPopover>
 
-            <UPopover
-              v-model:open="echoPanelOpen"
-              mode="click"
-              :popper="{ placement: 'bottom', strategy: 'fixed' }"
-              :ui="{
-                ring: 'ring-0',
-                background: 'bg-transparent',
-                shadow: 'shadow-xl',
-                rounded: 'rounded-2xl',
-              }"
-            >
-              <CowTooltip
-                text="Copies, spacing, fade and colour fringe"
-                :prevent="echoPanelOpen"
+          <UPopover
+            v-if="effectPanel"
+            v-model:open="effectPanelOpen"
+            mode="click"
+            :popper="{ placement: 'bottom', strategy: 'fixed' }"
+            :ui="{
+              ring: 'ring-0',
+              background: 'bg-transparent',
+              shadow: 'shadow-xl',
+              rounded: 'rounded-2xl',
+            }"
+          >
+            <CowTooltip :text="effectPanel.tooltip" :prevent="effectPanelOpen">
+              <UButton
+                :class="[
+                  'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+                  { 'toolbar-toggle-active': effectPanelOpen },
+                ]"
+                icon="i-tabler-adjustments-horizontal"
+                variant="ghost"
+                color="gray"
+                >Adjust</UButton
               >
-                <UButton
-                  :class="[
-                    'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
-                    { 'toolbar-toggle-active': echoPanelOpen },
-                  ]"
-                  icon="i-tabler-adjustments-horizontal"
-                  variant="ghost"
-                  color="gray"
-                  >Adjust</UButton
-                >
-              </CowTooltip>
-              <template #panel>
-                <CameraEchoPanel :settings="echoSettings" @update="patchEcho" />
-              </template>
-            </UPopover>
-          </template>
+            </CowTooltip>
+            <template #panel>
+              <CameraEffectPanel
+                :title="effectPanel.title"
+                :note="effectPanel.note"
+                :choices="effectPanel.choices"
+                :settings="effectPanel.settings"
+                :sliders="effectPanel.sliders"
+                :ranges="effectPanel.ranges"
+                :defaults="effectPanel.defaults"
+                @update="effectPanel.update"
+              />
+            </template>
+          </UPopover>
         </template>
 
         <template v-else>
@@ -701,18 +656,28 @@
 <script setup lang="ts">
 import type {
   CameraEchoSettings,
+  CameraEffect,
   CameraSlideData,
   ExtendedFileT,
   ExternalVideo,
+  LightLeakSettings,
   Slide,
   SongSetlistData,
 } from "~/types"
 import {
   cameraEffectLabel,
   cameraEffectOf,
-  cameraEffects,
+  defaultEchoSettings,
+  defaultLightLeakSettings,
+  echoRanges,
   echoSettingsOf,
+  echoSliders,
+  lightLeakRanges,
+  lightLeakSettingsOf,
+  lightLeakSliders,
+  type CameraEffectChoice,
 } from "~/utils/camera"
+import { personSegmenterState } from "~/utils/personSegmenter"
 import { appWideActions } from "~/utils/constants"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 import {
@@ -764,26 +729,105 @@ const cameraData = computed(() =>
   isCamera.value ? (props.slide?.data as CameraSlideData | undefined) : null
 )
 const cameraEffect = computed(() => cameraEffectOf(cameraData.value))
-const echoActive = computed(
-  () => cameraEffect.value === "main-character-echo"
-)
 const echoSettings = computed(() => echoSettingsOf(cameraData.value))
 const effectMenuOpen = ref(false)
-const echoPanelOpen = ref(false)
+const effectPanelOpen = ref(false)
 
-const echoSides = [
-  { value: "left", label: "Copies to the left", icon: "i-tabler-arrow-narrow-left" },
-  { value: "right", label: "Copies to the right", icon: "i-tabler-arrow-narrow-right" },
-  { value: "both", label: "Copies on both sides", icon: "i-tabler-arrows-horizontal" },
-] as const
+// The echo's either/or settings, shown as dropdowns in its Adjust panel.
+// "Main person" copies only the person nearest the camera (`focus` "main").
+const echoChoices = computed((): CameraEffectChoice[] => {
+  const { subject, direction } = echoSettings.value
+  return [
+    {
+      label: "Who gets copied",
+      options: [
+        {
+          label: "Main person",
+          icon: "i-tabler-user",
+          active: subject === "people",
+          patch: { subject: "people", focus: "main" },
+        },
+        {
+          label: "Whole picture",
+          icon: "i-tabler-photo",
+          active: subject === "whole",
+          patch: { subject: "whole" },
+        },
+      ],
+    },
+    {
+      label: "Which side the copies go",
+      options: [
+        { label: "Left", icon: "i-tabler-arrow-narrow-left", value: "left" },
+        { label: "Right", icon: "i-tabler-arrow-narrow-right", value: "right" },
+        { label: "Both", icon: "i-tabler-arrows-horizontal", value: "both" },
+      ].map(({ value, ...option }) => ({
+        ...option,
+        active: direction === value,
+        patch: { direction: value },
+      })),
+    },
+  ]
+})
 
-const onSelectEffect = (label: string) => {
-  const effect =
-    cameraEffects.find((item) => item.label === label)?.value ?? "none"
+const onSelectEffect = (effect: CameraEffect) => {
+  effectMenuOpen.value = false
   if (effect === cameraEffect.value) return
   emit("update-camera", { effect })
   usePosthogCapture("CAMERA_EFFECT_CHANGED", { effect })
 }
+
+const lightLeakSettings = computed(() => lightLeakSettingsOf(cameraData.value))
+const patchLightLeak = (patch: Partial<LightLeakSettings>) =>
+  emit("update-camera", {
+    lightLeak: { ...lightLeakSettings.value, ...patch },
+  })
+
+const echoNote = computed(() => {
+  if (echoSettings.value.subject === "whole") {
+    return "Works best with a well-lit person on a dark stage."
+  }
+  if (personSegmenterState.value === "failed") {
+    return "This computer can't pick out people, so the whole picture is copied."
+  }
+  if (personSegmenterState.value === "loading") {
+    return "Getting ready to find people…"
+  }
+  return "Looks cleanest with a plain wall or screen behind the person."
+})
+
+// The Adjust panel's contents for the chosen effect, or null for none.
+const effectPanel = computed(() => {
+  if (cameraEffect.value === "main-character-echo") {
+    return {
+      title: "Main character echo",
+      tooltip: "Who gets copied, which side, how many and how far",
+      note: echoNote.value,
+      choices: echoChoices.value,
+      settings: echoSettings.value as unknown as Record<string, unknown>,
+      sliders: echoSliders,
+      ranges: echoRanges,
+      defaults: defaultEchoSettings() as unknown as Record<string, unknown>,
+      update: (patch: Record<string, unknown>) =>
+        patchEcho(patch as Partial<CameraEchoSettings>),
+    }
+  }
+  if (cameraEffect.value === "light-leak") {
+    return {
+      title: "Light leak",
+      tooltip: "Strength, speed and rest between bursts",
+      note: "",
+      choices: [],
+      settings: lightLeakSettings.value as unknown as Record<string, unknown>,
+      sliders: lightLeakSliders,
+      ranges: lightLeakRanges,
+      defaults: defaultLightLeakSettings() as unknown as Record<string, unknown>,
+      update: (patch: Record<string, unknown>) =>
+        patchLightLeak(patch as Partial<LightLeakSettings>),
+    }
+  }
+  return null
+})
 
 const patchEcho = (patch: Partial<CameraEchoSettings>) =>
   emit("update-camera", { echo: { ...echoSettings.value, ...patch } })
