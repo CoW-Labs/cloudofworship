@@ -1,10 +1,15 @@
 <template>
   <div
     v-if="backgroundPanel"
-    class="grid h-[149.5px] w-[216.5px] grid-cols-6 gap-[8.5px] rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
+    ref="panelGrid"
+    class="grid gap-[8.5px] rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
+    :class="fill ? 'w-full justify-between' : 'h-[149.5px] w-[216.5px] grid-cols-6'"
+    :style="
+      fill ? { gridTemplateColumns: `repeat(${fillColumns}, ${SWATCH}px)` } : {}
+    "
   >
     <button
-      v-for="color in panelColors"
+      v-for="color in fill ? fillColors : panelColors"
       :key="color"
       type="button"
       class="h-[25px] w-[25px] rounded transition-transform duration-150 hover:scale-110 focus-visible:ring-2 focus-visible:ring-[#E8D1F8]"
@@ -54,6 +59,7 @@
 </template>
 
 <script setup lang="ts">
+import { useResizeObserver } from "@vueuse/core"
 
 /**
  * `select` is a bubbling native DOM event name. Declared so a parent's
@@ -71,6 +77,11 @@ const props = withDefaults(
     backgroundPanel?: boolean
     colors?: string[]
     colorPurpose?: string
+    /**
+     * With `backgroundPanel`: span the container's width and show as many
+     * columns of swatches as fit, instead of the fixed six.
+     */
+    fill?: boolean
   }>(),
   {
     colorPurpose: "background",
@@ -107,6 +118,51 @@ const backgroundPanelColors = [
 const panelColors = computed(() =>
   props.colors?.length ? props.colors : backgroundPanelColors
 )
+
+// ─── FILL: as many columns as the width allows ───────────────────────────────
+// The panel's colours are a grid by column: each column a hue, its rows a pale
+// tint, a mid tone, a deep tone and an accent. A wider grid adds columns from
+// the right, so every row keeps its kind of colour.
+const SWATCH = 25
+const GAP = 8.5
+const PADDING = 24
+const ROWS = 4
+const panelColumns = Array.from({ length: 6 }, (_, column) =>
+  Array.from({ length: ROWS }, (_, row) => backgroundPanelColors[row * 6 + column]!)
+)
+const extraColumns = [
+  ["#FCE7F6", "#F670C7", "#C11574", "#EE46BC"], // Pink
+  ["#CCFBEF", "#2ED3B7", "#107569", "#15B79E"], // Teal
+  ["#FFE6D5", "#FF9C66", "#E62E05", "#FB6514"], // Orange
+  ["#FEF7C3", "#FDE272", "#CA8504", "#EAAA08"], // Yellow
+  ["#E0F2FE", "#7CD4FD", "#0086C9", "#0BA5EC"], // Sky
+  ["#E0EAFF", "#8098F9", "#3538CD", "#6172F3"], // Indigo
+  ["#FFE4E8", "#FD6F8E", "#C01048", "#F63D68"], // Rose
+  ["#ECFCCB", "#A3E635", "#4D7C0F", "#84CC16"], // Lime
+  ["#F5EDE6", "#C4A484", "#7C4A2D", "#5C3A21"], // Brown
+  ["#EEF2F6", "#9AA4B2", "#4B5565", "#202939"], // Slate
+]
+const allColumns = [...panelColumns, ...extraColumns]
+
+const panelGrid = ref<HTMLElement | null>(null)
+const fillColumns = ref(6)
+useResizeObserver(panelGrid, ([entry]) => {
+  if (!props.fill || !entry) return
+  const inner = entry.contentRect.width
+  fillColumns.value = Math.min(
+    allColumns.length,
+    Math.max(6, Math.floor((inner + GAP) / (SWATCH + GAP)))
+  )
+})
+
+// Row by row, as the grid lays them out.
+const fillColors = computed(() => {
+  const columns = props.colors?.length ? null : allColumns.slice(0, fillColumns.value)
+  if (!columns) return props.colors!
+  return Array.from({ length: ROWS }, (_, row) =>
+    columns.map((column) => column[row]!)
+  ).flat()
+})
 
 const backgroundColors = [
   "#a855f7", // Purple

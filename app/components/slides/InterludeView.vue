@@ -35,9 +35,13 @@
 <script setup lang="ts">
 import type { InterludeSlideData, Slide } from "~/types"
 import {
+  INTERLUDE_SIZE,
+  INTERLUDE_SPEED,
   STATIC_FRAME_T,
   TEXT_MOTION,
+  customizeInterludeVariant,
   getInterludeVariant,
+  interludeScale,
   renderInterludeFrame,
   scrimAmount,
   textMotion,
@@ -75,7 +79,15 @@ const isStatic = computed(() => mode.value === "static")
 const data = computed(
   () => props.slide?.data as InterludeSlideData | undefined
 )
-const variant = computed(() => getInterludeVariant(data.value?.variant))
+// Recoloured once per settings change; frames only read the result.
+const variant = computed(() =>
+  customizeInterludeVariant(getInterludeVariant(data.value?.variant), {
+    tone: data.value?.tone,
+    color: data.value?.color,
+  })
+)
+const size = computed(() => interludeScale(data.value?.size, INTERLUDE_SIZE))
+const speed = computed(() => interludeScale(data.value?.speed, INTERLUDE_SPEED))
 const heading = computed(() => data.value?.heading ?? "")
 const subtitle = computed(() => data.value?.subtitle?.trim() ?? "")
 const textBackgroundOn = computed(() => {
@@ -144,6 +156,13 @@ let startedAt = performance.now()
 let textIn = 0
 let textOut: number | null = null
 const elapsed = () => (performance.now() - startedAt) / 1000
+// The artwork runs on its own clock so Speed can scale it. Text keeps the
+// slide clock, so it enters and exits at the same pace at every speed. A
+// speed change rebases the clock instead of jumping the animation.
+let clockAt = 0
+let clockBase = 0
+let clockSpeed = speed.value
+const artTime = (t: number) => clockBase + (t - clockAt) * clockSpeed
 
 const applyText = (
   T: number,
@@ -186,10 +205,16 @@ const draw = (T: number) => {
   if (!ctx || !width || !height) return
   ctx.setTransform(density, 0, 0, density, 0, 0)
   if (isStatic.value) {
-    renderInterludeFrame(ctx, width, height, T, variant.value, 1, {
-      text: heading.value,
-      amount: 1,
-    })
+    renderInterludeFrame(
+      ctx,
+      width,
+      height,
+      T,
+      variant.value,
+      1,
+      { text: heading.value, amount: 1 },
+      size.value
+    )
     return
   }
   const scrim = scrimAmount(T, textIn, textOut)
@@ -200,10 +225,11 @@ const draw = (T: number) => {
     ctx,
     width,
     height,
-    T,
+    artTime(T),
     variant.value,
     scrim,
-    { text: heading.value, amount: 1 - head.b }
+    { text: heading.value, amount: 1 - head.b },
+    size.value
   )
   applyText(T, S, wipe, head)
 }
@@ -245,7 +271,7 @@ const resize = () => {
     : baseDensity * scale * QUALITY_STEPS[quality]!
   el.dataset.quality = String(QUALITY_STEPS[quality])
   // Read by the stylesheet, so static frames place the sub text too.
-  const offset = variant.value.subtitleOffset?.(height)
+  const offset = variant.value.subtitleOffset?.(height, size.value)
   if (offset) el.style.setProperty("--ix-sub-offset", `${offset.toFixed(1)}px`)
   else el.style.removeProperty("--ix-sub-offset")
   // Assigning a canvas size, even the same one, throws away its backing
@@ -275,10 +301,16 @@ const clearTextStyles = () => {
   })
 }
 
-const restart = () => {
+const resetClocks = () => {
   startedAt = performance.now()
   textIn = 0
   textOut = null
+  clockAt = 0
+  clockBase = 0
+}
+
+const restart = () => {
+  resetClocks()
   if (isStatic.value) draw(STATIC_FRAME_T)
 }
 
@@ -307,16 +339,21 @@ watch(
     awaitHeadingFont()
   }
 )
+watch(speed, (next) => {
+  const t = elapsed()
+  clockBase = artTime(t)
+  clockAt = t
+  clockSpeed = next
+})
+// Colours, tone and size apply in place, without replaying the intro. Size
+// moves Rolling Stone's sub text, which resize() places.
+watch([variant, size], () => resize())
 // Going from a still frame to animated plays the intro from the start.
 watch(mode, (next, prev) => {
   stop()
   if (next === "preview") observeVisibility()
   if (next === "static") clearTextStyles()
-  else if (prev === "static") {
-    startedAt = performance.now()
-    textIn = 0
-    textOut = null
-  }
+  else if (prev === "static") resetClocks()
   resize()
   start()
 })
