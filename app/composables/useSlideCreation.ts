@@ -986,7 +986,6 @@ export default function useSlideCreation() {
     usePosthogCapture("NEW_CAMERA_SLIDE_CREATED", {
       fit: input.fit,
       mirror: input.mirror,
-      effect: input.effect ?? "none",
     })
     return withCameraData(tempSlide, { id: useID(), ...input })
   }

@@ -17,6 +17,129 @@
       <div
         class="relative flex w-max items-center gap-1 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
       >
+        <!-- CAMERA EFFECTS: a camera slide has no text, so these are all its
+             toolbar shows. -->
+        <template v-if="isCamera">
+          <CowTooltip text="Camera effect" :prevent="effectMenuOpen">
+            <CowSelectMenu
+              :model-value="cameraEffectLabel(cameraEffect)"
+              size="md"
+              :select-class="`h-10 border-0 shadow-none outline-none text-center w-[236px] bg-gray-100 dark:bg-[#222938] dark:text-white rounded-full`"
+              variant="none"
+              color="gray"
+              :popper="{ strategy: 'fixed' }"
+              :ui-menu="{
+                width: 'w-[236px]',
+                input: 'text-xs',
+                empty: 'text-xs',
+                option: {
+                  size: 'text-xs',
+                },
+              }"
+              :options="cameraEffects.map((item) => item.label)"
+              @update:model-value="onSelectEffect"
+              @open="effectMenuOpen = true"
+              @close="effectMenuOpen = false"
+            >
+              <template #label>
+                <IconWrapper name="i-tabler-sparkles" size="4" />
+                <span class="truncate">{{
+                  cameraEffectLabel(cameraEffect)
+                }}</span>
+              </template>
+            </CowSelectMenu>
+          </CowTooltip>
+
+          <template v-if="echoActive">
+            <!-- What gets copied -->
+            <div class="button-group rounded-md p-1 flex items-center gap-1">
+              <CowTooltip text="Copy only the people">
+                <UButton
+                  @click="patchEcho({ subject: 'people' })"
+                  variant="ghost"
+                  color="gray"
+                  class="toolbar-icon-btn"
+                  :class="{
+                    'toolbar-toggle-active': echoSettings.subject === 'people',
+                  }"
+                  :aria-pressed="echoSettings.subject === 'people'"
+                  aria-label="Copy only the people"
+                  icon="i-tabler-user"
+                />
+              </CowTooltip>
+              <CowTooltip text="Copy the whole picture">
+                <UButton
+                  @click="patchEcho({ subject: 'whole' })"
+                  variant="ghost"
+                  color="gray"
+                  class="toolbar-icon-btn"
+                  :class="{
+                    'toolbar-toggle-active': echoSettings.subject === 'whole',
+                  }"
+                  :aria-pressed="echoSettings.subject === 'whole'"
+                  aria-label="Copy the whole picture"
+                  icon="i-tabler-photo"
+                />
+              </CowTooltip>
+            </div>
+
+            <!-- Which side the copies go -->
+            <div class="button-group rounded-md p-1 flex items-center gap-1">
+              <CowTooltip
+                v-for="side in echoSides"
+                :key="side.value"
+                :text="side.label"
+              >
+                <UButton
+                  @click="patchEcho({ direction: side.value })"
+                  variant="ghost"
+                  color="gray"
+                  class="toolbar-icon-btn"
+                  :class="{
+                    'toolbar-toggle-active':
+                      echoSettings.direction === side.value,
+                  }"
+                  :aria-pressed="echoSettings.direction === side.value"
+                  :aria-label="side.label"
+                  :icon="side.icon"
+                />
+              </CowTooltip>
+            </div>
+
+            <UPopover
+              v-model:open="echoPanelOpen"
+              mode="click"
+              :popper="{ placement: 'bottom', strategy: 'fixed' }"
+              :ui="{
+                ring: 'ring-0',
+                background: 'bg-transparent',
+                shadow: 'shadow-xl',
+                rounded: 'rounded-2xl',
+              }"
+            >
+              <CowTooltip
+                text="Copies, spacing, fade and colour fringe"
+                :prevent="echoPanelOpen"
+              >
+                <UButton
+                  :class="[
+                    'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+                    { 'toolbar-toggle-active': echoPanelOpen },
+                  ]"
+                  icon="i-tabler-adjustments-horizontal"
+                  variant="ghost"
+                  color="gray"
+                  >Adjust</UButton
+                >
+              </CowTooltip>
+              <template #panel>
+                <CameraEchoPanel :settings="echoSettings" @update="patchEcho" />
+              </template>
+            </UPopover>
+          </template>
+        </template>
+
+        <template v-else>
         <!-- SLIDE CONTENT CASE CONTROLS -->
         <CowTooltip
           text="Uppercase"
@@ -562,6 +685,7 @@
             >
           </CowTooltip>
         </div>
+        </template>
       </div>
     </div>
     <CowScrollFade
@@ -576,11 +700,19 @@
 
 <script setup lang="ts">
 import type {
+  CameraEchoSettings,
+  CameraSlideData,
   ExtendedFileT,
   ExternalVideo,
   Slide,
   SongSetlistData,
 } from "~/types"
+import {
+  cameraEffectLabel,
+  cameraEffectOf,
+  cameraEffects,
+  echoSettingsOf,
+} from "~/utils/camera"
 import { appWideActions } from "~/utils/constants"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 import {
@@ -621,7 +753,40 @@ const emit = defineEmits([
   "update-bg-fill-type",
   "update-media-muted",
   "update-media-seek",
+  "update-camera",
 ])
+
+// ─── CAMERA EFFECTS ──────────────────────────────────────────────────────────
+// Saved on the slide's camera data (see utils/camera), which the projector
+// reads, so a change shows on screen as soon as it is saved.
+const isCamera = computed(() => props.slide?.type === slideTypes.camera)
+const cameraData = computed(() =>
+  isCamera.value ? (props.slide?.data as CameraSlideData | undefined) : null
+)
+const cameraEffect = computed(() => cameraEffectOf(cameraData.value))
+const echoActive = computed(
+  () => cameraEffect.value === "main-character-echo"
+)
+const echoSettings = computed(() => echoSettingsOf(cameraData.value))
+const effectMenuOpen = ref(false)
+const echoPanelOpen = ref(false)
+
+const echoSides = [
+  { value: "left", label: "Copies to the left", icon: "i-tabler-arrow-narrow-left" },
+  { value: "right", label: "Copies to the right", icon: "i-tabler-arrow-narrow-right" },
+  { value: "both", label: "Copies on both sides", icon: "i-tabler-arrows-horizontal" },
+] as const
+
+const onSelectEffect = (label: string) => {
+  const effect =
+    cameraEffects.find((item) => item.label === label)?.value ?? "none"
+  if (effect === cameraEffect.value) return
+  emit("update-camera", { effect })
+  usePosthogCapture("CAMERA_EFFECT_CHANGED", { effect })
+}
+
+const patchEcho = (patch: Partial<CameraEchoSettings>) =>
+  emit("update-camera", { echo: { ...echoSettings.value, ...patch } })
 
 const isMediaFileButNotExternalMedia = computed(() => {
   const mediaType = (props.slide?.data as ExternalVideo)?.type
@@ -711,6 +876,7 @@ const hasPlayableMedia = computed(() => {
 
 const supportsTextStyling = computed(
   () =>
+    !isCamera.value &&
     !(
       props.slide?.type === slideTypes.text ||
       props.slide?.type === slideTypes.media ||
@@ -720,6 +886,7 @@ const supportsTextStyling = computed(
 
 const supportsLineBackground = computed(
   () =>
+    !isCamera.value &&
     !(
       props.slide?.type === slideTypes.media ||
       props.slide?.type === slideTypes.presentation
@@ -728,6 +895,7 @@ const supportsLineBackground = computed(
 
 const supportsAlignment = computed(
   () =>
+    !isCamera.value &&
     !(
       props.slide?.type === slideTypes?.media ||
       props.slide?.type === slideTypes?.presentation
