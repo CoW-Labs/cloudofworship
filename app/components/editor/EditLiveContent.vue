@@ -413,10 +413,10 @@
         v-else-if="
           slide &&
           !isEmptySongSetlist &&
-          slide.type !== slideTypes.interlude &&
-          slide.type !== slideTypes.camera
+          slide.type !== slideTypes.interlude
         "
         :slide="slide"
+        @update-camera="patchCamera({ ...cameraInput, ...$event })"
         @update-style="onUpdateSlideStyle($event, false)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
         @update-font="onUpdateFont($event)"

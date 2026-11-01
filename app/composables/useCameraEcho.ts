@@ -1,5 +1,23 @@
 import type { Ref } from "vue"
-import { createEchoRenderer, type EchoOptions, type EchoRenderer } from "~/utils/cameraEcho"
+import type { CameraEchoSettings } from "~/types"
+import { createEchoRenderer, type EchoRenderer } from "~/utils/cameraEcho"
+import {
+  latestPersonMask,
+  personSegmenterState,
+  refreshPersonMask,
+} from "~/utils/personSegmenter"
+
+export interface CameraEchoOptions {
+  /** The echo's settings, or null for no effect. */
+  settings: CameraEchoSettings | null
+  /** Whether the feed is flipped by CSS. */
+  mirrored: boolean
+  /**
+   * The shortest gap between person detections for this feed, in ms. The
+   * projector wants smooth outlines; an operator's thumbnail can lag a little.
+   */
+  detectionIntervalMs: number
+}
 
 type FrameCallbackVideo = HTMLVideoElement & {
   requestVideoFrameCallback?: (callback: () => void) => number
@@ -7,7 +25,9 @@ type FrameCallbackVideo = HTMLVideoElement & {
 }
 
 /**
- * Draws the echo effect from `video` into `canvas` once per camera frame.
+ * Draws the "Main character echo" from `video` into `canvas` once per camera
+ * frame, asking the person detector for a fresh outline as it goes (it skips
+ * the request when it is busy or the last outline is recent enough).
  *
  * `drawing` turns true once a frame is on the canvas, so the caller can hold
  * the canvas hidden until then and keep showing the plain video wherever WebGL
@@ -17,7 +37,7 @@ type FrameCallbackVideo = HTMLVideoElement & {
 export default function useCameraEcho(
   video: Ref<HTMLVideoElement | null>,
   canvas: Ref<HTMLCanvasElement | null>,
-  options: Ref<EchoOptions & { enabled: boolean }>
+  options: Ref<CameraEchoOptions>
 ) {
   const drawing = ref(false)
 
@@ -71,8 +91,28 @@ export default function useCameraEcho(
     frameHandle = null
     rafHandle = null
     const element = video.value
-    if (!renderer || !element) return
-    const drew = renderer.draw(element, options.value)
+    const { settings, mirrored, detectionIntervalMs } = options.value
+    if (!renderer || !element || !settings) return
+    let drawSettings = settings
+    let mask = null
+    if (settings.subject === "people") {
+      if (personSegmenterState.value === "failed") {
+        // Without detection (no WebGL for TensorFlow.js, or the model would
+        // not load) the whole picture is copied, rather than no effect at all.
+        drawSettings = { ...settings, subject: "whole" }
+      } else {
+        // Feeds of one camera share its stream, and so its outline.
+        const stream = element.srcObject as MediaStream | null
+        const key = stream?.id ?? element.currentSrc
+        mask = latestPersonMask(key)
+        void refreshPersonMask(element, key, detectionIntervalMs)
+      }
+    }
+    const drew = renderer.draw(element, {
+      settings: drawSettings,
+      mirrored,
+      mask,
+    })
     if (drew !== drawing.value) drawing.value = drew
     schedule(element)
   }
@@ -93,7 +133,7 @@ export default function useCameraEcho(
     cancelLoop()
     const element = video.value
     const target = canvas.value
-    if (!options.value.enabled || !element || !target) {
+    if (!options.value.settings || !element || !target) {
       teardown()
       return
     }
@@ -116,7 +156,7 @@ export default function useCameraEcho(
     { immediate: true }
   )
 
-  watch([video, canvas, () => options.value.enabled], () => restart(), {
+  watch([video, canvas, () => !!options.value.settings], () => restart(), {
     flush: "post",
   })
 
