@@ -421,10 +421,11 @@
                       v-if="appStore.pairForSlide(slide?.id)"
                       text="Slide pair: both slides go live together"
                     >
-                      <UIcon
-                        name="i-tabler-layout-columns"
-                        class="w-4 h-4 text-primary-500"
-                      />
+                      <span
+                        class="inline-flex items-center justify-center rounded-full p-[5px] bg-primary-100 text-primary-700"
+                      >
+                        <UIcon name="i-tabler-layout-columns" class="w-4 h-4" />
+                      </span>
                     </CowTooltip>
                   </div>
                 </div>

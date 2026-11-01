@@ -138,6 +138,8 @@ import CameraIcon from "~/components/svgs/CameraIcon.vue"
 import useCameraStream, {
   cameraCaptureIsExclusive,
   cameraErrorState,
+  CameraStreamError,
+  reportCameraFailure,
 } from "~/composables/useCameraStream"
 import useCameraOnAir from "~/composables/useCameraOnAir"
 
@@ -216,11 +218,16 @@ const refresh = async () => {
   unsupported.value = false
   try {
     cameras.value = await listCameras({ probe: !holdCamera.value })
+    // "No camera detected" is a failure to the operator, though nothing threw.
+    if (!cameras.value.length && !holdCamera.value) {
+      reportCameraFailure("picker", new CameraStreamError("missing"))
+    }
     // A new slide starts on the first camera rather than an empty preview.
     const first = cameras.value[0]
     if (!props.modelValue.deviceId && first) select(first)
   } catch (error) {
     cameras.value = []
+    reportCameraFailure("picker", error)
     const state = cameraErrorState(error)
     if (state === "denied") permissionDenied.value = true
     else if (state === "unsupported") unsupported.value = true

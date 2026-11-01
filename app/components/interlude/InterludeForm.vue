@@ -26,6 +26,11 @@
       @update:model-value="onTextBackground"
     />
 
+    <InterludeStyleControls
+      :model-value="local"
+      @update:model-value="update($event)"
+    />
+
     <div>
       <p class="mb-2 text-xs text-gray-500 dark:text-[#9BA3B2]">
         Animation · hover to preview

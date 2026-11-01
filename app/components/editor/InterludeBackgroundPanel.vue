@@ -70,6 +70,19 @@
         </div>
       </form>
 
+      <!-- Each change applies straight away, like picking an animation. -->
+      <div
+        v-else-if="activeSection === 'style'"
+        class="min-h-0 flex-1 overflow-y-auto rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
+      >
+        <InterludeStyleControls
+          bare
+          :model-value="styleOf()"
+          size="sm"
+          @update:model-value="$emit('save-style', $event)"
+        />
+      </div>
+
       <div
         v-else
         class="min-h-0 flex-1 overflow-y-auto rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
@@ -124,8 +137,9 @@ import {
 } from "~/utils/interlude/engine"
 import { interludeModeKey } from "~/utils/interlude/context"
 import { defaultInterludeData } from "~/utils/interlude/slide"
+import type { InterludeStyle } from "~/components/interlude/InterludeStyleControls.vue"
 
-type SectionKey = "animation" | "texts"
+type SectionKey = "animation" | "texts" | "style"
 type PanelSize = { width: number; height: number }
 type InterludeTexts = Pick<
   InterludeSlideData,
@@ -139,6 +153,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "select", variant: string): void
   (e: "save-texts", texts: InterludeTexts): void
+  (e: "save-style", style: InterludeStyle): void
   (e: "resize", size: PanelSize): void
   (e: "close"): void
 }>()
@@ -152,21 +167,25 @@ const value = computed(() => slideData.value.variant)
 const sections: { key: SectionKey; label: string }[] = [
   { key: "animation", label: "Animation" },
   { key: "texts", label: "Texts" },
+  { key: "style", label: "Style" },
 ]
 
 const headings: Record<SectionKey, string> = {
   animation: "Choose Background Animation",
   texts: "Edit Texts",
+  style: "Colour, Size and Speed",
 }
 
 const panelSizes: Record<SectionKey, PanelSize> = {
   animation: { width: 753, height: 330 },
   texts: { width: 640, height: 240 },
+  style: { width: 640, height: 330 },
 }
 
 const mobilePanelSizes: Record<SectionKey, PanelSize> = {
   animation: { width: 9999, height: 460 },
   texts: { width: 9999, height: 380 },
+  style: { width: 9999, height: 460 },
 }
 
 // Texts are edited as a draft and applied together on Save, so the live slide
@@ -177,6 +196,12 @@ const textsOf = (): InterludeTexts => ({
   textBackground: slideData.value.textBackground,
 })
 const draft = reactive<InterludeTexts>(textsOf())
+const styleOf = (): InterludeStyle => ({
+  color: slideData.value.color,
+  tone: slideData.value.tone,
+  size: slideData.value.size,
+  speed: slideData.value.speed,
+})
 watch(
   () => props.slide?.id,
   () => Object.assign(draft, textsOf())

@@ -1,14 +1,29 @@
 import type { InterludeSlideData, Slide } from "~/types"
 import useSlideContent from "~/composables/useSlideContent"
 import { backgroundTypes } from "~/utils/constants"
-import { DEFAULT_INTERLUDE_VARIANT, getInterludeVariant } from "./engine"
+import {
+  DEFAULT_INTERLUDE_VARIANT,
+  customizeInterludeVariant,
+  getInterludeVariant,
+} from "./engine"
 
 export const defaultInterludeData = (): Omit<InterludeSlideData, "id"> => ({
   variant: DEFAULT_INTERLUDE_VARIANT,
   heading: "Welcome Home",
   subtitle: "We'll begin shortly",
   textBackground: "auto",
+  color: null,
+  tone: "mix",
+  size: 1,
+  speed: 1,
 })
+
+/** The slide's variant with its colours and tone applied. */
+export const interludeVariantFor = (data?: Partial<InterludeSlideData>) =>
+  customizeInterludeVariant(getInterludeVariant(data?.variant), {
+    tone: data?.tone,
+    color: data?.color,
+  })
 
 /**
  * Returns the slide with its interlude data applied, keeping the fields
@@ -22,7 +37,7 @@ export const withInterludeData = (
   slide: Slide,
   data: InterludeSlideData
 ): Slide => {
-  const variant = getInterludeVariant(data.variant)
+  const variant = interludeVariantFor(data)
   const next: Slide = {
     ...slide,
     data,

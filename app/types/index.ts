@@ -274,6 +274,17 @@ export interface InterludeSlideData {
   subtitle: string
   /** "auto" follows the variant's default. */
   textBackground: "auto" | "on" | "off"
+  /**
+   * Tints the animation from one colour (its partner colour is derived);
+   * null keeps the variant's own colours.
+   */
+  color?: string | null
+  /** "mix" plays both palettes; "light" / "dark" hold one. Default "mix". */
+  tone?: "mix" | "light" | "dark"
+  /** Artwork size multiplier, 0.5 to 1.5. Default 1. */
+  size?: number
+  /** Animation speed multiplier, 0.3 to 2. Default 1. */
+  speed?: number
 }
 
 /**
@@ -288,6 +299,60 @@ export interface CameraSlideData {
   deviceLabel: string
   fit: "cover" | "contain"
   mirror: boolean
+  /** A look drawn over the feed. Absent on slides made before effects. */
+  effect?: CameraEffect
+  /** Settings for "main-character-echo"; missing values use the defaults. */
+  echo?: Partial<CameraEchoSettings>
+  /** Settings for "light-leak"; missing values use the defaults. */
+  lightLeak?: Partial<LightLeakSettings>
+}
+
+/**
+ * `main-character-echo` repeats the people on screen in fading copies to one
+ * or both sides, each with a red/cyan fringe, the stage-concert look.
+ * `light-leak` flashes bursts of burnt orange film over the picture, with
+ * scratches and dust, as a film camera's light leaks and frame burns do.
+ */
+export type CameraEffect = "none" | "main-character-echo" | "light-leak"
+
+export interface LightLeakSettings {
+  /** How strongly the burst lights the picture, in %. */
+  strength: number
+  /** How fast the film runs through a burst, in % of normal. */
+  speed: number
+  /** Seconds of plain picture between bursts; 0 runs them back to back. */
+  rest: number
+}
+
+export interface CameraEchoSettings {
+  /**
+   * `people` copies only the people found by on-device person detection;
+   * `whole` copies the whole picture, blended so only its bright parts show.
+   */
+  subject: "people" | "whole"
+  /**
+   * With `subject` "people": `main` copies only the biggest person in shot
+   * (usually the one nearest the camera), `everyone` copies all of them.
+   */
+  focus: "main" | "everyone"
+  /** The side of the screen the copies go to. */
+  direction: "left" | "right" | "both"
+  /** Copies on each side, 1 to 4. */
+  copies: number
+  /** How far the first copy sits from the real one, in % of the frame's width. */
+  gap: number
+  /** Gap between one copy and the next, in % of the frame's width. */
+  spacing: number
+  /** Degrees the line of copies climbs (or, below 0, falls) as it goes out. */
+  rise: number
+  /** Size of each copy against the real person, in %. */
+  scale: number
+  /** Opacity of the nearest copy, in %. */
+  strength: number
+  /** How much of the previous copy's opacity each further copy keeps, in %. */
+  falloff: number
+  /** How far a copy's red and blue part, in % of the frame's width. */
+  fringe: number
 }
 
 /**

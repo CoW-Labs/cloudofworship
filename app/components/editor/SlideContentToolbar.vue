@@ -17,6 +17,84 @@
       <div
         class="relative flex w-max items-center gap-1 px-2 py-1 text-gray-600 dark:text-[#a7afbd]"
       >
+        <!-- CAMERA EFFECTS: a camera slide has no text, so these are all its
+             toolbar shows. -->
+        <template v-if="isCamera">
+          <UPopover
+            v-model:open="effectMenuOpen"
+            mode="click"
+            :popper="{ placement: 'bottom-start', strategy: 'fixed' }"
+            :ui="{
+              ring: 'ring-0',
+              background: 'bg-transparent',
+              shadow: 'shadow-xl',
+              rounded: 'rounded-2xl',
+            }"
+          >
+            <CowTooltip text="Camera effect" :prevent="effectMenuOpen">
+              <UButton
+                class="h-10 w-[236px] justify-between rounded-full bg-gray-100 px-4 text-xs text-gray-800 hover:bg-gray-200 dark:bg-[#222938] dark:text-white dark:hover:bg-[#2b3242]"
+                variant="ghost"
+                color="gray"
+                :aria-expanded="effectMenuOpen"
+              >
+                <span class="flex min-w-0 items-center gap-2">
+                  <IconWrapper name="i-tabler-sparkles" size="4" />
+                  <span class="truncate">{{
+                    cameraEffectLabel(cameraEffect)
+                  }}</span>
+                </span>
+                <IconWrapper name="i-tabler-chevron-down" size="4" />
+              </UButton>
+            </CowTooltip>
+            <template #panel>
+              <CameraEffectPicker
+                :model-value="cameraEffect"
+                @select="onSelectEffect"
+              />
+            </template>
+          </UPopover>
+
+          <UPopover
+            v-if="effectPanel"
+            v-model:open="effectPanelOpen"
+            mode="click"
+            :popper="{ placement: 'bottom', strategy: 'fixed' }"
+            :ui="{
+              ring: 'ring-0',
+              background: 'bg-transparent',
+              shadow: 'shadow-xl',
+              rounded: 'rounded-2xl',
+            }"
+          >
+            <CowTooltip :text="effectPanel.tooltip" :prevent="effectPanelOpen">
+              <UButton
+                :class="[
+                  'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+                  { 'toolbar-toggle-active': effectPanelOpen },
+                ]"
+                icon="i-tabler-adjustments-horizontal"
+                variant="ghost"
+                color="gray"
+                >Adjust</UButton
+              >
+            </CowTooltip>
+            <template #panel>
+              <CameraEffectPanel
+                :title="effectPanel.title"
+                :note="effectPanel.note"
+                :choices="effectPanel.choices"
+                :settings="effectPanel.settings"
+                :sliders="effectPanel.sliders"
+                :ranges="effectPanel.ranges"
+                :defaults="effectPanel.defaults"
+                @update="effectPanel.update"
+              />
+            </template>
+          </UPopover>
+        </template>
+
+        <template v-else>
         <!-- SLIDE CONTENT CASE CONTROLS -->
         <CowTooltip
           text="Uppercase"
@@ -562,6 +640,7 @@
             >
           </CowTooltip>
         </div>
+        </template>
       </div>
     </div>
     <CowScrollFade
@@ -576,11 +655,29 @@
 
 <script setup lang="ts">
 import type {
+  CameraEchoSettings,
+  CameraEffect,
+  CameraSlideData,
   ExtendedFileT,
   ExternalVideo,
+  LightLeakSettings,
   Slide,
   SongSetlistData,
 } from "~/types"
+import {
+  cameraEffectLabel,
+  cameraEffectOf,
+  defaultEchoSettings,
+  defaultLightLeakSettings,
+  echoRanges,
+  echoSettingsOf,
+  echoSliders,
+  lightLeakRanges,
+  lightLeakSettingsOf,
+  lightLeakSliders,
+  type CameraEffectChoice,
+} from "~/utils/camera"
+import { personSegmenterState } from "~/utils/personSegmenter"
 import { appWideActions } from "~/utils/constants"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 import {
@@ -621,7 +718,119 @@ const emit = defineEmits([
   "update-bg-fill-type",
   "update-media-muted",
   "update-media-seek",
+  "update-camera",
 ])
+
+// ─── CAMERA EFFECTS ──────────────────────────────────────────────────────────
+// Saved on the slide's camera data (see utils/camera), which the projector
+// reads, so a change shows on screen as soon as it is saved.
+const isCamera = computed(() => props.slide?.type === slideTypes.camera)
+const cameraData = computed(() =>
+  isCamera.value ? (props.slide?.data as CameraSlideData | undefined) : null
+)
+const cameraEffect = computed(() => cameraEffectOf(cameraData.value))
+const echoSettings = computed(() => echoSettingsOf(cameraData.value))
+const effectMenuOpen = ref(false)
+const effectPanelOpen = ref(false)
+
+// The echo's either/or settings, shown as dropdowns in its Adjust panel.
+// "Main person" copies only the person nearest the camera (`focus` "main").
+const echoChoices = computed((): CameraEffectChoice[] => {
+  const { subject, direction } = echoSettings.value
+  return [
+    {
+      label: "Who gets copied",
+      options: [
+        {
+          label: "Main person",
+          icon: "i-tabler-user",
+          active: subject === "people",
+          patch: { subject: "people", focus: "main" },
+        },
+        {
+          label: "Whole picture",
+          icon: "i-tabler-photo",
+          active: subject === "whole",
+          patch: { subject: "whole" },
+        },
+      ],
+    },
+    {
+      label: "Which side the copies go",
+      options: [
+        { label: "Left", icon: "i-tabler-arrow-narrow-left", value: "left" },
+        { label: "Right", icon: "i-tabler-arrow-narrow-right", value: "right" },
+        { label: "Both", icon: "i-tabler-arrows-horizontal", value: "both" },
+      ].map(({ value, ...option }) => ({
+        ...option,
+        active: direction === value,
+        patch: { direction: value },
+      })),
+    },
+  ]
+})
+
+const onSelectEffect = (effect: CameraEffect) => {
+  effectMenuOpen.value = false
+  if (effect === cameraEffect.value) return
+  emit("update-camera", { effect })
+  usePosthogCapture("CAMERA_EFFECT_CHANGED", { effect })
+}
+
+const lightLeakSettings = computed(() => lightLeakSettingsOf(cameraData.value))
+const patchLightLeak = (patch: Partial<LightLeakSettings>) =>
+  emit("update-camera", {
+    lightLeak: { ...lightLeakSettings.value, ...patch },
+  })
+
+const echoNote = computed(() => {
+  if (echoSettings.value.subject === "whole") {
+    return "Works best with a well-lit person on a dark stage."
+  }
+  if (personSegmenterState.value === "failed") {
+    return "This computer can't pick out people, so the whole picture is copied."
+  }
+  if (personSegmenterState.value === "loading") {
+    return "Getting ready to find people…"
+  }
+  return "Looks cleanest with a plain wall or screen behind the person."
+})
+
+// The Adjust panel's contents for the chosen effect, or null for none.
+const effectPanel = computed(() => {
+  if (cameraEffect.value === "main-character-echo") {
+    return {
+      title: "Main character echo",
+      tooltip: "Who gets copied, which side, how many and how far",
+      note: echoNote.value,
+      choices: echoChoices.value,
+      settings: echoSettings.value as unknown as Record<string, unknown>,
+      sliders: echoSliders,
+      ranges: echoRanges,
+      defaults: defaultEchoSettings() as unknown as Record<string, unknown>,
+      update: (patch: Record<string, unknown>) =>
+        patchEcho(patch as Partial<CameraEchoSettings>),
+    }
+  }
+  if (cameraEffect.value === "light-leak") {
+    return {
+      title: "Light leak",
+      tooltip: "Strength, speed and rest between bursts",
+      note: "",
+      choices: [],
+      settings: lightLeakSettings.value as unknown as Record<string, unknown>,
+      sliders: lightLeakSliders,
+      ranges: lightLeakRanges,
+      defaults: defaultLightLeakSettings() as unknown as Record<string, unknown>,
+      update: (patch: Record<string, unknown>) =>
+        patchLightLeak(patch as Partial<LightLeakSettings>),
+    }
+  }
+  return null
+})
+
+const patchEcho = (patch: Partial<CameraEchoSettings>) =>
+  emit("update-camera", { echo: { ...echoSettings.value, ...patch } })
 
 const isMediaFileButNotExternalMedia = computed(() => {
   const mediaType = (props.slide?.data as ExternalVideo)?.type
@@ -711,6 +920,7 @@ const hasPlayableMedia = computed(() => {
 
 const supportsTextStyling = computed(
   () =>
+    !isCamera.value &&
     !(
       props.slide?.type === slideTypes.text ||
       props.slide?.type === slideTypes.media ||
@@ -720,6 +930,7 @@ const supportsTextStyling = computed(
 
 const supportsLineBackground = computed(
   () =>
+    !isCamera.value &&
     !(
       props.slide?.type === slideTypes.media ||
       props.slide?.type === slideTypes.presentation
@@ -728,6 +939,7 @@ const supportsLineBackground = computed(
 
 const supportsAlignment = computed(
   () =>
+    !isCamera.value &&
     !(
       props.slide?.type === slideTypes?.media ||
       props.slide?.type === slideTypes?.presentation
