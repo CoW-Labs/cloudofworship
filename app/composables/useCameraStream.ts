@@ -513,6 +513,45 @@ export const postCameraPrewarm = (data: CameraSettingsInput) =>
     data: { deviceId: data.deviceId, deviceLabel: data.deviceLabel },
   })
 
+/**
+ * Where a camera failure was seen: the projector or an operator preview (see
+ * CameraQuality), or the camera picker listing cameras.
+ */
+export type CameraFailureSource = CameraQuality | "picker"
+
+// The projector retries a failed feed every few seconds, so the same failure
+// is reported once per window per minute, not once per retry.
+const FAILURE_REPORT_INTERVAL_MS = 60_000
+const lastFailureReport = new Map<string, number>()
+
+/**
+ * Tells PostHog a camera could not be shown. The failure itself is handled
+ * where it happens (a message in the operator's preview, black on the
+ * projector); without this nothing reaches us.
+ */
+export const reportCameraFailure = (
+  source: CameraFailureSource,
+  error: unknown,
+  data?: Partial<CameraSettingsInput> | null
+) => {
+  const state = cameraErrorState(error)
+  const key = `${source}:${state}:${data?.deviceLabel || data?.deviceId || ""}`
+  const now = Date.now()
+  if (now - (lastFailureReport.get(key) ?? 0) < FAILURE_REPORT_INTERVAL_MS) return
+  lastFailureReport.set(key, now)
+  const cause =
+    error instanceof CameraStreamError ? (error as any).cause : error
+  usePosthogCapture("CAMERA_STREAM_FAILED", {
+    source,
+    state,
+    errorName: (cause as DOMException | undefined)?.name || null,
+    errorMessage: (cause as Error | undefined)?.message || null,
+    deviceLabel: data?.deviceLabel || null,
+    hasDeviceId: !!data?.deviceId,
+    exclusiveCapture: cameraCaptureIsExclusive(),
+  })
+}
+
 /** Stops every camera this window has open, grace period or not. */
 const releaseAllCameras = () => {
   ;[...cache.values()].forEach(evict)

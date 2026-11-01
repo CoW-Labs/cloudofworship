@@ -70,6 +70,8 @@ import useCameraStream, {
   cameraCaptureIsExclusive,
   cameraErrorMessage,
   cameraErrorState,
+  CameraStreamError,
+  reportCameraFailure,
   type CameraDeviceMatch,
   type CameraErrorState,
   type CameraHandle,
@@ -172,6 +174,7 @@ const attach = (next: CameraHandle) => {
     handle = null
     if (videoEl.value) videoEl.value.srcObject = null
     status.value = "missing"
+    reportCameraFailure(props.quality, new CameraStreamError("missing"), props.data)
   })
   // Safari's engine (and the macOS app) mutes this page's camera for good when
   // another page opens it. Let go and report it; on the projector the retry
@@ -183,6 +186,7 @@ const attach = (next: CameraHandle) => {
       if (handle !== next) return
       detach()
       status.value = "in-use"
+      reportCameraFailure(props.quality, new CameraStreamError("in-use"), props.data)
     }
     track.addEventListener("mute", onMute)
     stopMuteWatch = () => track.removeEventListener("mute", onMute)
@@ -227,6 +231,7 @@ const start = async () => {
     if (mine !== token) return
     if (videoEl.value) videoEl.value.srcObject = null
     status.value = cameraErrorState(error)
+    reportCameraFailure(props.quality, error, props.data)
   }
 }
 
