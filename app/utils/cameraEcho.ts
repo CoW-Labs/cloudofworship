@@ -1,23 +1,25 @@
+import type { CameraEchoSettings } from "~/types"
+import type { PersonMask } from "~/utils/personSegmenter"
+
 /**
- * The camera slide's echo effect: the picture repeated in fading copies to one
- * side, each with a red/cyan fringe, as seen on concert broadcasts.
+ * The camera slide's "Main character echo": the people on screen repeated in
+ * fading copies to one or both sides, each with a red/cyan fringe, as seen on
+ * concert broadcasts.
  *
  * One WebGL pass per camera frame: the frame is uploaded once and the shader
- * samples it at each copy's offset. A copy only brightens what is under it
- * (lighten blend), so a lit singer echoes across a dark stage while the dark
- * parts of a copy never dim the original. Canvas 2D would need a draw per copy
- * plus offscreen passes for the fringe, which falls to the CPU on laptops whose
- * GPU Chrome has blocklisted.
+ * samples it at each copy's offset. With a person outline (see
+ * personSegmenter) a copy is the people only, laid behind the real ones. With
+ * none ("whole picture") a copy only brightens what is under it (lighten
+ * blend), so a lit singer echoes across a dark stage while the dark parts of a
+ * copy never dim the original. Canvas 2D would need a draw per copy plus
+ * offscreen passes for the fringe, which falls to the CPU on laptops whose GPU
+ * Chrome has blocklisted.
  */
 
-/** Gap between copies, as a share of the frame's width. */
-const ECHO_STEP = 0.075
-/** How far the red and blue of a copy part, as a share of the width. */
-const ECHO_FRINGE = 0.0035
-/** Strength of each copy, nearest first. */
-const ECHO_STRENGTHS = [0.72, 0.5, 0.3] as const
 /** The largest frame drawn; a 4K capture card is scaled down to this. */
 const MAX_WIDTH = 1920
+/** The shader's loop bound; the settings never ask for more copies a side. */
+const MAX_COPIES = 4
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -32,15 +34,31 @@ void main() {
 const FRAGMENT_SHADER = `
 precision mediump float;
 uniform sampler2D u_frame;
+uniform sampler2D u_mask;
 uniform float u_step;
 uniform float u_fringe;
-uniform vec3 u_strengths;
+uniform float u_strength;
+uniform float u_falloff;
+uniform int u_copies;
+uniform int u_people;
+uniform int u_both;
+uniform vec2 u_maskScale;
+uniform vec2 u_maskOffset;
 varying vec2 v_uv;
 
-vec3 copyAt(float index) {
-  vec2 uv = vec2(v_uv.x - u_step * index, v_uv.y);
-  // Past the frame's edge there is nothing to echo (clamping would smear the
-  // edge column across the screen).
+// How much of a person is at uv (0 to 1), read from the outline grid. Past
+// the frame's edge there is nobody.
+float personAt(vec2 uv) {
+  float inside = step(0.0, uv.x) * step(uv.x, 1.0);
+  float p = texture2D(u_mask, uv * u_maskScale + u_maskOffset).r;
+  return smoothstep(0.35, 0.65, p) * inside;
+}
+
+// The picture shifted sideways by d (a share of the width), with its red and
+// blue parted. Past the frame's edge there is nothing to echo (clamping would
+// smear the edge column across the screen).
+vec3 copyAt(float d) {
+  vec2 uv = vec2(v_uv.x - d, v_uv.y);
   float inside = step(0.0, uv.x) * step(uv.x, 1.0);
   float r = texture2D(u_frame, vec2(uv.x + u_fringe, uv.y)).r;
   float g = texture2D(u_frame, uv).g;
@@ -48,26 +66,55 @@ vec3 copyAt(float index) {
   return vec3(r, g, b) * inside;
 }
 
+// Lays one copy, shifted by d, over the colour so far.
+vec3 echo(vec3 color, float d, float a) {
+  if (u_people == 1) {
+    // Each channel takes its own shifted outline, which gives the copy its
+    // red and cyan edges.
+    float x = v_uv.x - d;
+    vec3 cut = vec3(
+      personAt(vec2(x + u_fringe, v_uv.y)),
+      personAt(vec2(x, v_uv.y)),
+      personAt(vec2(x - u_fringe, v_uv.y))
+    );
+    return mix(color, copyAt(d), cut * a);
+  }
+  return mix(color, max(color, copyAt(d)), a);
+}
+
 void main() {
-  vec3 color = texture2D(u_frame, v_uv).rgb;
+  vec3 base = texture2D(u_frame, v_uv).rgb;
+  vec3 color = base;
   // Farthest first, so a nearer copy sits over a farther one.
-  color = mix(color, max(color, copyAt(3.0)), u_strengths.z);
-  color = mix(color, max(color, copyAt(2.0)), u_strengths.y);
-  color = mix(color, max(color, copyAt(1.0)), u_strengths.x);
+  for (int k = 0; k < ${MAX_COPIES}; k++) {
+    int i = ${MAX_COPIES} - k;
+    if (i > u_copies) continue;
+    float fi = float(i);
+    float a = u_strength * pow(u_falloff, fi - 1.0);
+    color = echo(color, u_step * fi, a);
+    if (u_both == 1) color = echo(color, -u_step * fi, a);
+  }
+  // The real people stay in front of their copies.
+  if (u_people == 1) color = mix(color, base, personAt(v_uv));
   gl_FragColor = vec4(color, 1.0);
 }
 `
 
-export interface EchoOptions {
-  /** The side of the screen the copies trail toward. */
-  direction: "left" | "right"
-  /** The canvas is flipped by CSS, so the trail is drawn the other way. */
+export interface EchoDrawOptions {
+  settings: CameraEchoSettings
+  /** The canvas is flipped by CSS, so the copies are drawn the other way. */
   mirrored: boolean
+  /**
+   * The latest person outline, or null. With `settings.subject` "people" and
+   * no outline yet, the plain picture is drawn rather than a whole-picture
+   * echo that would then jump to a people-only one.
+   */
+  mask: PersonMask | null
 }
 
 export interface EchoRenderer {
   /** Draws the video's current frame. False when there is no frame yet. */
-  draw: (video: HTMLVideoElement, options: EchoOptions) => boolean
+  draw: (video: HTMLVideoElement, options: EchoDrawOptions) => boolean
   dispose: () => void
 }
 
@@ -86,6 +133,19 @@ const compile = (
     return null
   }
   return shader
+}
+
+const makeTexture = (gl: WebGLRenderingContext, unit: number) => {
+  gl.activeTexture(gl.TEXTURE0 + unit)
+  const texture = gl.createTexture()
+  gl.bindTexture(gl.TEXTURE_2D, texture)
+  // Camera frames are rarely a power of two, which WebGL 1 only samples with
+  // clamped edges and no mipmaps.
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+  return texture
 }
 
 /**
@@ -131,27 +191,63 @@ export const createEchoRenderer = (
   gl.enableVertexAttribArray(position)
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0)
 
-  const texture = gl.createTexture()
-  gl.bindTexture(gl.TEXTURE_2D, texture)
-  // Camera frames are rarely a power of two, which WebGL 1 only samples with
-  // clamped edges and no mipmaps.
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-
-  const stepLocation = gl.getUniformLocation(program, "u_step")
-  gl.uniform1i(gl.getUniformLocation(program, "u_frame"), 0)
-  gl.uniform1f(gl.getUniformLocation(program, "u_fringe"), ECHO_FRINGE)
-  gl.uniform3f(
-    gl.getUniformLocation(program, "u_strengths"),
-    ...ECHO_STRENGTHS
+  const maskTexture = makeTexture(gl, 1)
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    1,
+    1,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    new Uint8Array(4)
   )
+  const frameTexture = makeTexture(gl, 0)
+
+  const uniform = (name: string) => gl.getUniformLocation(program, name)
+  const u = {
+    step: uniform("u_step"),
+    fringe: uniform("u_fringe"),
+    strength: uniform("u_strength"),
+    falloff: uniform("u_falloff"),
+    copies: uniform("u_copies"),
+    people: uniform("u_people"),
+    both: uniform("u_both"),
+    maskScale: uniform("u_maskScale"),
+    maskOffset: uniform("u_maskOffset"),
+  }
+  gl.uniform1i(uniform("u_frame"), 0)
+  gl.uniform1i(uniform("u_mask"), 1)
 
   let textureWidth = 0
   let textureHeight = 0
+  let maskVersion = -1
 
-  const draw = (video: HTMLVideoElement, options: EchoOptions) => {
+  const uploadMask = (mask: PersonMask) => {
+    if (mask.version === maskVersion) return
+    gl.activeTexture(gl.TEXTURE1)
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      mask.width,
+      mask.height,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      mask.pixels
+    )
+    gl.activeTexture(gl.TEXTURE0)
+    maskVersion = mask.version
+    // The outline grid's corners sit on the picture's corners (BodyPix reads
+    // sizes of 16n + 1), not half a cell in as texture sampling assumes.
+    const { width, height } = mask
+    gl.uniform2f(u.maskScale, (width - 1) / width, (height - 1) / height)
+    gl.uniform2f(u.maskOffset, 0.5 / width, 0.5 / height)
+  }
+
+  const draw = (video: HTMLVideoElement, options: EchoDrawOptions) => {
     const { videoWidth, videoHeight } = video
     if (
       gl.isContextLost() ||
@@ -185,28 +281,35 @@ export const createEchoRenderer = (
 
     // Reallocate only when the camera's size changes; otherwise refill.
     if (videoWidth !== textureWidth || videoHeight !== textureHeight) {
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGB,
-        gl.RGB,
-        gl.UNSIGNED_BYTE,
-        video
-      )
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, video)
       textureWidth = videoWidth
       textureHeight = videoHeight
     } else {
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGB, gl.UNSIGNED_BYTE, video)
     }
 
-    const toRight = (options.direction === "right") !== options.mirrored
-    gl.uniform1f(stepLocation, toRight ? ECHO_STEP : -ECHO_STEP)
+    const { settings, mirrored, mask } = options
+    const people = settings.subject === "people"
+    if (people && mask) uploadMask(mask)
+    const copies = people && !mask ? 0 : Math.min(MAX_COPIES, settings.copies)
+
+    // Left and right are the screen's, so a mirrored canvas draws them flipped.
+    const toRight = (settings.direction !== "left") !== mirrored
+    const step = settings.spacing / 100
+    gl.uniform1f(u.step, toRight ? step : -step)
+    gl.uniform1i(u.both, settings.direction === "both" ? 1 : 0)
+    gl.uniform1f(u.fringe, settings.fringe / 100)
+    gl.uniform1f(u.strength, settings.strength / 100)
+    gl.uniform1f(u.falloff, settings.falloff / 100)
+    gl.uniform1i(u.copies, copies)
+    gl.uniform1i(u.people, people && mask ? 1 : 0)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     return true
   }
 
   const dispose = () => {
-    gl.deleteTexture(texture)
+    gl.deleteTexture(frameTexture)
+    gl.deleteTexture(maskTexture)
     gl.deleteBuffer(buffer)
     gl.deleteProgram(program)
     gl.deleteShader(vertex)

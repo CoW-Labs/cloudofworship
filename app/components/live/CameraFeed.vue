@@ -14,9 +14,9 @@
       :style="data?.mirror ? 'transform: scaleX(-1)' : ''"
     ></video>
 
-    <!-- The echo effect, drawn from the video above (which keeps playing
-         underneath). Hidden until its first frame, so where WebGL is missing
-         the plain feed shows instead. -->
+    <!-- "Main character echo", drawn from the video above (which keeps
+         playing underneath). Hidden until its first frame, so where WebGL is
+         missing the plain feed shows instead. -->
     <canvas
       v-if="echoEnabled"
       ref="echoEl"
@@ -65,6 +65,7 @@
 import type { CameraSlideData } from "~/types"
 import CameraIcon from "~/components/svgs/CameraIcon.vue"
 import useCameraEcho from "~/composables/useCameraEcho"
+import { cameraEffectOf, echoSettingsOf } from "~/utils/camera"
 import useCameraStream, {
   cameraCaptureIsExclusive,
   cameraErrorMessage,
@@ -104,14 +105,20 @@ const resolvedLabel = ref("")
 watch(status, (value) => emit("status", value), { immediate: true })
 
 const echoEl = ref<HTMLCanvasElement | null>(null)
-const echoEnabled = computed(() => props.data?.effect === "echo")
+const echoEnabled = computed(
+  () => cameraEffectOf(props.data) === "main-character-echo"
+)
+// The projector refreshes the person outline up to 15 times a second; the
+// operator's previews make do with 5, as they are small and share the
+// operator's computer with everything else.
+const DETECTION_INTERVAL_MS = { output: 1000 / 15, preview: 1000 / 5 }
 const { drawing: echoDrawing } = useCameraEcho(
   videoEl,
   echoEl,
   computed(() => ({
-    enabled: echoEnabled.value,
-    direction: props.data?.echoDirection ?? "right",
+    settings: echoEnabled.value ? echoSettingsOf(props.data) : null,
     mirrored: !!props.data?.mirror,
+    detectionIntervalMs: DETECTION_INTERVAL_MS[props.quality],
   }))
 )
 

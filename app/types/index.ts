@@ -290,16 +290,35 @@ export interface CameraSlideData {
   mirror: boolean
   /** A look drawn over the feed. Absent on slides made before effects. */
   effect?: CameraEffect
-  /** Which side of the screen the echo trails toward. */
-  echoDirection?: "left" | "right"
+  /** Settings for "main-character-echo"; missing values use the defaults. */
+  echo?: Partial<CameraEchoSettings>
 }
 
 /**
- * `echo` repeats the picture in fading copies to one side, with a red/cyan
- * fringe, the stage-concert look. Copies are blended "lighten", so they show
- * over dark backgrounds and vanish over bright ones.
+ * `main-character-echo` repeats the people on screen in fading copies to one
+ * or both sides, each with a red/cyan fringe, the stage-concert look.
  */
-export type CameraEffect = "none" | "echo"
+export type CameraEffect = "none" | "main-character-echo"
+
+export interface CameraEchoSettings {
+  /**
+   * `people` copies only the people found by on-device person detection;
+   * `whole` copies the whole picture, blended so only its bright parts show.
+   */
+  subject: "people" | "whole"
+  /** The side of the screen the copies go to. */
+  direction: "left" | "right" | "both"
+  /** Copies on each side, 1 to 4. */
+  copies: number
+  /** Gap between copies, in % of the frame's width. */
+  spacing: number
+  /** Opacity of the nearest copy, in %. */
+  strength: number
+  /** How much of the previous copy's opacity each further copy keeps, in %. */
+  falloff: number
+  /** How far a copy's red and blue part, in % of the frame's width. */
+  fringe: number
+}
 
 /**
  * What the stage display's clock is doing: counting up for the service, or
