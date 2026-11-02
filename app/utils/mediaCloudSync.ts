@@ -25,19 +25,64 @@ export const CLOUD_RETRY_BACKOFF_MS = [
   6 * 60 * 60_000,
 ]
 
-/** Whether a stranded page's backoff has run out. */
-export const isCloudRetryDue = (
-  record: Pick<MediaCloudSyncRecord, "retryAttempts" | "lastRetryAt">,
-  now = Date.now()
-) => {
+/**
+ * How old a "pending" upload must be before another tab treats it as
+ * stranded. Gives an upload still running in a second tab on this device
+ * time to finish; a single page uploads well inside this.
+ */
+export const STRANDED_PENDING_AFTER_MS = 2 * 60_000
+
+/**
+ * A "pending" record written before this page loaded is an upload that a
+ * closed or reloaded tab never finished. Nothing else would ever move it on:
+ * only the tab that started an upload records how it ended.
+ */
+export const isStrandedPending = (
+  record: Pick<MediaCloudSyncRecord, "status" | "updatedAt">,
+  pageLoadedAt = performance.timeOrigin
+) => record.status === "pending" && Date.parse(record.updatedAt) < pageLoadedAt
+
+type CloudRetryTiming = Pick<
+  MediaCloudSyncRecord,
+  "status" | "updatedAt" | "retryAttempts" | "lastRetryAt"
+>
+
+/** When a stranded page may next be re-uploaded in the background. */
+export const cloudRetryDueAt = (record: CloudRetryTiming) => {
+  if (record.status === "pending") {
+    return Date.parse(record.updatedAt) + STRANDED_PENDING_AFTER_MS
+  }
   const attempts = record.retryAttempts ?? 0
   const lastTried = record.lastRetryAt ? Date.parse(record.lastRetryAt) : NaN
-  if (!attempts || Number.isNaN(lastTried)) return true
+  if (!attempts || Number.isNaN(lastTried)) return 0
   const wait =
     CLOUD_RETRY_BACKOFF_MS[
       Math.min(attempts, CLOUD_RETRY_BACKOFF_MS.length) - 1
     ]!
-  return now - lastTried >= wait
+  return lastTried + wait
+}
+
+/** Whether a stranded page's backoff has run out. */
+export const isCloudRetryDue = (record: CloudRetryTiming, now = Date.now()) =>
+  cloudRetryDueAt(record) <= now
+
+/**
+ * A reconnect is a fresh chance, so it skips the backoff for any page not
+ * tried in the last minute. Flaky Wi-Fi can reconnect every few seconds, and
+ * this keeps it from resending media on each one.
+ */
+export const RECONNECT_RETRY_AFTER_MS = 60_000
+
+/** Whether a stranded page should be retried now that the connection is back. */
+export const isCloudRetryDueOnReconnect = (
+  record: CloudRetryTiming,
+  now = Date.now()
+) => {
+  if (isCloudRetryDue(record, now)) return true
+  // A pending upload's wait is for another tab to finish, not a backoff.
+  if (record.status === "pending") return false
+  const lastTried = record.lastRetryAt ? Date.parse(record.lastRetryAt) : NaN
+  return Number.isNaN(lastTried) || now - lastTried >= RECONNECT_RETRY_AFTER_MS
 }
 
 export const unavailableMediaCopy = (

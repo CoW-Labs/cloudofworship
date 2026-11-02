@@ -4,7 +4,10 @@ import useLocalMediaStorage from "~/composables/useLocalMediaStorage"
 import useUploadFile from "~/composables/useUploadFile"
 import { tabSessionId } from "./useRealtimeSlides"
 import {
+  cloudRetryDueAt,
   isCloudRetryDue,
+  isCloudRetryDueOnReconnect,
+  isStrandedPending,
   mediaCloudFailureReason,
 } from "~/utils/mediaCloudSync"
 import { toTransportSafeSlide } from "~/utils/mediaTransport"
@@ -24,21 +27,68 @@ const inFlight = new Set<string>()
 // Pages of one slide re-uploaded at the same time.
 const UPLOAD_CONCURRENCY = 3
 
+// The reconnect and schedule-load sweeps never fire while the browser keeps
+// reporting online through flaky Wi-Fi, so a page whose backoff runs out has
+// this timer to come back for it. Only ever moved earlier.
+let backoffSweepTimer: ReturnType<typeof setTimeout> | null = null
+let backoffSweepAt = Infinity
+const MIN_BACKOFF_SWEEP_DELAY_MS = 5000
+
+const armBackoffSweep = (
+  at: number | undefined,
+  sweep: () => Promise<unknown>
+) => {
+  if (!at || at >= backoffSweepAt) return
+  if (backoffSweepTimer) clearTimeout(backoffSweepTimer)
+  backoffSweepAt = at
+  backoffSweepTimer = setTimeout(() => {
+    backoffSweepTimer = null
+    backoffSweepAt = Infinity
+    sweep().catch((err) =>
+      console.error("Cloud upload retry sweep failed:", err)
+    )
+  }, Math.max(at - Date.now(), MIN_BACKOFF_SWEEP_DELAY_MS))
+}
+
 /**
  * A page that never reached the cloud and is still worth another try. Quota
  * and the video opt-out are the church's decision, not a transient failure,
  * so they are left alone until something changes on their side. Pages whose
  * background re-uploads keep failing wait out a backoff (see
  * isCloudRetryDue), so flaky Wi-Fi doesn't resend them on every reconnect;
- * `force` is for the operator's own "Retry now".
+ * `force` is for the operator's own "Retry now", and `reconnected` cuts the
+ * backoff short once the connection is back (see isCloudRetryDueOnReconnect).
+ * An upload left "pending" by a tab that closed mid-upload counts too.
  */
-const needsUpload = (record?: MediaCloudSyncRecord, force = false) =>
+const needsUpload = (
+  record?: MediaCloudSyncRecord,
+  force = false,
+  reconnected = false
+) =>
   !!record &&
   record.reason !== "quota" &&
   record.reason !== "disabled" &&
   (record.status === "failed" ||
-    (record.status === "local-only" && record.reason === "offline")) &&
-  (force || isCloudRetryDue(record))
+    (record.status === "local-only" && record.reason === "offline") ||
+    isStrandedPending(record)) &&
+  (force ||
+    (reconnected
+      ? isCloudRetryDueOnReconnect(record)
+      : isCloudRetryDue(record)))
+
+/** When the earliest of these pages still waiting out a backoff comes due. */
+const earliestBackoffEnd = (
+  records: readonly (MediaCloudSyncRecord | undefined)[]
+) => {
+  const now = Date.now()
+  const dueTimes = records
+    .filter(
+      (record): record is MediaCloudSyncRecord =>
+        needsUpload(record, true) && !isCloudRetryDue(record!, now)
+    )
+    .map(cloudRetryDueAt)
+  return dueTimes.length ? Math.min(...dueTimes) : undefined
+}
 
 const cloudKeysFor = (slide: Slide): string[] => {
   if (slide.type === slideTypes.presentation) {
@@ -74,9 +124,11 @@ export default function useCloudUploadRetry() {
       knownRecords?: Map<string, MediaCloudSyncRecord | undefined>
       // Skip the backoff: the operator asked for this retry.
       force?: boolean
+      // The connection just came back: retry pages not tried in the last minute.
+      reconnected?: boolean
     } = {}
   ): Promise<CloudRetryResult> => {
-    const { knownRecords, force = false } = options
+    const { knownRecords, force = false, reconnected = false } = options
     const result: CloudRetryResult = {
       uploaded: 0,
       failed: 0,
@@ -97,7 +149,7 @@ export default function useCloudUploadRetry() {
         ? keys.map((key) => knownRecords!.get(key))
         : await db.mediaCloudSync.bulkGet(keys)
       const pending = keys.filter((_, index) =>
-        needsUpload(records[index], force)
+        needsUpload(records[index], force, reconnected)
       )
       if (!pending.length) return result
 
@@ -164,6 +216,15 @@ export default function useCloudUploadRetry() {
         )
       )
 
+      // The sweep arms its timer once for the whole schedule. A direct call
+      // (the post-create retry, "Retry now") arms it here.
+      if (result.failed && !result.quotaExceeded && !knownRecords) {
+        armBackoffSweep(
+          earliestBackoffEnd(await db.mediaCloudSync.bulkGet(keys)),
+          retryActiveScheduleUploads
+        )
+      }
+
       if (result.uploaded) {
         // Re-read the slide: the operator may have edited it while pages
         // were uploading, and that edit must not be overwritten.
@@ -191,7 +252,10 @@ export default function useCloudUploadRetry() {
    * connection returns and when a schedule is opened, so a page that failed
    * on Sunday morning is repaired the next time that device is online.
    */
-  const retryActiveScheduleUploads = async (): Promise<CloudRetryResult> => {
+  const retryActiveScheduleUploads = async (
+    options: { reconnected?: boolean } = {}
+  ): Promise<CloudRetryResult> => {
+    const { reconnected = false } = options
     const total: CloudRetryResult = {
       uploaded: 0,
       failed: 0,
@@ -216,9 +280,12 @@ export default function useCloudUploadRetry() {
     )
 
     for (const { slide, keys } of candidates) {
-      if (!keys.some((key) => needsUpload(recordsByKey.get(key)))) continue
+      if (!keys.some((key) => needsUpload(recordsByKey.get(key), false, reconnected))) {
+        continue
+      }
       const result = await retrySlideUploads(slide.id, {
         knownRecords: recordsByKey,
+        reconnected,
       })
       total.uploaded += result.uploaded
       total.failed += result.failed
@@ -226,6 +293,15 @@ export default function useCloudUploadRetry() {
         total.quotaExceeded = true
         break
       }
+    }
+
+    // Come back when the next page's backoff runs out, including pages that
+    // just failed again and pages this sweep skipped as not yet due.
+    if (!total.quotaExceeded && allKeys.length) {
+      armBackoffSweep(
+        earliestBackoffEnd(await useIndexedDB().mediaCloudSync.bulkGet(allKeys)),
+        retryActiveScheduleUploads
+      )
     }
     return total
   }

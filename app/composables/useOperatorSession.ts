@@ -1,5 +1,6 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
 import type { Slide } from "~/types"
 import { livePayloadForSlide } from "~/composables/useSlidePairs"
 
@@ -87,6 +88,10 @@ export const useOperatorSession = () => {
     const scheduleId = appStore.currentState.activeSchedule?._id
     if (!scheduleId) return
 
+    // Sockets now retry forever, so one replaced here without being closed
+    // would keep a second connection (and a second presence) alive for good.
+    socketInstance.value?.disconnect()
+
     socketInstance.value = useSocketIO({
       scheduleId,
       onMessage: (event, data) => {
@@ -101,6 +106,9 @@ export const useOperatorSession = () => {
         // there is a socket to say it on, rather than leaving a phone to wait
         // out a heartbeat before the screen it wants shows up in its list.
         liveOutputControl.announce()
+        // A slide taken live while the socket was down never reached the
+        // livestream. Send what is on screen now that it can.
+        if (liveSlideUnsent) sendCurrentLiveSlide()
 
         const wasReconnected =
           socketInstance.value?.isReconnecting?.value === false &&
@@ -124,6 +132,15 @@ export const useOperatorSession = () => {
       },
       onUserJoined: (user) => {
         appStore.triggerUserJoinedAnimation(user)
+        // Your own second device (say /mobile) joining is not news to you.
+        if (user.userId !== useAuthStore().user?._id) {
+          toast.add({
+            title: `${user.userName || "A teammate"} joined`,
+            icon: "i-tabler-user-plus",
+            color: "blue",
+            timeout: 3000,
+          })
+        }
         // Whoever just arrived may be the phone looking for a screen to drive.
         liveOutputControl.announce()
       },
@@ -181,33 +198,48 @@ export const useOperatorSession = () => {
         ].join("|")
       : ""
   })
+  // Set when what is on screen changed while the socket was down, and cleared
+  // once it is sent. Only this device's own changes set it, so a console that
+  // was offline does not replay a stale slide over a teammate's newer one.
+  let liveSlideUnsent = false
+
+  const sendCurrentLiveSlide = () => {
+    // While this device is driving another device's output, that device is
+    // the one with a slide on screen — and it broadcasts this same feed. A
+    // controller staying quiet is what keeps livestream viewers on a single
+    // source of truth instead of two devices overwriting each other. This is
+    // a derived condition, not a flag some other code has to remember to
+    // clear: it is true for exactly as long as a host is selected.
+    if (liveOutputControl.hasRemoteTarget.value) {
+      liveSlideUnsent = false
+      return
+    }
+
+    if (!socketInstance.value?.isConnected()) {
+      liveSlideUnsent = true
+      return
+    }
+    liveSlideUnsent = false
+
+    // Blank clears liveSlideId (see goBlank in LiveOutput). Send
+    // an explicit null so viewers blank out instead of holding the last slide.
+    const liveSlideId = appStore.currentState.liveSlideId
+    if (!liveSlideId) {
+      socketInstance.value.sendLiveSlide(null)
+      return
+    }
+
+    const liveSlide = appStore.activeSlidesById.get(liveSlideId)
+    if (liveSlide) {
+      socketInstance.value.sendLiveSlide(
+        livePayloadForSlide(liveSlide, { keepShape: true })
+      )
+    }
+  }
+
   watch(
     () => [appStore.currentState.liveSlideId, livePairSignature.value] as const,
-    ([liveSlideId]) => {
-      if (!socketInstance.value?.isConnected()) return
-
-      // While this device is driving another device's output, that device is
-      // the one with a slide on screen — and it broadcasts this same feed. A
-      // controller staying quiet is what keeps livestream viewers on a single
-      // source of truth instead of two devices overwriting each other. This is
-      // a derived condition, not a flag some other code has to remember to
-      // clear: it is true for exactly as long as a host is selected.
-      if (liveOutputControl.hasRemoteTarget.value) return
-
-      // Blank clears liveSlideId (see goBlank in LiveOutput). Send
-      // an explicit null so viewers blank out instead of holding the last slide.
-      if (!liveSlideId) {
-        socketInstance.value.sendLiveSlide(null)
-        return
-      }
-
-      const liveSlide = appStore.activeSlidesById.get(liveSlideId)
-      if (liveSlide) {
-        socketInstance.value.sendLiveSlide(
-          livePayloadForSlide(liveSlide, { keepShape: true })
-        )
-      }
-    }
+    sendCurrentLiveSlide
   )
 
   // Watch for schedule changes to reconnect Socket

@@ -179,6 +179,8 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
+import { slidesCreatingInBackground } from "~/composables/useSlideCreation"
+import { onSocketConnected } from "~/composables/useSocketIO"
 import { reportSongSearchPick } from "~/composables/useSongSearchLog"
 import { isSongPending, setSongPending } from "~/composables/useSongs"
 import {
@@ -2374,8 +2376,16 @@ const uploadOfflineSlides = async () => {
 
   // Snapshot offline slides at the moment the lock is acquired so that any
   // slides added while the request is in-flight are picked up on the next run.
+  // The batch endpoint creates into the active schedule, so a slide still in
+  // memory from the schedule being left (mid-switch) waits for its own. A
+  // slide whose media flow is still running is that flow's to create.
+  const activeScheduleId = appStore.currentState.activeSchedule?._id
   const offlineSlides = appStore.activeSlides.filter(
-    (slide) => slide._id === undefined && slide.scheduleId
+    (slide) =>
+      slide._id === undefined &&
+      slide.scheduleId &&
+      slide.scheduleId === activeScheduleId &&
+      !slidesCreatingInBackground.has(slide.id)
   )
   if (offlineSlides.length === 0) return
 
@@ -2424,7 +2434,10 @@ const uploadOfflineSlides = async () => {
         )
       )
       editedDuringUpload.forEach((slide) => {
-        enqueueCoalescedSlideShadowPut(slide, { syncState: "pending" })
+        enqueueCoalescedSlideShadowPut(slide, {
+          syncState: "pending",
+          requestResync: needsSlideResync(slide),
+        })
         persistSlideOnline(slide, true)
       })
 
@@ -2433,6 +2446,21 @@ const uploadOfflineSlides = async () => {
         broadcastSlideUpdate("batch-create-slides", {
           slides: savedSlides,
         })
+      }
+
+      // Media in a slide created offline is still only on this device, and
+      // the re-upload sweep needs the server id the slide has just gained.
+      if (
+        savedSlides.some(
+          (slide) =>
+            slide._id &&
+            (slide.type === slideTypes.presentation ||
+              slide.type === slideTypes.media)
+        )
+      ) {
+        useCloudUploadRetry()
+          .retryActiveScheduleUploads()
+          .catch((err) => console.error("Cloud upload retry sweep failed:", err))
       }
     }
   } finally {
@@ -2444,6 +2472,29 @@ const uploadOfflineSlides = async () => {
     }
   }
 }
+
+// Slides created offline exist only on this device until they are sent, so
+// send them as soon as the connection is back instead of waiting for the next
+// slide to be created. A socket connect means the server is reachable; the
+// browser's online event fires earlier, so it waits a moment first.
+const OFFLINE_SLIDE_UPLOAD_DELAY_MS = 3000
+let offlineSlideUploadTimer: ReturnType<typeof setTimeout> | undefined
+watch(online, (isOnline) => {
+  clearTimeout(offlineSlideUploadTimer)
+  if (isOnline) {
+    offlineSlideUploadTimer = setTimeout(
+      () => uploadOfflineSlides(),
+      OFFLINE_SLIDE_UPLOAD_DELAY_MS
+    )
+  }
+})
+const stopOfflineSlideUploadOnConnect = onSocketConnected(() =>
+  uploadOfflineSlides()
+)
+onBeforeUnmount(() => {
+  clearTimeout(offlineSlideUploadTimer)
+  stopOfflineSlideUploadOnConnect()
+})
 
 let networkRefreshGeneration = 0
 let slideEditGeneration = 0
@@ -2785,18 +2836,26 @@ const reportSlideUpdateFailure = (slide: Slide, error: any, durable: boolean) =>
   })
 }
 
+// An edit to a server slide stays queued for replay until its PUT is
+// confirmed. Video slides are excluded: useSlideResync never sends them, so a
+// marker on one would never clear and would block schedule refreshes.
+const needsSlideResync = (slide: Slide) =>
+  !!slide?._id && !isMediaVideoSlide(slide)
+
 // HTTP persistence cadence (2s): decoupled from the broadcast above so live
 // typing stays responsive without multiplying database writes.
 const persistSlideOnline = useThrottleFn(
   async (slide: Slide, durable: boolean) => {
-    // Don't make API calls when offline; persistence needs a server `_id`.
+    // Persistence needs a server `_id`.
     const activeChurchId = authStore.user?.churchId
-    if (
-      !online.value ||
-      !activeChurchId ||
-      !slide?._id ||
-      isMediaVideoSlide(slide)
-    ) {
+    if (!activeChurchId || !slide?._id || isMediaVideoSlide(slide)) {
+      return
+    }
+
+    // Offline, the edit exists only in this browser. Queue it so
+    // useSlideResync replays it once the connection returns.
+    if (!online.value) {
+      if (durable) await markSlideUnsynced(slide)
       return
     }
 
@@ -2893,7 +2952,10 @@ const updateSlideOnline = (
   // allowed to replace it when that GET completes.
   slideEditGeneration += 1
   if (options.durable !== false) {
-    enqueueCoalescedSlideShadowPut(slide, { syncState: "pending" })
+    enqueueCoalescedSlideShadowPut(slide, {
+      syncState: "pending",
+      requestResync: needsSlideResync(slide),
+    })
   }
   announceEditing(slide?.id)
   broadcastSlideEdit(slide)
