@@ -10,7 +10,6 @@ function fixture() {
   const store = defineStore("app", {
     state: () => ({
       currentState: { activeSlides: [slide], liveSlideId: "", settings: { font: 32 } },
-      pastStates: [{ activeSlides: [slide] }], futureStates: [],
       panelSizes: { left: 200 }, panelSizesTouched: {},
     }),
   })(createPinia())
@@ -22,7 +21,7 @@ function fixture() {
 }
 
 describe("selective state subscriptions", () => {
-  it("shares settings without reading slides or undo entries", async () => {
+  it("shares settings without reading slides", async () => {
     const { store, channel, readSlide } = fixture()
     const stop = synchronizeStore(store, channel, { initialize: false })
     store.currentState.settings.font = 40
@@ -33,7 +32,6 @@ describe("selective state subscriptions", () => {
     })
     expect(readSlide).not.toHaveBeenCalled()
     store.currentState.activeSlides[0].id = "edited"
-    store.pastStates.push({ activeSlides: [] })
     await nextTick()
     expect(channel.postMessage).toHaveBeenCalledTimes(1)
     stop()

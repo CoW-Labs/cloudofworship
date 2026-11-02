@@ -480,7 +480,7 @@
                         button-label="Delete Slide"
                         button-styles="more-item-danger"
                         header="Delete slide"
-                        label="Are you sure you want to delete this slide? This action is not reversible"
+                        label="Delete this slide? Cmd/Ctrl + Z brings it back."
                         @confirm="
                           () => {
                             useGlobalEmit(appWideActions.deleteSlide, scheduleRowSlide(slide))
@@ -514,7 +514,7 @@
                       button-styles="px-1 text-red-500 hover:bg-primary-white"
                       button-color="red"
                       header="Delete slide"
-                      label="Are you sure you want to delete this slide? This action is not reversible"
+                      label="Delete this slide? Cmd/Ctrl + Z brings it back."
                       @confirm="useGlobalEmit(appWideActions.deleteSlide, scheduleRowSlide(slide))"
                     >
                       <template #icon>
@@ -555,6 +555,7 @@ import {
 import { editingMemberOf, livePayloadForSlide } from "~/composables/useSlidePairs"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
 import { shortcutIds } from "~/utils/shortcuts"
+import { recordUndoStep } from "~/utils/undoHistory"
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -846,19 +847,49 @@ const liveOutputSlides = computed({
           if (member) expanded.push(member)
         })
     })
-    // Set Index for each slide
-    const tempSlides = expanded.map((slide, index) => ({
-      ...slide,
-      index,
-    }))
-    appStore.replaceScheduleActiveSlides(tempSlides)
-    useGlobalEmit(appWideActions.batchUpdateSlides, tempSlides)
-
-    // Broadcast the reorder to other tabs/devices
-    const slideOrder = tempSlides.map((slide) => slide.id)
-    broadcastSlideReorder(slideOrder)
+    const before = appStore.activeScheduleSlides.map((slide) => slide.id)
+    const after = expanded.map((slide) => slide.id)
+    commitScheduleOrder(expanded)
+    if (before.join() !== after.join()) {
+      recordUndoStep({
+        label: "Move slide",
+        undo: () => reorderSchedule(before),
+        redo: () => reorderSchedule(after),
+      })
+    }
   },
 })
+
+// Renumbers the schedule in this order, saves it and sends it to teammates.
+const commitScheduleOrder = (ordered: Slide[]) => {
+  const tempSlides = ordered.map((slide, index) => ({
+    ...slide,
+    index,
+  }))
+  appStore.replaceScheduleActiveSlides(tempSlides)
+  useGlobalEmit(appWideActions.batchUpdateSlides, tempSlides)
+
+  // Broadcast the reorder to other tabs/devices
+  const slideOrder = tempSlides.map((slide) => slide.id)
+  broadcastSlideReorder(slideOrder)
+}
+
+// Puts the schedule back in a recorded order. Slides added since then go after
+// the recorded ones, and slides deleted since are skipped.
+const reorderSchedule = (order: string[]) => {
+  const current = appStore.activeScheduleSlides
+  const byId = new Map(current.map((slide) => [slide.id, slide] as const))
+  const recorded = new Set(order)
+  const ordered = [
+    ...order
+      .map((id) => byId.get(id))
+      .filter((slide): slide is Slide => !!slide),
+    ...current.filter((slide) => !recorded.has(slide.id)),
+  ]
+  if (ordered.every((slide, index) => slide === current[index])) return false
+  commitScheduleOrder(ordered)
+  return true
+}
 
 const navigationSlides = computed(() =>
   liveOutputSlides.value.filter((slide) => slide.slideMode !== "overlay")
