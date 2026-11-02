@@ -199,7 +199,7 @@
       button-label="Delete Slide"
       header="Delete slide"
       button-styles="more-item-danger"
-      label="Are you sure you want to delete this slide? This action is not reversible"
+      label="Delete this slide? Cmd/Ctrl + Z brings it back."
       @confirm="
         () => {
           useGlobalEmit(appWideActions.deleteSlide, slide)

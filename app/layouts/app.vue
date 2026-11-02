@@ -803,7 +803,6 @@ const downloadEssentialResources = async () => {
     appStore.currentState.activeSchedule?._id
   )
   overrideAppSettings()
-  appStore.refreshAppActionsStack()
 
   // ── Phase 2: Background ───────────────────────────────────────────────────
   // These run after the workspace is visible. Errors are isolated and non-fatal.

@@ -55,6 +55,7 @@ export const shortcutIds = {
   settings: "settings",
   undo: "undo",
   redo: "redo",
+  redoAlt: "redo-alt",
   zoomIn: "zoom-in",
   zoomOut: "zoom-out",
   promoteActiveSlide: "promote-active-slide",
@@ -151,14 +152,20 @@ export const shortcuts: ShortcutDefinition[] = [
   {
     id: shortcutIds.undo,
     combo: "Mod+Z",
-    label: "Undo the previous action",
+    label: "Undo your last change to the schedule",
     scope: "global",
-    hidden: true,
   },
   {
     id: shortcutIds.redo,
     combo: "Mod+Y",
-    label: "Redo the previous action",
+    label: "Redo the change you undid",
+    scope: "global",
+  },
+  {
+    // The macOS habit, same action as Mod+Y.
+    id: shortcutIds.redoAlt,
+    combo: "Mod+Shift+Z",
+    label: "Redo the change you undid",
     scope: "global",
     hidden: true,
   },

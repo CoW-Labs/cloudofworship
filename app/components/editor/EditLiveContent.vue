@@ -640,6 +640,7 @@ import type {
 import { escapePriority } from "~/composables/useEscapeKey"
 import { songOnSlide } from "~/utils/songTranslation"
 import { pairBackgroundOf } from "~/utils/slidePairs"
+import type { SlideUpdateMeta } from "~/utils/undoHistory"
 import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
 import useCameraOnAir from "~/composables/useCameraOnAir"
 import {
@@ -1298,7 +1299,7 @@ const handleGotoPage = (page: number) => {
     presentationPageIndex: idx,
     background: objects[idx]?.imageUrl || props.slide.background,
   }
-  emit("slide-update", updatedSlide)
+  emit("slide-update", updatedSlide, { navigation: true } satisfies SlideUpdateMeta)
 }
 
 const handleNextPage = () => {
@@ -1500,7 +1501,7 @@ const goToSetlistSong = async (songIndex: number) => {
     activeSongIndex: songIndex,
     verseIndex: item?.verseIndex || 0,
   })
-  emit("slide-update", updatedSlide)
+  emit("slide-update", updatedSlide, { navigation: true } satisfies SlideUpdateMeta)
 }
 
 const reorderSetlistSongs = async (songs: SongSetlistItem[]) => {

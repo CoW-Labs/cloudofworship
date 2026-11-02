@@ -39,6 +39,7 @@ useHead({
   ],
 })
 import { useAppStore } from "~/store/app"
+import { redoLastStep, undoLastStep } from "~/utils/undoHistory"
 import { until } from "@vueuse/core"
 import { computed, ref } from "vue"
 
@@ -262,6 +263,25 @@ onMounted(async () => {
   useRegisteredShortcut(shortcutIds.settings, () => {
     useGlobalEmit(appWideActions.openSettings)
   })
+
+  // Undo and redo take back this operator's own schedule changes (see
+  // ~/utils/undoHistory). In a text field or the slide editor the same keys
+  // undo typing instead, because these chords stand aside in editable fields.
+  const toast = useToast()
+  let historyToastId: string | null = null
+  const announceHistory = (label: string | null, done: string, idle: string) => {
+    if (historyToastId) toast.remove(historyToastId)
+    historyToastId = toast.add({
+      title: label ? `${done}: ${label}` : idle,
+      icon: done === "Undone" ? "i-lucide-undo-2" : "i-lucide-redo-2",
+      timeout: 2000,
+    }).id
+  }
+  const undo = () => announceHistory(undoLastStep(), "Undone", "Nothing to undo")
+  const redo = () => announceHistory(redoLastStep(), "Redone", "Nothing to redo")
+  useRegisteredShortcut(shortcutIds.undo, undo)
+  useRegisteredShortcut(shortcutIds.redo, redo)
+  useRegisteredShortcut(shortcutIds.redoAlt, redo)
 })
 
 // Cleanup on unmount — the socket half is owned by useOperatorSession.
