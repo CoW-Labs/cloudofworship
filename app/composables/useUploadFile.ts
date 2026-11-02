@@ -52,6 +52,9 @@ const PATH_A_TYPES = new Set([
 // Upload 4 parts at a time; retry a failed part a few times before giving up.
 const PART_CONCURRENCY = 4
 const PART_MAX_RETRIES = 3
+// Waits between attempts at one part. Back to back, every attempt landed in
+// the same dropped-connection blip and the whole upload was abandoned.
+const PART_RETRY_DELAYS_MS = [1000, 3000]
 
 // Path A gets the same patience. A church uploading from a phone on patchy
 // venue Wi-Fi lost single PDF pages to one dropped request, because nothing
@@ -60,6 +63,22 @@ const DIRECT_MAX_ATTEMPTS = 3
 const DIRECT_RETRY_DELAYS_MS = [1000, 3000]
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const abortError = () => new DOMException("Upload aborted", "AbortError")
+
+const waitUnlessAborted = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError())
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(abortError())
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener("abort", onAbort, { once: true })
+  })
 
 /**
  * A 4xx is the server saying no (quota, bad type, too large, signed out) and
@@ -147,7 +166,11 @@ type InitiateResponse = {
 
 type CompletedPart = { PartNumber: number; ETag: string }
 
-/** PUT a single part straight to the presigned S3 URL and return its ETag. */
+/**
+ * PUT a single part straight to the presigned S3 URL and return its ETag. A
+ * dropped request, a 5xx, 408 or 429 is retried; any other 4xx (an expired or
+ * rejected presigned URL) and a missing ETag fail the same way every time.
+ */
 const putPart = async (
   url: string,
   chunk: Blob,
@@ -155,22 +178,36 @@ const putPart = async (
 ): Promise<string> => {
   let lastError: unknown
   for (let attempt = 0; attempt < PART_MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await waitUnlessAborted(PART_RETRY_DELAYS_MS[attempt - 1] ?? 3000, signal)
+    }
+
+    let res: Response
     try {
       // No auth header, no Content-Type override — the URL is already signed.
-      const res = await fetch(url, { method: "PUT", body: chunk, signal })
-      if (!res.ok) throw new Error(`Part upload failed: ${res.status}`)
-      const etag = res.headers.get("ETag")
-      if (!etag) {
-        // Not a client bug: the bucket CORS config is missing ExposeHeaders:[ETag].
-        throw new Error(
-          "S3 did not expose the ETag header (bucket CORS ExposeHeaders must include ETag)"
-        )
-      }
-      return etag
+      res = await fetch(url, { method: "PUT", body: chunk, signal })
     } catch (err) {
       if (signal?.aborted) throw err
       lastError = err
+      continue
     }
+
+    if (!res.ok) {
+      lastError = new Error(`Part upload failed: ${res.status}`)
+      if (res.status >= 500 || res.status === 408 || res.status === 429) {
+        continue
+      }
+      throw lastError
+    }
+
+    const etag = res.headers.get("ETag")
+    if (!etag) {
+      // Not a client bug: the bucket CORS config is missing ExposeHeaders:[ETag].
+      throw new Error(
+        "S3 did not expose the ETag header (bucket CORS ExposeHeaders must include ETag)"
+      )
+    }
+    return etag
   }
   throw lastError instanceof Error
     ? lastError
@@ -189,16 +226,23 @@ const uploadParts = async (
   let completed = 0
   let cursor = 0
 
+  // One failed part fails the upload. Cancel the parts still in flight and
+  // stop the rest, rather than spend the church's bandwidth mid-service on an
+  // upload that is about to be aborted.
+  const controller = new AbortController()
+  const forwardAbort = () => controller.abort()
+  if (options?.signal?.aborted) controller.abort()
+  options?.signal?.addEventListener("abort", forwardAbort, { once: true })
+  const signal = controller.signal
+
   const worker = async () => {
     while (true) {
       const index = cursor++
       if (index >= total) break
-      if (options?.signal?.aborted) {
-        throw new DOMException("Upload aborted", "AbortError")
-      }
+      if (signal.aborted) throw abortError()
       const start = index * partSize
       const chunk = file.slice(start, start + partSize)
-      const etag = await putPart(partUrls[index] as string, chunk, options?.signal)
+      const etag = await putPart(partUrls[index] as string, chunk, signal)
       // Parts are 1-indexed on the completion call.
       parts[index] = { PartNumber: index + 1, ETag: etag }
       completed++
@@ -207,7 +251,14 @@ const uploadParts = async (
   }
 
   const workerCount = Math.min(PART_CONCURRENCY, total)
-  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  try {
+    await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  } catch (err) {
+    controller.abort()
+    throw err
+  } finally {
+    options?.signal?.removeEventListener("abort", forwardAbort)
+  }
   return parts
 }
 

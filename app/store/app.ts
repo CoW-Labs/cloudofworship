@@ -254,7 +254,6 @@ export const useAppStore = defineStore("app", {
         activeOverlay: "none",
         activeOverlaySlide: null,
         recentBibleSearches: [],
-        failedUploadRequests: [],
         slidesLoading: false,
         lastSynced: new Date().toISOString(),
         bannerVisible: true,
@@ -754,29 +753,6 @@ export const useAppStore = defineStore("app", {
         this.currentState.recentBibleSearches = Array.from(tempSet)
       }
     },
-    setFailedUploadRequests(
-      failedRequest: { path: string; options: any; timestamp: number } | null
-    ) {
-      const tempArr = this.currentState.failedUploadRequests ? [...this.currentState.failedUploadRequests] : []
-      if (failedRequest) {
-        tempArr.push(failedRequest)
-        this.currentState.failedUploadRequests = tempArr
-      }
-    },
-    removeFailedUploadRequest(
-      failedRequest: { path: string; options: any; timestamp: number }
-    ) {
-      const index = this.currentState.failedUploadRequests.findIndex(
-        (req) =>
-          req.path === failedRequest.path &&
-          req.timestamp === failedRequest.timestamp
-      );
-      if (index !== -1) {
-        const tempArr = [...this.currentState.failedUploadRequests];
-        tempArr.splice(index, 1);
-        this.currentState.failedUploadRequests = tempArr;
-      }
-    },
     setSlidesLoading(loading: boolean) {
       this.currentState.slidesLoading = loading
     },
@@ -1104,7 +1080,6 @@ export const useAppStore = defineStore("app", {
       this.setActiveAlert(null)
       this.setActiveOverlaySlide(null)
       this.setRecentBibleSearches("")
-      this.setFailedUploadRequests(null)
       this.setSlidesLoading(false)
       this.setLastSynced(new Date().toISOString())
       this.setMainDisplayLabel("")

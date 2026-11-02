@@ -1,14 +1,97 @@
 import type { AsyncDataRequestStatus } from "#app";
 import type { Ref } from "vue";
-import { useOnline } from "@vueuse/core";
 import { useAuthStore } from "~/store/auth";
 import { useAppStore } from "~/store/app";
-import { useOnlineStatus } from "./useOnlineStatus";
+import { isNetworkError } from "~/utils/apiErrors";
 
 const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+// Writes made while the browser reports offline, replayed one at a time in
+// the order they were made once it is back. Memory only: a reload starts
+// clean instead of replaying an earlier session's writes, possibly under
+// another account. Each entry is sent until the server answers, then dropped.
+type QueuedRequest = { path: string; options: any; userId?: string };
+const offlineQueue: QueuedRequest[] = [];
+
+// While the browser still reports online but the replay cannot get through
+// (flaky venue wifi), try again on this cadence until the queue drains.
+const OFFLINE_RETRY_MS = 30_000;
+let drainInFlight: Promise<void> | null = null;
+let drainRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let drainTriggerInstalled = false;
+
+const isOffline = () =>
+  typeof navigator !== "undefined" && navigator.onLine === false;
+
+// Slide PUTs are replayed by useSlideResync from IndexedDB. File uploads have
+// their own retries and re-upload sweep; replaying one here would store an
+// extra copy that no slide points at.
+const isQueueable = (method: string, path: string) =>
+  !/\/files(\/|$)/.test(path) &&
+  !(method === "PUT" && path.includes("/slides"));
+
+const armDrainRetry = () => {
+  if (drainRetryTimer) return;
+  drainRetryTimer = setTimeout(() => {
+    drainRetryTimer = null;
+    void drainOfflineQueue();
+  }, OFFLINE_RETRY_MS);
+};
+
+const drainOfflineQueue = (): Promise<void> => {
+  if (drainInFlight) return drainInFlight;
+
+  drainInFlight = (async () => {
+    if (drainRetryTimer) clearTimeout(drainRetryTimer);
+    drainRetryTimer = null;
+
+    while (offlineQueue.length) {
+      // The next "online" event drains again.
+      if (isOffline()) return;
+
+      const request = offlineQueue[0]!;
+      if (request.userId !== useAuthStore().user?._id) {
+        offlineQueue.shift();
+        continue;
+      }
+
+      try {
+        const { error } = await useAPIFetch(request.path, {
+          ...request.options,
+          offlineReplay: true,
+        });
+        if (error.value && isNetworkError(error.value)) {
+          armDrainRetry();
+          return;
+        }
+        if (error.value) {
+          console.error(`Queued request to ${request.path} was rejected:`, error.value);
+        }
+      } catch (err) {
+        console.error(`Error replaying queued request to ${request.path}:`, err);
+        armDrainRetry();
+        return;
+      }
+      offlineQueue.shift();
+    }
+  })().finally(() => {
+    drainInFlight = null;
+  });
+
+  return drainInFlight;
+};
+
+const installDrainTrigger = () => {
+  if (drainTriggerInstalled || typeof window === "undefined") return;
+  drainTriggerInstalled = true;
+  const nuxtApp = useNuxtApp();
+  window.addEventListener("online", () => {
+    void nuxtApp.runWithContext(() => drainOfflineQueue());
+  });
+};
+
 // Without a timeout, a GET on a lossy connection hangs until the browser gives
-// up (minutes) while useOnline() still reports online. ofetch retries a
+// up (minutes) while navigator.onLine still reports online. ofetch retries a
 // timed-out GET once, so the worst case is twice this. Callers can pass their
 // own `timeout`.
 const DEFAULT_GET_TIMEOUT_MS = 20_000;
@@ -28,7 +111,6 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
   path: any,
   options: any = {}
 ): Promise<APIFetchResult<ResT, ErrorT>> => {
-  const online = useOnline();
   const toast = useToast();
   const config = useRuntimeConfig();
   const appStore = useAppStore();
@@ -96,6 +178,7 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
     delete retryOptions.onRequest;
     delete retryOptions.onRequestError;
     delete retryOptions.onResponseError;
+    delete retryOptions.offlineReplay;
     return retryOptions;
   };
 
@@ -107,37 +190,16 @@ export const useAPIFetch = async <ResT = any, ErrorT = any>(
     handleResponseError(response);
   };
 
-  const { onBackOnline } = useOnlineStatus();
-
-  if (!online.value) {
-    // Track failed mutation requests. Slide PUTs are intentionally skipped because
-    // they are high-frequency edits and are already reconciled by realtime state.
-    if (
-      method === "POST" ||
-      method === "PATCH" ||
-      (method === "PUT" && !(path as string).includes("/slides")) ||
-      method === "DELETE"
-    ) {
-      const retryOptions = getRetryOptions();
-      const failedRequest = { path: path as string, options: retryOptions, timestamp: Date.now() };
-      appStore.setFailedUploadRequests(failedRequest);
-
-      // Set up retry when back online
-      onBackOnline(async () => {
-        try {
-          const { error } = await useAPIFetch(path, retryOptions);
-          if (error.value) {
-            console.error(`Failed to retry request to ${path}:`, error.value);
-          } else {
-            // Remove from failed requests if successful
-            appStore.removeFailedUploadRequest(failedRequest);
-            console.log(`Successfully retried request to ${path}`);
-          }
-        } catch (err) {
-          console.error(`Error retrying request to ${path}:`, err);
-        }
+  if (isOffline()) {
+    // A replay that finds the connection gone again stays at the head of the
+    // queue; it is not queued a second time.
+    if (isMutation && !options.offlineReplay && isQueueable(method, path as string)) {
+      offlineQueue.push({
+        path: path as string,
+        options: getRetryOptions(),
+        userId: authStore.user?._id,
       });
-
+      installDrainTrigger();
       addErrorInDevEnvironment(`${path}: Failed, cause: offline`);
     }
     appStore.setSlidesLoading(false);

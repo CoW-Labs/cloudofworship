@@ -69,6 +69,19 @@ export interface SlideEditLock {
 // never points at a dead socket.
 let activeSocket: Socket | null = null
 
+// Run on every connect of whichever socket is live. A listener added to a
+// socket instance (including through the proxy) is dropped when `reconnect()`
+// or a schedule switch replaces that socket, so code that must hear every
+// reconnect subscribes here instead.
+const connectListeners = new Set<() => void>()
+
+export const onSocketConnected = (listener: () => void) => {
+  connectListeners.add(listener)
+  return () => {
+    connectListeners.delete(listener)
+  }
+}
+
 // One source per operator tab, stable through reconnects and page reloads.
 // The server also binds ownership to one active socket, since duplicating a
 // browser tab can copy its sessionStorage along with this id.
@@ -147,7 +160,6 @@ export const useSocketIO = (options: SocketIOOptions) => {
   let retryCount = 0
   let reconnectTimer: NodeJS.Timeout | null = null
   let isIntentionallyClosed = false
-  let hasBeenConnected = false
 
   // Connection state for reactivity
   const isConnectedRef = ref(false)
@@ -164,9 +176,10 @@ export const useSocketIO = (options: SocketIOOptions) => {
         // Coming back online
         isReconnecting.value = true
 
-        // Give the network a moment to stabilize
+        // Give the network a moment to stabilize. A page that never managed
+        // its first connection (opened offline) reconnects here too.
         setTimeout(() => {
-          if (!isIntentionallyClosed && hasBeenConnected) {
+          if (!isIntentionallyClosed) {
             if (!socket?.connected) {
               retryCount = 0 // Reset retry count for fresh reconnection
               reconnect()
@@ -195,6 +208,7 @@ export const useSocketIO = (options: SocketIOOptions) => {
 
     // Close existing socket if any
     if (socket) {
+      socket.io.removeAllListeners()
       socket.removeAllListeners()
       socket.disconnect()
       socket = null
@@ -203,6 +217,22 @@ export const useSocketIO = (options: SocketIOOptions) => {
     // Reconnect
     connect()
   }
+
+  // Browsers throttle and freeze hidden tabs, and Socket.IO's backoff can be
+  // up to `maxRetryDelay` away. Coming back to the tab reconnects at once.
+  const reconnectWhenVisible = () => {
+    if (
+      document.visibilityState !== 'visible' ||
+      isIntentionallyClosed ||
+      !online.value ||
+      socket?.connected
+    ) {
+      return
+    }
+    retryCount = 0
+    reconnect()
+  }
+  document.addEventListener('visibilitychange', reconnectWhenVisible)
 
   const getSocketUrl = () => {
     // For Socket.IO, we need just the origin (protocol + host + port)
@@ -285,7 +315,8 @@ export const useSocketIO = (options: SocketIOOptions) => {
     }
 
     if (!online.value) {
-      scheduleReconnect()
+      // The online watcher connects as soon as the browser is back.
+      isReconnecting.value = true
       return null
     }
 
@@ -303,17 +334,23 @@ export const useSocketIO = (options: SocketIOOptions) => {
         // URL query, where it would be logged by proxies and could be spoofed
         // by changing `user_id`. The server uses this token to authorize the
         // live-output host/request events against the selected schedule.
-        auth: {
-          token: getToken() || undefined,
-          ...(!client ? { liveSourceId } : {}),
-        },
+        // Read on every attempt, so a reconnect never presents a stale token
+        // and lands as an anonymous viewer with no presence.
+        auth: (cb) =>
+          cb({
+            token: getToken() || undefined,
+            ...(!client ? { liveSourceId } : {}),
+          }),
         // Start with polling first (more reliable behind proxies/load balancers)
         // then upgrade to websocket
         transports: ['polling', 'websocket'],
         upgrade: true,
         timeout: connectionTimeout,
         reconnection: true,
-        reconnectionAttempts: maxRetries,
+        // Never give up. A projector or livestream left running through a long
+        // venue outage must come back by itself; with a cap it sat dead until
+        // someone reloaded. `maxRetries` now only decides when to report it.
+        reconnectionAttempts: Infinity,
         reconnectionDelay: baseRetryDelay,
         reconnectionDelayMax: maxRetryDelay,
         autoConnect: true,
@@ -331,10 +368,16 @@ export const useSocketIO = (options: SocketIOOptions) => {
       // Connection events
       socket.on('connect', () => {
         retryCount = 0
-        hasBeenConnected = true
         isConnectedRef.value = true
         isReconnecting.value = false
         flushMessageQueue()
+        connectListeners.forEach((listener) => {
+          try {
+            listener()
+          } catch (error) {
+            console.error('Socket connect listener failed:', error)
+          }
+        })
       })
 
       socket.on('connected', (data) => {
@@ -357,19 +400,10 @@ export const useSocketIO = (options: SocketIOOptions) => {
         }
       })
 
-      socket.on('reconnect', (attemptNumber) => {
-        isConnectedRef.value = true
-        isReconnecting.value = false
-        flushMessageQueue()
-      })
-
-      socket.on('reconnect_attempt', (attemptNumber) => {
+      // Reconnection events belong to the Manager in Socket.IO v4; the socket
+      // itself never emits them. A completed reconnect arrives as `connect`.
+      socket.io.on('reconnect_attempt', () => {
         isReconnecting.value = true
-      })
-
-      socket.on('reconnect_failed', () => {
-        isReconnecting.value = false
-        onMaxRetriesReached?.()
       })
 
       socket.on('connect_error', (error: any) => {
@@ -383,8 +417,9 @@ export const useSocketIO = (options: SocketIOOptions) => {
         isConnectedRef.value = false
         onError?.(error)
 
+        // Reported once; Socket.IO keeps retrying regardless.
         retryCount++
-        if (retryCount >= maxRetries) {
+        if (retryCount === maxRetries) {
           onMaxRetriesReached?.()
         }
       })
@@ -564,10 +599,10 @@ export const useSocketIO = (options: SocketIOOptions) => {
     const delay = calculateRetryDelay()
     retryCount++
 
-    if (retryCount >= maxRetries) {
-      console.error(`Max reconnection attempts (${maxRetries}) reached. Giving up.`)
+    // Reported once, then keep trying at the capped delay.
+    if (retryCount === maxRetries) {
+      console.error(`Still unable to connect after ${maxRetries} attempts.`)
       onMaxRetriesReached?.()
-      return
     }
 
     reconnectTimer = setTimeout(() => {
@@ -585,8 +620,10 @@ export const useSocketIO = (options: SocketIOOptions) => {
     isReconnecting.value = false
     clearTimers()
     stopOnlineWatcher() // Stop watching online status
+    document.removeEventListener('visibilitychange', reconnectWhenVisible)
 
     if (socket) {
+      socket.io.removeAllListeners()
       socket.removeAllListeners()
       socket.disconnect()
       if (activeSocket === socket) activeSocket = null
