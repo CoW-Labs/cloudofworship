@@ -1,52 +1,97 @@
 # Cloud of Worship
 
-![Cloud of Worship](https://revaise.s3.us-east-2.amazonaws.com/cow-og.webp)
+![Cloud of Worship: open to every church](https://cloudofworship.com/images/og/open-source.jpg)
 
-Cloud of Worship is a free, minimalist, browser-based presentation software tailored for churches. It allows you to display song lyrics, scriptures, videos, and customizable slides with ease. This software is designed to be offline-ready, browser-ready, and supports team collaboration.
+Cloud of Worship is simple presentation software for churches. Show song lyrics, scripture, hymns, media and custom slides on your projector, from your browser or the desktop app.
+
+Use it at [app.cloudofworship.com](https://app.cloudofworship.com).
 
 ## Features
 
-- **Offline Ready**: Access and display your slides even without an internet connection.
-- **Browser-Based**: No installation required. Simply open your browser and start presenting.
-- **Customizable Layout**: Easily modify and structure the app interface.
-- **Bible Search and Version Support**: Integrated Bible with support for various public domain translations, and other versions.
-- **Global Song Sharing**: Access a growing library of over 7,000 worship songs shared by churches worldwide (Cloud functionality).
-- **Team Workflow (Multiplayer Mode)**: Collaborate with your church team in real-time (Cloud functionality).
-- **Stream Live Content via WebSocket (WS)**: Seamless live streaming of content (Cloud functionality).
+**Free**
 
-## Support Us
+- **Bible**: display any verse or search the whole Bible, in several translations.
+- **Hymns**: a built-in hymnal.
+- **Songs**: add your own songs, keep them in your library and build setlists.
+- **Text and media slides**: images, videos, PDFs and your own text.
+- **Schedules**: plan each service ahead and reuse recent ones.
+- **Live output**: a second window for your projector, with blank screen, overlays and slide styles.
+- **Works offline**: Bibles, hymns, songs and media are cached on your device.
 
-Cloud of Worship is free to install locally and also accessible via the cloud. If you'd like to support us so we can keep doing this, please consider donating through our [website](https://www.cloudofworship.com/pricing) or [sending an email](mailto:hello@cloudofworship.com).
+**Teams**
 
-## Report an Issue, Request a Feature or Give Feedback
+- **Song search**: search a shared catalogue of worship songs by title or lyrics. Free churches get 50 songs a month.
+- **Sermon transcription**: live captions of the sermon. Free churches get 10 minutes to try it.
+- **Team collaboration**: invite your team and edit the same schedule in real time.
+- **Stage display**: a confidence monitor with the next slide, clock and countdown, also viewable over the network.
+- **Livestream link**: share your slides as a link for online viewers.
+- **More slide types**: alerts and banners, countdowns, clock, interludes, slide pairs, YouTube and Vimeo.
 
-If you encounter any issues or have suggestions for improvements, please feel free to report them on our [GitHub Issues Page](https://github.com/CoW-Labs/cloudofworship/issues). We would also love to know how this software has been useful, feel free to send feedback [here](https://senja.io/p/cloudofworship/r/9XMjTH).
+See [cloudofworship.com/pricing](https://www.cloudofworship.com/pricing) for plans.
 
-## Join our Growing Community
+## Desktop app
 
-We have a growing community of users and contributors on [Whatsapp](https://chat.whatsapp.com/DeQX11igCSU6YaOoTqY7GY) and [Instagram](https://instagram.com/cloudofworshipapp).
+The desktop app is built with [Tauri 2](https://tauri.app). It adds things the browser can't do, like sending your live output over NDI.
 
-## Tech Stack
+## Development
 
-Vue (Nuxt 3), Tauri (Desktop App), TypeScript, Pinia, TailwindCSS
-
-## Desktop App
-
-Cloud of Worship is now available as a desktop application! See [TAURI_README.md](./TAURI_README.md) for details on running and building the desktop version.
-
-**Quick Start:**
+You need Node.js 22 or later.
 
 ```bash
-# Development mode
-npm run tauri:dev
-
-# Build desktop app
-npm run tauri:build
+npm install
 ```
+
+```bash
+npm run dev
+```
+
+The app runs at http://localhost:3000 and talks to the production API by default. Set `BASE_URL` in `.env` to point at another API.
+
+Other commands:
+
+| Command | What it does |
+|---------|--------------|
+| `npm test` | Run the test suite (Vitest) |
+| `npm run build` | Build the static site (`nuxt generate`) |
+| `npm run tauri:dev` | Run the desktop app in development |
+| `npm run tauri:build` | Build the desktop app |
+
+### Tech stack
+
+Nuxt 4 (SPA), Vue 3, TypeScript, Pinia, Nuxt UI, TailwindCSS, Dexie (IndexedDB), Socket.IO and Tauri 2.
+
+### Project structure
+
+```bash
+├── app
+│   ├── components    # Vue components
+│   ├── composables   # Shared logic (API, slides, songs, Bible, sockets, Tauri)
+│   ├── layouts       # default, auth, app (operator) and live (projector)
+│   ├── middleware    # Route guards, including auth
+│   ├── pages         # Routes: operator, /live, /stage, /mobile, /livestream
+│   ├── plugins       # PostHog, Tauri, shared state and more
+│   ├── store         # Pinia stores (app, auth, template)
+│   ├── types         # TypeScript types
+│   └── utils         # Constants and helpers
+├── public            # Static assets, service worker, hymns
+├── src-tauri         # Desktop app (Rust)
+├── docs              # Developer notes
+└── tests             # Vitest tests
+```
+
+See [CLAUDE.md](./CLAUDE.md) for a deeper look at the architecture.
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) to get set up.
+Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) to get set up. Open pull requests against the `staging` branch.
+
+## Report an issue or give feedback
+
+Report bugs and request features on [GitHub Issues](https://github.com/cow-labs/cloudofworship/issues). Tell us how Cloud of Worship has helped your church [here](https://senja.io/p/cloudofworship/r/9XMjTH), or email [hello@cloudofworship.com](mailto:hello@cloudofworship.com).
+
+## Community
+
+Join us on [WhatsApp](https://chat.whatsapp.com/DeQX11igCSU6YaOoTqY7GY) and [Instagram](https://instagram.com/cloudofworshipapp).
 
 ## License
 
@@ -58,22 +103,3 @@ Cloud of Worship is open source under the [GNU Affero General Public License v3.
 The name and logo are not part of the license. See [TRADEMARKS.md](./TRADEMARKS.md).
 
 Want to use it under different terms? Email [hello@cloudofworship.com](mailto:hello@cloudofworship.com).
-
-## Project Structure
-
-```bash
-├── assets/css             # Stylesheets and related files
-├── components             # Reusable Vue components
-├── composables            # Functions and utilities for Vue composition API
-├── layouts                # Application layout templates
-├── middleware             # Custom middleware for routing and auth
-├── pages                  # Page components
-├── plugins                # Vue.js plugins, including Bible version and song features
-├── public                 # Static assets and icons
-├── server                 # Backend server setup (Node.js and Express)
-├── store                  # Vuex store for state management
-├── types                  # TypeScript types
-├── utils                  # Utility functions for handling WebSocket streams
-└── src-tauri              # Tauri integration (for lightweight desktop builds)
-
-```
