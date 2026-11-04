@@ -19,6 +19,16 @@ interface TranscriptionState {
   limitSeconds: number | null
 }
 
+// Close codes the API uses when it ends a session on purpose. Any other
+// close mid-session is treated as a drop and reconnected.
+const CLOSE_LIMIT_REACHED = 4001
+const CLOSE_PAUSED_TOO_LONG = 4002
+const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 10_000]
+// About three minutes of retrying before giving up.
+const MAX_RECONNECT_ATTEMPTS = 20
+// 30 s of 16 kHz linear16.
+const MAX_BUFFERED_AUDIO_BYTES = 30 * 32_000
+
 interface ReferenceMessageMeta {
   isFinal?: boolean
   speechFinal?: boolean
@@ -45,6 +55,8 @@ interface ReferenceMessageMeta {
  * Performance/reliability features:
  *   - AudioWorklet capture (off the main thread, 32 ms chunks)
  *   - KeepAlive frames during silence to prevent Deepgram timeouts
+ *   - Reconnects on its own after a drop, holding up to 30 s of audio so
+ *     the words spoken while reconnecting still get transcribed
  *   - Voice commands fire on interim results with a fire-once latch
  */
 export default function useDeepgramTranscription() {
@@ -72,6 +84,18 @@ export default function useDeepgramTranscription() {
   const isPaused = ref(false)
 
   let ws: WebSocket | null = null
+  // True once the server has said "ready"; audio sent before that is dropped
+  // because the upstream Deepgram socket isn't open yet.
+  let socketReady = false
+
+  // A socket that drops mid-service reconnects on its own. Audio captured
+  // while reconnecting is held (up to 30 s) and sent to the new session.
+  const isReconnecting = ref(false)
+  let stopRequested = false
+  let reconnectAttempt = 0
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let bufferedAudio: ArrayBuffer[] = []
+  let bufferedBytes = 0
   let audioContext: AudioContext | null = null
   let mediaStream: MediaStream | null = null
   // Allow either an AudioWorkletNode (preferred) or a ScriptProcessorNode (fallback)
@@ -306,6 +330,8 @@ export default function useDeepgramTranscription() {
 
     state.value.isConnecting = true
     state.value.error = null
+    stopRequested = false
+    reconnectAttempt = 0
 
     // Request mic permission
     try {
@@ -326,117 +352,22 @@ export default function useDeepgramTranscription() {
       return
     }
 
+    openSocket(churchId)
+  }
+
+  /**
+   * Opens the transcription socket. Used for the first connection and for
+   * every reconnect; the mic and audio pipeline stay up across reconnects.
+   */
+  const openSocket = (churchId: string) => {
+    let socket: WebSocket
     try {
-      const wsUrl = buildWsUrl(churchId)
-      ws = new WebSocket(wsUrl)
-      ws.binaryType = 'arraybuffer'
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data)
-
-          if (msg.type === 'ready') {
-            state.value.remainingSeconds = msg.remainingSeconds
-            if (msg.period) state.value.period = msg.period
-            if (msg.limit) state.value.limitSeconds = msg.limit
-            state.value.isTranscribing = true
-            state.value.isConnecting = false
-
-            // Pre-warm the selected scripture version so the first auto-live
-            // reference hits a hot cache instead of paying the IndexedDB/index
-            // build cost on the critical path.
-            prewarmScriptureVersion().catch(() => { })
-
-            sessionElapsedTimer = setInterval(() => {
-              if (isPaused.value) return
-              if (state.value.remainingSeconds !== null && state.value.remainingSeconds > 0) {
-                state.value.remainingSeconds--
-                state.value.usedSeconds++
-              }
-            }, 1000)
-
-            usageSyncTimer = setInterval(() => {
-              if (isPaused.value) return
-              fetchUsage()
-            }, 60_000)
-
-            // KeepAlive — every 5s of true silence, send a frame so Deepgram
-            // doesn't time out the upstream socket.
-            keepAliveTimer = setInterval(() => {
-              if (ws?.readyState !== WebSocket.OPEN) return
-              if (Date.now() - lastAudioSentAt > 5_000) {
-                ws.send(JSON.stringify({ type: 'KeepAlive' }))
-              }
-            }, 5_000)
-
-            startAudioCapture()
-          } else if (msg.type === 'transcript') {
-            if (msg.isFinal || msg.speechFinal) {
-              // Some short commands arrive as final-only results, so run the
-              // same latched detector here as well as on interim text.
-              maybeFireVoiceCommand(msg.transcript ?? '')
-              createSegmentFromText(msg.transcript ?? '')
-            } else {
-              state.value.currentTranscript = msg.transcript ?? ''
-              // Fire voice commands on interim for snappy response
-              maybeFireVoiceCommand(msg.transcript ?? '')
-            }
-          } else if (msg.type === 'references') {
-            applyServerReferences(msg.references, {
-              isFinal: msg.isFinal,
-              speechFinal: msg.speechFinal,
-              provisional: msg.provisional,
-              receivedAt: msg.receivedAt,
-              sentAt: msg.sentAt,
-            })
-          } else if (msg.type === 'limit_reached') {
-            if (msg.period) state.value.period = msg.period
-            if (msg.limit) state.value.limitSeconds = msg.limit
-            state.value.remainingSeconds = 0
-            showLimitReachedToast(msg.message)
-            stopTranscription()
-          } else if (msg.type === 'error') {
-            state.value.error = msg.message
-            toast.add({
-              title: 'Transcription error',
-              description: msg.message,
-              icon: 'i-bx-error',
-              color: 'red',
-            })
-          }
-        } catch (err) {
-          console.error('Failed to parse WS message:', err)
-        }
-      }
-
-      ws.onerror = async () => {
-        state.value.isConnecting = false
-        cleanup()
-        // The server refuses a spent allowance at the handshake (HTTP 429),
-        // which a browser WebSocket only reports as a bare error. Re-read the
-        // usage to tell that apart from a real connection failure.
-        await fetchUsage()
-        if (state.value.remainingSeconds === 0) {
-          showLimitReachedToast()
-          return
-        }
-        state.value.error = 'WebSocket connection error'
-        toast.add({
-          title: 'Connection error',
-          description: 'Failed to connect to transcription service',
-          icon: 'i-bx-error',
-          color: 'red',
-        })
-      }
-
-      ws.onclose = () => {
-        if (state.value.isTranscribing || state.value.isConnecting) {
-          cleanup()
-          state.value.isTranscribing = false
-          state.value.isConnecting = false
-        }
-      }
+      socket = new WebSocket(buildWsUrl(churchId))
     } catch (err: any) {
+      if (isReconnecting.value) {
+        scheduleReconnect(churchId)
+        return
+      }
       state.value.isConnecting = false
       state.value.error = err.message
       toast.add({
@@ -446,7 +377,212 @@ export default function useDeepgramTranscription() {
         color: 'red',
       })
       cleanup()
+      return
     }
+    ws = socket
+    socketReady = false
+    socket.binaryType = 'arraybuffer'
+
+    socket.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data)
+
+        if (msg.type === 'ready') {
+          state.value.remainingSeconds = msg.remainingSeconds
+          if (msg.period) state.value.period = msg.period
+          if (msg.limit) state.value.limitSeconds = msg.limit
+          socketReady = true
+
+          // A reconnected session picks up where the dropped one left off:
+          // the mic, timers and transcript are all still running.
+          if (isReconnecting.value) {
+            isReconnecting.value = false
+            reconnectAttempt = 0
+            if (isPaused.value) sendControlFrame('Pause')
+            flushBufferedAudio()
+            toast.add({ title: 'Transcription reconnected', icon: 'i-bx-check-circle', timeout: 3000 })
+            return
+          }
+
+          state.value.isTranscribing = true
+          state.value.isConnecting = false
+
+          // Pre-warm the selected scripture version so the first auto-live
+          // reference hits a hot cache instead of paying the IndexedDB/index
+          // build cost on the critical path.
+          prewarmScriptureVersion().catch(() => { })
+
+          sessionElapsedTimer = setInterval(() => {
+            if (isPaused.value || !socketReady) return
+            if (state.value.remainingSeconds !== null && state.value.remainingSeconds > 0) {
+              state.value.remainingSeconds--
+              state.value.usedSeconds++
+            }
+          }, 1000)
+
+          usageSyncTimer = setInterval(() => {
+            if (isPaused.value || !socketReady) return
+            fetchUsage()
+          }, 60_000)
+
+          // KeepAlive — every 5s of true silence, send a frame so Deepgram
+          // doesn't time out the upstream socket.
+          keepAliveTimer = setInterval(() => {
+            if (ws?.readyState !== WebSocket.OPEN) return
+            if (Date.now() - lastAudioSentAt > 5_000) {
+              ws.send(JSON.stringify({ type: 'KeepAlive' }))
+            }
+          }, 5_000)
+
+          startAudioCapture()
+        } else if (msg.type === 'transcript') {
+          if (msg.isFinal || msg.speechFinal) {
+            // Some short commands arrive as final-only results, so run the
+            // same latched detector here as well as on interim text.
+            maybeFireVoiceCommand(msg.transcript ?? '')
+            createSegmentFromText(msg.transcript ?? '')
+          } else {
+            state.value.currentTranscript = msg.transcript ?? ''
+            // Fire voice commands on interim for snappy response
+            maybeFireVoiceCommand(msg.transcript ?? '')
+          }
+        } else if (msg.type === 'references') {
+          applyServerReferences(msg.references, {
+            isFinal: msg.isFinal,
+            speechFinal: msg.speechFinal,
+            provisional: msg.provisional,
+            receivedAt: msg.receivedAt,
+            sentAt: msg.sentAt,
+          })
+        } else if (msg.type === 'limit_reached') {
+          if (msg.period) state.value.period = msg.period
+          if (msg.limit) state.value.limitSeconds = msg.limit
+          state.value.remainingSeconds = 0
+          showLimitReachedToast(msg.message)
+          stopTranscription()
+        } else if (msg.type === 'error') {
+          state.value.error = msg.message
+          toast.add({
+            title: 'Transcription error',
+            description: msg.message,
+            icon: 'i-bx-error',
+            color: 'red',
+          })
+        }
+      } catch (err) {
+        console.error('Failed to parse WS message:', err)
+      }
+    }
+
+    socket.onerror = async () => {
+      // A drop or failed reconnect mid-session is handled in onclose.
+      if (ws !== socket || state.value.isTranscribing) return
+      state.value.isConnecting = false
+      cleanup()
+      // The server refuses a spent allowance at the handshake (HTTP 429),
+      // which a browser WebSocket only reports as a bare error. Re-read the
+      // usage to tell that apart from a real connection failure.
+      await fetchUsage()
+      if (state.value.remainingSeconds === 0) {
+        showLimitReachedToast()
+        return
+      }
+      state.value.error = 'WebSocket connection error'
+      toast.add({
+        title: 'Connection error',
+        description: 'Failed to connect to transcription service',
+        icon: 'i-bx-error',
+        color: 'red',
+      })
+    }
+
+    socket.onclose = async (event) => {
+      if (ws !== socket) return
+      const wasReady = socketReady
+      ws = null
+      socketReady = false
+      if (stopRequested) return
+
+      if (!state.value.isTranscribing) {
+        if (state.value.isConnecting) {
+          cleanup()
+          state.value.isConnecting = false
+        }
+        return
+      }
+
+      // The server ended the session on purpose; don't fight it.
+      if (event.code === CLOSE_LIMIT_REACHED || event.code === CLOSE_PAUSED_TOO_LONG) {
+        stopTranscription()
+        return
+      }
+
+      // Keep the words already on screen before the line is lost.
+      if ((state.value.currentTranscript ?? '').trim()) {
+        createSegmentFromText(state.value.currentTranscript)
+      }
+
+      // A reconnect the server refused may be a spent allowance (HTTP 429).
+      if (!wasReady && isReconnecting.value) {
+        await fetchUsage()
+        if (stopRequested) return
+        if (state.value.remainingSeconds === 0) {
+          showLimitReachedToast()
+          stopTranscription()
+          return
+        }
+      }
+
+      isReconnecting.value = true
+      scheduleReconnect(churchId)
+    }
+  }
+
+  const scheduleReconnect = (churchId: string) => {
+    if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+      toast.add({
+        title: 'Transcription stopped',
+        description: 'Lost the connection and could not reconnect. Start it again when you are back online.',
+        icon: 'i-bx-error',
+        color: 'red',
+        timeout: 0,
+      })
+      stopTranscription()
+      return
+    }
+    const delay = RECONNECT_DELAYS_MS[Math.min(reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)]
+    reconnectAttempt++
+    if (reconnectTimer) clearTimeout(reconnectTimer)
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null
+      if (stopRequested || !state.value.isTranscribing) return
+      openSocket(churchId)
+    }, delay)
+  }
+
+  /**
+   * Sends a captured chunk, or holds it while reconnecting so the words
+   * spoken during a short drop still reach the new session.
+   */
+  const sendAudio = (audio: ArrayBuffer) => {
+    if (socketReady && ws?.readyState === WebSocket.OPEN) {
+      ws.send(audio)
+      lastAudioSentAt = Date.now()
+      return
+    }
+    if (!isReconnecting.value) return
+    bufferedAudio.push(audio)
+    bufferedBytes += audio.byteLength
+    while (bufferedBytes > MAX_BUFFERED_AUDIO_BYTES && bufferedAudio.length) {
+      bufferedBytes -= bufferedAudio.shift()!.byteLength
+    }
+  }
+
+  const flushBufferedAudio = () => {
+    const chunks = bufferedAudio
+    bufferedAudio = []
+    bufferedBytes = 0
+    for (const chunk of chunks) sendAudio(chunk)
   }
 
   /**
@@ -482,10 +618,7 @@ export default function useDeepgramTranscription() {
       // RMS of speech peaks around 0.3 — clamp and scale to 0–100
       micLevel.value = Math.min(100, Math.round((rms / 0.3) * 100))
 
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(audio)
-        lastAudioSentAt = Date.now()
-      }
+      sendAudio(audio)
     }
 
     sourceNode.connect(workletNode)
@@ -526,10 +659,7 @@ export default function useDeepgramTranscription() {
         const s = Math.max(-1, Math.min(1, pcmData[i] ?? 0))
         int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff
       }
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(int16.buffer)
-        lastAudioSentAt = Date.now()
-      }
+      sendAudio(int16.buffer)
     }
 
     source.connect(processor)
@@ -576,6 +706,7 @@ export default function useDeepgramTranscription() {
 
   const stopTranscription = () => {
     if (!state.value.isTranscribing && !state.value.isConnecting) return
+    stopRequested = true
 
     if ((state.value.currentTranscript ?? '')?.trim()) {
       createSegmentFromText(state.value.currentTranscript)
@@ -592,6 +723,11 @@ export default function useDeepgramTranscription() {
     if (sessionElapsedTimer) { clearInterval(sessionElapsedTimer); sessionElapsedTimer = null }
     if (usageSyncTimer) { clearInterval(usageSyncTimer); usageSyncTimer = null }
     if (keepAliveTimer) { clearInterval(keepAliveTimer); keepAliveTimer = null }
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    isReconnecting.value = false
+    reconnectAttempt = 0
+    bufferedAudio = []
+    bufferedBytes = 0
 
     if (workletNode) {
       try { workletNode.disconnect() } catch { }
@@ -610,10 +746,13 @@ export default function useDeepgramTranscription() {
       mediaStream = null
     }
     if (ws) {
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close()
-      }
+      // Clear the slot first so this socket's onclose knows it was ours.
+      const socket = ws
       ws = null
+      socketReady = false
+      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+        socket.close()
+      }
     }
     micLevel.value = 0
     isPaused.value = false
@@ -652,6 +791,7 @@ export default function useDeepgramTranscription() {
     isTranscribing: computed(() => state.value.isTranscribing),
     isConnecting: computed(() => state.value.isConnecting),
     isPaused: computed(() => isPaused.value),
+    isReconnecting: computed(() => isReconnecting.value),
     error: computed(() => state.value.error),
     segments: computed(() => state.value.segments),
     currentTranscript: computed(() => state.value.currentTranscript),
