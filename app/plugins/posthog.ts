@@ -4,6 +4,7 @@ import { useAppStore } from "~/store/app";
 import { shouldSuppressExceptionEvent } from "~/utils/errorFilters";
 import useAppVersion from "~/composables/useAppVersion";
 import { useTauri } from "~/composables/useTauri";
+import { BUILD_LINEAGE, isForeignHost } from "~/utils/deploymentHost";
 
 export default defineNuxtPlugin(nuxtApp => {
   const auth = useAuthStore();
@@ -40,6 +41,7 @@ export default defineNuxtPlugin(nuxtApp => {
     posthog.register({
       app_version: useAppVersion().appVersion,
       app_platform: useTauri().isTauri ? "desktop" : "web",
+      build_lineage: BUILD_LINEAGE,
       ...(nav.deviceMemory ? { device_memory_gb: nav.deviceMemory } : {}),
       ...(nav.hardwareConcurrency
         ? { hardware_concurrency: nav.hardwareConcurrency }
@@ -56,6 +58,15 @@ export default defineNuxtPlugin(nuxtApp => {
       is_teams: auth.church?.subscriptionPlan === "teams",
       appVersion: appStore.currentState.settings.appVersion,
     });
+    // A deployment on a domain we don't run is reported once per page load,
+    // with only where it is running. Nothing about the person using it.
+    if (isForeignHost(window.location.hostname)) {
+      posthog.capture("foreign_host_detected", {
+        host: window.location.host,
+        origin: window.location.origin,
+        build_lineage: BUILD_LINEAGE,
+      });
+    }
     nuxtApp.provide("posthog", posthog);
   }
 });
