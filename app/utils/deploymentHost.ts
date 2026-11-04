@@ -1,7 +1,7 @@
 // Hosts we serve the app from: production, staging, our preview deploys, the
 // desktop webview and local development. Anything else is someone else's
-// deployment of this code, which the license (PolyForm Shield) only allows
-// when it doesn't compete with Cloud of Worship.
+// deployment of this code. The license (AGPL-3.0) allows that, but only with
+// its source published and without our name or logo (see TRADEMARKS.md).
 const OWN_HOST_PATTERNS: RegExp[] = [
   /(^|\.)cloudofworship\.com$/,
   /(^|\.)cloudofworship\.pages\.dev$/,

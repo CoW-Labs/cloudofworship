@@ -50,14 +50,14 @@ Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) to get set u
 
 ## License
 
-Cloud of Worship is source-available under the [PolyForm Shield License 1.0.0](./LICENSE).
+Cloud of Worship is open source under the [GNU Affero General Public License v3.0](./LICENSE) (AGPL-3.0-only). Copyright (C) 2024-2026 Favour Felix. See [NOTICE](./NOTICE).
 
 - **You can** read, change and run the code, including for your own church or ministry, for free.
-- **You can't** offer it, or anything built from it, as a product that competes with Cloud of Worship. That covers a hosted service, a desktop app, a paid or a free one.
+- **If you share a changed version, or run it for people to use over a network**, you must release your full source code under the same license.
 
 The name and logo are not part of the license. See [TRADEMARKS.md](./TRADEMARKS.md).
 
-Want to use it in a way the license doesn't allow? Email [hello@cloudofworship.com](mailto:hello@cloudofworship.com).
+Want to use it under different terms? Email [hello@cloudofworship.com](mailto:hello@cloudofworship.com).
 
 ## Project Structure
 
