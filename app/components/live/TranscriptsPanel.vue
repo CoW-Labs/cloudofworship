@@ -92,7 +92,14 @@
                     leave-to-class="opacity-0 blur-[3px]"
                   >
                     <span
-                      v-if="isPaused"
+                      v-if="isReconnecting"
+                      key="reconnecting"
+                      class="text-amber-600 dark:text-amber-400"
+                    >
+                      Reconnecting…
+                    </span>
+                    <span
+                      v-else-if="isPaused"
                       key="paused"
                       class="text-gray-600 dark:text-gray-300"
                     >
@@ -409,6 +416,7 @@ const {
   isTranscribing,
   isConnecting,
   isPaused,
+  isReconnecting,
   segments,
   currentTranscript,
   isSpeechRecognitionSupported,
