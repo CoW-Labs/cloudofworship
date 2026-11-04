@@ -91,7 +91,7 @@ Report bugs and request features on [GitHub Issues](https://github.com/cow-labs/
 
 ## Community
 
-Join us on [WhatsApp](https://chat.whatsapp.com/DeQX11igCSU6YaOoTqY7GY) and [Instagram](https://instagram.com/cloudofworshipapp).
+Join us on [Discord](https://discord.gg/WTkdgNNpQG), [WhatsApp](https://chat.whatsapp.com/DeQX11igCSU6YaOoTqY7GY) and [Instagram](https://instagram.com/cloudofworshipapp).
 
 ## License
 
