@@ -18,7 +18,7 @@ import type {
 import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
 import { defaultStageTimerState } from "~/utils/stageTimer"
-import { useThrottleFn } from "@vueuse/core"
+import { clearUndoHistory } from "~/utils/undoHistory"
 import posthog from "posthog-js"
 import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
 import {
@@ -96,7 +96,7 @@ const shallowEqual = (a: Record<string, any>, b: Record<string, any>) => {
  * through a snapshot: `appStateSerializer` and `sharedStateSerializer` both
  * strip it because SlideRepository owns the durable copy. Any path that
  * installs a whole `currentState` object (persist hydration, a shared-state
- * patch, an undo/redo restore) can therefore hand back a state with the key
+ * patch) can therefore hand back a state with the key
  * missing, which left the store holding `undefined` and crashed the first
  * reader — `[...activeSlides]`, `activeSlides.map`, `activeSlides.find`.
  * Every read goes through this coercion so a missing key degrades to empty.
@@ -140,48 +140,9 @@ function ensureUniqueIds(slides: unknown): Slide[] {
   })
 }
 
-/**
- * Upper bound on the undo/redo stack. Depth beyond this is never reached in
- * practice, and each retained entry holds a full activeSlides snapshot.
- */
-const MAX_UNDO_HISTORY = 50
-
-/**
- * This function is used to throttle the amount of times the app state is updated
- * in relation to the past states (undo/redo stack)
- * The key/value approach for updating is used to ensure reactivity of the app state
- * @param pastStates
- * @param currentState
- * @param key
- * @param value
- */
-const onAppStateChange = useThrottleFn(
-  (
-    pastStates: AppState[],
-    currentState: any,
-    key: keyof AppState,
-    value: any
-  ) => {
-    // console.log('added to Stack')
-    const tempCurrentState = { ...currentState }
-    if (key) {
-      tempCurrentState[key] = value
-    }
-    pastStates.push({ ...tempCurrentState })
-    // Every entry expands its full activeSlides array when serialized, so an
-    // uncapped stack grows without bound over a long session.
-    if (pastStates.length > MAX_UNDO_HISTORY) {
-      pastStates.splice(0, pastStates.length - MAX_UNDO_HISTORY)
-    }
-  },
-  1500
-)
-
 export const useAppStore = defineStore("app", {
   state: (): {
     currentState: AppState
-    pastStates: AppState[]
-    futureStates: AppState[]
     panelSizes: PanelSizes
     panelSizesTouched: Partial<Record<PanelSizeKey, boolean>>
   } => {
@@ -254,7 +215,6 @@ export const useAppStore = defineStore("app", {
         activeOverlay: "none",
         activeOverlaySlide: null,
         recentBibleSearches: [],
-        failedUploadRequests: [],
         slidesLoading: false,
         lastSynced: new Date().toISOString(),
         bannerVisible: true,
@@ -274,9 +234,6 @@ export const useAppStore = defineStore("app", {
         >,
         // activeLiveWindows: [] as any[]
       },
-      // Undo/Redo stacks
-      pastStates: [],
-      futureStates: [],
       panelSizes: getDefaultPanelSizes(),
       panelSizesTouched: {},
     }
@@ -370,7 +327,6 @@ export const useAppStore = defineStore("app", {
       this.panelSizesTouched[panel] = true
     },
     setSchedules(schedules: Schedule[]) {
-      // onAppStateChange(this.pastStates, this.currentState)
       this.currentState.schedules = schedules?.filter(
         (schedule) => schedule !== null
       )
@@ -381,7 +337,6 @@ export const useAppStore = defineStore("app", {
         // console.log("tempSchedule", tempSchedule)
         this.currentState.activeSchedule = tempSchedule
       }
-      this.futureStates = []
     },
     setActiveSchedule(schedule: Schedule | null) {
       if (schedule) {
@@ -403,10 +358,6 @@ export const useAppStore = defineStore("app", {
       }
     },
     appendActiveSlide(slide: Slide, position?: number) {
-      onAppStateChange(this.pastStates, this.currentState, "activeSlides", [
-        ...this.activeSlides,
-      ])
-      // console.log('appending active slide', [...this.activeSlides])
       if (!this.activeSlides.find((s) => s?.id === slide?.id)) {
         const nextSlides = [...this.activeSlides]
         if (position !== undefined && position >= 0) {
@@ -422,11 +373,9 @@ export const useAppStore = defineStore("app", {
           repository.putSlide(slide)
         )
       }
-      this.futureStates = []
     },
     appendActiveSlides(slides: Array<Slide>) {
       // console.log('appending active slides', this.currentState.activeSlides?.length)
-      // onAppStateChange(this.pastStates, this.currentState)
       let tempSlides = [...this.activeSlides]
       tempSlides.push(...toSlideArray(slides))
       this.currentState.activeSlides = ensureUniqueIds(tempSlides)
@@ -436,7 +385,6 @@ export const useAppStore = defineStore("app", {
       enqueueSlideShadowWrite("append slides", (repository) =>
         repository.putSlides(slides)
       )
-      this.futureStates = []
     },
     removeActiveSlide(slide: Slide) {
       // console.log('removing active slides', this.currentState.activeSlides?.length)
@@ -454,10 +402,6 @@ export const useAppStore = defineStore("app", {
         this.currentState.activeOverlaySlide = null
       }
 
-      onAppStateChange(this.pastStates, this.currentState, "activeSlides", [
-        ...this.activeSlides,
-      ])
-      // onAppStateChange(this.pastStates, this.currentState)
       // Reassign the array reference (not an in-place splice) so shallow
       // watchers re-fire. PreviewContent keeps a filtered copy synced via
       // `watch(() => activeSlides)`, which only triggers on reference change.
@@ -475,10 +419,8 @@ export const useAppStore = defineStore("app", {
       // The API dissolves a pair that loses a member; match it here so the
       // other slide comes back as an ordinary card straight away.
       this.detachSlidesFromPairs([slide.id])
-      this.futureStates = []
     },
     replaceScheduleActiveSlides(slides: Array<Slide>) {
-      // onAppStateChange(this.pastStates, this.currentState)
       let tempSlides = [...this.activeSlides]
       tempSlides = tempSlides.filter(
         (slide) => slide.scheduleId !== this.currentState.activeSchedule?._id
@@ -500,11 +442,9 @@ export const useAppStore = defineStore("app", {
           })
         )
       }
-      this.futureStates = []
     },
     setActiveSlides(slides: Array<Slide>) {
       // console.log('setting active slides', this.currentState.activeSlides?.length)
-      // onAppStateChange(this.pastStates, this.currentState)
       // console.log("setActiveSlides", slides)
       this.currentState.activeSlides = ensureUniqueIds(slides)
       if (
@@ -523,7 +463,6 @@ export const useAppStore = defineStore("app", {
       // Slides arriving from the server, the cache or a teammate carry whatever
       // pairId they were saved with; the pairs held here decide.
       if (this.allSlidePairs.length) this.syncPairMembership()
-      this.futureStates = []
     },
     // setActiveSlideId(slideId: string) {
     //   this.currentState.activeSlideId = slideId
@@ -752,29 +691,6 @@ export const useAppStore = defineStore("app", {
         const tempSet = new Set(tempArr)
         tempSet.add(searchQuery)
         this.currentState.recentBibleSearches = Array.from(tempSet)
-      }
-    },
-    setFailedUploadRequests(
-      failedRequest: { path: string; options: any; timestamp: number } | null
-    ) {
-      const tempArr = this.currentState.failedUploadRequests ? [...this.currentState.failedUploadRequests] : []
-      if (failedRequest) {
-        tempArr.push(failedRequest)
-        this.currentState.failedUploadRequests = tempArr
-      }
-    },
-    removeFailedUploadRequest(
-      failedRequest: { path: string; options: any; timestamp: number }
-    ) {
-      const index = this.currentState.failedUploadRequests.findIndex(
-        (req) =>
-          req.path === failedRequest.path &&
-          req.timestamp === failedRequest.timestamp
-      );
-      if (index !== -1) {
-        const tempArr = [...this.currentState.failedUploadRequests];
-        tempArr.splice(index, 1);
-        this.currentState.failedUploadRequests = tempArr;
       }
     },
     setSlidesLoading(loading: boolean) {
@@ -1104,7 +1020,6 @@ export const useAppStore = defineStore("app", {
       this.setActiveAlert(null)
       this.setActiveOverlaySlide(null)
       this.setRecentBibleSearches("")
-      this.setFailedUploadRequests(null)
       this.setSlidesLoading(false)
       this.setLastSynced(new Date().toISOString())
       this.setMainDisplayLabel("")
@@ -1113,85 +1028,8 @@ export const useAppStore = defineStore("app", {
       this.setStageDisplayScreen(null)
       this.currentState.onlineUsers = []
       this.currentState.slidesBeingEdited = {}
-      this.refreshAppActionsStack()
+      clearUndoHistory()
       posthog.reset()
-    },
-    // Undo/Redo Actions
-    setCurrentState(state: any) {
-      // An undo/redo entry is a snapshot clone, and a snapshot that travelled
-      // through a serializer no longer carries activeSlides. Restore the key
-      // explicitly instead of letting `undefined` reach the readers.
-      // Pairs are server state, created and removed through the API, so an
-      // undo never brings back or takes away a pair: it would leave this
-      // device disagreeing with the server and every teammate.
-      this.currentState = {
-        ...state,
-        activeSlides: toSlideArray(state?.activeSlides),
-        slidePairs: this.allSlidePairs,
-        livePairId: this.currentState.livePairId ?? null,
-      }
-      this.syncPairMembership()
-      const scheduleId = this.currentState.activeSchedule?._id
-      if (scheduleId) {
-        cancelPendingScheduleShadowPuts(scheduleId)
-        const scheduleSlides = this.activeSlides.filter(
-          (slide) => slide.scheduleId === scheduleId
-        )
-        enqueueSlideShadowWrite("restore undo state", (repository) =>
-          repository.replaceScheduleSlides(scheduleId, scheduleSlides, {
-            removeMissing: true,
-            preservePending: false,
-            syncState: "pending",
-          })
-        )
-      }
-      // console.log("updated current state", this.currentState)
-    },
-    undo() {
-      // console.log("undo action")
-      if (this.pastStates.length) {
-        this.futureStates.push(this.currentState)
-        this.setCurrentState(this.pastStates.pop())
-      }
-    },
-    redo() {
-      // console.log("redo action")
-      if (this.futureStates.length) {
-        this.pastStates.push(this.currentState)
-        this.setCurrentState(this.futureStates.pop())
-      }
-    },
-    /**
-     * Rewrites one slide in every undo/redo snapshot. A song added from a
-     * library preview goes onto the schedule before its claim answers, so a
-     * snapshot taken in between holds the preview, and undo would bring it
-     * back: without its full lyrics, or, when the claim was refused, as a slide
-     * the API reads as unlocking the song. `settle` returns the slide to keep
-     * in its place, or null to leave it out.
-     */
-    settleSlideInHistory(
-      slideId: string,
-      settle: (slide: Slide) => Slide | null
-    ) {
-      const rewrite = (states: AppState[]) =>
-        states.map((state) => {
-          const slides = toSlideArray(state?.activeSlides)
-          if (!slides.some((slide) => slide.id === slideId)) return state
-          return {
-            ...state,
-            activeSlides: slides.flatMap((slide) => {
-              if (slide.id !== slideId) return [slide]
-              const settled = settle(slide)
-              return settled ? [settled] : []
-            }),
-          }
-        })
-      this.pastStates = rewrite(this.pastStates)
-      this.futureStates = rewrite(this.futureStates)
-    },
-    refreshAppActionsStack() {
-      this.pastStates = []
-      this.futureStates = []
     },
     setOnlineUsers(users: OnlineUser[]) {
       this.currentState.onlineUsers = users
@@ -1245,12 +1083,9 @@ export const useAppStore = defineStore("app", {
     },
   },
   // app-state-persistence watches only the serializable projection. The generic
-  // plugin's deep subscription would still traverse slides and undo history.
+  // plugin's deep subscription would still traverse every slide.
   persist: false,
   share: {
     enable: true,
-    // Undo history is per-window. The outgoing serializer also removes it and
-    // activeSlides before pinia-shared-state sends the snapshot.
-    omit: ["pastStates", "futureStates"],
   },
 })

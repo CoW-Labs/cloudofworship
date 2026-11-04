@@ -50,7 +50,7 @@ const label = computed(() =>
     : props.status === "disconnected"
     ? "Reconnecting..."
     : props.status === "failed"
-    ? "Connection lost. Reload to try again."
+    ? "Connection lost. Still trying..."
     : ""
 )
 </script>

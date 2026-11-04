@@ -3,7 +3,7 @@
  * serializes an outgoing snapshot. Its `share.omit` option only controls what
  * a receiver applies, so it cannot provide this performance boundary itself.
  */
-export const NEVER_BROADCAST = ["pastStates", "futureStates", "activeSlides"]
+export const NEVER_BROADCAST = ["activeSlides"]
 
 /**
  * Serializer for PiniaSharedState. Slides live in IndexedDB and secondary

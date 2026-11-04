@@ -107,7 +107,7 @@
               @duplicate-as-overlay="duplicatePreviewSlideAsOverlay"
               @show-overlay="showSlideOverlay"
               @clear-overlay="clearSlideOverlay"
-              @delete="deleteSlide"
+              @delete="(slideId: string) => deleteSlidesWithUndo([slideId])"
               @save-slide="saveSlide(gridCardSlide(slide))"
               @save-as-template="openSaveTemplateModal(gridCardSlide(slide))"
               @bulk-selected="addToSelectedSlides(slide?.id, $event)"
@@ -179,6 +179,8 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
+import { slidesCreatingInBackground } from "~/composables/useSlideCreation"
+import { onSocketConnected } from "~/composables/useSocketIO"
 import { reportSongSearchPick } from "~/composables/useSongSearchLog"
 import { isSongPending, setSongPending } from "~/composables/useSongs"
 import {
@@ -192,7 +194,7 @@ import {
   mergeServerAndPendingScheduleSlides,
   replaceScheduleSlidesInCorpus,
 } from "~/composables/useScheduleSlideHydration"
-import { toSlideArray, useAppStore } from "~/store/app"
+import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {
   CameraSlideData,
@@ -212,6 +214,15 @@ import {
   toTransportSafePayload,
 } from "~/utils/mediaTransport"
 import { unavailableMediaCopy } from "~/utils/mediaCloudSync"
+import {
+  changedSlideFields,
+  clearUndoHistory,
+  isLatestUndoStep,
+  pickSlideFields,
+  recordUndoStep,
+  type SlideUpdateMeta,
+  type UndoStep,
+} from "~/utils/undoHistory"
 import type { CameraSettings } from "~/utils/camera"
 import { postCameraPrewarm } from "~/composables/useCameraStream"
 import { isPdfPresentationFile } from "~/utils/presentationFile"
@@ -727,7 +738,11 @@ const makeSlideActive = (
 ) => {
   activeSlide.value = slide
   if (options?.newlyCreated) {
+    // "Preview / edit" on a card comes through here too, with a slide that is
+    // already on the schedule: only a slide that was not there is an add.
+    const added = !appStore.activeSlidesById.has(slide.id)
     appStore.appendActiveSlide(slide, options.position)
+    if (added) recordSlideMembership("Add slide", [slide], true)
     // Lets the mobile route dismiss the Quick Actions sheet the slide was
     // created from, so it does not stay stacked over the editor.
     if (props.mobile) emit("slide-created")
@@ -1531,7 +1546,6 @@ const addPreviewSongThenClaim = async (picked: Song) => {
   const claimed = await claimSong(picked)
   if (!claimed) {
     await deleteSlide(slide.id, false)
-    appStore.settleSlideInHistory(slide.id, () => null)
     return
   }
 
@@ -1540,10 +1554,6 @@ const addPreviewSongThenClaim = async (picked: Song) => {
     { ...claimed },
     (current || slide).slideStyle?.linesPerSlide
   )
-  // Undo snapshots taken while the claim was out hold the preview's song.
-  if (full) {
-    appStore.settleSlideInHistory(slide.id, (old) => ({ ...old, data: full }))
-  }
   // Deleted while the claim was out: nothing else to fill in.
   if (!current) return
 
@@ -1617,36 +1627,13 @@ const settleSetlistVersion = async (
   )
 }
 
-// Undo snapshots taken while the claim was out hold the setlist with the
-// preview in it, and undo would bring that back. Snapshots share slide
-// objects, so each distinct version is settled once.
-const settleSetlistHistory = async (
-  slideId: string,
-  songKey: string,
-  claimed: Song | null
-) => {
-  const versions = new Map<Slide, Slide>()
-  for (const state of [...appStore.pastStates, ...appStore.futureStates]) {
-    for (const slide of toSlideArray(state?.activeSlides)) {
-      if (slide.id !== slideId || versions.has(slide)) continue
-      if (previewItemIndex(slide, songKey) < 0) continue
-      versions.set(slide, await settleSetlistVersion(slide, songKey, claimed))
-    }
-  }
-  if (!versions.size) return
-  appStore.settleSlideInHistory(slideId, (slide) => versions.get(slide) ?? slide)
-}
-
-// Settles a preview song sitting in a setlist once its claim has answered,
-// on the schedule and in the undo history.
+// Settles a preview song sitting in a setlist once its claim has answered.
 const settlePreviewInSetlist = async (
   slideId: string,
   picked: Song,
   claimed: Song | null
 ): Promise<Slide | null> => {
   const songKey = (picked as any)._id || picked.id
-  await settleSetlistHistory(slideId, songKey, claimed)
-
   const current = slides.value.find((item) => item.id === slideId)
   if (!current) return null
   const updated = await settleSetlistVersion(current, songKey, claimed)
@@ -1680,7 +1667,11 @@ const addPreviewSongToSetlistThenClaim = async (
 
   const claimed = await claimSong(picked)
   const settled = await settlePreviewInSetlist(withPreview.id, picked, claimed)
-  if (settled) updateSlideOnline(settled)
+  if (!settled) return
+  // Recorded only now: until the claim lands the setlist holds a preview,
+  // which an undo step must never carry.
+  if (claimed) recordSlideEdit(setlistSlide, settled)
+  updateSlideOnline(settled)
 }
 
 // A brand new setlist opened with a library song: the setlist appears at once
@@ -1694,7 +1685,6 @@ const addPreviewSetlistThenClaim = async (picked: Song) => {
   const claimed = await claimSong(picked)
   if (!claimed) {
     await deleteSlide(newSlide.id, false)
-    appStore.settleSlideInHistory(newSlide.id, () => null)
     return
   }
 
@@ -1712,6 +1702,7 @@ const addSongToSetlist = async (setlistSlide: Slide, song: Song) => {
   const updatedSlide = await appendSongToSetlist(setlistSlide, song)
   if (!updatedSlide) return
 
+  recordSlideEdit(setlistSlide, updatedSlide)
   appStore.updateSlideInActiveSlides(updatedSlide)
   makeSlideActive(updatedSlide, { goLive: false, newlyCreated: false })
   updateLiveOutput(updatedSlide)
@@ -1897,7 +1888,7 @@ emitter.on("restart-countdown", (data: Slide) => {
 })
 
 emitter.on("delete-slide", (data: Slide) => {
-  deleteSlide(data?.id)
+  if (data?.id) deleteSlidesWithUndo([data.id])
 })
 
 // "Edit song in library" is reachable from the editor's own actions menu, and
@@ -2321,6 +2312,8 @@ emitter.on("selected-schedule", (data: Schedule | string | null) => {
   // just left, so keeping it would leave the editor on a slide that isn't in
   // the grid any more.
   activeSlide.value = undefined
+  // Undo steps belong to the schedule they were made on.
+  clearUndoHistory()
 
   // Clear live projection
   appStore.setLiveSlide("")
@@ -2374,8 +2367,16 @@ const uploadOfflineSlides = async () => {
 
   // Snapshot offline slides at the moment the lock is acquired so that any
   // slides added while the request is in-flight are picked up on the next run.
+  // The batch endpoint creates into the active schedule, so a slide still in
+  // memory from the schedule being left (mid-switch) waits for its own. A
+  // slide whose media flow is still running is that flow's to create.
+  const activeScheduleId = appStore.currentState.activeSchedule?._id
   const offlineSlides = appStore.activeSlides.filter(
-    (slide) => slide._id === undefined && slide.scheduleId
+    (slide) =>
+      slide._id === undefined &&
+      slide.scheduleId &&
+      slide.scheduleId === activeScheduleId &&
+      !slidesCreatingInBackground.has(slide.id)
   )
   if (offlineSlides.length === 0) return
 
@@ -2424,7 +2425,10 @@ const uploadOfflineSlides = async () => {
         )
       )
       editedDuringUpload.forEach((slide) => {
-        enqueueCoalescedSlideShadowPut(slide, { syncState: "pending" })
+        enqueueCoalescedSlideShadowPut(slide, {
+          syncState: "pending",
+          requestResync: needsSlideResync(slide),
+        })
         persistSlideOnline(slide, true)
       })
 
@@ -2433,6 +2437,21 @@ const uploadOfflineSlides = async () => {
         broadcastSlideUpdate("batch-create-slides", {
           slides: savedSlides,
         })
+      }
+
+      // Media in a slide created offline is still only on this device, and
+      // the re-upload sweep needs the server id the slide has just gained.
+      if (
+        savedSlides.some(
+          (slide) =>
+            slide._id &&
+            (slide.type === slideTypes.presentation ||
+              slide.type === slideTypes.media)
+        )
+      ) {
+        useCloudUploadRetry()
+          .retryActiveScheduleUploads()
+          .catch((err) => console.error("Cloud upload retry sweep failed:", err))
       }
     }
   } finally {
@@ -2444,6 +2463,29 @@ const uploadOfflineSlides = async () => {
     }
   }
 }
+
+// Slides created offline exist only on this device until they are sent, so
+// send them as soon as the connection is back instead of waiting for the next
+// slide to be created. A socket connect means the server is reachable; the
+// browser's online event fires earlier, so it waits a moment first.
+const OFFLINE_SLIDE_UPLOAD_DELAY_MS = 3000
+let offlineSlideUploadTimer: ReturnType<typeof setTimeout> | undefined
+watch(online, (isOnline) => {
+  clearTimeout(offlineSlideUploadTimer)
+  if (isOnline) {
+    offlineSlideUploadTimer = setTimeout(
+      () => uploadOfflineSlides(),
+      OFFLINE_SLIDE_UPLOAD_DELAY_MS
+    )
+  }
+})
+const stopOfflineSlideUploadOnConnect = onSocketConnected(() =>
+  uploadOfflineSlides()
+)
+onBeforeUnmount(() => {
+  clearTimeout(offlineSlideUploadTimer)
+  stopOfflineSlideUploadOnConnect()
+})
 
 let networkRefreshGeneration = 0
 let slideEditGeneration = 0
@@ -2785,18 +2827,26 @@ const reportSlideUpdateFailure = (slide: Slide, error: any, durable: boolean) =>
   })
 }
 
+// An edit to a server slide stays queued for replay until its PUT is
+// confirmed. Video slides are excluded: useSlideResync never sends them, so a
+// marker on one would never clear and would block schedule refreshes.
+const needsSlideResync = (slide: Slide) =>
+  !!slide?._id && !isMediaVideoSlide(slide)
+
 // HTTP persistence cadence (2s): decoupled from the broadcast above so live
 // typing stays responsive without multiplying database writes.
 const persistSlideOnline = useThrottleFn(
   async (slide: Slide, durable: boolean) => {
-    // Don't make API calls when offline; persistence needs a server `_id`.
+    // Persistence needs a server `_id`.
     const activeChurchId = authStore.user?.churchId
-    if (
-      !online.value ||
-      !activeChurchId ||
-      !slide?._id ||
-      isMediaVideoSlide(slide)
-    ) {
+    if (!activeChurchId || !slide?._id || isMediaVideoSlide(slide)) {
+      return
+    }
+
+    // Offline, the edit exists only in this browser. Queue it so
+    // useSlideResync replays it once the connection returns.
+    if (!online.value) {
+      if (durable) await markSlideUnsynced(slide)
       return
     }
 
@@ -2893,14 +2943,23 @@ const updateSlideOnline = (
   // allowed to replace it when that GET completes.
   slideEditGeneration += 1
   if (options.durable !== false) {
-    enqueueCoalescedSlideShadowPut(slide, { syncState: "pending" })
+    enqueueCoalescedSlideShadowPut(slide, {
+      syncState: "pending",
+      requestResync: needsSlideResync(slide),
+    })
   }
   announceEditing(slide?.id)
   broadcastSlideEdit(slide)
   persistSlideOnline(slide, options.durable !== false)
 }
 
-const deleteSlide = async (slideId: string, addToast: boolean = true) => {
+const deleteSlide = async (
+  slideId: string,
+  addToast: boolean = true,
+  // An undoable delete keeps the slide's local media until its undo step is
+  // gone (see recordSlideMembership), or undo would bring back a blank slide.
+  options: { keepLocalMedia?: boolean } = {}
+) => {
   if (!slideId) return
 
   const slideMatchesId = (slide: Slide) =>
@@ -2989,23 +3048,7 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
     await deleteSlideAPI(tempSlide)
   }
 
-  // Delete local media bytes and metadata when no library item still owns it.
-  // Library rows are keyed `_id || id` (see useLibrary.cacheSlidesInLibrary), so
-  // a saved slide is filed under its server id — looking it up by client id
-  // alone missed it and sent us into deleteGroup for media that was still owned.
-  const itemSaved =
-    (await getLibraryItem(clientSlideId)) ||
-    (tempSlide._id ? await getLibraryItem(tempSlide._id) : undefined)
-  if (!itemSaved) {
-    try {
-      await useLocalMediaStorage().deleteGroup(clientSlideId)
-    } catch (error) {
-      // deleteGroup refuses to delete media another slide still points at.
-      // That's the correct outcome, not a failure of this deletion — keep the
-      // bytes and move on rather than aborting the rest of the flow.
-      console.warn("Local media kept — still referenced by another slide", error)
-    }
-  }
+  if (!options.keepLocalMedia) await releaseLocalMedia(tempSlide)
 
   if (addToast) {
     toast.add({ title: `${tempSlide?.name} deleted`, icon: "i-tabler-trash" })
@@ -3013,19 +3056,59 @@ const deleteSlide = async (slideId: string, addToast: boolean = true) => {
   usePosthogCapture("DELETE_SLIDE")
 }
 
+// Deletes this device's copy of a deleted slide's media, unless the slide is
+// back on the schedule or a library item still owns it. Library rows are keyed
+// `_id || id` (see useLibrary.cacheSlidesInLibrary), so a saved slide is filed
+// under its server id — looking it up by client id alone missed it and sent us
+// into deleteGroup for media that was still owned.
+const releaseLocalMedia = async (slide: Slide) => {
+  if (appStore.activeSlidesById.has(slide.id)) return
+  const itemSaved =
+    (await getLibraryItem(slide.id)) ||
+    (slide._id ? await getLibraryItem(slide._id) : undefined)
+  if (itemSaved) return
+  try {
+    await useLocalMediaStorage().deleteGroup(slide.id)
+  } catch (error) {
+    // deleteGroup refuses to delete media another slide still points at.
+    // That's the correct outcome, not a failure of this deletion — keep the
+    // bytes and move on rather than aborting the rest of the flow.
+    console.warn("Local media kept — still referenced by another slide", error)
+  }
+}
+
+// The operator deleting slides from this schedule: the usual delete, recorded
+// as one undo step. A slide not on this schedule (Storage settings can name
+// one from anywhere) is deleted without a step.
+const deleteSlidesWithUndo = (slideIds: string[], addToast = true) => {
+  const removed: Slide[] = []
+  slideIds.forEach((slideId) => {
+    const slide = slides.value.find(
+      (item) => item.id === slideId || item._id === slideId
+    )
+    if (slide) removed.push({ ...slide })
+    void deleteSlide(slideId, addToast, { keepLocalMedia: !!slide })
+  })
+  if (removed.length) {
+    recordSlideMembership(
+      removed.length === 1 ? "Delete slide" : `Delete ${removed.length} slides`,
+      removed,
+      false
+    )
+  }
+}
+
 const deleteMultipleSlides = (slideIds: Array<string>) => {
   // Broadcast batch deletion via WebSocket
   broadcastSlideUpdate("batch-delete-slides", { slideIds })
 
-  slideIds.forEach((slideId) => {
-    deleteSlide(slideId, false)
-  })
+  deleteSlidesWithUndo(slideIds, false)
   toast.add({ title: "Multiple slides deleted", icon: "i-tabler-trash" })
   bulkSelectedSlides.value = []
   bulkSelectSlides.value = false
 }
 
-const onUpdateSlide = (slide: Slide) => {
+const onUpdateSlide = (slide: Slide, meta?: SlideUpdateMeta) => {
   // Always pause countdown slide before updating it
   if (slide.type === slideTypes.countdown) {
     // pause the active countdown animation so edits don't conflict
@@ -3034,6 +3117,9 @@ const onUpdateSlide = (slide: Slide) => {
 
   // Stamp a client-side updatedAt so v-memo detects the change and re-renders the card
   const updatedSlide: Slide = { ...slide, updatedAt: new Date().toISOString() }
+  if (!meta?.navigation) {
+    recordSlideEdit(appStore.activeSlidesById.get(slide.id), updatedSlide)
+  }
 
   // The store copy has to be current *before* `makeSlideActive` runs. That call
   // kicks off `resolveSlideMedia`, which looks the slide up in `activeSlides` to
@@ -3064,7 +3150,14 @@ const onUpdateSlide = (slide: Slide) => {
 // This function updates specific slide that is not active
 const onUpdateInactiveSlide = (slide: Slide) => {
   const updatedSlide: Slide = { ...slide, updatedAt: new Date().toISOString() }
+  recordSlideEdit(appStore.activeSlidesById.get(slide.id), updatedSlide)
+  applySlideVersion(updatedSlide)
+}
 
+// Saves a new version of a slide without moving the selection: the store,
+// the editor's copy, the server, and the projector or overlay when it is on
+// screen.
+const applySlideVersion = (updatedSlide: Slide) => {
   appStore.updateSlideInActiveSlides(updatedSlide)
 
   // Toolbar actions use the selected slide as their source of truth. Keep that
@@ -3080,6 +3173,145 @@ const onUpdateInactiveSlide = (slide: Slide) => {
   if (appStore.currentState.activeOverlaySlide?.id === updatedSlide.id) {
     showSlideOverlay(updatedSlide, { capture: false })
   }
+}
+
+// ── Undo ─────────────────────────────────────────────────────────────────────
+// Steps for this operator's adds, deletes and edits (see utils/undoHistory).
+// Teammates' changes arrive through useRealtimeSlides and are never recorded.
+
+// A library preview stays off the server until its claim lands, and a slide
+// carrying one reads to the API as the song being unlocked, so undo and redo
+// never bring one back.
+const carriesPreviewSong = (slide: Slide) =>
+  !!(slide.data as Song | undefined)?.isPreview ||
+  (slide.type === slideTypes.songSetlist &&
+    getSetlistData(slide).songs.some((item) => item.song?.isPreview))
+
+// Deletes the step's slides that are still on the schedule, keeping their
+// media on this device while the step can bring them back. Returns copies of
+// what was deleted, or null when nothing was left to delete.
+const takeOutSlides = (held: Slide[]) => {
+  const present = held
+    .map((slide) => slides.value.find((item) => item.id === slide.id))
+    .filter((slide): slide is Slide => !!slide)
+  present.forEach(
+    (slide) => void deleteSlide(slide.id, false, { keepLocalMedia: true })
+  )
+  return present.length ? present.map((slide) => ({ ...slide })) : null
+}
+
+// Puts deleted slides back, each at its place by `index`. The API soft-deletes,
+// and creating a slide under its old id revives that record, so the slide
+// returns under the same id for every teammate once uploadOfflineSlides sends
+// it (straight away, or when the connection is back).
+const putBackSlides = (held: Slide[]) => {
+  const scheduleId = appStore.currentState.activeSchedule?._id
+  const missing = held
+    .filter(
+      (slide) =>
+        slide.scheduleId === scheduleId &&
+        !appStore.activeSlidesById.has(slide.id) &&
+        !carriesPreviewSong(slide)
+    )
+    .sort((a, b) => a.index - b.index)
+  if (!missing.length) return false
+  missing.forEach((slide) => {
+    const restored: Slide = { ...slide }
+    delete restored._id
+    delete restored.pairId
+    const next = appStore.activeSlides.findIndex(
+      (other) => other.scheduleId === scheduleId && other.index > slide.index
+    )
+    appStore.appendActiveSlide(restored, next < 0 ? undefined : next)
+    void resolveSlideMedia(restored)
+  })
+  uploadOfflineSlides()
+  return true
+}
+
+// Adding and deleting slides are one step run in opposite directions.
+const recordSlideMembership = (
+  label: string,
+  stepSlides: Slide[],
+  added: boolean
+) => {
+  let held = stepSlides.map((slide) => ({ ...slide }))
+  const takeOut = () => {
+    const removed = takeOutSlides(held)
+    if (removed) held = removed
+    return !!removed
+  }
+  const putBack = () => putBackSlides(held)
+  recordUndoStep({
+    label,
+    undo: added ? takeOut : putBack,
+    redo: added ? putBack : takeOut,
+    // Media kept for an undo goes with the step, unless the slide is back.
+    discard: () => held.forEach((slide) => void releaseLocalMedia(slide)),
+  })
+}
+
+// Puts a slide's fields back to the values a step holds. Fields the step did
+// not touch keep whatever they hold now, a teammate's edit included.
+const restoreSlideFields = (slideId: string, values: Record<string, any>) => {
+  const current = slides.value.find((slide) => slide.id === slideId)
+  if (!current) return false
+  const restored: Slide = {
+    ...current,
+    ...pickSlideFields(values, Object.keys(values)),
+    updatedAt: new Date().toISOString(),
+  }
+  if (carriesPreviewSong(restored)) return false
+  if (!changedSlideFields(current, restored).length) return false
+  applySlideVersion(restored)
+  return true
+}
+
+// Edits to one slide in quick succession (a slider dragged, a few toggles)
+// undo as one step.
+const EDIT_MERGE_MS = 1500
+let openEdit: {
+  slideId: string
+  step: UndoStep
+  before: Record<string, any>
+  after: Record<string, any>
+  at: number
+} | null = null
+
+const recordSlideEdit = (before: Slide | undefined, after: Slide) => {
+  if (!before || before.scheduleId !== appStore.currentState.activeSchedule?._id) {
+    return
+  }
+  if (carriesPreviewSong(before) || carriesPreviewSong(after)) return
+  const fields = changedSlideFields(before, after)
+  if (!fields.length) return
+
+  const now = Date.now()
+  if (
+    openEdit?.slideId === after.id &&
+    now - openEdit.at < EDIT_MERGE_MS &&
+    isLatestUndoStep(openEdit.step)
+  ) {
+    const edit = openEdit
+    // The step keeps each field's oldest value and its newest.
+    const firstSeen = fields.filter((field) => !(field in edit.before))
+    Object.assign(edit.before, pickSlideFields(before, firstSeen))
+    Object.assign(edit.after, pickSlideFields(after, fields))
+    edit.at = now
+    return
+  }
+
+  const values = {
+    before: pickSlideFields(before, fields),
+    after: pickSlideFields(after, fields),
+  }
+  const step: UndoStep = {
+    label: "Edit slide",
+    undo: () => restoreSlideFields(after.id, values.before),
+    redo: () => restoreSlideFields(after.id, values.after),
+  }
+  openEdit = { slideId: after.id, step, ...values, at: now }
+  recordUndoStep(step)
 }
 
 // Countdown management functions
@@ -3282,7 +3514,8 @@ const editorBindings = computed(() => ({
 }))
 
 const editorHandlers = {
-  "slide-update": (slide: Slide) => onUpdateSlide(slide),
+  "slide-update": (slide: Slide, meta?: SlideUpdateMeta) =>
+    onUpdateSlide(slide, meta),
   "inactive-slide-update": (slide: Slide) => onUpdateInactiveSlide(slide),
   // EditLiveContent emits `goto-verse` as (title, version) — forward both, or
   // the Bible version silently falls back to the slide's current one.

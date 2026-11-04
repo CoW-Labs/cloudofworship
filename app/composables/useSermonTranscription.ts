@@ -587,6 +587,7 @@ export default function useSermonTranscription() {
     isTranscribing: computed(() => useDeepgramEngine.value ? deepgram.isTranscribing.value : state.value.isTranscribing),
     isConnecting: computed(() => useDeepgramEngine.value ? deepgram.isConnecting.value : state.value.isConnecting),
     isPaused: computed(() => useDeepgramEngine.value ? deepgram.isPaused.value : isPausedLocal.value),
+    isReconnecting: computed(() => useDeepgramEngine.value && deepgram.isReconnecting.value),
     error: computed(() => useDeepgramEngine.value ? deepgram.error.value : state.value.error),
     segments: computed(() => useDeepgramEngine.value ? deepgram.segments.value : state.value.segments),
     currentTranscript: computed(() => useDeepgramEngine.value ? deepgram.currentTranscript.value : state.value.currentTranscript),

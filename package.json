@@ -1,6 +1,7 @@
 {
   "name": "cloud-of-worship",
   "private": true,
+  "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"

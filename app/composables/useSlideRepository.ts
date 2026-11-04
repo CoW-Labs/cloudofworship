@@ -9,6 +9,13 @@ import { notifySlideDatabaseChanged } from "~/composables/useSlideDatabaseNotifi
 
 export type SlideWriteOptions = {
   syncState?: SlideSyncState | ((slide: Slide) => SlideSyncState)
+  /**
+   * Queue a pending write for replay by useSlideResync until a PUT confirms
+   * it. Set for operator edits to server slides, so an edit is not lost when
+   * the tab closes inside the 2s persist throttle, while its PUT is in
+   * flight, or while the device is offline.
+   */
+  requestResync?: boolean | ((slide: Slide) => boolean)
 }
 
 export type ReplaceScheduleOptions = SlideWriteOptions & {
@@ -33,9 +40,10 @@ export interface SlideRepository {
   ): Promise<StoredSlideRecord | undefined>
   getScheduleSlides(scheduleId: string): Promise<Slide[]>
   /**
-   * Records explicitly queued after an existing server slide PUT failed.
-   * Generic `pending` records are intentionally excluded: older app versions
-   * used that state for every local edit, including successful writes.
+   * Records explicitly queued for replay: an edit to a server slide whose PUT
+   * has not been confirmed yet, or whose PUT failed. Generic `pending` records
+   * are intentionally excluded: older app versions used that state for every
+   * local edit, including successful writes.
    */
   getPendingSlides(): Promise<StoredSlideRecord[]>
   markSlideSyncState(
@@ -75,6 +83,11 @@ const resolveSyncState = (slide: Slide, options?: SlideWriteOptions) => {
   if (options?.syncState) return options.syncState
   return slide._id ? "synced" : "pending"
 }
+
+const resolveRequestResync = (slide: Slide, options?: SlideWriteOptions) =>
+  typeof options?.requestResync === "function"
+    ? options.requestResync(slide)
+    : !!options?.requestResync
 
 export const createSlideRepository = (
   injectedDb?: WorshipCloudDatabase,
@@ -121,7 +134,8 @@ export const createSlideRepository = (
           // failed request. A confirmed server/realtime write clears it.
           resyncRequestedAt:
             syncState === "pending"
-              ? existing[index]?.resyncRequestedAt || null
+              ? existing[index]?.resyncRequestedAt ||
+                (resolveRequestResync(slide, options) ? storedAt : null)
               : null,
           storedAt,
           deletedAt: null,
@@ -218,9 +232,10 @@ export const createSlideRepository = (
         const storedAt = new Date().toISOString()
         const records: StoredSlideRecord[] = prepared.map((slide) => {
           const previous = existingById.get(slide.id)
-          // A confirmed failed PUT is the only local server-backed record that
-          // may override a fetched snapshot. Preserve it until replay succeeds;
-          // generic legacy `pending` records do not get this protection.
+          // An edit queued for replay is the only local server-backed record
+          // that may override a fetched snapshot. Preserve it until replay
+          // succeeds; generic legacy `pending` records do not get this
+          // protection.
           if (
             previous?.resyncRequestedAt &&
             options.preservePending !== false
@@ -337,7 +352,7 @@ let repositoryInstance: SlideRepository | null = null
 let shadowWriteTail: Promise<void> = Promise.resolve()
 const pendingSlidePuts = new Map<
   string,
-  { slide: Slide; syncState: SlideSyncState }
+  { slide: Slide; syncState: SlideSyncState; requestResync: boolean }
 >()
 let pendingSlidePutTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -376,18 +391,20 @@ const flushPendingSlidePuts = () => {
 
   const batch = [...pendingSlidePuts.values()]
   pendingSlidePuts.clear()
-  const syncStates = new Map(
-    batch.map(({ slide, syncState }) => [
-      shadowKey(slide.scheduleId, slide.id),
-      syncState,
+  const entries = new Map(
+    batch.map((entry) => [
+      shadowKey(entry.slide.scheduleId, entry.slide.id),
+      entry,
     ])
   )
+  const entryFor = (slide: Slide) =>
+    entries.get(shadowKey(slide.scheduleId, slide.id))
   enqueueSlideShadowWrite("coalesced slide edits", (repository) =>
     repository.putSlides(
       batch.map(({ slide }) => slide),
       {
-        syncState: (slide) =>
-          syncStates.get(shadowKey(slide.scheduleId, slide.id)) || "pending",
+        syncState: (slide) => entryFor(slide)?.syncState || "pending",
+        requestResync: (slide) => !!entryFor(slide)?.requestResync,
       }
     )
   )
@@ -400,9 +417,16 @@ export const enqueueCoalescedSlideShadowPut = (
   intervalMs = 500
 ) => {
   if (!isValidSlide(slide)) return
-  pendingSlidePuts.set(shadowKey(slide.scheduleId, slide.id), {
+  const key = shadowKey(slide.scheduleId, slide.id)
+  const syncState = resolveSyncState(slide, options)
+  pendingSlidePuts.set(key, {
     slide,
-    syncState: resolveSyncState(slide, options),
+    syncState,
+    // A later pending write coalesced over an edit must not drop that edit's
+    // replay request before it reaches the database.
+    requestResync:
+      resolveRequestResync(slide, options) ||
+      (syncState === "pending" && !!pendingSlidePuts.get(key)?.requestResync),
   })
   if (!pendingSlidePutTimer) {
     pendingSlidePutTimer = setTimeout(flushPendingSlidePuts, intervalMs)

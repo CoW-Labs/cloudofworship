@@ -87,6 +87,7 @@ import { appWideActions, backgroundTypes } from "~/utils/constants"
 import { isRetryableMediaDownloadError } from "~/utils/mediaDownloadErrors"
 import { safeDBOperation } from "~/composables/useIndexedDB"
 import { invalidateHymnCache } from "~/composables/useHymn"
+import { onSocketConnected } from "~/composables/useSocketIO"
 import { cloneDurableSlide } from "~/utils/durableSlide"
 import { stageTimerReading } from "~/utils/stageTimer"
 
@@ -352,25 +353,37 @@ watch(online, (isOnline) => {
 // of the loads that matter first.
 const { retryActiveScheduleUploads } = useCloudUploadRetry()
 let cloudRetryTimer: ReturnType<typeof setTimeout> | undefined
-const scheduleCloudRetry = () => {
+// Held until the timer fires, so a schedule load landing in the same 5s does
+// not cancel a reconnect's shortcut past the backoff.
+let cloudRetryAfterReconnect = false
+const scheduleCloudRetry = (reconnected = false) => {
+  cloudRetryAfterReconnect ||= reconnected
   clearTimeout(cloudRetryTimer)
   cloudRetryTimer = setTimeout(() => {
+    const afterReconnect = cloudRetryAfterReconnect
+    cloudRetryAfterReconnect = false
     if (!online.value) return
-    retryActiveScheduleUploads().catch((err) =>
+    retryActiveScheduleUploads({ reconnected: afterReconnect }).catch((err) =>
       console.error("Cloud upload retry sweep failed:", err)
     )
   }, 5000)
 }
 watch(online, (isOnline) => {
-  if (isOnline) scheduleCloudRetry()
+  if (isOnline) scheduleCloudRetry(true)
 })
+// A socket reconnect is the signal for a flaky connection recovering while
+// the browser still reports online, which the watcher above never sees.
+const stopCloudRetryOnConnect = onSocketConnected(() => scheduleCloudRetry(true))
 watch(
   () => appStore.currentState.slidesLoading,
   (loading, wasLoading) => {
     if (wasLoading && !loading) scheduleCloudRetry()
   }
 )
-onUnmounted(() => clearTimeout(cloudRetryTimer))
+onUnmounted(() => {
+  clearTimeout(cloudRetryTimer)
+  stopCloudRetryOnConnect()
+})
 
 const fetchHymns = async () => {
   if (!online.value) {
@@ -790,7 +803,6 @@ const downloadEssentialResources = async () => {
     appStore.currentState.activeSchedule?._id
   )
   overrideAppSettings()
-  appStore.refreshAppActionsStack()
 
   // ── Phase 2: Background ───────────────────────────────────────────────────
   // These run after the workspace is visible. Errors are isolated and non-fatal.

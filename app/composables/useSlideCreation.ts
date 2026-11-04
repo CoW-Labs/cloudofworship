@@ -23,6 +23,14 @@ import { isSessionMediaUrl, toTransportSafeSlide } from "~/utils/mediaTransport"
  * Composable for creating different types of slides
  * Handles Bible, Hymn, Song, Media, Countdown, and Text slides
  */
+/**
+ * Slides whose own background flow (media upload or presentation pages, then
+ * the server create) is still running. The generic offline-slide upload skips
+ * them: sent early, a slide reaches the server without its media URLs and the
+ * flow's own create then lands as a duplicate.
+ */
+export const slidesCreatingInBackground = new Set<string>()
+
 export default function useSlideCreation() {
   const appStore = useAppStore()
   const authStore = useAuthStore()
@@ -457,6 +465,8 @@ export default function useSlideCreation() {
 
     useGlobalEmit(appWideActions.appLoading, false)
 
+    newSlides.forEach((slide) => slidesCreatingInBackground.add(slide.id))
+
       // ── Step 2 — background: upload → server create → socket broadcast ────
       ; (async () => {
         try {
@@ -671,6 +681,8 @@ export default function useSlideCreation() {
             icon: "i-bx-error",
             color: "red",
           })
+        } finally {
+          newSlides.forEach((slide) => slidesCreatingInBackground.delete(slide.id))
         }
       })()
 
@@ -717,6 +729,8 @@ export default function useSlideCreation() {
     tempSlide.backgroundVideoKey = null
     tempSlide.backgroundImageKey = null
     tempSlide.contents = []
+
+    slidesCreatingInBackground.add(tempSlide.id)
 
       // ── Step 2 — background ───────────────────────────────────────────────
       ; (async () => {
@@ -906,7 +920,7 @@ export default function useSlideCreation() {
           })
           if (navigator.onLine) setTimeout(() => void retry(false), 15_000)
         }
-      })()
+      })().finally(() => slidesCreatingInBackground.delete(tempSlide.id))
 
     usePosthogCapture("NEW_PRESENTATION_SLIDE_CREATED", {
       page_count: presentationObjects.length,

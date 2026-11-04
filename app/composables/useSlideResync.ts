@@ -8,6 +8,7 @@ import {
   useSlideRepository,
 } from "~/composables/useSlideRepository"
 import { isNetworkError, isNotFoundError } from "~/utils/apiErrors"
+import { onSocketConnected } from "~/composables/useSocketIO"
 import {
   isMediaVideoSlide,
   slideUpdatePath,
@@ -27,7 +28,9 @@ import {
  * is still true — flaky venue wifi and captive portals — so nothing catches them.
  *
  * The repository already tracks `syncState`, so the retry queue is the set of
- * records marked "pending" rather than a second parallel store.
+ * records marked "pending" rather than a second parallel store. An operator
+ * edit is queued as it is written and cleared once its PUT is confirmed, which
+ * also covers an edit made offline or lost to a tab closed mid-request.
  */
 
 /**
@@ -242,8 +245,7 @@ export const useSlideResync = () => {
 
   // A socket reconnect is the most reliable signal that a flaky connection
   // recovered, which is the case `navigator.onLine` misses entirely.
-  const socket = nuxtApp.$socketio as any
-  socket?.on?.("connect", () => void flushPendingSlides())
+  onSocketConnected(() => void flushPendingSlides())
 
   // Anything left pending from a previous session — a tab closed or crashed
   // before the queue drained — is only recoverable at startup.

@@ -46,18 +46,18 @@ npm run tauri:build
 
 ## Contributing
 
-Contributions are welcome! To get started on your local development environment, please follow the steps below:
-
-1. Fork the repository and clone it to your local machine.
-2. Install the required dependencies using `yarn install` or `npm install`.
-3. Start the development server using `yarn dev` or `npm run dev`.
-4. Make your changes and test them locally.
-5. Commit your changes and push them to your forked repository.
-6. Create a pull request to the main repository.
+Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) to get set up.
 
 ## License
 
-Cloud of Worship is licensed under the [GNU](https://github.com/CoW-Labs/cloudofworship/blob/master/LICENSE).
+Cloud of Worship is source-available under the [PolyForm Shield License 1.0.0](./LICENSE).
+
+- **You can** read, change and run the code, including for your own church or ministry, for free.
+- **You can't** offer it, or anything built from it, as a product that competes with Cloud of Worship. That covers a hosted service, a desktop app, a paid or a free one.
+
+The name and logo are not part of the license. See [TRADEMARKS.md](./TRADEMARKS.md).
+
+Want to use it in a way the license doesn't allow? Email [hello@cloudofworship.com](mailto:hello@cloudofworship.com).
 
 ## Project Structure
 
@@ -77,7 +77,3 @@ Cloud of Worship is licensed under the [GNU](https://github.com/CoW-Labs/cloudof
 └── src-tauri              # Tauri integration (for lightweight desktop builds)
 
 ```
-
-## License
-
-Cloud of Worship is licensed under the [GNU General Public License v3.0](https://github.com/CoW-Labs/cloudofworship/blob/master/LICENSE).
