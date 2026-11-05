@@ -69,25 +69,51 @@
             @confirm="$emit(secondaryButton.action)"
           >
           </ConfirmDialog>
-          <!-- Direct button when live (no popover) -->
-          <CowButton
+          <!-- Direct button when live (no popover); while streaming, the
+               YouTube badge beside it opens the live stream stats. -->
+          <div
             v-if="
               secondaryButton.visible &&
               !secondaryButton.confirmAction &&
               secondaryButton.action === appWideActions.goLive &&
               isLiveWindowActive
             "
-            :variant="getCowButtonVariant(secondaryButton.variant)"
-            size="2xs"
-            class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
-            @click.stop="useGlobalEmit(appWideActions.closeLiveWindow)"
+            class="flex items-center gap-1.5"
           >
-            <GoLiveIcon
-              v-if="secondaryButton.svgIcon === 'GoLiveIcon'"
-              class="w-3.5 h-3.5"
-            />
-            End Live Session
-          </CowButton>
+            <CowButton
+              :variant="getCowButtonVariant(secondaryButton.variant)"
+              size="2xs"
+              class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
+              @click.stop="useGlobalEmit(appWideActions.closeLiveWindow)"
+            >
+              <GoLiveIcon
+                v-if="secondaryButton.svgIcon === 'GoLiveIcon'"
+                class="w-3.5 h-3.5"
+              />
+              End Live Session
+            </CowButton>
+            <UPopover v-if="youtubeIsStreaming" mode="click">
+              <button
+                class="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-1 text-[10px] font-semibold uppercase leading-none text-white hover:bg-red-700"
+                :title="
+                  youtubeStatus.phase === 'reconnecting'
+                    ? 'YouTube connection lost — reconnecting. Click for stream stats.'
+                    : 'Streaming to YouTube. Click for stream stats.'
+                "
+              >
+                <span
+                  class="h-1.5 w-1.5 rounded-full bg-white"
+                  :class="youtubeStatus.phase === 'reconnecting' ? 'animate-pulse' : ''"
+                />
+                YouTube
+              </button>
+              <template #panel>
+                <div class="p-4">
+                  <YoutubeStreamStats />
+                </div>
+              </template>
+            </UPopover>
+          </div>
 
           <button
             v-else-if="
@@ -246,16 +272,55 @@ const canOpenStageDisplay = computed(() =>
   hasAccessToFeature(appWideActions.openStageDisplay)
 )
 
+const { isTauri } = useTauri()
+const {
+  status: youtubeStatus,
+  isStreaming: youtubeIsStreaming,
+  streamOnGoLive: youtubeStreamOnGoLive,
+  hasStreamKey: youtubeHasKey,
+} = useYoutubeStream()
+
+// One-off "go live and stream": opens the live window and starts YouTube.
+// Without a key yet, take the operator to where they add one.
+const goLiveOnYoutube = () => {
+  if (props.isLiveWindowActive) return
+  secondaryActionPopoverOpen.value = false
+  if (!youtubeHasKey.value) {
+    useGlobalEmit(appWideActions.openSettings, "Display Settings")
+    return
+  }
+  useGlobalEmit(appWideActions.goLive, { youtube: true })
+}
+
 const goLiveMenuItems = computed(() => [
   {
     label: "Open live window",
-    desc: "Opens another browser window with the live display",
+    desc:
+      youtubeStreamOnGoLive.value && youtubeHasKey.value
+        ? "Opens the live display and streams it to YouTube"
+        : "Opens another browser window with the live display",
     icon: "",
     svgIcon: "GoLiveIcon",
     disabled: props.isLiveWindowActive,
     locked: false,
     onClick: () => useGlobalEmit(appWideActions.goLive),
   },
+  // Desktop only, and redundant once "Open live window" already streams.
+  ...(isTauri && !(youtubeStreamOnGoLive.value && youtubeHasKey.value)
+    ? [
+        {
+          label: "Go live on YouTube",
+          desc: youtubeHasKey.value
+            ? "Opens the live display and streams it to YouTube"
+            : "Add your stream key in Display Settings first",
+          icon: "i-ph-broadcast",
+          svgIcon: undefined,
+          disabled: props.isLiveWindowActive,
+          locked: false,
+          onClick: goLiveOnYoutube,
+        },
+      ]
+    : []),
   {
     label: "Open stage display",
     desc: "Opens the confidence monitor for musicians and speakers",

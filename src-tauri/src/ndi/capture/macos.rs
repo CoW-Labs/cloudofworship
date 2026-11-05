@@ -245,8 +245,19 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
   let mailbox = context.mailbox.clone();
   let handler_id = stream.add_output_handler(
     move |sample: CMSampleBuffer, output_type: SCStreamOutputType| {
+      // Idle/blank/suspended callbacks carry no new picture. Frames whose
+      // status attachment is missing still do: macOS 26 sends every frame that
+      // way, so requiring `Complete` would drop them all.
       if output_type != SCStreamOutputType::Screen
-        || sample.frame_status() != Some(SCFrameStatus::Complete)
+        || matches!(
+          sample.frame_status(),
+          Some(
+            SCFrameStatus::Idle
+              | SCFrameStatus::Blank
+              | SCFrameStatus::Suspended
+              | SCFrameStatus::Stopped
+          )
+        )
       {
         return;
       }

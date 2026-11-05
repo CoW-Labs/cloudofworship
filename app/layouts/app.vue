@@ -34,6 +34,7 @@
         :active-advert="currentState?.activeAdvert"
       />
       <UpgradePlanModal />
+      <YoutubePreflightModal v-if="isTauriApp" />
       <OnboardingTour />
       <SatisfactionPromptModal ref="satisfactionPrompt" />
     </ClientOnly>
@@ -136,6 +137,15 @@ const { refreshLibrary } = useLibrary()
 const { fetchPlans } = useSubscriptionPlans()
 const { fetchUserSettings } = useUserSettings()
 const ndiBroadcast = useNdiBroadcast()
+const youtubeStream = useYoutubeStream()
+// Track stream status app-wide (not only while Display Settings is open), so
+// the Go Live controls always show whether YouTube is live.
+onMounted(() => youtubeStream.initialize())
+// Set while a "Go live on YouTube" request is opening the live window.
+let pendingYoutubeGoLive = false
+// Set when the operator chose "Live window only" in the pre-flight check.
+let skipYoutubeThisGoLive = false
+const isTauriApp = useTauri().isTauri
 let tauriLiveWindowCloseListenerBound = false
 
 const { currentState } = storeToRefs(appStore)
@@ -470,8 +480,22 @@ emitter.on("selected-schedule", (schedule: Schedule) => {
   })
 })
 
-emitter.on("go-live", async () => {
+emitter.on("go-live", async (options?: { youtube?: boolean }) => {
   const { isTauri } = useTauri()
+  // "Go live on YouTube" in the Go Live menu streams this once; the settings
+  // toggle streams on every Go Live.
+  pendingYoutubeGoLive = options?.youtube === true
+  skipYoutubeThisGoLive = false
+
+  // Check the connection and sound first, unless the operator turned that off.
+  if (youtubeWillStreamOnGoLive() && youtubeStream.checkBeforeStreaming.value) {
+    const choice = await youtubeStream.requestPreflight()
+    if (choice === "cancel") {
+      pendingYoutubeGoLive = false
+      return
+    }
+    skipYoutubeThisGoLive = choice === "window-only"
+  }
 
   if (isTauri) {
     await openTauriLiveWindow()
@@ -479,10 +503,17 @@ emitter.on("go-live", async () => {
     openWindows()
   }
 
+  // One flow: once the live window is up, also start the YouTube stream if the
+  // operator asked for it and entered a key.
+  await startYoutubeForLiveWindow()
+  pendingYoutubeGoLive = false
+  skipYoutubeThisGoLive = false
+
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
 
 emitter.on("close-live-window", async () => {
+  await youtubeStream.stop()
   await closeAllWindows()
   usePosthogCapture("CLOSE_LIVE_WINDOW_BUTTON_CLICKED")
 })
@@ -1142,6 +1173,66 @@ async function startNdiForLiveWindow() {
   }
 }
 
+// Mirrors startNdiForLiveWindow: when the operator has turned on "stream to
+// YouTube when I go live" and entered a key, start the YouTube broadcast once
+// the live window is open (it is captured by window ID; see useYoutubeStream).
+function youtubeWillStreamOnGoLive() {
+  return (
+    useTauri().isTauri &&
+    !skipYoutubeThisGoLive &&
+    (pendingYoutubeGoLive || youtubeStream.streamOnGoLive.value) &&
+    youtubeStream.hasStreamKey.value
+  )
+}
+
+async function startYoutubeForLiveWindow() {
+  if (!youtubeWillStreamOnGoLive()) return
+  // Let the freshly opened live window finish its full-screen transition
+  // before capturing it, so the capture picks up its final shape.
+  await new Promise((resolve) => setTimeout(resolve, 2000))
+  const status = await youtubeStream.start()
+  if (status.phase === "error" && youtubeStream.needsPicker.value) {
+    offerYoutubeWindowPicker(status.error)
+    return
+  }
+  if (status.phase === "error") showYoutubeStartError(status.error)
+}
+
+// The window picker needs its own click (and a retry after a wrong pick); this
+// toast's button provides it.
+function offerYoutubeWindowPicker(reason: string | null) {
+  useToast().add({
+    title: "Start the YouTube stream",
+    description:
+      reason ||
+      "Click below, then choose the “Cloud of Worship - Live Output” window (not the whole screen).",
+    icon: "i-bx-broadcast",
+    timeout: 0,
+    actions: [
+      {
+        label: "Choose live window",
+        click: () => {
+          void youtubeStream.start().then((retry) => {
+            if (retry.phase !== "error") return
+            // Wrong pick again (e.g. a whole screen): offer the picker again.
+            if (youtubeStream.needsPicker.value) offerYoutubeWindowPicker(retry.error)
+            else showYoutubeStartError(retry.error)
+          })
+        },
+      },
+    ],
+  })
+}
+
+function showYoutubeStartError(error: string | null) {
+  useToast().add({
+    title: "Live window opened, but YouTube streaming didn't start",
+    description: error || "Open Display Settings to check the stream.",
+    icon: "i-bx-info-circle",
+    color: "amber",
+  })
+}
+
 /**
  * Reattach a Tauri live window to this control-center session. This also
  * handles the refresh case, where the native window survives but `windowRefs`
@@ -1158,6 +1249,7 @@ async function trackTauriLiveWindow(liveWindow: any) {
     await liveWindow.once("tauri://close-requested", async () => {
       console.log("Live window closed")
       try {
+        await youtubeStream.stop()
         await ndiBroadcast.stop()
       } catch (error) {
         console.warn("NDI cleanup after live window close failed:", error)
@@ -1221,6 +1313,9 @@ async function openTauriLiveWindow() {
 
     if (existingLiveWindow) {
       await trackTauriLiveWindow(existingLiveWindow)
+      if (youtubeWillStreamOnGoLive()) {
+        await existingLiveWindow.setFullscreen(true).catch(console.error)
+      }
       await existingLiveWindow.setFocus()
       await startNdiForLiveWindow()
       return
@@ -1297,9 +1392,11 @@ async function openTauriLiveWindow() {
       }
     }
 
-    // Get fullscreen setting from store
+    // Get fullscreen setting from store. Streaming to YouTube always opens it
+    // full screen (on its own desktop), so the broadcast fills the frame.
     const isFullscreen =
-      appStore.currentState.settings.liveWindowFullscreen ?? true
+      (appStore.currentState.settings.liveWindowFullscreen ?? true) ||
+      youtubeWillStreamOnGoLive()
 
     // Window options are in logical units while monitors report physical
     // pixels, so a Retina/scaled projector needs the scale factor divided out —
