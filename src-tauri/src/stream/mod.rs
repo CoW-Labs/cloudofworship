@@ -31,8 +31,11 @@ use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Emitter, State};
 
+mod stats;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod window_capture;
+
+pub use stats::Counters;
 
 /// YouTube's primary RTMP ingest. The stream key is appended as the last path
 /// segment, e.g. rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx-xxxx-xxxx.
@@ -40,6 +43,15 @@ const YOUTUBE_INGEST_BASE: &str = "rtmp://a.rtmp.youtube.com/live2";
 
 /// Event name the frontend listens on for live status changes.
 const STATUS_EVENT: &str = "stream://status";
+
+/// Broadcast quality: 720p at 30fps, YouTube's recommended range for 720p30.
+const OUTPUT_HEIGHT: u32 = 720;
+const OUTPUT_FPS: u32 = 30;
+const VIDEO_KBPS: u32 = 2500;
+const AUDIO_KBPS: u32 = 128;
+
+/// YouTube's RTMP ingest host and port, for the pre-flight reachability check.
+const YOUTUBE_INGEST_HOST: &str = "a.rtmp.youtube.com:1935";
 
 /// How often the supervisor polls the FFmpeg child for exit / a stop request.
 const MONITOR_POLL: Duration = Duration::from_millis(500);
@@ -106,6 +118,8 @@ struct Inner {
   operation: Mutex<()>,
   session: Mutex<Option<Session>>,
   status: Mutex<StreamStatus>,
+  /// The pre-flight audio meter's FFmpeg process, while it runs.
+  meter: Mutex<Option<Child>>,
 }
 
 struct Session {
@@ -128,6 +142,9 @@ struct Feed {
   forwarder: Option<JoinHandle<()>>,
   /// Stops whatever produces the input (the native window capture).
   stop_source: Option<Box<dyn FnOnce() + Send>>,
+  /// Live numbers for the operator, and the thread that reports them.
+  counters: Arc<Counters>,
+  reporter: Option<JoinHandle<()>>,
 }
 
 /// How a (re)spawn of the supervised process is done. Shared so reconnects run
@@ -142,6 +159,7 @@ impl StreamBridge {
         operation: Mutex::new(()),
         session: Mutex::new(None),
         status: Mutex::new(StreamStatus::default()),
+        meter: Mutex::new(None),
       }),
     }
   }
@@ -166,6 +184,8 @@ impl StreamBridge {
     audio_device: Option<String>,
   ) -> Result<StreamStatus, String> {
     let _op = self.inner.operation.lock().unwrap_or_else(|p| p.into_inner());
+    // The broadcast takes over the audio input from the pre-flight meter.
+    self.stop_audio_meter();
 
     let key = stream_key.trim();
     if key.is_empty() {
@@ -208,7 +228,7 @@ impl StreamBridge {
       .map_err(|e| format!("Could not start FFmpeg ({e}). Is it installed and on PATH?"))?;
     let stopping = Arc::new(AtomicBool::new(false));
     let child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(Some(first)));
-    let supervisor = self.spawn_supervisor(spawner, child.clone(), stopping.clone());
+    let supervisor = self.spawn_supervisor(spawner, child.clone(), stopping.clone(), None);
 
     self
       .inner
@@ -239,11 +259,11 @@ impl StreamBridge {
     let audio = resolve_audio_device(audio)?;
     self.start_feed_locked(url, window_encoder_args(target.width, target.height, audio))?;
 
-    let (input, stopping) = {
+    let (input, stopping, counters) = {
       let session = self.inner.session.lock().unwrap_or_else(|p| p.into_inner());
       let session = session.as_ref().expect("start_feed_locked stores a session");
       let feed = session.feed.as_ref().expect("start_feed_locked stores a feed");
-      (feed.input.clone(), session.stopping.clone())
+      (feed.input.clone(), session.stopping.clone(), feed.counters.clone())
     };
     let fail: window_capture::FailHandler = {
       let bridge = self.clone();
@@ -261,7 +281,7 @@ impl StreamBridge {
         });
       })
     };
-    let capture = match window_capture::start(target, input, fail) {
+    let capture = match window_capture::start(target, input, fail, counters) {
       Ok(capture) => capture,
       Err(error) => {
         self.stop_locked();
@@ -300,11 +320,17 @@ impl StreamBridge {
       .args(encoder_args)
       .stdin(Stdio::piped())
       .stdout(Stdio::piped())
-      .stderr(Stdio::inherit())
+      .stderr(Stdio::piped())
       .spawn()
       .map_err(|e| format!("Could not start FFmpeg ({e}). Is it installed and on PATH?"))?;
     let input = Arc::new(Mutex::new(encoder.stdin.take()));
     let mut encoded = encoder.stdout.take().expect("encoder stdout is piped");
+    let counters = Arc::new(Counters::default());
+    {
+      let counters = counters.clone();
+      let stderr = encoder.stderr.take().expect("encoder stderr is piped");
+      stats::read_levels(stderr, move |db| counters.set_audio_level(db));
+    }
 
     // The pusher's stdin lives in a slot the spawner refills on every
     // (re)connect; the forwarder writes whatever pusher is current.
@@ -341,6 +367,7 @@ impl StreamBridge {
     let forwarder = {
       let bridge = self.clone();
       let stopping = stopping.clone();
+      let counters = counters.clone();
       std::thread::Builder::new()
         .name("cow-stream-forwarder".into())
         .spawn(move || {
@@ -352,7 +379,13 @@ impl StreamBridge {
             };
             let mut slot = pusher_input.lock().unwrap_or_else(|p| p.into_inner());
             if let Some(stdin) = slot.as_mut() {
-              if stdin.write_all(&buffer[..read]).is_err() {
+              let writing = std::time::Instant::now();
+              if stdin.write_all(&buffer[..read]).is_ok() {
+                counters.sent_bytes.fetch_add(read as u64, Ordering::Relaxed);
+                if writing.elapsed() > Duration::from_millis(100) {
+                  counters.upload_stalls.fetch_add(1, Ordering::Relaxed);
+                }
+              } else {
                 *slot = None;
               }
             }
@@ -367,7 +400,14 @@ impl StreamBridge {
         .ok()
     };
 
-    let supervisor = self.spawn_supervisor(spawner, child.clone(), stopping.clone());
+    let supervisor =
+      self.spawn_supervisor(spawner, child.clone(), stopping.clone(), Some(counters.clone()));
+    let reporter = stats::spawn_reporter(
+      self.inner.app.clone(),
+      counters.clone(),
+      stopping.clone(),
+      VIDEO_KBPS + AUDIO_KBPS,
+    );
     self
       .inner
       .session
@@ -377,7 +417,7 @@ impl StreamBridge {
         child,
         stopping,
         supervisor,
-        feed: Some(Feed { encoder, input, forwarder, stop_source: None }),
+        feed: Some(Feed { encoder, input, forwarder, stop_source: None, counters, reporter }),
       });
     Ok(())
   }
@@ -414,6 +454,7 @@ impl StreamBridge {
     spawner: Spawner,
     child: Arc<Mutex<Option<Child>>>,
     stopping: Arc<AtomicBool>,
+    counters: Option<Arc<Counters>>,
   ) -> Option<JoinHandle<()>> {
     let bridge = self.clone();
     std::thread::Builder::new()
@@ -439,6 +480,9 @@ impl StreamBridge {
                 }
               }
               drop(slot);
+              if let Some(counters) = &counters {
+                counters.reconnects.fetch_add(1, Ordering::Relaxed);
+              }
               bridge.set_status(StreamPhase::Live, None);
             }
           }
@@ -540,6 +584,52 @@ impl StreamBridge {
       if let Some(forwarder) = feed.forwarder.take() {
         let _ = forwarder.join();
       }
+      if let Some(reporter) = feed.reporter.take() {
+        let _ = reporter.join();
+      }
+    }
+  }
+
+  /// Starts the pre-flight audio meter on the chosen input: FFmpeg measures
+  /// its loudness ~10 times a second and each reading is emitted on
+  /// `stream://audio-level`. Returns false when no audio input is selected.
+  pub fn start_audio_meter(&self, audio: Option<&str>) -> Result<bool, String> {
+    self.stop_audio_meter();
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+      let Some(device) = resolve_audio_device(audio)? else {
+        return Ok(false);
+      };
+      let mut args = ["-hide_banner", "-loglevel", "error"].map(String::from).to_vec();
+      args.extend(audio_input_args(&device));
+      args.extend(["-af".to_string(), stats::LEVEL_FILTERS.to_string()]);
+      // Stop by itself after 10 minutes, so a meter can't outlive an app that
+      // was killed without closing its window (it would hold the input).
+      args.extend(["-t", "600", "-f", "null", "-"].map(String::from));
+      let mut child = ffmpeg_command()
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Could not start the audio meter ({e})."))?;
+      let app = self.inner.app.clone();
+      let stderr = child.stderr.take().expect("meter stderr is piped");
+      stats::read_levels(stderr, move |db| stats::emit_level(&app, db));
+      *self.inner.meter.lock().unwrap_or_else(|p| p.into_inner()) = Some(child);
+      Ok(true)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+      let _ = audio;
+      Ok(false)
+    }
+  }
+
+  pub fn stop_audio_meter(&self) {
+    if let Some(mut child) = self.inner.meter.lock().unwrap_or_else(|p| p.into_inner()).take() {
+      let _ = child.kill();
+      let _ = child.wait();
     }
   }
 }
@@ -778,17 +868,27 @@ fn parse_device_line(line: &str) -> Option<(String, String)> {
 /// keeps width even and the aspect intact); `constant_fps` re-times irregular
 /// input (the browser feed) to a steady 30fps.
 fn encode_args(constant_fps: bool) -> Vec<String> {
-  let filter = if constant_fps { "fps=30,scale=-2:720" } else { "scale=-2:720" };
-  let mut args = vec!["-vf".to_string(), filter.to_string()];
+  let scale = format!("scale=-2:{OUTPUT_HEIGHT}");
+  let filter = if constant_fps { format!("fps={OUTPUT_FPS},{scale}") } else { scale };
+  let mut args = vec!["-vf".to_string(), filter];
   args.extend(video_encoder_args().iter().cloned());
-  args.extend(
-    [
-      "-b:v", "2500k", "-maxrate", "2500k", "-bufsize", "5000k",
-      "-g", "60",
-      "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
-    ]
-    .map(String::from),
-  );
+  args.extend([
+    "-b:v".to_string(),
+    format!("{VIDEO_KBPS}k"),
+    "-maxrate".to_string(),
+    format!("{VIDEO_KBPS}k"),
+    "-bufsize".to_string(),
+    format!("{}k", VIDEO_KBPS * 2),
+    // A keyframe every 2 seconds, as YouTube asks.
+    "-g".to_string(),
+    (OUTPUT_FPS * 2).to_string(),
+    "-c:a".to_string(),
+    "aac".to_string(),
+    "-b:a".to_string(),
+    format!("{AUDIO_KBPS}k"),
+    "-ar".to_string(),
+    "44100".to_string(),
+  ]);
   args
 }
 
@@ -897,7 +997,13 @@ fn window_encoder_args(width: u32, height: u32, audio: Option<String>) -> Vec<St
   }
   args.extend(["-map", "0:v:0"].map(String::from));
   if audio.is_some() {
-    args.extend(["-map", "1:a:0", "-af", "aresample=async=1000"].map(String::from));
+    // Also measures loudness for the live audio meter (see stats.rs).
+    args.extend([
+      "-map".to_string(),
+      "1:a:0".to_string(),
+      "-af".to_string(),
+      format!("aresample=async=1000,{}", stats::LEVEL_FILTERS),
+    ]);
   }
   args.extend(encode_args(true));
   args.extend(
@@ -975,6 +1081,85 @@ pub async fn stream_stop(state: State<'_, StreamBridge>) -> Result<StreamStatus,
 #[tauri::command]
 pub fn stream_status(state: State<'_, StreamBridge>) -> StreamStatus {
   state.status()
+}
+
+#[tauri::command]
+pub async fn stream_audio_meter_start(
+  state: State<'_, StreamBridge>,
+  audio_device: Option<String>,
+) -> Result<bool, String> {
+  let bridge = state.inner().clone();
+  tauri::async_runtime::spawn_blocking(move || bridge.start_audio_meter(audio_device.as_deref()))
+    .await
+    .map_err(|e| format!("The audio meter task failed: {e}"))?
+}
+
+#[tauri::command]
+pub fn stream_audio_meter_stop(state: State<'_, StreamBridge>) {
+  state.stop_audio_meter();
+}
+
+/// What the broadcast will be, for the pre-flight check.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamPlan {
+  pub height: u32,
+  pub fps: u32,
+  pub video_kbps: u32,
+  pub audio_kbps: u32,
+  /// The H.264 encoder this machine will use, in plain words.
+  pub encoder: String,
+  pub hardware_encoder: bool,
+}
+
+#[tauri::command]
+pub async fn stream_plan() -> Result<StreamPlan, String> {
+  tauri::async_runtime::spawn_blocking(|| {
+    // On Windows this probes the encoders once (a few seconds), so the real
+    // start is faster afterwards.
+    let codec = video_encoder_args().get(1).cloned().unwrap_or_default();
+    let (encoder, hardware_encoder) = match codec.as_str() {
+      "h264_videotoolbox" => ("Apple hardware encoder", true),
+      "h264_nvenc" => ("NVIDIA hardware encoder", true),
+      "h264_qsv" => ("Intel hardware encoder", true),
+      "h264_amf" => ("AMD hardware encoder", true),
+      "h264_mf" => ("Windows built-in encoder", true),
+      _ => ("Software encoder (uses more CPU)", false),
+    };
+    StreamPlan {
+      height: OUTPUT_HEIGHT,
+      fps: OUTPUT_FPS,
+      video_kbps: VIDEO_KBPS,
+      audio_kbps: AUDIO_KBPS,
+      encoder: encoder.to_string(),
+      hardware_encoder,
+    }
+  })
+  .await
+  .map_err(|e| format!("Checking the encoder failed: {e}"))
+}
+
+/// Opens (and closes) a connection to YouTube's ingest server and returns how
+/// long it took in milliseconds. It doesn't send the stream key, so nothing
+/// starts on YouTube.
+#[tauri::command]
+pub async fn stream_check_youtube() -> Result<u32, String> {
+  tauri::async_runtime::spawn_blocking(|| {
+    use std::net::{TcpStream, ToSocketAddrs};
+    let unreachable =
+      |detail: String| format!("Couldn't reach YouTube's streaming server ({detail}).");
+    let address = YOUTUBE_INGEST_HOST
+      .to_socket_addrs()
+      .map_err(|e| unreachable(e.to_string()))?
+      .next()
+      .ok_or_else(|| unreachable("no address".into()))?;
+    let started = std::time::Instant::now();
+    TcpStream::connect_timeout(&address, Duration::from_secs(5))
+      .map_err(|e| unreachable(e.to_string()))?;
+    Ok(started.elapsed().as_millis() as u32)
+  })
+  .await
+  .map_err(|e| format!("The YouTube check failed: {e}"))?
 }
 
 #[cfg(test)]

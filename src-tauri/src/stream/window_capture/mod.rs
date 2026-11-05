@@ -12,12 +12,14 @@
 
 use std::io::Write;
 use std::process::ChildStdin;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use tauri::AppHandle;
+
+use super::Counters;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -53,13 +55,13 @@ struct Sink {
   fail: FailHandler,
   /// The first few rejected callbacks, logged if no frame ever arrives.
   rejected: Arc<Mutex<Vec<String>>>,
-  /// New pictures received from the OS, for the health log.
-  published: AtomicU64,
+  /// Live stream stats (new pictures, frames sent and delayed).
+  stats: Arc<Counters>,
 }
 
 impl Sink {
   fn publish(&self, frame: Vec<u8>) {
-    self.published.fetch_add(1, Ordering::Relaxed);
+    self.stats.window_frames.fetch_add(1, Ordering::Relaxed);
     *self.latest.lock().unwrap_or_else(|p| p.into_inner()) = Some(Arc::new(frame));
   }
 
@@ -112,6 +114,7 @@ pub fn start(
   target: Target,
   input: Arc<Mutex<Option<ChildStdin>>>,
   fail: FailHandler,
+  stats: Arc<Counters>,
 ) -> Result<WindowCapture, String> {
   let sink = Arc::new(Sink {
     width: target.width,
@@ -120,7 +123,7 @@ pub fn start(
     stop: Arc::new(AtomicBool::new(false)),
     fail,
     rejected: Arc::new(Mutex::new(Vec::new())),
-    published: AtomicU64::new(0),
+    stats,
   });
   let native = platform::start(target.native, sink.clone())?;
   let stop = sink.stop.clone();
@@ -194,20 +197,24 @@ impl Health {
 
   fn record(&mut self, sink: &Sink, write_time: Duration) {
     self.sent += 1;
+    sink.stats.frames_sent.fetch_add(1, Ordering::Relaxed);
     if write_time > SLOW_WRITE {
       self.slow += 1;
+      sink.stats.frames_delayed.fetch_add(1, Ordering::Relaxed);
     }
     let elapsed = self.since.elapsed();
     if elapsed < HEALTH_INTERVAL {
       return;
     }
-    let published = sink.published.load(Ordering::Relaxed);
+    let published = sink.stats.window_frames.load(Ordering::Relaxed);
     let seconds = elapsed.as_secs_f64();
     log::info!(
-      "stream health: window {:.1} new fps, sent {:.1} fps, {} slow writes",
+      "stream health: window {:.1} new fps, sent {:.1} fps, {} slow writes, \
+       {} upload stalls so far",
       (published - self.published) as f64 / seconds,
       self.sent as f64 / seconds,
-      self.slow
+      self.slow,
+      sink.stats.upload_stalls.load(Ordering::Relaxed)
     );
     *self = Self { published, ..Self::new() };
   }

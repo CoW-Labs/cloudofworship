@@ -198,6 +198,7 @@ pub fn run() {
         let bridge = window.state::<stream::StreamBridge>().inner().clone();
         tauri::async_runtime::spawn_blocking(move || {
           bridge.stop_blocking();
+          bridge.stop_audio_meter();
         });
       }
     })
@@ -215,7 +216,11 @@ pub fn run() {
       stream::stream_stop,
       stream::stream_status,
       stream::stream_audio_devices,
-      stream::stream_feed
+      stream::stream_feed,
+      stream::stream_audio_meter_start,
+      stream::stream_audio_meter_stop,
+      stream::stream_plan,
+      stream::stream_check_youtube
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
