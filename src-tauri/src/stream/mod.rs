@@ -31,6 +31,7 @@ use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Emitter, State};
 
+mod keep_awake;
 mod stats;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod window_capture;
@@ -145,6 +146,8 @@ struct Feed {
   /// Live numbers for the operator, and the thread that reports them.
   counters: Arc<Counters>,
   reporter: Option<JoinHandle<()>>,
+  /// Keeps macOS from napping the app (and the Mac from sleeping) while live.
+  _awake: Option<keep_awake::KeepAwake>,
 }
 
 /// How a (re)spawn of the supervised process is done. Shared so reconnects run
@@ -417,7 +420,15 @@ impl StreamBridge {
         child,
         stopping,
         supervisor,
-        feed: Some(Feed { encoder, input, forwarder, stop_source: None, counters, reporter }),
+        feed: Some(Feed {
+          encoder,
+          input,
+          forwarder,
+          stop_source: None,
+          counters,
+          reporter,
+          _awake: keep_awake::KeepAwake::begin("Streaming the live output to YouTube"),
+        }),
       });
     Ok(())
   }
