@@ -109,6 +109,22 @@ The base URL comes from `runtimeConfig.public.BASE_URL` (default: `https://api.c
 - **Metered free allowances**, enforced by the API and shown via `useUsageQuotas` (`GET /church/:churchId/usage`): 50 library songs per calendar month (search returns previews with `isPreview`; `useSongs().claimSong` spends one and returns the full song), 10 transcription minutes once per church, 5 livestream sessions per church (a schedule watched on a new UTC day, counted by the socket gate).
 - Client-side gating is for UX only. Anything that costs money — storage, transcription minutes, PPT conversion, the public livestream relay, the shared song catalogue, seats, schedule count — is enforced by the API as well.
 
+### Analytics events (PostHog)
+
+Every new feature ships with PostHog events at its key points, so we can see whether churches find it, use it and finish it.
+
+- Capture through `usePosthogCapture("EVENT_NAME", { ...properties })` (`app/composables/usePosthogCapture.ts`). Don't call `$posthog.capture` directly.
+- Event names are always ALL CAPS `SNAKE_CASE`: the thing first, then a past-tense verb, e.g. `SCHEDULE_CREATED`, `SLIDE_PAIR_LAYOUT_CHANGED`, `ISSUE_REPORTED`. Never lowercase. `onboarding_tour_started`, `onboarding_tour_completed` and `foreign_host_detected` are legacy exceptions: don't copy them, and don't rename them either, because renaming splits their history in PostHog.
+- Track the same key points the existing events do:
+  - **Opened or seen**: a page, panel, modal or prompt appears, using `_PAGE_VIEWED`, `_OPENED` or `_SHOWN` (`SIGNUP_PAGE_VIEWED`, `SEARCH_BIBLE_PAGE_OPENED`, `SATISFACTION_PROMPT_SHOWN`).
+  - **Committed**: the step that creates or changes something, using `_CREATED`, `_CHANGED`, `_DELETED`, `_RENAMED`, `_APPLIED` and so on (`NEW_BIBLE_SLIDE_CREATED`, `SCHEDULE_RENAMED`, `CAMERA_EFFECT_CHANGED`).
+  - **Multi-step or network flows**: `_ATTEMPTED`, `_COMPLETED` and `_FAILED`, with an `error` property on failure (`SIGNUP_STEP1_ATTEMPTED` / `_COMPLETED` / `_FAILED`, `LOGIN_*`).
+  - **Choices and answers**: `_ANSWERED` or `_SELECTED` with the choice as a property (`SATISFACTION_PROMPT_ANSWERED`, `SCHEDULE_SELECTED`).
+  - **Paywall**: `UPGRADE_PROMPT_SHOWN` with the gated action whenever gating stops a free church.
+- Property keys are camelCase with small values: types, methods, counts, IDs (`{ slideType, backgroundType, signupMethod }`). Never send passwords, tokens, or slide and lyric contents.
+- Before naming an event, check `docs/POSTHOG_TRACKING_EVENTS.md` and grep `usePosthogCapture` for one you can reuse. Add every new event to that doc, in the matching section, with its properties and a ✅ status.
+- PostHog doesn't initialise on `localhost`, so events won't appear while developing locally; check the call fires rather than looking for it in PostHog.
+
 ### Global event bus
 
 An **emitter** (mitt) is provided to the Nuxt app as `nuxtApp.$emitter` and stored in `appStore.currentState.emitter`. All cross-component communication goes through this emitter using the string action names from `appWideActions` (defined in `app/utils/constants.ts`). Always use those constants rather than raw strings.
