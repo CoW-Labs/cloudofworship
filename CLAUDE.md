@@ -136,6 +136,16 @@ An **emitter** (mitt) is provided to the Nuxt app as `nuxtApp.$emitter` and stor
 | `app` | Main operator window (`/`) |
 | `live` | Live projection window (`/live`) |
 
+## Design system and brand
+
+`design-system/` is the source of truth for design decisions. Read `design-system/README.md` (rules for colour, type, layout, imagery, icons, motion) and `design-system/brand-guidelines.md` (voice, naming, logo) before designing or writing anything user-facing.
+
+- Choose colours, type, spacing, radii and shadows by their token names in `design-system/tokens.json`; each token's `usage` note says where it belongs. Don't hard-code a new value: add a token with a usage note, then run `npm run tokens:build` to regenerate `tokens.css`.
+- In CSS the tokens are `--ds-<name>` variables and type styles are `.ds-<style>` classes; component classes are `ds-*` (`design-system/components.css`). The app's own `cow-*` classes are separate, so don't mix the prefixes.
+- Copy and microcopy follow the voice rules in `brand-guidelines.md`: short, Sunday-first, real numbers, sign-up is always "Get started for free".
+- Use the logo files in `design-system/assets/logos` as they are; never redraw or recolour the mark.
+- Open `design-system/showcase.html` in a browser to see every component in light and dark.
+
 ## Git commits
 
 - Always commit as `felixfavour <felixfavour0@gmail.com>` (author and committer).
