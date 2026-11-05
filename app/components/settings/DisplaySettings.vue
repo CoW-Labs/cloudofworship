@@ -278,10 +278,22 @@
       >
         <SettingsSelect
           width="w-full sm:w-[240px]"
-          :options="youtubeAudioOptions"
-          :model-value="youtubeAudioLabel"
+          :options="youtubeAudioChoices"
+          :model-value="youtubeAudioChoice"
           :disabled="youtubeIsStreaming"
-          @change="(label: string) => setYoutubeAudio(label)"
+          @change="(label: string) => setYoutubeAudioChoice(label)"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Check before streaming"
+        description="Before each YouTube stream, test your upload speed, the YouTube connection and your audio level."
+      >
+        <CowToggle
+          bare
+          label="Check before streaming"
+          :model-value="youtubeCheckFirst"
+          @update:model-value="(on) => (youtubeCheckFirst = on)"
         />
       </SettingsRow>
 
@@ -328,6 +340,11 @@
         >
           <p class="font-semibold">{{ youtubeStatus.error }}</p>
         </div>
+
+        <YoutubeStreamStats
+          v-if="youtubeIsStreaming && youtubeSource !== 'test'"
+          class="mt-4 !w-full"
+        />
 
         <div class="mt-4 flex flex-wrap items-center gap-2">
           <CowButton
@@ -478,8 +495,10 @@ const {
   streamKey: youtubeStreamKey,
   source: youtubeSource,
   streamOnGoLive: youtubeStreamOnGoLive,
-  audioDevices: youtubeAudioDevices,
-  audioDevice: youtubeAudioDevice,
+  audioChoices: youtubeAudioChoices,
+  audioChoice: youtubeAudioChoice,
+  setAudioChoice: setYoutubeAudioChoice,
+  checkBeforeStreaming: youtubeCheckFirst,
   initialize: initializeYoutube,
   start: startYoutube,
   end: endYoutube,
@@ -488,39 +507,6 @@ const {
 onMounted(() => {
   initializeYoutube()
 })
-
-// The audio dropdown shows device *names*, but stores a tri-state value on
-// youtubeAudioDevice: null = default (first), "" = no audio, else a device index.
-const AUDIO_DEFAULT_LABEL = "Default (first available)"
-const AUDIO_NONE_LABEL = "No audio"
-
-const youtubeAudioOptions = computed(() => [
-  AUDIO_DEFAULT_LABEL,
-  ...youtubeAudioDevices.value.map((device) => device.name),
-  AUDIO_NONE_LABEL,
-])
-
-const youtubeAudioLabel = computed(() => {
-  if (youtubeAudioDevice.value === null) return AUDIO_DEFAULT_LABEL
-  if (youtubeAudioDevice.value === "") return AUDIO_NONE_LABEL
-  return (
-    youtubeAudioDevices.value.find(
-      (device) => device.index === youtubeAudioDevice.value
-    )?.name ?? AUDIO_DEFAULT_LABEL
-  )
-})
-
-const setYoutubeAudio = (label: string) => {
-  if (label === AUDIO_NONE_LABEL) {
-    youtubeAudioDevice.value = ""
-  } else if (label === AUDIO_DEFAULT_LABEL) {
-    youtubeAudioDevice.value = null
-  } else {
-    youtubeAudioDevice.value =
-      youtubeAudioDevices.value.find((device) => device.name === label)?.index ??
-      null
-  }
-}
 
 const youtubePhaseLabel = computed(
   () =>

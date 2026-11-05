@@ -69,40 +69,51 @@
             @confirm="$emit(secondaryButton.action)"
           >
           </ConfirmDialog>
-          <!-- Direct button when live (no popover) -->
-          <CowButton
+          <!-- Direct button when live (no popover); while streaming, the
+               YouTube badge beside it opens the live stream stats. -->
+          <div
             v-if="
               secondaryButton.visible &&
               !secondaryButton.confirmAction &&
               secondaryButton.action === appWideActions.goLive &&
               isLiveWindowActive
             "
-            :variant="getCowButtonVariant(secondaryButton.variant)"
-            size="2xs"
-            class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
-            @click.stop="useGlobalEmit(appWideActions.closeLiveWindow)"
+            class="flex items-center gap-1.5"
           >
-            <GoLiveIcon
-              v-if="secondaryButton.svgIcon === 'GoLiveIcon'"
-              class="w-3.5 h-3.5"
-            />
-            End Live Session
-            <span
-              v-if="youtubeIsStreaming"
-              class="inline-flex items-center gap-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-white"
-              :title="
-                youtubeStatus.phase === 'reconnecting'
-                  ? 'YouTube connection lost — reconnecting'
-                  : 'Streaming to YouTube'
-              "
+            <CowButton
+              :variant="getCowButtonVariant(secondaryButton.variant)"
+              size="2xs"
+              class="whitespace-nowrap !px-3 !py-1.5 text-xs gap-1.5"
+              @click.stop="useGlobalEmit(appWideActions.closeLiveWindow)"
             >
-              <span
-                class="h-1.5 w-1.5 rounded-full bg-white"
-                :class="youtubeStatus.phase === 'reconnecting' ? 'animate-pulse' : ''"
+              <GoLiveIcon
+                v-if="secondaryButton.svgIcon === 'GoLiveIcon'"
+                class="w-3.5 h-3.5"
               />
-              YouTube
-            </span>
-          </CowButton>
+              End Live Session
+            </CowButton>
+            <UPopover v-if="youtubeIsStreaming" mode="click">
+              <button
+                class="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-1 text-[10px] font-semibold uppercase leading-none text-white hover:bg-red-700"
+                :title="
+                  youtubeStatus.phase === 'reconnecting'
+                    ? 'YouTube connection lost — reconnecting. Click for stream stats.'
+                    : 'Streaming to YouTube. Click for stream stats.'
+                "
+              >
+                <span
+                  class="h-1.5 w-1.5 rounded-full bg-white"
+                  :class="youtubeStatus.phase === 'reconnecting' ? 'animate-pulse' : ''"
+                />
+                YouTube
+              </button>
+              <template #panel>
+                <div class="p-4">
+                  <YoutubeStreamStats />
+                </div>
+              </template>
+            </UPopover>
+          </div>
 
           <button
             v-else-if="

@@ -34,6 +34,7 @@
         :active-advert="currentState?.activeAdvert"
       />
       <UpgradePlanModal />
+      <YoutubePreflightModal v-if="isTauriApp" />
       <OnboardingTour />
       <SatisfactionPromptModal ref="satisfactionPrompt" />
     </ClientOnly>
@@ -142,6 +143,9 @@ const youtubeStream = useYoutubeStream()
 onMounted(() => youtubeStream.initialize())
 // Set while a "Go live on YouTube" request is opening the live window.
 let pendingYoutubeGoLive = false
+// Set when the operator chose "Live window only" in the pre-flight check.
+let skipYoutubeThisGoLive = false
+const isTauriApp = useTauri().isTauri
 let tauriLiveWindowCloseListenerBound = false
 
 const { currentState } = storeToRefs(appStore)
@@ -481,6 +485,17 @@ emitter.on("go-live", async (options?: { youtube?: boolean }) => {
   // "Go live on YouTube" in the Go Live menu streams this once; the settings
   // toggle streams on every Go Live.
   pendingYoutubeGoLive = options?.youtube === true
+  skipYoutubeThisGoLive = false
+
+  // Check the connection and sound first, unless the operator turned that off.
+  if (youtubeWillStreamOnGoLive() && youtubeStream.checkBeforeStreaming.value) {
+    const choice = await youtubeStream.requestPreflight()
+    if (choice === "cancel") {
+      pendingYoutubeGoLive = false
+      return
+    }
+    skipYoutubeThisGoLive = choice === "window-only"
+  }
 
   if (isTauri) {
     await openTauriLiveWindow()
@@ -492,6 +507,7 @@ emitter.on("go-live", async (options?: { youtube?: boolean }) => {
   // operator asked for it and entered a key.
   await startYoutubeForLiveWindow()
   pendingYoutubeGoLive = false
+  skipYoutubeThisGoLive = false
 
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
@@ -1163,6 +1179,7 @@ async function startNdiForLiveWindow() {
 function youtubeWillStreamOnGoLive() {
   return (
     useTauri().isTauri &&
+    !skipYoutubeThisGoLive &&
     (pendingYoutubeGoLive || youtubeStream.streamOnGoLive.value) &&
     youtubeStream.hasStreamKey.value
   )

@@ -24,6 +24,33 @@ export interface AudioDevice {
   name: string
 }
 
+// Live numbers emitted once a second while streaming (see stats.rs).
+export interface StreamStats {
+  uptimeSecs: number
+  bitrateKbps: number
+  targetKbps: number
+  fps: number
+  framesDelayed: number
+  delayedPercent: number
+  windowFps: number
+  reconnects: number
+  // Loudness in dB (0 = loudest); null when no audio is arriving.
+  audioDb: number | null
+}
+
+// What the broadcast will be, shown in the pre-flight check.
+export interface StreamPlan {
+  height: number
+  fps: number
+  videoKbps: number
+  audioKbps: number
+  encoder: string
+  hardwareEncoder: boolean
+}
+
+// The operator's answer to the pre-flight check.
+export type PreflightChoice = "stream" | "window-only" | "cancel"
+
 const idleStatus = (): StreamStatus => ({ phase: "idle", error: null })
 
 const messageOf = (error: unknown): string =>
@@ -36,6 +63,15 @@ const messageOf = (error: unknown): string =>
 // One shared status listener across all callers (the event is app-wide).
 let sharedStatusListener: Promise<void> | null = null
 
+// Resolves the pending pre-flight check when the operator answers it.
+let resolvePreflightChoice: ((choice: PreflightChoice) => void) | null = null
+
+// The upload test posts throwaway bytes to Cloudflare's public speed-test
+// endpoint (the one speed.cloudflare.com uses); nothing else is sent.
+const UPLOAD_TEST_URL = "https://speed.cloudflare.com/__up"
+const UPLOAD_TEST_DURATION_MS = 3000
+const UPLOAD_TEST_MAX_CHUNK = 16 * 1024 * 1024
+
 // The operator's stream setup survives restarts. It stays on this device only
 // (the settings panel says so) — never synced to the account.
 const SETTINGS_KEY = "cow-youtube-stream-settings"
@@ -44,6 +80,7 @@ interface SavedSettings {
   streamOnGoLive?: boolean
   audioDevice?: string | null
   source?: StreamSource
+  checkBeforeStreaming?: boolean
 }
 let settingsHydrated = false
 
@@ -54,6 +91,9 @@ const readSavedSettings = (): SavedSettings => {
     return {}
   }
 }
+
+const AUDIO_DEFAULT_LABEL = "Default (first available)"
+const AUDIO_NONE_LABEL = "No audio"
 
 // The running in-page capture (one per app), kept outside reactive state.
 interface Capture {
@@ -105,6 +145,12 @@ export const useYoutubeStream = () => {
   // True when starting failed only because the window picker needs a fresh
   // click; the UI then shows a "choose the live window" button.
   const needsPicker = useState<boolean>("yt-stream-needs-picker", () => false)
+  const stats = useState<StreamStats | null>("yt-stream-stats", () => null)
+  // The pre-flight meter's latest reading (dB), null when nothing's arriving.
+  const meterDb = useState<number | null>("yt-stream-meter-db", () => null)
+  // Show the pre-flight check before each YouTube stream.
+  const checkBeforeStreaming = useState<boolean>("yt-stream-check-first", () => true)
+  const preflightOpen = useState<boolean>("yt-stream-preflight-open", () => false)
 
   if (isDesktop && !settingsHydrated) {
     settingsHydrated = true
@@ -113,7 +159,10 @@ export const useYoutubeStream = () => {
     if (typeof saved.streamOnGoLive === "boolean") streamOnGoLive.value = saved.streamOnGoLive
     if (saved.audioDevice !== undefined) audioDevice.value = saved.audioDevice
     if (saved.source === "live-window" || saved.source === "test") source.value = saved.source
-    watch([streamKey, streamOnGoLive, audioDevice, source], () => {
+    if (typeof saved.checkBeforeStreaming === "boolean") {
+      checkBeforeStreaming.value = saved.checkBeforeStreaming
+    }
+    watch([streamKey, streamOnGoLive, audioDevice, source, checkBeforeStreaming], () => {
       try {
         localStorage.setItem(
           SETTINGS_KEY,
@@ -122,6 +171,7 @@ export const useYoutubeStream = () => {
             streamOnGoLive: streamOnGoLive.value,
             audioDevice: audioDevice.value,
             source: source.value,
+            checkBeforeStreaming: checkBeforeStreaming.value,
           } satisfies SavedSettings)
         )
       } catch {
@@ -131,6 +181,40 @@ export const useYoutubeStream = () => {
   }
 
   const hasStreamKey = computed(() => !!streamKey.value.trim())
+
+  // The audio dropdown shows device *names* but stores the tri-state
+  // audioDevice: null = default (first), "" = no audio, else a device index.
+  const audioChoices = computed(() => [
+    AUDIO_DEFAULT_LABEL,
+    ...audioDevices.value.map((device) => device.name),
+    AUDIO_NONE_LABEL,
+  ])
+
+  const audioChoice = computed(() => {
+    if (audioDevice.value === null) return AUDIO_DEFAULT_LABEL
+    if (audioDevice.value === "") return AUDIO_NONE_LABEL
+    return (
+      audioDevices.value.find((device) => device.index === audioDevice.value)?.name ??
+      AUDIO_DEFAULT_LABEL
+    )
+  })
+
+  const setAudioChoice = (label: string) => {
+    if (label === AUDIO_NONE_LABEL) audioDevice.value = ""
+    else if (label === AUDIO_DEFAULT_LABEL) audioDevice.value = null
+    else {
+      audioDevice.value =
+        audioDevices.value.find((device) => device.name === label)?.index ?? null
+    }
+  }
+
+  // The device that will actually be used, by name ("default" resolves to the
+  // first input), or null for no audio.
+  const audioDeviceName = computed(() => {
+    if (audioDevice.value === "") return null
+    if (audioDevice.value === null) return audioDevices.value[0]?.name ?? null
+    return audioDevices.value.find((device) => device.index === audioDevice.value)?.name ?? null
+  })
 
   // Reconnecting still counts as an active session (show Stop, not Go live).
   const isStreaming = computed(
@@ -166,14 +250,23 @@ export const useYoutubeStream = () => {
       if (!sharedStatusListener) {
         sharedStatusListener = import("@tauri-apps/api/event")
           .then(({ listen }) =>
-            listen<StreamStatus>("stream://status", (message) => {
-              status.value = message.payload
-              // The backend ended the session (gave up, or the feed broke):
-              // release the window capture and the microphone too.
-              if (message.payload.phase === "idle" || message.payload.phase === "error") {
-                stopCapture()
-              }
-            })
+            Promise.all([
+              listen<StreamStatus>("stream://status", (message) => {
+                status.value = message.payload
+                // The backend ended the session (gave up, or the feed broke):
+                // release the window capture and the microphone too.
+                if (message.payload.phase === "idle" || message.payload.phase === "error") {
+                  stopCapture()
+                  stats.value = null
+                }
+              }),
+              listen<StreamStats>("stream://stats", (message) => {
+                stats.value = message.payload
+              }),
+              listen<{ db: number }>("stream://audio-level", (message) => {
+                meterDb.value = message.payload.db
+              }),
+            ])
           )
           .then(() => undefined)
           .catch((error) => {
@@ -351,6 +444,70 @@ export const useYoutubeStream = () => {
     return status.value
   }
 
+  // Asks the operator to confirm the pre-flight check; resolves with their
+  // choice. The check itself lives in YoutubePreflightModal.
+  const requestPreflight = () => {
+    resolvePreflightChoice?.("cancel")
+    preflightOpen.value = true
+    return new Promise<PreflightChoice>((resolve) => {
+      resolvePreflightChoice = resolve
+    })
+  }
+
+  const answerPreflight = (choice: PreflightChoice) => {
+    preflightOpen.value = false
+    const resolve = resolvePreflightChoice
+    resolvePreflightChoice = null
+    resolve?.(choice)
+  }
+
+  const getPlan = () => invokeTauri<StreamPlan>("stream_plan")
+
+  // Milliseconds to open a connection to YouTube's ingest server.
+  const checkYoutube = () => invokeTauri<number>("stream_check_youtube")
+
+  // Upload speed in Mbps: posts growing chunks for ~3 seconds and divides
+  // what was sent by the time it took. The first (small) post only warms up
+  // the connection, so it isn't counted.
+  const measureUploadMbps = async () => {
+    let size = 256 * 1024
+    let bytes = 0
+    let elapsed = 0
+    let warmedUp = false
+    while (elapsed < UPLOAD_TEST_DURATION_MS) {
+      const body = new Uint8Array(size)
+      const started = performance.now()
+      const response = await fetch(UPLOAD_TEST_URL, {
+        method: "POST",
+        body,
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (!response.ok) throw new Error(`The speed test failed (${response.status}).`)
+      const took = performance.now() - started
+      if (warmedUp) {
+        bytes += size
+        elapsed += took
+      }
+      warmedUp = true
+      if (took < 1000 && size < UPLOAD_TEST_MAX_CHUNK) size *= 2
+    }
+    return (bytes * 8) / (elapsed / 1000) / 1_000_000
+  }
+
+  // Starts the live level meter on the chosen audio input. Returns false when
+  // "no audio" is selected.
+  const startAudioMeter = async () => {
+    meterDb.value = null
+    if (!isDesktop) return false
+    return invokeTauri<boolean>("stream_audio_meter_start", { audioDevice: audioDevice.value })
+  }
+
+  const stopAudioMeter = async () => {
+    meterDb.value = null
+    if (!isDesktop) return
+    await invokeTauri("stream_audio_meter_stop").catch(() => undefined)
+  }
+
   // Ending the broadcast is one action for the operator: it closes the live
   // window too, and closing the live window stops the stream (app layout).
   // A test-pattern run has no window to close, so it just stops.
@@ -369,7 +526,22 @@ export const useYoutubeStream = () => {
     streamOnGoLive,
     audioDevices,
     audioDevice,
+    audioChoices,
+    audioChoice,
+    setAudioChoice,
+    audioDeviceName,
     needsPicker: readonly(needsPicker),
+    stats: readonly(stats),
+    meterDb: readonly(meterDb),
+    checkBeforeStreaming,
+    preflightOpen: readonly(preflightOpen),
+    requestPreflight,
+    answerPreflight,
+    getPlan,
+    checkYoutube,
+    measureUploadMbps,
+    startAudioMeter,
+    stopAudioMeter,
     listAudioDevices,
     initialize,
     start,
