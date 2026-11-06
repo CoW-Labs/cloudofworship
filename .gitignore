@@ -36,3 +36,12 @@ bible-json-converter.ts
 .vercel
 .env*
 bench-runs/
+
+# Internal notes, QA plans, one-off reports and marketing templates: keep out of the repo
+*-report.md
+*-test-plan.csv
+docs/*_PLAN.md
+docs/*_FIX*.md
+docs/kit-*-template.html
+skills/documentation-skills.md
+public/large_assets/
