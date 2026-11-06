@@ -224,7 +224,7 @@
 
       <div
         class="sample-monitor rounded-2xl bg-[#f1f3f6] dark:bg-[#1b212e] relative grid place-items-center overflow-hidden"
-        :style="`width: 400px; height: 220px`"
+        :style="`width: 400px; height: 225px`"
       >
         <div class="inner max-w-[60%] mx-auto text-center p-8">
           <p class="text-xs text-gray-500 dark:text-[#9aa3b2]">
@@ -468,11 +468,10 @@ const windowPadding = computed(
   () => currentState.value.settings.slideStyles?.windowPadding
 )
 
-// Left/right padding is capped lower than top/bottom — a 16:9 stage runs out
-// of horizontal room first.
-const paddingMax = computed(() =>
-  activePadding.value === "right" || activePadding.value === "left" ? 100 : 120
-)
+// Padding renders as value / 4 cqw, so 200 is half the stage width — on a
+// 16:9 screen that is ~89% of the height, letting text be pushed almost to the
+// opposite edge.
+const paddingMax = 200
 
 const activePaddingLabel = computed(() =>
   activePadding.value

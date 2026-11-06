@@ -163,7 +163,9 @@
           crossorigin="anonymous"
         ></video>
 
-        <!-- VIDEO THUMBNAIL - Only when NOT fullScreen -->
+        <!-- VIDEO PREVIEW - Only when NOT fullScreen. Muted, and never plays
+             on its own: it follows the projector's actual playback (see
+             useMediaPlaybackSync), so it moves only while /live does. -->
         <video
           v-if="
             !fullScreen &&
@@ -171,7 +173,11 @@
             (slide?.data as any)?.type !== 'youtube' &&
             (slide?.data as any)?.type !== 'vimeo'
           "
+          ref="previewVideo"
           :src="slide?.background"
+          :loop="
+            slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
+          "
           muted
           playsinline="true"
           :class="[
@@ -420,6 +426,10 @@ import {
   safePostMessage,
 } from "~/utils/browserSafety"
 import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
+import {
+  useFollowMediaPlayback,
+  useReportMediaPlayback,
+} from "~/composables/useMediaPlaybackSync"
 import type { Ref } from "vue"
 import {
   adoptMedia,
@@ -435,6 +445,7 @@ import {
 
 const appMounted = ref<boolean>(false)
 const video = ref<HTMLVideoElement | null>(null)
+const previewVideo = ref<HTMLVideoElement | null>(null)
 const audio = ref<HTMLAudioElement | null>(null)
 const iframe = ref<HTMLIFrameElement | null>(null)
 const isLargePreviewOpen = ref<boolean>(false)
@@ -1014,6 +1025,20 @@ watch(playableVideo, async (next, previous) => {
 
   safePlayMedia(element)
 })
+
+// The projector reports its video's playback; the operator-side preview copy
+// follows it instead of playing by itself. The public livestream page plays
+// for viewers elsewhere, so it does not report.
+useReportMediaPlayback(
+  video,
+  () => props.slide?.id,
+  () => props.fullScreen && !route.path.startsWith("/livestream")
+)
+useFollowMediaPlayback(
+  previewVideo,
+  () => props.slide?.id,
+  () => !props.fullScreen
+)
 
 const computeBackgroundStyles = (slide: Slide): string => {
   if (
