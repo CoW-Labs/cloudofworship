@@ -1,6 +1,6 @@
 # Trademarks
 
-"Cloud of Worship", "CoW" and the Cloud of Worship logo are trademarks of Favour Felix. The code license (see [LICENSE](./LICENSE)) does not grant any right to use them.
+"Cloud of Worship", "CoW" and the Cloud of Worship logo are trademarks of Favour Felix. The code license (AGPL-3.0, see [LICENSE](./LICENSE)) does not grant any right to use them, as its section 7(e) allows.
 
 ## What you can do
 
