@@ -44,17 +44,34 @@ describe("slide sync helpers", () => {
     })
   })
 
-  it("preserves video keys and identifies media video slides", async () => {
-    const video = slide({
-      type: "media",
+  it("preserves video background keys on non-media slides", async () => {
+    const motion = slide({
       backgroundType: "video",
       backgroundVideoKey: "video-key",
     })
 
-    expect(isMediaVideoSlide(video)).toBe(true)
-    expect(await toSlideUpdatePayload(video)).toMatchObject({
+    expect(isMediaVideoSlide(motion)).toBe(false)
+    expect(await toSlideUpdatePayload(motion)).toMatchObject({
       backgroundVideoKey: "video-key",
     })
-    expect(isMediaVideoSlide(slide({ backgroundType: "video" }))).toBe(false)
+  })
+
+  it("saves only the settings of a media video slide", async () => {
+    const slideStyle = { repeatMedia: true, isMediaMuted: true }
+    const video = slide({
+      type: "media",
+      backgroundType: "video",
+      background: "https://cdn.example/clip.mp4",
+      backgroundVideoKey: "video-key",
+      slideStyle,
+    })
+
+    expect(isMediaVideoSlide(video)).toBe(true)
+    // The upload flow owns the video's URL and key; a settings save must not
+    // send them, or it could overwrite them mid-upload.
+    expect(await toSlideUpdatePayload(video)).toEqual({
+      name: "Slide",
+      slideStyle,
+    })
   })
 })

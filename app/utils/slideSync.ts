@@ -13,8 +13,9 @@ import { toTransportSafeSlide } from "~/utils/mediaTransport"
  */
 
 /**
- * Media (video) slides are never re-synced — their heavy video payload is
- * handled by its own upload flow and must not be re-broadcast/re-persisted.
+ * Media (video) slides: the video itself is owned by its own upload flow, so
+ * an edit never re-broadcasts it, and saving one sends only its settings (see
+ * toSlideUpdatePayload).
  */
 export const isMediaVideoSlide = (slide: Slide) =>
   slide.type === slideTypes.media &&
@@ -25,6 +26,14 @@ export const isMediaVideoSlide = (slide: Slide) =>
  * mis-stores them when they arrive in the body.
  */
 export const toSlideUpdatePayload = async (slide: Slide) => {
+  // A video slide's edits are its settings (loop, mute, fill). The API $sets
+  // only what it is sent, so leaving the video fields out keeps a save from
+  // touching the upload flow's URL and key. Sending nothing at all, as before,
+  // let the server copy undo those settings on the next reload.
+  if (isMediaVideoSlide(slide)) {
+    return { name: slide.name, slideStyle: slide.slideStyle }
+  }
+
   // A rehydrated slide carries this device's playback URLs (blob:, and
   // asset.localhost file paths on desktop). Sent as-is they replaced the CDN
   // URLs on the server, and the media vanished for every other device.
