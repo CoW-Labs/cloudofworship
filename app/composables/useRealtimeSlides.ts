@@ -1,6 +1,6 @@
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import type { Slide } from "~/types"
+import type { Slide, SlidePair, Song, SongSetlistData } from "~/types"
 import type { OnlineUser, SlideEditLock } from "./useSocketIO"
 import type { Socket } from "socket.io-client"
 import {
@@ -16,10 +16,19 @@ import {
 import { livePairChanged } from "~/utils/slidePairs"
 
 interface RealtimeSlidesOptions {
-  onSlideCreated?: (slide: Slide, createdByName: string) => void
+  onSlideCreated?: (slide: Slide, createdByName: string, createdBy?: string) => void
   onSlideUpdated?: (slide: Slide, updatedByName: string) => void
-  onSlideDeleted?: (slide: Slide, deletedByName: string) => void
-  onBatchSlidesCreated?: (slides: Slide[], createdByName: string) => void
+  onSlidePairCreated?: (pair: SlidePair, createdByName: string, createdBy?: string) => void
+  /** Only for changes that alter how the pair shows, not save echoes. */
+  onSlidePairUpdated?: (pair: SlidePair, updatedByName: string, updatedBy?: string) => void
+  onSetlistSongsAdded?: (
+    setlist: Slide,
+    songs: Song[],
+    addedByName: string,
+    addedBy?: string
+  ) => void
+  onSlideDeleted?: (slide: Slide, deletedByName: string, deletedBy?: string) => void
+  onBatchSlidesCreated?: (slides: Slide[], createdByName: string, createdBy?: string) => void
   onBatchSlidesUpdated?: (slides: Slide[], updatedByName: string) => void
   onBatchSlidesDeleted?: (slideIds: string[], deletedByName: string) => void
   onSlidesReordered?: (slideOrder: string[], reorderedByName: string) => void
@@ -119,6 +128,24 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   }
 
   /**
+   * Songs in the updated setlist that the previous version did not have,
+   * matched by setlist item id. Skipped when the old setlist's songs were never
+   * loaded here, so a first hydration does not read as a teammate adding songs.
+   */
+  const songsAddedToSetlist = (before: Slide | undefined, after: Slide): Song[] => {
+    if (before?.type !== slideTypes.songSetlist || after.type !== slideTypes.songSetlist) {
+      return []
+    }
+    const beforeSongs = (before.data as SongSetlistData | undefined)?.songs
+    const afterSongs = (after.data as SongSetlistData | undefined)?.songs
+    if (!Array.isArray(beforeSongs) || !Array.isArray(afterSongs)) return []
+    const known = new Set(beforeSongs.map((item) => item?.id))
+    return afterSongs
+      .filter((item) => item?.id && !known.has(item.id) && item.song)
+      .map((item) => item.song)
+  }
+
+  /**
    * Handle incoming WebSocket messages
    */
   const handleWebSocketMessage = (message: any) => {
@@ -140,7 +167,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           delete (newSlide as any).tabId
 
           appStore.appendActiveSlide(newSlide)
-          options.onSlideCreated?.(newSlide, data.createdByName)
+          options.onSlideCreated?.(newSlide, data.createdByName, data.createdBy)
         }
         break
 
@@ -180,6 +207,15 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
               syncState: "synced",
             })
             options.onSlideUpdated?.(mergedSlide, data.updatedByName)
+            const addedSongs = songsAddedToSetlist(existingSlide, mergedSlide)
+            if (addedSongs.length) {
+              options.onSetlistSongsAdded?.(
+                mergedSlide,
+                addedSongs,
+                data.updatedByName,
+                data.updatedBy
+              )
+            }
 
             // If slide is live, update the live output. A member of the live
             // pair re-sends the whole pair with that member changed.
@@ -209,7 +245,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             clearLiveSlideIfDeleted(slideToRemove)
             clearOverlaySlideIfDeleted(slideToRemove)
             appStore.removeActiveSlide(slideToRemove)
-            options.onSlideDeleted?.(slideToRemove, data.deletedByName)
+            options.onSlideDeleted?.(slideToRemove, data.deletedByName, data.deletedBy)
           }
         }
         break
@@ -229,7 +265,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             return slide
           })
           appStore.appendActiveSlides(newSlides)
-          options.onBatchSlidesCreated?.(newSlides, data.createdByName)
+          options.onBatchSlidesCreated?.(newSlides, data.createdByName, data.createdBy)
         }
         break
 
@@ -306,6 +342,11 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         const previous = appStore.slidePairsById.get(pair.id)
         const wasLive = appStore.currentState.livePairId === pair.id
         appStore.upsertSlidePair(pair)
+        if (action === 'slide-pair-created' && !previous) {
+          options.onSlidePairCreated?.(pair, data.createdByName, data.createdBy)
+        } else if (previous && livePairChanged(previous, pair)) {
+          options.onSlidePairUpdated?.(pair, data.updatedByName, data.updatedBy)
+        }
         // A teammate changed how the live pair shows (layout, hidden member,
         // microphone, order, members or backdrop): show it here too. Which
         // member a teammate is editing is theirs alone and never sent.
