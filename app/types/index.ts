@@ -410,6 +410,8 @@ export interface QuickAction {
   opensPanel?: boolean
   // ISO date the action shipped. It carries a "NEW" badge for a while after.
   newSince?: string
+  // Marks a feature still being refined. Shows a "BETA" tag beside the name.
+  beta?: boolean
   // Shown once, the first time a new action is opened.
   intro?: QuickActionIntro
 }

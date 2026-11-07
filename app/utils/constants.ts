@@ -149,6 +149,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newTranscribe,
     meta: "transcribe sermon speech text bible audio microphone speech to text, audio to text transcripts",
     tier: 'teams',
+    beta: true,
     // unreleased: true,
     featureFlag: 'transcripts-feature',
   },
@@ -220,16 +221,6 @@ export const quickActionsArr: QuickAction[] = [
   //   // type: slideTypes.text
   // },
   {
-    icon: "i-bx-bell",
-    name: "Add Banners/Alert",
-    desc: "Notify your audience without disruption",
-    action: appWideActions.newAlert,
-    meta: "",
-    tier: "teams",
-    // unreleased: true,
-    // type: slideTypes.text
-  },
-  {
     icon: "i-bx-trash",
     name: "Remove Alert",
     desc: "Remove current alert",
@@ -249,15 +240,6 @@ export const quickActionsArr: QuickAction[] = [
     type: slideTypes.countdown,
     tier: "teams",
     // unreleased: true,
-  },
-  {
-    icon: "i-bx-clock",
-    name: "Add Time Slide",
-    desc: "Display the current time on a slide",
-    action: appWideActions.newTimeSlide,
-    meta: "time clock live clock current time",
-    type: slideTypes.time,
-    tier: "teams",
   },
   {
     icon: "i-ph-coffee",
@@ -337,6 +319,25 @@ export const quickActionsArr: QuickAction[] = [
         },
       ],
     },
+  },
+  {
+    icon: "i-bx-bell",
+    name: "Add Banners/Alert",
+    desc: "Notify your audience without disruption",
+    action: appWideActions.newAlert,
+    meta: "",
+    tier: "teams",
+    // unreleased: true,
+    // type: slideTypes.text
+  },
+  {
+    icon: "i-bx-clock",
+    name: "Add Time Slide",
+    desc: "Display the current time on a slide",
+    action: appWideActions.newTimeSlide,
+    meta: "time clock live clock current time",
+    type: slideTypes.time,
+    tier: "teams",
   },
   {
     icon: "i-mdi-youtube",
