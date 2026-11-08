@@ -4,6 +4,7 @@ import {
   cameraShareEncoding,
   chooseCameraSource,
   findCameraHost,
+  withStartBitrate,
   type CameraHost,
 } from "~/utils/cameraShare"
 
@@ -15,6 +16,7 @@ const host = (overrides: Partial<CameraHost>): CameraHost => ({
   paused: false,
   projecting: false,
   seenAt: 1,
+  firstSeenAt: 1,
   ...overrides,
 })
 
@@ -42,11 +44,21 @@ describe("findCameraHost", () => {
     expect(findCameraHost([a, b], made)).toMatchObject({ host: b, match: "label" })
   })
 
-  it("follows a computer that reconnected, not its old socket", () => {
+  it("stays on the same computer while two keep announcing the camera", () => {
     const cameras = [{ deviceId: "id-on-a", label: "FaceTime HD Camera" }]
-    const old = host({ cameras, seenAt: 1 })
-    const reconnected = host({ socketId: "socket-a2", cameras, seenAt: 2 })
-    expect(findCameraHost([old, reconnected], made)?.host.socketId).toBe("socket-a2")
+    const first = host({ cameras, firstSeenAt: 1, seenAt: 100 })
+    const second = host({ socketId: "socket-b", cameras, firstSeenAt: 5, seenAt: 90 })
+    expect(findCameraHost([first, second], made, null, 100)?.host.socketId).toBe("socket-a")
+    // The other computer announcing again does not move it.
+    const later = { ...second, seenAt: 110 }
+    expect(findCameraHost([first, later], made, null, 110)?.host.socketId).toBe("socket-a")
+  })
+
+  it("follows a computer that reconnected once its old socket goes quiet", () => {
+    const cameras = [{ deviceId: "id-on-a", label: "FaceTime HD Camera" }]
+    const old = host({ cameras, firstSeenAt: 1, seenAt: 1 })
+    const reconnected = host({ socketId: "socket-a2", cameras, firstSeenAt: 20_000, seenAt: 30_000 })
+    expect(findCameraHost([old, reconnected], made, null, 30_000)?.host.socketId).toBe("socket-a2")
   })
 
   it("never picks this computer's own socket", () => {
@@ -90,5 +102,31 @@ describe("cameraShareEncoding", () => {
 
   it("never scales a small camera up", () => {
     expect(cameraShareEncoding(360).scaleResolutionDownBy).toBe(1)
+  })
+})
+
+describe("withStartBitrate", () => {
+  const sdp = [
+    "v=0",
+    "m=audio 9 UDP/TLS/RTP/SAVPF 111",
+    "a=rtpmap:111 opus/48000/2",
+    "a=fmtp:111 minptime=10",
+    "m=video 9 UDP/TLS/RTP/SAVPF 96 98",
+    "a=rtpmap:96 VP8/90000",
+    "a=rtpmap:98 H264/90000",
+    "a=fmtp:98 profile-level-id=42e01f",
+    "",
+  ].join("\r\n")
+
+  it("adds the start bitrate to every video codec and leaves audio alone", () => {
+    const out = withStartBitrate(sdp, 800).split("\r\n")
+    expect(out).toContain("a=fmtp:96 x-google-start-bitrate=800")
+    expect(out).toContain("a=fmtp:98 profile-level-id=42e01f;x-google-start-bitrate=800")
+    expect(out).toContain("a=fmtp:111 minptime=10")
+  })
+
+  it("does not add it twice", () => {
+    const once = withStartBitrate(sdp, 800)
+    expect(withStartBitrate(once, 800)).toBe(once)
   })
 })
