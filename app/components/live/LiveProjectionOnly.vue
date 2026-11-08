@@ -47,6 +47,8 @@
               :data="cameraData"
               :quality="cameraMode === 'capture' ? 'output' : 'preview'"
               :resolution="cameraResolution"
+              :remote="cameraMode === 'preview'"
+              :remote-only="cameraMode === 'preview' && cameraIsExclusive"
             />
             <CameraPlaceholder
               v-else
@@ -426,6 +428,7 @@ import {
   safePostMessage,
 } from "~/utils/browserSafety"
 import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
+import useCameraShare from "~/composables/useCameraShare"
 import {
   useFollowMediaPlayback,
   useReportMediaPlayback,
@@ -838,10 +841,15 @@ provide(
 )
 // The operator's preview is skipped where only one page may hold the camera
 // (Safari's engine, the macOS app): opening it there would mute the projector.
+// A teammate's computer sending the camera opens nothing here, so the preview
+// shows it even there. The projector itself never uses a teammate's feed.
+const cameraIsExclusive = cameraCaptureIsExclusive()
+const { hostFor: cameraHostFor } = useCameraShare()
 const opensCamera = computed(
   () =>
     props.cameraMode === "capture" ||
-    (props.cameraMode === "preview" && !cameraCaptureIsExclusive())
+    (props.cameraMode === "preview" &&
+      (!cameraIsExclusive || !!cameraHostFor(cameraData.value)))
 )
 const labelLayerClass = computed(() =>
   displayedSlide.value?.type === slideTypes.interlude ? "z-20" : "z-10"

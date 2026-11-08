@@ -77,6 +77,9 @@ const ACTION_TIER_MAP: Record<string, 'free' | 'teams'> = {
   // Only the *search* is gated: 'new-song' below stays free so a church can
   // still play songs it saved itself (personal library, "Add Song").
   'new-song-search': 'teams',
+  // A camera slide whose camera is on a teammate's computer, sent over WebRTC.
+  // Peer to peer, so it costs nothing to enforce server side.
+  'camera-share': 'teams',
   // Two slides on the live screen at once. Building a pair is the preview;
   // taking one live is the commit.
   [appWideActions.slidePair]: 'teams',

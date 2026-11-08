@@ -3,6 +3,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type { Slide, SlidePair } from "~/types"
 import { livePayloadForSlide } from "~/composables/useSlidePairs"
+import useCameraShare from "~/composables/useCameraShare"
 
 /**
  * The realtime session shared by every operator surface.
@@ -56,6 +57,7 @@ export const useOperatorSession = () => {
   const emitter = useNuxtApp().$emitter as Emitter<any>
   const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
   const liveOutputControl = useLiveOutputControl()
+  const cameraShare = useCameraShare()
   const stageStreamFeed = useStageStreamFeed({
     getSocket: () => socketInstance.value,
     hasRemoteTarget: liveOutputControl.hasRemoteTarget,
@@ -146,6 +148,7 @@ export const useOperatorSession = () => {
       scheduleId,
       onMessage: (event, data) => {
         if (stageStreamFeed.handleMessage(event, data?.data)) return
+        if (cameraShare.handleMessage(event, data?.data)) return
         handleWebSocketMessage(data)
       },
       onConnected: () => {
@@ -156,6 +159,8 @@ export const useOperatorSession = () => {
         // there is a socket to say it on, rather than leaving a phone to wait
         // out a heartbeat before the screen it wants shows up in its list.
         liveOutputControl.announce()
+        // Say which cameras this computer has, and hear teammates' cameras.
+        cameraShare.onConnected()
         // A slide taken live while the socket was down never reached the
         // livestream. Send what is on screen now that it can.
         if (liveSlideUnsent) sendCurrentLiveSlide()
@@ -223,6 +228,7 @@ export const useOperatorSession = () => {
   const disconnectSocket = () => {
     socketInstance.value?.disconnect()
     stageStreamFeed.reset()
+    cameraShare.reset()
     cleanupRealtimeSlides()
     appStore.setOnlineUsers([])
   }
@@ -324,6 +330,8 @@ export const useOperatorSession = () => {
     // devices offering theirs. Started here so both operator routes get it on
     // the same terms as the socket itself.
     liveOutputControl.start()
+    // Shares this computer's cameras with teammates, and theirs with it.
+    cameraShare.start()
     // Lets a stage display on this computer tell a closed console from a
     // quiet one.
     stopPresence = announceOperatorPresence()
@@ -333,6 +341,7 @@ export const useOperatorSession = () => {
     stopPresence?.()
     stopPresence = null
     liveOutputControl.stop()
+    cameraShare.stop()
     disconnectSocket()
   })
 

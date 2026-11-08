@@ -549,6 +549,21 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('live-control-request', { action: 'live-control-request', data })
       })
 
+      // Camera sharing — a teammate's camera shown on this computer. These
+      // carry only the WebRTC handshake; the video goes computer to computer.
+      // See useCameraShare.
+      socket.on('camera-share-announce', (data) => {
+        onMessage?.('camera-share-announce', { action: 'camera-share-announce', data })
+      })
+
+      socket.on('camera-share-signal', (data) => {
+        onMessage?.('camera-share-signal', { action: 'camera-share-signal', data })
+      })
+
+      socket.on('camera-share-left', (data) => {
+        onMessage?.('camera-share-left', { action: 'camera-share-left', data })
+      })
+
       // Alert and overlay events
       socket.on('add-alert', (data) => {
         onMessage?.('add-alert', { action: 'add-alert', data })
