@@ -315,7 +315,7 @@
                         : undefined
                     "
                     size="sm"
-                    class="transition-all duration-200 cursor-pointer hover:scale-110"
+                    class="relative z-[1] transition-all duration-200 cursor-pointer hover:scale-110"
                     :class="{ 'grayscale opacity-50': !online }"
                     :style="{
                       backgroundColor: onlineUser?.theme || '#6366f1',
@@ -326,7 +326,7 @@
                   />
                   <span
                     v-if="online"
-                    class="animate-ping absolute inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75"
+                    class="animate-ping absolute z-0 inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75 pointer-events-none"
                   ></span>
                   <!-- MOBILE CONTROL BADGE — this face is the phone driving
                        this screen. It rides the avatar rather than sitting in
