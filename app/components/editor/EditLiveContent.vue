@@ -503,6 +503,8 @@
             :data="editorCameraData"
             quality="preview"
             assigned-only
+            remote
+            :remote-only="cameraIsExclusive && cameraOnAir"
             :release-immediately="cameraIsExclusive"
           />
           <CameraPlaceholder
@@ -643,6 +645,7 @@ import { pairBackgroundOf } from "~/utils/slidePairs"
 import type { SlideUpdateMeta } from "~/utils/undoHistory"
 import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
 import useCameraOnAir from "~/composables/useCameraOnAir"
+import useCameraShare from "~/composables/useCameraShare"
 import {
   computeNextVerseLabel,
   computePreviousVerseLabel,
@@ -848,8 +851,13 @@ const editorCameraData = computed(() =>
     ? (props.slide.data as CameraSlideData | undefined) ?? null
     : null
 )
+// A teammate's computer can still send it: that never opens a camera here.
+const { hostFor: cameraHostFor } = useCameraShare()
 const editorCameraPaused = computed(
-  () => cameraIsExclusive && cameraOnAir.value
+  () =>
+    cameraIsExclusive &&
+    cameraOnAir.value &&
+    !cameraHostFor(editorCameraData.value)
 )
 
 // ── Pair background ─────────────────────────────────────────────────────────

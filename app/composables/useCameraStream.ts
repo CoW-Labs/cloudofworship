@@ -1,4 +1,5 @@
 import type { CameraSlideData } from "~/types"
+import type { LocalCameraMatch } from "~/utils/cameraShare"
 import { postCrossWindowNotification } from "~/composables/useBroadcastPost"
 
 /**
@@ -334,6 +335,30 @@ const resolveDevice = async (
   }
 }
 
+/**
+ * How the slide's camera shows up on this machine, read from the device list
+ * alone: never opens a camera or asks for permission, so it is safe where only
+ * one page may hold the camera.
+ */
+const localCameraMatch = async (
+  data: CameraSettingsInput
+): Promise<LocalCameraMatch> => {
+  let cameras: MediaDeviceInfo[]
+  try {
+    cameras = await enumerateCameras()
+  } catch {
+    return "none"
+  }
+  if (!cameras.length) return "none"
+  if (cameras.every((camera) => !camera.deviceId || !camera.label)) return "unknown"
+  if (data.deviceId && cameras.some((camera) => camera.deviceId === data.deviceId)) {
+    return "exact"
+  }
+  const label = data.deviceLabel?.trim()
+  if (label && cameras.some((camera) => camera.label.trim() === label)) return "label"
+  return "none"
+}
+
 const openStream = async (deviceId: string) => {
   const video = (frameRate: MediaTrackConstraints["frameRate"]) => ({
     ...CAPTURE_CONSTRAINTS,
@@ -576,6 +601,7 @@ if (typeof window !== "undefined") {
 const useCameraStream = () => ({
   listCameras,
   resolveDevice,
+  localCameraMatch,
   acquire,
   prewarm,
   releaseAllCameras,
