@@ -1192,6 +1192,55 @@ async function restoreExistingTauriLiveWindow() {
   }
 }
 
+/**
+ * A display was plugged in while the app was running (Windows never tells a
+ * running app this, so useDisplayHotplug polls for it). Point the live output
+ * at it and open the live window there, unless one is already open.
+ */
+const displayHotplug = useDisplayHotplug(async (added, all) => {
+  try {
+    const { getAllWebviewWindows } = await import(
+      "@tauri-apps/api/webviewWindow"
+    )
+    const liveWindowOpen = (await getAllWebviewWindows()).some(
+      (w: any) => w.label === "live-output"
+    )
+
+    usePosthogCapture("NEW_DISPLAY_DETECTED", {
+      monitorCount: all.length,
+      liveWindowAlreadyOpen: liveWindowOpen,
+    })
+
+    if (liveWindowOpen) return
+
+    // Keep the operator's chosen display if it is connected; otherwise (first
+    // plug-in, or the saved screen was swapped) take the one that just arrived.
+    const savedLabel = appStore.currentState.mainDisplayLabel
+    const savedStillConnected =
+      !!savedLabel && all.some((m: any) => useScreenId(m) === savedLabel)
+    if (!savedStillConnected) {
+      await useAutoDetectSecondaryDisplay(true, added[0]?.name)
+    }
+
+    useToast().add({
+      title: "New display detected",
+      description: "Opening the live output on it",
+      icon: "i-lucide-monitor-check",
+    })
+    await openTauriLiveWindow()
+    usePosthogCapture("NEW_DISPLAY_LIVE_WINDOW_OPENED", {
+      usedSavedDisplay: savedStillConnected,
+    })
+  } catch (error) {
+    console.warn("Could not open the live window on the new display:", error)
+    usePosthogCapture("NEW_DISPLAY_LIVE_WINDOW_FAILED", {
+      reason: error instanceof Error ? error.message : "unknown",
+    })
+  }
+})
+
+onBeforeUnmount(() => displayHotplug.stop())
+
 async function openTauriLiveWindow() {
   try {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
@@ -1399,10 +1448,57 @@ async function closeAllWindows() {
   windowRefs.value = []
 }
 
+/**
+ * The browser can't (or won't) place the live window on another display. Say
+ * why, report it, and open it on the screen the operator is on so Go live
+ * still does something.
+ */
+function openLiveOnCurrentScreen(reason: "unsupported" | "denied") {
+  usePosthogCapture("DISPLAY_PLACEMENT_UNAVAILABLE", { reason })
+
+  useToast().add(
+    reason === "unsupported"
+      ? {
+          title: "This browser can't open on another display",
+          description:
+            "The live window opened on this screen. Use Chrome or Edge to open it on your projector automatically, or drag it across.",
+          icon: "i-bx-info-circle",
+          color: "amber",
+        }
+      : {
+          title: "Display access is blocked",
+          description:
+            "The live window opened on this screen. To open it on your projector, click the lock icon next to the address, allow \"Window management\", then try again.",
+          icon: "i-bx-info-circle",
+          color: "amber",
+        }
+  )
+
+  openWindow(
+    window.screen.availLeft ?? 0,
+    window.screen.availTop ?? 0,
+    window.screen.availWidth,
+    window.screen.availHeight,
+    `${window.location.origin}/live`
+  )
+}
+
 async function openWindows() {
+  const screenAccess = await getScreenAccess()
+  if (screenAccess === "unsupported" || screenAccess === "denied") {
+    openLiveOnCurrentScreen(screenAccess)
+    return
+  }
+
   if ("getScreenDetails" in window) {
-    // prettier-ignore
-    const screenDetails = await (window as any).getScreenDetails()
+    let screenDetails: any
+    try {
+      screenDetails = await (window as any).getScreenDetails()
+    } catch {
+      // The user dismissed or refused the permission prompt just now
+      openLiveOnCurrentScreen("denied")
+      return
+    }
     screenDetails.currentScreen.id = useScreenId(screenDetails?.currentScreen)
     screenDetails?.screens?.forEach((screen: any) => {
       screen.id = useScreenId(screen)
@@ -1778,6 +1874,7 @@ onMounted(async () => {
     await ndiBroadcast.initialize()
     await restoreExistingTauriLiveWindow()
     bindTauriLiveWindowLifecycle()
+    displayHotplug.start()
   }
 
   useLocalMediaStorage()
