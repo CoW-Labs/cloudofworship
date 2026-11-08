@@ -166,8 +166,13 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           delete (newSlide as any).timestamp
           delete (newSlide as any).tabId
 
-          appStore.appendActiveSlide(newSlide)
-          options.onSlideCreated?.(newSlide, data.createdByName, data.createdBy)
+          // A slide already on the schedule (this delivery is a repeat —
+          // a reconnect replaying it, two of the sender's own sockets in
+          // the room) is not new, so it gets no second "X added…" toast.
+          const wasNew = appStore.appendActiveSlide(newSlide)
+          if (wasNew) {
+            options.onSlideCreated?.(newSlide, data.createdByName, data.createdBy)
+          }
         }
         break
 
@@ -264,8 +269,17 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             delete slide.tabId
             return slide
           })
-          appStore.appendActiveSlides(newSlides)
-          options.onBatchSlidesCreated?.(newSlides, data.createdByName, data.createdBy)
+          // Same guard as the single-slide case, scoped to just the slides
+          // this delivery actually added — a repeat delivery whose slides are
+          // all already on the schedule gets no toast at all.
+          const actuallyAdded = appStore.appendActiveSlides(newSlides)
+          if (actuallyAdded.length) {
+            options.onBatchSlidesCreated?.(
+              actuallyAdded,
+              data.createdByName,
+              data.createdBy
+            )
+          }
         }
         break
 
