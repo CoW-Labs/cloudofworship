@@ -1,3 +1,4 @@
+import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { safePlayMedia } from "~/utils/browserSafety"
 
@@ -33,9 +34,11 @@ const playTeammateChime = () => {
 export const useTeammateToast = () => {
   const toast = useToast()
   const authStore = useAuthStore()
+  const appStore = useAppStore()
   return (fromUserId: string | undefined, options: Parameters<typeof toast.add>[0]) => {
     const id = toast.add(options)
-    if (!fromUserId || fromUserId !== authStore.user?._id) playTeammateChime()
+    const soundsOn = appStore.currentState.settings.notificationSounds !== false
+    if (soundsOn && (!fromUserId || fromUserId !== authStore.user?._id)) playTeammateChime()
     return id
   }
 }

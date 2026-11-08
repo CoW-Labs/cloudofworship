@@ -703,6 +703,7 @@ export interface AppSettings {
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number
   alertLimit?: number
+  notificationSounds?: boolean // Chime with teammate toasts. Defaults to true.
   // Settings for the "Blank" screen. The key keeps its old name because it is
   // persisted locally and synced to the server; renaming it drops saved settings.
   intermission?: {
