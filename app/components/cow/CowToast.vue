@@ -183,7 +183,14 @@ const notificationUi = (hasDescription: boolean) => ({
   shadow: "",
   ring: "",
   rounded: "",
-  padding: "py-[15px] ps-3.5 pe-[18px]",
+  // A toast with no description is one line next to a round avatar, both
+  // flex-centered already — but the smoke glow (see .cow-toast__smoke) is
+  // anchored to the bottom edge and reads as extra weight down there, so
+  // symmetric padding looks top-heavy. Nudge the content down to compensate.
+  // A toast with a description is taller and doesn't have this problem.
+  padding: hasDescription
+    ? "py-[15px] ps-3.5 pe-[18px]"
+    : "pt-[19px] pb-[11px] ps-3.5 pe-[18px]",
   gap: "gap-3",
   title: "text-sm font-semibold leading-5 text-[#1a1f2e] dark:text-white",
   description: "mt-0.5 text-[13px] leading-[1.4] text-[#30333f] dark:text-white/75",

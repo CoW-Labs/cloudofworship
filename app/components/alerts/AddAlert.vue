@@ -188,9 +188,8 @@ const speed = ref<number>(1)
 const toast = useToast()
 const emit = defineEmits(["go-home"])
 
-const alertLimit = computed(
-  () => appStore.currentState.settings.alertLimit || 0
-)
+// Fixed cap; the old per-account setting (settings.alertLimit) is no longer read.
+const alertLimit = computed(() => 30)
 const atAlertLimit = computed(
   () => (currentState.value?.alerts?.length || 0) >= alertLimit.value
 )

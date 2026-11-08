@@ -2828,10 +2828,9 @@ const reportSlideUpdateFailure = (slide: Slide, error: any, durable: boolean) =>
 }
 
 // An edit to a server slide stays queued for replay until its PUT is
-// confirmed. Video slides are excluded: useSlideResync never sends them, so a
-// marker on one would never clear and would block schedule refreshes.
-const needsSlideResync = (slide: Slide) =>
-  !!slide?._id && !isMediaVideoSlide(slide)
+// confirmed. A video slide's replay sends only its settings (see
+// toSlideUpdatePayload).
+const needsSlideResync = (slide: Slide) => !!slide?._id
 
 // HTTP persistence cadence (2s): decoupled from the broadcast above so live
 // typing stays responsive without multiplying database writes.
@@ -2839,7 +2838,7 @@ const persistSlideOnline = useThrottleFn(
   async (slide: Slide, durable: boolean) => {
     // Persistence needs a server `_id`.
     const activeChurchId = authStore.user?.churchId
-    if (!activeChurchId || !slide?._id || isMediaVideoSlide(slide)) {
+    if (!activeChurchId || !slide?._id) {
       return
     }
 

@@ -357,27 +357,40 @@ export const useAppStore = defineStore("app", {
         }
       }
     },
-    appendActiveSlide(slide: Slide, position?: number) {
-      if (!this.activeSlides.find((s) => s?.id === slide?.id)) {
-        const nextSlides = [...this.activeSlides]
-        if (position !== undefined && position >= 0) {
-          nextSlides.splice(position, 0, slide)
-        } else {
-          nextSlides.push(slide)
-        }
-        this.currentState.activeSlides = ensureUniqueIds(nextSlides)
-        this.currentState.liveOutputSlidesId = Array.from(
-          new Set(this.currentState.activeSlides.map((slide) => slide?.id))
-        )
-        enqueueSlideShadowWrite("append slide", (repository) =>
-          repository.putSlide(slide)
-        )
+    // Returns whether the slide was actually new. A duplicate id is dropped
+    // silently (see ensureUniqueIds) — callers that announce "X added a
+    // slide" off the back of this (a teammate toast) must check the return
+    // value, or a slide delivered twice (a flaky reconnect, a stale retry)
+    // announces itself twice even though it only ever appears once.
+    appendActiveSlide(slide: Slide, position?: number): boolean {
+      if (this.activeSlides.find((s) => s?.id === slide?.id)) return false
+
+      const nextSlides = [...this.activeSlides]
+      if (position !== undefined && position >= 0) {
+        nextSlides.splice(position, 0, slide)
+      } else {
+        nextSlides.push(slide)
       }
+      this.currentState.activeSlides = ensureUniqueIds(nextSlides)
+      this.currentState.liveOutputSlidesId = Array.from(
+        new Set(this.currentState.activeSlides.map((slide) => slide?.id))
+      )
+      enqueueSlideShadowWrite("append slide", (repository) =>
+        repository.putSlide(slide)
+      )
+      return true
     },
-    appendActiveSlides(slides: Array<Slide>) {
+    // Returns the subset of `slides` that were actually new, in the same
+    // order. See appendActiveSlide for why a caller announcing the addition
+    // needs this rather than assuming every slide passed in landed.
+    appendActiveSlides(slides: Array<Slide>): Slide[] {
       // console.log('appending active slides', this.currentState.activeSlides?.length)
+      const existingIds = new Set(this.activeSlides.map((s) => s?.id))
+      const incoming = toSlideArray(slides)
+      const newSlides = incoming.filter((s) => !existingIds.has(s?.id))
+
       let tempSlides = [...this.activeSlides]
-      tempSlides.push(...toSlideArray(slides))
+      tempSlides.push(...incoming)
       this.currentState.activeSlides = ensureUniqueIds(tempSlides)
       this.currentState.liveOutputSlidesId = Array.from(
         new Set(this.currentState.activeSlides.map((slide) => slide?.id).filter(Boolean))
@@ -385,6 +398,7 @@ export const useAppStore = defineStore("app", {
       enqueueSlideShadowWrite("append slides", (repository) =>
         repository.putSlides(slides)
       )
+      return newSlides
     },
     removeActiveSlide(slide: Slide) {
       // console.log('removing active slides', this.currentState.activeSlides?.length)

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { useAppStore } from './app'
 import posthog from 'posthog-js'
 import type { SubscriptionDetails } from '~/types'
+import { identifyPosthogUser } from '~/utils/posthogIdentity'
 
 
 export interface User {
@@ -82,6 +83,16 @@ export const useAuthStore = defineStore('auth', {
         this.subscriptionDetails = null
         this.subscriptionDetailsLastFetched = null
       }
+
+      this.identifyInPosthog()
+    },
+    // Keeps the PostHog profile in step with who is signed in and their plan.
+    identifyInPosthog() {
+      identifyPosthogUser(
+        this.user,
+        this.church,
+        useAppStore().currentState.settings.appVersion
+      )
     },
     /**
      * Stores the church and stamps the plan as freshly verified.
@@ -94,6 +105,7 @@ export const useAuthStore = defineStore('auth', {
     setChurch(church: Church) {
       this.church = church
       this.planVerifiedAt = Date.now()
+      this.identifyInPosthog()
     },
     setToken(token: string | null) {
       this.token = token

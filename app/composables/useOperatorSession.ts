@@ -1,7 +1,7 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import type { Slide } from "~/types"
+import type { Slide, SlidePair } from "~/types"
 import { livePayloadForSlide } from "~/composables/useSlidePairs"
 
 /**
@@ -39,9 +39,20 @@ const describeSlides = (slides: Slide[]): string => {
   return `${first} and ${others} other slides`
 }
 
+const PAIR_TOAST_COOLDOWN_MS = 5000
+
 export const useOperatorSession = () => {
   const appStore = useAppStore()
   const toast = useToast()
+  const teammateToast = useTeammateToast()
+  const pairToastAt = new Map<string, number>()
+  // A pair's members by name: "Camera" and "John 3:16".
+  const describePair = (pair: SlidePair) =>
+    describeSlides(
+      pair.slideIds
+        .map((id) => appStore.activeSlidesById.get(id))
+        .filter(Boolean) as Slide[]
+    )
   const emitter = useNuxtApp().$emitter as Emitter<any>
   const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
   const liveOutputControl = useLiveOutputControl()
@@ -58,24 +69,63 @@ export const useOperatorSession = () => {
     onSlideUpdated: () => {
       // Silent update - no toast for every update to avoid noise
     },
-    onSlideCreated: (slide, createdByName) => {
-      toast.add({
+    onSlideCreated: (slide, createdByName, createdBy) => {
+      teammateToast(createdBy, {
         title: `${createdByName} added ${describeSlides([slide])}`,
         icon: "i-tabler-plus",
         color: "blue",
         timeout: 3000,
       })
     },
-    onSlideDeleted: (slide, deletedByName) => {
-      toast.add({
+    onSlideDeleted: (slide, deletedByName, deletedBy) => {
+      teammateToast(deletedBy, {
         title: `${deletedByName} deleted ${describeSlides([slide])}`,
         icon: "i-tabler-trash",
         color: "amber",
         timeout: 3000,
       })
     },
-    onBatchSlidesCreated: (slides, createdByName) => {
-      toast.add({
+    onSlidePairCreated: (pair, createdByName, createdBy) => {
+      teammateToast(createdBy, {
+        title: `${createdByName || "A teammate"} paired ${describePair(pair)}`,
+        icon: "i-tabler-layout-columns",
+        color: "blue",
+        timeout: 3000,
+      })
+    },
+    onSlidePairUpdated: (pair, updatedByName, updatedBy) => {
+      // Flipping layouts or the mic sends a change per click. One toast per pair
+      // in a short window is enough.
+      const now = Date.now()
+      if (now - (pairToastAt.get(pair.id) ?? 0) < PAIR_TOAST_COOLDOWN_MS) return
+      pairToastAt.set(pair.id, now)
+      teammateToast(updatedBy, {
+        title: `${updatedByName || "A teammate"} changed the pair ${describePair(pair)}`,
+        icon: "i-tabler-layout-columns",
+        color: "blue",
+        timeout: 3000,
+      })
+    },
+    onSetlistSongsAdded: (setlist, songs, addedByName, addedBy) => {
+      const [first] = songs
+      const what =
+        songs.length === 1
+          ? first?.title?.trim()
+            ? `"${first.title.trim()}"`
+            : "a song"
+          : `${songs.length} songs`
+      // "Song Setlist 1 (4 songs)" reads better here without its count.
+      const target =
+        setlist.name?.replace(/\s*\(\d+ songs?\)$/, "").trim() || "the setlist"
+      teammateToast(addedBy, {
+        title: `${addedByName || "A teammate"} added ${what} to ${target}`,
+        icon: "i-lucide-list-music",
+        color: "blue",
+        timeout: 3000,
+      })
+    },
+    onBatchSlidesCreated: (slides, createdByName, createdBy) => {
+      teammateToast(createdBy, {
         title: `${createdByName} added ${describeSlides(slides)}`,
         icon: "i-tabler-plus",
         color: "blue",
@@ -134,7 +184,7 @@ export const useOperatorSession = () => {
         appStore.triggerUserJoinedAnimation(user)
         // Your own second device (say /mobile) joining is not news to you.
         if (user.userId !== useAuthStore().user?._id) {
-          toast.add({
+          teammateToast(user.userId, {
             title: `${user.userName || "A teammate"} joined`,
             icon: "i-tabler-user-plus",
             color: "blue",
