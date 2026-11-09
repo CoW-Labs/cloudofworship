@@ -179,7 +179,10 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
-import { slidesCreatingInBackground } from "~/composables/useSlideCreation"
+import {
+  slidesCreatingInBackground,
+  slidesDeletedWhileCreating,
+} from "~/composables/useSlideCreation"
 import { onSocketConnected } from "~/composables/useSocketIO"
 import { reportSongSearchPick } from "~/composables/useSongSearchLog"
 import { isSongPending, setSongPending } from "~/composables/useSongs"
@@ -3057,6 +3060,12 @@ const deleteSlide = async (
 
   const clientSlideId = tempSlide.id || slideId
 
+  // Still uploading, so not on the server yet: tell its upload flow not to
+  // create it, or it comes back once the upload finishes.
+  if (slidesCreatingInBackground.has(clientSlideId)) {
+    slidesDeletedWhileCreating.add(clientSlideId)
+  }
+
   // Clear countdown animation if slide is a countdown slide before deleting
   if (tempSlide?.type === slideTypes.countdown) {
     stopCountdown()
@@ -3263,6 +3272,8 @@ const putBackSlides = (held: Slide[]) => {
     .sort((a, b) => a.index - b.index)
   if (!missing.length) return false
   missing.forEach((slide) => {
+    // Undone while its upload is still running: that flow creates it again.
+    slidesDeletedWhileCreating.delete(slide.id)
     const restored: Slide = { ...slide }
     delete restored._id
     delete restored.pairId
