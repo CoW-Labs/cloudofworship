@@ -212,6 +212,13 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 
 ---
 
+## 🧠 Performance
+| Event Name | Properties | Description | Status |
+|------------|-----------|-------------|---------|
+| `MEMORY_SAMPLED` | `window` (`operator`\|`live`), `used_heap_mb`, `total_heap_mb`, `heap_limit_mb`, `minutes_open`, `slide_count`, `live_slide_type` | JS heap of the operator console or projector, sampled 5 minutes after load and then every 15 minutes while the tab is visible. Chromium only (Chrome, Edge, Windows desktop app); nothing is sent from Safari, Firefox or the macOS app. JS heap only: decoded images, video and camera frames are outside it. Sent from `app/plugins/memory-telemetry.client.ts`. | ✅ Added |
+
+---
+
 ## 📊 Legend
 - ✅ **Exists**: Event is already implemented in codebase
 - ✅ **Added**: Event added during this tracking improvement session
