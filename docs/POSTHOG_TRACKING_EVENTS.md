@@ -157,6 +157,11 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `VIMEO_VIDEO_ADDED` | `videoUrl` | Vimeo video embedded | ⚠️ Missing |
 | `TEMPLATE_BROWSED` | - | User opens templates gallery | ⚠️ Missing |
 | `TEMPLATE_APPLIED` | `templateName`, `slideType` | Pre-designed template applied | ⚠️ Missing |
+| `GO_LIVE_MEDIA_STREAMED` | `mediaType` | Go Live waited 3s for a slide's media to be saved on this computer, then put it on screen streaming the cloud copy | ✅ Added |
+| `GO_LIVE_MEDIA_SAVED_LATE` | `mediaType`, `seconds` | After a streamed Go Live, the local copy finished saving (`seconds` from Go Live) | ✅ Added |
+| `GO_LIVE_MEDIA_SAVE_FAILED` | `mediaType`, `seconds` | After a streamed Go Live, the local copy could not be saved; the screen keeps streaming | ✅ Added |
+| `TEAMMATE_MEDIA_PREFETCHED` | `count`, `pending` | Media for slides a teammate added or updated mid-session was pulled down in the background; `pending` is how many are still not saved | ✅ Added |
+| `TEAMMATE_MEDIA_PREFETCH_FAILED` | `count` | Some of those slides' media could not be saved (they retry in the background) | ✅ Added |
 
 ---
 
