@@ -212,8 +212,9 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `TRANSCRIPTION_STARTED` | `provider` (`deepgram`\|`web-speech-api`), `plan` (`teams`\|`free`) | User starts a transcription session | ✅ Added |
 | `TRANSCRIPTION_STOPPED` | `provider`, `plan`, `segmentCount` | User stops a transcription session | ✅ Added |
 | `TRANSCRIPTION_CLEARED` | `provider`, `plan`, `segmentCount` | User clears the transcript | ✅ Added |
-| `TRANSCRIPTION_BIBLE_REFERENCE_CLICKED` | `reference` | User clicks an inline Bible reference in the transcript | ✅ Added |
+| `TRANSCRIPTION_BIBLE_REFERENCE_CLICKED` | `reference`, `chapterOnly` | User clicks an inline Bible reference in the transcript. `chapterOnly` is true when only a chapter was said ("Joshua chapter 14"), which opens verse 1 | ✅ Added |
 | `TRANSCRIPTION_SCRIPTURE_SUGGESTION_CLICKED` | `reference`, `displayLabel` | User clicks a scripture in the Scriptures tab | ✅ Added |
+| `TRANSCRIPTION_MIC_SETTINGS_OPENED` | `isTranscribing` | User opens Microphone Settings from the transcript panel's More menu (operator window only) | ✅ Added |
 
 ---
 

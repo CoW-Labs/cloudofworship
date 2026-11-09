@@ -175,7 +175,7 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-bx-music",
-    name: "Search song lyrics",
+    name: "Search Song Lyrics",
     desc: "Find lyrics to any song, native too",
     action: appWideActions.newSongSearch,
     meta: "",
@@ -269,22 +269,22 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-bx-video",
-    name: "Add Camera",
-    desc: "Show a webcam or capture card full screen",
+    name: "Add Video Input (Camera)",
+    desc: "Show a webcam, capture card or any video input full screen",
     action: appWideActions.newCamera,
-    meta: "camera webcam imag capture card live video feed preacher",
+    meta: "camera webcam imag capture card live video feed input source obs vmix preacher",
     type: slideTypes.camera,
     featureFlag: 'camera-slide',
     newSince: "2026-10-20",
     intro: {
-      title: "Camera slides",
+      title: "Video input slides",
       animation: "camera",
       description:
-        "Show a webcam or capture card on the screen.",
+        "Show a webcam, capture card or any video input on the screen.",
       points: [
         {
-          title: "Choose your camera",
-          body: "Any camera connected to this computer works.",
+          title: "Choose your video input",
+          body: "Any camera or video input connected to this computer works.",
         },
         {
           title: "Plays on the live screen",
@@ -294,7 +294,7 @@ export const quickActionsArr: QuickAction[] = [
     },
   },
   {
-    icon: "i-tabler-layout-columns",
+    icon: "i-ph-picture-in-picture",
     name: "Create Slide Pair",
     desc: "Show a camera and another slide on screen together",
     action: appWideActions.slidePair,

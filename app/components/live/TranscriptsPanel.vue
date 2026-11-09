@@ -141,6 +141,22 @@
             <template #leading><DeleteIcon class="w-4 h-4" /></template>
             Clear transcript
           </UButton>
+          <!-- The settings modal lives in the operator window only. -->
+          <UButton
+            v-if="!mobile"
+            color="gray"
+            variant="ghost"
+            block
+            @click="
+              () => {
+                openMicSettings()
+                close()
+              }
+            "
+          >
+            <template #leading><SettingsIcon class="w-4 h-4" /></template>
+            Microphone settings
+          </UButton>
           <UButton
             color="gray"
             variant="ghost"
@@ -558,6 +574,8 @@ const LOCAL_AUTO_LIVE_COOLDOWN_MS = 1500
 
 const maybeAutoOpenLocalReference = (reference: BibleReference) => {
   if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
+  // A chapter-only mention is a click target, never an automatic go-live
+  if (reference.chapterOnly) return
   if (reference.shortLabel === lastLocalAutoLiveReference) return
 
   const now = Date.now()
@@ -634,6 +652,13 @@ watch(() => segments.value.length, scrollTranscriptToBottom)
 watch(currentTranscript, scrollTranscriptToBottom)
 
 // ── Actions ────────────────────────────────────────────────────────────────
+const openMicSettings = () => {
+  usePosthogCapture("TRANSCRIPTION_MIC_SETTINGS_OPENED", {
+    isTranscribing: isTranscribing.value,
+  })
+  useGlobalEmit(appWideActions.openSettings, "Microphone Settings")
+}
+
 const handleClear = () => {
   // `clearTranscript()` from useSermonTranscription clears both segments AND
   // the Deepgram-path scripture results (handled inside the composable).
@@ -649,6 +674,7 @@ const handleClear = () => {
 const handleReferenceClick = (reference: BibleReference) => {
   usePosthogCapture("TRANSCRIPTION_BIBLE_REFERENCE_CLICKED", {
     reference: reference.shortLabel,
+    chapterOnly: !!reference.chapterOnly,
   })
   useGlobalEmit(appWideActions.updateOrCreateBible, reference.shortLabel)
 }

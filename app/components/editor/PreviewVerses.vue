@@ -146,12 +146,25 @@
         <div class="flex-initial w-[100%] text-sm leading-relaxed">
           {{ verseTemp }}
         </div>
+        <UTooltip
+          v-if="verseTranslations[Number(index)]?.length"
+          text="This line has been translated"
+          class="shrink-0 ml-auto self-center"
+        >
+          <UIcon name="i-ph-translate" class="block w-4 h-4 text-primary" />
+        </UTooltip>
       </UButton>
     </template>
   </div>
 </template>
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+import {
+  buildTranslationLookup,
+  getSongTranslation,
+  lineKey,
+  songOnSlide,
+} from "~/utils/songTranslation"
 import type {
   Scripture,
   Slide,
@@ -264,6 +277,26 @@ const getSongOrHymnObj = async () => {
     }
   }
 }
+
+// Each song verse's translated lines, found by lyric text (the same lookup the
+// slide uses). Empty for a verse with none, or a song with no translation.
+const verseTranslations = computed<string[][]>(() => {
+  const verses: string[] = relatedData.value?.verses || []
+  if (props.slide?.type === slideTypes.hymn) return []
+  const song =
+    [songOnSlide(props.slide), relatedData.value].find((candidate) =>
+      getSongTranslation(candidate)
+    ) || null
+  const translation = getSongTranslation(song)
+  if (!song || !translation) return verses.map(() => [])
+  const lookup = buildTranslationLookup(song, translation)
+  return verses.map((verseText) =>
+    (verseText || "")
+      .split(/\r?\n/)
+      .map((line) => lookup.get(lineKey(line)) || "")
+      .filter(Boolean)
+  )
+})
 
 const convertStringToSlug = (str: string) => {
   return str

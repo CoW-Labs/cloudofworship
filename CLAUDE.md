@@ -138,7 +138,7 @@ An **emitter** (mitt) is provided to the Nuxt app as `nuxtApp.$emitter` and stor
 
 ## Analytics (PostHog events)
 
-Every new feature ships with its PostHog events in the same change. A feature without events cannot be judged after launch, so treat missing events as an unfinished feature.
+Every new user-facing (UI) feature ships with its PostHog events in the same change. A feature without events cannot be judged after launch, so treat missing events as an unfinished feature. Reliability, performance and internal fixes (reconnect logic, watchdogs, backpressure, refactors) are not features and need no new events; only add one when the user asks or a failure would otherwise be invisible and they want it tracked.
 
 - Capture with `usePosthogCapture("EVENT_NAME", { ...properties })` (`app/composables/usePosthogCapture.ts`). Names are `SCREAMING_SNAKE_CASE`, reusing the existing verbs: `NEW_<THING>_SLIDE_CREATED`, `<THING>_CHANGED`, `<THING>_FAILED`.
 - Cover the whole path, not only the first click: the entry point (opened/previewed), the commit (created/sent/enabled), the outcome that matters (reached the live screen, saved, failed), and each setting a person can change. `CAMERA_EFFECT_CHANGED` alone says people tried an effect, not that one ever reached the screen.

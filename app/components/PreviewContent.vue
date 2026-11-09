@@ -2088,7 +2088,7 @@ emitter.on(
 )
 // "Create Slide Pair" from Quick Actions. A pair starts from a camera: the
 // selected slide when it is an unpaired camera, else the first one in the
-// schedule (the picker names it). No camera yet opens the Add Camera panel,
+// schedule (the picker names it). No camera yet opens the Add Video Input panel,
 // except on a phone, which cannot add one (see desktopOnlyActions).
 emitter.on(appWideActions.slidePair, () => {
   const candidates = slides.value.filter(

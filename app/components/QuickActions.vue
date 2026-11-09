@@ -2015,6 +2015,27 @@ const rankedSearchResults = computed((): QuickAction[] => {
     }
   }
 
+  // Then actions whose hidden keywords hold every typed word whole ("obs"
+  // finds Add Video Input, "webcam" too). Without this such an action is not
+  // pinned, and a fuzzy title match elsewhere ("obs" against "Oba Awon Oba")
+  // promotes the song and hymn groups above the Actions block. Whole words
+  // only, and at most two, so a common word cannot crowd out title matches.
+  const typedWords = normalizeSearchText(bestMatchQuery)
+    .split(" ")
+    .filter(Boolean)
+  if (typedWords.length) {
+    let keywordPins = 0
+    for (const action of ordered) {
+      if (keywordPins >= 2 || pinned.length >= 4) break
+      if (!staticQuickActions.has(action) || pinnedSet.has(action)) continue
+      const keywords = normalizeSearchText(action.meta)
+      if (typedWords.every((word) => keywords.includes(` ${word} `))) {
+        pin(action)
+        keywordPins += 1
+      }
+    }
+  }
+
   const closeNameMatches = new Set(
     fuzzysort
       .go(bestMatchQuery, ordered, {
