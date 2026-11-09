@@ -124,6 +124,39 @@ export const useReportMediaPlayback = (
   })
 }
 
+/**
+ * Operator side: whether the projector is playing `slideId`'s video or audio
+ * right now, or null before it has said (not live, no output window, or a
+ * YouTube/Vimeo player, which does not report). The stored `isMediaPlaying` is
+ * only the last command, and a video starts on its own when it goes live, so
+ * play/pause controls read this first.
+ */
+export const useProjectorPlayback = (slideId: () => string | undefined) => {
+  const playing = ref<boolean | null>(null)
+
+  const stopListening = useBroadcastMessage((data) => {
+    const payload = readPayload(data)
+    if (!isPlayback(payload) || payload.slideId !== slideId()) return
+    playing.value = payload.playing
+  })
+
+  watch(
+    slideId,
+    (id) => {
+      playing.value = null
+      if (!id) return
+      postCrossWindowNotification<MediaPlaybackRequestBroadcast>({
+        kind: "media-playback-request",
+        slideId: id,
+      })
+    },
+    { immediate: true }
+  )
+
+  onBeforeUnmount(stopListening)
+  return playing
+}
+
 /** Preview side: make `el` follow the projector's playback of `slideId`. */
 export const useFollowMediaPlayback = (
   el: Ref<HTMLMediaElement | null>,
