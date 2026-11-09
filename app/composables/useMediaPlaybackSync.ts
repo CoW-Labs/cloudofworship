@@ -1,6 +1,8 @@
 import type { Ref } from "vue"
 import { postCrossWindowNotification } from "~/composables/useBroadcastPost"
-import useBroadcastMessage from "~/composables/useBroadcastMessage"
+import useBroadcastMessage, {
+  broadcastNoticeKind,
+} from "~/composables/useBroadcastMessage"
 import { safePauseMedia, safePlayMedia } from "~/utils/browserSafety"
 
 /**
@@ -37,7 +39,14 @@ const HEARTBEAT_MS = 5000
 /** Below this the preview is left alone; seeking a video is not free. */
 const DRIFT_TOLERANCE_S = 0.75
 
+// The live channel also carries every live slide in full, sent on each edit of
+// the live slide, and several of these listeners run in each window. Only our
+// own notices are parsed.
 const readPayload = (data: unknown) => {
+  const kind = broadcastNoticeKind(data)
+  if (kind !== undefined && kind !== "media-playback" && kind !== "media-playback-request") {
+    return null
+  }
   try {
     const envelope = typeof data === "string" ? JSON.parse(data) : data
     return typeof envelope?.payload === "string"
@@ -113,6 +122,7 @@ export const useReportMediaPlayback = (
   )
 
   const stopListening = useBroadcastMessage((data) => {
+    if (!enabled()) return
     const payload = readPayload(data)
     if (isPlaybackRequest(payload) && payload.slideId === slideId()) report()
   })
@@ -124,6 +134,39 @@ export const useReportMediaPlayback = (
   })
 }
 
+/**
+ * Operator side: whether the projector is playing `slideId`'s video or audio
+ * right now, or null before it has said (not live, no output window, or a
+ * YouTube/Vimeo player, which does not report). The stored `isMediaPlaying` is
+ * only the last command, and a video starts on its own when it goes live, so
+ * play/pause controls read this first.
+ */
+export const useProjectorPlayback = (slideId: () => string | undefined) => {
+  const playing = ref<boolean | null>(null)
+
+  const stopListening = useBroadcastMessage((data) => {
+    const payload = readPayload(data)
+    if (!isPlayback(payload) || payload.slideId !== slideId()) return
+    playing.value = payload.playing
+  })
+
+  watch(
+    slideId,
+    (id) => {
+      playing.value = null
+      if (!id) return
+      postCrossWindowNotification<MediaPlaybackRequestBroadcast>({
+        kind: "media-playback-request",
+        slideId: id,
+      })
+    },
+    { immediate: true }
+  )
+
+  onBeforeUnmount(stopListening)
+  return playing
+}
+
 /** Preview side: make `el` follow the projector's playback of `slideId`. */
 export const useFollowMediaPlayback = (
   el: Ref<HTMLMediaElement | null>,
@@ -131,17 +174,25 @@ export const useFollowMediaPlayback = (
   enabled: () => boolean
 ) => {
   let latest: MediaPlaybackBroadcast | null = null
+  // One deferred seek at most: a heartbeat landing while the file is still
+  // loading replaces the waiting one rather than stacking another seek on it.
+  let pendingSeek: { media: HTMLMediaElement; run: () => void } | null = null
+  const clearPendingSeek = () => {
+    pendingSeek?.media.removeEventListener("loadedmetadata", pendingSeek.run)
+    pendingSeek = null
+  }
 
   const apply = () => {
     const media = el.value
     const state = latest
     if (!media || !state || state.slideId !== slideId()) return
 
-    const elapsed = state.playing ? ((Date.now() - state.at) / 1000) * state.rate : 0
-    let target = state.time + elapsed
-    if (media.loop && media.duration > 0) target %= media.duration
-
     const seek = () => {
+      // Worked out when it runs, so a seek deferred to `loadedmetadata`
+      // lands where the projector is then, not where it was.
+      const elapsed = state.playing ? ((Date.now() - state.at) / 1000) * state.rate : 0
+      let target = state.time + elapsed
+      if (media.loop && media.duration > 0) target %= media.duration
       if (Math.abs(media.currentTime - target) > DRIFT_TOLERANCE_S) {
         try {
           media.currentTime = target
@@ -150,8 +201,17 @@ export const useFollowMediaPlayback = (
         }
       }
     }
-    if (media.readyState >= 1) seek()
-    else media.addEventListener("loadedmetadata", seek, { once: true })
+    clearPendingSeek()
+    if (media.readyState >= 1) {
+      seek()
+    } else {
+      const run = () => {
+        pendingSeek = null
+        seek()
+      }
+      pendingSeek = { media, run }
+      media.addEventListener("loadedmetadata", run, { once: true })
+    }
 
     if (media.playbackRate !== state.rate) media.playbackRate = state.rate
     if (state.playing) safePlayMedia(media)
@@ -182,5 +242,8 @@ export const useFollowMediaPlayback = (
     { immediate: true, flush: "post" }
   )
 
-  onBeforeUnmount(stopListening)
+  onBeforeUnmount(() => {
+    clearPendingSeek()
+    stopListening()
+  })
 }

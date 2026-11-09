@@ -43,6 +43,7 @@ export const hasSlideChanged = (newSlide: Slide | null, oldSlide: Slide | null):
   if (newStyle?.lettercase !== oldStyle?.lettercase) return true;
   if (newStyle?.lineSpacing !== oldStyle?.lineSpacing) return true;
   if (newStyle?.isMediaPlaying !== oldStyle?.isMediaPlaying) return true;
+  if (newStyle?.mediaCommandAt !== oldStyle?.mediaCommandAt) return true;
   if (newStyle?.isMediaMuted !== oldStyle?.isMediaMuted) return true;
   if (newStyle?.mediaSeekPosition !== oldStyle?.mediaSeekPosition) return true;
   if (newStyle?.blur !== oldStyle?.blur) return true;

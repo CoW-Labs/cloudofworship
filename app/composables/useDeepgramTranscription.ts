@@ -241,7 +241,10 @@ export default function useDeepgramTranscription() {
     // Auto go-live with the first reference if cooldown has elapsed. Repeated
     // interim pushes for the same reference are ignored locally, while a later
     // final result that corrects the provisional reference is allowed through.
-    const firstReference = references[0]
+    // A chapter-only mention ("Joshua chapter 14") stays a click target: interim
+    // text can say the chapter before the verse, and a casual mention should not
+    // move the projector.
+    const firstReference = references.find((reference) => !reference.chapterOnly)
     if (!firstReference) return
 
     const nextReference = firstReference.shortLabel

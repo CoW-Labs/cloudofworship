@@ -603,6 +603,12 @@ export interface SlideStyle {
   backgroundFillType?: string
   repeatMedia?: boolean
   isMediaPlaying?: boolean // also used to check if countdown is paused or is beginning
+  /**
+   * When the operator last pressed play or pause. The projector acts on every
+   * new value, so a press lands even when `isMediaPlaying` already held the
+   * wanted value (a video that started on its own when it went live).
+   */
+  mediaCommandAt?: number
   mediaSeekPosition?: number // 0 or -1, -1 means not at the beginning
   isMediaMuted?: boolean
   windowPadding?: {

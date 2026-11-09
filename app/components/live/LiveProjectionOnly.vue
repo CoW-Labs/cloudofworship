@@ -62,11 +62,15 @@
         </Transition>
 
         <!-- AUDIO BACKGROUND -->
+        <!-- Fed only for an audio slide. A video media slide's `data.url` is
+             the video file too, and `v-show` hides the element without
+             stopping it, so an unmuted video played its sound twice: once here
+             and once from the <video>. -->
         <audio
           v-if="fullScreen"
           ref="audio"
-          v-show="(slide?.data as ExtendedFileT)?.type?.includes('audio')"
-          :src="(slide?.data as ExtendedFileT)?.url"
+          v-show="isAudioSlide"
+          :src="isAudioSlide ? (slide?.data as ExtendedFileT)?.url : undefined"
           autoplay
           :loop="
             slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
@@ -427,6 +431,7 @@ import {
   safePlayMedia,
   safePostMessage,
 } from "~/utils/browserSafety"
+import { externalEmbedUrl } from "~/utils/externalVideo"
 import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
 import useCameraShare from "~/composables/useCameraShare"
 import {
@@ -898,27 +903,11 @@ function getEmbedUrl(data: ExternalVideo): string {
     props.slide?.type !== slideTypes.media ||
     props.slide?.slideStyle?.repeatMedia
 
-  if (data.type === "youtube") {
-    let videoId = ""
-    if (data.url.includes("youtu.be")) {
-      videoId = data.url.split("youtu.be/")[1]?.split("?")[0] || ""
-    } else if (data.url.includes("/shorts/")) {
-      videoId = data.url.split("/shorts/")[1]?.split("?")[0] || ""
-    } else {
-      videoId = data.url.split("v=")[1]?.split("&")[0] || ""
-    }
-    // Enable JS API for control and add necessary parameters
-    const muteParam = isMuted ? "&mute=1" : "&mute=0"
-    const loopParam = shouldLoop ? `&loop=1&playlist=${videoId}` : ""
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0&enablejsapi=1&origin=${window.location.origin}${muteParam}${loopParam}`
-  } else if (data.type === "vimeo") {
-    const videoId = data.url.split("vimeo.com/")[1]?.split("?")[0] || ""
-    // Enable JS API for control
-    const muteParam = isMuted ? "&muted=1" : "&muted=0"
-    const loopParam = shouldLoop ? "&loop=1" : ""
-    return `https://player.vimeo.com/video/${videoId}?autoplay=1&api=1${muteParam}${loopParam}`
-  }
-  return ""
+  return externalEmbedUrl(data, {
+    muted: !!isMuted,
+    loop: !!shouldLoop,
+    origin: window.location.origin,
+  })
 }
 
 // Preload background images so the crossfade doesn't flash a blank background.
@@ -988,6 +977,11 @@ watch(
 
 // The playable file for the current slide, or null when there is nothing this
 // element can play (a still background, or a YouTube/Vimeo link the iframe owns).
+// Only an audio file feeds the <audio> element; see the template.
+const isAudioSlide = computed(
+  () => !!(props.slide?.data as ExtendedFileT | undefined)?.type?.includes("audio")
+)
+
 const playableVideo = computed(() => {
   const slide = props.slide
   if (!slide || slide.backgroundType !== backgroundTypes.video) return null
@@ -1010,8 +1004,17 @@ watch(playableVideo, async (next, previous) => {
   // Same slide, new source: the local copy replaced the cloud URL it had been
   // streaming. It is the same footage, so keep the position rather than
   // restarting the clip mid-service. A different slide starts from the top.
-  const resumeAt =
-    previous?.id === next.id && video.value ? video.value.currentTime : 0
+  const sameSlide = previous?.id === next.id
+  const resumeAt = sameSlide && video.value ? video.value.currentTime : 0
+  // Paused by the operator while the local copy was still saving: it stays
+  // paused when the copy lands. Playing it here undid the pause mid-service.
+  // A stream that simply has not started yet (no pause pressed) still plays.
+  const stayPaused =
+    sameSlide &&
+    !!video.value?.paused &&
+    !video.value?.ended &&
+    !!props.slide?.slideStyle?.mediaCommandAt &&
+    props.slide?.slideStyle?.isMediaPlaying === false
 
   // Let Vue patch :src onto the element before asking it to play.
   await nextTick()
@@ -1031,6 +1034,17 @@ watch(playableVideo, async (next, previous) => {
     else element.addEventListener("loadedmetadata", seek, { once: true })
   }
 
+  if (stayPaused) {
+    // The new src re-arms the element's `autoplay`. The element already
+    // reports `paused`, so safePauseMedia would skip it; only a real pause()
+    // call disarms autoplay.
+    try {
+      element.pause()
+    } catch {
+      // Nothing loaded yet to pause; autoplay is disarmed all the same.
+    }
+    return
+  }
   safePlayMedia(element)
 })
 
@@ -1133,10 +1147,27 @@ watch(
 )
 
 // Separate watcher for media play/pause control
+// Every play/pause press carries a fresh `mediaCommandAt`, so it lands even
+// when `isMediaPlaying` already held that value: a video starts on its own when
+// it goes live while the stored value still says paused.
+//
+// Only a command for the slide already on screen counts. Comparing across a
+// slide change paused a video as it went live whenever the slide before it had
+// last been played from the toolbar (`true` there, `false` on the new one).
 watch(
-  () => props.slide?.slideStyle?.isMediaPlaying,
-  (isPlaying, wasPlaying) => {
-    if (!props.fullScreen || isPlaying === wasPlaying) {
+  () =>
+    [
+      props.slide?.id,
+      props.slide?.slideStyle?.isMediaPlaying,
+      props.slide?.slideStyle?.mediaCommandAt,
+    ] as const,
+  ([slideId, isPlaying, commandAt], previous) => {
+    const [previousId, wasPlaying, previousCommandAt] = previous ?? []
+    if (
+      !props.fullScreen ||
+      slideId !== previousId ||
+      (isPlaying === wasPlaying && commandAt === previousCommandAt)
+    ) {
       return
     }
 

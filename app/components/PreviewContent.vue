@@ -179,7 +179,10 @@ import { useDebounceFn, useThrottleFn, useOnline } from "@vueuse/core"
 import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
-import { slidesCreatingInBackground } from "~/composables/useSlideCreation"
+import {
+  slidesCreatingInBackground,
+  slidesDeletedWhileCreating,
+} from "~/composables/useSlideCreation"
 import { onSocketConnected } from "~/composables/useSocketIO"
 import { reportSongSearchPick } from "~/composables/useSongSearchLog"
 import { isSongPending, setSongPending } from "~/composables/useSongs"
@@ -1038,6 +1041,18 @@ const missingMediaCopy = async (slide: Slide) => {
 // it. The slide that was taken live is never held back by its partner.
 const PARTNER_MEDIA_WAIT_MS = 2000
 
+// How long Go Live waits for a slide's own media to be saved on this computer.
+// Past this, a slide with a cloud copy goes live streaming it, and the
+// projection switches to the local copy once it lands without restarting the
+// clip. Waiting for the whole file left a large video on a slow church
+// connection looking like Go Live had done nothing at all.
+const MAIN_MEDIA_WAIT_MS = 3000
+
+const mediaTypeFor = (slide: Slide) =>
+  slide.type === slideTypes.presentation
+    ? "presentation"
+    : (slide.data as ExtendedFileT)?.type || slide.backgroundType || "unknown"
+
 const handleTakeLiveAction = async (slide: Slide) => {
   // When this device is driving another device's screen, that device projects
   // from its own copy of the media, so neither the download below nor the "not
@@ -1076,7 +1091,43 @@ const handleTakeLiveAction = async (slide: Slide) => {
   }))
   const startedAt = Date.now()
 
-  if (bearsResolvableMedia(slide)) await prepare(slide)
+  if (bearsResolvableMedia(slide)) {
+    const mainPrep = prepare(slide).then(
+      () => true,
+      (error) => {
+        console.warn("Go-live media preparation failed:", error)
+        return false
+      }
+    )
+    // Only a slide with a cloud copy has something to stream meanwhile; a
+    // local-only file still being saved has to be waited for.
+    const canStream = !!requiredMediaFor(slide)?.remoteUrl
+    const ready = canStream
+      ? await Promise.race([
+          mainPrep,
+          new Promise<false>((resolve) =>
+            setTimeout(() => resolve(false), MAIN_MEDIA_WAIT_MS)
+          ),
+        ])
+      : await mainPrep
+    if (!ready && canStream) {
+      const mediaType = mediaTypeFor(slide)
+      usePosthogCapture("GO_LIVE_MEDIA_STREAMED", { mediaType })
+      void mainPrep.then(async (ok) => {
+        const required = requiredMediaFor(slide)
+        const saved =
+          ok &&
+          (!required ||
+            !!(await projectionMediaStorage
+              .getPlaybackUrl(required.key)
+              .catch(() => null)))
+        usePosthogCapture(
+          saved ? "GO_LIVE_MEDIA_SAVED_LATE" : "GO_LIVE_MEDIA_SAVE_FAILED",
+          { mediaType, seconds: Math.round((Date.now() - startedAt) / 1000) }
+        )
+      })
+    }
+  }
 
   const mainProblem = await missingMediaCopy(slide)
   if (mainProblem) {
@@ -1955,11 +2006,16 @@ emitter.on(
         toast.add({ title: rejection, icon: "i-tabler-layout-columns", color: "amber" })
         return
       }
-      const pair = await replaceMember(existing.id, outgoing, source.id)
+      // The swap shows (here and on the live screen) before the server answers;
+      // the reorder and the confirmation wait for it to be saved.
+      const pair = await replaceMember(existing.id, outgoing, source.id, {
+        onApplied: (applied) => {
+          setEditingMember(applied.id, source.id)
+          makeSlideActive(source, { goLive: false, newlyCreated: false })
+        },
+      })
       if (!pair) return
       keepPairTogether(pair, staying!.id)
-      setEditingMember(pair.id, source.id)
-      makeSlideActive(source, { goLive: false, newlyCreated: false })
       toast.add({
         icon: "i-tabler-layout-columns",
         title: "Pair updated",
@@ -2032,7 +2088,7 @@ emitter.on(
 )
 // "Create Slide Pair" from Quick Actions. A pair starts from a camera: the
 // selected slide when it is an unpaired camera, else the first one in the
-// schedule (the picker names it). No camera yet opens the Add Camera panel,
+// schedule (the picker names it). No camera yet opens the Add Video Input panel,
 // except on a phone, which cannot add one (see desktopOnlyActions).
 emitter.on(appWideActions.slidePair, () => {
   const candidates = slides.value.filter(
@@ -3009,6 +3065,12 @@ const deleteSlide = async (
 
   const clientSlideId = tempSlide.id || slideId
 
+  // Still uploading, so not on the server yet: tell its upload flow not to
+  // create it, or it comes back once the upload finishes.
+  if (slidesCreatingInBackground.has(clientSlideId)) {
+    slidesDeletedWhileCreating.add(clientSlideId)
+  }
+
   // Clear countdown animation if slide is a countdown slide before deleting
   if (tempSlide?.type === slideTypes.countdown) {
     stopCountdown()
@@ -3215,6 +3277,8 @@ const putBackSlides = (held: Slide[]) => {
     .sort((a, b) => a.index - b.index)
   if (!missing.length) return false
   missing.forEach((slide) => {
+    // Undone while its upload is still running: that flow creates it again.
+    slidesDeletedWhileCreating.delete(slide.id)
     const restored: Slide = { ...slide }
     delete restored._id
     delete restored.pairId

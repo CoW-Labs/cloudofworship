@@ -4,6 +4,8 @@ import { useAuthStore } from "~/store/auth"
 import type { Slide, SlidePair } from "~/types"
 import { livePayloadForSlide } from "~/composables/useSlidePairs"
 import useCameraShare from "~/composables/useCameraShare"
+import { useOnline } from "@vueuse/core"
+import { isSessionMediaUrl } from "~/utils/mediaTransport"
 
 /**
  * The realtime session shared by every operator surface.
@@ -42,6 +44,35 @@ const describeSlides = (slides: Slide[]): string => {
 
 const PAIR_TOAST_COOLDOWN_MS = 5000
 
+const isExternalVideo = (slide: Slide) => {
+  const type = (slide.data as any)?.type
+  return type === "youtube" || type === "vimeo"
+}
+
+const bearsMedia = (slide: Slide) =>
+  !isExternalVideo(slide) &&
+  (slide.type === slideTypes.media ||
+    slide.type === slideTypes.presentation ||
+    !!slide.backgroundImageKey ||
+    !!slide.backgroundVideoKey)
+
+// The cloud URLs a slide's media can be pulled from. Empty while a teammate's
+// upload is still running: the slide arrives first and its hosted URL in a
+// later update, which is when the download can start.
+const remoteMediaSources = (slide: Slide) =>
+  [
+    slide.background,
+    (slide.data as any)?.url,
+    ...(slide.presentationObjects || []).map((page) => page.imageUrl),
+  ]
+    .filter(
+      (url): url is string =>
+        typeof url === "string" &&
+        /^https?:\/\//.test(url) &&
+        !isSessionMediaUrl(url)
+    )
+    .join("|")
+
 export const useOperatorSession = () => {
   const appStore = useAppStore()
   const toast = useToast()
@@ -63,15 +94,70 @@ export const useOperatorSession = () => {
     hasRemoteTarget: liveOutputControl.hasRemoteTarget,
   })
 
+  // A slide a teammate adds while this schedule is open used to wait until it
+  // went live before its media came down, and Go Live then sat on the whole
+  // download. Pull it now, in the background, as opening the schedule does.
+  // Not on /mobile (mobile data, and the phone projects nothing) and not while
+  // this device drives another computer's screen, which projects from its own
+  // copy.
+  const route = useRoute()
+  const online = useOnline()
+  const { rehydrateSlideMediaWithStatus } = useSlideMediaCache()
+  const prefetchedSources = new Map<string, string>()
+  const prefetchTeammateMedia = async (incoming: Slide[]) => {
+    if (route.path.startsWith("/mobile")) return
+    if (liveOutputControl.hasRemoteTarget.value || !online.value) return
+    const slides = incoming
+      .map((slide) => appStore.activeSlidesById.get(slide.id))
+      .filter((slide): slide is Slide => {
+        if (!slide || !bearsMedia(slide)) return false
+        const sources = remoteMediaSources(slide)
+        if (!sources || prefetchedSources.get(slide.id) === sources) return false
+        prefetchedSources.set(slide.id, sources)
+        return true
+      })
+    if (!slides.length) return
+
+    let pending = 0
+    // Two at a time, like the schedule prefetch, so a batch of videos does not
+    // split a weak connection a dozen ways.
+    for (let index = 0; index < slides.length; index += 2) {
+      const results = await Promise.all(
+        slides.slice(index, index + 2).map((slide) =>
+          rehydrateSlideMediaWithStatus(slide, { allowDownload: true }).catch(
+            () => ({ pendingKeys: ["error"] })
+          )
+        )
+      )
+      pending += results.filter((result) => result.pendingKeys.length).length
+    }
+    usePosthogCapture("TEAMMATE_MEDIA_PREFETCHED", {
+      count: slides.length,
+      pending,
+    })
+    if (pending) {
+      usePosthogCapture("TEAMMATE_MEDIA_PREFETCH_FAILED", { count: pending })
+    }
+  }
+  const prefetchInBackground = (slides: Slide[]) => {
+    prefetchTeammateMedia(slides).catch((error) =>
+      console.warn("Teammate media prefetch failed:", error)
+    )
+  }
+
   const {
     handleWebSocketMessage,
     updateOnlineUsers,
     cleanup: cleanupRealtimeSlides,
   } = useRealtimeSlides({
-    onSlideUpdated: () => {
-      // Silent update - no toast for every update to avoid noise
+    onSlideUpdated: (slide) => {
+      // Silent update - no toast for every update to avoid noise. A teammate's
+      // upload finishing arrives this way, carrying the hosted URL.
+      prefetchInBackground([slide])
     },
+    onBatchSlidesUpdated: (slides) => prefetchInBackground(slides),
     onSlideCreated: (slide, createdByName, createdBy) => {
+      prefetchInBackground([slide])
       teammateToast(createdBy, {
         title: `${createdByName} added ${describeSlides([slide])}`,
         icon: "i-tabler-plus",
@@ -127,6 +213,7 @@ export const useOperatorSession = () => {
       })
     },
     onBatchSlidesCreated: (slides, createdByName, createdBy) => {
+      prefetchInBackground(slides)
       teammateToast(createdBy, {
         title: `${createdByName} added ${describeSlides(slides)}`,
         icon: "i-tabler-plus",

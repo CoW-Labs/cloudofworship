@@ -129,6 +129,37 @@ export interface LocalMediaAdapter {
 }
 
 const activeOperations = new Map<string, Promise<LocalMediaFileRecord | null>>()
+
+/**
+ * Runs `task` holding a browser-wide lock for one media key, so the operator
+ * console and the /live window never download the same file at the same time.
+ * Going live no longer waits for the console's copy, which put /live's own
+ * download beside it: two full transfers of one video sharing a weak
+ * connection. The second window now waits here and finds the finished copy.
+ * Without Web Locks (or when the wait is aborted) the task just runs.
+ */
+const withMediaKeyLock = async <T>(
+  key: string,
+  signal: AbortSignal | undefined,
+  task: () => Promise<T>
+): Promise<T> => {
+  if (typeof navigator === "undefined" || !navigator.locks?.request) {
+    return task()
+  }
+  try {
+    return await navigator.locks.request(
+      `cow-media-download:${key}`,
+      signal ? { signal } : {},
+      task
+    )
+  } catch (error) {
+    // An aborted wait is the caller's own cancellation: surface it as before.
+    if ((error as DOMException)?.name === "AbortError") throw error
+    // Anything the lock itself refused must not stop the download.
+    if (!(error instanceof DOMException)) throw error
+    return task()
+  }
+}
 const playbackUrls = new Map<
   string,
   { relativePath: string; url: string; backend: LocalMediaBackend }
@@ -1066,17 +1097,24 @@ export const createLocalMediaStorage = (
       }
     }
     if (!record && source.url) {
-      record = await downloadToLocal({
-        key,
-        groupId: source.groupId || groupIdFromKey(key),
-        category: source.category || categoryFromKey(key),
-        kind: source.kind,
-        url: source.url,
-        mimeType: source.mimeType,
-        originalName: source.originalName,
-        recoverable: source.recoverable ?? true,
-        signal: source.signal,
-        onProgress: source.onProgress,
+      const url = source.url
+      record = await withMediaKeyLock(key, source.signal, async () => {
+        // Another window (or another pass in this one) may have saved it
+        // while this one waited for the lock.
+        const saved = await db.localMediaFiles.get(key)
+        if (saved?.backend === adapter.backend) return saved
+        return downloadToLocal({
+          key,
+          groupId: source.groupId || groupIdFromKey(key),
+          category: source.category || categoryFromKey(key),
+          kind: source.kind,
+          url,
+          mimeType: source.mimeType,
+          originalName: source.originalName,
+          recoverable: source.recoverable ?? true,
+          signal: source.signal,
+          onProgress: source.onProgress,
+        })
       })
     }
     if (record) return await getPlaybackUrl(key)

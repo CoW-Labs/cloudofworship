@@ -148,6 +148,28 @@ const remoteHandle = shallowRef<RemoteCameraHandle | null>(null)
 const remoteName = ref("")
 const remoteState = ref<RemoteCameraState | null>(null)
 const allowsRemote = computed(() => !!props.remote || !!props.remoteOnly)
+// Who last sent this slide's camera here, so a feed whose sender goes away
+// waits for it instead of reaching for this computer's own devices.
+let lastRemoteName = ""
+
+// Analytics. Retries run every few seconds, so each failure reason is sent
+// at most once a minute per feed, and the Teams gate once per feed.
+const shareSurface = computed(() => (props.assignedOnly ? "editor" : "live-output"))
+const SHARE_FAILURE_REPORT_MS = 60_000
+const shareFailureReportedAt = new Map<RemoteCameraState, number>()
+let teamsGateReported = false
+const reportShareFailure = (reason: RemoteCameraState) => {
+  if (reason === "teams") {
+    if (teamsGateReported) return
+    teamsGateReported = true
+    usePosthogCapture("TEAMS_FEATURE_BLOCKED", { feature: "camera-share", stage: "view" })
+    return
+  }
+  const now = Date.now()
+  if (now - (shareFailureReportedAt.get(reason) ?? 0) < SHARE_FAILURE_REPORT_MS) return
+  shareFailureReportedAt.set(reason, now)
+  usePosthogCapture("CAMERA_SHARE_FAILED", { reason, surface: shareSurface.value })
+}
 
 watch(status, (value) => emit("status", value), { immediate: true })
 
@@ -207,11 +229,21 @@ watch(status, (value) => {
 
 // A teammate's camera that was busy or out of reach is tried again now and
 // then; one that is paused or gone waits for its computer's next announcement.
+// Its own timer: a failure sets this state and `status` in the same step, and
+// the status watcher above clears `retryTimer` whenever status changes.
 const REMOTE_RETRY_MS = 15_000
+// A feed that stopped (this computer or its sender reconnected) tries again
+// almost at once, showing "Connecting" rather than a failure.
+const REMOTE_QUICK_RETRY_MS = 300
+let remoteRetryTimer: ReturnType<typeof setTimeout> | null = null
+const clearRemoteRetry = () => {
+  if (remoteRetryTimer) clearTimeout(remoteRetryTimer)
+  remoteRetryTimer = null
+}
 watch(remoteState, (value) => {
   if (value === "busy" || value === "unreachable") {
-    clearRetry()
-    retryTimer = setTimeout(() => start(), REMOTE_RETRY_MS)
+    clearRemoteRetry()
+    remoteRetryTimer = setTimeout(() => start(), REMOTE_RETRY_MS)
   }
 })
 
@@ -258,10 +290,20 @@ const startRemote = async (mine: number, previous: CameraHandle | null) => {
     remoteName.value = name
     remoteState.value = state
     status.value = "error"
+    reportShareFailure(state)
   }
 
   if (source === "local" || !found) {
-    if (!props.remoteOnly) return false
+    if (!props.remoteOnly) {
+      // Its sender went away and this computer does not have the camera
+      // (or has never been allowed to look): wait for the sender to come
+      // back rather than open, or ask permission for, a camera here.
+      if (!found && lastRemoteName && (local === "unknown" || local === "none")) {
+        fail("offline", lastRemoteName)
+        return true
+      }
+      return false
+    }
     // The camera is here but must stay closed, or it is nowhere.
     fail(local === "exact" || local === "label" ? "paused" : "missing")
     return true
@@ -277,7 +319,9 @@ const startRemote = async (mine: number, previous: CameraHandle | null) => {
 
   remoteName.value = found.host.userName
   remoteState.value = null
-  if (!remoteHandle.value) status.value = "connecting"
+  const wasShowing = !!remoteHandle.value
+  if (!wasShowing) status.value = "connecting"
+  const startedAt = performance.now()
   try {
     // The same camera again shares its connection, so nothing reconnects.
     const next = await cameraShare.acquireRemote(found)
@@ -288,14 +332,26 @@ const startRemote = async (mine: number, previous: CameraHandle | null) => {
     }
     detachRemote()
     remoteHandle.value = next
+    if (!wasShowing) {
+      usePosthogCapture("CAMERA_SHARE_CONNECTED", {
+        surface: shareSurface.value,
+        match: found.match,
+        msToVideo: Math.round(performance.now() - startedAt),
+        // Back after its sender or this computer dropped, not a first view.
+        resumed: !!lastRemoteName,
+      })
+    }
+    lastRemoteName = next.userName
     match.value = "exact"
     showStream(next.stream)
     next.onEnded(() => {
       if (remoteHandle.value !== next) return
       detachRemote()
       if (videoEl.value) videoEl.value.srcObject = null
-      remoteState.value = "unreachable"
-      status.value = "error"
+      remoteState.value = null
+      status.value = "connecting"
+      clearRemoteRetry()
+      remoteRetryTimer = setTimeout(() => start(), REMOTE_QUICK_RETRY_MS)
     })
     status.value = "live"
   } catch (error) {
@@ -351,6 +407,8 @@ const attach = (next: CameraHandle) => {
 
 const start = async () => {
   const mine = ++token
+  // Whatever retry was waiting, this is it.
+  clearRemoteRetry()
   stopMuteWatch()
   const previous = handle
   handle = null
@@ -400,7 +458,10 @@ const start = async () => {
 
 watch(
   () => [props.data?.deviceId, props.data?.deviceLabel],
-  () => start()
+  () => {
+    lastRemoteName = ""
+    start()
+  }
 )
 
 watch(
@@ -443,6 +504,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   token += 1
   clearRetry()
+  clearRemoteRetry()
   stopDeviceWatch()
   detach()
 })

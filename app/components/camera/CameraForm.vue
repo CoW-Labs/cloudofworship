@@ -1,6 +1,6 @@
 <template>
   <div class="camera-form flex flex-col gap-4">
-    <!-- Only the Add Camera panel shows a live preview. The editor keeps to
+    <!-- Only the Add Video Input panel shows a live preview. The editor keeps to
          the placeholder so editing a slide never opens a stream. -->
     <div
       v-if="showPreview"
@@ -31,7 +31,7 @@
     <div class="flex flex-col gap-2">
       <div class="flex items-center justify-between gap-2">
         <h4 class="text-xs font-semibold text-gray-700 dark:text-[#c3cad6]">
-          Camera
+          Video source
         </h4>
         <CowButton
           variant="secondary"
@@ -50,7 +50,7 @@
         color="amber"
         variant="subtle"
         icon="i-bx-error"
-        title="Camera access denied"
+        title="Video access denied"
         :description="deniedHelp"
         :ui="{ rounded: 'rounded-2xl' }"
       />
@@ -74,29 +74,24 @@
         v-else-if="!loading && cameras.length === 0"
         class="text-xs text-gray-500 dark:text-[#9aa3b2]"
       >
-        No cameras detected. Plug one in, then click Refresh.
+        No video inputs found. Plug one in, then click Refresh.
       </p>
 
-      <button
-        v-for="(camera, index) in cameras"
-        :key="camera.deviceId"
-        type="button"
-        class="rounded-xl px-3 py-2.5 flex items-center gap-2.5 text-left transition-shadow bg-white dark:bg-[#131a27]"
-        :class="
-          camera.deviceId === selectedId
-            ? 'ring-2 ring-primary-500'
-            : 'ring-1 ring-gray-200 dark:ring-white/10 hover:ring-gray-300 dark:hover:ring-white/20'
-        "
-        @click="select(camera)"
+      <SettingsSelect
+        v-if="cameras.length"
+        width="w-full"
+        select-class="camera-form__trigger w-full"
+        :options="cameraOptions"
+        value-attribute="value"
+        option-attribute="label"
+        :model-value="selectedId"
+        @change="selectById"
       >
-        <CameraIcon
-          class="w-4 h-4 shrink-0"
-          :class="camera.deviceId === selectedId ? 'text-primary-500' : ''"
-        />
-        <span class="text-sm font-medium truncate">
-          {{ camera.label || `Camera ${index + 1}` }}
-        </span>
-      </button>
+        <template #label>
+          <CameraIcon class="w-4 h-4 shrink-0" />
+          <span class="truncate">{{ selectedLabel }}</span>
+        </template>
+      </SettingsSelect>
 
       <!-- The slide's camera, when this machine does not have it. The
            projector falls back to another camera rather than black. -->
@@ -212,6 +207,25 @@ const deniedHelp = computed(() =>
 const select = (camera: MediaDeviceInfo) =>
   update({ deviceId: camera.deviceId, deviceLabel: camera.label })
 
+const cameraOptions = computed(() =>
+  cameras.value.map((camera, index) => ({
+    value: camera.deviceId,
+    label: camera.label || `Camera ${index + 1}`,
+  }))
+)
+
+const selectedLabel = computed(
+  () =>
+    cameraOptions.value.find((option) => option.value === selectedId.value)
+      ?.label ?? "Choose a video source"
+)
+
+const selectById = (deviceId: string) => {
+  if (deviceId === selectedId.value) return
+  const camera = cameras.value.find((c) => c.deviceId === deviceId)
+  if (camera) select(camera)
+}
+
 const refresh = async () => {
   loading.value = true
   permissionDenied.value = false
@@ -249,3 +263,36 @@ onMounted(() => {
 
 onBeforeUnmount(() => stopDeviceWatch())
 </script>
+
+<style>
+/* Same card as CowToggle (white, hairline ring, raised edge, 1rem radius,
+   0.85rem x 1rem padding) so the camera picker sits in the same stack as the
+   Fill and Flip toggles. Global because the class lands on USelectMenu's own
+   trigger button, below scoped CSS's reach. */
+.camera-form__trigger {
+  border-radius: 1rem !important;
+  padding: 0.85rem 1rem !important;
+  background-color: #ffffff !important;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1), 0 4px 0 0 #e2e8f0,
+    0 10px 16px -10px rgba(15, 23, 42, 0.22) !important;
+  color: #334155 !important;
+  font-size: 0.92rem !important;
+  font-weight: 650 !important;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.camera-form__trigger:hover {
+  background-color: #f8fafc !important;
+}
+
+html.dark .camera-form__trigger {
+  background-color: #1c2433 !important;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2), 0 4px 0 0 #0d1320,
+    0 10px 16px -10px rgba(0, 0, 0, 0.6) !important;
+  color: #f8fafc !important;
+}
+
+html.dark .camera-form__trigger:hover {
+  background-color: #232c3d !important;
+}
+</style>

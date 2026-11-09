@@ -6,6 +6,7 @@ import { useObservable } from '@vueuse/rxjs'
 import { useOnline } from '@vueuse/core'
 import fuzzysort from 'fuzzysort'
 import { safeDBGet } from './useIndexedDB'
+import { isSongNewer } from '~/utils/songVersion'
 
 // Shared by every useLibrary() caller, so the startup refresh in the app layout
 // and each mount of the Library panel don't each re-download the catalog.
@@ -64,7 +65,7 @@ export default function useLibrary() {
   const libraryItems = useObservable<LibraryItem[]>(
     liveQuery(async () => {
       const data = await useIndexedDB()
-        .library.orderBy('createdAt')
+        .library.orderBy('updatedAt')
         .reverse()
         .toArray()
       return data
@@ -284,6 +285,75 @@ export default function useLibrary() {
     }
   }
 
+  /**
+   * Saves an edit to an existing catalogue song to the server, so the edit is
+   * not only a copy on this device that the next sync or a lookup by id would
+   * replace with the older server version.
+   *
+   * - "saved": the server has the edit.
+   * - "rejected": the server refused it and will keep refusing (the song
+   *   belongs to another church, or no longer exists). The edit stays on this
+   *   device only, so it is not retried.
+   * - "failed": the request did not get through; a later sync tries again.
+   * - "skipped": nothing to send (a local-only song, or offline).
+   */
+  const uploadSongEdit = async (
+    song: Song,
+    churchId?: string
+  ): Promise<'saved' | 'rejected' | 'failed' | 'skipped'> => {
+    const serverId = song._id
+    const targetChurchId = churchId || getChurchId()
+    if (!serverId || !targetChurchId || !online.value) return 'skipped'
+    const songKey = `${serverId}:edit`
+    if (songUploadsInFlight.has(songKey) || songUploadsRejected.has(songKey)) {
+      return 'skipped'
+    }
+    songUploadsInFlight.add(songKey)
+    try {
+      // The server derives verses from the lyrics and picks the fields it lets
+      // an edit change; a client-built `verses` copy would only be stale.
+      const { verses: _verses, isPreview: _isPreview, ...body } = song
+      const { error } = await useAPIFetch(
+        `/church/${targetChurchId}/songs/${serverId}`,
+        { method: 'PUT', body, key: `library-update-song-${serverId}` }
+      )
+      if (!error.value) return 'saved'
+      const err = error.value as any
+      const status = err?.response?.status || err?.statusCode || err?.status
+      if (status === 403 || status === 404) {
+        songUploadsRejected.add(songKey)
+        return 'rejected'
+      }
+      return 'failed'
+    } catch (error) {
+      console.error('Error saving song edit to the server:', error)
+      return 'failed'
+    } finally {
+      songUploadsInFlight.delete(songKey)
+    }
+  }
+
+  // Strictly newer than the catalogue's copy: an edit made on this device that
+  // the server does not have (yet, or ever).
+  const findLocalEdit = (
+    remote: Song,
+    localSongs: Song[]
+  ): Song | undefined =>
+    // A song can be stored twice on this device (saved by `_id`, cached by
+    // `id`), so the newest matching copy is the edit.
+    localSongs
+      .filter(
+        (local) =>
+          ((local._id && local._id === remote._id) ||
+            (local.id && local.id === remote.id)) &&
+          isSongNewer(local, remote)
+      )
+      .reduce<Song | undefined>(
+        (newest, local) =>
+          !newest || isSongNewer(local, newest) ? local : newest,
+        undefined
+      )
+
   // Fire-and-forget: the sync (and the Library skeleton) never waits on these.
   // The next sync picks uploaded songs up from the catalog.
   const uploadLocalOnlySongs = (songs: Song[], churchId: string) => {
@@ -343,14 +413,28 @@ export default function useLibrary() {
         .equals(libraryTypes.song)
         .toArray()
 
+      const localSongs = localSongItems.map((item) => item.content as Song)
       const remoteIds = collectSongIds(remoteSongs)
-      const localOnlySongs = localSongItems
-        .map((item) => item.content as Song)
-        .filter((song) => (song.id || song._id) && !isSongInSet(song, remoteIds))
+      const localOnlySongs = localSongs.filter(
+        (song) => (song.id || song._id) && !isSongInSet(song, remoteIds)
+      )
 
-      // Merge: remote catalog is the source of truth, plus every local-only song
-      // so offline / failed-upload songs survive the cache replacement.
-      const mergedSongs = [...remoteSongs, ...localOnlySongs]
+      // An existing song edited on this device is newer than the catalogue's
+      // copy until the server has the edit. Replacing it with the catalogue's
+      // copy is what made edits vanish from the Library (and from any slide
+      // that later re-read the song), so the edit is kept instead.
+      const localEdits: Song[] = []
+      const remoteWithEdits = remoteSongs.map((remote) => {
+        const edit = findLocalEdit(remote, localSongs)
+        if (!edit) return remote
+        localEdits.push(edit)
+        return edit
+      })
+
+      // Merge: remote catalog is the source of truth, except for edits it does
+      // not have yet, plus every local-only song so offline / failed-upload
+      // songs survive the cache replacement.
+      const mergedSongs = [...remoteWithEdits, ...localOnlySongs]
 
       await cacheSongsInLibrary(mergedSongs)
       librarySyncedAt.songs = Date.now()
@@ -358,6 +442,9 @@ export default function useLibrary() {
       // Then push local-only songs up to the catalog in the background so
       // teammates see them too. The local copy is kept regardless of outcome.
       uploadLocalOnlySongs(localOnlySongs, churchId)
+      // The same for edits that never reached the server (offline, or the
+      // request failed); a refusal is remembered and not retried.
+      localEdits.forEach((edit) => void uploadSongEdit(edit, churchId))
 
       return mergedSongs
     } catch (error) {
@@ -663,6 +750,7 @@ export default function useLibrary() {
     cacheSlidesInLibrary,
     cacheSongsInLibrary,
     saveSong,
+    uploadSongEdit,
     saveSlide,
     deleteSong,
     deleteSlide,

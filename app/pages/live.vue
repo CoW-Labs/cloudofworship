@@ -156,6 +156,26 @@ type LocalizedMedia = {
 }
 const localizedLiveMedia = new Map<string, LocalizedMedia>()
 
+// The last copy resolved for each slide, with the media key it was resolved
+// for. Once the operator's own copy is saved, its slide carries a session-only
+// link that the broadcast blanks, so the same slide arrives with an empty
+// background and misses the signature cache above. Without this, every play,
+// pause or mute on a live video cleared its source and reloaded it from the
+// top (and the reload played it again, undoing a pause).
+const lastLocalizedBySlide = new Map<
+  string,
+  { mediaKey: string; media: LocalizedMedia }
+>()
+const slideMediaKey = (slide: Slide) =>
+  `${slide.backgroundVideoKey ?? ""}|${slide.backgroundImageKey ?? ""}`
+const reusableLocalizedMedia = (slide: Slide): LocalizedMedia | null => {
+  if (slide.type === slideTypes.presentation || slide.background) return null
+  const last = lastLocalizedBySlide.get(slide.id)
+  return last?.media.background && last.mediaKey === slideMediaKey(slide)
+    ? last.media
+    : null
+}
+
 const slideNeedsLocalMedia = (slide: Slide) =>
   slide.type === slideTypes.media ||
   slide.type === slideTypes.presentation ||
@@ -408,7 +428,7 @@ onMounted(() => {
       incoming.forEach((slide) => {
         if (!slideNeedsLocalMedia(slide)) return
         const sig = mediaSignature(slide)
-        const cached = localizedLiveMedia.get(sig)
+        const cached = localizedLiveMedia.get(sig) ?? reusableLocalizedMedia(slide)
         if (cached) {
           applyLocalizedMedia(slide, cached)
         } else {
@@ -455,7 +475,13 @@ onMounted(() => {
             dataUrl: (rehydrated.data as any)?.url,
             presentationObjects: rehydrated.presentationObjects,
           }
-          if (cacheable) localizedLiveMedia.set(sig, localized)
+          if (cacheable) {
+            localizedLiveMedia.set(sig, localized)
+            lastLocalizedBySlide.set(rehydrated.id, {
+              mediaKey: slideMediaKey(rehydrated),
+              media: localized,
+            })
+          }
           // Re-apply onto whatever is on screen now rather than adopting
           // `rehydrated` wholesale — the operator may have paged ahead while
           // the download ran, and that newer page index must win. Inside a
@@ -505,6 +531,7 @@ onBeforeUnmount(() => {
   })
   urls.forEach((url) => localMedia.releasePlaybackUrl(url))
   localizedLiveMedia.clear()
+  lastLocalizedBySlide.clear()
   window.removeEventListener("fullscreenchange", checkFullScreen)
   window.removeEventListener("webkitfullscreenchange", checkFullScreen)
   window.removeEventListener("mozfullscreenchange", checkFullScreen)

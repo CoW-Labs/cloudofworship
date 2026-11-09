@@ -1,7 +1,9 @@
 import type { Countdown, StageTimerState } from "~/types"
 import { useAppStore } from "~/store/app"
 import { postCrossWindowNotification } from "~/composables/useBroadcastPost"
-import useBroadcastMessage from "~/composables/useBroadcastMessage"
+import useBroadcastMessage, {
+  broadcastNoticeKind,
+} from "~/composables/useBroadcastMessage"
 import useTimeStringToMilli from "~/composables/useTimeStringToMilli"
 import {
   clearedStageTimer,
@@ -153,6 +155,11 @@ export const useStageTimerSync = () => {
   const stageTimer = useStageTimer()
 
   const cleanup = useBroadcastMessage((data) => {
+    // Every live slide crosses this channel too; parse only timer notices.
+    const kind = broadcastNoticeKind(data)
+    if (kind !== undefined && kind !== "stage-timer" && kind !== "stage-timer-request") {
+      return
+    }
     try {
       const envelope = typeof data === "string" ? JSON.parse(data) : data
       const payload =

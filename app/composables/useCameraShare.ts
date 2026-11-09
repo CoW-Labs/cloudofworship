@@ -16,6 +16,7 @@ import {
   CAMERA_SHARE_MAX_VIEWERS,
   cameraShareEncoding,
   findCameraHost,
+  withStartBitrate,
   type CameraHost,
   type CameraHostMatch,
   type RemoteCameraState,
@@ -61,7 +62,7 @@ type Signal = {
   deviceLabel?: string
 }
 
-type Announcement = Omit<CameraHost, "seenAt"> & { wantReplies?: boolean }
+type Announcement = Omit<CameraHost, "seenAt" | "firstSeenAt"> & { wantReplies?: boolean }
 
 export class RemoteCameraError extends Error {
   constructor(public state: RemoteCameraState) {
@@ -243,6 +244,12 @@ const serve = async (signal: Signal) => {
     handle = null
     served.set(sessionId, session)
     session.handle.onEnded(() => endServed(sessionId, true))
+    let servedReported = false
+    pc.addEventListener("connectionstatechange", () => {
+      if (servedReported || pc.connectionState !== "connected") return
+      servedReported = true
+      usePosthogCapture("CAMERA_SHARE_SERVED", { viewers: served.size })
+    })
 
     const encoding = cameraShareEncoding(track.getSettings().height)
     let sender: RTCRtpSender
@@ -277,7 +284,7 @@ const onServedSignal = (signal: Signal) => {
   if (!session || session.viewer !== signal.from) return
   if (signal.type === "answer" && signal.sdp) {
     session.pc
-      .setRemoteDescription({ type: "answer", sdp: signal.sdp })
+      .setRemoteDescription({ type: "answer", sdp: withStartBitrate(signal.sdp) })
       .then(() => {
         flushIce(session.pc, session.ice)
         const sender = session.pc.getSenders()[0]
@@ -540,14 +547,16 @@ const handleMessage = (event: string, data: any): boolean => {
   if (event === "camera-share-announce") {
     const announcement = data as Announcement | undefined
     if (!announcement?.socketId || announcement.socketId === selfId()) return true
+    const now = Date.now()
     hosts.set(announcement.socketId, {
+      firstSeenAt: hosts.get(announcement.socketId)?.firstSeenAt ?? now,
       socketId: announcement.socketId,
       userId: announcement.userId,
       userName: announcement.userName,
       cameras: Array.isArray(announcement.cameras) ? announcement.cameras : [],
       paused: !!announcement.paused,
       projecting: !!announcement.projecting,
-      seenAt: Date.now(),
+      seenAt: now,
     })
     if (announcement.wantReplies) announce()
     return true
@@ -573,10 +582,14 @@ const handleMessage = (event: string, data: any): boolean => {
 }
 
 /** Every connection closed and every teammate forgotten (schedule change, stop). */
-const reset = () => {
+const closeConnections = () => {
   ;[...served.keys()].forEach((id) => endServed(id, true))
   cancelPending(() => true)
   ;[...remotes.values()].forEach((entry) => endRemote(entry, { notify: true }))
+}
+
+const reset = () => {
+  closeConnections()
   hosts.clear()
   lastAnnouncedCameras = 0
 }
@@ -616,8 +629,14 @@ const stop = () => {
 
 /** On every connect: say ours and ask teammates for theirs. */
 const onConnected = () => {
-  // The old socket's sessions and teammates' old socket ids are gone.
-  reset()
+  // Every session was addressed to the old socket, so they close. Teammates'
+  // computers are kept: only this socket changed, and clearing them left
+  // feeds with no sender for a moment, so they fell back to this computer's
+  // own devices (a "Camera not found" flash, or a permission prompt). Any that
+  // did leave meanwhile stop announcing and drop out. A schedule switch is
+  // different and goes through reset().
+  closeConnections()
+  lastAnnouncedCameras = 0
   announce({ wantReplies: true })
 }
 
