@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.4.9"
+version = "1.4.10"
 description = "A Tauri App"
 authors = ["Favour Felix (Cloud of Worship)"]
 license = "AGPL-3.0-only"
