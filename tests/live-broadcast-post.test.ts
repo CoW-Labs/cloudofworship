@@ -87,3 +87,40 @@ describe("useBroadcastPost", () => {
     expect(writes.map((write) => write.slideId)).toEqual([null])
   })
 })
+
+describe("broadcastNoticeKind", () => {
+  let broadcastNoticeKind: typeof import("~/composables/useBroadcastMessage").broadcastNoticeKind
+  let postCrossWindowNotification: typeof import("~/composables/useBroadcastPost").postCrossWindowNotification
+
+  beforeAll(async () => {
+    broadcastNoticeKind = (await import("~/composables/useBroadcastMessage")).broadcastNoticeKind
+    postCrossWindowNotification = (await import("~/composables/useBroadcastPost")).postCrossWindowNotification
+  })
+
+  const nextMessage = (send: () => void) => {
+    const receiver = new BroadcastChannel("cow-live-channel")
+    return new Promise<string>((resolve) => {
+      receiver.onmessage = (event) => {
+        receiver.close()
+        resolve(event.data)
+      }
+      send()
+    })
+  }
+
+  it("reads a notice's kind from the envelope as it is sent", async () => {
+    const data = await nextMessage(() =>
+      postCrossWindowNotification({ kind: "media-playback", slideId: "a" })
+    )
+    expect(broadcastNoticeKind(data)).toBe("media-playback")
+  })
+
+  it("says a live slide is not a notice, so listeners skip parsing it", async () => {
+    const data = await nextMessage(() => useBroadcastPost(slide("video")))
+    expect(broadcastNoticeKind(data)).toBeNull()
+  })
+
+  it("leaves a message that is not a string to be inspected", () => {
+    expect(broadcastNoticeKind({ payload: { kind: "stage-timer" } })).toBeUndefined()
+  })
+})

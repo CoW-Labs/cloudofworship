@@ -12,6 +12,18 @@ const envelopeId = (data: unknown) => {
   return data.match(/^\{"id":"([^"]+)"/)?.[1] || null
 }
 
+const NOTIFICATION_KIND = /^\{"id":"[^"]*","ts":\d+,"payload":\{"kind":"([^"]+)"/
+
+/**
+ * The `kind` of a small cross-window notice, read from the head of the
+ * serialised envelope without parsing it. Every live slide crosses this
+ * channel in full, so a listener that only wants its own notices should check
+ * this before parsing. `null` means a string message that is not a notice;
+ * `undefined` means the message was not a string and has to be inspected.
+ */
+export const broadcastNoticeKind = (data: unknown): string | null | undefined =>
+  typeof data === "string" ? data.match(NOTIFICATION_KIND)?.[1] ?? null : undefined
+
 const useBroadcastMessage = (callback: (data: unknown) => void) => {
   const seen = new Set<string>()
   const seenOrder: string[] = []

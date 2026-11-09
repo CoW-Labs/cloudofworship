@@ -41,7 +41,11 @@
                 <SearchIcon class="w-4 h-4 text-gray-400 dark:text-[#9aa3b2]" />
               </template>
             </UInput>
-            <Transition name="quick-actions-placeholder-fade">
+            <!-- type="transition": the span also runs the 3.6s infinite
+                 shimmer, and without this Vue waits for that animation, not
+                 the 150ms fade, so the faded-out span kept repainting for
+                 most of every 5s cycle. -->
+            <Transition name="quick-actions-placeholder-fade" type="transition">
               <span
                 v-if="!searchInput"
                 :key="quickSearchPlaceholder"

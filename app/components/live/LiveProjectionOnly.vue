@@ -1004,8 +1004,17 @@ watch(playableVideo, async (next, previous) => {
   // Same slide, new source: the local copy replaced the cloud URL it had been
   // streaming. It is the same footage, so keep the position rather than
   // restarting the clip mid-service. A different slide starts from the top.
-  const resumeAt =
-    previous?.id === next.id && video.value ? video.value.currentTime : 0
+  const sameSlide = previous?.id === next.id
+  const resumeAt = sameSlide && video.value ? video.value.currentTime : 0
+  // Paused by the operator while the local copy was still saving: it stays
+  // paused when the copy lands. Playing it here undid the pause mid-service.
+  // A stream that simply has not started yet (no pause pressed) still plays.
+  const stayPaused =
+    sameSlide &&
+    !!video.value?.paused &&
+    !video.value?.ended &&
+    !!props.slide?.slideStyle?.mediaCommandAt &&
+    props.slide?.slideStyle?.isMediaPlaying === false
 
   // Let Vue patch :src onto the element before asking it to play.
   await nextTick()
@@ -1025,6 +1034,17 @@ watch(playableVideo, async (next, previous) => {
     else element.addEventListener("loadedmetadata", seek, { once: true })
   }
 
+  if (stayPaused) {
+    // The new src re-arms the element's `autoplay`. The element already
+    // reports `paused`, so safePauseMedia would skip it; only a real pause()
+    // call disarms autoplay.
+    try {
+      element.pause()
+    } catch {
+      // Nothing loaded yet to pause; autoplay is disarmed all the same.
+    }
+    return
+  }
   safePlayMedia(element)
 })
 
