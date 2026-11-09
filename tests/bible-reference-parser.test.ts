@@ -84,3 +84,50 @@ describe("useBibleReferenceParser — singular book names", () => {
     expect(ref!.shortLabel).toBe("11:4:7")
   })
 })
+
+describe("useBibleReferenceParser — how speech writes a reference", () => {
+  const parse = (text: string) => useBibleReferenceParser(text)
+
+  it("reads a stop between the chapter and the verse", () => {
+    expect(labels("In the book of John, John chapter 4, verse 23, it says")).toEqual(["John 4:23"])
+    expect(labels("John, John chapter 1. Verse 12. Today we")).toEqual(["John 1:12"])
+  })
+
+  it("does not invent a verse when no number follows", () => {
+    expect(labels("Matthew chapter 6 verse, it says seek")).toEqual([])
+  })
+
+  it("allows the word chapter before filler and a verse", () => {
+    expect(labels("there in Matthew chapter 20 from verses 1 to about say verses 12.")).toEqual(["Matthew 20:1"])
+  })
+
+  it("reads a chapter-only mention as that chapter, flagged chapterOnly", () => {
+    const [ref] = parse("turn to Joshua chapter 14")
+    expect(ref).toMatchObject({ displayLabel: "Joshua 14", shortLabel: "6:14:1", chapterOnly: true })
+    expect(labels("Psalm 23")).toEqual(["Psalms 23"])
+  })
+
+  it("needs the word chapter for books other than Psalms", () => {
+    expect(labels("Mark 5 people came")).toEqual([])
+  })
+
+  it("drops the chapter mention when a verse of that chapter is also said", () => {
+    expect(labels("in Exodus chapter 3 verse 8, when God heard, in Exodus chapter 3,")).toEqual(["Exodus 3:8"])
+  })
+
+  it("does not flag a normal verse reference", () => {
+    expect(parse("John 3:16")[0]!.chapterOnly).toBeUndefined()
+  })
+
+  it("reads digits said one at a time as one chapter", () => {
+    expect(labels("According to Psalms 1 1 4, it says")).toEqual(["Psalms 114"])
+    expect(labels("Psalm one one nine verse 105")).toEqual(["Psalms 119:105"])
+    expect(labels("Psalm 1 19 verse 11.")).toEqual(["Psalms 119:11"])
+    expect(labels("John 3 1 6")).toEqual(["John 3:1"])
+  })
+
+  it("rejects a chapter the book does not have", () => {
+    expect(labels("Exodus chapter 50 verse 24, something happened")).toEqual([])
+    expect(labels("Genesis chapter 50 verse 24")).toEqual(["Genesis 50:24"])
+  })
+})

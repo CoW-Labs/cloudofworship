@@ -4,6 +4,9 @@ export interface BibleReference {
   displayLabel: string // The human-readable label (e.g., "John 3:16")
   startIndex: number // Start position in the transcript text
   endIndex: number // End position in the transcript text
+  // Only a chapter was said ("Joshua chapter 14"). It points at verse 1 and is
+  // listed for a click, but never goes live on its own.
+  chapterOnly?: boolean
 }
 
 export interface TranscriptSegment {

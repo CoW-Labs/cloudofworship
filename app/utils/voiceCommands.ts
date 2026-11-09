@@ -57,7 +57,9 @@ const normalizeVersionAlias = (text: string) =>
     .replace(/\s+/g, " ")
     .trim()
 
-const commandTarget = "(?:verse|verses|scripture|passage|slide|one|part)"
+// Navigation only counts when "verse" is spoken. "next one", "last part" and
+// "next slide" are ordinary sermon speech.
+const commandTarget = "(?:verse|verses)"
 const oneToNinePattern = "(?:one|two|three|four|five|six|seven|eight|nine)"
 const tenToNineteenPattern =
   "(?:ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen)"
@@ -67,32 +69,24 @@ const hundredPattern = `(?:one\\s+hundred(?:\\s+(?:and\\s+)?${underHundredPatter
 const verseNumberPattern = `(?:\\d{1,3}|${hundredPattern}|${underHundredPattern})`
 
 const nextVersePatterns: RegExp[] = [
-  /^next$/,
-  /^next please$/,
   /\bnext first\b/,
   new RegExp(`\\b(?:next|following)\\s+${commandTarget}\\b`),
   new RegExp(
     `\\b(?:go|move|take|show|switch|advance|continue|proceed)\\s+(?:to\\s+)?(?:the\\s+)?(?:next|following)\\s+${commandTarget}\\b`,
   ),
-  /\b(?:go|move|step|advance)\s+(?:forward|forwards|ahead|on)\b/,
-  /\b(?:forward|forwards|ahead)\s+(?:one|please)?\b/,
-  /\b(?:take|show)\s+(?:the\s+)?next\b/,
-  /\b(?:let us|let s|lets)\s+(?:move|go|continue|proceed)\s+(?:forward|forwards|ahead|on)\b/,
+  // Same rule as "back": "forward" / "ahead" need "verse" with them, so
+  // "ahead of the assembly" is just speech.
+  /\b(?:forward|forwards|ahead)\s+(?:(?:one|a|1)\s+)?verses?\b/,
 ]
 
 const previousVersePatterns: RegExp[] = [
-  /^back$/,
-  /^back please$/,
-  /^previous$/,
-  /^previous please$/,
   new RegExp(`\\b(?:previous|prev|last|former)\\s+${commandTarget}\\b`),
   new RegExp(
     `\\b(?:go|move|take|show|switch|return)\\s+(?:to\\s+)?(?:the\\s+)?(?:previous|prev|last|former)\\s+${commandTarget}\\b`,
   ),
-  /\b(?:go|move|step)\s+(?:back|backward|backwards)\b/,
-  /\b(?:back|backward|backwards)\s+(?:one|please)?\b/,
-  /\b(?:take|bring|move)\s+(?:it\s+)?back\b/,
-  /\b(?:let us|let s|lets)\s+(?:move|go|step)\s+(?:back|backward|backwards)\b/,
+  // "back" only counts when "verse" comes with it ("back one verse", "go back
+  // a verse"). A bare "back" is ordinary sermon speech ("go back to that part").
+  /\b(?:back|backward|backwards)\s+(?:(?:one|a|1)\s+)?verses?\b/,
 ]
 
 const gotoVerseNumberPatterns: RegExp[] = [
