@@ -19,6 +19,11 @@ export type SlideOverlayBroadcast = {
   slide: Slide | null
 }
 
+/**
+ * No longer sent: the live slide now travels in the message itself (see
+ * useBroadcastPost). Still understood, so a window on an older bundle during a
+ * hot update keeps working.
+ */
 export type LiveSlideChangedNotification = {
   kind: "live-slide-changed"
   revision: string
@@ -123,7 +128,35 @@ const isLivePayload = (payload: unknown): payload is Slide | Slide[] =>
     ? (payload as unknown[]).every(isSlidePayload)
     : isSlidePayload(payload)
 
-let liveProjectionWriteTail: Promise<void> = Promise.resolve()
+/**
+ * The newest live state still to be written for windows that open later (a
+ * reloaded /live, the stage display). Only the newest matters, so a write that
+ * has not started yet is replaced rather than queued behind it.
+ */
+type PendingProjection = { live: LivePayload; revision: string; timestamp: number }
+let pendingProjection: PendingProjection | null = null
+let projectionWriter: Promise<void> | null = null
+
+const writePendingProjections = async () => {
+  while (pendingProjection) {
+    const { live, revision, timestamp } = pendingProjection
+    pendingProjection = null
+    try {
+      await useLiveProjectionRepository().putCurrent(live, revision, timestamp)
+    } catch (error) {
+      console.warn("Unable to persist live projection:", error)
+    }
+  }
+}
+
+const persistLiveProjection = (projection: PendingProjection) => {
+  pendingProjection = projection
+  if (!projectionWriter) {
+    projectionWriter = writePendingProjections().finally(() => {
+      projectionWriter = null
+    })
+  }
+}
 
 const useBroadcastPost = <T>(payload: T) => {
   // Overlay messages are already small and do not represent the primary live
@@ -134,49 +167,25 @@ const useBroadcastPost = <T>(payload: T) => {
   }
 
   const live = payload as LivePayload
-  const slide = primaryLiveSlide(live)
   const revision = messageId()
   const timestamp = Date.now()
 
-  // Writes and notifications are ordered. The notification is posted only
-  // after its record is committed, so a secondary window never wakes up before
-  // the projected state is readable. On an IndexedDB failure, send the legacy
-  // full payload so projection remains available during the cutover.
-  liveProjectionWriteTail = liveProjectionWriteTail
-    .catch((error) => {
-      console.warn("Previous live projection broadcast failed:", error)
-    })
-    .then(async () => {
-      try {
-        await useLiveProjectionRepository().putCurrent(
-          live,
-          revision,
-          timestamp
-        )
-        postEnvelope<LiveSlideChangedNotification>(
-          {
-            kind: "live-slide-changed",
-            revision,
-            slideId: slide?.id || null,
-            ...(isPairPayload(live)
-              ? { slideIds: live.map((member) => member.id) }
-              : {}),
-          },
-          revision,
-          timestamp
-        )
-      } catch (error) {
-        console.warn(
-          "Unable to persist live projection, sending legacy payload:",
-          error
-        )
-        postEnvelope(live, revision, timestamp)
-      }
-    })
+  // The slide itself goes out now. It used to wait for its IndexedDB record to
+  // commit and send only a notice, which every window then read back from
+  // IndexedDB: two database round trips before the projector moved. While the
+  // database was busy (a large video being saved, say) a go-live or a
+  // play/pause took seconds to reach the screen. Session-only media links are
+  // blanked on the wire; each window resolves its own local copy.
+  postEnvelope(live, revision, timestamp)
+
+  // The record is for windows that open later, so it no longer holds up the
+  // ones already open.
+  persistLiveProjection({ live, revision, timestamp })
 }
 
+/** Resolves once the newest live state is in IndexedDB. */
 export const flushLiveProjectionBroadcasts = async () => {
-  await liveProjectionWriteTail
+  while (projectionWriter) await projectionWriter
 }
 
 export const useBroadcastOverlayPost = (
