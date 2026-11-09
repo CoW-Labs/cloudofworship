@@ -2006,11 +2006,16 @@ emitter.on(
         toast.add({ title: rejection, icon: "i-tabler-layout-columns", color: "amber" })
         return
       }
-      const pair = await replaceMember(existing.id, outgoing, source.id)
+      // The swap shows (here and on the live screen) before the server answers;
+      // the reorder and the confirmation wait for it to be saved.
+      const pair = await replaceMember(existing.id, outgoing, source.id, {
+        onApplied: (applied) => {
+          setEditingMember(applied.id, source.id)
+          makeSlideActive(source, { goLive: false, newlyCreated: false })
+        },
+      })
       if (!pair) return
       keepPairTogether(pair, staying!.id)
-      setEditingMember(pair.id, source.id)
-      makeSlideActive(source, { goLive: false, newlyCreated: false })
       toast.add({
         icon: "i-tabler-layout-columns",
         title: "Pair updated",
