@@ -354,7 +354,7 @@ const props = defineProps<{
   initialTitle?: string
 }>()
 
-const { saveSong } = useLibrary()
+const { saveSong, uploadSongEdit } = useLibrary()
 const { findSimilarSongs } = useSongs()
 const { searchArtists } = useArtistSearch()
 const loading = ref<boolean>(false)
@@ -706,13 +706,20 @@ const addSong = async (force = false) => {
 
   loading.value = true
   try {
-    // Editing an existing song updates the local copy only (current behaviour).
+    // Editing an existing song is saved on this device first, so the edit is
+    // never lost to a slow or failed request, then sent to the server.
     if (props.song) {
       await saveSong(song)
       // Slides in the open schedule hold a snapshot of the song — tell them to
       // rebuild from the edited lyrics.
       useGlobalEmit(appWideActions.songUpdated, song)
       emit("go-home")
+      // Without this the edit exists only here: the next library sync and any
+      // lookup by id would bring the older server copy back. A song the church
+      // did not write is refused (403) and stays a device-local edit, which the
+      // newer `updatedAt` protects; a failed request is retried by the next
+      // library sync. Not awaited, so the editor never waits on the network.
+      void uploadSongEdit(song)
       return
     }
 
