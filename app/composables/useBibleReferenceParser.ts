@@ -1,5 +1,5 @@
 import type { BibleReference } from '~/types/transcript'
-import { bibleBooks } from '~/utils/constants'
+import { bibleBooks, bibleBookChapters } from '~/utils/constants'
 
 // Mapping of book names and their variations to book index (1-based)
 const bookNameVariations: Record<string, number> = {}
@@ -318,6 +318,38 @@ function replaceSpokenNumbers(text: string): string {
 }
 
 /**
+ * Smooth over how speech recognition writes a reference, so the patterns only
+ * meet one shape. Every edit only deletes or joins characters, which the
+ * processed-to-raw index map below copes with. Keep in step with the API's
+ * `bibleReferenceParser.js`, which is the copy live transcription runs.
+ */
+function normalizeReferenceText(text: string): string {
+  let out = text
+
+  // "John chapter 4, verse 23" / "John chapter 1. Verse 12": a stop between the
+  // number and the word "verse" is the recogniser's punctuation, not a break.
+  out = out.replace(/(\d)\s*[,.;]\s*(?=verses?\b)/gi, '$1 ')
+
+  // "Psalms 1 1 4": three digits said one by one are one number when the book has
+  // that many chapters (only Psalms in practice). Otherwise leave them alone.
+  out = out.replace(/\b([a-z]+)\s+(\d)\s+(\d)\s+(\d)\b(?!\s*[:-]?\s*\d)/gi, (match, book, a, b, c) => {
+    const bookIndex = findBookIndex(String(book).toLowerCase())
+    const joined = parseInt(`${a}${b}${c}`, 10)
+    if (bookIndex && joined <= (bibleBookChapters[bookIndex - 1] ?? 0)) return `${book} ${joined}`
+    return match
+  })
+
+  // "Psalm 1 19 verse 11": the recogniser split 119 in two, and a verse follows,
+  // so these two numbers cannot be chapter and verse.
+  out = out.replace(/\b(psalms?)\s+(\d)\s+(\d{2})\b(?=\s+verses?\b)/gi, (match, book, a, bc) => {
+    const joined = parseInt(`${a}${bc}`, 10)
+    return joined <= 150 ? `${book} ${joined}` : match
+  })
+
+  return out
+}
+
+/**
  * Parse Bible references from transcribed text
  * Handles various formats:
  * - "John 3:16"
@@ -409,7 +441,7 @@ const useBibleReferenceParser = (rawText: string): BibleReference[] => {
   // Pre-process: convert all spoken/word numbers to digits so every pattern
   // below only needs to handle numeric tokens.
   // e.g. "first Timothy six from verse three to 12" → "1 Timothy 6 from verse 3 to 12"
-  const text = replaceSpokenNumbers(rawText)
+  const text = normalizeReferenceText(replaceSpokenNumbers(rawText))
 
   // Pattern for various Bible reference formats
   // Updated patterns to match spoken ordinals directly
@@ -424,11 +456,11 @@ const useBibleReferenceParser = (rawText: string): BibleReference[] => {
     [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+chapter\s+(\d+)\s+verse[s]?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
 
     // Mixed format: "John 3 verse 16" or "John 3 verse 16 to 18"
-    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(\d+)\s+verse[s]?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
+    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(?:chapters?\s+)?(\d+)\s+verse[s]?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
 
     // Spoken format with filler words: "1 Timothy 6 from verse 3 to 12"
     // Tolerates up to 4 filler/connector words between chapter and verse keyword
-    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(\d+)(?:\s+(?!verses?\b|from\b)\w+){0,4}\s+(?:from\s+)?verses?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
+    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(?:chapters?\s+)?(\d+)(?:\s+(?!verses?\b|from\b)\w+){0,4}\s+(?:from\s+)?verses?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 3, 4, 5],
 
     // Spoken chapter+verse without colon or "verse" keyword: "1 Corinthians 15 57"
     // (produced by pre-processing "first Corinthians fifteen fifty seven")
@@ -438,6 +470,13 @@ const useBibleReferenceParser = (rawText: string): BibleReference[] => {
     // Single-chapter book format: "3 John verse 4" or "Jude verse 3 to 5"
     // No chapter number — verse is treated as chapter 1 verse N
     [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+(?:from\s+)?verses?\s+(\d+)(?:\s+(?:to|through|-)\s+(\d+))?/gi, 0, 3, 4],
+
+    // Chapter only, last so a verse reference wins any overlap. "Psalm 23" and
+    // "Psalms 114" count on their own; every other book needs the word "chapter"
+    // ("Joshua chapter 14"), since "Mark 5 people" is only speech. Read as verse 1
+    // of that chapter and flagged `chapterOnly` (verse group -1).
+    [/\b(psalms?)\s+(\d+)\b(?!\s*[:,.;]?\s*(?:verses?\b|\d))/gi, 2, -1, -1],
+    [/(?:the\s+book\s+of\s+)?((first|second|third|1st|2nd|3rd|\d)?\s*[a-z]+(?:\s+(?:of\s+the|of|the)\s+[a-z]+)*)\s+chapters?\s+(\d+)\b(?!\s*[:,.;]?\s*(?:verses?\b|\d))/gi, 3, -1, -1],
   ]
 
   for (const [pattern, chapterGroup, verseStartGroup, verseEndGroup] of patterns) {
@@ -459,16 +498,22 @@ const useBibleReferenceParser = (rawText: string): BibleReference[] => {
       // verseStartGroup = verse start
       // verseEndGroup   = verse end (optional)
       const chapter = chapterGroup === 0 ? 1 : parseInt(match[chapterGroup] ?? '', 10)
-      const verseStart = parseInt(match[verseStartGroup] ?? '', 10)
-      const verseEnd = match[verseEndGroup] ? parseInt(match[verseEndGroup]!, 10) : null
+      const chapterOnly = verseStartGroup === -1
+      const verseStart = chapterOnly ? 1 : parseInt(match[verseStartGroup] ?? '', 10)
+      const verseEnd = verseEndGroup > 0 && match[verseEndGroup] ? parseInt(match[verseEndGroup]!, 10) : null
 
       // Find the book index using normalized book name
       const bookIndex = findBookIndex(bookName)
 
-      if (bookIndex && chapter && verseStart) {
+      // A chapter the book does not have is a slip or a mishearing, not a reference
+      const hasChapter = !!bookIndex && chapter <= (bibleBookChapters[bookIndex - 1] ?? 0)
+
+      if (bookIndex && hasChapter && chapter && verseStart) {
         const verseLabel = verseEnd ? `${verseStart}-${verseEnd}` : verseStart.toString()
         const shortLabel = `${bookIndex}:${chapter}:${verseLabel}`
-        const displayLabel = `${bibleBooks[bookIndex - 1]} ${chapter}:${verseLabel}`
+        const displayLabel = chapterOnly
+          ? `${bibleBooks[bookIndex - 1]} ${chapter}`
+          : `${bibleBooks[bookIndex - 1]} ${chapter}:${verseLabel}`
 
         // The match indices are positions in the pre-processed `text`.
         // We need to map them back to positions in `rawText` so that
@@ -494,9 +539,19 @@ const useBibleReferenceParser = (rawText: string): BibleReference[] => {
             displayLabel,
             startIndex: rawStartIndex,
             endIndex: rawEndIndex,
+            ...(chapterOnly ? { chapterOnly: true } : {}),
           })
         }
       }
+    }
+  }
+
+  // A chapter-only mention adds nothing when a verse of that same chapter was found too
+  for (let i = references.length - 1; i >= 0; i--) {
+    if (!references[i]!.chapterOnly) continue
+    const [book, chapter] = references[i]!.shortLabel.split(':')
+    if (references.some(other => !other.chapterOnly && other.shortLabel.startsWith(`${book}:${chapter}:`))) {
+      references.splice(i, 1)
     }
   }
 

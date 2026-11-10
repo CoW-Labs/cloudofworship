@@ -410,6 +410,8 @@ export interface QuickAction {
   opensPanel?: boolean
   // ISO date the action shipped. It carries a "NEW" badge for a while after.
   newSince?: string
+  // Marks a feature still being refined. Shows a "BETA" tag beside the name.
+  beta?: boolean
   // Shown once, the first time a new action is opened.
   intro?: QuickActionIntro
 }
@@ -601,6 +603,12 @@ export interface SlideStyle {
   backgroundFillType?: string
   repeatMedia?: boolean
   isMediaPlaying?: boolean // also used to check if countdown is paused or is beginning
+  /**
+   * When the operator last pressed play or pause. The projector acts on every
+   * new value, so a press lands even when `isMediaPlaying` already held the
+   * wanted value (a video that started on its own when it went live).
+   */
+  mediaCommandAt?: number
   mediaSeekPosition?: number // 0 or -1, -1 means not at the beginning
   isMediaMuted?: boolean
   windowPadding?: {
@@ -701,6 +709,7 @@ export interface AppSettings {
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number
   alertLimit?: number
+  notificationSounds?: boolean // Chime with teammate toasts. Defaults to true.
   // Settings for the "Blank" screen. The key keeps its old name because it is
   // persisted locally and synced to the server; renaming it drops saved settings.
   intermission?: {

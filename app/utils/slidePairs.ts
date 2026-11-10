@@ -238,6 +238,60 @@ export const livePairChanged = (before: SlidePair, after: SlidePair) =>
   (before.backgroundImageKey ?? null) !== (after.backgroundImageKey ?? null) ||
   (before.backgroundVideoKey ?? null) !== (after.backgroundVideoKey ?? null)
 
+/** The pair fields a member replace rewrites, besides `slideIds`. */
+const REPLACED_FIELDS = ["activeSlideId", "hiddenSlideId", "audioSlideId"] as const
+
+/**
+ * The pair with `incomingId` in the place of `outgoingId`, worked out the way
+ * the API's replace works it out, so a swap can be shown before the server has
+ * answered. Layout and background stay; a microphone choice survives only
+ * while it still names a camera.
+ */
+export const replacePairMember = (
+  pair: SlidePair,
+  outgoingId: string,
+  incomingId: string,
+  isCamera: (slideId: string) => boolean
+): SlidePair => {
+  const swap = (id: string | null | undefined) => (id === outgoingId ? incomingId : id)
+  const slideIds = pair.slideIds.map((id) => swap(id)!)
+  const audioSlideId = swap(pair.audioSlideId) ?? null
+  return {
+    ...pair,
+    slideIds,
+    activeSlideId: swap(pair.activeSlideId) || slideIds[0]!,
+    hiddenSlideId: swap(pair.hiddenSlideId) ?? null,
+    audioSlideId: audioSlideId && isCamera(audioSlideId) ? audioSlideId : null,
+  }
+}
+
+/**
+ * Takes back a replace the server refused, from the pair as it is now: the
+ * incoming slide goes back out, and each field the replace set returns to what
+ * it was. Anything changed since, such as a new layout or a member hidden,
+ * is kept.
+ */
+export const revertPairMember = (
+  latest: SlidePair,
+  before: SlidePair,
+  applied: SlidePair,
+  outgoingId: string,
+  incomingId: string
+): SlidePair => {
+  const putBack = (id: string | null | undefined) => (id === incomingId ? outgoingId : id)
+  const reverted: SlidePair = {
+    ...latest,
+    slideIds: latest.slideIds.map((id) => putBack(id)!),
+  }
+  REPLACED_FIELDS.forEach((field) => {
+    const value =
+      (latest[field] ?? null) === (applied[field] ?? null) ? before[field] : latest[field]
+    ;(reverted as any)[field] = putBack(value) ?? null
+  })
+  reverted.activeSlideId = reverted.activeSlideId || reverted.slideIds[0]!
+  return reverted
+}
+
 export const isSlidePairLayout = (value: unknown): value is SlidePairLayout =>
   SLIDE_PAIR_LAYOUTS.some((layout) => layout.value === value)
 

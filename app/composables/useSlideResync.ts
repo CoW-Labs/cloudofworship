@@ -9,11 +9,7 @@ import {
 } from "~/composables/useSlideRepository"
 import { isNetworkError, isNotFoundError } from "~/utils/apiErrors"
 import { onSocketConnected } from "~/composables/useSocketIO"
-import {
-  isMediaVideoSlide,
-  slideUpdatePath,
-  toSlideUpdatePayload,
-} from "~/utils/slideSync"
+import { slideUpdatePath, toSlideUpdatePayload } from "~/utils/slideSync"
 
 /**
  * Re-sends slide edits whose PUT never reached the server.
@@ -111,7 +107,7 @@ export const flushPendingSlides = async (): Promise<void> => {
     // to the create flow, which owns its own retry; a PUT to a nonexistent id
     // would 404 and delete the slide out from under the operator.
     const retryable = records.filter(
-      (record) => record.serverId && !isMediaVideoSlide(record.slide)
+      (record) => record.serverId
     )
     if (!retryable.length) {
       disarmRetry()
@@ -204,7 +200,7 @@ export const flushPendingSlides = async (): Promise<void> => {
       const remaining = await repository.getPendingSlides()
       if (
         remaining.some(
-          (record) => record.serverId && !isMediaVideoSlide(record.slide)
+          (record) => record.serverId
         )
       ) {
         armRetry()

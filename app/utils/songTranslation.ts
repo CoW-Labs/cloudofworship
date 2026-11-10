@@ -35,7 +35,7 @@ export const isTranslationShown = (slide?: Slide | null) =>
  * useSlideContent drops "[Refrain]", so the raw lyric and the rendered line
  * only match after the same clean-up.
  */
-const lineKey = (line = "") =>
+export const lineKey = (line = "") =>
   line
     .replaceAll("â", "'")
     .replaceAll("solo: ", "")

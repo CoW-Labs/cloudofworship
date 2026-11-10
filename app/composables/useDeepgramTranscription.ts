@@ -105,6 +105,11 @@ export default function useDeepgramTranscription() {
   let usageSyncTimer: ReturnType<typeof setInterval> | null = null
   let keepAliveTimer: ReturnType<typeof setInterval> | null = null
   let lastAudioSentAt = 0
+  // Seconds the open socket has counted down. The API only adds a session to
+  // the church's usage when its socket closes, so a usage read taken mid-session
+  // still shows the minutes as they were at the start. Subtracting this keeps
+  // the countdown from snapping back to that figure on every sync.
+  let liveSessionSeconds = 0
 
   // Track navigation and version independently. Deepgram sends cumulative
   // interim text, so "next verse" may later become "next verse in NIV". The
@@ -241,7 +246,10 @@ export default function useDeepgramTranscription() {
     // Auto go-live with the first reference if cooldown has elapsed. Repeated
     // interim pushes for the same reference are ignored locally, while a later
     // final result that corrects the provisional reference is allowed through.
-    const firstReference = references[0]
+    // A chapter-only mention ("Joshua chapter 14") stays a click target: interim
+    // text can say the chapter before the verse, and a casual mention should not
+    // move the projector.
+    const firstReference = references.find((reference) => !reference.chapterOnly)
     if (!firstReference) return
 
     const nextReference = firstReference.shortLabel
@@ -265,7 +273,12 @@ export default function useDeepgramTranscription() {
     return `${wsBase}/church/${churchId}/transcription/stream?token=${token}`
   }
 
-  const fetchUsage = async () => {
+  /**
+   * `neverIncrease` is for the read just after a session ends: the API records
+   * the session as its socket closes, and a read that lands first would put
+   * back the minutes that were just used.
+   */
+  const fetchUsage = async ({ neverIncrease = false } = {}) => {
     const churchId = authStore.user?.churchId
     if (!churchId) return
     try {
@@ -277,8 +290,15 @@ export default function useDeepgramTranscription() {
           limit: number
           period?: 'lifetime' | 'week'
         }
-        state.value.remainingSeconds = usage.remaining
-        state.value.usedSeconds = usage.used
+        let remaining = Math.max(0, usage.remaining - liveSessionSeconds)
+        let used = usage.used + liveSessionSeconds
+        const current = state.value.remainingSeconds
+        if (neverIncrease && current !== null && remaining > current) {
+          remaining = current
+          used = state.value.usedSeconds
+        }
+        state.value.remainingSeconds = remaining
+        state.value.usedSeconds = used
         state.value.limitSeconds = usage.limit
         state.value.period = usage.period ?? 'week'
       }
@@ -388,6 +408,9 @@ export default function useDeepgramTranscription() {
         const msg = JSON.parse(event.data)
 
         if (msg.type === 'ready') {
+          // The server read the allowance as this socket opened, so it already
+          // counts any earlier session, including one a reconnect replaced.
+          liveSessionSeconds = 0
           state.value.remainingSeconds = msg.remainingSeconds
           if (msg.period) state.value.period = msg.period
           if (msg.limit) state.value.limitSeconds = msg.limit
@@ -415,6 +438,7 @@ export default function useDeepgramTranscription() {
           sessionElapsedTimer = setInterval(() => {
             if (isPaused.value || !socketReady) return
             if (state.value.remainingSeconds !== null && state.value.remainingSeconds > 0) {
+              liveSessionSeconds++
               state.value.remainingSeconds--
               state.value.usedSeconds++
             }
@@ -501,6 +525,9 @@ export default function useDeepgramTranscription() {
       const wasReady = socketReady
       ws = null
       socketReady = false
+      // The server records this session as the socket closes, so later usage
+      // reads include it.
+      liveSessionSeconds = 0
       if (stopRequested) return
 
       if (!state.value.isTranscribing) {
@@ -716,7 +743,11 @@ export default function useDeepgramTranscription() {
     state.value.isTranscribing = false
     state.value.isConnecting = false
 
-    fetchUsage()
+    // Give the API a moment to record the session before reading usage back.
+    setTimeout(() => {
+      if (state.value.isTranscribing || state.value.isConnecting) return
+      fetchUsage({ neverIncrease: true })
+    }, 3000)
   }
 
   const cleanup = () => {
@@ -728,6 +759,7 @@ export default function useDeepgramTranscription() {
     reconnectAttempt = 0
     bufferedAudio = []
     bufferedBytes = 0
+    liveSessionSeconds = 0
 
     if (workletNode) {
       try { workletNode.disconnect() } catch { }

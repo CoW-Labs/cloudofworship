@@ -149,6 +149,7 @@ export const quickActionsArr: QuickAction[] = [
     action: appWideActions.newTranscribe,
     meta: "transcribe sermon speech text bible audio microphone speech to text, audio to text transcripts",
     tier: 'teams',
+    beta: true,
     // unreleased: true,
     featureFlag: 'transcripts-feature',
   },
@@ -174,7 +175,7 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-bx-music",
-    name: "Search song lyrics",
+    name: "Search Song Lyrics",
     desc: "Find lyrics to any song, native too",
     action: appWideActions.newSongSearch,
     meta: "",
@@ -220,16 +221,6 @@ export const quickActionsArr: QuickAction[] = [
   //   // type: slideTypes.text
   // },
   {
-    icon: "i-bx-bell",
-    name: "Add Banners/Alert",
-    desc: "Notify your audience without disruption",
-    action: appWideActions.newAlert,
-    meta: "",
-    tier: "teams",
-    // unreleased: true,
-    // type: slideTypes.text
-  },
-  {
     icon: "i-bx-trash",
     name: "Remove Alert",
     desc: "Remove current alert",
@@ -249,15 +240,6 @@ export const quickActionsArr: QuickAction[] = [
     type: slideTypes.countdown,
     tier: "teams",
     // unreleased: true,
-  },
-  {
-    icon: "i-bx-clock",
-    name: "Add Time Slide",
-    desc: "Display the current time on a slide",
-    action: appWideActions.newTimeSlide,
-    meta: "time clock live clock current time",
-    type: slideTypes.time,
-    tier: "teams",
   },
   {
     icon: "i-ph-coffee",
@@ -287,22 +269,22 @@ export const quickActionsArr: QuickAction[] = [
   },
   {
     icon: "i-bx-video",
-    name: "Add Camera",
-    desc: "Show a webcam or capture card full screen",
+    name: "Add Video Input (Camera)",
+    desc: "Show a webcam, capture card or any video input full screen",
     action: appWideActions.newCamera,
-    meta: "camera webcam imag capture card live video feed preacher",
+    meta: "camera webcam imag capture card live video feed input source obs vmix preacher",
     type: slideTypes.camera,
     featureFlag: 'camera-slide',
     newSince: "2026-10-20",
     intro: {
-      title: "Camera slides",
+      title: "Video input slides",
       animation: "camera",
       description:
-        "Show a webcam or capture card on the screen.",
+        "Show a webcam, capture card or any video input on the screen.",
       points: [
         {
-          title: "Choose your camera",
-          body: "Any camera connected to this computer works.",
+          title: "Choose your video input",
+          body: "Any camera or video input connected to this computer works.",
         },
         {
           title: "Plays on the live screen",
@@ -312,7 +294,7 @@ export const quickActionsArr: QuickAction[] = [
     },
   },
   {
-    icon: "i-tabler-layout-columns",
+    icon: "i-ph-picture-in-picture",
     name: "Create Slide Pair",
     desc: "Show a camera and another slide on screen together",
     action: appWideActions.slidePair,
@@ -337,6 +319,25 @@ export const quickActionsArr: QuickAction[] = [
         },
       ],
     },
+  },
+  {
+    icon: "i-bx-bell",
+    name: "Add Banners/Alert",
+    desc: "Notify your audience without disruption",
+    action: appWideActions.newAlert,
+    meta: "",
+    tier: "teams",
+    // unreleased: true,
+    // type: slideTypes.text
+  },
+  {
+    icon: "i-bx-clock",
+    name: "Add Time Slide",
+    desc: "Display the current time on a slide",
+    action: appWideActions.newTimeSlide,
+    meta: "time clock live clock current time",
+    type: slideTypes.time,
+    tier: "teams",
   },
   {
     icon: "i-mdi-youtube",

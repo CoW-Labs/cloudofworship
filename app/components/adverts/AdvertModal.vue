@@ -17,10 +17,11 @@
         <CloseIcon class="p-2 text-white" />
       </button>
       <a
-        :href="activeAdvert?.url"
+        :href="advertHref"
         target="_blank"
+        rel="noopener noreferrer"
         class="block"
-        @click="onAdvertClicked"
+        @click.prevent="onAdvertClicked"
       >
         <img
           class="w-full max-h-[88dvh] object-contain scale-105"
@@ -61,7 +62,18 @@ useEscapeKey(
   { priority: escapePriority.modal }
 )
 
+// A link saved without a scheme ("example.com/offer") is read as a path on this
+// app, so the click lands on a page of ours instead of the advertiser's.
+const advertHref = computed(() => {
+  const url = props.activeAdvert?.url?.trim() || ""
+  if (!url) return ""
+  return /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url.replace(/^\/+/, "")}`
+})
+
+// Open the link ourselves (the same path every other outbound link uses) so the
+// click does not depend on the browser's default anchor handling.
 const onAdvertClicked = () => {
   usePosthogCapture("ADVERT_CLICKED")
+  if (advertHref.value) useOpenExternal(advertHref.value)
 }
 </script>

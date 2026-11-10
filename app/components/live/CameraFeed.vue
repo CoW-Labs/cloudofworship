@@ -44,14 +44,24 @@
         />
         <p class="text-xs font-medium leading-snug">
           {{
-            status === "connecting"
-              ? "Connecting camera…"
+            remoteState
+              ? remoteCameraMessage(remoteState, remoteName)
+              : status === "connecting"
+              ? remoteName
+                ? `Connecting to ${remoteName}'s camera…`
+                : "Connecting camera…"
               : assignedOnly && status === "missing"
               ? "This slide's camera is not on this computer"
               : cameraErrorMessage(status)
           }}
         </p>
       </div>
+      <p
+        v-else-if="remoteHandle"
+        class="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white/80"
+      >
+        From {{ remoteName }}'s computer
+      </p>
       <p
         v-else-if="match === 'fallback'"
         class="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-amber-200"
@@ -74,6 +84,15 @@ import {
   echoSettingsOf,
   lightLeakSettingsOf,
 } from "~/utils/camera"
+import useCameraShare, {
+  RemoteCameraError,
+  type RemoteCameraHandle,
+} from "~/composables/useCameraShare"
+import {
+  chooseCameraSource,
+  remoteCameraMessage,
+  type RemoteCameraState,
+} from "~/utils/cameraShare"
 import useCameraStream, {
   cameraCaptureIsExclusive,
   cameraErrorMessage,
@@ -97,6 +116,16 @@ const props = withDefaults(
     resolution?: CameraResolution
     /** Show the slide's own camera or nothing, never a stand-in (the editor). */
     assignedOnly?: boolean
+    /**
+     * May show the camera from a teammate's computer when it is plugged in
+     * there rather than here (see useCameraShare). Operator previews only.
+     */
+    remote?: boolean
+    /**
+     * Never opens a camera on this computer: a teammate's or nothing. Where
+     * one page holds the camera at a time and a camera is on the projector.
+     */
+    remoteOnly?: boolean
   }>(),
   { resolution: "full" }
 )
@@ -105,12 +134,42 @@ const emit = defineEmits<{
   status: [status: "connecting" | "live" | CameraErrorState]
 }>()
 
-const { acquire, listCameras, onCameraDevicesChange } = useCameraStream()
+const { acquire, listCameras, localCameraMatch, onCameraDevicesChange } =
+  useCameraStream()
+const cameraShare = useCameraShare()
+const { hasAccessToFeature } = useSubscription()
 
 const videoEl = ref<HTMLVideoElement | null>(null)
 const status = ref<"connecting" | "live" | CameraErrorState>("connecting")
 const match = ref<CameraDeviceMatch>("exact")
 const resolvedLabel = ref("")
+// A teammate's camera: the feed showing, who sends it, or why it is not.
+const remoteHandle = shallowRef<RemoteCameraHandle | null>(null)
+const remoteName = ref("")
+const remoteState = ref<RemoteCameraState | null>(null)
+const allowsRemote = computed(() => !!props.remote || !!props.remoteOnly)
+// Who last sent this slide's camera here, so a feed whose sender goes away
+// waits for it instead of reaching for this computer's own devices.
+let lastRemoteName = ""
+
+// Analytics. Retries run every few seconds, so each failure reason is sent
+// at most once a minute per feed, and the Teams gate once per feed.
+const shareSurface = computed(() => (props.assignedOnly ? "editor" : "live-output"))
+const SHARE_FAILURE_REPORT_MS = 60_000
+const shareFailureReportedAt = new Map<RemoteCameraState, number>()
+let teamsGateReported = false
+const reportShareFailure = (reason: RemoteCameraState) => {
+  if (reason === "teams") {
+    if (teamsGateReported) return
+    teamsGateReported = true
+    usePosthogCapture("TEAMS_FEATURE_BLOCKED", { feature: "camera-share", stage: "view" })
+    return
+  }
+  const now = Date.now()
+  if (now - (shareFailureReportedAt.get(reason) ?? 0) < SHARE_FAILURE_REPORT_MS) return
+  shareFailureReportedAt.set(reason, now)
+  usePosthogCapture("CAMERA_SHARE_FAILED", { reason, surface: shareSurface.value })
+}
 
 watch(status, (value) => emit("status", value), { immediate: true })
 
@@ -168,14 +227,148 @@ watch(status, (value) => {
   }
 })
 
+// A teammate's camera that was busy or out of reach is tried again now and
+// then; one that is paused or gone waits for its computer's next announcement.
+// Its own timer: a failure sets this state and `status` in the same step, and
+// the status watcher above clears `retryTimer` whenever status changes.
+const REMOTE_RETRY_MS = 15_000
+// A feed that stopped (this computer or its sender reconnected) tries again
+// almost at once, showing "Connecting" rather than a failure.
+const REMOTE_QUICK_RETRY_MS = 300
+let remoteRetryTimer: ReturnType<typeof setTimeout> | null = null
+const clearRemoteRetry = () => {
+  if (remoteRetryTimer) clearTimeout(remoteRetryTimer)
+  remoteRetryTimer = null
+}
+watch(remoteState, (value) => {
+  if (value === "busy" || value === "unreachable") {
+    clearRemoteRetry()
+    remoteRetryTimer = setTimeout(() => start(), REMOTE_RETRY_MS)
+  }
+})
+
+const detachRemote = () => {
+  remoteHandle.value?.release()
+  remoteHandle.value = null
+}
+
 const detach = () => {
   stopMuteWatch()
   handle?.release(releaseOptions())
   handle = null
+  detachRemote()
   if (videoEl.value) videoEl.value.srcObject = null
 }
 
+const showStream = (stream: MediaStream) => {
+  const element = videoEl.value
+  if (element && element.srcObject !== stream) {
+    element.srcObject = stream
+    element.play().catch(() => {})
+  }
+}
+
+/**
+ * Shows a teammate's camera when that beats this computer's own (see
+ * chooseCameraSource). True when it handled the slide, so the caller does not
+ * open a camera here.
+ */
+const startRemote = async (mine: number, previous: CameraHandle | null) => {
+  const data = props.data!
+  const found = cameraShare.hostFor(data)
+  const local = await localCameraMatch(data)
+  if (mine !== token) {
+    previous?.release(releaseOptions())
+    return true
+  }
+  const source = chooseCameraSource(local, found)
+
+  const fail = (state: RemoteCameraState, name = "") => {
+    previous?.release(releaseOptions())
+    detachRemote()
+    if (videoEl.value) videoEl.value.srcObject = null
+    remoteName.value = name
+    remoteState.value = state
+    status.value = "error"
+    reportShareFailure(state)
+  }
+
+  if (source === "local" || !found) {
+    if (!props.remoteOnly) {
+      // Its sender went away and this computer does not have the camera
+      // (or has never been allowed to look): wait for the sender to come
+      // back rather than open, or ask permission for, a camera here.
+      if (!found && lastRemoteName && (local === "unknown" || local === "none")) {
+        fail("offline", lastRemoteName)
+        return true
+      }
+      return false
+    }
+    // The camera is here but must stay closed, or it is nowhere.
+    fail(local === "exact" || local === "label" ? "paused" : "missing")
+    return true
+  }
+  if (!hasAccessToFeature("camera-share")) {
+    fail("teams", found.host.userName)
+    return true
+  }
+  if (found.host.paused) {
+    fail("paused", found.host.userName)
+    return true
+  }
+
+  remoteName.value = found.host.userName
+  remoteState.value = null
+  const wasShowing = !!remoteHandle.value
+  if (!wasShowing) status.value = "connecting"
+  const startedAt = performance.now()
+  try {
+    // The same camera again shares its connection, so nothing reconnects.
+    const next = await cameraShare.acquireRemote(found)
+    previous?.release(releaseOptions())
+    if (mine !== token) {
+      next.release()
+      return true
+    }
+    detachRemote()
+    remoteHandle.value = next
+    if (!wasShowing) {
+      usePosthogCapture("CAMERA_SHARE_CONNECTED", {
+        surface: shareSurface.value,
+        match: found.match,
+        msToVideo: Math.round(performance.now() - startedAt),
+        // Back after its sender or this computer dropped, not a first view.
+        resumed: !!lastRemoteName,
+      })
+    }
+    lastRemoteName = next.userName
+    match.value = "exact"
+    showStream(next.stream)
+    next.onEnded(() => {
+      if (remoteHandle.value !== next) return
+      detachRemote()
+      if (videoEl.value) videoEl.value.srcObject = null
+      remoteState.value = null
+      status.value = "connecting"
+      clearRemoteRetry()
+      remoteRetryTimer = setTimeout(() => start(), REMOTE_QUICK_RETRY_MS)
+    })
+    status.value = "live"
+  } catch (error) {
+    previous?.release(releaseOptions())
+    if (mine !== token) return true
+    fail(
+      error instanceof RemoteCameraError ? error.state : "unreachable",
+      found.host.userName
+    )
+  }
+  return true
+}
+
 const attach = (next: CameraHandle) => {
+  detachRemote()
+  remoteState.value = null
+  remoteName.value = ""
   handle = next
   next.setResolution(props.resolution)
   match.value = next.match
@@ -214,6 +407,8 @@ const attach = (next: CameraHandle) => {
 
 const start = async () => {
   const mine = ++token
+  // Whatever retry was waiting, this is it.
+  clearRemoteRetry()
   stopMuteWatch()
   const previous = handle
   handle = null
@@ -222,6 +417,13 @@ const start = async () => {
     status.value = "missing"
     return
   }
+  if (allowsRemote.value && (await startRemote(mine, previous))) return
+  if (mine !== token) {
+    previous?.release(releaseOptions())
+    return
+  }
+  remoteState.value = null
+  remoteName.value = ""
   if (!previous) status.value = "connecting"
   try {
     // Acquire before releasing the old handle, so a re-resolve that lands on
@@ -247,6 +449,7 @@ const start = async () => {
   } catch (error) {
     previous?.release(releaseOptions())
     if (mine !== token) return
+    detachRemote()
     if (videoEl.value) videoEl.value.srcObject = null
     status.value = cameraErrorState(error)
     reportCameraFailure(props.quality, error, props.data)
@@ -255,12 +458,35 @@ const start = async () => {
 
 watch(
   () => [props.data?.deviceId, props.data?.deviceLabel],
-  () => start()
+  () => {
+    lastRemoteName = ""
+    start()
+  }
 )
 
 watch(
   () => props.resolution,
   (resolution) => handle?.setResolution(resolution)
+)
+
+// A teammate's computer appearing, going, or pausing its camera.
+watch(
+  () => {
+    if (!allowsRemote.value) return ""
+    const found = cameraShare.hostFor(props.data)
+    return found
+      ? `${found.host.socketId}|${found.match}|${found.host.paused}`
+      : ""
+  },
+  (now, before) => {
+    if (now === before) return
+    // Also while connecting: the teammates' list usually lands a moment after
+    // the feed mounts, when it has already started on this computer's devices
+    // (and may be waiting on a permission prompt it no longer needs).
+    if (status.value !== "live" || match.value === "fallback" || remoteHandle.value) {
+      start()
+    }
+  }
 )
 
 // A camera plugged back in recovers a failed feed, and the slide's own camera
@@ -278,6 +504,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   token += 1
   clearRetry()
+  clearRemoteRetry()
   stopDeviceWatch()
   detach()
 })

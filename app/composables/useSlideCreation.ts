@@ -31,6 +31,23 @@ import { isSessionMediaUrl, toTransportSafeSlide } from "~/utils/mediaTransport"
  */
 export const slidesCreatingInBackground = new Set<string>()
 
+/**
+ * Slides the operator deleted while their background flow was still running.
+ * Such a slide has no server `_id` yet, so the delete has nothing to send, and
+ * the flow's create used to land afterwards and bring the slide back. The flow
+ * skips these, or deletes its server copy if the create was already in flight.
+ * Undo takes a slide back out of here (see PreviewContent.putBackSlides).
+ */
+export const slidesDeletedWhileCreating = new Set<string>()
+
+/** Deletes the server copy of a slide the operator removed mid-create. */
+const discardCreatedSlide = async (created: Slide) => {
+  if (!created._id) return
+  const appStore = useAppStore()
+  if (created.scheduleId !== appStore.currentState.activeSchedule?._id) return
+  await useSlides().deleteSlide(created)
+}
+
 export default function useSlideCreation() {
   const appStore = useAppStore()
   const authStore = useAuthStore()
@@ -656,11 +673,26 @@ export default function useSlideCreation() {
             return sanitizedSlide
           })
 
+          // A slide deleted while its media uploaded stays deleted.
+          const slidesToCreate = sanitizedSlides.filter(
+            (slide) => !slidesDeletedWhileCreating.has(slide.id)
+          )
+          if (!slidesToCreate.length) return
+
           const { batchCreateSlides } = useSlides()
-          const { inserted } = await batchCreateSlides(sanitizedSlides)
+          const { inserted } = await batchCreateSlides(slidesToCreate)
+
+          // Deleted while the create was in flight: remove the server copy.
+          const deletedDuringCreate = inserted.filter((serverSlide) =>
+            slidesDeletedWhileCreating.has(serverSlide.id)
+          )
+          await Promise.all(deletedDuringCreate.map(discardCreatedSlide))
+          const kept = inserted.filter(
+            (serverSlide) => !deletedDuringCreate.includes(serverSlide)
+          )
 
           // Backfill _id from the server response onto our local objects
-          inserted.forEach((serverSlide) => {
+          kept.forEach((serverSlide) => {
             const local = newSlides.find((s) => s.id === serverSlide.id)
             if (local && serverSlide._id) local._id = serverSlide._id
           })
@@ -668,9 +700,9 @@ export default function useSlideCreation() {
           // 2f — Broadcast to other clients only after server confirms creation
           const nuxtApp = useNuxtApp()
           const socket = nuxtApp.$socketio as any
-          if (socket?.connected && inserted.length > 0) {
+          if (socket?.connected && kept.length > 0) {
             socket.emit("batch-create-slides", {
-              slides: inserted.map((s) => ({ ...s })),
+              slides: kept.map((s) => ({ ...s })),
               tabId: tabSessionId,
             })
           }
@@ -682,7 +714,10 @@ export default function useSlideCreation() {
             color: "red",
           })
         } finally {
-          newSlides.forEach((slide) => slidesCreatingInBackground.delete(slide.id))
+          newSlides.forEach((slide) => {
+            slidesCreatingInBackground.delete(slide.id)
+            slidesDeletedWhileCreating.delete(slide.id)
+          })
         }
       })()
 
@@ -874,6 +909,9 @@ export default function useSlideCreation() {
           presentationObjects: serverPresentationObjects,
           background: remotePageUrls.get(1) || "",
         }
+        // Deleted while its pages uploaded: it stays deleted.
+        if (slidesDeletedWhileCreating.has(tempSlide.id)) return
+
         let createdSlide: Slide | null = null
         try {
           createdSlide = await createSlide(serverSlide)
@@ -882,6 +920,12 @@ export default function useSlideCreation() {
         }
 
         if (!createdSlide) return
+
+        // Deleted while the create was in flight: remove the server copy.
+        if (slidesDeletedWhileCreating.has(tempSlide.id)) {
+          await discardCreatedSlide(createdSlide)
+          return
+        }
 
         // Backfill the server-assigned _id onto the local object
         if (createdSlide._id) tempSlide._id = createdSlide._id
@@ -920,7 +964,10 @@ export default function useSlideCreation() {
           })
           if (navigator.onLine) setTimeout(() => void retry(false), 15_000)
         }
-      })().finally(() => slidesCreatingInBackground.delete(tempSlide.id))
+      })().finally(() => {
+        slidesCreatingInBackground.delete(tempSlide.id)
+        slidesDeletedWhileCreating.delete(tempSlide.id)
+      })
 
     usePosthogCapture("NEW_PRESENTATION_SLIDE_CREATED", {
       page_count: presentationObjects.length,

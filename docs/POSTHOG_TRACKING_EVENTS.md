@@ -157,6 +157,11 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `VIMEO_VIDEO_ADDED` | `videoUrl` | Vimeo video embedded | ⚠️ Missing |
 | `TEMPLATE_BROWSED` | - | User opens templates gallery | ⚠️ Missing |
 | `TEMPLATE_APPLIED` | `templateName`, `slideType` | Pre-designed template applied | ⚠️ Missing |
+| `GO_LIVE_MEDIA_STREAMED` | `mediaType` | Go Live waited 3s for a slide's media to be saved on this computer, then put it on screen streaming the cloud copy | ✅ Added |
+| `GO_LIVE_MEDIA_SAVED_LATE` | `mediaType`, `seconds` | After a streamed Go Live, the local copy finished saving (`seconds` from Go Live) | ✅ Added |
+| `GO_LIVE_MEDIA_SAVE_FAILED` | `mediaType`, `seconds` | After a streamed Go Live, the local copy could not be saved; the screen keeps streaming | ✅ Added |
+| `TEAMMATE_MEDIA_PREFETCHED` | `count`, `pending` | Media for slides a teammate added or updated mid-session was pulled down in the background; `pending` is how many are still not saved | ✅ Added |
+| `TEAMMATE_MEDIA_PREFETCH_FAILED` | `count` | Some of those slides' media could not be saved (they retry in the background) | ✅ Added |
 
 ---
 
@@ -207,8 +212,16 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `TRANSCRIPTION_STARTED` | `provider` (`deepgram`\|`web-speech-api`), `plan` (`teams`\|`free`) | User starts a transcription session | ✅ Added |
 | `TRANSCRIPTION_STOPPED` | `provider`, `plan`, `segmentCount` | User stops a transcription session | ✅ Added |
 | `TRANSCRIPTION_CLEARED` | `provider`, `plan`, `segmentCount` | User clears the transcript | ✅ Added |
-| `TRANSCRIPTION_BIBLE_REFERENCE_CLICKED` | `reference` | User clicks an inline Bible reference in the transcript | ✅ Added |
+| `TRANSCRIPTION_BIBLE_REFERENCE_CLICKED` | `reference`, `chapterOnly` | User clicks an inline Bible reference in the transcript. `chapterOnly` is true when only a chapter was said ("Joshua chapter 14"), which opens verse 1 | ✅ Added |
 | `TRANSCRIPTION_SCRIPTURE_SUGGESTION_CLICKED` | `reference`, `displayLabel` | User clicks a scripture in the Scriptures tab | ✅ Added |
+| `TRANSCRIPTION_MIC_SETTINGS_OPENED` | `isTranscribing` | User opens Microphone Settings from the transcript panel's More menu (operator window only) | ✅ Added |
+
+---
+
+## 🧠 Performance
+| Event Name | Properties | Description | Status |
+|------------|-----------|-------------|---------|
+| `MEMORY_SAMPLED` | `window` (`operator`\|`live`), `used_heap_mb`, `total_heap_mb`, `heap_limit_mb`, `minutes_open`, `slide_count`, `live_slide_type` | JS heap of the operator console or projector, sampled 5 minutes after load and then every 15 minutes while the tab is visible. Chromium only (Chrome, Edge, Windows desktop app); nothing is sent from Safari, Firefox or the macOS app. JS heap only: decoded images, video and camera frames are outside it. Sent from `app/plugins/memory-telemetry.client.ts`. | ✅ Added |
 
 ---
 

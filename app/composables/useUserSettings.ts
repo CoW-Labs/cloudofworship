@@ -2,12 +2,35 @@ import type { AppSettings, DefaultBackgroundSetting } from "~/types"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { useDebounceFn } from "@vueuse/core"
-import { bibleVersionObjects } from "~/utils/constants"
+import {
+  bibleVersionObjects,
+  DEFAULT_TRANSITION_INTERVAL,
+  MAX_TRANSITION_INTERVAL,
+  MIN_TRANSITION_INTERVAL,
+} from "~/utils/constants"
 import { toTransportSafeMediaSetting } from "~/utils/mediaTransport"
 
 // Track the timestamp of the last local settings change across composable instances
 // so that fetchUserSettings can skip overwriting in-flight user edits
 let lastLocalSaveTimestamp = 0
+
+/**
+ * A saved transition interval the slider could actually have produced, else
+ * the default. Anything outside the slider's range is a stale schema default.
+ */
+export const sanitiseTransitionInterval = (value?: number | null): number => {
+  const interval = Number(value)
+  if (
+    value === null ||
+    value === undefined ||
+    !Number.isFinite(interval) ||
+    interval < MIN_TRANSITION_INTERVAL ||
+    interval > MAX_TRANSITION_INTERVAL
+  ) {
+    return DEFAULT_TRANSITION_INTERVAL
+  }
+  return interval
+}
 
 /**
  * Merge one saved background entry over the local one, keeping fields the
@@ -140,7 +163,12 @@ export const useUserSettings = () => {
           transcriptionAutoActions: userSettings.transcriptionAutoActions ?? true,
           transcriptionVoiceBibleVersionCommands:
             userSettings.transcriptionVoiceBibleVersionCommands ?? true,
-          transitionInterval: userSettings.transitionInterval,
+          // A missing or out-of-range value (older accounts were stored with
+          // 10, above the 3s slider cap) falls back to the default instead of
+          // overwriting the local one with undefined or a value nobody chose.
+          transitionInterval: sanitiseTransitionInterval(
+            userSettings.transitionInterval
+          ),
           alertLimit: userSettings.alertLimit,
           intermission:
             userSettings.intermission ??

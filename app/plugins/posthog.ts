@@ -5,6 +5,7 @@ import { shouldSuppressExceptionEvent } from "~/utils/errorFilters";
 import useAppVersion from "~/composables/useAppVersion";
 import { useTauri } from "~/composables/useTauri";
 import { BUILD_LINEAGE, isForeignHost } from "~/utils/deploymentHost";
+import { identifyPosthogUser } from "~/utils/posthogIdentity";
 
 export default defineNuxtPlugin(nuxtApp => {
   const auth = useAuthStore();
@@ -47,17 +48,13 @@ export default defineNuxtPlugin(nuxtApp => {
         ? { hardware_concurrency: nav.hardwareConcurrency }
         : {}),
     });
-    posthog.identify(auth.user?._id, {
-      email: auth.user?.email,
-      name: auth.user?.fullname,
-      role: auth.user?.role,
-      church: auth.church?.name,
-      church_id: auth.church?._id,
-      signup_date: auth.user?.createdAt,
-      subscription_plan: auth.church?.subscriptionPlan,
-      is_teams: auth.church?.subscriptionPlan === "teams",
-      appVersion: appStore.currentState.settings.appVersion,
-    });
+    // From here on the auth store re-identifies whenever the user or church
+    // changes (sign-in, sign-up, a plan change).
+    identifyPosthogUser(
+      auth.user,
+      auth.church,
+      appStore.currentState.settings.appVersion
+    );
     // A deployment on a domain we don't run is reported once per page load,
     // with only where it is running. Nothing about the person using it.
     if (isForeignHost(window.location.hostname)) {

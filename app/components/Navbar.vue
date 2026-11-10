@@ -45,13 +45,23 @@
         <!-- UPDATE READY CHIP — the staged update survives dismissing the card -->
         <CowTooltip
           v-if="isUpdateReady"
-          :text="isTauri ? 'An update is ready to install' : 'A new version is ready. Click to reload.'"
+          :text="
+            isTauri
+              ? 'An update is ready to install'
+              : 'A new version is ready. Click to reload.'
+          "
           placement="bottom"
         >
           <button
             type="button"
             class="update-chip shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-semibold leading-none text-primary-600 dark:text-primary-400 bg-primary-500/10 hover:bg-primary-500/20 transition-colors"
-            @click="useGlobalEmit(isTauri ? appWideActions.revealUpdate : appWideActions.installUpdate)"
+            @click="
+              useGlobalEmit(
+                isTauri
+                  ? appWideActions.revealUpdate
+                  : appWideActions.installUpdate
+              )
+            "
           >
             <span class="w-1.5 h-1.5 rounded-full bg-primary-500" />
             Update ready
@@ -196,7 +206,12 @@
         </CowTooltip>
 
         <!-- COMMUNITY — same pill surface as the theme toggle beside it. -->
-        <CowTooltip v-if="showCommunity" text="Join our Discord community" placement="bottom" class="hidden md:block">
+        <CowTooltip
+          v-if="showCommunity"
+          text="Join our Discord community"
+          placement="bottom"
+          class="hidden md:block"
+        >
           <button
             type="button"
             class="theme-toggle grid place-items-center w-8 h-8 rounded-full bg-gray-100 dark:bg-[#171d2b] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
@@ -300,7 +315,7 @@
                         : undefined
                     "
                     size="sm"
-                    class="transition-all duration-200 cursor-pointer hover:scale-110"
+                    class="relative z-[1] transition-all duration-200 cursor-pointer hover:scale-110"
                     :class="{ 'grayscale opacity-50': !online }"
                     :style="{
                       backgroundColor: onlineUser?.theme || '#6366f1',
@@ -311,7 +326,7 @@
                   />
                   <span
                     v-if="online"
-                    class="animate-ping absolute inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75"
+                    class="animate-ping absolute z-0 inline-flex h-[70%] w-[70%] rounded-full bg-green-400 opacity-75 pointer-events-none"
                   ></span>
                   <!-- MOBILE CONTROL BADGE — this face is the phone driving
                        this screen. It rides the avatar rather than sitting in
@@ -416,7 +431,8 @@ const shortcutsModalVisible = ref(false)
 const restoreModalVisible = ref(false)
 
 // Subscription check
-const { hasAccessToFeature, hasLapsedTeamsSubscription, isTeamsPlan } = useSubscription()
+const { hasAccessToFeature, hasLapsedTeamsSubscription, isTeamsPlan } =
+  useSubscription()
 const toast = useToast()
 
 const { isUpdateReady } = useAppUpdater()
@@ -647,7 +663,7 @@ const isDark = computed({
   },
 })
 
-const COMMUNITY_URL = "https://discord.gg/dAP8UdmyP"
+const COMMUNITY_URL = "https://discord.gg/WTkdgNNpQG"
 const { isEnabled: showCommunity } = useFeatureFlags("discord-community")
 
 const openCommunity = () => {

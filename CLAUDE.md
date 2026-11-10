@@ -161,6 +161,17 @@ An **emitter** (mitt) is provided to the Nuxt app as `nuxtApp.$emitter` and stor
 - Copy and microcopy follow the voice rules in `brand-guidelines.md`: short, Sunday-first, real numbers, sign-up is always "Get started for free".
 - Use the logo files in `design-system/assets/logos` as they are; never redraw or recolour the mark.
 - Open `design-system/showcase.html` in a browser to see every component in light and dark.
+## Analytics (PostHog events)
+
+Every new user-facing (UI) feature ships with its PostHog events in the same change. A feature without events cannot be judged after launch, so treat missing events as an unfinished feature. Reliability, performance and internal fixes (reconnect logic, watchdogs, backpressure, refactors) are not features and need no new events; only add one when the user asks or a failure would otherwise be invisible and they want it tracked.
+
+- Capture with `usePosthogCapture("EVENT_NAME", { ...properties })` (`app/composables/usePosthogCapture.ts`). Names are `SCREAMING_SNAKE_CASE`, reusing the existing verbs: `NEW_<THING>_SLIDE_CREATED`, `<THING>_CHANGED`, `<THING>_FAILED`.
+- Cover the whole path, not only the first click: the entry point (opened/previewed), the commit (created/sent/enabled), the outcome that matters (reached the live screen, saved, failed), and each setting a person can change. `CAMERA_EFFECT_CHANGED` alone says people tried an effect, not that one ever reached the screen.
+- Send the choice as a property (`{ effect }`, `{ layout }`, `{ on }`), never one event per option, so a breakdown works.
+- Fire on a real change only, once per action. Skip no-op picks and anything that runs in a watcher or render loop.
+- Failures get their own event with the reason (see `CAMERA_STREAM_FAILED`). Paid features also emit the existing `TEAMS_FEATURE_PREVIEWED` / `TEAMS_FEATURE_BLOCKED` events through `useSubscription`; do not invent parallel ones.
+- No personal data in properties: no lyrics, scripture text, names, emails or file names. Ids, enum values, counts and booleans only.
+- PostHog does not initialise on `localhost`, so events cannot be seen locally. Say in the PR which events were added and what each means, and confirm they arrive on staging.
 
 ## Git commits
 

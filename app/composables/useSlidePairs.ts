@@ -12,7 +12,14 @@ import { tabSessionId } from "~/composables/useRealtimeSlides"
 import { safeDBOperation } from "~/composables/useIndexedDB"
 import { getAPIErrorStatus } from "~/utils/apiErrors"
 import { appWideActions } from "~/utils/constants"
-import { drivenMemberId, stampPairForLive } from "~/utils/slidePairs"
+import {
+  drivenMemberId,
+  isCameraSlide,
+  livePairChanged,
+  replacePairMember,
+  revertPairMember,
+  stampPairForLive,
+} from "~/utils/slidePairs"
 
 // ── Per-window state ────────────────────────────────────────────────────────
 
@@ -206,6 +213,9 @@ const writeCachedPairs = (scheduleId: string, pairs: SlidePair[]) => {
 // failed older change never undoes a later one that worked.
 const latestUpdate = new Map<string, number>()
 let updateSequence = 0
+// Member replaces, one at a time per pair. The next replace names the slide the
+// last one put in, which the server only knows once that one is saved.
+const replaceQueues = new Map<string, Promise<unknown>>()
 let flushingPendingPairs: Promise<void> | null = null
 
 /**
@@ -585,14 +595,67 @@ export default function useSlidePairs() {
   /**
    * Puts `incomingId` in the place of `outgoingId`, in the same pair: layout,
    * background, hidden member and microphone carry over, and a live pair stays
-   * live showing the new member. Membership is the server's to change (it
-   * claims and releases the slides), so this waits for it.
+   * live showing the new member.
+   *
+   * Shown here and on screen at once, then saved. The server still decides
+   * (it claims and releases the slides), so teammates hear of the change only
+   * once it agrees, and a refusal puts the old slide back on screen. A second
+   * replace on the same pair waits for the first to be saved.
+   *
+   * `onApplied` runs as soon as the swap shows, before the server answers.
+   * The returned promise resolves to the saved pair, or null when the replace
+   * did not happen.
    */
-  const replaceMember = async (
+  const replaceMember = (
     pairId: string,
     outgoingId: string,
-    incomingId: string
-  ) => {
+    incomingId: string,
+    options: { onApplied?: (pair: SlidePair) => void } = {}
+  ): Promise<SlidePair | null> => {
+    const previous = replaceQueues.get(pairId) ?? Promise.resolve()
+    const run = previous.then(() =>
+      runReplace(pairId, outgoingId, incomingId, options.onApplied)
+    )
+    const settled = run.catch(() => null)
+    replaceQueues.set(pairId, settled)
+    void settled.then(() => {
+      if (replaceQueues.get(pairId) === settled) replaceQueues.delete(pairId)
+    })
+    return run
+  }
+
+  /**
+   * After a refused replace, takes the schedule's pairs from the server. A pair
+   * still there is re-projected as saved; one unpaired on another device leaves
+   * the live screen on the slide it was driven by.
+   */
+  const resyncPairAfterRefusal = async (scheduleId: string, pairId: string) => {
+    const before = appStore.slidePairsById.get(pairId)
+    const wasLive = appStore.currentState.livePairId === pairId
+    const driven = before ? appStore.activeSlidesById.get(drivenMemberOf(before)) : undefined
+    // A failed fetch leaves the store as it is, so the pair stays here too.
+    await fetchSchedulePairs(scheduleId)
+    if (appStore.slidePairsById.has(pairId)) {
+      republishLivePair(pairId)
+      return
+    }
+    editingMembers.delete(pairId)
+    if (wasLive && appStore.currentState.livePairId === pairId) {
+      appStore.setLivePair(null)
+    }
+    if (wasLive && driven) projectLiveSlide(driven)
+    toast.add({
+      icon: "i-bx-info-circle",
+      title: "This pair was unpaired on another device",
+    })
+  }
+
+  const runReplace = async (
+    pairId: string,
+    outgoingId: string,
+    incomingId: string,
+    onApplied?: (pair: SlidePair) => void
+  ): Promise<SlidePair | null> => {
     const current = appStore.slidePairsById.get(pairId)
     if (
       !current ||
@@ -610,28 +673,74 @@ export default function useSlidePairs() {
       return null
     }
 
+    const wasLive = appStore.currentState.livePairId === pairId
+    const incomingType = appStore.activeSlidesById.get(incomingId)?.type
+    const editingBefore = editingMembers.get(pairId)
+    const applied = replacePairMember(current, outgoingId, incomingId, (id) =>
+      isCameraSlide(appStore.activeSlidesById.get(id))
+    )
+    appStore.upsertSlidePair(applied)
+    if (editingBefore === outgoingId) editingMembers.set(pairId, incomingId)
+    republishLivePair(pairId)
+    onApplied?.(applied)
+
     const { data, error } = await useAPIFetch(
       `${basePath(current.scheduleId)}/${pairId}/replace`,
       { method: "POST", body: { outgoingId, incomingId } }
     )
     const saved = normalizePair(data.value as SlidePair)
+
     if (error.value || !saved) {
+      const status = getAPIErrorStatus(error.value)
+      usePosthogCapture("SLIDE_PAIR_MEMBER_REPLACE_FAILED", {
+        status: status ?? null,
+        live: wasLive,
+      })
+
+      const latest = appStore.slidePairsById.get(pairId)
+      if (latest) {
+        appStore.upsertSlidePair(
+          revertPairMember(latest, current, applied, outgoingId, incomingId)
+        )
+        if (editingMembers.get(pairId) === incomingId) {
+          if (editingBefore) editingMembers.set(pairId, editingBefore)
+          else editingMembers.delete(pairId)
+        }
+        republishLivePair(pairId)
+      }
       toast.add({
         icon: "i-bx-error",
         title: "Couldn't change the paired slide",
         description: errorMessage(error.value),
         color: "red",
       })
+      // The pair or the incoming slide is gone (404), or the pair changed on
+      // another device (409): catch up with what the server holds.
+      if (status === 404 || status === 409) {
+        void resyncPairAfterRefusal(current.scheduleId, pairId)
+      }
       return null
     }
 
-    const next = { ...current, ...saved, id: pairId }
-    appStore.upsertSlidePair(next)
-    if (editingMembers.get(pairId) === outgoingId) {
-      editingMembers.set(pairId, incomingId)
+    // Membership as the server saved it, over whatever else changed here
+    // while the request was in flight (a layout, say).
+    const latest = appStore.slidePairsById.get(pairId) || applied
+    const next: SlidePair = {
+      ...latest,
+      id: pairId,
+      slideIds: saved.slideIds,
+      activeSlideId: saved.activeSlideId,
+      hiddenSlideId: saved.hiddenSlideId ?? null,
+      audioSlideId: saved.audioSlideId ?? null,
+      ...(saved.updatedAt ? { updatedAt: saved.updatedAt } : {}),
     }
-    republishLivePair(pairId)
+    appStore.upsertSlidePair(next)
+    if (livePairChanged(latest, next)) republishLivePair(pairId)
     sendSlidePairUpdated(next)
+    usePosthogCapture("SLIDE_PAIR_MEMBER_REPLACED", {
+      slideType: incomingType ?? null,
+      live: wasLive,
+    })
     return next
   }
 
