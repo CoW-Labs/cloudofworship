@@ -154,6 +154,9 @@ const persistLiveProjection = (projection: PendingProjection) => {
   if (!projectionWriter) {
     projectionWriter = writePendingProjections().finally(() => {
       projectionWriter = null
+      // A state queued in the instant the writer was finishing would
+      // otherwise wait for the next change to be written.
+      if (pendingProjection) persistLiveProjection(pendingProjection)
     })
   }
 }

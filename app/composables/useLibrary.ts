@@ -64,11 +64,12 @@ export default function useLibrary() {
   // the fetch/refresh functions instead.
   const libraryItems = useObservable<LibraryItem[]>(
     liveQuery(async () => {
-      const data = await useIndexedDB()
-        .library.orderBy('updatedAt')
-        .reverse()
-        .toArray()
-      return data
+      // Sorted here, not through the `updatedAt` index: a record with no
+      // `updatedAt` (a catalogue song written by a script, say) is left out of
+      // an index, so ordering by it would drop that song from the Library.
+      const data = await useIndexedDB().library.toArray()
+      const stamp = (item: LibraryItem) => item.updatedAt || item.createdAt || ''
+      return data.sort((a, b) => (stamp(a) < stamp(b) ? 1 : stamp(a) > stamp(b) ? -1 : 0))
     }) as any
   )
 
@@ -333,26 +334,45 @@ export default function useLibrary() {
     }
   }
 
+  // The device's songs by `_id` and by `id`, in their stored order, so the
+  // catalogue's copies can be matched without scanning the whole list for each
+  // one (the catalogue holds thousands of songs, and the library mirrors it).
+  const indexLocalSongs = (localSongs: Song[]) => {
+    const byKey = new Map<string, { song: Song; index: number }[]>()
+    localSongs.forEach((song, index) => {
+      for (const key of new Set([song._id, song.id])) {
+        if (!key) continue
+        const list = byKey.get(key)
+        if (list) list.push({ song, index })
+        else byKey.set(key, [{ song, index }])
+      }
+    })
+    return byKey
+  }
+
   // Strictly newer than the catalogue's copy: an edit made on this device that
   // the server does not have (yet, or ever).
   const findLocalEdit = (
     remote: Song,
-    localSongs: Song[]
-  ): Song | undefined =>
+    localByKey: ReturnType<typeof indexLocalSongs>
+  ): Song | undefined => {
     // A song can be stored twice on this device (saved by `_id`, cached by
-    // `id`), so the newest matching copy is the edit.
-    localSongs
-      .filter(
-        (local) =>
-          ((local._id && local._id === remote._id) ||
-            (local.id && local.id === remote.id)) &&
-          isSongNewer(local, remote)
-      )
-      .reduce<Song | undefined>(
-        (newest, local) =>
-          !newest || isSongNewer(local, newest) ? local : newest,
-        undefined
-      )
+    // `id`), so the newest matching copy is the edit. Ties go to the copy
+    // stored first.
+    const matches = new Map<number, Song>()
+    for (const key of [remote._id, remote.id]) {
+      if (!key) continue
+      localByKey.get(key)?.forEach(({ song, index }) => matches.set(index, song))
+    }
+    let newest: Song | undefined
+    ;[...matches.entries()]
+      .sort(([a], [b]) => a - b)
+      .forEach(([, local]) => {
+        if (!isSongNewer(local, remote)) return
+        if (!newest || isSongNewer(local, newest)) newest = local
+      })
+    return newest
+  }
 
   // Fire-and-forget: the sync (and the Library skeleton) never waits on these.
   // The next sync picks uploaded songs up from the catalog.
@@ -424,8 +444,9 @@ export default function useLibrary() {
       // copy is what made edits vanish from the Library (and from any slide
       // that later re-read the song), so the edit is kept instead.
       const localEdits: Song[] = []
+      const localByKey = indexLocalSongs(localSongs)
       const remoteWithEdits = remoteSongs.map((remote) => {
-        const edit = findLocalEdit(remote, localSongs)
+        const edit = findLocalEdit(remote, localByKey)
         if (!edit) return remote
         localEdits.push(edit)
         return edit
