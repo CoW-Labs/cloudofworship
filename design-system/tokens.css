@@ -1,0 +1,147 @@
+/* Cloud of Worship design system — tokens.
+ * Generated from design-system/tokens.json. Edit the JSON, then regenerate; do not hand-edit values here.
+ * Every token is a CSS variable named --ds-<token-name>. Dark values apply under .dark (Nuxt color mode) or [data-theme="dark"]. */
+
+:root {
+  --ds-purple-50: #faf5ff;
+  --ds-purple-100: #f3e8ff;
+  --ds-purple-200: #e9d5ff;
+  --ds-purple-300: #d8b4fe;
+  --ds-purple-400: #c084fc;
+  --ds-purple-500: #a855f7;
+  --ds-purple-600: #9333ea;
+  --ds-purple-700: #7e22ce;
+  --ds-purple-800: #6b21a8;
+  --ds-purple-900: #581c87;
+  --ds-purple-950: #3b0764;
+  --ds-violet-press: #8a41c9;
+  --ds-violet-press-hover: #9450d0;
+  --ds-violet-ledge: #6b17a9;
+  --ds-violet-mist: #b98ae6;
+  --ds-lilac-100: #f4eafe;
+  --ds-lilac-200: #f3eafb;
+  --ds-lilac-300: #d9c0ee;
+  --ds-lavender-wash: #fbf7ff;
+  --ds-night: #0c0f19;
+  --ds-night-raised: #131723;
+  --ds-mist: #e6e7eb;
+  --ds-ink-900: #1a1f2e;
+  --ds-graphite: #3b4151;
+  --ds-graphite-hover: #464d60;
+  --ds-graphite-ledge: #1f232c;
+  --ds-stage: #101010;
+  --ds-snow: #f8f9fb;
+  --ds-slate-600: #4b5263;
+  --ds-slate-500: #6e7787;
+  --ds-slate-400: #9ba3b2;
+  --ds-ash: #b7b7b7;
+  --ds-line-lilac: #e5e1e9;
+  --ds-line-night: #2e2e2e;
+  --ds-chip-grey: #efeff1;
+  --ds-coral: #ff8980;
+  --ds-coral-wash: #ffe9e8;
+  --ds-sky: #e2f0ff;
+  --ds-butter: #fdefd4;
+  --ds-mint: #e3f5e9;
+  --ds-cursor-violet: #bc7be8;
+  --ds-cursor-blue: #528bfe;
+  --ds-cursor-gold: #f1c778;
+  --ds-white: #ffffff;
+  --ds-black: #000000;
+  --ds-surface: var(--ds-white);
+  --ds-surface-wash: var(--ds-lavender-wash);
+  --ds-surface-raised: var(--ds-white);
+  --ds-surface-stage: var(--ds-stage);
+  --ds-surface-poster: var(--ds-purple-500);
+  --ds-surface-footer: var(--ds-black);
+  --ds-ink: var(--ds-ink-900);
+  --ds-ink-strong: var(--ds-night);
+  --ds-ink-muted: var(--ds-slate-600);
+  --ds-ink-subtle: var(--ds-slate-500);
+  --ds-ink-on-brand: var(--ds-snow);
+  --ds-ink-on-poster: var(--ds-night);
+  --ds-ink-on-pastel: var(--ds-ink-900);
+  --ds-brand: var(--ds-violet-press);
+  --ds-brand-hover: var(--ds-violet-press-hover);
+  --ds-brand-ledge: var(--ds-violet-ledge);
+  --ds-brand-text: var(--ds-violet-press);
+  --ds-brand-soft: var(--ds-lilac-100);
+  --ds-focus-ring: var(--ds-purple-400);
+  --ds-line: var(--ds-line-lilac);
+  --ds-accent: var(--ds-coral);
+  --ds-shadow-pill: inset 0 1px 0 0 #ffffff47, 0 5px 0 0 #6b17a9, 0 12px 18px -8px #6b17a973;
+  --ds-shadow-pill-hover: inset 0 1px 0 0 #ffffff47, 0 9px 0 0 #6b17a9, 0 16px 22px -8px #6b17a973;
+  --ds-shadow-pill-pressed: inset 0 1px 0 0 #ffffff33, 0 1px 0 0 #6b17a9, 0 4px 8px -6px #6b17a999;
+  --ds-shadow-pill-dark: inset 0 1px 0 0 #ffffff29, 0 5px 0 0 #1f232c, 0 12px 18px -8px #0f121a73;
+  --ds-shadow-pill-dark-hover: inset 0 1px 0 0 #ffffff29, 0 9px 0 0 #1f232c, 0 16px 22px -8px #0f121a73;
+  --ds-shadow-pill-dark-pressed: inset 0 1px 0 0 #ffffff1f, 0 1px 0 0 #1f232c, 0 4px 8px -6px #0f121a99;
+  --ds-shadow-menu: 0 18px 40px -18px #1a1f2e59;
+  --ds-shadow-quote: inset 0 0 0 1px #8a41c914, 0 12px 40px #4c1d9524;
+  --ds-shadow-lift: 0 24px 50px -20px #0000008c;
+  --ds-shadow-window: 0 30px 70px -40px #4c1d9559;
+  --ds-shadow-avatar-ring: 0 0 0 3px #fbf7ff;
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-7: 28px;
+  --ds-space-10: 40px;
+  --ds-space-14: 56px;
+  --ds-space-16: 64px;
+  --ds-space-20: 80px;
+  --ds-space-28: 112px;
+  --ds-space-36: 144px;
+  --ds-radius-tile: 12px;
+  --ds-radius-ticket-joint: 16px;
+  --ds-radius-card: 20px;
+  --ds-radius-panel: 22px;
+  --ds-radius-ticket: 24px;
+  --ds-radius-card-lg: 28px;
+  --ds-radius-pill: 9999px;
+  --ds-font-display: "Bricolage Grotesque Condensed", "Arial Narrow", Arial, sans-serif;
+  --ds-font-sans: Geist, Arial, sans-serif;
+  --ds-font-wordmark: "Bricolage Grotesque", Arial, sans-serif;
+}
+
+.dark,
+[data-theme="dark"] {
+  --ds-surface: var(--ds-night);
+  --ds-surface-wash: var(--ds-night-raised);
+  --ds-surface-raised: var(--ds-ink-900);
+  --ds-ink: var(--ds-snow);
+  --ds-ink-strong: var(--ds-white);
+  --ds-ink-muted: var(--ds-slate-400);
+  --ds-ink-subtle: var(--ds-ash);
+  --ds-brand-text: var(--ds-purple-400);
+  --ds-brand-soft: var(--ds-purple-950);
+  --ds-line: var(--ds-line-night);
+}
+
+/* Type styles: one class per style in tokens.json */
+.ds-display-poster { font-family: var(--ds-font-display); font-size: 288px; line-height: 0.9; font-weight: 800; letter-spacing: -0.01em; }
+.ds-display-poster-thin { font-family: var(--ds-font-display); font-size: 288px; line-height: 0.9; font-weight: 200; letter-spacing: -0.01em; }
+.ds-display-hero { font-family: var(--ds-font-display); font-size: 90px; line-height: 0.943; font-weight: 700; letter-spacing: -0.02em; }
+.ds-display-section-xl { font-family: var(--ds-font-display); font-size: 96px; line-height: 0.95; font-weight: 700; letter-spacing: -0.02em; }
+.ds-display-stat { font-family: var(--ds-font-display); font-size: 132px; line-height: 0.82; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ds-display-cta { font-family: var(--ds-font-display); font-size: 96px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; }
+.ds-display-section { font-family: var(--ds-font-display); font-size: 52px; line-height: 0.98; font-weight: 700; }
+.ds-display-feature { font-family: var(--ds-font-display); font-size: 48px; line-height: 0.95; font-weight: 700; letter-spacing: -0.01em; }
+.ds-display-card-title { font-family: var(--ds-font-display); font-size: 44px; line-height: 1; font-weight: 800; letter-spacing: -0.01em; }
+.ds-display-point-title { font-family: var(--ds-font-display); font-size: 38px; line-height: 1; font-weight: 700; letter-spacing: -0.01em; }
+.ds-display-tile-title { font-family: var(--ds-font-display); font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: -0.01em; }
+.ds-display-index { font-family: var(--ds-font-display); font-size: 22px; line-height: 1; font-weight: 800; }
+.ds-text-lede { font-family: var(--ds-font-sans); font-size: 26px; line-height: 1.3; font-weight: 400; }
+.ds-text-intro { font-family: var(--ds-font-sans); font-size: 21px; line-height: 1.4; font-weight: 400; }
+.ds-text-body-lg { font-family: var(--ds-font-sans); font-size: 20px; line-height: 1.45; font-weight: 400; }
+.ds-text-quote { font-family: var(--ds-font-sans); font-size: 23px; line-height: 1.2; font-weight: 400; }
+.ds-text-hero-sub { font-family: var(--ds-font-sans); font-size: 18px; line-height: 1.19; font-weight: 400; }
+.ds-text-body { font-family: var(--ds-font-sans); font-size: 16px; line-height: 24px; font-weight: 400; }
+.ds-text-note { font-family: var(--ds-font-sans); font-size: 16px; line-height: 1.26; font-weight: 400; }
+.ds-text-button { font-family: var(--ds-font-sans); font-size: 16px; line-height: 24px; font-weight: 500; }
+.ds-text-meta { font-family: var(--ds-font-sans); font-size: 16px; line-height: 1.45; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.ds-text-fineprint { font-family: var(--ds-font-sans); font-size: 15px; line-height: 1.25; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; }
+.ds-text-eyebrow { font-family: var(--ds-font-sans); font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
+.ds-text-badge { font-family: var(--ds-font-sans); font-size: 11px; line-height: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+.ds-text-wordmark { font-family: var(--ds-font-wordmark); font-size: 18px; line-height: 1; font-weight: 700; }

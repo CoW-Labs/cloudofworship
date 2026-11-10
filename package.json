@@ -13,6 +13,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "test": "vitest run",
+    "tokens:build": "node scripts/build-design-tokens.mjs",
     "test:media-1gb": "COW_MEDIA_1GB_TEST=1 vitest run tests/local-media-storage.contract.test.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
