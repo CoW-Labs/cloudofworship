@@ -1,8 +1,11 @@
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
-import type { Slide } from "~/types"
+import type { Slide, SlidePair } from "~/types"
 import { livePayloadForSlide } from "~/composables/useSlidePairs"
+import useCameraShare from "~/composables/useCameraShare"
+import { useOnline } from "@vueuse/core"
+import { isSessionMediaUrl } from "~/utils/mediaTransport"
 
 /**
  * The realtime session shared by every operator surface.
@@ -39,43 +42,179 @@ const describeSlides = (slides: Slide[]): string => {
   return `${first} and ${others} other slides`
 }
 
+const PAIR_TOAST_COOLDOWN_MS = 5000
+
+const isExternalVideo = (slide: Slide) => {
+  const type = (slide.data as any)?.type
+  return type === "youtube" || type === "vimeo"
+}
+
+const bearsMedia = (slide: Slide) =>
+  !isExternalVideo(slide) &&
+  (slide.type === slideTypes.media ||
+    slide.type === slideTypes.presentation ||
+    !!slide.backgroundImageKey ||
+    !!slide.backgroundVideoKey)
+
+// The cloud URLs a slide's media can be pulled from. Empty while a teammate's
+// upload is still running: the slide arrives first and its hosted URL in a
+// later update, which is when the download can start.
+const remoteMediaSources = (slide: Slide) =>
+  [
+    slide.background,
+    (slide.data as any)?.url,
+    ...(slide.presentationObjects || []).map((page) => page.imageUrl),
+  ]
+    .filter(
+      (url): url is string =>
+        typeof url === "string" &&
+        /^https?:\/\//.test(url) &&
+        !isSessionMediaUrl(url)
+    )
+    .join("|")
+
 export const useOperatorSession = () => {
   const appStore = useAppStore()
   const toast = useToast()
+  const teammateToast = useTeammateToast()
+  const pairToastAt = new Map<string, number>()
+  // A pair's members by name: "Camera" and "John 3:16".
+  const describePair = (pair: SlidePair) =>
+    describeSlides(
+      pair.slideIds
+        .map((id) => appStore.activeSlidesById.get(id))
+        .filter(Boolean) as Slide[]
+    )
   const emitter = useNuxtApp().$emitter as Emitter<any>
   const socketInstance = ref<ReturnType<typeof useSocketIO> | null>(null)
   const liveOutputControl = useLiveOutputControl()
+  const cameraShare = useCameraShare()
   const stageStreamFeed = useStageStreamFeed({
     getSocket: () => socketInstance.value,
     hasRemoteTarget: liveOutputControl.hasRemoteTarget,
   })
+
+  // A slide a teammate adds while this schedule is open used to wait until it
+  // went live before its media came down, and Go Live then sat on the whole
+  // download. Pull it now, in the background, as opening the schedule does.
+  // Not on /mobile (mobile data, and the phone projects nothing) and not while
+  // this device drives another computer's screen, which projects from its own
+  // copy.
+  const route = useRoute()
+  const online = useOnline()
+  const { rehydrateSlideMediaWithStatus } = useSlideMediaCache()
+  const prefetchedSources = new Map<string, string>()
+  const prefetchTeammateMedia = async (incoming: Slide[]) => {
+    if (route.path.startsWith("/mobile")) return
+    if (liveOutputControl.hasRemoteTarget.value || !online.value) return
+    const slides = incoming
+      .map((slide) => appStore.activeSlidesById.get(slide.id))
+      .filter((slide): slide is Slide => {
+        if (!slide || !bearsMedia(slide)) return false
+        const sources = remoteMediaSources(slide)
+        if (!sources || prefetchedSources.get(slide.id) === sources) return false
+        prefetchedSources.set(slide.id, sources)
+        return true
+      })
+    if (!slides.length) return
+
+    let pending = 0
+    // Two at a time, like the schedule prefetch, so a batch of videos does not
+    // split a weak connection a dozen ways.
+    for (let index = 0; index < slides.length; index += 2) {
+      const results = await Promise.all(
+        slides.slice(index, index + 2).map((slide) =>
+          rehydrateSlideMediaWithStatus(slide, { allowDownload: true }).catch(
+            () => ({ pendingKeys: ["error"] })
+          )
+        )
+      )
+      pending += results.filter((result) => result.pendingKeys.length).length
+    }
+    usePosthogCapture("TEAMMATE_MEDIA_PREFETCHED", {
+      count: slides.length,
+      pending,
+    })
+    if (pending) {
+      usePosthogCapture("TEAMMATE_MEDIA_PREFETCH_FAILED", { count: pending })
+    }
+  }
+  const prefetchInBackground = (slides: Slide[]) => {
+    prefetchTeammateMedia(slides).catch((error) =>
+      console.warn("Teammate media prefetch failed:", error)
+    )
+  }
 
   const {
     handleWebSocketMessage,
     updateOnlineUsers,
     cleanup: cleanupRealtimeSlides,
   } = useRealtimeSlides({
-    onSlideUpdated: () => {
-      // Silent update - no toast for every update to avoid noise
+    onSlideUpdated: (slide) => {
+      // Silent update - no toast for every update to avoid noise. A teammate's
+      // upload finishing arrives this way, carrying the hosted URL.
+      prefetchInBackground([slide])
     },
-    onSlideCreated: (slide, createdByName) => {
-      toast.add({
+    onBatchSlidesUpdated: (slides) => prefetchInBackground(slides),
+    onSlideCreated: (slide, createdByName, createdBy) => {
+      prefetchInBackground([slide])
+      teammateToast(createdBy, {
         title: `${createdByName} added ${describeSlides([slide])}`,
         icon: "i-tabler-plus",
         color: "blue",
         timeout: 3000,
       })
     },
-    onSlideDeleted: (slide, deletedByName) => {
-      toast.add({
+    onSlideDeleted: (slide, deletedByName, deletedBy) => {
+      teammateToast(deletedBy, {
         title: `${deletedByName} deleted ${describeSlides([slide])}`,
         icon: "i-tabler-trash",
         color: "amber",
         timeout: 3000,
       })
     },
-    onBatchSlidesCreated: (slides, createdByName) => {
-      toast.add({
+    onSlidePairCreated: (pair, createdByName, createdBy) => {
+      teammateToast(createdBy, {
+        title: `${createdByName || "A teammate"} paired ${describePair(pair)}`,
+        icon: "i-tabler-layout-columns",
+        color: "blue",
+        timeout: 3000,
+      })
+    },
+    onSlidePairUpdated: (pair, updatedByName, updatedBy) => {
+      // Flipping layouts or the mic sends a change per click. One toast per pair
+      // in a short window is enough.
+      const now = Date.now()
+      if (now - (pairToastAt.get(pair.id) ?? 0) < PAIR_TOAST_COOLDOWN_MS) return
+      pairToastAt.set(pair.id, now)
+      teammateToast(updatedBy, {
+        title: `${updatedByName || "A teammate"} changed the pair ${describePair(pair)}`,
+        icon: "i-tabler-layout-columns",
+        color: "blue",
+        timeout: 3000,
+      })
+    },
+    onSetlistSongsAdded: (setlist, songs, addedByName, addedBy) => {
+      const [first] = songs
+      const what =
+        songs.length === 1
+          ? first?.title?.trim()
+            ? `"${first.title.trim()}"`
+            : "a song"
+          : `${songs.length} songs`
+      // "Song Setlist 1 (4 songs)" reads better here without its count.
+      const target =
+        setlist.name?.replace(/\s*\(\d+ songs?\)$/, "").trim() || "the setlist"
+      teammateToast(addedBy, {
+        title: `${addedByName || "A teammate"} added ${what} to ${target}`,
+        icon: "i-lucide-list-music",
+        color: "blue",
+        timeout: 3000,
+      })
+    },
+    onBatchSlidesCreated: (slides, createdByName, createdBy) => {
+      prefetchInBackground(slides)
+      teammateToast(createdBy, {
         title: `${createdByName} added ${describeSlides(slides)}`,
         icon: "i-tabler-plus",
         color: "blue",
@@ -96,6 +235,7 @@ export const useOperatorSession = () => {
       scheduleId,
       onMessage: (event, data) => {
         if (stageStreamFeed.handleMessage(event, data?.data)) return
+        if (cameraShare.handleMessage(event, data?.data)) return
         handleWebSocketMessage(data)
       },
       onConnected: () => {
@@ -106,6 +246,8 @@ export const useOperatorSession = () => {
         // there is a socket to say it on, rather than leaving a phone to wait
         // out a heartbeat before the screen it wants shows up in its list.
         liveOutputControl.announce()
+        // Say which cameras this computer has, and hear teammates' cameras.
+        cameraShare.onConnected()
         // A slide taken live while the socket was down never reached the
         // livestream. Send what is on screen now that it can.
         if (liveSlideUnsent) sendCurrentLiveSlide()
@@ -134,7 +276,7 @@ export const useOperatorSession = () => {
         appStore.triggerUserJoinedAnimation(user)
         // Your own second device (say /mobile) joining is not news to you.
         if (user.userId !== useAuthStore().user?._id) {
-          toast.add({
+          teammateToast(user.userId, {
             title: `${user.userName || "A teammate"} joined`,
             icon: "i-tabler-user-plus",
             color: "blue",
@@ -173,6 +315,7 @@ export const useOperatorSession = () => {
   const disconnectSocket = () => {
     socketInstance.value?.disconnect()
     stageStreamFeed.reset()
+    cameraShare.reset()
     cleanupRealtimeSlides()
     appStore.setOnlineUsers([])
   }
@@ -274,6 +417,8 @@ export const useOperatorSession = () => {
     // devices offering theirs. Started here so both operator routes get it on
     // the same terms as the socket itself.
     liveOutputControl.start()
+    // Shares this computer's cameras with teammates, and theirs with it.
+    cameraShare.start()
     // Lets a stage display on this computer tell a closed console from a
     // quiet one.
     stopPresence = announceOperatorPresence()
@@ -283,6 +428,7 @@ export const useOperatorSession = () => {
     stopPresence?.()
     stopPresence = null
     liveOutputControl.stop()
+    cameraShare.stop()
     disconnectSocket()
   })
 

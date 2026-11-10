@@ -141,6 +141,22 @@
             <template #leading><DeleteIcon class="w-4 h-4" /></template>
             Clear transcript
           </UButton>
+          <!-- The settings modal lives in the operator window only. -->
+          <UButton
+            v-if="!mobile"
+            color="gray"
+            variant="ghost"
+            block
+            @click="
+              () => {
+                openMicSettings()
+                close()
+              }
+            "
+          >
+            <template #leading><SettingsIcon class="w-4 h-4" /></template>
+            Microphone settings
+          </UButton>
           <UButton
             color="gray"
             variant="ghost"
@@ -272,13 +288,32 @@
           <div
             v-for="segment in segments"
             :key="segment.id"
-            class="segment text-sm leading-relaxed"
+            class="segment group relative -mx-2 rounded-lg py-1 pl-2 pr-10 text-sm leading-relaxed transition-colors hover:bg-gray-100 dark:hover:bg-[#222938]"
           >
             <TranscriptText
               :text="segment.text"
               :bible-references="segment.bibleReferences"
               @reference-click="handleReferenceClick"
             />
+            <!-- Pinned to the far right of the row, level with the line, while it is highlighted -->
+            <div
+              class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+              :class="{ '!opacity-100': copiedSegmentId === segment.id }"
+            >
+              <UTooltip :text="copiedSegmentId === segment.id ? 'Copied' : 'Copy line'">
+                <UButton
+                  :icon="
+                    copiedSegmentId === segment.id ? 'i-ph-check' : 'i-ph-copy'
+                  "
+                  color="gray"
+                  variant="solid"
+                  size="2xs"
+                  aria-label="Copy line"
+                  class="shadow-sm ring-1 ring-gray-200 dark:ring-[#2c3446]"
+                  @click.stop="copySegment(segment)"
+                />
+              </UTooltip>
+            </div>
           </div>
           <div
             v-if="currentTranscript"
@@ -539,6 +574,8 @@ const LOCAL_AUTO_LIVE_COOLDOWN_MS = 1500
 
 const maybeAutoOpenLocalReference = (reference: BibleReference) => {
   if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
+  // A chapter-only mention is a click target, never an automatic go-live
+  if (reference.chapterOnly) return
   if (reference.shortLabel === lastLocalAutoLiveReference) return
 
   const now = Date.now()
@@ -580,6 +617,26 @@ watch(
 )
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
+// Copy one transcript line; the button shows a tick for a moment afterwards.
+const copiedSegmentId = ref<string | null>(null)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+const copySegment = async (segment: { id: string; text: string }) => {
+  try {
+    await navigator.clipboard.writeText(segment.text)
+  } catch {
+    const el = document.createElement("textarea")
+    el.value = segment.text
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand("copy")
+    document.body.removeChild(el)
+  }
+  copiedSegmentId.value = segment.id
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => (copiedSegmentId.value = null), 1500)
+}
+onBeforeUnmount(() => clearTimeout(copiedTimer))
+
 const transcriptContainer = ref<HTMLElement | null>(null)
 const transcriptBottom = ref<HTMLElement | null>(null)
 const scripturesContainer = ref<HTMLElement | null>(null)
@@ -595,6 +652,13 @@ watch(() => segments.value.length, scrollTranscriptToBottom)
 watch(currentTranscript, scrollTranscriptToBottom)
 
 // ── Actions ────────────────────────────────────────────────────────────────
+const openMicSettings = () => {
+  usePosthogCapture("TRANSCRIPTION_MIC_SETTINGS_OPENED", {
+    isTranscribing: isTranscribing.value,
+  })
+  useGlobalEmit(appWideActions.openSettings, "Microphone Settings")
+}
+
 const handleClear = () => {
   // `clearTranscript()` from useSermonTranscription clears both segments AND
   // the Deepgram-path scripture results (handled inside the composable).
@@ -610,6 +674,7 @@ const handleClear = () => {
 const handleReferenceClick = (reference: BibleReference) => {
   usePosthogCapture("TRANSCRIPTION_BIBLE_REFERENCE_CLICKED", {
     reference: reference.shortLabel,
+    chapterOnly: !!reference.chapterOnly,
   })
   useGlobalEmit(appWideActions.updateOrCreateBible, reference.shortLabel)
 }

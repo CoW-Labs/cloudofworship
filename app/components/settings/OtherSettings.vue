@@ -2,17 +2,19 @@
   <div
     class="settings-ctn h-[100%] overflow-y-auto mb-[2.5%] p-1 pb-[15%] flex flex-col gap-8"
   >
-    <!-- ALERT SETTINGS -->
-    <SettingsGroup title="Alert Settings">
-      <SettingsSlider
-        label="Default alert limit"
-        :description="`Currently ${currentState.settings.alertLimit ?? 5} alerts.`"
-        :model-value="currentState.settings.alertLimit ?? 5"
-        :min="5"
-        :max="30"
-        :step="1"
-        @change="updateSetting('alertLimit', Number($event))"
-      />
+    <!-- NOTIFICATION SETTINGS -->
+    <SettingsGroup title="Notification Settings">
+      <SettingsRow
+        label="Notification sounds"
+        description="Play a chime when a teammate changes the schedule."
+      >
+        <CowToggle
+          bare
+          label="Notification sounds"
+          :model-value="currentState.settings.notificationSounds ?? true"
+          @update:model-value="updateSetting('notificationSounds', $event)"
+        />
+      </SettingsRow>
     </SettingsGroup>
 
     <!-- TRANSCRIPTION SETTINGS -->

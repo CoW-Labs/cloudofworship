@@ -109,6 +109,22 @@ The base URL comes from `runtimeConfig.public.BASE_URL` (default: `https://api.c
 - **Metered free allowances**, enforced by the API and shown via `useUsageQuotas` (`GET /church/:churchId/usage`): 50 library songs per calendar month (search returns previews with `isPreview`; `useSongs().claimSong` spends one and returns the full song), 10 transcription minutes once per church, 5 livestream sessions per church (a schedule watched on a new UTC day, counted by the socket gate).
 - Client-side gating is for UX only. Anything that costs money — storage, transcription minutes, PPT conversion, the public livestream relay, the shared song catalogue, seats, schedule count — is enforced by the API as well.
 
+### Analytics events (PostHog)
+
+Every new feature ships with PostHog events at its key points, so we can see whether churches find it, use it and finish it.
+
+- Capture through `usePosthogCapture("EVENT_NAME", { ...properties })` (`app/composables/usePosthogCapture.ts`). Don't call `$posthog.capture` directly.
+- Event names are always ALL CAPS `SNAKE_CASE`: the thing first, then a past-tense verb, e.g. `SCHEDULE_CREATED`, `SLIDE_PAIR_LAYOUT_CHANGED`, `ISSUE_REPORTED`. Never lowercase. `onboarding_tour_started`, `onboarding_tour_completed` and `foreign_host_detected` are legacy exceptions: don't copy them, and don't rename them either, because renaming splits their history in PostHog.
+- Track the same key points the existing events do:
+  - **Opened or seen**: a page, panel, modal or prompt appears, using `_PAGE_VIEWED`, `_OPENED` or `_SHOWN` (`SIGNUP_PAGE_VIEWED`, `SEARCH_BIBLE_PAGE_OPENED`, `SATISFACTION_PROMPT_SHOWN`).
+  - **Committed**: the step that creates or changes something, using `_CREATED`, `_CHANGED`, `_DELETED`, `_RENAMED`, `_APPLIED` and so on (`NEW_BIBLE_SLIDE_CREATED`, `SCHEDULE_RENAMED`, `CAMERA_EFFECT_CHANGED`).
+  - **Multi-step or network flows**: `_ATTEMPTED`, `_COMPLETED` and `_FAILED`, with an `error` property on failure (`SIGNUP_STEP1_ATTEMPTED` / `_COMPLETED` / `_FAILED`, `LOGIN_*`).
+  - **Choices and answers**: `_ANSWERED` or `_SELECTED` with the choice as a property (`SATISFACTION_PROMPT_ANSWERED`, `SCHEDULE_SELECTED`).
+  - **Paywall**: `UPGRADE_PROMPT_SHOWN` with the gated action whenever gating stops a free church.
+- Property keys are camelCase with small values: types, methods, counts, IDs (`{ slideType, backgroundType, signupMethod }`). Never send passwords, tokens, or slide and lyric contents.
+- Before naming an event, check `docs/POSTHOG_TRACKING_EVENTS.md` and grep `usePosthogCapture` for one you can reuse. Add every new event to that doc, in the matching section, with its properties and a ✅ status.
+- PostHog doesn't initialise on `localhost`, so events won't appear while developing locally; check the call fires rather than looking for it in PostHog.
+
 ### Global event bus
 
 An **emitter** (mitt) is provided to the Nuxt app as `nuxtApp.$emitter` and stored in `appStore.currentState.emitter`. All cross-component communication goes through this emitter using the string action names from `appWideActions` (defined in `app/utils/constants.ts`). Always use those constants rather than raw strings.
@@ -135,6 +151,27 @@ An **emitter** (mitt) is provided to the Nuxt app as `nuxtApp.$emitter` and stor
 | `auth` | Login, signup, verify, forgot/reset password |
 | `app` | Main operator window (`/`) |
 | `live` | Live projection window (`/live`) |
+
+## Design system and brand
+
+`design-system/` is the source of truth for design decisions. Read `design-system/README.md` (rules for colour, type, layout, imagery, icons, motion) and `design-system/brand-guidelines.md` (voice, naming, logo) before designing or writing anything user-facing.
+
+- Choose colours, type, spacing, radii and shadows by their token names in `design-system/tokens.json`; each token's `usage` note says where it belongs. Don't hard-code a new value: add a token with a usage note, then run `npm run tokens:build` to regenerate `tokens.css`.
+- In CSS the tokens are `--ds-<name>` variables and type styles are `.ds-<style>` classes; component classes are `ds-*` (`design-system/components.css`). The app's own `cow-*` classes are separate, so don't mix the prefixes.
+- Copy and microcopy follow the voice rules in `brand-guidelines.md`: short, Sunday-first, real numbers, sign-up is always "Get started for free".
+- Use the logo files in `design-system/assets/logos` as they are; never redraw or recolour the mark.
+- Open `design-system/showcase.html` in a browser to see every component in light and dark.
+## Analytics (PostHog events)
+
+Every new user-facing (UI) feature ships with its PostHog events in the same change. A feature without events cannot be judged after launch, so treat missing events as an unfinished feature. Reliability, performance and internal fixes (reconnect logic, watchdogs, backpressure, refactors) are not features and need no new events; only add one when the user asks or a failure would otherwise be invisible and they want it tracked.
+
+- Capture with `usePosthogCapture("EVENT_NAME", { ...properties })` (`app/composables/usePosthogCapture.ts`). Names are `SCREAMING_SNAKE_CASE`, reusing the existing verbs: `NEW_<THING>_SLIDE_CREATED`, `<THING>_CHANGED`, `<THING>_FAILED`.
+- Cover the whole path, not only the first click: the entry point (opened/previewed), the commit (created/sent/enabled), the outcome that matters (reached the live screen, saved, failed), and each setting a person can change. `CAMERA_EFFECT_CHANGED` alone says people tried an effect, not that one ever reached the screen.
+- Send the choice as a property (`{ effect }`, `{ layout }`, `{ on }`), never one event per option, so a breakdown works.
+- Fire on a real change only, once per action. Skip no-op picks and anything that runs in a watcher or render loop.
+- Failures get their own event with the reason (see `CAMERA_STREAM_FAILED`). Paid features also emit the existing `TEAMS_FEATURE_PREVIEWED` / `TEAMS_FEATURE_BLOCKED` events through `useSubscription`; do not invent parallel ones.
+- No personal data in properties: no lyrics, scripture text, names, emails or file names. Ids, enum values, counts and booleans only.
+- PostHog does not initialise on `localhost`, so events cannot be seen locally. Say in the PR which events were added and what each means, and confirm they arrive on staging.
 
 ## Git commits
 

@@ -1,6 +1,8 @@
 import type { LiveBroadcastEnvelope } from "~/composables/useBroadcastPost"
 import { postCrossWindowNotification } from "~/composables/useBroadcastPost"
-import useBroadcastMessage from "~/composables/useBroadcastMessage"
+import useBroadcastMessage, {
+  broadcastNoticeKind,
+} from "~/composables/useBroadcastMessage"
 
 export type SlideDatabaseNotification = {
   kind: "slides-changed"
@@ -21,6 +23,9 @@ export const notifySlideDatabaseChanged = () => {
 export const useSlideDatabaseNotifications = (callback: () => void) => {
   if (typeof window === "undefined") return () => undefined
   return useBroadcastMessage((input) => {
+    // Every live slide crosses this channel too; parse only this notice.
+    const kind = broadcastNoticeKind(input)
+    if (kind !== undefined && kind !== "slides-changed") return
     try {
       const envelope = (typeof input === "string"
         ? JSON.parse(input)

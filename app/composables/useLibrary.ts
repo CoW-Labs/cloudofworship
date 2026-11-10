@@ -6,6 +6,7 @@ import { useObservable } from '@vueuse/rxjs'
 import { useOnline } from '@vueuse/core'
 import fuzzysort from 'fuzzysort'
 import { safeDBGet } from './useIndexedDB'
+import { isSongNewer } from '~/utils/songVersion'
 
 // Shared by every useLibrary() caller, so the startup refresh in the app layout
 // and each mount of the Library panel don't each re-download the catalog.
@@ -63,11 +64,12 @@ export default function useLibrary() {
   // the fetch/refresh functions instead.
   const libraryItems = useObservable<LibraryItem[]>(
     liveQuery(async () => {
-      const data = await useIndexedDB()
-        .library.orderBy('createdAt')
-        .reverse()
-        .toArray()
-      return data
+      // Sorted here, not through the `updatedAt` index: a record with no
+      // `updatedAt` (a catalogue song written by a script, say) is left out of
+      // an index, so ordering by it would drop that song from the Library.
+      const data = await useIndexedDB().library.toArray()
+      const stamp = (item: LibraryItem) => item.updatedAt || item.createdAt || ''
+      return data.sort((a, b) => (stamp(a) < stamp(b) ? 1 : stamp(a) > stamp(b) ? -1 : 0))
     }) as any
   )
 
@@ -284,6 +286,94 @@ export default function useLibrary() {
     }
   }
 
+  /**
+   * Saves an edit to an existing catalogue song to the server, so the edit is
+   * not only a copy on this device that the next sync or a lookup by id would
+   * replace with the older server version.
+   *
+   * - "saved": the server has the edit.
+   * - "rejected": the server refused it and will keep refusing (the song
+   *   belongs to another church, or no longer exists). The edit stays on this
+   *   device only, so it is not retried.
+   * - "failed": the request did not get through; a later sync tries again.
+   * - "skipped": nothing to send (a local-only song, or offline).
+   */
+  const uploadSongEdit = async (
+    song: Song,
+    churchId?: string
+  ): Promise<'saved' | 'rejected' | 'failed' | 'skipped'> => {
+    const serverId = song._id
+    const targetChurchId = churchId || getChurchId()
+    if (!serverId || !targetChurchId || !online.value) return 'skipped'
+    const songKey = `${serverId}:edit`
+    if (songUploadsInFlight.has(songKey) || songUploadsRejected.has(songKey)) {
+      return 'skipped'
+    }
+    songUploadsInFlight.add(songKey)
+    try {
+      // The server derives verses from the lyrics and picks the fields it lets
+      // an edit change; a client-built `verses` copy would only be stale.
+      const { verses: _verses, isPreview: _isPreview, ...body } = song
+      const { error } = await useAPIFetch(
+        `/church/${targetChurchId}/songs/${serverId}`,
+        { method: 'PUT', body, key: `library-update-song-${serverId}` }
+      )
+      if (!error.value) return 'saved'
+      const err = error.value as any
+      const status = err?.response?.status || err?.statusCode || err?.status
+      if (status === 403 || status === 404) {
+        songUploadsRejected.add(songKey)
+        return 'rejected'
+      }
+      return 'failed'
+    } catch (error) {
+      console.error('Error saving song edit to the server:', error)
+      return 'failed'
+    } finally {
+      songUploadsInFlight.delete(songKey)
+    }
+  }
+
+  // The device's songs by `_id` and by `id`, in their stored order, so the
+  // catalogue's copies can be matched without scanning the whole list for each
+  // one (the catalogue holds thousands of songs, and the library mirrors it).
+  const indexLocalSongs = (localSongs: Song[]) => {
+    const byKey = new Map<string, { song: Song; index: number }[]>()
+    localSongs.forEach((song, index) => {
+      for (const key of new Set([song._id, song.id])) {
+        if (!key) continue
+        const list = byKey.get(key)
+        if (list) list.push({ song, index })
+        else byKey.set(key, [{ song, index }])
+      }
+    })
+    return byKey
+  }
+
+  // Strictly newer than the catalogue's copy: an edit made on this device that
+  // the server does not have (yet, or ever).
+  const findLocalEdit = (
+    remote: Song,
+    localByKey: ReturnType<typeof indexLocalSongs>
+  ): Song | undefined => {
+    // A song can be stored twice on this device (saved by `_id`, cached by
+    // `id`), so the newest matching copy is the edit. Ties go to the copy
+    // stored first.
+    const matches = new Map<number, Song>()
+    for (const key of [remote._id, remote.id]) {
+      if (!key) continue
+      localByKey.get(key)?.forEach(({ song, index }) => matches.set(index, song))
+    }
+    let newest: Song | undefined
+    ;[...matches.entries()]
+      .sort(([a], [b]) => a - b)
+      .forEach(([, local]) => {
+        if (!isSongNewer(local, remote)) return
+        if (!newest || isSongNewer(local, newest)) newest = local
+      })
+    return newest
+  }
+
   // Fire-and-forget: the sync (and the Library skeleton) never waits on these.
   // The next sync picks uploaded songs up from the catalog.
   const uploadLocalOnlySongs = (songs: Song[], churchId: string) => {
@@ -343,14 +433,29 @@ export default function useLibrary() {
         .equals(libraryTypes.song)
         .toArray()
 
+      const localSongs = localSongItems.map((item) => item.content as Song)
       const remoteIds = collectSongIds(remoteSongs)
-      const localOnlySongs = localSongItems
-        .map((item) => item.content as Song)
-        .filter((song) => (song.id || song._id) && !isSongInSet(song, remoteIds))
+      const localOnlySongs = localSongs.filter(
+        (song) => (song.id || song._id) && !isSongInSet(song, remoteIds)
+      )
 
-      // Merge: remote catalog is the source of truth, plus every local-only song
-      // so offline / failed-upload songs survive the cache replacement.
-      const mergedSongs = [...remoteSongs, ...localOnlySongs]
+      // An existing song edited on this device is newer than the catalogue's
+      // copy until the server has the edit. Replacing it with the catalogue's
+      // copy is what made edits vanish from the Library (and from any slide
+      // that later re-read the song), so the edit is kept instead.
+      const localEdits: Song[] = []
+      const localByKey = indexLocalSongs(localSongs)
+      const remoteWithEdits = remoteSongs.map((remote) => {
+        const edit = findLocalEdit(remote, localByKey)
+        if (!edit) return remote
+        localEdits.push(edit)
+        return edit
+      })
+
+      // Merge: remote catalog is the source of truth, except for edits it does
+      // not have yet, plus every local-only song so offline / failed-upload
+      // songs survive the cache replacement.
+      const mergedSongs = [...remoteWithEdits, ...localOnlySongs]
 
       await cacheSongsInLibrary(mergedSongs)
       librarySyncedAt.songs = Date.now()
@@ -358,6 +463,9 @@ export default function useLibrary() {
       // Then push local-only songs up to the catalog in the background so
       // teammates see them too. The local copy is kept regardless of outcome.
       uploadLocalOnlySongs(localOnlySongs, churchId)
+      // The same for edits that never reached the server (offline, or the
+      // request failed); a refusal is remembered and not retried.
+      localEdits.forEach((edit) => void uploadSongEdit(edit, churchId))
 
       return mergedSongs
     } catch (error) {
@@ -663,6 +771,7 @@ export default function useLibrary() {
     cacheSlidesInLibrary,
     cacheSongsInLibrary,
     saveSong,
+    uploadSongEdit,
     saveSlide,
     deleteSong,
     deleteSlide,

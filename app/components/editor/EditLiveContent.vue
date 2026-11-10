@@ -503,6 +503,8 @@
             :data="editorCameraData"
             quality="preview"
             assigned-only
+            remote
+            :remote-only="cameraIsExclusive && cameraOnAir"
             :release-immediately="cameraIsExclusive"
           />
           <CameraPlaceholder
@@ -541,15 +543,17 @@
           }"
           :style="useSlideBackground(slide)"
         >
-          <!-- EXTERNAL VIDEO (YOUTUBE/VIMEO) — the editor never embeds the
-               player, so show the video's thumbnail the way the live preview
-               does instead of a video element pointed at a link. -->
+          <!-- EXTERNAL VIDEO (YOUTUBE/VIMEO) — the video's thumbnail, the way
+               the live preview shows it. The player itself is mounted only
+               once the operator presses play on a slide that is not live
+               (see useEditorMediaPreview), so an idle slide loads nothing. -->
           <div v-if="externalVideo" class="absolute inset-0 bg-primary-950">
             <img
               v-if="externalVideo.thumbnail"
               :src="externalVideo.thumbnail"
               :alt="externalVideo.name"
-              class="w-full h-full object-cover"
+              class="w-full h-full"
+              :class="mediaFitClass"
             />
             <div
               v-else
@@ -565,13 +569,31 @@
               />
               <span class="text-sm">{{ externalVideo.name }}</span>
             </div>
+            <iframe
+              v-if="previewEmbedSrc"
+              ref="previewIframe"
+              :src="previewEmbedSrc"
+              class="h-full w-full absolute inset-0"
+              frameborder="0"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              @load="onPreviewIframeLoad"
+            ></iframe>
           </div>
-          <!-- VIDEO BACKGROUND -->
+          <!-- VIDEO BACKGROUND — silent, and never plays by itself: the
+               toolbar's play starts it, and only while the slide is not live. -->
           <video
             v-else-if="slide?.backgroundType === backgroundTypes.video"
+            ref="previewVideo"
             :src="slide?.background"
-            class="h-[100%] w-[100%] object-cover absolute inset-0"
+            :loop="!!slide?.slideStyle?.repeatMedia"
+            muted
+            playsinline
+            preload="metadata"
+            class="h-[100%] w-[100%] absolute inset-0"
+            :class="mediaFitClass"
             crossorigin="anonymous"
+            @pause="mediaPreview.report(false)"
+            @ended="mediaPreview.report(false)"
           ></video>
           <div class="bg-black opacity-30 absolute inset-0"></div>
           <div
@@ -638,11 +660,27 @@ import type {
   SongSetlistItem,
 } from "~/types"
 import { escapePriority } from "~/composables/useEscapeKey"
+import {
+  useEditorMediaPreview,
+  useEditorMediaPreviewGuard,
+} from "~/composables/useEditorMediaPreview"
+import {
+  externalEmbedUrl,
+  externalPlayerMessage,
+  type ExternalPlayerCommand,
+} from "~/utils/externalVideo"
+import {
+  safePauseMedia,
+  safePlayMedia,
+  safePostMessage,
+} from "~/utils/browserSafety"
 import { songOnSlide } from "~/utils/songTranslation"
+import { isSongNewer } from "~/utils/songVersion"
 import { pairBackgroundOf } from "~/utils/slidePairs"
 import type { SlideUpdateMeta } from "~/utils/undoHistory"
 import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
 import useCameraOnAir from "~/composables/useCameraOnAir"
+import useCameraShare from "~/composables/useCameraShare"
 import {
   computeNextVerseLabel,
   computePreviousVerseLabel,
@@ -848,8 +886,13 @@ const editorCameraData = computed(() =>
     ? (props.slide.data as CameraSlideData | undefined) ?? null
     : null
 )
+// A teammate's computer can still send it: that never opens a camera here.
+const { hostFor: cameraHostFor } = useCameraShare()
 const editorCameraPaused = computed(
-  () => cameraIsExclusive && cameraOnAir.value
+  () =>
+    cameraIsExclusive &&
+    cameraOnAir.value &&
+    !cameraHostFor(editorCameraData.value)
 )
 
 // ── Pair background ─────────────────────────────────────────────────────────
@@ -1108,6 +1151,100 @@ const externalVideo = computed<ExternalVideo | undefined>(() => {
   const data = props.slide?.data as ExternalVideo | undefined
   if (props.slide?.type !== slideTypes.media) return undefined
   return data?.type === "youtube" || data?.type === "vimeo" ? data : undefined
+})
+
+// How the slide's fill type sits a video or thumbnail in the pane, matching the
+// projector: a media slide fits whole unless a fill type says otherwise, any
+// other slide's background video covers.
+const mediaFitClass = computed(() => {
+  switch (props.slide?.slideStyle?.backgroundFillType) {
+    case backgroundFillTypes.crop:
+      return "object-cover object-center"
+    case backgroundFillTypes.cropTop:
+      return "object-cover object-top"
+    case backgroundFillTypes.cropBottom:
+      return "object-cover object-bottom"
+    case backgroundFillTypes.fit:
+      return "object-contain object-center"
+    case backgroundFillTypes.stretch:
+      return "object-fill"
+    default:
+      return props.slide?.type === slideTypes.media
+        ? "object-contain"
+        : "object-cover"
+  }
+})
+
+// ── Video preview ───────────────────────────────────────────────────────────
+// The toolbar's play, pause, restart and seek drive these two players while the
+// slide is NOT live. Once it is live they go to the projector instead, and the
+// preview is stopped here, so one video never plays in both places. Everything
+// below reacts to the preview state; nothing polls or listens per frame.
+const mediaPreview = useEditorMediaPreview(() => props.slide?.id)
+useEditorMediaPreviewGuard(() => props.slide?.id)
+const previewVideo = ref<HTMLVideoElement | null>(null)
+const previewIframe = ref<HTMLIFrameElement | null>(null)
+
+// The player's address is fixed from the first play until the preview stops, so
+// toggling Loop mid-preview does not reload it from the start.
+const previewEmbedSrc = ref("")
+watch(
+  () => [mediaPreview.started.value, externalVideo.value] as const,
+  ([started, external]) => {
+    previewEmbedSrc.value =
+      started && external
+        ? externalEmbedUrl(external, {
+            muted: true,
+            loop: !!props.slide?.slideStyle?.repeatMedia,
+            origin: window.location.origin,
+          })
+        : ""
+  },
+  { immediate: true }
+)
+
+const sendPreviewCommand = (command: ExternalPlayerCommand) => {
+  const type = externalVideo.value?.type
+  if (type !== "youtube" && type !== "vimeo") return
+  safePostMessage(
+    previewIframe.value?.contentWindow,
+    externalPlayerMessage(type, command),
+    "*"
+  )
+}
+
+// A command sent before the player loads is dropped, so a pause pressed in that
+// window is applied once it is ready. The first play is the address's autoplay.
+const onPreviewIframeLoad = () => {
+  sendPreviewCommand({ kind: "mute", muted: true })
+  if (!mediaPreview.playing.value) sendPreviewCommand({ kind: "pause" })
+}
+
+watch(mediaPreview.playing, async (playing) => {
+  if (externalVideo.value) {
+    sendPreviewCommand({ kind: playing ? "play" : "pause" })
+    return
+  }
+  if (playing) {
+    // A refused or failed play leaves the toolbar saying "Pause" over a still
+    // frame, so tell it.
+    if (!(await safePlayMedia(previewVideo.value))) mediaPreview.report(false)
+  } else {
+    safePauseMedia(previewVideo.value)
+  }
+})
+
+watch(mediaPreview.seek, (seek) => {
+  if (!seek) return
+  if (externalVideo.value) {
+    sendPreviewCommand({ kind: "seek", seconds: seek.to })
+    return
+  }
+  try {
+    if (previewVideo.value) previewVideo.value.currentTime = seek.to
+  } catch {
+    // Not seekable yet; the next press retries.
+  }
 })
 
 const setlistData = computed<SongSetlistData>(() => getSetlistData(props.slide))
@@ -1908,8 +2045,14 @@ watch(
     })
     // The operator may have moved to another slide while this was in flight
     if (!song || props.slide?.id !== slideId) return
-    if (songContentKey(song) === songContentKey(songOnSlide(props.slide)))
-      return
+    const onSlide = songOnSlide(props.slide)
+    if (songContentKey(song) === songContentKey(onSlide)) return
+    // The slide can hold an edit the copy found by id does not have yet: a
+    // song edited here is saved on this device first, and a song the church
+    // did not write can never be saved to the server at all. Pulling the older
+    // copy back would silently undo the edit, and the update below would then
+    // save and broadcast the undo.
+    if (isSongNewer(onSlide, song)) return
 
     await onUpdateSongLyrics(song, { keepFontSize: true })
   },

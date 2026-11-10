@@ -157,7 +157,23 @@ describe("regressions — existing behaviour is unchanged", () => {
     expect(detectVerseVoiceCommand("next verse")).toBe("next-verse")
     expect(detectVerseVoiceCommand("previous verse")).toBe("previous-verse")
     expect(plan("next verse")).toMatchObject({ action: "next-verse" })
-    expect(plan("go back please")).toMatchObject({ action: "previous-verse" })
+    expect(plan("go back one verse")).toMatchObject({ action: "previous-verse" })
+  })
+
+  it("does not move on a bare \"next\" or \"back\"", () => {
+    for (const text of ["next", "next please", "back", "back please", "take the next", "go back please", "so we'll go back to the text", "please go back to that part", "back in the day", "we came back home", "ahead of the assembly", "forward please", "go ahead", "go on", "move forward", "let us continue on", "previous", "previous please", "next one", "next part", "next slide", "following passage", "last one", "the last part of the church", "last passage", "former scripture"]) {
+      expect(plan(text)).toBeNull()
+    }
+  })
+
+  it("still moves when the word verse comes with next or back", () => {
+    expect(plan("next verse")).toMatchObject({ action: "next-verse" })
+    expect(plan("back verse")).toMatchObject({ action: "previous-verse" })
+    expect(plan("back one verse")).toMatchObject({ action: "previous-verse" })
+    expect(plan("ahead one verse")).toMatchObject({ action: "next-verse" })
+    expect(plan("last verse")).toMatchObject({ action: "previous-verse" })
+    expect(plan("previous verse please")).toMatchObject({ action: "previous-verse" })
+    expect(plan("continue to the next verse")).toMatchObject({ action: "next-verse" })
   })
 
   it("keeps the explicit version commands working", () => {

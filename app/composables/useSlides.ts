@@ -12,6 +12,9 @@ import {
   isNotFoundError,
 } from "~/utils/apiErrors"
 
+/** Live slides whose media is being fetched to this device right now. */
+const localizingLiveSlides = new Set<string>()
+
 export default function useSlides() {
   const appStore = useAppStore()
   const authStore = useAuthStore()
@@ -127,16 +130,39 @@ export default function useSlides() {
       !!liveSlide.backgroundVideoKey
     if (!isRemote || !bearsMedia) return
 
+    // One localize per slide. Every edit of the live slide lands here, and a
+    // large file takes a while: each extra pass only queued behind the first.
+    if (localizingLiveSlides.has(liveSlide.id)) return
+    localizingLiveSlides.add(liveSlide.id)
+
     rehydrateSlideMedia({ ...liveSlide }, { allowDownload: true })
       .then((rehydrated) => {
         // Nothing was localized (no local/remote copy available) — leave as-is.
         if (rehydrated.background === bg) return
-        appStore.updateSlideInActiveSlides(rehydrated)
-        if (appStore.isSlideLive(rehydrated.id)) {
-          projectLiveSlide(rehydrated, { keepShape: true })
+        // Apply the local links to the slide as it is NOW. `rehydrated` is a
+        // copy from when the download started, and re-projecting it replayed
+        // that moment's play/pause (and any other edit made since) on screen.
+        const current = appStore.activeSlides.find(
+          (slide) => slide.id === rehydrated.id
+        )
+        if (!current || current.background !== bg) return
+        const localized: Slide = {
+          ...current,
+          background: rehydrated.background,
+          ...(rehydrated.presentationObjects
+            ? { presentationObjects: rehydrated.presentationObjects }
+            : {}),
+          ...(current.data && (rehydrated.data as any)?.url
+            ? { data: { ...current.data, url: (rehydrated.data as any).url } as Slide["data"] }
+            : {}),
+        }
+        appStore.updateSlideInActiveSlides(localized)
+        if (appStore.isSlideLive(localized.id)) {
+          projectLiveSlide(localized, { keepShape: true })
         }
       })
       .catch((err) => console.warn("Go-live media localize failed:", err))
+      .finally(() => localizingLiveSlides.delete(liveSlide.id))
   }
 
   /**

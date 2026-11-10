@@ -15,7 +15,11 @@ import { useAppStore } from '~/store/app'
  *  - No display has been manually configured yet (mainDisplayLabel is empty), OR
  *  - `force = true` is passed (used when screens change)
  */
-export const useAutoDetectSecondaryDisplay = async (force = false) => {
+export const useAutoDetectSecondaryDisplay = async (
+  force = false,
+  /** Tauri only: monitor name to pick over the first non-current one, e.g. the display that was just plugged in. */
+  preferredMonitorName?: string | null
+) => {
   const appStore = useAppStore()
   const { isTauri } = useTauri()
 
@@ -25,7 +29,7 @@ export const useAutoDetectSecondaryDisplay = async (force = false) => {
   }
 
   if (isTauri) {
-    await autoDetectTauri(appStore)
+    await autoDetectTauri(appStore, preferredMonitorName)
   } else if ('getScreenDetails' in window) {
     await autoDetectBrowser(appStore)
   }
@@ -34,7 +38,10 @@ export const useAutoDetectSecondaryDisplay = async (force = false) => {
 }
 
 // ── Tauri (desktop) ──────────────────────────────────────────────────────────
-async function autoDetectTauri(appStore: ReturnType<typeof useAppStore>) {
+async function autoDetectTauri(
+  appStore: ReturnType<typeof useAppStore>,
+  preferredMonitorName?: string | null
+) {
   try {
     const { availableMonitors, currentMonitor } = await import('@tauri-apps/api/window')
     const monitors = await availableMonitors()
@@ -44,11 +51,22 @@ async function autoDetectTauri(appStore: ReturnType<typeof useAppStore>) {
 
     const currentId = current ? useScreenId(current) : null
 
-    // Prefer a monitor that isn't the current app monitor
-    let secondary = monitors.find((m: any) => {
-      const id = useScreenId(m)
-      return id !== currentId
-    })
+    // A display that was just plugged in wins, as long as it isn't the one the
+    // control center is on
+    let secondary = preferredMonitorName
+      ? monitors.find(
+          (m: any) =>
+            m.name === preferredMonitorName && useScreenId(m) !== currentId
+        )
+      : undefined
+
+    // Otherwise prefer a monitor that isn't the current app monitor
+    if (!secondary) {
+      secondary = monitors.find((m: any) => {
+        const id = useScreenId(m)
+        return id !== currentId
+      })
+    }
 
     // Final fallback: anything that is not at (0,0) — typically the non-primary
     if (!secondary) {

@@ -41,7 +41,11 @@
                 <SearchIcon class="w-4 h-4 text-gray-400 dark:text-[#9aa3b2]" />
               </template>
             </UInput>
-            <Transition name="quick-actions-placeholder-fade">
+            <!-- type="transition": the span also runs the 3.6s infinite
+                 shimmer, and without this Vue waits for that animation, not
+                 the 150ms fade, so the faded-out span kept repainting for
+                 most of every 5s cycle. -->
+            <Transition name="quick-actions-placeholder-fade" type="transition">
               <span
                 v-if="!searchInput"
                 :key="quickSearchPlaceholder"
@@ -2012,6 +2016,27 @@ const rankedSearchResults = computed((): QuickAction[] => {
       songTitleMatchRank(action.songData, bestMatchQuery) < 2
     ) {
       pin(action)
+    }
+  }
+
+  // Then actions whose hidden keywords hold every typed word whole ("obs"
+  // finds Add Video Input, "webcam" too). Without this such an action is not
+  // pinned, and a fuzzy title match elsewhere ("obs" against "Oba Awon Oba")
+  // promotes the song and hymn groups above the Actions block. Whole words
+  // only, and at most two, so a common word cannot crowd out title matches.
+  const typedWords = normalizeSearchText(bestMatchQuery)
+    .split(" ")
+    .filter(Boolean)
+  if (typedWords.length) {
+    let keywordPins = 0
+    for (const action of ordered) {
+      if (keywordPins >= 2 || pinned.length >= 4) break
+      if (!staticQuickActions.has(action) || pinnedSet.has(action)) continue
+      const keywords = normalizeSearchText(action.meta)
+      if (typedWords.every((word) => keywords.includes(` ${word} `))) {
+        pin(action)
+        keywordPins += 1
+      }
     }
   }
 

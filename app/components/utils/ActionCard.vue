@@ -71,6 +71,12 @@
           >
             NEW
           </span>
+          <span
+            v-if="action?.beta"
+            class="shrink-0 text-[9px] font-bold leading-none tracking-wide border border-primary-500 text-primary-600 dark:text-primary-400 rounded px-1.5 py-[2px]"
+          >
+            BETA
+          </span>
         </h4>
         <p
           v-if="!compact || showSubtext || matchedLine"
