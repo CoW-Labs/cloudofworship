@@ -53,6 +53,7 @@
             "core:window:allow-set-decorations",
             "core:window:allow-set-always-on-top",
             "shell:allow-open",
+            "dialog:allow-open",
             "deep-link:default",
             "updater:default",
             "process:allow-restart",
