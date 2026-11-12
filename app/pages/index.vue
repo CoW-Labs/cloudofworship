@@ -1,31 +1,28 @@
 <template #default="{ defaultProps }">
-  <div class="flex h-full min-h-0 flex-col">
+  <div
+    class="flex h-full min-h-0 px-4 pb-2 pt-2 short:px-3 short:pb-1 short:pt-1"
+  >
     <div
-      class="flex min-h-0 flex-1 px-4 pb-2 pt-2 short:px-3 short:pb-1 short:pt-1"
+      :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }"
+      class="h-full"
     >
-      <div
-        :style="{ width: quickActionsWidth + 'px', flexShrink: 0 }"
-        class="h-full"
-      >
-        <QuickActions />
-      </div>
-      <div
-        class="w-2 flex-shrink-0 mx-1 cursor-ew-resize rounded opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
-        @mousedown.prevent="startResize('left', $event)"
-      />
-      <PreviewContent class="flex-1 min-w-0 h-full" />
-      <div
-        class="w-2 flex-shrink-0 mx-1 cursor-ew-resize rounded opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
-        @mousedown.prevent="startResize('right', $event)"
-      />
-      <div
-        :style="{ width: liveOutputWidth + 'px', flexShrink: 0 }"
-        class="h-full"
-      >
-        <LiveOutput />
-      </div>
+      <QuickActions />
     </div>
-    <BroadcastStatusBar />
+    <div
+      class="w-2 flex-shrink-0 mx-1 cursor-ew-resize rounded opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
+      @mousedown.prevent="startResize('left', $event)"
+    />
+    <PreviewContent class="flex-1 min-w-0 h-full" />
+    <div
+      class="w-2 flex-shrink-0 mx-1 cursor-ew-resize rounded opacity-0 hover:opacity-100 hover:bg-primary-300/40 dark:hover:bg-[#313a4d]/70 transition-opacity"
+      @mousedown.prevent="startResize('right', $event)"
+    />
+    <div
+      :style="{ width: liveOutputWidth + 'px', flexShrink: 0 }"
+      class="h-full"
+    >
+      <LiveOutput />
+    </div>
   </div>
 </template>
 
