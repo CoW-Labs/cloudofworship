@@ -82,33 +82,7 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
   let logical_width = outer_size.width as f64 / scale_factor;
   let logical_height = outer_size.height as f64 / scale_factor;
 
-  let content = if macos_at_least(14, 4) {
-    SCShareableContent::current_process()
-  } else {
-    SCShareableContent::get()
-  }
-  .map_err(|error| {
-    // A refused capture surfaces here as an error rather than an empty list, and
-    // its text is ScreenCaptureKit's, not something an operator can act on. When
-    // it is TCC talking, say so in the terms the rest of this module uses.
-    let text = error.to_string();
-    if text.contains("TCC") || text.contains("declined") {
-      capture_permission_error(access.request())
-    } else {
-      capture_error(format!("Could not enumerate capturable windows: {error}"))
-    }
-  })?;
-
   let process_id = std::process::id() as i32;
-  let mut process_windows: Vec<SCWindow> = content
-    .windows()
-    .into_iter()
-    .filter(|candidate| {
-      candidate
-        .owning_application()
-        .is_some_and(|application| application.process_id() == process_id)
-    })
-    .collect();
 
   let frame_matches = |candidate: &SCWindow| {
     let frame = candidate.frame();
@@ -119,85 +93,140 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
     candidate.title().as_deref() == Some(LIVE_WINDOW_TITLE)
   };
 
-  let selected_index = process_windows
-    .iter()
-    // AppKit's window number is authoritative even during a resize or title update.
-    .position(|candidate| native_number > 0 && candidate.window_id() == native_number as u32)
-    .or_else(|| {
-      let matches: Vec<_> = process_windows
-        .iter()
-        .enumerate()
-        .filter(|(_, candidate)| title_matches(candidate) && frame_matches(candidate))
-        .map(|(index, _)| index)
-        .collect();
-      match matches.as_slice() {
-        [only] => Some(*only),
-        _ => None,
-      }
-    })
-    // The frame comparison is the fragile signal: the window may not have settled
-    // at its final size when ScreenCaptureKit took its snapshot. The title is ours
-    // and unique, so fall back to it alone rather than giving up.
-    .or_else(|| {
-      let matches: Vec<_> = process_windows
-        .iter()
-        .enumerate()
-        .filter(|(_, candidate)| title_matches(candidate))
-        .map(|(index, _)| index)
-        .collect();
-      match matches.as_slice() {
-        [only] => Some(*only),
-        _ => None,
-      }
-    });
+  // Right after the live window is created or resized, ScreenCaptureKit's own
+  // window list can still report its pre-settle title/frame for a beat, so none
+  // of the match signals below line up on the first snapshot. Re-enumerate for a
+  // short while before giving up, rather than failing on that first beat.
+  const MAX_ATTEMPTS: u32 = 10;
+  const RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(150);
 
-  let sc_window = match selected_index {
-    Some(index) => process_windows.swap_remove(index),
-    None if process_windows.is_empty() => {
-      // ScreenCaptureKit hands back an empty list when it is refused access, so
-      // this is far more often a permission problem than a missing window.
-      if permission == CapturePermission::NotRequired {
-        // We let the preflight slide on the assumption that our own windows need
-        // no grant. An empty list is that assumption being proved wrong, so ask
-        // for the permission now and surface the hint.
-        return Err(capture_permission_error(access.request()));
-      }
-      return Err(
-        NdiErrorInfo::new(
-          NdiErrorCode::LiveWindowMissing,
-          "ScreenCaptureKit could not find the live output window.",
-          true,
-        )
-        .hint("If the live output window is open, check Cloud of Worship in Privacy & Security > Screen Recording, then restart the app."),
-      );
+  let mut sc_window: Option<SCWindow> = None;
+  let mut last_error: Option<NdiErrorInfo> = None;
+
+  for attempt in 0..MAX_ATTEMPTS {
+    let content = if macos_at_least(14, 4) {
+      SCShareableContent::current_process()
+    } else {
+      SCShareableContent::get()
     }
-    None => {
-      let seen = process_windows
-        .iter()
-        .map(|candidate| {
-          let frame = candidate.frame();
-          format!(
-            "{:?} {}x{}",
-            candidate.title().unwrap_or_default(),
-            frame.size.width.round(),
-            frame.size.height.round()
+    .map_err(|error| {
+      // A refused capture surfaces here as an error rather than an empty list, and
+      // its text is ScreenCaptureKit's, not something an operator can act on. When
+      // it is TCC talking, say so in the terms the rest of this module uses.
+      let text = error.to_string();
+      if text.contains("TCC") || text.contains("declined") {
+        capture_permission_error(access.request())
+      } else {
+        capture_error(format!("Could not enumerate capturable windows: {error}"))
+      }
+    })?;
+
+    let mut process_windows: Vec<SCWindow> = content
+      .windows()
+      .into_iter()
+      .filter(|candidate| {
+        candidate
+          .owning_application()
+          .is_some_and(|application| application.process_id() == process_id)
+      })
+      .collect();
+
+    let selected_index = process_windows
+      .iter()
+      // AppKit's window number is authoritative even during a resize or title update.
+      .position(|candidate| native_number > 0 && candidate.window_id() == native_number as u32)
+      .or_else(|| {
+        let matches: Vec<_> = process_windows
+          .iter()
+          .enumerate()
+          .filter(|(_, candidate)| title_matches(candidate) && frame_matches(candidate))
+          .map(|(index, _)| index)
+          .collect();
+        match matches.as_slice() {
+          [only] => Some(*only),
+          _ => None,
+        }
+      })
+      // The frame comparison is the fragile signal: the window may not have settled
+      // at its final size when ScreenCaptureKit took its snapshot. The title is ours
+      // and unique, so fall back to it alone rather than giving up.
+      .or_else(|| {
+        let matches: Vec<_> = process_windows
+          .iter()
+          .enumerate()
+          .filter(|(_, candidate)| title_matches(candidate))
+          .map(|(index, _)| index)
+          .collect();
+        match matches.as_slice() {
+          [only] => Some(*only),
+          _ => None,
+        }
+      });
+
+    match selected_index {
+      Some(index) => {
+        sc_window = Some(process_windows.swap_remove(index));
+        break;
+      }
+      None if process_windows.is_empty() => {
+        // ScreenCaptureKit hands back an empty list when it is refused access, so
+        // this is far more often a permission problem than a missing window.
+        if permission == CapturePermission::NotRequired {
+          // We let the preflight slide on the assumption that our own windows need
+          // no grant. An empty list is that assumption being proved wrong, so ask
+          // for the permission now and surface the hint.
+          return Err(capture_permission_error(access.request()));
+        }
+        last_error = Some(
+          NdiErrorInfo::new(
+            NdiErrorCode::LiveWindowMissing,
+            "ScreenCaptureKit could not find the live output window.",
+            true,
           )
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-      return Err(
-        NdiErrorInfo::new(
-          NdiErrorCode::AmbiguousLiveWindow,
-          format!(
-            "ScreenCaptureKit could not uniquely identify the live output window. \
-             Looking for {LIVE_WINDOW_TITLE:?} at {}x{}; saw: {seen}",
-            logical_width.round(),
-            logical_height.round()
-          ),
-          true,
-        )
-        .hint("Close duplicate Cloud of Worship windows and try again."),
-      );
+          .hint("If the live output window is open, check Cloud of Worship in Privacy & Security > Screen Recording, then restart the app."),
+        );
+      }
+      None => {
+        let seen = process_windows
+          .iter()
+          .map(|candidate| {
+            let frame = candidate.frame();
+            format!(
+              "{:?} {}x{}",
+              candidate.title().unwrap_or_default(),
+              frame.size.width.round(),
+              frame.size.height.round()
+            )
+          })
+          .collect::<Vec<_>>()
+          .join(", ");
+        last_error = Some(
+          NdiErrorInfo::new(
+            NdiErrorCode::AmbiguousLiveWindow,
+            format!(
+              "ScreenCaptureKit could not uniquely identify the live output window. \
+               Looking for {LIVE_WINDOW_TITLE:?} at {}x{}; saw: {seen}",
+              logical_width.round(),
+              logical_height.round()
+            ),
+            true,
+          )
+          .hint("Close duplicate Cloud of Worship windows and try again."),
+        );
+      }
+    }
+
+    if attempt + 1 < MAX_ATTEMPTS {
+      std::thread::sleep(RETRY_DELAY);
+    }
+  }
+
+  let sc_window = match sc_window {
+    Some(window) => window,
+    None => {
+      return Err(last_error.unwrap_or_else(|| {
+        capture_error("ScreenCaptureKit could not find the live output window.")
+      }))
     }
   };
 
@@ -245,8 +274,19 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
   let mailbox = context.mailbox.clone();
   let handler_id = stream.add_output_handler(
     move |sample: CMSampleBuffer, output_type: SCStreamOutputType| {
+      // Idle/blank/suspended callbacks carry no new picture. Frames whose
+      // status attachment is missing still do: macOS 26 sends every frame that
+      // way, so requiring `Complete` would drop them all.
       if output_type != SCStreamOutputType::Screen
-        || sample.frame_status() != Some(SCFrameStatus::Complete)
+        || matches!(
+          sample.frame_status(),
+          Some(
+            SCFrameStatus::Idle
+              | SCFrameStatus::Blank
+              | SCFrameStatus::Suspended
+              | SCFrameStatus::Stopped
+          )
+        )
       {
         return;
       }

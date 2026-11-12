@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run generate"
+    "beforeDevCommand": "node scripts/fetch-ffmpeg.mjs && npm run dev",
+    "beforeBuildCommand": "node scripts/fetch-ffmpeg.mjs && npm run generate"
   },
   "app": {
     "windows": [
@@ -43,6 +43,7 @@
             "core:webview:allow-webview-close",
             "core:webview:allow-webview-position",
             "core:webview:allow-webview-size",
+            "core:webview:allow-set-webview-zoom",
             "core:window:allow-create",
             "core:window:allow-close",
             "core:window:allow-destroy",
@@ -53,6 +54,7 @@
             "core:window:allow-set-decorations",
             "core:window:allow-set-always-on-top",
             "shell:allow-open",
+            "dialog:allow-open",
             "deep-link:default",
             "updater:default",
             "process:allow-restart",
@@ -108,6 +110,10 @@
     "active": true,
     "targets": ["nsis", "dmg", "deb", "appimage"],
     "createUpdaterArtifacts": true,
+    "externalBin": ["binaries/ffmpeg"],
+    "resources": {
+      "licenses/ffmpeg.txt": "licenses/ffmpeg.txt"
+    },
     "macOS": {
       "entitlements": "entitlements.plist",
       "minimumSystemVersion": "13.0"

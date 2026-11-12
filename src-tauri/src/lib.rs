@@ -4,6 +4,8 @@ use tauri::{Manager, WindowEvent};
 
 mod ndi;
 mod desktop_update;
+mod easyworship;
+mod stream;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,6 +161,7 @@ pub fn run() {
   builder
     .plugin(tauri_plugin_deep_link::init())
     .plugin(tauri_plugin_fs::init())
+    .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
@@ -171,6 +174,7 @@ pub fn run() {
         app.deep_link().register_all()?;
       }
       app.manage(ndi::NdiBridge::new(app.handle().clone()));
+      app.manage(stream::StreamBridge::new(app.handle().clone()));
       app.manage(desktop_update::DesktopUpdateState::default());
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -190,17 +194,36 @@ pub fn run() {
           }
         });
       }
+      // Never let an FFmpeg stream outlive the app: stop it when the main
+      // window closes.
+      if window.label() == "main" && matches!(event, WindowEvent::Destroyed) {
+        let bridge = window.state::<stream::StreamBridge>().inner().clone();
+        tauri::async_runtime::spawn_blocking(move || {
+          bridge.stop_blocking();
+          bridge.stop_audio_meter();
+        });
+      }
     })
     .invoke_handler(tauri::generate_handler![
       media_storage_stats,
       media_storage_capacity,
+      easyworship::import_easyworship_songs,
       desktop_update::desktop_stage_update,
       desktop_update::desktop_cancel_update,
       desktop_update::desktop_install_update,
       ndi::ndi_start,
       ndi::ndi_stop,
       ndi::ndi_status,
-      ndi::ndi_open_capture_settings
+      ndi::ndi_open_capture_settings,
+      stream::stream_start,
+      stream::stream_stop,
+      stream::stream_status,
+      stream::stream_audio_devices,
+      stream::stream_feed,
+      stream::stream_audio_meter_start,
+      stream::stream_audio_meter_stop,
+      stream::stream_plan,
+      stream::stream_check_youtube
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
