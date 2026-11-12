@@ -43,6 +43,7 @@
             "core:webview:allow-webview-close",
             "core:webview:allow-webview-position",
             "core:webview:allow-webview-size",
+            "core:webview:allow-set-webview-zoom",
             "core:window:allow-create",
             "core:window:allow-close",
             "core:window:allow-destroy",
