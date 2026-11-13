@@ -63,6 +63,15 @@
               {{ row.hint }}
             </p>
 
+            <div v-if="row.key === 'quality'" class="mt-2">
+              <SettingsSelect
+                width="w-full sm:w-[300px]"
+                :options="qualityChoices"
+                :model-value="qualityChoice"
+                @change="(label: string) => setQualityChoice(label)"
+              />
+            </div>
+
             <div v-if="row.key === 'audio'" class="mt-2 flex items-center gap-3">
               <SettingsSelect
                 width="w-full sm:w-[220px]"
@@ -128,6 +137,12 @@ const {
   preflightOpen,
   answerPreflight,
   checkBeforeStreaming,
+  qualityChoices,
+  qualityChoice,
+  setQualityChoice,
+  qualityIsUpscaled,
+  sourceHeight,
+  quality,
   audioChoices,
   audioChoice,
   setAudioChoice,
@@ -150,7 +165,9 @@ const LISTEN_FOR_MS = 5000
 const METER_FLOOR_DB = -60
 
 const plan = ref<StreamPlan | null>(null)
-const upload = ref<{ state: CheckState; mbps?: number; error?: string }>({
+// The measured speed is kept apart from its verdict, so changing the quality
+// re-judges the same measurement against the new bitrate.
+const upload = ref<{ state: "checking" | "done" | "error"; mbps?: number; error?: string }>({
   state: "checking",
 })
 const youtube = ref<{ state: CheckState; ms?: number; error?: string }>({
@@ -204,14 +221,10 @@ const runChecks = async () => {
 
   measureUploadMbps()
     .then((mbps) => {
-      if (id !== run) return
-      // Headroom matters: other devices share the church's connection.
-      const state: CheckState =
-        mbps >= neededMbps.value * 1.5 ? "ok" : mbps >= neededMbps.value ? "warn" : "fail"
-      upload.value = { state, mbps }
+      if (id === run) upload.value = { state: "done", mbps }
     })
     .catch((error) => {
-      if (id === run) upload.value = { state: "warn", error: String(error) }
+      if (id === run) upload.value = { state: "error", error: String(error) }
     })
 }
 
@@ -225,6 +238,28 @@ watch(preflightOpen, (open) => {
   meterOn.value = false
   void stopAudioMeter()
 })
+
+// Picking another quality re-reads the plan: the bitrate it needs changes the
+// internet verdict, and the encoder can differ by codec.
+watch(quality, () => {
+  if (!preflightOpen.value) return
+  getPlan()
+    .then((result) => (plan.value = result))
+    .catch((error) => console.warn("Couldn't read the stream plan:", error))
+})
+
+// Seen once per run of the check, not on every re-render.
+watch(
+  () => preflightOpen.value && qualityIsUpscaled.value,
+  (shown) => {
+    if (shown) {
+      usePosthogCapture("STREAM_QUALITY_UPSCALE_WARNING_SHOWN", {
+        quality: quality.value,
+        sourceHeight: sourceHeight.value,
+      })
+    }
+  }
+)
 
 // Picking another input restarts the meter on it.
 watch(audioDevice, () => {
@@ -248,18 +283,23 @@ const meterPercent = computed(() => {
 const formatMbps = (mbps: number) => (mbps >= 10 ? Math.round(mbps) : mbps.toFixed(1))
 
 const internetRow = computed<Row>(() => {
-  const { state, mbps, error } = upload.value
+  const { mbps, error } = upload.value
   const needs = `needs about ${formatMbps(neededMbps.value)} Mbps`
-  if (state === "checking") return { key: "internet", label: "Internet", value: "Testing…", state }
+  if (upload.value.state === "checking") {
+    return { key: "internet", label: "Internet", value: "Testing…", state: "checking" }
+  }
   if (mbps === undefined) {
     return {
       key: "internet",
       label: "Internet",
       value: "Couldn't test",
-      state,
+      state: "warn",
       hint: error ? `The speed test didn't finish (${error}).` : undefined,
     }
   }
+  // Headroom matters: other devices share the church's connection.
+  const state: CheckState =
+    mbps >= neededMbps.value * 1.5 ? "ok" : mbps >= neededMbps.value ? "warn" : "fail"
   return {
     key: "internet",
     label: "Internet",
@@ -314,8 +354,11 @@ const qualityRow = computed<Row>(() => {
   return {
     key: "quality",
     label: "Quality",
-    value: `${height}p · ${fps} fps · ${formatMbps((videoKbps + audioKbps) / 1000)} Mbps`,
-    state: "ok",
+    value: `${height === 2160 ? "4K" : `${height}p`} · ${fps} fps · ${formatMbps((videoKbps + audioKbps) / 1000)} Mbps`,
+    state: qualityIsUpscaled.value ? "warn" : "ok",
+    hint: qualityIsUpscaled.value
+      ? `Your live window is ${sourceHeight.value}p, so this is an upscale. It won't look sharper than ${sourceHeight.value}p.`
+      : undefined,
   }
 })
 

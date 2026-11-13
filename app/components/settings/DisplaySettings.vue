@@ -131,6 +131,20 @@
         />
       </SettingsRow>
 
+      <SettingsRow
+        v-if="ndiQualityChoices.length"
+        label="NDI quality"
+        description="Size and frame rate sent to receivers. Never larger than your live window. 4K and 60 fps need a wired gigabit network and a receiver that can keep up. Changes apply the next time NDI starts."
+      >
+        <SettingsSelect
+          width="w-full sm:w-[300px]"
+          :options="ndiQualityChoices"
+          :model-value="ndiQualityChoice"
+          :disabled="ndiStatus.phase === 'broadcasting' || ndiStatus.phase === 'starting'"
+          @change="(label: string) => setNdiQualityChoice(label)"
+        />
+      </SettingsRow>
+
       <div
         class="rounded-2xl bg-white dark:bg-[#131a27] ring-1 ring-gray-200 dark:ring-white/10 p-4"
       >
@@ -282,6 +296,20 @@
           :model-value="youtubeAudioChoice"
           :disabled="youtubeIsStreaming"
           @change="(label: string) => setYoutubeAudioChoice(label)"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        v-if="youtubeQualityChoices.length"
+        label="Stream quality"
+        :description="youtubeQualityNote"
+      >
+        <SettingsSelect
+          width="w-full sm:w-[300px]"
+          :options="youtubeQualityChoices"
+          :model-value="youtubeQualityChoice"
+          :disabled="youtubeIsStreaming"
+          @change="(label: string) => setYoutubeQualityChoice(label)"
         />
       </SettingsRow>
 
@@ -486,6 +514,9 @@ const {
   stop: stopNdi,
   retry: retryNdiCommand,
   openCaptureSettings: openCaptureSettings,
+  qualityChoices: ndiQualityChoices,
+  qualityChoice: ndiQualityChoice,
+  setQualityChoice: setNdiQualityChoice,
 } = useNdiBroadcast()
 
 const {
@@ -499,6 +530,11 @@ const {
   audioChoice: youtubeAudioChoice,
   setAudioChoice: setYoutubeAudioChoice,
   checkBeforeStreaming: youtubeCheckFirst,
+  qualityChoices: youtubeQualityChoices,
+  qualityChoice: youtubeQualityChoice,
+  setQualityChoice: setYoutubeQualityChoice,
+  qualityIsUpscaled: youtubeQualityUpscaled,
+  sourceHeight: youtubeSourceHeight,
   initialize: initializeYoutube,
   start: startYoutube,
   end: endYoutube,
@@ -507,6 +543,12 @@ const {
 onMounted(() => {
   initializeYoutube()
 })
+
+const youtubeQualityNote = computed(() =>
+  youtubeQualityUpscaled.value
+    ? `Your live window is ${youtubeSourceHeight.value}p, so this quality is an upscale. It won't look sharper than 1080p.`
+    : "Higher qualities need a faster upload and a stronger computer. Some are greyed out on computers that can't make them."
+)
 
 const youtubePhaseLabel = computed(
   () =>

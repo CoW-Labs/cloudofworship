@@ -215,6 +215,7 @@ pub fn run() {
       ndi::ndi_stop,
       ndi::ndi_status,
       ndi::ndi_open_capture_settings,
+      ndi::ndi_tiers,
       stream::stream_start,
       stream::stream_stop,
       stream::stream_status,

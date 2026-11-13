@@ -38,15 +38,42 @@ export interface StreamStats {
   audioDb: number | null
 }
 
+// One quality the operator can pick. `available` is false when this computer
+// can't produce it yet, with `reason` saying why in plain words.
+export interface StreamTier {
+  id: string
+  codec: "h264" | "hevc"
+  height: number
+  fps: number
+  videoKbps: number
+  available: boolean
+  reason: string | null
+}
+
 // What the broadcast will be, shown in the pre-flight check.
 export interface StreamPlan {
+  quality: string
   height: number
   fps: number
   videoKbps: number
   audioKbps: number
   encoder: string
   hardwareEncoder: boolean
+  tiers: StreamTier[]
+  // The live window's height in pixels, or null while it isn't open.
+  sourceHeight: number | null
 }
+
+export const DEFAULT_STREAM_QUALITY = "720p30"
+
+const formatTierMbps = (kbps: number) => {
+  const mbps = kbps / 1000
+  return Number.isInteger(mbps) ? `${mbps}` : mbps.toFixed(1)
+}
+
+// "720p 30 fps · 2.5 Mbps"; 2160 reads as 4K.
+export const tierLabel = (tier: StreamTier) =>
+  `${tier.height === 2160 ? "4K" : `${tier.height}p`} ${tier.fps} fps · ${formatTierMbps(tier.videoKbps)} Mbps`
 
 // The operator's answer to the pre-flight check.
 export type PreflightChoice = "stream" | "window-only" | "cancel"
@@ -81,6 +108,7 @@ interface SavedSettings {
   audioDevice?: string | null
   source?: StreamSource
   checkBeforeStreaming?: boolean
+  quality?: string
 }
 let settingsHydrated = false
 
@@ -131,6 +159,11 @@ const isGestureError = (error: unknown) =>
 export const useYoutubeStream = () => {
   const { isTauri } = useTauri()
   const isDesktop = isTauri && import.meta.client
+  // Events fire after awaits, where Nuxt's context is gone, so each capture
+  // runs inside the app's context.
+  const nuxtApp = useNuxtApp()
+  const track = (event: string, properties?: Record<string, unknown>) =>
+    nuxtApp.runWithContext(() => usePosthogCapture(event, properties))
 
   const status = useState<StreamStatus>("yt-stream-status", idleStatus)
   const isInvoking = useState<boolean>("yt-stream-pending", () => false)
@@ -151,6 +184,12 @@ export const useYoutubeStream = () => {
   // Show the pre-flight check before each YouTube stream.
   const checkBeforeStreaming = useState<boolean>("yt-stream-check-first", () => true)
   const preflightOpen = useState<boolean>("yt-stream-preflight-open", () => false)
+  // The chosen quality tier, an id the backend knows (e.g. "1080p60").
+  const quality = useState<string>("yt-stream-quality", () => DEFAULT_STREAM_QUALITY)
+  // The tiers this computer offers, and the live window's height, from the
+  // backend's plan. Empty until the plan has been read once.
+  const tiers = useState<StreamTier[]>("yt-stream-tiers", () => [])
+  const sourceHeight = useState<number | null>("yt-stream-source-height", () => null)
 
   if (isDesktop && !settingsHydrated) {
     settingsHydrated = true
@@ -162,7 +201,8 @@ export const useYoutubeStream = () => {
     if (typeof saved.checkBeforeStreaming === "boolean") {
       checkBeforeStreaming.value = saved.checkBeforeStreaming
     }
-    watch([streamKey, streamOnGoLive, audioDevice, source, checkBeforeStreaming], () => {
+    if (typeof saved.quality === "string") quality.value = saved.quality
+    watch([streamKey, streamOnGoLive, audioDevice, source, checkBeforeStreaming, quality], () => {
       try {
         localStorage.setItem(
           SETTINGS_KEY,
@@ -172,6 +212,7 @@ export const useYoutubeStream = () => {
             audioDevice: audioDevice.value,
             source: source.value,
             checkBeforeStreaming: checkBeforeStreaming.value,
+            quality: quality.value,
           } satisfies SavedSettings)
         )
       } catch {
@@ -215,6 +256,42 @@ export const useYoutubeStream = () => {
     if (audioDevice.value === null) return audioDevices.value[0]?.name ?? null
     return audioDevices.value.find((device) => device.index === audioDevice.value)?.name ?? null
   })
+
+  // The quality dropdown shows labels; a tier this computer can't produce is
+  // listed but marked, and picking it is refused.
+  const UNAVAILABLE_NOTE = " (not available on this computer)"
+  const qualityLabelFor = (tier: StreamTier) =>
+    tier.available ? tierLabel(tier) : `${tierLabel(tier)}${UNAVAILABLE_NOTE}`
+
+  const qualityChoices = computed(() => tiers.value.map(qualityLabelFor))
+
+  const currentTier = computed(() => tiers.value.find((tier) => tier.id === quality.value))
+
+  const qualityChoice = computed(() => {
+    const tier = currentTier.value ?? tiers.value.find((t) => t.id === DEFAULT_STREAM_QUALITY)
+    return tier ? qualityLabelFor(tier) : ""
+  })
+
+  // True when the chosen tier is taller than the live window, so the stream
+  // is an upscale of what the window really shows.
+  const qualityIsUpscaled = computed(
+    () =>
+      !!currentTier.value &&
+      sourceHeight.value !== null &&
+      currentTier.value.height > sourceHeight.value
+  )
+
+  const setQualityChoice = (label: string) => {
+    const tier = tiers.value.find((candidate) => qualityLabelFor(candidate) === label)
+    if (!tier || !tier.available || tier.id === quality.value) return
+    quality.value = tier.id
+    track("STREAM_QUALITY_CHANGED", {
+      quality: tier.id,
+      codec: tier.codec,
+      height: tier.height,
+      fps: tier.fps,
+    })
+  }
 
   // Reconnecting still counts as an active session (show Stop, not Go live).
   const isStreaming = computed(
@@ -277,6 +354,7 @@ export const useYoutubeStream = () => {
       await sharedStatusListener
       status.value = await invokeTauri<StreamStatus>("stream_status")
       await listAudioDevices()
+      await getPlan().catch((error) => console.warn("Couldn't read the stream plan:", error))
     } catch (error) {
       console.error("Failed to initialize YouTube stream status:", error)
     }
@@ -359,6 +437,7 @@ export const useYoutubeStream = () => {
       streamKey: streamKey.value,
       source: "browser",
       audioDevice: null,
+      quality: DEFAULT_STREAM_QUALITY,
     }).catch((error) => {
       tracks.forEach((track) => track.stop())
       throw error
@@ -399,6 +478,7 @@ export const useYoutubeStream = () => {
         streamKey: streamKey.value,
         source: "native-window",
         audioDevice: audioDevice.value,
+        quality: quality.value,
       })
     } catch (error) {
       if (!messageOf(error).includes("isn't available on this OS")) throw error
@@ -418,11 +498,21 @@ export const useYoutubeStream = () => {
           streamKey: streamKey.value,
           source: source.value,
           audioDevice: audioDevice.value,
+          quality: quality.value,
         })
       }
+      track("YOUTUBE_STREAM_STARTED", {
+        source: source.value,
+        quality: source.value === "live-window" ? quality.value : DEFAULT_STREAM_QUALITY,
+      })
     } catch (error) {
       stopCapture()
       status.value = { phase: "error", error: messageOf(error) }
+      track("YOUTUBE_STREAM_FAILED", {
+        source: source.value,
+        quality: quality.value,
+        error: messageOf(error).slice(0, 120),
+      })
     } finally {
       isInvoking.value = false
     }
@@ -461,7 +551,17 @@ export const useYoutubeStream = () => {
     resolve?.(choice)
   }
 
-  const getPlan = () => invokeTauri<StreamPlan>("stream_plan")
+  // Reads what the broadcast would be at the chosen quality, and keeps the
+  // tiers and the live window's size for the pickers.
+  const getPlan = async () => {
+    const plan = await invokeTauri<StreamPlan>("stream_plan", { quality: quality.value })
+    tiers.value = plan.tiers
+    sourceHeight.value = plan.sourceHeight
+    // A saved tier this computer can't produce falls back to the default.
+    const saved = plan.tiers.find((tier) => tier.id === quality.value)
+    if (saved && !saved.available) quality.value = DEFAULT_STREAM_QUALITY
+    return plan
+  }
 
   // Milliseconds to open a connection to YouTube's ingest server.
   const checkYoutube = () => invokeTauri<number>("stream_check_youtube")
@@ -534,6 +634,12 @@ export const useYoutubeStream = () => {
     stats: readonly(stats),
     meterDb: readonly(meterDb),
     checkBeforeStreaming,
+    quality,
+    qualityChoices,
+    qualityChoice,
+    setQualityChoice,
+    qualityIsUpscaled,
+    sourceHeight: readonly(sourceHeight),
     preflightOpen: readonly(preflightOpen),
     requestPreflight,
     answerPreflight,

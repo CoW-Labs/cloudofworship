@@ -32,10 +32,13 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Emitter, State};
 
 mod keep_awake;
+mod quality;
 mod stats;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod window_capture;
 
+pub use quality::StreamQuality;
+use quality::{Codec, AUDIO_KBPS};
 pub use stats::Counters;
 
 /// YouTube's primary RTMP ingest. The stream key is appended as the last path
@@ -44,12 +47,6 @@ const YOUTUBE_INGEST_BASE: &str = "rtmp://a.rtmp.youtube.com/live2";
 
 /// Event name the frontend listens on for live status changes.
 const STATUS_EVENT: &str = "stream://status";
-
-/// Broadcast quality: 720p at 30fps, YouTube's recommended range for 720p30.
-const OUTPUT_HEIGHT: u32 = 720;
-const OUTPUT_FPS: u32 = 30;
-const VIDEO_KBPS: u32 = 2500;
-const AUDIO_KBPS: u32 = 128;
 
 /// YouTube's RTMP ingest host and port, for the pre-flight reachability check.
 const YOUTUBE_INGEST_HOST: &str = "a.rtmp.youtube.com:1935";
@@ -185,6 +182,7 @@ impl StreamBridge {
     stream_key: String,
     source: String,
     audio_device: Option<String>,
+    quality: Option<String>,
   ) -> Result<StreamStatus, String> {
     let _op = self.inner.operation.lock().unwrap_or_else(|p| p.into_inner());
     // The broadcast takes over the audio input from the pre-flight meter.
@@ -197,19 +195,23 @@ impl StreamBridge {
 
     let url = format!("{YOUTUBE_INGEST_BASE}/{key}");
 
+    // Only the native window feed can deliver more than the default; the other
+    // sources are capped by what they capture.
+    let default = quality::DEFAULT;
     if source == "browser" {
-      self.start_feed_locked(url, browser_encoder_args())?;
+      self.start_feed_locked(url, browser_encoder_args(default), default)?;
       return Ok(self.set_status(StreamPhase::Live, None));
     }
     if source == "native-window" {
-      return self.start_window_feed_locked(url, audio_device.as_deref());
+      let quality = StreamQuality::by_id(quality.as_deref());
+      return self.start_window_feed_locked(url, audio_device.as_deref(), quality);
     }
 
     // Resolve the whole FFmpeg command once (before tearing down any running
     // stream, so a bad source/permission doesn't kill a live one) and reuse it
     // across reconnects, so a network blip re-runs the identical pipeline.
     let mut args = input_args(&source, audio_device.as_deref())?;
-    args.extend(encode_args(false));
+    args.extend(encode_args(default, false));
     // -rw_timeout makes FFmpeg give up on a stalled network write (~8s) instead
     // of blocking indefinitely, so a dropped connection is detected promptly and
     // the supervisor can reconnect — rather than sitting on a false "live".
@@ -256,11 +258,12 @@ impl StreamBridge {
     &self,
     url: String,
     audio: Option<&str>,
+    quality: StreamQuality,
   ) -> Result<StreamStatus, String> {
     // Find the window and audio device before touching a running stream.
-    let target = window_capture::locate(&self.inner.app)?;
+    let target = window_capture::locate(&self.inner.app, quality)?;
     let audio = resolve_audio_device(audio)?;
-    self.start_feed_locked(url, window_encoder_args(target.width, target.height, audio))?;
+    self.start_feed_locked(url, window_encoder_args(&target, quality, audio), quality)?;
 
     let (input, stopping, counters) = {
       let session = self.inner.session.lock().unwrap_or_else(|p| p.into_inner());
@@ -284,7 +287,7 @@ impl StreamBridge {
         });
       })
     };
-    let capture = match window_capture::start(target, input, fail, counters) {
+    let capture = match window_capture::start(target, quality, input, fail, counters) {
       Ok(capture) => capture,
       Err(error) => {
         self.stop_locked();
@@ -309,6 +312,7 @@ impl StreamBridge {
     &self,
     _url: String,
     _audio: Option<&str>,
+    _quality: StreamQuality,
   ) -> Result<StreamStatus, String> {
     Err("Native live window capture isn't available on this OS yet.".into())
   }
@@ -316,7 +320,12 @@ impl StreamBridge {
   /// Starts the encoder + pusher pair; the caller then writes the encoder's
   /// input (window frames or the page's recording). Caller holds the operation
   /// lock.
-  fn start_feed_locked(&self, url: String, encoder_args: Vec<String>) -> Result<(), String> {
+  fn start_feed_locked(
+    &self,
+    url: String,
+    encoder_args: Vec<String>,
+    quality: StreamQuality,
+  ) -> Result<(), String> {
     self.stop_locked();
 
     let mut encoder = ffmpeg_command()
@@ -409,7 +418,7 @@ impl StreamBridge {
       self.inner.app.clone(),
       counters.clone(),
       stopping.clone(),
-      VIDEO_KBPS + AUDIO_KBPS,
+      quality.total_kbps(),
     );
     self
       .inner
@@ -878,29 +887,33 @@ fn parse_device_line(line: &str) -> Option<(String, String)> {
 /// macOS (near-free CPU), libx264 elsewhere. Downscales to a sane 720p (`-2`
 /// keeps width even and the aspect intact); `constant_fps` re-times irregular
 /// input (the browser feed) to a steady 30fps.
-fn encode_args(constant_fps: bool) -> Vec<String> {
-  let scale = format!("scale=-2:{OUTPUT_HEIGHT}");
-  let filter = if constant_fps { format!("fps={OUTPUT_FPS},{scale}") } else { scale };
+fn encode_args(quality: StreamQuality, constant_fps: bool) -> Vec<String> {
+  let scale = format!("scale=-2:{}", quality.height);
+  let filter =
+    if constant_fps { format!("fps={},{scale}", quality.fps) } else { scale };
   let mut args = vec!["-vf".to_string(), filter];
   args.extend(video_encoder_args().iter().cloned());
   args.extend([
     "-b:v".to_string(),
-    format!("{VIDEO_KBPS}k"),
+    format!("{}k", quality.video_kbps),
     "-maxrate".to_string(),
-    format!("{VIDEO_KBPS}k"),
+    format!("{}k", quality.video_kbps),
     "-bufsize".to_string(),
-    format!("{}k", VIDEO_KBPS * 2),
+    format!("{}k", quality.video_kbps * 2),
     // A keyframe every 2 seconds, as YouTube asks.
     "-g".to_string(),
-    (OUTPUT_FPS * 2).to_string(),
-    "-c:a".to_string(),
-    "aac".to_string(),
-    "-b:a".to_string(),
-    format!("{AUDIO_KBPS}k"),
-    "-ar".to_string(),
-    "44100".to_string(),
+    quality.keyframe_interval().to_string(),
   ]);
+  args.extend(audio_encode_args());
   args
+}
+
+/// AAC audio at YouTube's recommended rate, shared by every encoder path.
+fn audio_encode_args() -> Vec<String> {
+  ["-c:a".to_string(), "aac".to_string(), "-b:a".to_string(), format!("{AUDIO_KBPS}k")]
+    .into_iter()
+    .chain(["-ar".to_string(), "44100".to_string()])
+    .collect()
 }
 
 /// H.264 encoders in order of preference, with their settings. The bundled
@@ -959,7 +972,7 @@ fn encoder_works(args: &[&str]) -> bool {
 /// (recorder timestamps are irregular, YouTube wants steady frames), encodes
 /// with a 2-second keyframe interval and writes MPEG-TS to stdout for the
 /// pusher. `aresample=async` papers over small audio clock drift.
-fn browser_encoder_args() -> Vec<String> {
+fn browser_encoder_args(quality: StreamQuality) -> Vec<String> {
   let mut args = [
     "-hide_banner", "-loglevel", "warning",
     "-fflags", "+genpts+discardcorrupt",
@@ -969,7 +982,7 @@ fn browser_encoder_args() -> Vec<String> {
   ]
   .map(String::from)
   .to_vec();
-  args.extend(encode_args(true));
+  args.extend(encode_args(quality, true));
   args.extend(
     ["-bsf:v", "dump_extra=freq=keyframe", "-flush_packets", "1", "-f", "mpegts", "pipe:1"]
       .map(String::from),
@@ -977,32 +990,57 @@ fn browser_encoder_args() -> Vec<String> {
   args
 }
 
-/// Encoder for the native window feed: raw BGRA frames from the pacer on stdin
-/// plus, optionally, an audio input.
+/// Encoder for the native window feed.
 ///
-/// Video frames are timed by their position in the pacer's steady 30fps
-/// schedule, not by when FFmpeg reads them. FFmpeg pauses reading any input
-/// that's more than 0.1s ahead of the others; with read-time stamps every
-/// paused frame came out even further ahead, which locked video at ~3fps.
-/// Audio keeps wall-clock stamps (device clocks are unrelated to ours); FFmpeg
-/// starts both inputs at zero, and `aresample=async` absorbs small drift.
+/// Two shapes, chosen by how the window was captured:
+///
+/// * **Raw pipe**: the pacer writes raw BGRA frames to stdin and FFmpeg scales,
+///   converts and encodes them (Windows, and macOS when the in-process encoder
+///   is unavailable).
+/// * **Hardware encoded**: the app has already encoded H.264 on the GPU (macOS
+///   VideoToolbox, fed straight from the capture's surfaces), so FFmpeg only
+///   muxes it with the audio. Nothing but a few MB/s of compressed video
+///   crosses the pipe, which is what makes 4K60 possible.
+///
+/// Either way video is timed by its position in the pacer's steady schedule,
+/// not by when FFmpeg reads it. FFmpeg pauses reading any input that's more
+/// than 0.1s ahead of the others; with read-time stamps every paused frame
+/// came out even further ahead, which locked video at ~3fps. Audio keeps
+/// wall-clock stamps (device clocks are unrelated to ours); FFmpeg starts both
+/// inputs at zero, and `aresample=async` absorbs small drift.
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-fn window_encoder_args(width: u32, height: u32, audio: Option<String>) -> Vec<String> {
-  let mut args = [
-    "-hide_banner", "-loglevel", "warning",
-    "-thread_queue_size", "64",
-    "-f", "rawvideo", "-pix_fmt", "bgra",
-  ]
-  .map(String::from)
-  .to_vec();
-  args.extend([
-    "-s".to_string(),
-    format!("{width}x{height}"),
-    "-framerate".to_string(),
-    "30".to_string(),
-    "-i".to_string(),
-    "pipe:0".to_string(),
-  ]);
+fn window_encoder_args(
+  target: &window_capture::Target,
+  quality: StreamQuality,
+  audio: Option<String>,
+) -> Vec<String> {
+  let mut args = ["-hide_banner", "-loglevel", "warning", "-thread_queue_size", "64"]
+    .map(String::from)
+    .to_vec();
+  if target.hardware_encoded() {
+    // Raw H.264 carries no timestamps, so FFmpeg numbers the frames at the
+    // pacer's rate. Probing is kept short: the stream opens with its
+    // parameter sets, and a long probe would delay the first output.
+    let demuxer = match quality.codec {
+      Codec::H264 => "h264",
+      Codec::Hevc => "hevc",
+    };
+    // No `-fflags nobuffer` here: it makes FFmpeg discard what it read while
+    // probing, which at the start of a stream is its first ~2 seconds of video.
+    args.extend(
+      ["-probesize", "262144", "-analyzeduration", "0", "-f", demuxer].map(String::from),
+    );
+    args.extend(["-framerate".to_string(), quality.fps.to_string()]);
+  } else {
+    args.extend(["-f", "rawvideo", "-pix_fmt", "bgra"].map(String::from));
+    args.extend([
+      "-s".to_string(),
+      format!("{}x{}", target.width, target.height),
+      "-framerate".to_string(),
+      quality.fps.to_string(),
+    ]);
+  }
+  args.extend(["-i".to_string(), "pipe:0".to_string()]);
   if let Some(device) = &audio {
     args.extend(audio_input_args(device));
   }
@@ -1016,11 +1054,21 @@ fn window_encoder_args(width: u32, height: u32, audio: Option<String>) -> Vec<St
       format!("aresample=async=1000,{}", stats::LEVEL_FILTERS),
     ]);
   }
-  args.extend(encode_args(true));
-  args.extend(
-    ["-bsf:v", "dump_extra=freq=keyframe", "-flush_packets", "1", "-f", "mpegts", "pipe:1"]
-      .map(String::from),
-  );
+  if target.hardware_encoded() {
+    args.extend(["-c:v", "copy"].map(String::from));
+    args.extend(audio_encode_args());
+  } else {
+    args.extend(encode_args(quality, true));
+  }
+  // A raw stream has no timestamps, and FFmpeg can't work out the rate of one
+  // from a short probe, so each frame is stamped from its position instead.
+  let video_filters = if target.hardware_encoded() {
+    format!("setts=ts=N/({}*TB),dump_extra=freq=keyframe", quality.fps)
+  } else {
+    "dump_extra=freq=keyframe".to_string()
+  };
+  args.extend(["-bsf:v".to_string(), video_filters]);
+  args.extend(["-flush_packets", "1", "-f", "mpegts", "pipe:1"].map(String::from));
   args
 }
 
@@ -1063,10 +1111,11 @@ pub async fn stream_start(
   stream_key: String,
   source: String,
   audio_device: Option<String>,
+  quality: Option<String>,
 ) -> Result<StreamStatus, String> {
   let bridge = state.inner().clone();
   tauri::async_runtime::spawn_blocking(move || {
-    bridge.start_blocking(stream_key, source, audio_device)
+    bridge.start_blocking(stream_key, source, audio_device, quality)
   })
   .await
   .map_err(|e| format!("The stream start task failed: {e}"))?
@@ -1110,10 +1159,23 @@ pub fn stream_audio_meter_stop(state: State<'_, StreamBridge>) {
   state.stop_audio_meter();
 }
 
+/// One quality tier as the pre-flight check shows it.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TierInfo {
+  #[serde(flatten)]
+  pub tier: StreamQuality,
+  /// False when this machine can't produce the tier yet, with `reason` saying
+  /// why in plain words. The picker shows it greyed out rather than hiding it.
+  pub available: bool,
+  pub reason: Option<String>,
+}
+
 /// What the broadcast will be, for the pre-flight check.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StreamPlan {
+  pub quality: String,
   pub height: u32,
   pub fps: u32,
   pub video_kbps: u32,
@@ -1121,15 +1183,42 @@ pub struct StreamPlan {
   /// The H.264 encoder this machine will use, in plain words.
   pub encoder: String,
   pub hardware_encoder: bool,
+  /// Every tier, in order, with whether this machine can run it.
+  pub tiers: Vec<TierInfo>,
+  /// The live window's height in pixels, so the picker can warn that a tier
+  /// taller than it is only an upscale. `None` when the window isn't open.
+  pub source_height: Option<u32>,
+}
+
+/// Whether this machine can produce `tier`, and if not, why.
+fn tier_support(tier: &StreamQuality) -> (bool, Option<String>) {
+  // Raw frames reach FFmpeg through a pipe unless the app encodes them itself
+  // (macOS, VideoToolbox, straight from the capture's GPU surfaces). That pipe
+  // carries 250 MB/s at 1080p30 and double that at 1080p60 or more at higher
+  // sizes, which is why only the macOS path offers anything past 1080p30.
+  #[cfg(not(target_os = "macos"))]
+  if tier.height > 1080 || (tier.height == 1080 && tier.fps > 30) {
+    return (
+      false,
+      Some("This quality needs GPU encoding, which isn't available on this system yet.".into()),
+    );
+  }
+  let _ = tier;
+  (true, None)
 }
 
 #[tauri::command]
-pub async fn stream_plan() -> Result<StreamPlan, String> {
-  tauri::async_runtime::spawn_blocking(|| {
+pub async fn stream_plan(
+  app: AppHandle,
+  quality: Option<String>,
+) -> Result<StreamPlan, String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    let quality = StreamQuality::by_id(quality.as_deref());
     // On Windows this probes the encoders once (a few seconds), so the real
     // start is faster afterwards.
     let codec = video_encoder_args().get(1).cloned().unwrap_or_default();
     let (encoder, hardware_encoder) = match codec.as_str() {
+      "h264_videotoolbox" if quality.codec == Codec::Hevc => ("Apple hardware encoder (HEVC)", true),
       "h264_videotoolbox" => ("Apple hardware encoder", true),
       "h264_nvenc" => ("NVIDIA hardware encoder", true),
       "h264_qsv" => ("Intel hardware encoder", true),
@@ -1137,13 +1226,29 @@ pub async fn stream_plan() -> Result<StreamPlan, String> {
       "h264_mf" => ("Windows built-in encoder", true),
       _ => ("Software encoder (uses more CPU)", false),
     };
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    let source_height = window_capture::source_height(&app);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let source_height = {
+      let _ = &app;
+      None
+    };
     StreamPlan {
-      height: OUTPUT_HEIGHT,
-      fps: OUTPUT_FPS,
-      video_kbps: VIDEO_KBPS,
+      quality: quality.id.to_string(),
+      height: quality.height,
+      fps: quality.fps,
+      video_kbps: quality.video_kbps,
       audio_kbps: AUDIO_KBPS,
       encoder: encoder.to_string(),
       hardware_encoder,
+      tiers: quality::TIERS
+        .iter()
+        .map(|tier| {
+          let (available, reason) = tier_support(tier);
+          TierInfo { tier: *tier, available, reason }
+        })
+        .collect(),
+      source_height,
     }
   })
   .await

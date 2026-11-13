@@ -13,16 +13,20 @@ use screencapturekit::prelude::*;
 use screencapturekit::stream::delegate_trait::ErrorHandler;
 use tauri::{AppHandle, Manager};
 
-use super::{Sink, Target, LIVE_WINDOW_LABEL};
+use super::vt_encoder::VtEncoder;
+use super::{Sink, StreamQuality, Target, LIVE_WINDOW_LABEL};
 
-/// ScreenCaptureKit scales into the configured size, so frames come out at
-/// the broadcast's 720p directly.
-const OUTPUT_HEIGHT: u32 = 720;
+/// ScreenCaptureKit scales into the configured size on the GPU, so frames come
+/// out at the tier's size directly.
 
 pub(super) type NativeTarget = SCWindow;
 pub(super) type NativeCapture = SCStream;
 
-pub(super) fn locate(app: &AppHandle) -> Result<Target, String> {
+pub(super) fn source_height(app: &AppHandle) -> Option<u32> {
+  app.get_webview_window(LIVE_WINDOW_LABEL)?.outer_size().ok().map(|size| size.height)
+}
+
+pub(super) fn locate(app: &AppHandle, quality: StreamQuality) -> Result<Target, String> {
   let window = app
     .get_webview_window(LIVE_WINDOW_LABEL)
     .ok_or("Open the live output window first, then go live.")?;
@@ -67,8 +71,28 @@ pub(super) fn locate(app: &AppHandle) -> Result<Target, String> {
   );
 
   let aspect = if frame.size.height > 0.0 { frame.size.width / frame.size.height } else { 16.0 / 9.0 };
-  let width = ((OUTPUT_HEIGHT as f64 * aspect).round() as u32).max(2) & !1;
-  Ok(Target { native: found.clone(), width, height: OUTPUT_HEIGHT })
+  let width = quality.width_for(aspect);
+  let height = quality.height;
+
+  // Prefer encoding on the GPU straight from capture surfaces. If this Mac
+  // can't (no hardware encoder for the size), FFmpeg encodes from raw frames
+  // instead, which is fine up to 1080p but not beyond.
+  let encoder = match VtEncoder::new(width, height, quality) {
+    Ok(encoder) => {
+      log::info!("stream: hardware encoder ready for {width}x{height} @ {} fps", quality.fps);
+      Some(Arc::new(encoder))
+    }
+    Err(reason) => {
+      log::warn!("stream: in-process encoder unavailable ({reason}); encoding in FFmpeg");
+      None
+    }
+  };
+  if encoder.is_none() && height > 1080 {
+    return Err(format!(
+      "This Mac's hardware encoder can't take {width}x{height}. Choose 1080p or lower."
+    ));
+  }
+  Ok(Target { native: found.clone(), width, height, encoder })
 }
 
 pub(super) fn start(window: SCWindow, sink: Arc<Sink>) -> Result<SCStream, String> {
@@ -77,16 +101,27 @@ pub(super) fn start(window: SCWindow, sink: Arc<Sink>) -> Result<SCStream, Strin
     .with_window(&window)
     .try_build()
     .map_err(|e| format!("Could not set up live window capture ({e})."))?;
-  let interval = CMTime::new(1, 30);
-  let configuration = SCStreamConfiguration::new()
+  let interval = CMTime::new(1, sink.fps as i32);
+  // The hardware encoder takes NV12 (video range) as it comes, so the GPU does
+  // the colour conversion and nothing converts on the CPU. The FFmpeg path
+  // needs packed BGRA. Surfaces are kept until the next one replaces them, so
+  // that mode gets a deeper queue to leave the capture room to work.
+  let (pixel_format, queue_depth) =
+    if sink.hardware { (PixelFormat::YCbCr_420v, 6) } else { (PixelFormat::BGRA, 3) };
+  let mut configuration = SCStreamConfiguration::new()
     .with_width(width)
     .with_height(height)
-    .with_pixel_format(PixelFormat::BGRA)
+    .with_pixel_format(pixel_format)
     .with_scales_to_fit(true)
     .with_shows_cursor(false)
     .with_ignores_shadows_single_window(true)
-    .with_queue_depth(3)
+    .with_queue_depth(queue_depth)
     .with_minimum_frame_interval(&interval);
+  if sink.hardware {
+    // The encoder tags its output from the surfaces, and players assume
+    // BT.709 for HD video, so say so rather than rely on a default.
+    configuration.set_color_matrix("ITU_R_709_2");
+  }
 
   let delegate = {
     let sink = sink.clone();
@@ -115,6 +150,15 @@ pub(super) fn start(window: SCWindow, sink: Arc<Sink>) -> Result<SCStream, Strin
         sink.reject(format!("{status:?} without pixels"));
         return;
       };
+      if sink.hardware {
+        if buffer.width() as u32 != width || buffer.height() as u32 != height {
+          sink.reject(format!("{}x{} (want {width}x{height})", buffer.width(), buffer.height()));
+          return;
+        }
+        // No copy: the encoder reads the capture's own surface.
+        sink.publish_surface(buffer);
+        return;
+      }
       let Ok(guard) = buffer.lock(CVPixelBufferLockFlags::READ_ONLY) else {
         sink.reject(format!("{status:?} lock failed"));
         return;
@@ -126,9 +170,15 @@ pub(super) fn start(window: SCWindow, sink: Arc<Sink>) -> Result<SCStream, Strin
       let row = width as usize * 4;
       let stride = guard.bytes_per_row();
       let data = guard.as_slice();
-      let mut packed = Vec::with_capacity(row * height as usize);
-      for y in 0..height as usize {
-        packed.extend_from_slice(&data[y * stride..y * stride + row]);
+      let mut packed = sink.buffer();
+      packed.clear();
+      packed.reserve(row * height as usize);
+      if stride == row {
+        packed.extend_from_slice(&data[..row * height as usize]);
+      } else {
+        for y in 0..height as usize {
+          packed.extend_from_slice(&data[y * stride..y * stride + row]);
+        }
       }
       sink.publish(packed);
     },

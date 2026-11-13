@@ -35,15 +35,15 @@ use windows_capture::window::Window;
 
 use super::{ActiveCapture, CaptureContext, CaptureStarted};
 use crate::ndi::pipeline::{fit_within, FrameMailbox};
-use crate::ndi::status::{CapturePermission, NdiErrorCode, NdiErrorInfo, StatusSink, FRAME_RATE};
+use crate::ndi::quality::NdiQuality;
+use crate::ndi::status::{CapturePermission, NdiErrorCode, NdiErrorInfo, StatusSink};
 use std::sync::{atomic::AtomicBool, Arc};
 
 const LIVE_WINDOW_LABEL: &str = "live-output";
-const MAX_WIDTH: u32 = 1920;
-const MAX_HEIGHT: u32 = 1080;
 
 #[derive(Clone)]
 struct CaptureFlags {
+  quality: NdiQuality,
   mailbox: Arc<FrameMailbox>,
   stop: Arc<AtomicBool>,
   status: StatusSink,
@@ -77,7 +77,12 @@ impl GraphicsCaptureApiHandler for WindowsFrameHandler {
     let source_width = frame.width();
     let source_height = frame.height();
     let (target_width, target_height) =
-      fit_within(source_width, source_height, MAX_WIDTH, MAX_HEIGHT);
+      fit_within(
+        source_width,
+        source_height,
+        self.flags.quality.max_width,
+        self.flags.quality.max_height,
+      );
     if target_width == 0 || target_height == 0 {
       return Err(NdiErrorInfo::new(
         NdiErrorCode::ScalingFailed,
@@ -207,7 +212,7 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
     SecondaryWindowSettings::Default
   };
   let interval = if GraphicsCaptureApi::is_minimum_update_interval_supported().unwrap_or(false) {
-    MinimumUpdateIntervalSettings::Custom(Duration::from_secs_f64(1.0 / FRAME_RATE as f64))
+    MinimumUpdateIntervalSettings::Custom(Duration::from_secs_f64(1.0 / context.quality.fps as f64))
   } else {
     MinimumUpdateIntervalSettings::Default
   };
@@ -220,6 +225,7 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
     DirtyRegionSettings::Default,
     ColorFormat::Bgra8,
     CaptureFlags {
+      quality: context.quality,
       mailbox: context.mailbox,
       stop: context.stop,
       status: context.status,
@@ -388,7 +394,7 @@ fn run_readback(
   height: u32,
 ) -> Result<(), NdiErrorInfo> {
   let (lock, changed) = shared;
-  let interval = Duration::from_secs_f64(1.0 / FRAME_RATE as f64);
+  let interval = Duration::from_secs_f64(1.0 / flags.quality.fps as f64);
   let mut next_capture = Instant::now();
   let mut state = lock.lock().unwrap_or_else(|p| p.into_inner());
   loop {

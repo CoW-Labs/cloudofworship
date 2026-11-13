@@ -1,5 +1,6 @@
 mod capture;
 mod pipeline;
+mod quality;
 mod status;
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -8,6 +9,8 @@ mod ffi;
 mod runtime;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod sender;
+#[cfg(all(test, target_os = "macos"))]
+mod bench;
 
 use std::sync::{
   atomic::{AtomicBool, Ordering},
@@ -19,6 +22,7 @@ use tauri::{AppHandle, State};
 
 use capture::ActiveCapture;
 use pipeline::FrameMailbox;
+use quality::NdiQuality;
 pub use status::{NdiErrorInfo, NdiStatus, NdiPhase};
 use status::{CapturePermission, NdiErrorCode, StatusSink};
 
@@ -58,7 +62,7 @@ impl NdiBridge {
   }
 
   #[cfg(any(target_os = "macos", target_os = "windows"))]
-  pub fn start_blocking(&self) -> Result<NdiStatus, NdiErrorInfo> {
+  pub fn start_blocking(&self, quality: NdiQuality) -> Result<NdiStatus, NdiErrorInfo> {
     let _operation = self
       .inner
       .operation
@@ -90,6 +94,8 @@ impl NdiBridge {
     self.inner.status.update(|status| {
       *status = NdiStatus::default();
       status.phase = NdiPhase::Starting;
+      status.fps = quality.fps;
+      status.quality = quality.id.to_string();
     });
 
     let runtime = match runtime::load() {
@@ -117,6 +123,7 @@ impl NdiBridge {
       .spawn(move || {
         sender::run_sender(
           sender_runtime,
+          quality,
           sender_mailbox,
           sender_stop,
           sender_status,
@@ -135,6 +142,7 @@ impl NdiBridge {
 
     let capture = match capture::start_capture(capture::CaptureContext {
       app: self.inner.app.clone(),
+      quality,
       mailbox: mailbox.clone(),
       stop: stop.clone(),
       status: self.inner.status.clone(),
@@ -190,7 +198,7 @@ impl NdiBridge {
   }
 
   #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-  pub fn start_blocking(&self) -> Result<NdiStatus, NdiErrorInfo> {
+  pub fn start_blocking(&self, _quality: NdiQuality) -> Result<NdiStatus, NdiErrorInfo> {
     let error = NdiErrorInfo::new(
       NdiErrorCode::UnsupportedPlatform,
       "NDI live output is currently available only on macOS and Windows.",
@@ -261,9 +269,13 @@ fn update_permission_from_error(status: &StatusSink, error: &NdiErrorInfo) {
 }
 
 #[tauri::command]
-pub async fn ndi_start(state: State<'_, NdiBridge>) -> Result<NdiStatus, NdiErrorInfo> {
+pub async fn ndi_start(
+  state: State<'_, NdiBridge>,
+  quality: Option<String>,
+) -> Result<NdiStatus, NdiErrorInfo> {
   let bridge = state.inner().clone();
-  tauri::async_runtime::spawn_blocking(move || bridge.start_blocking())
+  let quality = NdiQuality::by_id(quality.as_deref());
+  tauri::async_runtime::spawn_blocking(move || bridge.start_blocking(quality))
     .await
     .map_err(|error| NdiErrorInfo::internal(format!("The NDI start task failed: {error}")))?
 }
@@ -286,4 +298,42 @@ pub async fn ndi_open_capture_settings() -> Result<(), NdiErrorInfo> {
   tauri::async_runtime::spawn_blocking(capture::open_capture_settings)
     .await
     .map_err(|error| NdiErrorInfo::internal(format!("Could not open capture settings: {error}")))?
+}
+
+/// One NDI quality tier as the picker shows it.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NdiTierInfo {
+  #[serde(flatten)]
+  pub tier: NdiQuality,
+  /// False when this computer can't send the tier yet, with `reason` in plain
+  /// words. The picker lists it greyed out.
+  pub available: bool,
+  pub reason: Option<String>,
+}
+
+/// Whether this computer can send `tier`.
+fn tier_support(tier: &NdiQuality) -> (bool, Option<String>) {
+  // Only the macOS capture sends NV12 and has been run above 1080p30; the
+  // Windows readback still goes through BGRA at 30 fps.
+  #[cfg(not(target_os = "macos"))]
+  if tier.id != quality::DEFAULT.id {
+    return (
+      false,
+      Some("This size and frame rate isn't available on this system yet.".into()),
+    );
+  }
+  let _ = tier;
+  (true, None)
+}
+
+#[tauri::command]
+pub fn ndi_tiers() -> Vec<NdiTierInfo> {
+  quality::TIERS
+    .iter()
+    .map(|tier| {
+      let (available, reason) = tier_support(tier);
+      NdiTierInfo { tier: *tier, available, reason }
+    })
+    .collect()
 }

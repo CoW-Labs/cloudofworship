@@ -27,6 +27,7 @@ pub struct NdiVideoFrameV2 {
 }
 
 pub const FOURCC_BGRA: c_int = 0x4152_4742;
+pub const FOURCC_NV12: c_int = 0x3231_564E;
 pub const FRAME_FORMAT_PROGRESSIVE: c_int = 1;
 pub const TIMECODE_SYNTHESIZE: i64 = i64::MAX;
 
@@ -57,6 +58,7 @@ mod tests {
     assert_eq!(std::mem::offset_of!(NdiVideoFrameV2, p_metadata), 56);
     assert_eq!(std::mem::offset_of!(NdiVideoFrameV2, timestamp), 64);
     assert_eq!(FOURCC_BGRA.to_le_bytes(), *b"BGRA");
+    assert_eq!(FOURCC_NV12.to_le_bytes(), *b"NV12");
   }
 
   #[test]

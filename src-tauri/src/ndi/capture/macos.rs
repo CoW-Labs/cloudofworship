@@ -12,14 +12,10 @@ use tauri::Manager;
 
 use super::{ActiveCapture, CaptureContext, CaptureStarted};
 use crate::ndi::pipeline::fit_within;
-use crate::ndi::status::{
-  CapturePermission, NdiErrorCode, NdiErrorInfo, FRAME_RATE,
-};
+use crate::ndi::status::{CapturePermission, NdiErrorCode, NdiErrorInfo};
 
 const LIVE_WINDOW_LABEL: &str = "live-output";
 const LIVE_WINDOW_TITLE: &str = "Cloud of Worship - Live Output";
-const MAX_WIDTH: u32 = 1920;
-const MAX_HEIGHT: u32 = 1080;
 
 struct MacCapture {
   stream: SCStream,
@@ -233,7 +229,10 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
   let frame = sc_window.frame();
   let pixel_width = (frame.size.width * scale_factor).round().max(2.0) as u32;
   let pixel_height = (frame.size.height * scale_factor).round().max(2.0) as u32;
-  let (target_width, target_height) = fit_within(pixel_width, pixel_height, MAX_WIDTH, MAX_HEIGHT);
+  // Never upscaled: a window smaller than the tier is sent at its own size.
+  let quality = context.quality;
+  let (target_width, target_height) =
+    fit_within(pixel_width, pixel_height, quality.max_width, quality.max_height);
   if target_width == 0 || target_height == 0 {
     return Err(NdiErrorInfo::new(
       NdiErrorCode::ScalingFailed,
@@ -246,15 +245,19 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
     .with_window(&sc_window)
     .try_build()
     .map_err(|error| capture_error(format!("Could not create a window capture filter: {error}")))?;
-  let interval = CMTime::new(1, FRAME_RATE as i32);
+  let interval = CMTime::new(1, quality.fps as i32);
+  // NV12 straight from the GPU: a third less to copy than BGRA, and NDI takes
+  // it as it is instead of converting the colours itself. BT.709 is what NDI
+  // receivers assume for HD video.
   let configuration = SCStreamConfiguration::new()
     .with_width(target_width)
     .with_height(target_height)
-    .with_pixel_format(PixelFormat::BGRA)
+    .with_pixel_format(PixelFormat::YCbCr_420v)
+    .with_color_matrix("ITU_R_709_2")
     .with_scales_to_fit(true)
     .with_shows_cursor(false)
     .with_ignores_shadows_single_window(true)
-    .with_queue_depth(3)
+    .with_queue_depth(5)
     .with_minimum_frame_interval(&interval);
 
   let stop_for_error = context.stop.clone();
@@ -296,10 +299,17 @@ pub fn start_capture(context: CaptureContext) -> Result<CaptureStarted, NdiError
       let Ok(guard) = buffer.lock(CVPixelBufferLockFlags::READ_ONLY) else {
         return;
       };
-      let width = guard.width() as u32;
-      let height = guard.height() as u32;
-      let stride = guard.bytes_per_row();
-      mailbox.publish(width, height, stride, guard.as_slice());
+      let (Some(luma), Some(chroma)) = (guard.plane_data(0), guard.plane_data(1)) else {
+        return;
+      };
+      mailbox.publish_nv12(
+        guard.width() as u32,
+        guard.height() as u32,
+        luma,
+        guard.bytes_per_row_of_plane(0),
+        chroma,
+        guard.bytes_per_row_of_plane(1),
+      );
     },
     SCStreamOutputType::Screen,
   );
