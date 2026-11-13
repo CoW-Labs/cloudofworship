@@ -1,29 +1,11 @@
 use std::ffi::c_void;
-use std::mem::ManuallyDrop;
 use std::sync::atomic::Ordering;
 use std::sync::{Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use tauri::Manager;
-use windows::core::Interface;
-use windows::Win32::Foundation::RECT;
-use windows::Win32::Graphics::Direct3D11::{
-  ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, ID3D11VideoContext, ID3D11VideoDevice,
-  ID3D11VideoProcessor, ID3D11VideoProcessorEnumerator, ID3D11VideoProcessorOutputView,
-  D3D11_BIND_RENDER_TARGET, D3D11_CPU_ACCESS_READ, D3D11_MAPPED_SUBRESOURCE,
-  D3D11_MAP_FLAG_DO_NOT_WAIT, D3D11_MAP_READ, D3D11_TEX2D_VPIV, D3D11_TEX2D_VPOV,
-  D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT, D3D11_USAGE_STAGING,
-  D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE, D3D11_VIDEO_PROCESSOR_CONTENT_DESC,
-  D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC_0,
-  D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC_0,
-  D3D11_VIDEO_PROCESSOR_STREAM, D3D11_VIDEO_USAGE_PLAYBACK_NORMAL, D3D11_VPIV_DIMENSION_TEXTURE2D,
-  D3D11_VPOV_DIMENSION_TEXTURE2D,
-};
-use windows::Win32::Graphics::Dxgi::Common::{
-  DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_RATIONAL, DXGI_SAMPLE_DESC,
-};
-use windows::Win32::Graphics::Dxgi::DXGI_ERROR_WAS_STILL_DRAWING;
+use windows::Win32::Graphics::Direct3D11::{ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D};
 use windows_capture::capture::{CaptureControl, Context, GraphicsCaptureApiHandler};
 use windows_capture::frame::Frame;
 use windows_capture::graphics_capture_api::{GraphicsCaptureApi, InternalCaptureControl};
@@ -34,6 +16,7 @@ use windows_capture::settings::{
 use windows_capture::window::Window;
 
 use super::{ActiveCapture, CaptureContext, CaptureStarted};
+use crate::d3d_nv12::Nv12Converter;
 use crate::ndi::pipeline::{fit_within, FrameMailbox};
 use crate::ndi::quality::NdiQuality;
 use crate::ndi::status::{CapturePermission, NdiErrorCode, NdiErrorInfo, StatusSink};
@@ -252,28 +235,15 @@ pub fn open_capture_settings() -> Result<(), NdiErrorInfo> {
   Ok(())
 }
 
-struct VideoScaleResources {
-  source_width: u32,
-  source_height: u32,
-  target_width: u32,
-  target_height: u32,
-  video_device: ID3D11VideoDevice,
-  enumerator: ID3D11VideoProcessorEnumerator,
-  processor: ID3D11VideoProcessor,
-  output: ID3D11Texture2D,
-  output_view: ID3D11VideoProcessorOutputView,
-}
-
-// Capture retains one GPU snapshot. Scaling and CPU readback are admitted by
-// the worker at 30 fps, including on Windows without MinUpdateInterval. A new
-// callback replaces this snapshot, so the last static frame is never discarded.
+// Capture retains one GPU snapshot. Scaling, colour conversion and CPU readback
+// are admitted by the worker at the tier's frame rate, including on Windows
+// without MinUpdateInterval. A new callback replaces this snapshot, so the last
+// static frame is never discarded. The frame goes out as NV12, which the GPU
+// produces while scaling: 3/8 the bytes of BGRA to read back and copy, and
+// cheaper for the NDI runtime to compress.
 struct ReadbackState {
-  context: ID3D11DeviceContext,
-  source: ID3D11Texture2D,
+  converter: Nv12Converter,
   dirty: bool,
-  staging: Vec<ID3D11Texture2D>,
-  pending: std::collections::VecDeque<usize>,
-  scaler: Option<VideoScaleResources>,
   shutdown: bool,
 }
 
@@ -296,48 +266,18 @@ impl D3dFrameReader {
     target_width: u32,
     target_height: u32,
   ) -> Result<Self, NdiErrorInfo> {
-    let source = create_texture(
+    let converter = Nv12Converter::new(
       device,
-      &texture_description(
-        source_width,
-        source_height,
-        D3D11_USAGE_DEFAULT,
-        D3D11_BIND_RENDER_TARGET.0 as u32,
-        0,
-      ),
-      "capture snapshot",
-    )?;
-    let staging_desc = texture_description(
+      context,
+      source_width,
+      source_height,
       target_width,
       target_height,
-      D3D11_USAGE_STAGING,
-      0,
-      D3D11_CPU_ACCESS_READ.0 as u32,
-    );
-    let staging = (0..2)
-      .map(|_| create_texture(device, &staging_desc, "CPU staging"))
-      .collect::<Result<Vec<_>, _>>()?;
-    let scaler = if source_width == target_width && source_height == target_height {
-      None
-    } else {
-      Some(VideoScaleResources::new(
-        device,
-        source_width,
-        source_height,
-        target_width,
-        target_height,
-      )?)
-    };
+      flags.quality.fps,
+    )
+    .map_err(scaling_error)?;
     let shared = Arc::new((
-      Mutex::new(ReadbackState {
-        context: context.clone(),
-        source,
-        dirty: false,
-        staging,
-        pending: std::collections::VecDeque::new(),
-        scaler,
-        shutdown: false,
-      }),
+      Mutex::new(ReadbackState { converter, dirty: false, shutdown: false }),
       Condvar::new(),
     ));
     let worker_shared = shared.clone();
@@ -368,9 +308,7 @@ impl D3dFrameReader {
     // All immediate-context access is serialized with the readback worker.
     // Copy while WGC still owns its frame; retaining only its texture after
     // returning would let the capture pool recycle pixels under the worker.
-    unsafe {
-      state.context.CopyResource(&state.source, source);
-    }
+    state.converter.snapshot(source);
     state.dirty = true;
     changed.notify_one();
   }
@@ -402,66 +340,25 @@ fn run_readback(
       return Ok(());
     }
 
-    while let Some(&slot) = state.pending.front() {
-      let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
-      let result = unsafe {
-        state.context.Map(
-          &state.staging[slot],
-          0,
-          D3D11_MAP_READ,
-          D3D11_MAP_FLAG_DO_NOT_WAIT.0 as u32,
-          Some(&mut mapped),
-        )
-      };
-      match result {
-        Err(error) if error.code() == DXGI_ERROR_WAS_STILL_DRAWING => break,
-        Err(error) => {
-          return Err(scaling_error(format!(
-            "Could not map the D3D11 staging texture: {error}"
-          )))
-        }
-        Ok(()) => {}
-      }
-      // Always unmap, including validation failures.
-      let stride = mapped.RowPitch as usize;
-      let length = stride.checked_mul(height as usize);
-      if let Some(length) = length {
-        if !mapped.pData.is_null() {
-          let pixels = unsafe { std::slice::from_raw_parts(mapped.pData.cast::<u8>(), length) };
-          flags.mailbox.publish(width, height, stride, pixels);
-        }
-      }
-      unsafe {
-        state.context.Unmap(&state.staging[slot], 0);
-      }
-      state.pending.pop_front();
-      if length.is_none() || mapped.pData.is_null() {
-        return Err(scaling_error("The mapped D3D11 frame is invalid."));
-      }
-    }
+    // Collect every frame the GPU has finished, without waiting for the rest.
+    while state
+      .converter
+      .poll_readback(|luma, luma_stride, chroma, chroma_stride| {
+        flags.mailbox.publish_nv12(width, height, luma, luma_stride, chroma, chroma_stride)
+      })
+      .map_err(scaling_error)?
+      .is_some()
+    {}
 
     let now = Instant::now();
-    if state.dirty && now >= next_capture {
-      if let Some(slot) = (0..state.staging.len()).find(|slot| !state.pending.contains(slot)) {
-        let source = if let Some(scaler) = &state.scaler {
-          scaler.blit(&state.source, &state.context)?;
-          &scaler.output
-        } else {
-          &state.source
-        };
-        unsafe {
-          state.context.CopyResource(&state.staging[slot], source);
-          // No swap-chain Present occurs here. Submit the queued work so the
-          // last static frame completes even when no further callback arrives.
-          state.context.Flush();
-        }
-        state.pending.push_back(slot);
-        state.dirty = false;
-        next_capture = now + interval;
-      }
+    if state.dirty && now >= next_capture && state.converter.can_submit() {
+      state.converter.blit().map_err(scaling_error)?;
+      state.converter.submit_readback();
+      state.dirty = false;
+      next_capture = now + interval;
     }
 
-    let delay = if !state.pending.is_empty() {
+    let delay = if state.converter.has_pending() {
       Duration::from_millis(1)
     } else if state.dirty {
       next_capture.saturating_duration_since(Instant::now())
@@ -470,199 +367,8 @@ fn run_readback(
     };
     // Wait releases the mutex. Capture can replace its GPU snapshot while
     // readback is pending, without ever waiting for Map to finish on the GPU.
-    state = changed
-      .wait_timeout(state, delay)
-      .unwrap_or_else(|p| p.into_inner())
-      .0;
+    state = changed.wait_timeout(state, delay).unwrap_or_else(|p| p.into_inner()).0;
   }
-}
-
-impl VideoScaleResources {
-  fn new(
-    device: &ID3D11Device,
-    source_width: u32,
-    source_height: u32,
-    target_width: u32,
-    target_height: u32,
-  ) -> Result<Self, NdiErrorInfo> {
-    let video_device: ID3D11VideoDevice = device
-      .cast()
-      .map_err(|error| scaling_error(format!("D3D11 video processing is unavailable: {error}")))?;
-    let content = D3D11_VIDEO_PROCESSOR_CONTENT_DESC {
-      InputFrameFormat: D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
-      InputFrameRate: DXGI_RATIONAL {
-        Numerator: 30,
-        Denominator: 1,
-      },
-      InputWidth: source_width,
-      InputHeight: source_height,
-      OutputFrameRate: DXGI_RATIONAL {
-        Numerator: 30,
-        Denominator: 1,
-      },
-      OutputWidth: target_width,
-      OutputHeight: target_height,
-      Usage: D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
-    };
-    let enumerator =
-      unsafe { video_device.CreateVideoProcessorEnumerator(&content) }.map_err(|error| {
-        scaling_error(format!(
-          "Could not create the D3D11 video processor: {error}"
-        ))
-      })?;
-    let processor =
-      unsafe { video_device.CreateVideoProcessor(&enumerator, 0) }.map_err(|error| {
-        scaling_error(format!("Could not initialize D3D11 video scaling: {error}"))
-      })?;
-
-    let output_desc = texture_description(
-      target_width,
-      target_height,
-      D3D11_USAGE_DEFAULT,
-      D3D11_BIND_RENDER_TARGET.0 as u32,
-      0,
-    );
-    let output = create_texture(device, &output_desc, "video processor output")?;
-    let view_desc = D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC {
-      ViewDimension: D3D11_VPOV_DIMENSION_TEXTURE2D,
-      Anonymous: D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC_0 {
-        Texture2D: D3D11_TEX2D_VPOV { MipSlice: 0 },
-      },
-    };
-    let mut output_view = None;
-    unsafe {
-      video_device
-        .CreateVideoProcessorOutputView(&output, &enumerator, &view_desc, Some(&mut output_view))
-        .map_err(|error| {
-          scaling_error(format!("Could not create the D3D11 output view: {error}"))
-        })?;
-    }
-    Ok(Self {
-      source_width,
-      source_height,
-      target_width,
-      target_height,
-      video_device,
-      enumerator,
-      processor,
-      output,
-      output_view: output_view
-        .ok_or_else(|| scaling_error("D3D11 did not return a video processor output view."))?,
-    })
-  }
-
-  fn blit(
-    &self,
-    source: &ID3D11Texture2D,
-    device_context: &ID3D11DeviceContext,
-  ) -> Result<(), NdiErrorInfo> {
-    let input_desc = D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC {
-      FourCC: 0,
-      ViewDimension: D3D11_VPIV_DIMENSION_TEXTURE2D,
-      Anonymous: D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC_0 {
-        Texture2D: D3D11_TEX2D_VPIV {
-          MipSlice: 0,
-          ArraySlice: 0,
-        },
-      },
-    };
-    let mut input_view = None;
-    unsafe {
-      self
-        .video_device
-        .CreateVideoProcessorInputView(source, &self.enumerator, &input_desc, Some(&mut input_view))
-        .map_err(|error| {
-          scaling_error(format!("Could not create the D3D11 input view: {error}"))
-        })?;
-    }
-    let input_view = input_view
-      .ok_or_else(|| scaling_error("D3D11 did not return a video processor input view."))?;
-    let video_context: ID3D11VideoContext = device_context.cast().map_err(|error| {
-      scaling_error(format!(
-        "D3D11 video processing context is unavailable: {error}"
-      ))
-    })?;
-    let source_rect = RECT {
-      left: 0,
-      top: 0,
-      right: self.source_width.try_into().unwrap_or(i32::MAX),
-      bottom: self.source_height.try_into().unwrap_or(i32::MAX),
-    };
-    let destination_rect = RECT {
-      left: 0,
-      top: 0,
-      right: self.target_width.try_into().unwrap_or(i32::MAX),
-      bottom: self.target_height.try_into().unwrap_or(i32::MAX),
-    };
-    unsafe {
-      video_context.VideoProcessorSetStreamFrameFormat(
-        &self.processor,
-        0,
-        D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
-      );
-      video_context.VideoProcessorSetStreamSourceRect(&self.processor, 0, true, Some(&source_rect));
-      video_context.VideoProcessorSetStreamDestRect(
-        &self.processor,
-        0,
-        true,
-        Some(&destination_rect),
-      );
-    }
-    let stream = D3D11_VIDEO_PROCESSOR_STREAM {
-      Enable: true.into(),
-      pInputSurface: ManuallyDrop::new(Some(input_view)),
-      ..Default::default()
-    };
-    let mut streams = [stream];
-    let result =
-      unsafe { video_context.VideoProcessorBlt(&self.processor, &self.output_view, 0, &streams) };
-    unsafe {
-      ManuallyDrop::drop(&mut streams[0].pInputSurface);
-    }
-    result.map_err(|error| scaling_error(format!("D3D11 could not scale the live frame: {error}")))
-  }
-}
-
-fn texture_description(
-  width: u32,
-  height: u32,
-  usage: windows::Win32::Graphics::Direct3D11::D3D11_USAGE,
-  bind_flags: u32,
-  cpu_access_flags: u32,
-) -> D3D11_TEXTURE2D_DESC {
-  D3D11_TEXTURE2D_DESC {
-    Width: width,
-    Height: height,
-    MipLevels: 1,
-    ArraySize: 1,
-    Format: DXGI_FORMAT_B8G8R8A8_UNORM,
-    SampleDesc: DXGI_SAMPLE_DESC {
-      Count: 1,
-      Quality: 0,
-    },
-    Usage: usage,
-    BindFlags: bind_flags,
-    CPUAccessFlags: cpu_access_flags,
-    MiscFlags: 0,
-  }
-}
-
-fn create_texture(
-  device: &ID3D11Device,
-  description: &D3D11_TEXTURE2D_DESC,
-  purpose: &str,
-) -> Result<ID3D11Texture2D, NdiErrorInfo> {
-  let mut texture = None;
-  unsafe {
-    device
-      .CreateTexture2D(description, None, Some(&mut texture))
-      .map_err(|error| {
-        scaling_error(format!(
-          "Could not create the D3D11 {purpose} texture: {error}"
-        ))
-      })?;
-  }
-  texture.ok_or_else(|| scaling_error(format!("D3D11 did not return the {purpose} texture.")))
 }
 
 fn scaling_error(message: impl Into<String>) -> NdiErrorInfo {

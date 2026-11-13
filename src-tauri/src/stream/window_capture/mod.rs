@@ -10,8 +10,9 @@
 //! here re-sends the latest one at the tier's steady frame rate, to one of two
 //! outputs:
 //!
-//! * **Pipe**: tightly packed BGRA frames written to FFmpeg's stdin, which
-//!   scales, converts and encodes them.
+//! * **Pipe**: tightly packed raw frames at the final size, written to
+//!   FFmpeg's stdin, which encodes them (NV12 on Windows, where the GPU has
+//!   already scaled and converted them; BGRA on the macOS fallback).
 //! * **Hardware encoder** (macOS): the capture's own GPU surfaces are handed to
 //!   VideoToolbox without a CPU copy, and only the compressed H.264 reaches
 //!   FFmpeg. See `vt_encoder`.
@@ -49,7 +50,8 @@ const SLOW_WRITE: Duration = Duration::from_millis(100);
 /// One captured picture at the target size.
 #[derive(Clone)]
 enum Picture {
-  /// Tightly packed BGRA, for the pipe.
+  /// Tightly packed raw frames for the pipe: NV12 from the GPU on Windows,
+  /// BGRA on macOS's FFmpeg fallback.
   Packed(Arc<Vec<u8>>),
   /// The capture's own GPU surface, for the hardware encoder. Holding it keeps
   /// the surface out of the capture's pool, so it is only ever the latest one.
@@ -71,6 +73,7 @@ struct Sink {
   fps: u32,
   /// True when frames go to the in-process hardware encoder as GPU surfaces
   /// rather than to the pipe as packed BGRA.
+  #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
   hardware: bool,
   latest: LatestFrame,
   /// A recycled buffer for the next packed frame, so a 1080p+ capture doesn't
@@ -338,113 +341,5 @@ impl Health {
       sink.stats.upload_stalls.load(Ordering::Relaxed)
     );
     *self = Self { published, ..Self::new() };
-  }
-}
-
-/// Copies a BGRA image with row padding (`stride` bytes per row) into `out` as a
-/// tightly packed `width`×`height` frame, downscaling by an integer `factor`
-/// with a box filter (averaging each factor×factor block keeps slide text
-/// smooth). Rows or columns beyond the source are left black, extra ones are
-/// cropped, so a window a few pixels off the expected size still produces a
-/// valid frame.
-///
-/// `out` is reused between frames: the frame size is fixed for a session, so
-/// the black margin written when it was first sized is still there and only
-/// the picture area is overwritten.
-#[cfg_attr(target_os = "macos", allow(dead_code))]
-fn pack_frame_into(
-  out: &mut Vec<u8>,
-  data: &[u8],
-  stride: usize,
-  source_width: u32,
-  source_height: u32,
-  factor: u32,
-  width: u32,
-  height: u32,
-) {
-  let factor = factor.max(1) as usize;
-  let (width, height) = (width as usize, height as usize);
-  let usable_width = (source_width as usize / factor).min(width);
-  let usable_height = (source_height as usize / factor).min(height);
-  if out.len() != width * height * 4 {
-    out.clear();
-    out.resize(width * height * 4, 0);
-  }
-  for y in 0..usable_height {
-    let out_row = &mut out[y * width * 4..(y + 1) * width * 4];
-    if factor == 1 {
-      let start = y * stride;
-      out_row[..usable_width * 4].copy_from_slice(&data[start..start + usable_width * 4]);
-      continue;
-    }
-    for x in 0..usable_width {
-      let mut sum = [0u32; 4];
-      for dy in 0..factor {
-        let row = (y * factor + dy) * stride;
-        for dx in 0..factor {
-          let at = row + (x * factor + dx) * 4;
-          for (channel, total) in sum.iter_mut().enumerate() {
-            *total += data[at + channel] as u32;
-          }
-        }
-      }
-      let count = (factor * factor) as u32;
-      for (channel, total) in sum.iter().enumerate() {
-        out_row[x * 4 + channel] = (total / count) as u8;
-      }
-    }
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::pack_frame_into;
-
-  fn pack_frame(
-    data: &[u8],
-    stride: usize,
-    source_width: u32,
-    source_height: u32,
-    factor: u32,
-    width: u32,
-    height: u32,
-  ) -> Vec<u8> {
-    let mut out = Vec::new();
-    pack_frame_into(&mut out, data, stride, source_width, source_height, factor, width, height);
-    out
-  }
-
-  #[test]
-  fn packing_strips_row_padding() {
-    // 2×2 image with 4 bytes of padding per row.
-    let mut data = Vec::new();
-    data.extend([1, 1, 1, 1, 2, 2, 2, 2, 9, 9, 9, 9]);
-    data.extend([3, 3, 3, 3, 4, 4, 4, 4, 9, 9, 9, 9]);
-    let packed = pack_frame(&data, 12, 2, 2, 1, 2, 2);
-    assert_eq!(packed, [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4]);
-  }
-
-  #[test]
-  fn downscaling_averages_each_block() {
-    let data = [10u8, 10, 10, 10, 30, 30, 30, 30, 50, 50, 50, 50, 70, 70, 70, 70];
-    let packed = pack_frame(&data, 8, 2, 2, 2, 1, 1);
-    assert_eq!(packed, [40, 40, 40, 40]);
-  }
-
-  #[test]
-  fn undersized_sources_are_padded_with_black() {
-    let data = [5u8; 4];
-    let packed = pack_frame(&data, 4, 1, 1, 1, 2, 1);
-    assert_eq!(packed, [5, 5, 5, 5, 0, 0, 0, 0]);
-  }
-
-  #[test]
-  fn a_reused_buffer_keeps_its_black_margin() {
-    let mut out = Vec::new();
-    pack_frame_into(&mut out, &[5u8; 4], 4, 1, 1, 1, 2, 1);
-    let pointer = out.as_ptr();
-    pack_frame_into(&mut out, &[7u8; 4], 4, 1, 1, 1, 2, 1);
-    assert_eq!(out, [7, 7, 7, 7, 0, 0, 0, 0]);
-    assert_eq!(out.as_ptr(), pointer, "the allocation is reused");
   }
 }

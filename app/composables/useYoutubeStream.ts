@@ -5,7 +5,7 @@
 // desktop-only, dynamic Tauri imports so it's a no-op in the plain web build.
 //
 // The "live-window" source captures the live output window's real content.
-// On macOS Rust captures it natively by window ID (no picker). Where that isn't
+// On macOS and Windows Rust captures it natively by window ID (no picker). Where that isn't
 // available yet, the page captures it instead (getDisplayMedia — the OS window
 // picker), records it with the chosen audio input (MediaRecorder) and streams
 // the recording to Rust. Either way FFmpeg encodes and pushes it to YouTube,

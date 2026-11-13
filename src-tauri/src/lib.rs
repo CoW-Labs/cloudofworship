@@ -2,6 +2,8 @@ use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
 use tauri::{Manager, WindowEvent};
 
+#[cfg(target_os = "windows")]
+mod d3d_nv12;
 mod ndi;
 mod desktop_update;
 mod easyworship;

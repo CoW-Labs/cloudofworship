@@ -211,7 +211,7 @@ impl StreamBridge {
     // stream, so a bad source/permission doesn't kill a live one) and reuse it
     // across reconnects, so a network blip re-runs the identical pipeline.
     let mut args = input_args(&source, audio_device.as_deref())?;
-    args.extend(encode_args(default, false));
+    args.extend(encode_args(default, false, true));
     // -rw_timeout makes FFmpeg give up on a stalled network write (~8s) instead
     // of blocking indefinitely, so a dropped connection is detected promptly and
     // the supervisor can reconnect — rather than sitting on a false "live".
@@ -883,16 +883,26 @@ fn parse_device_line(line: &str) -> Option<(String, String)> {
   Some((index.to_string(), name.trim().to_string()))
 }
 
-/// Shared encode + mux settings for the YouTube RTMP output. Hardware encoder on
-/// macOS (near-free CPU), libx264 elsewhere. Downscales to a sane 720p (`-2`
-/// keeps width even and the aspect intact); `constant_fps` re-times irregular
-/// input (the browser feed) to a steady 30fps.
-fn encode_args(quality: StreamQuality, constant_fps: bool) -> Vec<String> {
-  let scale = format!("scale=-2:{}", quality.height);
-  let filter =
-    if constant_fps { format!("fps={},{scale}", quality.fps) } else { scale };
-  let mut args = vec!["-vf".to_string(), filter];
-  args.extend(video_encoder_args().iter().cloned());
+/// Shared encode + mux settings for the YouTube RTMP output, on the machine's
+/// hardware encoder. `rescale` scales to the tier's height (`-2` keeps the width
+/// even and the aspect intact); `constant_fps` re-times irregular input (the
+/// browser feed) to the tier's steady frame rate.
+fn encode_args(quality: StreamQuality, constant_fps: bool, rescale: bool) -> Vec<String> {
+  // The native window feed already arrives at the tier's size, so scaling it
+  // again would only cost time; the browser feed's size is whatever the page
+  // recorded.
+  let mut filters = Vec::new();
+  if constant_fps {
+    filters.push(format!("fps={}", quality.fps));
+  }
+  if rescale {
+    filters.push(format!("scale=-2:{}", quality.height));
+  }
+  let mut args = Vec::new();
+  if !filters.is_empty() {
+    args.extend(["-vf".to_string(), filters.join(",")]);
+  }
+  args.extend(video_encoder_args(quality.codec).iter().cloned());
   args.extend([
     "-b:v".to_string(),
     format!("{}k", quality.video_kbps),
@@ -916,37 +926,66 @@ fn audio_encode_args() -> Vec<String> {
     .collect()
 }
 
-/// H.264 encoders in order of preference, with their settings. The bundled
-/// FFmpeg is an LGPL build without libx264, so on Windows the first one that
-/// works on this machine wins: the GPU's encoder (NVIDIA, Intel, AMD), then
-/// Windows' own Media Foundation encoder, which every Windows 10+ PC has.
-/// libx264 stays last for a system FFmpeg that happens to include it. macOS
-/// always has VideoToolbox.
+/// Hardware encoders in order of preference, per codec, with their settings.
+/// The bundled FFmpeg is an LGPL build without libx264, so on Windows the first
+/// one that works on this machine wins: the GPU's own encoder (NVIDIA, Intel,
+/// AMD), then Windows' Media Foundation encoder. Every candidate takes NV12,
+/// which is what the capture produces, so no colour conversion happens between
+/// the GPU's video processor and the encoder. libx264 stays last for H.264 only,
+/// for a system FFmpeg that happens to include it. macOS always has VideoToolbox.
 #[cfg(not(target_os = "macos"))]
-const VIDEO_ENCODERS: &[&[&str]] = &[
-  &["-c:v", "h264_nvenc", "-preset", "p4", "-tune", "ll", "-rc", "cbr", "-pix_fmt", "yuv420p"],
+const H264_ENCODERS: &[&[&str]] = &[
+  &["-c:v", "h264_nvenc", "-preset", "p4", "-tune", "ll", "-rc", "cbr", "-pix_fmt", "nv12"],
   &["-c:v", "h264_qsv", "-preset", "veryfast", "-pix_fmt", "nv12"],
   &["-c:v", "h264_amf", "-usage", "lowlatency", "-rc", "cbr", "-pix_fmt", "nv12"],
   &["-c:v", "h264_mf", "-rate_control", "cbr", "-scenario", "live_streaming", "-pix_fmt", "nv12"],
   &["-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-pix_fmt", "yuv420p"],
 ];
 
-/// The video encoder arguments for this machine, chosen once per run.
-fn video_encoder_args() -> &'static [String] {
-  static CHOSEN: OnceLock<Vec<String>> = OnceLock::new();
-  CHOSEN.get_or_init(|| {
+/// HEVC for the 4K tier: about a third less bitrate than H.264 for the same
+/// picture, and the only way most hardware encoders reach 4K60. There is no
+/// software fallback; 4K60 in software isn't realistic.
+#[cfg(not(target_os = "macos"))]
+const HEVC_ENCODERS: &[&[&str]] = &[
+  &["-c:v", "hevc_nvenc", "-preset", "p4", "-tune", "ll", "-rc", "cbr", "-pix_fmt", "nv12"],
+  &["-c:v", "hevc_qsv", "-preset", "veryfast", "-pix_fmt", "nv12"],
+  &["-c:v", "hevc_amf", "-usage", "lowlatency", "-rc", "cbr", "-pix_fmt", "nv12"],
+  &["-c:v", "hevc_mf", "-rate_control", "cbr", "-scenario", "live_streaming", "-pix_fmt", "nv12"],
+];
+
+/// The video encoder arguments for this machine and codec, chosen once per run.
+/// Empty when the machine has no working encoder for the codec (HEVC only).
+fn video_encoder_args(codec: Codec) -> &'static [String] {
+  static H264: OnceLock<Vec<String>> = OnceLock::new();
+  static HEVC: OnceLock<Vec<String>> = OnceLock::new();
+  let cell = match codec {
+    Codec::H264 => &H264,
+    Codec::Hevc => &HEVC,
+  };
+  cell.get_or_init(|| {
     #[cfg(target_os = "macos")]
     {
-      ["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p"].map(String::from).to_vec()
+      let name = if codec == Codec::Hevc { "hevc_videotoolbox" } else { "h264_videotoolbox" };
+      ["-c:v", name, "-pix_fmt", "yuv420p"].map(String::from).to_vec()
     }
     #[cfg(not(target_os = "macos"))]
     {
-      let chosen = VIDEO_ENCODERS
-        .iter()
-        .find(|candidate| encoder_works(candidate))
-        .unwrap_or(&VIDEO_ENCODERS[VIDEO_ENCODERS.len() - 2]);
-      log::info!("stream video encoder: {}", chosen[1]);
-      chosen.iter().map(|arg| arg.to_string()).collect()
+      let candidates = if codec == Codec::Hevc { HEVC_ENCODERS } else { H264_ENCODERS };
+      let chosen = candidates.iter().find(|candidate| encoder_works(candidate)).or_else(|| {
+        // H.264 always has a last resort (Media Foundation exists on every
+        // Windows 10+ PC); HEVC without an encoder is reported as unavailable.
+        (codec == Codec::H264).then(|| &H264_ENCODERS[H264_ENCODERS.len() - 2])
+      });
+      match chosen {
+        Some(chosen) => {
+          log::info!("stream {codec:?} encoder: {}", chosen[1]);
+          chosen.iter().map(|arg| arg.to_string()).collect()
+        }
+        None => {
+          log::warn!("stream: no working {codec:?} encoder on this computer");
+          Vec::new()
+        }
+      }
     }
   })
 }
@@ -982,7 +1021,7 @@ fn browser_encoder_args(quality: StreamQuality) -> Vec<String> {
   ]
   .map(String::from)
   .to_vec();
-  args.extend(encode_args(quality, true));
+  args.extend(encode_args(quality, true, true));
   args.extend(
     ["-bsf:v", "dump_extra=freq=keyframe", "-flush_packets", "1", "-f", "mpegts", "pipe:1"]
       .map(String::from),
@@ -994,9 +1033,9 @@ fn browser_encoder_args(quality: StreamQuality) -> Vec<String> {
 ///
 /// Two shapes, chosen by how the window was captured:
 ///
-/// * **Raw pipe**: the pacer writes raw BGRA frames to stdin and FFmpeg scales,
-///   converts and encodes them (Windows, and macOS when the in-process encoder
-///   is unavailable).
+/// * **Raw pipe**: the pacer writes raw frames to stdin and FFmpeg
+///   encodes them (Windows, where the GPU has already scaled and converted
+///   them to NV12; and macOS when the in-process encoder is unavailable).
 /// * **Hardware encoded**: the app has already encoded H.264 on the GPU (macOS
 ///   VideoToolbox, fed straight from the capture's surfaces), so FFmpeg only
 ///   muxes it with the audio. Nothing but a few MB/s of compressed video
@@ -1032,7 +1071,10 @@ fn window_encoder_args(
     );
     args.extend(["-framerate".to_string(), quality.fps.to_string()]);
   } else {
-    args.extend(["-f", "rawvideo", "-pix_fmt", "bgra"].map(String::from));
+    // Windows' GPU hands over NV12 at the final size; the macOS fallback
+    // pipes BGRA, also at the final size.
+    let raw_format = if cfg!(target_os = "windows") { "nv12" } else { "bgra" };
+    args.extend(["-f", "rawvideo", "-pix_fmt", raw_format].map(String::from));
     args.extend([
       "-s".to_string(),
       format!("{}x{}", target.width, target.height),
@@ -1058,7 +1100,14 @@ fn window_encoder_args(
     args.extend(["-c:v", "copy"].map(String::from));
     args.extend(audio_encode_args());
   } else {
-    args.extend(encode_args(quality, true));
+    args.extend(encode_args(quality, true, false));
+    // The GPU converted to BT.709 studio range; say so, or players may assume
+    // BT.601 for an untagged stream and shift the colours.
+    #[cfg(target_os = "windows")]
+    args.extend(
+      ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
+        .map(String::from),
+    );
   }
   // A raw stream has no timestamps, and FFmpeg can't work out the rate of one
   // from a short probe, so each frame is stamped from its position instead.
@@ -1191,16 +1240,16 @@ pub struct StreamPlan {
 }
 
 /// Whether this machine can produce `tier`, and if not, why.
+///
+/// Every tier is offered wherever an encoder exists; whether a given computer
+/// can *sustain* 4K60 depends on its graphics card, which the status bar's
+/// delayed-frame count shows live.
 fn tier_support(tier: &StreamQuality) -> (bool, Option<String>) {
-  // Raw frames reach FFmpeg through a pipe unless the app encodes them itself
-  // (macOS, VideoToolbox, straight from the capture's GPU surfaces). That pipe
-  // carries 250 MB/s at 1080p30 and double that at 1080p60 or more at higher
-  // sizes, which is why only the macOS path offers anything past 1080p30.
   #[cfg(not(target_os = "macos"))]
-  if tier.height > 1080 || (tier.height == 1080 && tier.fps > 30) {
+  if video_encoder_args(tier.codec).is_empty() {
     return (
       false,
-      Some("This quality needs GPU encoding, which isn't available on this system yet.".into()),
+      Some("This computer's graphics card can't encode HEVC video, which this quality needs.".into()),
     );
   }
   let _ = tier;
@@ -1216,14 +1265,20 @@ pub async fn stream_plan(
     let quality = StreamQuality::by_id(quality.as_deref());
     // On Windows this probes the encoders once (a few seconds), so the real
     // start is faster afterwards.
-    let codec = video_encoder_args().get(1).cloned().unwrap_or_default();
+    let codec = video_encoder_args(quality.codec).get(1).cloned().unwrap_or_default();
+    let hevc = quality.codec == Codec::Hevc;
     let (encoder, hardware_encoder) = match codec.as_str() {
-      "h264_videotoolbox" if quality.codec == Codec::Hevc => ("Apple hardware encoder (HEVC)", true),
-      "h264_videotoolbox" => ("Apple hardware encoder", true),
-      "h264_nvenc" => ("NVIDIA hardware encoder", true),
-      "h264_qsv" => ("Intel hardware encoder", true),
-      "h264_amf" => ("AMD hardware encoder", true),
-      "h264_mf" => ("Windows built-in encoder", true),
+      "h264_videotoolbox" | "hevc_videotoolbox" if hevc => ("Apple hardware encoder (HEVC)", true),
+      "h264_videotoolbox" | "hevc_videotoolbox" => ("Apple hardware encoder", true),
+      "h264_nvenc" | "hevc_nvenc" if hevc => ("NVIDIA hardware encoder (HEVC)", true),
+      "h264_nvenc" | "hevc_nvenc" => ("NVIDIA hardware encoder", true),
+      "h264_qsv" | "hevc_qsv" if hevc => ("Intel hardware encoder (HEVC)", true),
+      "h264_qsv" | "hevc_qsv" => ("Intel hardware encoder", true),
+      "h264_amf" | "hevc_amf" if hevc => ("AMD hardware encoder (HEVC)", true),
+      "h264_amf" | "hevc_amf" => ("AMD hardware encoder", true),
+      "h264_mf" | "hevc_mf" if hevc => ("Windows built-in encoder (HEVC)", true),
+      "h264_mf" | "hevc_mf" => ("Windows built-in encoder", true),
+      "" => ("No video encoder for this quality", false),
       _ => ("Software encoder (uses more CPU)", false),
     };
     #[cfg(any(target_os = "macos", target_os = "windows"))]

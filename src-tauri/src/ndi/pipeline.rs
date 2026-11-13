@@ -9,9 +9,9 @@ use super::status::{NdiErrorCode, NdiErrorInfo};
 /// How the pixels of a captured frame are laid out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FrameFormat {
-  /// Packed 8-bit B, G, R, A; `stride` bytes per row. (Windows capture only;
-  /// macOS sends NV12.)
-  #[cfg_attr(target_os = "macos", allow(dead_code))]
+  /// Packed 8-bit B, G, R, A; `stride` bytes per row. (Both captures now send
+  /// NV12; kept for the sender and its tests.)
+  #[allow(dead_code)]
   Bgra,
   /// 4:2:0: a full-size luma plane, then one interleaved Cb/Cr plane at half
   /// the height, both `stride` bytes per row and back to back in one buffer,
@@ -57,7 +57,7 @@ pub struct FrameMailbox {
 
 impl FrameMailbox {
   /// Publishes a packed BGRA frame.
-  #[cfg_attr(target_os = "macos", allow(dead_code))]
+  #[allow(dead_code)]
   pub fn publish(&self, width: u32, height: u32, stride: usize, pixels: &[u8]) {
     let Some(required) = FrameFormat::Bgra.len(height as usize, stride) else {
       return;

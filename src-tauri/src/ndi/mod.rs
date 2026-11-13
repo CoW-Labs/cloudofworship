@@ -313,17 +313,11 @@ pub struct NdiTierInfo {
 }
 
 /// Whether this computer can send `tier`.
-fn tier_support(tier: &NdiQuality) -> (bool, Option<String>) {
-  // Only the macOS capture sends NV12 and has been run above 1080p30; the
-  // Windows readback still goes through BGRA at 30 fps.
-  #[cfg(not(target_os = "macos"))]
-  if tier.id != quality::DEFAULT.id {
-    return (
-      false,
-      Some("This size and frame rate isn't available on this system yet.".into()),
-    );
-  }
-  let _ = tier;
+///
+/// Both captures scale and convert to NV12 on the GPU, so every tier is
+/// offered. Whether a computer can *hold* 4K60 depends on its CPU (the NDI
+/// runtime compresses on it) and its network, which can't be known up front.
+fn tier_support(_tier: &NdiQuality) -> (bool, Option<String>) {
   (true, None)
 }
 

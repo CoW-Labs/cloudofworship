@@ -1,7 +1,9 @@
 //! Windows: Windows Graphics Capture of the live window by its HWND — the same
-//! capture library the NDI output uses on Windows. WGC hands frames over at
-//! the window's physical size; they're box-downscaled by an integer factor
-//! (e.g. 4K → 1080p) and packed for the encoder, which does the final scale.
+//! capture library the NDI output uses on Windows. WGC hands frames over as GPU
+//! textures at the window's physical size; the GPU's video processor scales
+//! them to the tier's size and converts them to NV12 (see `d3d_nv12`), so the
+//! CPU only copies finished frames and the encoder needs no scaling or colour
+//! conversion of its own.
 
 use std::ffi::c_void;
 use std::sync::Arc;
@@ -17,16 +19,11 @@ use windows_capture::settings::{
 };
 use windows_capture::window::Window;
 
-use super::{pack_frame_into, Sink, StreamQuality, Target, LIVE_WINDOW_LABEL};
-
-/// Frames taller than this are downscaled by an integer factor before they're
-/// piped to the encoder, to keep the pipe at a sane data rate. A tier above
-/// 1080p raises it to its own height, so the encoder gets what it asked for.
-const MIN_PIPE_HEIGHT_CAP: u32 = 1080;
+use super::{Sink, StreamQuality, Target, LIVE_WINDOW_LABEL};
+use crate::d3d_nv12::Nv12Converter;
 
 pub(super) struct NativeTarget {
   window: Window,
-  factor: u32,
 }
 
 pub(super) type NativeCapture = CaptureControl<FrameHandler, String>;
@@ -52,15 +49,17 @@ pub(super) fn locate(app: &AppHandle, quality: StreamQuality) -> Result<Target, 
   let size = webview
     .outer_size()
     .map_err(|e| format!("Could not read the live window size ({e})."))?;
-  let factor = size.height.div_ceil(quality.height.max(MIN_PIPE_HEIGHT_CAP)).max(1);
-  let width = (size.width / factor).max(2) & !1;
-  let height = (size.height / factor).max(2) & !1;
+  // The GPU scales to the tier's height whatever the window's size (a
+  // smaller window is upscaled, which the picker warns about).
+  let aspect =
+    if size.height > 0 { size.width as f64 / size.height as f64 } else { 16.0 / 9.0 };
+  let (width, height) = (quality.width_for(aspect), quality.height);
   log::info!(
-    "capturing live window {}x{} → {width}x{height}",
+    "capturing live window {}x{} → {width}x{height} NV12 on the GPU",
     size.width,
     size.height
   );
-  Ok(Target { native: NativeTarget { window, factor }, width, height })
+  Ok(Target { native: NativeTarget { window }, width, height })
 }
 
 pub(super) fn start(target: NativeTarget, sink: Arc<Sink>) -> Result<NativeCapture, String> {
@@ -92,7 +91,7 @@ pub(super) fn start(target: NativeTarget, sink: Arc<Sink>) -> Result<NativeCaptu
     interval,
     DirtyRegionSettings::Default,
     ColorFormat::Bgra8,
-    (sink, target.factor),
+    sink,
   );
   FrameHandler::start_free_threaded(settings)
     .map_err(|e| format!("Could not start live window capture ({e})."))
@@ -104,16 +103,17 @@ pub(super) fn stop(control: NativeCapture) {
 
 pub(super) struct FrameHandler {
   sink: Arc<Sink>,
-  factor: u32,
+  /// Rebuilt when the window's size changes (a resize or a display-scale
+  /// change alters the physical size WGC delivers).
+  converter: Option<Nv12Converter>,
 }
 
 impl GraphicsCaptureApiHandler for FrameHandler {
-  type Flags = (Arc<Sink>, u32);
+  type Flags = Arc<Sink>;
   type Error = String;
 
   fn new(context: Context<Self::Flags>) -> Result<Self, Self::Error> {
-    let (sink, factor) = context.flags;
-    Ok(Self { sink, factor })
+    Ok(Self { sink: context.flags, converter: None })
   }
 
   fn on_frame_arrived(
@@ -121,27 +121,37 @@ impl GraphicsCaptureApiHandler for FrameHandler {
     frame: &mut Frame,
     _capture_control: InternalCaptureControl,
   ) -> Result<(), Self::Error> {
-    let mut buffer = match frame.buffer() {
-      Ok(buffer) => buffer,
-      Err(error) => {
-        self.sink.reject(format!("buffer: {error}"));
-        return Ok(());
+    let (source_width, source_height) = (frame.width(), frame.height());
+    if source_width < 2 || source_height < 2 {
+      self.sink.reject(format!("empty frame {source_width}x{source_height}"));
+      return Ok(());
+    }
+    if self.converter.as_ref().is_none_or(|c| !c.takes(source_width, source_height)) {
+      match Nv12Converter::new(
+        frame.device(),
+        frame.device_context(),
+        source_width,
+        source_height,
+        self.sink.width,
+        self.sink.height,
+        self.sink.fps,
+      ) {
+        Ok(converter) => self.converter = Some(converter),
+        Err(error) => {
+          self.sink.fail(error);
+          return Ok(());
+        }
       }
-    };
-    let (source_width, source_height) = (buffer.width(), buffer.height());
-    let stride = buffer.row_pitch() as usize;
+    }
+    let Some(converter) = self.converter.as_mut() else { return Ok(()) };
     let mut packed = self.sink.buffer();
-    pack_frame_into(
-      &mut packed,
-      buffer.as_raw_buffer(),
-      stride,
-      source_width,
-      source_height,
-      self.factor,
-      self.sink.width,
-      self.sink.height,
-    );
-    self.sink.publish(packed);
+    let converted = converter
+      .convert(frame.as_raw_texture())
+      .and_then(|_| converter.read_packed(&mut packed));
+    match converted {
+      Ok(()) => self.sink.publish(packed),
+      Err(error) => self.sink.reject(error),
+    }
     Ok(())
   }
 
