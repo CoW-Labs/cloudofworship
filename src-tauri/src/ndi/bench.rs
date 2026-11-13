@@ -248,3 +248,101 @@ fn ndi_2160p30_nv12() {
 fn ndi_2160p60_nv12() {
   run(FrameFormat::Nv12, 3840, 2160, 60, 8);
 }
+
+/// Joins the running app's "CoW Live Output" as one more receiver (it doesn't
+/// disturb other receivers) and reports what actually arrives: size, pixel
+/// format and frame rate over ten seconds.
+/// `cargo test --lib ndi::bench::receive_from_the_running_app -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn receive_from_the_running_app() {
+  let runtime = runtime::load().expect("NDI runtime");
+  let library = runtime.library();
+  let find_create: FindCreateFn = unsafe { *library.get(b"NDIlib_find_create_v2\0").unwrap() };
+  let find_wait: FindWaitFn = unsafe { *library.get(b"NDIlib_find_wait_for_sources\0").unwrap() };
+  let find_sources: FindSourcesFn =
+    unsafe { *library.get(b"NDIlib_find_get_current_sources\0").unwrap() };
+  let find_destroy: FindDestroyFn = unsafe { *library.get(b"NDIlib_find_destroy\0").unwrap() };
+  let recv_create: RecvCreateFn = unsafe { *library.get(b"NDIlib_recv_create_v3\0").unwrap() };
+  let recv_destroy: RecvDestroyFn = unsafe { *library.get(b"NDIlib_recv_destroy\0").unwrap() };
+  let recv_capture: RecvCaptureFn = unsafe { *library.get(b"NDIlib_recv_capture_v2\0").unwrap() };
+  let recv_free: RecvFreeVideoFn = unsafe { *library.get(b"NDIlib_recv_free_video_v2\0").unwrap() };
+
+  let finder = unsafe {
+    find_create(&FindCreate { show_local_sources: true, groups: std::ptr::null(), extra_ips: std::ptr::null() })
+  };
+  let mut found: Option<CString> = None;
+  let deadline = Instant::now() + Duration::from_secs(8);
+  while found.is_none() && Instant::now() < deadline {
+    unsafe { find_wait(finder, 1000) };
+    let mut count = 0u32;
+    let sources = unsafe { find_sources(finder, &mut count) };
+    for i in 0..count as usize {
+      let name = unsafe { CStr::from_ptr((*sources.add(i)).name) };
+      if name.to_string_lossy().contains("CoW Live Output") {
+        found = Some(name.to_owned());
+      }
+    }
+  }
+  let Some(name) = found else {
+    println!("No \"CoW Live Output\" source on the network: NDI isn't broadcasting from the app.");
+    unsafe { find_destroy(finder) };
+    return;
+  };
+  let receiver_name = CString::new("probe").unwrap();
+  let receiver = unsafe {
+    recv_create(&RecvCreate {
+      source: Source { name: name.as_ptr(), url: std::ptr::null() },
+      color_format: 1,
+      bandwidth: 100,
+      allow_video_fields: false,
+      recv_name: receiver_name.as_ptr(),
+    })
+  };
+  let started = Instant::now();
+  let (mut frames, mut first_at, mut size, mut rate) = (0u32, None, (0, 0), (0, 0));
+  let mut gaps = Vec::new();
+  let mut last = None::<Instant>;
+  while started.elapsed() < Duration::from_secs(12) {
+    let mut video: NdiVideoFrameV2 = unsafe { std::mem::zeroed() };
+    let kind = unsafe { recv_capture(receiver, &mut video, std::ptr::null_mut(), std::ptr::null_mut(), 200) };
+    if kind == 1 {
+      let now = Instant::now();
+      if first_at.is_none() {
+        first_at = Some(now);
+      } else {
+        frames += 1;
+        if let Some(previous) = last {
+          gaps.push(now.duration_since(previous));
+        }
+      }
+      last = Some(now);
+      size = (video.xres, video.yres);
+      rate = (video.frame_rate_n, video.frame_rate_d);
+      unsafe { recv_free(receiver, &video) };
+    }
+  }
+  unsafe {
+    recv_destroy(receiver);
+    find_destroy(finder);
+  }
+  let Some(first_at) = first_at else {
+    println!("Connected to {name:?} but no video arrived in 12 seconds.");
+    return;
+  };
+  let seconds = last.unwrap_or(first_at).duration_since(first_at).as_secs_f64().max(0.001);
+  gaps.sort();
+  let p = |q: f64| gaps.get(((gaps.len() as f64 - 1.0) * q) as usize).copied().unwrap_or_default();
+  println!(
+    "{name:?}: {}x{} declared {}/{} fps; received {:.1} fps over {seconds:.1}s; \
+     frame gap median {:?}, 99th {:?}, max {:?}",
+    size.0,
+    size.1,
+    rate.0,
+    rate.1,
+    frames as f64 / seconds,
+    p(0.5),
+    p(0.99),
+    gaps.last().copied().unwrap_or_default(),
+  );
+}

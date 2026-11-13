@@ -193,7 +193,7 @@ impl StreamBridge {
       return Err("A YouTube stream key is required.".into());
     }
 
-    let url = format!("{YOUTUBE_INGEST_BASE}/{key}");
+    let url = ingest_url(key);
 
     // Only the native window feed can deliver more than the default; the other
     // sources are capped by what they capture.
@@ -654,6 +654,20 @@ impl StreamBridge {
   }
 }
 
+/// Where the stream goes: YouTube's ingest with the key.
+///
+/// Debug builds only: `COW_STREAM_INGEST` replaces the whole URL (key and all),
+/// so a developer can point the real pipeline at a local RTMP receiver and
+/// inspect exactly what YouTube would get. Release builds never read it.
+fn ingest_url(key: &str) -> String {
+  #[cfg(debug_assertions)]
+  if let Some(url) = std::env::var("COW_STREAM_INGEST").ok().filter(|url| !url.trim().is_empty()) {
+    log::warn!("stream: COW_STREAM_INGEST is set; streaming to {url} instead of YouTube");
+    return url;
+  }
+  format!("{YOUTUBE_INGEST_BASE}/{key}")
+}
+
 /// Locates the FFmpeg binary. The app bundles an LGPL FFmpeg as a sidecar
 /// (`bundle.externalBin`, fetched by scripts/fetch-ffmpeg.mjs), which Tauri
 /// places next to the app's executable — in dev builds too. If it's missing
@@ -1053,7 +1067,13 @@ fn window_encoder_args(
   quality: StreamQuality,
   audio: Option<String>,
 ) -> Vec<String> {
-  let mut args = ["-hide_banner", "-loglevel", "warning", "-thread_queue_size", "64"]
+  // How many input packets FFmpeg may queue while the encoder catches up.
+  // Compressed frames are small, so 64 costs nothing. A raw frame is a whole
+  // picture (12 MB of NV12 at 4K), so 64 of them would be ~800 MB of memory
+  // and a second of added delay on a computer that can't keep up; 16 still
+  // rides out the encoder pausing for a quarter of a second at 60 fps.
+  let queue = if target.hardware_encoded() { "64" } else { "16" };
+  let mut args = ["-hide_banner", "-loglevel", "warning", "-thread_queue_size", queue]
     .map(String::from)
     .to_vec();
   if target.hardware_encoded() {

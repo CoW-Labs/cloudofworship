@@ -49,6 +49,16 @@ struct MailboxState {
   closed: bool,
 }
 
+impl MailboxState {
+  /// Keeps a buffer for the next frame. Two are enough for one producer and
+  /// one consumer; more would only hold memory (12 MB each at 4K).
+  fn keep_spare(&mut self, buffer: Vec<u8>) {
+    if self.spare_buffers.len() < 2 {
+      self.spare_buffers.push(buffer);
+    }
+  }
+}
+
 #[derive(Default)]
 pub struct FrameMailbox {
   state: Mutex<MailboxState>,
@@ -98,15 +108,28 @@ impl FrameMailbox {
       return;
     }
     self.store(width, height, w, FrameFormat::Nv12, |owned| {
-      for row in 0..h {
-        owned.extend_from_slice(&luma[row * luma_stride..row * luma_stride + w]);
+      owned.reserve(w * h * 3 / 2);
+      // Unpadded planes go across in one copy each; padded ones row by row.
+      if luma_stride == w {
+        owned.extend_from_slice(&luma[..w * h]);
+      } else {
+        for row in 0..h {
+          owned.extend_from_slice(&luma[row * luma_stride..row * luma_stride + w]);
+        }
       }
-      for row in 0..h / 2 {
-        owned.extend_from_slice(&chroma[row * chroma_stride..row * chroma_stride + w]);
+      if chroma_stride == w {
+        owned.extend_from_slice(&chroma[..w * (h / 2)]);
+      } else {
+        for row in 0..h / 2 {
+          owned.extend_from_slice(&chroma[row * chroma_stride..row * chroma_stride + w]);
+        }
       }
     });
   }
 
+  /// Copies a new frame in and makes it the latest. The copy (12 MB at 4K)
+  /// happens outside the lock, so the sender never waits for it: it only
+  /// waits for the two pointer swaps either side.
   fn store(
     &self,
     width: u32,
@@ -115,6 +138,26 @@ impl FrameMailbox {
     format: FrameFormat,
     fill: impl FnOnce(&mut Vec<u8>),
   ) {
+    let mut owned = {
+      let mut state = self
+        .state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+      if state.closed {
+        return;
+      }
+      // An unsent latest frame is about to be superseded anyway; reuse its
+      // allocation rather than make a new one.
+      state
+        .latest
+        .take()
+        .map(|frame| frame.pixels)
+        .or_else(|| state.spare_buffers.pop())
+        .unwrap_or_default()
+    };
+    owned.clear();
+    fill(&mut owned);
+
     let mut state = self
       .state
       .lock()
@@ -124,14 +167,11 @@ impl FrameMailbox {
     }
     state.next_sequence = state.next_sequence.wrapping_add(1);
     let sequence = state.next_sequence;
-    let mut owned = state
-      .latest
-      .take()
-      .map(|frame| frame.pixels)
-      .or_else(|| state.spare_buffers.pop())
-      .unwrap_or_default();
-    owned.clear();
-    fill(&mut owned);
+    // Another publisher may have landed a frame while this one was copying;
+    // this one is newer, so keep that allocation for later.
+    if let Some(raced) = state.latest.take() {
+      state.keep_spare(raced.pixels);
+    }
     state.latest = Some(CapturedFrame {
       sequence,
       width,
@@ -196,7 +236,7 @@ impl FrameMailbox {
     let previous = std::mem::replace(current, latest);
     // The sender must retain one frame for static-slide repetition. Once a new
     // frame replaces it, return the old allocation to capture for reuse.
-    state.spare_buffers.push(previous.pixels);
+    state.keep_spare(previous.pixels);
     true
   }
 

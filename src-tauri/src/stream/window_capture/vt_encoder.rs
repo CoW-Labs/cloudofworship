@@ -93,6 +93,16 @@ extern "C" {
   static kVTProfileLevel_H264_High_AutoLevel: CFStringRef;
   static kVTProfileLevel_HEVC_Main_AutoLevel: CFStringRef;
   static kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder: CFStringRef;
+  static kVTCompressionPropertyKey_ColorPrimaries: CFStringRef;
+  static kVTCompressionPropertyKey_TransferFunction: CFStringRef;
+  static kVTCompressionPropertyKey_YCbCrMatrix: CFStringRef;
+}
+
+#[link(name = "CoreVideo", kind = "framework")]
+extern "C" {
+  static kCVImageBufferColorPrimaries_ITU_R_709_2: CFStringRef;
+  static kCVImageBufferTransferFunction_ITU_R_709_2: CFStringRef;
+  static kCVImageBufferYCbCrMatrix_ITU_R_709_2: CFStringRef;
 }
 
 #[link(name = "CoreMedia", kind = "framework")]
@@ -279,6 +289,19 @@ impl VtEncoder {
         kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration,
         CFNumber::from(2i64).as_CFTypeRef(),
       )?;
+      // Declare BT.709 in the stream itself. Left to the capture surfaces'
+      // attachments, VideoToolbox wrote HEVC streams tagged as an identity
+      // (GBR) matrix with unknown primaries, which a player or YouTube's
+      // transcoder that honours the tag would turn into wrong colours.
+      self.set(
+        kVTCompressionPropertyKey_ColorPrimaries,
+        kCVImageBufferColorPrimaries_ITU_R_709_2 as CFTypeRef,
+      )?;
+      self.set(
+        kVTCompressionPropertyKey_TransferFunction,
+        kCVImageBufferTransferFunction_ITU_R_709_2 as CFTypeRef,
+      )?;
+      self.set(kVTCompressionPropertyKey_YCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2 as CFTypeRef)?;
     }
     Ok(())
   }
