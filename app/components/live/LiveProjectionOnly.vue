@@ -370,38 +370,66 @@
           ></UButton>
         </UTooltip>
 
-        <UModal v-model="isLargePreviewOpen" fullscreen>
-          <UCard>
-            <div class="flex items-center justify-between h-[60px] mb-4">
-              <div class="logo flex items-center gap-2 w-[250px]">
-                <Logo class="w-[24px]" />
-                <h1 class="text-sm font-semibold">Cloud of Worship</h1>
+        <!-- Same shell as the app's other modals (see ShortcutsModal): a
+             transparent UModal around one rounded card. The stage is a 16:9 box
+             sized from the window's height as well as its width, so the whole
+             card always fits and the modal never scrolls. -->
+        <UModal
+          v-model="isLargePreviewOpen"
+          :ui="{
+            rounded: 'rounded-2xl',
+            background: 'bg-transparent dark:bg-transparent',
+            ring: '',
+            shadow: 'shadow-none',
+            width: 'w-full sm:max-w-none',
+            container: 'items-center',
+            overlay: { background: 'bg-gray-900/50 backdrop-blur-sm' },
+          }"
+        >
+          <div
+            class="mx-auto rounded-2xl bg-white dark:bg-[#171d2b] border border-white/80 dark:border-[#202838] overflow-hidden"
+            :style="{ width: largePreviewCardWidth }"
+          >
+            <div class="flex items-center justify-between gap-3 px-5 py-4">
+              <div class="min-w-0">
+                <h2 class="font-semibold text-base text-gray-900 dark:text-white">
+                  Large Preview
+                </h2>
+                <p
+                  class="text-sm text-gray-400 dark:text-[#9aa3b2] mt-0.5 truncate"
+                >
+                  {{ slide?.name || "No live slide" }}
+                </p>
               </div>
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                Large Preview
-              </h3>
-              <div class="close-ctn w-[250px] flex justify-end">
-                <UButton
-                  color="gray"
-                  variant="ghost"
-                  icon="i-mdi-close"
-                  class="my-1"
-                  @click="isLargePreviewOpen = false"
+              <button
+                class="grid h-8 w-8 place-items-center rounded-lg leading-none transition-colors hover:bg-gray-100 dark:hover:bg-[#222938] shrink-0"
+                aria-label="Close large preview"
+                @click="isLargePreviewOpen = false"
+              >
+                <CloseIcon
+                  class="block h-4 w-4 text-gray-600 dark:text-[#a7afbd]"
+                />
+              </button>
+            </div>
+            <div class="px-3 pb-3">
+              <div
+                class="w-full overflow-hidden rounded-xl bg-black"
+                style="aspect-ratio: 16 / 9"
+              >
+                <LiveProjectionOnly
+                  embedded
+                  :full-screen="true"
+                  :content-visible="true"
+                  :slide="slide"
+                  :slide-label="false"
+                  :slide-styles="slideStyles"
+                  :camera-mode="
+                    cameraMode === 'placeholder' ? 'placeholder' : 'preview'
+                  "
                 />
               </div>
             </div>
-            <LiveProjectionOnly
-              :full-screen="true"
-              full-screen-height="80vh"
-              :content-visible="true"
-              :slide="slide"
-              :slide-label="false"
-              :slide-styles="slideStyles"
-              :camera-mode="
-                cameraMode === 'placeholder' ? 'placeholder' : 'preview'
-              "
-            />
-          </UCard>
+          </div>
         </UModal>
       </template>
       <template v-if="!hideGlobalLayers">
@@ -457,6 +485,39 @@ const previewVideo = ref<HTMLVideoElement | null>(null)
 const audio = ref<HTMLAudioElement | null>(null)
 const iframe = ref<HTMLIFrameElement | null>(null)
 const isLargePreviewOpen = ref<boolean>(false)
+// The card is as wide as its 16:9 stage allows: the window's width, or less when
+// the window is short, so the header and stage always fit in the height.
+// 10rem is the header, the card's padding and a margin above and below.
+const largePreviewCardWidth =
+  "min(94vw, calc((100vh - 10rem) * 16 / 9 + 1.5rem))"
+
+// The Large Preview plays with sound, like the projector. With a Live Output
+// window open on this computer that is two copies of the same sound, so opening
+// it on a video or audio media slide warns about the echo.
+const makesSound = computed(() => {
+  const slide = props.slide
+  if (!slide || slide.type !== slideTypes.media) return false
+  if (slide.slideStyle?.isMediaMuted) return false
+  const data = slide.data as ExtendedFileT | ExternalVideo | undefined
+  const external = data?.type === "youtube" || data?.type === "vimeo"
+  return (
+    slide.backgroundType === backgroundTypes.video ||
+    external ||
+    !!(data as ExtendedFileT | undefined)?.type?.includes("audio")
+  )
+})
+watch(isLargePreviewOpen, (open) => {
+  if (!open || !makesSound.value) return
+  usePosthogCapture("LARGE_PREVIEW_ECHO_WARNED", { slideType: props.slide?.type })
+  useToast().add({
+    id: "large-preview-echo",
+    title: "Sound is on in Large Preview",
+    description: "If a Live Output window is open on this computer, you may hear an echo.",
+    icon: "i-bx-info-circle",
+    color: "amber",
+    timeout: 6000,
+  })
+})
 const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
 const route = useRoute()
@@ -469,7 +530,9 @@ const props = withDefaults(
     contentVisible: Boolean
     fullScreen: Boolean
     slideStyles: SlideStyle
-    audioMuted?: Boolean
+    // Lower-case `boolean`: with the `Boolean` wrapper type Vue does not cast a
+    // bare `audio-muted` attribute, which then arrives as "" and reads false.
+    audioMuted?: boolean
     slideLabel?: Boolean
     fullScreenHeight?: string
     /**
@@ -997,28 +1060,33 @@ const playableVideo = computed(() => {
 // That left the element relying on the bare `autoplay` attribute, which Chrome
 // refuses for unmuted media without user activation, and the video sat on its
 // first frame. Playing on the source itself covers both arrivals.
+// The operator's Live Output preview does the same on its own muted copy, so it
+// plays whether or not a projector window is open.
+const mediaElement = () => (props.fullScreen ? video.value : previewVideo.value)
+
 watch(playableVideo, async (next, previous) => {
-  if (!next || !props.fullScreen) return
+  if (!next) return
   if (previous?.id === next.id && previous.src === next.src) return
 
   // Same slide, new source: the local copy replaced the cloud URL it had been
   // streaming. It is the same footage, so keep the position rather than
   // restarting the clip mid-service. A different slide starts from the top.
   const sameSlide = previous?.id === next.id
-  const resumeAt = sameSlide && video.value ? video.value.currentTime : 0
+  const current = mediaElement()
+  const resumeAt = sameSlide && current ? current.currentTime : 0
   // Paused by the operator while the local copy was still saving: it stays
   // paused when the copy lands. Playing it here undid the pause mid-service.
   // A stream that simply has not started yet (no pause pressed) still plays.
   const stayPaused =
     sameSlide &&
-    !!video.value?.paused &&
-    !video.value?.ended &&
+    !!current?.paused &&
+    !current?.ended &&
     !!props.slide?.slideStyle?.mediaCommandAt &&
     props.slide?.slideStyle?.isMediaPlaying === false
 
   // Let Vue patch :src onto the element before asking it to play.
   await nextTick()
-  const element = video.value
+  const element = mediaElement()
   if (!element) return
 
   if (resumeAt > 0) {
@@ -1048,13 +1116,14 @@ watch(playableVideo, async (next, previous) => {
   safePlayMedia(element)
 })
 
-// The projector reports its video's playback; the operator-side preview copy
-// follows it instead of playing by itself. The public livestream page plays
-// for viewers elsewhere, so it does not report.
+// The projector reports its video's playback, and the operator-side preview
+// copy is corrected by it. Only the /live window is the projector: the public
+// livestream page plays for viewers elsewhere, and the operator's Large Preview
+// is a full-screen copy that must not pass for it.
 useReportMediaPlayback(
   video,
   () => props.slide?.id,
-  () => props.fullScreen && !route.path.startsWith("/livestream")
+  () => props.fullScreen && route.path === "/live"
 )
 useFollowMediaPlayback(
   previewVideo,
@@ -1085,7 +1154,6 @@ watch(
   () => props.slide?.slideStyle?.mediaSeekPosition,
   (newSeekPosition, oldSeekPosition) => {
     if (
-      !props.fullScreen ||
       newSeekPosition === undefined ||
       newSeekPosition < 0 ||
       newSeekPosition === oldSeekPosition
@@ -1100,6 +1168,12 @@ watch(
         !slide?.id ||
         !appStore.isSlideLive(slide.id)
       ) {
+        return
+      }
+
+      // The operator's preview copy follows the seek too.
+      if (!props.fullScreen) {
+        if (previewVideo.value) previewVideo.value.currentTime = newSeekPosition
         return
       }
 
@@ -1164,7 +1238,6 @@ watch(
   ([slideId, isPlaying, commandAt], previous) => {
     const [previousId, wasPlaying, previousCommandAt] = previous ?? []
     if (
-      !props.fullScreen ||
       slideId !== previousId ||
       (isPlaying === wasPlaying && commandAt === previousCommandAt)
     ) {
@@ -1178,6 +1251,15 @@ watch(
         !slide?.id ||
         !appStore.isSlideLive(slide.id)
       ) {
+        return
+      }
+
+      // The operator's preview copy: muted, no embedded players to command.
+      if (!props.fullScreen) {
+        if (isPlaying) safePlayMedia(previewVideo.value)
+        else if (isPlaying !== undefined && slide.type === slideTypes.media) {
+          safePauseMedia(previewVideo.value)
+        }
         return
       }
 
@@ -1315,9 +1397,16 @@ watchMediaHandoff(audio, "audio")
 
 onMounted(() => {
   appMounted.value = true
-  // Only play video when in fullScreen mode
   if (props.fullScreen) {
     safePlayMedia(video.value)
+  } else if (
+    // The preview plays on its own, unless the operator paused this clip.
+    !(
+      props.slide?.slideStyle?.mediaCommandAt &&
+      props.slide?.slideStyle?.isMediaPlaying === false
+    )
+  ) {
+    safePlayMedia(previewVideo.value)
   }
 })
 

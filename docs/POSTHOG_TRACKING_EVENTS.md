@@ -191,6 +191,10 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `SLIDES_IMPORTED` | `format`, `slideCount`, `source` | User imports slides from file | ⚠️ Missing |
 | `SCHEDULE_EXPORTED` | `scheduleId`, `slideCount` | Schedule exported | ⚠️ Missing |
 | `SCHEDULE_IMPORTED` | `scheduleId`, `slideCount` | Schedule imported | ⚠️ Missing |
+| `EASYWORSHIP_IMPORT_OPENED` | - | User opens the "Import from EasyWorship" panel | ✅ Exists |
+| `EASYWORSHIP_IMPORT_ATTEMPTED` | - | User picks a zipped EasyWorship backup and it starts being read | ✅ Exists |
+| `EASYWORSHIP_IMPORT_COMPLETED` | `importedCount`, `skippedDuplicates`, `failedCount`, `totalParsed` | Picked songs from an EasyWorship backup were sent to the library (`failedCount` = network/server failures, or songs left when the connection dropped) | ✅ Exists |
+| `EASYWORSHIP_IMPORT_FAILED` | `error` | EasyWorship import failed (bad file, parse error, network) | ✅ Exists |
 
 ---
 

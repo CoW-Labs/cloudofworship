@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud of Worship Design System</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  body { margin: 0; background: var(--ds-surface); color: var(--ds-ink); font-family: var(--ds-font-sans); }
+  .sc-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px var(--ds-space-10); border-bottom: 1px solid var(--ds-line); }
+  .sc-top button { font: 500 14px/1 var(--ds-font-sans); height: 36px; padding: 0 16px; border-radius: var(--ds-radius-pill); border: 1px solid var(--ds-line); background: var(--ds-surface-raised); color: var(--ds-ink); cursor: pointer; }
+  .sc-wrap { max-width: 1100px; margin: 0 auto; padding: var(--ds-space-10) max(16px, var(--ds-space-10)); }
+  .sc-wrap > h1 { margin: 0 0 8px; }
+  .sc-wrap > p { max-width: 640px; color: var(--ds-ink-muted); }
+  .sc-group > h2 { margin: var(--ds-space-14) 0 var(--ds-space-5); font: 500 11px/14px var(--ds-font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--ds-brand-text); }
+  .sc-card { margin-bottom: var(--ds-space-7); border: 1px solid var(--ds-line); border-radius: var(--ds-radius-card); overflow: hidden; }
+  .sc-card header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 14px 20px; }
+  .sc-card > header h3 { margin: 0; font: 700 22px/1 var(--ds-font-display); color: var(--ds-ink-strong); }
+  .sc-card header p { flex: 1 1 320px; margin: 0; color: var(--ds-ink-muted); font-size: 14px; }
+  .sc-card header a { color: var(--ds-brand-text); font-size: 14px; }
+  .sc-stage { overflow-x: auto; position: relative; }
+  .sc-stage .row { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
+  .sc-stage .stack { display: grid; gap: 16px; }
+ #Footer .ds-footer{padding:32px 28px}
+ #FreedomCard .ds-freedom{min-height:250px}
+ #NavBar .ds-nav{padding:0 24px}
+ #NumberedPoints .ds-point-title{font-size:30px;margin:18px 0 8px}
+ #StatBlock .ds-stat-number{font-size:104px}
+</style>
+</head>
+<body class="ds-root">
+<div class="sc-top"><a class="ds-logo" href="#"><img src="assets/logos/cow-mark.svg" alt=""><span class="ds-logo-name">Cloud of Worship</span></a><button type="button" id="theme">Toggle dark</button></div>
+<main class="sc-wrap">
+<h1 class="ds-display-section">Design system</h1>
+<p>Live previews of every component, built only from tokens.css, fonts.css and components.css. Read README.md for the rules and brand-guidelines.md for voice and logo use.</p>
+<section class="sc-group"><h2>Product</h2>
+  <article class="sc-card" id="AppWindow-card">
+    <header><h3>AppWindow</h3><p>A frosted-glass desktop window that frames real product footage on the home page.</p><a href="components/AppWindow.md">Guidelines</a></header>
+    <div class="sc-stage" id="AppWindow" style="background:linear-gradient(180deg,var(--ds-white),var(--ds-purple-100));padding:28px">
+<div class="ds-window" style="max-width:560px">
+<div class="ds-window-dots"><span style="background:#ff5f57"></span><span style="background:#febc2e"></span><span style="background:#28c840"></span></div>
+<div class="ds-window-screen" style="display:grid;grid-template-columns:1fr 2fr 1.2fr;gap:8px;padding:10px;height:150px;background:var(--ds-surface-wash)">
+<div style="background:var(--ds-white);border-radius:8px"></div><div style="background:var(--ds-white);border-radius:8px;display:grid;place-items:center"><span class="ds-pill-btn" style="height:28px;font-size:12px;padding:0 12px">Create new slide</span></div><div style="background:var(--ds-night);border-radius:8px;color:var(--ds-white);font:700 13px/1.1 var(--ds-font-sans);display:grid;place-items:center;text-align:center;padding:8px">In the beginning God created the heavens and the earth.</div>
+</div></div>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Labels</h2>
+  <article class="sc-card" id="Badge-card">
+    <header><h3>Badge</h3><p>A small uppercase pill marking a saving or a status next to a label.</p><a href="components/Badge.md">Guidelines</a></header>
+    <div class="sc-stage" id="Badge" style="background:var(--ds-surface);padding:24px">
+<div class="row"><span class="ds-badge">10% off</span><span class="ds-badge">New</span></div>
+    </div>
+  </article>
+  <article class="sc-card" id="Eyebrow-card">
+    <header><h3>Eyebrow</h3><p>An 11px uppercase label set above a display heading to name the section.</p><a href="components/Eyebrow.md">Guidelines</a></header>
+    <div class="sc-stage" id="Eyebrow" style="background:var(--ds-surface-wash);padding:24px">
+<div class="stack" style="gap:12px"><p class="ds-eyebrow">Pricing</p><p class="ds-eyebrow accessible">Featured testimonials</p></div>
+    </div>
+  </article>
+  <article class="sc-card" id="RatingBadge-card">
+    <header><h3>RatingBadge</h3><p>The trust chip above the hero headline: a star, a claim and a real rating, on the dark stage.</p><a href="components/RatingBadge.md">Guidelines</a></header>
+    <div class="sc-stage" id="RatingBadge" style="background:var(--ds-surface-stage);padding:24px">
+<span class="ds-rating"><span class="ds-rating-star" aria-hidden="true">★</span>Top-rated open source tool · 4.4 on Trustpilot</span>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Feedback</h2>
+  <article class="sc-card" id="CookieNotice-card">
+    <header><h3>CookieNotice</h3><p>A small lilac card in the bottom-right corner that explains cookies in one friendly sentence.</p><a href="components/CookieNotice.md">Guidelines</a></header>
+    <div class="sc-stage" id="CookieNotice" style="background:var(--ds-surface-stage);padding:24px">
+<div class="ds-cookie" role="dialog" aria-label="Cookies"><p>We keep a few cookies around. They help us see what’s working, so this site runs as smoothly as your Sunday service should.</p><button class="ds-pill-btn">That’s Okay</button></div>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Sections</h2>
+  <article class="sc-card" id="CtaBand-card">
+    <header><h3>CtaBand</h3><p>The closing poster before the footer: one question in huge type and a black disc that follows the cursor.</p><a href="components/CtaBand.md">Guidelines</a></header>
+    <div class="sc-stage" id="CtaBand" style="background:var(--ds-surface);padding:0">
+<section class="ds-cta" style="padding:40px 32px">
+<h2 class="ds-cta-head" style="font-size:80px">Sunday’s coming. Are you ready?</h2>
+<a class="ds-cta-disc" href="#" style="right:80px;top:150px">Get Started</a>
+<p class="ds-cta-foot" style="left:32px;bottom:24px">Prepare once,<br>use everywhere.</p>
+</section>
+    </div>
+  </article>
+  <article class="sc-card" id="NumberedPoints-card">
+    <header><h3>NumberedPoints</h3><p>Three principles in a row, each under a hairline with a purple step number.</p><a href="components/NumberedPoints.md">Guidelines</a></header>
+    <div class="sc-stage" id="NumberedPoints" style="background:var(--ds-surface);padding:24px">
+<ol class="ds-points">
+<li class="ds-point"><span class="ds-point-num">01</span><h3 class="ds-point-title">Nothing hidden</h3><p class="ds-point-body">Read every line of the app your church runs on Sunday.</p></li>
+<li class="ds-point"><span class="ds-point-num">02</span><h3 class="ds-point-title">Yours to change</h3><p class="ds-point-body">Fix a bug or build what your church needs.</p></li>
+<li class="ds-point"><span class="ds-point-num">03</span><h3 class="ds-point-title">Shaped by churches</h3><p class="ds-point-body">Ideas come from the teams who use it every week.</p></li>
+</ol>
+    </div>
+  </article>
+  <article class="sc-card" id="PosterHeadline-card">
+    <header><h3>PosterHeadline</h3><p>A full-bleed `surface-poster` section with a giant condensed headline that mixes ExtraBold and ExtraLight words.</p><a href="components/PosterHeadline.md">Guidelines</a></header>
+    <div class="sc-stage" id="PosterHeadline" style="background:var(--ds-surface);padding:0">
+<section class="ds-poster" style="padding:24px 28px 28px">
+<svg class="ds-globe" style="right:-180px;top:-200px;width:620px" viewBox="0 0 400 400" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="200" cy="200" r="190"/><ellipse cx="200" cy="200" rx="90" ry="190"/><ellipse cx="200" cy="200" rx="190" ry="70"/></svg>
+<h1 class="ds-poster-head" style="font-size:132px"><span class="line"><span class="heavy">Open to</span> <span class="thin">every</span></span><span class="line heavy">church.</span></h1>
+<p class="ds-poster-lede" style="font-size:20px;margin-top:20px">Cloud of Worship is open source. Read the code, change it and run it, free.</p>
+</section>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Navigation</h2>
+  <article class="sc-card" id="Footer-card">
+    <header><h3>Footer</h3><p>A black footer with link columns, a one-line description, the copyright and the lockup on the right.</p><a href="components/Footer.md">Guidelines</a></header>
+    <div class="sc-stage" id="Footer" style="background:var(--ds-surface-footer);padding:0">
+<footer class="ds-footer">
+<div class="stack" style="gap:28px"><div><h2>Support</h2><ul><li><a href="#">Contact COW</a></li><li><a href="#">Help Center</a></li><li><a href="#">Join Our Community</a></li><li><a href="#">Pricing</a></li></ul></div></div>
+<div><h2>Resources</h2><ul><li><a href="#">Blogs &amp; Guides</a></li><li><a href="#">Roadmap</a></li><li><a href="#">What's New!</a></li><li><a class="is-current" href="#">Open Source</a></li></ul></div>
+<div><p class="ds-footer-blurb">Cloud of Worship is a browser-based worship support system built for growing churches that want simple, reliable media setup</p><p class="ds-footer-blurb" style="margin-top:14px">© CoW Labs, All Rights Reserved, 2026</p></div>
+<a class="ds-logo on-dark" href="#"><img src="assets/logos/cow-mark.svg" alt="" style="width:28px;height:28px"><span class="ds-logo-name" style="font-size:16px">Cloud of Worship</span></a>
+</footer>
+    </div>
+  </article>
+  <article class="sc-card" id="NavBar-card">
+    <header><h3>NavBar</h3><p>The sticky top bar: lockup, four top links, a GitHub icon and the sign-up pill. Hovering a top link opens a lilac mega-menu.</p><a href="components/NavBar.md">Guidelines</a></header>
+    <div class="sc-stage" id="NavBar" style="background:var(--ds-surface);padding:0">
+<nav class="ds-nav" aria-label="Main">
+  <a class="ds-logo" href="#"><img src="assets/logos/cow-mark.svg" alt=""><span class="ds-logo-name">Cloud of Worship</span></a>
+  <ul class="ds-nav-links"><li><a class="ds-nav-link is-open" href="#">Products</a></li><li><a class="ds-nav-link" href="#">Pricing</a></li><li><a class="ds-nav-link" href="#">Resources</a></li><li><a class="ds-nav-link" href="#">Download</a></li></ul>
+  <div class="ds-nav-end"><a class="ds-pill-btn" href="#">Get started for free</a></div>
+</nav>
+<div style="padding:0 0 0 250px;margin-top:-14px"><div class="ds-menu-panel"><a class="ds-menu-link" href="#">Browser-ready UX</a><a class="ds-menu-link" href="#">Offline-first experience</a><a class="ds-menu-link is-active" href="#">Team Workflow</a><a class="ds-menu-link" href="#">Bible &amp; scripture</a><a class="ds-menu-link" href="#">Songs &amp; hymns</a><a class="ds-menu-link" href="#">Live projection</a><a class="ds-menu-link" href="#">Live transcription</a></div></div>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Cards</h2>
+  <article class="sc-card" id="FreedomCard-card">
+    <header><h3>FreedomCard</h3><p>A pastel card with a white icon disc at the top and a title and one sentence at the bottom.</p><a href="components/FreedomCard.md">Guidelines</a></header>
+    <div class="sc-stage" id="FreedomCard" style="background:var(--ds-surface);padding:24px">
+<ul class="row" style="list-style:none;margin:0;padding:0;align-items:stretch;gap:16px">
+<li class="ds-freedom sky" style="width:230px"><span class="ds-icon-disc"><img src="assets/icons/hand-heart.svg" alt=""></span><div><h3 class="ds-freedom-title">Use it free</h3><p>For any purpose. No fee and no license key, on Sunday or any other day.</p></div></li>
+<li class="ds-freedom butter" style="width:230px"><span class="ds-icon-disc"><img src="assets/icons/code-window.svg" alt=""></span><div><h3 class="ds-freedom-title">Read and change it</h3><p>Every line is on GitHub. Tweak a layout or fix a bug for your team.</p></div></li>
+<li class="ds-freedom blush" style="width:230px"><span class="ds-icon-disc"><img src="assets/icons/church.svg" alt=""></span><div><h3 class="ds-freedom-title">Run your own copy</h3><p>Host it on your own setup, for your church or ministry.</p></div></li>
+<li class="ds-freedom mint" style="width:230px"><span class="ds-icon-disc"><img src="assets/icons/share.svg" alt=""></span><div><h3 class="ds-freedom-title">Share it</h3><p>Pass it on to a sister church, or share what you built with everyone.</p></div></li>
+</ul>
+    </div>
+  </article>
+  <article class="sc-card" id="NightCard-card">
+    <header><h3>NightCard</h3><p>A `night` card with a lavender title, used to make the mission point inside a purple poster.</p><a href="components/NightCard.md">Guidelines</a></header>
+    <div class="sc-stage" id="NightCard" style="background:var(--ds-surface-poster);padding:28px">
+<div class="ds-night-card"><h3 class="ds-night-card-title">Your plan equips a ministry.</h3><p>When your church subscribes to Teams, you help put the tools for spreading the good news into the hands of churches that need them most.</p><a class="ds-night-card-meta" href="#">See Teams pricing</a></div>
+    </div>
+  </article>
+  <article class="sc-card" id="PricingTicket-card">
+    <header><h3>PricingTicket</h3><p>The Teams price shown as an admission ticket: a white top with the price, a perforated tear line, and a stub with the giving pledge.</p><a href="components/PricingTicket.md">Guidelines</a></header>
+    <div class="sc-stage" id="PricingTicket" style="background:var(--ds-night);padding:28px">
+<div class="ds-ticket">
+<div class="ds-ticket-top"><div class="ds-toggle" role="group" aria-label="Billing period"><button aria-pressed="true">Monthly</button><button aria-pressed="false">Annual <span class="ds-badge">10% off</span></button></div>
+<p class="ds-price">$10</p><p class="ds-price-unit">Billed monthly</p><a class="ds-pill-btn" href="#" style="width:100%">Get started</a></div>
+<div class="ds-ticket-perf"></div>
+<div class="ds-ticket-stub"><p class="ds-ticket-fine">90% of profits from Teams plan sales go directly to efforts pushing the gospel forward in churches across Africa and other regions.</p></div>
+</div>
+    </div>
+  </article>
+  <article class="sc-card" id="StickyNote-card">
+    <header><h3>StickyNote</h3><p>A tilted pastel note with a heart disc, pinned beside the pricing ticket to answer an objection in a friendly voice.</p><a href="components/StickyNote.md">Guidelines</a></header>
+    <div class="sc-stage" id="StickyNote" style="background:var(--ds-surface-wash);padding:24px">
+<div class="row" style="gap:40px;padding:12px 8px">
+<div class="ds-note sky tilt-l"><span class="ds-icon-disc"><img src="assets/icons/heart.svg" alt=""></span><p class="ds-note-text">Save at least 10 minutes every Sunday with Teams by reusing songs added by nearby churches.</p></div>
+<div class="ds-note butter tilt-r"><span class="ds-icon-disc"><img src="assets/icons/heart.svg" alt=""></span><p class="ds-note-text">Monthly cost too high? Tell us what your church can afford. We’ll reply in about 30 minutes—or 8.5 hours if we’re asleep :)</p><span><a class="ds-pill-btn dark" href="#">Contact us</a></span></div>
+</div>
+    </div>
+  </article>
+  <article class="sc-card" id="TestimonialCard-card">
+    <header><h3>TestimonialCard</h3><p>A real church's words in a lavender-gradient card, signed with the person and church in the display face.</p><a href="components/TestimonialCard.md">Guidelines</a></header>
+    <div class="sc-stage" id="TestimonialCard" style="background:var(--ds-surface-wash);padding:24px">
+<figure class="ds-quote-card" style="margin:0"><blockquote class="ds-quote">“Used by kids in the children’s ministry every Sunday. That’s how easy it is to use.”</blockquote><figcaption><p class="ds-quote-who">Victor, Foursquare Church</p><p class="ds-quote-src">Review on Trustpilot</p></figcaption></figure>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Brand</h2>
+  <article class="sc-card" id="Logo-card">
+    <header><h3>Logo</h3><p>The cloud mark beside the name set in Bricolage Grotesque Bold: the lockup used in the nav and footer.</p><a href="components/Logo.md">Guidelines</a></header>
+    <div class="sc-stage" id="Logo" style="background:var(--ds-surface);padding:16px">
+<div class="row" style="gap:0">
+  <div style="padding:20px 24px;background:var(--ds-white)"><a class="ds-logo" href="#" style="color:var(--ds-night)"><img src="assets/logos/cow-mark.svg" alt=""><span class="ds-logo-name">Cloud of Worship</span></a></div>
+  <div style="padding:20px 24px;background:var(--ds-stage)"><a class="ds-logo on-dark" href="#"><img src="assets/logos/cow-mark-white.svg" alt=""><span class="ds-logo-name">Cloud of Worship</span></a></div>
+  <div style="padding:20px 24px;background:var(--ds-purple-500)"><a class="ds-logo on-poster" href="#"><img src="assets/logos/cow-mark-ink.svg" alt=""><span class="ds-logo-name">Cloud of Worship</span></a></div>
+</div>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Actions</h2>
+  <article class="sc-card" id="OutlinePill-card">
+    <header><h3>OutlinePill</h3><p>A 2px outlined pill used as a section tag or anchor link on the purple poster.</p><a href="components/OutlinePill.md">Guidelines</a></header>
+    <div class="sc-stage" id="OutlinePill" style="background:var(--ds-surface-poster);padding:28px 24px">
+<div class="row"><a class="ds-outline-pill" href="#">Our open source philosophy</a><a class="ds-outline-pill sm" href="#">The Ends of The Earth Initiative</a></div>
+    </div>
+  </article>
+  <article class="sc-card" id="PillButton-card">
+    <header><h3>PillButton</h3><p>The only button shape on the site: a 44px pill sitting on a solid ledge, so it reads as a physical key you press.</p><a href="components/PillButton.md">Guidelines</a></header>
+    <div class="sc-stage" id="PillButton" style="background:var(--ds-surface);padding:20px 24px 28px">
+<div class="stack">
+<div class="row"><a class="ds-pill-btn" href="#">Get started for free</a><a class="ds-pill-btn is-hover" href="#">Hover</a><a class="ds-pill-btn is-pressed" href="#">Pressed</a></div>
+<div class="row"><a class="ds-pill-btn dark" href="#">See the code on GitHub</a><a class="ds-pill-btn dark" href="#">Contact us <svg class="ds-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8h11M9 4l4 4-4 4"/></svg></a></div>
+</div>
+    </div>
+  </article>
+  <article class="sc-card" id="TextLink-card">
+    <header><h3>TextLink</h3><p>Two link treatments: a thick underline beside buttons, and a dotted violet underline inside headlines.</p><a href="components/TextLink.md">Guidelines</a></header>
+    <div class="sc-stage" id="TextLink" style="background:var(--ds-surface);padding:24px">
+<div class="stack">
+<div style="background:var(--ds-surface-poster);color:var(--ds-night);padding:16px 20px;border-radius:12px"><a class="ds-text-link" href="#">How the license works</a></div>
+<p class="ds-display" style="margin:0;font-weight:700;font-size:44px;line-height:1;color:var(--ds-ink-strong)">and pay <a class="ds-dotted-link" href="#">only if</a></p>
+</div>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Collaboration</h2>
+  <article class="sc-card" id="PresenceCursor-card">
+    <header><h3>PresenceCursor</h3><p>Named cursors and stacked avatars that show several volunteers working on one service at once.</p><a href="components/PresenceCursor.md">Guidelines</a></header>
+    <div class="sc-stage" id="PresenceCursor" style="background:var(--ds-surface-wash);padding:24px">
+<div class="row" style="gap:28px">
+<span class="ds-presence blue"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 2 L18 8 L10.5 10.5 L8 18 Z" fill="#0c0f19" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/></svg><span class="ds-presence-label">Lanre O.</span></span>
+<span class="ds-presence gold"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 2 L18 8 L10.5 10.5 L8 18 Z" fill="#0c0f19" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/></svg><span class="ds-presence-label">Inioluwa</span></span>
+<span class="ds-presence violet"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 2 L18 8 L10.5 10.5 L8 18 Z" fill="#0c0f19" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/></svg><span class="ds-presence-label">Favour</span></span>
+<span class="ds-avatars"><span class="ds-avatar" style="background:var(--ds-cursor-violet)">FF</span><span class="ds-avatar" style="background:var(--ds-cursor-blue)">LO</span><span class="ds-avatar" style="background:var(--ds-cursor-gold);color:var(--ds-ink-900)">IA</span></span>
+</div>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Controls</h2>
+  <article class="sc-card" id="SegmentedToggle-card">
+    <header><h3>SegmentedToggle</h3><p>A pill track with two or three segments; the chosen one fills with `night`.</p><a href="components/SegmentedToggle.md">Guidelines</a></header>
+    <div class="sc-stage" id="SegmentedToggle" style="background:var(--ds-surface-wash);padding:24px">
+<div class="ds-toggle" role="group" aria-label="Billing period"><button aria-pressed="true">Monthly</button><button aria-pressed="false">Annual <span class="ds-badge">10% off</span></button></div>
+    </div>
+  </article>
+</section><section class="sc-group"><h2>Data</h2>
+  <article class="sc-card" id="StatBlock-card">
+    <header><h3>StatBlock</h3><p>A stack of big condensed numbers with a caption and hairline under each.</p><a href="components/StatBlock.md">Guidelines</a></header>
+    <div class="sc-stage" id="StatBlock" style="background:var(--ds-surface-wash);padding:24px">
+<div class="ds-stats">
+<p class="ds-stat-label">The result</p>
+<div class="ds-stat"><p class="ds-stat-number">3500+</p><p class="ds-stat-caption">Churches served</p><div class="ds-stat-divider"></div></div>
+<div class="ds-stat"><p class="ds-stat-number">99%</p><p class="ds-stat-caption">Uptime during service hours</p><div class="ds-stat-divider"></div></div>
+</div>
+    </div>
+  </article>
+</section>
+</main>
+<script>document.getElementById('theme').addEventListener('click',()=>document.documentElement.classList.toggle('dark'));</script>
+</body>
+</html>

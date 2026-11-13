@@ -1773,9 +1773,9 @@ const satisfactionPrompt = ref<{
   isWithinCooldown: () => boolean
 } | null>(null)
 
-// Asking on the very first launch reads as noise; by the fifth open the
+// Asking on the very first launch reads as noise; by the tenth open the
 // operator has run a service or two and has an opinion worth collecting.
-const APP_OPENS_BEFORE_FEEDBACK = 5
+const APP_OPENS_BEFORE_FEEDBACK = 10
 const APP_OPENS_KEY = "cow_app_open_count"
 const feedbackPromptTimers = new Set<ReturnType<typeof setTimeout>>()
 

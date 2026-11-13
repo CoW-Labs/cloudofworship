@@ -4,6 +4,7 @@ use tauri::{Manager, WindowEvent};
 
 mod ndi;
 mod desktop_update;
+mod easyworship;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,6 +160,7 @@ pub fn run() {
   builder
     .plugin(tauri_plugin_deep_link::init())
     .plugin(tauri_plugin_fs::init())
+    .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
@@ -194,6 +196,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       media_storage_stats,
       media_storage_capacity,
+      easyworship::import_easyworship_songs,
       desktop_update::desktop_stage_update,
       desktop_update::desktop_cancel_update,
       desktop_update::desktop_install_update,
