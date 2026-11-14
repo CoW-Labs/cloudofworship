@@ -224,6 +224,8 @@
               {{
                 subscriptionData.activeSubscription.status === "canceled"
                   ? "Access Until"
+                  : renewsByHand
+                  ? "Paid Until"
                   : "Next Billing Date"
               }}
             </p>
@@ -248,6 +250,15 @@
         >
           <div class="flex flex-wrap gap-2">
             <CowButton
+              v-if="renewsByHand"
+              variant="primary"
+              size="2xs"
+              class="!px-3.5 !py-1.5 text-xs"
+              @click="handleUpgrade"
+            >
+              Renew
+            </CowButton>
+            <CowButton
               v-if="subscriptionData.activeSubscription.canUpdatePaymentMethod"
               variant="secondary"
               size="2xs"
@@ -271,6 +282,8 @@
             {{
               subscriptionData.activeSubscription.status === 'trialing'
                 ? 'You will keep access until your trial ends. You will not be charged.'
+                : renewsByHand
+                ? "This plan doesn't renew automatically. Renew before it ends to keep Teams; renewing early adds to the time you have left."
                 : 'You will have access until the end of your current billing period.'
             }}
           </p>
@@ -436,6 +449,12 @@ const transactionsLoading = ref(true)
 
 const isFreeTrial = computed(() => subscriptionData.value?.isFreeTrial ?? false)
 
+// Mobile money, bank transfers and admin-granted plans: no card on file, so
+// the church pays again to keep Teams.
+const renewsByHand = computed(() =>
+  needsManualRenewal(subscriptionData.value?.activeSubscription)
+)
+
 // A failed renewal drops the church to the free plan but keeps the
 // subscription linked, so this must not depend on subscriptionPlan.
 const isPastDue = computed(
@@ -535,7 +554,7 @@ const fetchSubscriptionDetails = async (showLoader = true) => {
     return
   }
 
-  const newData = (data.value as any)?.data || null
+  const newData = normalizeSubscriptionDetails((data.value as any)?.data || null)
   subscriptionData.value = newData
 
   // Cache the data in auth store

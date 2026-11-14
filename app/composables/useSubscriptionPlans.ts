@@ -1,3 +1,18 @@
+import { useAuthStore } from '~/store/auth'
+import {
+  BILLING_CURRENCIES,
+  DEFAULT_BILLING_ROUTE,
+  formatPrice,
+  isBillingCurrency,
+  readTestCountry,
+  resolveBillingRoute,
+  routeForCurrency,
+  type BillingCurrency,
+  type BillingProvider,
+  type BillingRoute,
+  type GeoResponse,
+} from '~/utils/billing'
+
 export interface SubscriptionPlanFeature {
   feature: string
 }
@@ -5,12 +20,12 @@ export interface SubscriptionPlanFeature {
 export interface SubscriptionPlan {
   id: string
   alias: string
-  planCode: string | null  // Paystack plan code (NGN plans only); null for USD/Dodo plans
-  amount: number
+  planCode: string | null  // Paystack plan code (NGN plans only); null for every other currency
+  amount: number           // Main unit (499 = KES 499)
   amountKobo: number | null
   amountCents: number | null
   features: string[]
-  currency: 'NGN' | 'USD'
+  currency: BillingCurrency
   interval: 'yearly' | 'monthly'
   discount: string | null
 }
@@ -21,25 +36,34 @@ export interface SubscriptionPlansResponse {
 }
 
 /**
- * Composable for fetching subscription plans from the API
+ * Composable for fetching subscription plans from the API, and for knowing
+ * which provider and currency this church pays with.
  */
 export const useSubscriptionPlans = () => {
   // Shared across every caller (the upgrade modal and usePayment use separate
   // instances) so plans fetched once are reused — no refetch before checkout opens.
   const plans = useState<SubscriptionPlan[]>('subscription-plans', () => [])
-  const selectedCurrency = useState<'NGN' | 'USD'>('subscription-selected-currency', () => 'USD') // Default to USD
-  const detectedCurrency = useState<'NGN' | 'USD' | null>('subscription-detected-currency', () => null)
+  const selectedCurrency = useState<BillingCurrency>('subscription-selected-currency', () => 'USD') // Default to USD
+  const selectedProvider = useState<BillingProvider>('subscription-selected-provider', () => 'dodo')
+  const detectedCurrency = useState<BillingCurrency | null>('subscription-detected-currency', () => null)
+  // What the API offers this church: provider, currency, and a card fallback.
+  const detectedRoute = useState<BillingRoute | null>('subscription-detected-route', () => null)
+  // The church the route was worked out for. The API keeps a church on the
+  // provider it already pays through, so a different sign-in asks again.
+  const detectedForChurch = useState<string | null>('subscription-detected-for', () => null)
   const loading = ref(false)
   const error = ref<string | null>(null)
   const isDetectingCurrency = ref(false)
 
+  const authStore = useAuthStore()
+
   // Allow local testing by setting currency in localStorage
-  const getTestCurrency = (): 'NGN' | 'USD' | null => {
+  const getTestCurrency = (): BillingCurrency | null => {
     // Dev builds only: in production this would let anyone pick the NGN price.
     if (process.client && import.meta.dev) {
       try {
         const testCurrency = localStorage.getItem('test_currency')
-        if (testCurrency === 'NGN' || testCurrency === 'USD') {
+        if (isBillingCurrency(testCurrency)) {
           return testCurrency
         }
       } catch {
@@ -49,7 +73,7 @@ export const useSubscriptionPlans = () => {
     return null
   }
 
-  const setTestCurrency = (currency: 'NGN' | 'USD' | null) => {
+  const setTestCurrency = (currency: BillingCurrency | null) => {
     if (process.client) {
       try {
         if (currency) {
@@ -64,21 +88,53 @@ export const useSubscriptionPlans = () => {
   }
 
   /**
-   * Detect user's currency based on IP/location
+   * Dev builds only: there is no Cloudflare locally, so `localStorage.test_country`
+   * (e.g. "KE") is sent as the `cf-ipcountry` header the API reads.
    */
-  const detectCurrency = async (): Promise<'NGN' | 'USD'> => {
+  const getTestCountryHeaders = (): Record<string, string> => {
+    if (process.client && import.meta.dev) {
+      try {
+        const country = readTestCountry(localStorage.getItem('test_country'))
+        if (country) return { 'cf-ipcountry': country }
+      } catch {
+        // localStorage unavailable (private mode / SecurityError)
+      }
+    }
+    return {}
+  }
+
+  const applyRoute = (route: BillingRoute) => {
+    detectedRoute.value = route
+    detectedCurrency.value = route.currency
+    selectedCurrency.value = route.currency
+    selectedProvider.value = route.provider
+  }
+
+  /** Switch checkout to another option the route offers (e.g. the card fallback). */
+  const selectOption = (provider: BillingProvider, currency: BillingCurrency) => {
+    selectedProvider.value = provider
+    selectedCurrency.value = currency
+  }
+
+  /**
+   * Ask the API which provider and currency to offer, from the caller's
+   * country (Cloudflare) and the church's existing subscription.
+   * Returns the currency, as before.
+   */
+  const detectCurrency = async (): Promise<BillingCurrency> => {
     // Check for test currency override first (for local testing)
     const testCurrency = getTestCurrency()
     if (testCurrency) {
       console.log('Using test currency override:', testCurrency)
-      detectedCurrency.value = testCurrency
-      selectedCurrency.value = testCurrency
+      applyRoute(routeForCurrency(testCurrency))
       return testCurrency
     }
 
-    // Check if already detected in this session
-    if (detectedCurrency.value) {
-      return detectedCurrency.value
+    const churchId = authStore.church?._id ?? null
+
+    // Already detected in this session, for this church
+    if (detectedRoute.value && detectedForChurch.value === churchId) {
+      return detectedRoute.value.currency
     }
 
     // Drop the old 24h localStorage cache: it pinned users to a wrong USD result
@@ -97,49 +153,44 @@ export const useSubscriptionPlans = () => {
     try {
       // The API reads Cloudflare's CF-IPCountry header, which is far more
       // reliable than client-side lookups and can't be altered by the visitor.
-      let countryCode: string | undefined
-      let detectionMethod = 'cloudflare_ip_country'
+      let geo: GeoResponse | null = null
       try {
-        const { data } = await useAPIFetch<{ country: string | null; currency: 'NGN' | 'USD' }>('/app-config/geo', {
+        const { data } = await useAPIFetch<GeoResponse>('/app-config/geo', {
           key: `billing-geo-${Date.now()}`,
+          headers: getTestCountryHeaders(),
         })
-        countryCode = data.value?.country ?? undefined
+        geo = data.value ?? null
       } catch (err) {
         console.warn('Currency detection via API failed:', err)
       }
 
-      // Only when Cloudflare has no country: browser timezone (Nigeria is
-      // Africa/Lagos), so a failed lookup doesn't push Nigerians onto USD.
-      if (!countryCode) {
-        detectionMethod = 'timezone'
-        try {
-          if (Intl.DateTimeFormat().resolvedOptions().timeZone === 'Africa/Lagos') {
-            countryCode = 'NG'
-          }
-        } catch {
-          // Intl unavailable — keep default USD
-        }
+      // Only when the lookup failed or Cloudflare has no country: browser
+      // timezone (Nigeria is Africa/Lagos), so Nigerians aren't pushed onto USD.
+      let timeZone: string | undefined
+      try {
+        timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      } catch {
+        // Intl unavailable — keep default USD
       }
 
-      // Only Nigeria is billed in NGN (Paystack). Everywhere else pays in USD via Dodo.
-      const currency: 'NGN' | 'USD' = countryCode === 'NG' ? 'NGN' : 'USD'
-      detectedCurrency.value = currency
-      selectedCurrency.value = currency
+      const route = resolveBillingRoute(geo, timeZone)
+      applyRoute(route)
+      detectedForChurch.value = churchId
 
       // Track detection
       usePosthogCapture('CURRENCY_AUTO_DETECTED', {
-        detectedCurrency: currency,
-        method: detectionMethod
+        detectedCurrency: route.currency,
+        provider: route.provider,
+        hasFallback: !!route.fallback,
+        method: geo?.country ? 'cloudflare_ip_country' : 'timezone',
       })
 
-      return currency
+      return route.currency
     } catch (error) {
       console.error('Currency detection failed:', error)
       // Default to USD on error
-      const fallbackCurrency = 'USD'
-      detectedCurrency.value = fallbackCurrency
-      selectedCurrency.value = fallbackCurrency
-      return fallbackCurrency
+      applyRoute({ ...DEFAULT_BILLING_ROUTE })
+      return DEFAULT_BILLING_ROUTE.currency
     } finally {
       isDetectingCurrency.value = false
     }
@@ -147,9 +198,9 @@ export const useSubscriptionPlans = () => {
 
   /**
    * Fetch subscription plans from the API
-   * @param currency - Optional currency filter ('NGN' or 'USD')
+   * @param currency - Optional currency filter
    */
-  const fetchPlans = async (currency?: 'NGN' | 'USD') => {
+  const fetchPlans = async (currency?: BillingCurrency) => {
     loading.value = true
     error.value = null
 
@@ -181,7 +232,7 @@ export const useSubscriptionPlans = () => {
   /**
    * Get plans for a specific currency
    */
-  const getPlansByCurrency = (currency: 'NGN' | 'USD'): SubscriptionPlan[] => {
+  const getPlansByCurrency = (currency: BillingCurrency): SubscriptionPlan[] => {
     return plans.value.filter((plan) => plan.currency === currency)
   }
 
@@ -199,7 +250,7 @@ export const useSubscriptionPlans = () => {
    */
   const getPlanByIntervalAndCurrency = (
     interval: 'yearly' | 'monthly',
-    currency: 'NGN' | 'USD'
+    currency: BillingCurrency
   ): SubscriptionPlan | undefined => {
     return plans.value.find(
       (plan) => plan.interval === interval && plan.currency === currency
@@ -226,28 +277,48 @@ export const useSubscriptionPlans = () => {
   }
 
   /**
-   * Get currency symbol
+   * The price of a plan in its main unit (USD plans also carry cents).
    */
-  const getCurrencySymbol = (currency: 'NGN' | 'USD'): string => {
-    return currency === 'NGN' ? '₦' : '$'
+  const getPlanPrice = (plan: SubscriptionPlan | undefined): number => {
+    if (!plan) return 0
+    if (plan.currency === 'USD' && plan.amountCents) return plan.amountCents / 100
+    return plan.amount
   }
 
   /**
-   * Format amount with currency
+   * @deprecated Use formatAmount: most currencies have no one-character symbol.
    */
-  const formatAmount = (amount: number, currency: 'NGN' | 'USD'): string => {
-    const symbol = getCurrencySymbol(currency)
-    return `${symbol}${amount.toLocaleString()}`
+  const getCurrencySymbol = (currency: BillingCurrency): string => {
+    try {
+      const parts = new Intl.NumberFormat('en', {
+        style: 'currency',
+        currency,
+        currencyDisplay: 'narrowSymbol',
+      }).formatToParts(0)
+      return parts.find((part) => part.type === 'currency')?.value ?? currency
+    } catch {
+      return currency
+    }
   }
+
+  /**
+   * Format amount with currency: $69.99, ₦49,999.99, KES 499, USh 15,500
+   */
+  const formatAmount = (amount: number, currency: BillingCurrency, options?: { keepDecimals?: boolean }): string =>
+    formatPrice(amount, currency, options)
 
   return {
     plans,
     loading,
     error,
+    currencies: BILLING_CURRENCIES,
     selectedCurrency,
+    selectedProvider,
     detectedCurrency,
+    detectedRoute,
     isDetectingCurrency,
     detectCurrency,
+    selectOption,
     fetchPlans,
     getPlansByCurrency,
     getPlanByInterval,
@@ -255,6 +326,7 @@ export const useSubscriptionPlans = () => {
     getPlanByPlanCode,
     getPlanByPaystackCode,
     getPlanById,
+    getPlanPrice,
     getCurrencySymbol,
     formatAmount,
     setTestCurrency, // Expose for testing

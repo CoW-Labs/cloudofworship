@@ -3,6 +3,7 @@ import { useAppStore } from './app'
 import posthog from 'posthog-js'
 import type { SubscriptionDetails } from '~/types'
 import { identifyPosthogUser } from '~/utils/posthogIdentity'
+import { normalizeSubscriptionDetails } from '~/utils/billing'
 
 
 export interface User {
@@ -111,7 +112,7 @@ export const useAuthStore = defineStore('auth', {
       this.token = token
     },
     setSubscriptionDetails(details: SubscriptionDetails) {
-      this.subscriptionDetails = details
+      this.subscriptionDetails = normalizeSubscriptionDetails(details)
       this.subscriptionDetailsLastFetched = Date.now()
     },
     clearSubscriptionDetails() {
