@@ -20,6 +20,7 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@bachs/js": "^0.2.0",
     "@nuxt/ui": "npm:@nuxt/ui-edge@latest",
     "@nuxthub/core": "^0.10.7",
     "@paystack/inline-js": "^2.22.9",

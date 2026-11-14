@@ -20,7 +20,6 @@
           color="amber"
           variant="solid"
           @click="openUpgradePlanModal"
-          v-if="daysUntilExpiry <= 0"
         >
           Renew
         </UButton>
@@ -39,6 +38,7 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/store/auth"
 import { appWideActions } from "~/utils/constants"
+import { needsManualRenewal } from "~/utils/billing"
 
 const authStore = useAuthStore()
 const dismissed = ref(false)
@@ -58,10 +58,12 @@ const showBanner = computed(() => {
   if (dismissed.value) return false
   const days = daysUntilExpiry.value
   if (days === null) return false
-  // Only show for active teams subscriptions expiring within 7 days (and not already expired)
+  // Only for Teams plans that end within 7 days unless the church pays
+  // again: mobile money, bank transfer, admin-granted. A card subscription
+  // renews itself, so telling it to renew would invite a second payment.
   return (
     authStore.subscriptionDetails?.subscriptionPlan === "teams" &&
-    activeSubscription.value?.status === "active" &&
+    needsManualRenewal(activeSubscription.value) &&
     days >= 0 &&
     days <= 7
   )

@@ -1,5 +1,6 @@
 import type { Emitter, EventType } from "mitt"
 import type { User } from "~/store/auth"
+import type { BillingCurrency, BillingProvider } from "~/utils/billing"
 
 export interface SubscriptionActiveDetails {
   id: string
@@ -9,14 +10,15 @@ export interface SubscriptionActiveDetails {
   lastPaidAt: string | null
   canceledAt: string | null
   paystackSubscriptionCode: string | null
-  // False for admin-provisioned plans and Paystack bank-transfer payments,
-  // which have no card on a provider subscription to change.
+  // False for admin-provisioned plans, Paystack bank-transfer payments and
+  // mobile money (Bachs), which have no card on a provider subscription to
+  // change. These don't renew themselves: the church pays again.
   canUpdatePaymentMethod?: boolean
   // Set while status is "past-due": Teams stays on until accessEndsAt, and the
   // payment can be retried until retryEndsAt.
   pastDue?: { accessEndsAt: string; retryEndsAt: string } | null
   amount: number | null
-  currency: "NGN" | "USD" | null
+  currency: BillingCurrency | null
   interval: "monthly" | "yearly" | null
 }
 
@@ -25,7 +27,7 @@ export interface SubscriptionBillingRecord {
   plan: string
   status: "active" | "inactive" | "canceled"
   amount: number | null
-  currency: "NGN" | "USD" | null
+  currency: BillingCurrency | null
   lastPaidAt: string | null
   expiresAt: string | null
   canceledAt: string | null
@@ -42,7 +44,7 @@ export interface SubscriptionDetails {
 
 export interface BillingTransaction {
   _id: string
-  provider: "paystack" | "dodo"
+  provider: BillingProvider
   providerReference: string
   status: "successful" | "failed" | "pending" | "reversed"
   kind: "initial_payment" | "renewal" | "unknown"
