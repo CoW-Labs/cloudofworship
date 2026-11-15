@@ -770,14 +770,36 @@ fn screen_input_args(audio: Option<&str>) -> Result<Vec<String>, String> {
 
 /// The operator's audio choice as a device id (avfoundation index on macOS,
 /// DirectShow name on Windows): `Some("none")`/`Some("")` → no audio;
-/// `Some(id)` → that device; `None` → the first available input.
+/// `Some(id)` → that device; `None` → the first real-looking input, or the
+/// first device at all if every one of them looks virtual.
+///
+/// "First available" alone used to be a safe default, but this app's own NDI
+/// settings tell churches to install NDI Tools, which installs a virtual
+/// "NDI Audio" input device — and on a machine with it, avfoundation lists it
+/// *before* the built-in microphone (confirmed here: `[0] NDI Audio`,
+/// `[1] MacBook Pro Microphone`). That device carries no sound unless
+/// something else is explicitly routed into it, so defaulting to it silently
+/// drops the stream's audio with no error: FFmpeg opens it fine, just never
+/// gets a sample. Skip it when picking a default; the operator can still
+/// choose it explicitly from the dropdown.
 #[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 fn pick_audio(audio: Option<&str>, devices: &[AudioDevice]) -> Option<String> {
   match audio {
     Some("none") | Some("") => None,
     Some(index) => Some(index.to_string()),
-    None => devices.first().map(|d| d.index.clone()),
+    None => devices
+      .iter()
+      .find(|device| !is_virtual_ndi_audio_device(&device.name))
+      .or_else(|| devices.first())
+      .map(|device| device.index.clone()),
   }
+}
+
+/// Whether `name` is the virtual audio device the NDI runtime installs (same
+/// name on macOS and Windows), never a real microphone or mixer.
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+fn is_virtual_ndi_audio_device(name: &str) -> bool {
+  name.to_ascii_lowercase().contains("ndi audio")
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -1355,7 +1377,7 @@ pub async fn stream_check_youtube() -> Result<u32, String> {
 
 #[cfg(test)]
 mod tests {
-  use super::parse_dshow_audio;
+  use super::{parse_dshow_audio, pick_audio, AudioDevice};
 
   #[test]
   fn parses_dshow_audio_devices() {
@@ -1366,5 +1388,59 @@ mod tests {
 "#;
     let names: Vec<_> = parse_dshow_audio(listing).into_iter().map(|d| d.name).collect();
     assert_eq!(names, ["Microphone (Realtek(R) Audio)", "Line In (Behringer UMC204HD)"]);
+  }
+
+  /// Confirms the fix against this machine's real devices, not a fixture:
+  /// with NDI Tools installed, avfoundation lists "NDI Audio" before the
+  /// microphone, and the default resolution must still land on the mic.
+  /// `cargo test --lib stream::tests::default_resolves_to_a_real_device_on_this_machine -- --ignored --nocapture`
+  #[cfg(target_os = "macos")]
+  #[test]
+  #[ignore]
+  fn default_resolves_to_a_real_device_on_this_machine() {
+    let devices = super::list_audio_devices().expect("ffmpeg could list avfoundation devices");
+    for device in &devices {
+      println!("device [{}] {:?}", device.index, device.name);
+    }
+    let resolved = super::resolve_audio_device(None).expect("resolving the default failed");
+    let resolved_name =
+      resolved.as_deref().and_then(|index| devices.iter().find(|d| d.index == index)).map(|d| &d.name);
+    println!("resolved default: {resolved_name:?}");
+    assert!(
+      resolved_name.is_none_or(|name| !super::is_virtual_ndi_audio_device(name)),
+      "the default resolved to a virtual NDI device: {resolved_name:?}"
+    );
+  }
+
+  fn device(index: &str, name: &str) -> AudioDevice {
+    AudioDevice { index: index.to_string(), name: name.to_string() }
+  }
+
+  #[test]
+  fn default_audio_skips_the_virtual_ndi_device_installed_by_ndi_tools() {
+    // This exact order is what avfoundation reports on a Mac with NDI Tools
+    // installed: the virtual device sorts before the real microphone.
+    let devices = [device("0", "NDI Audio"), device("1", "MacBook Pro Microphone")];
+    assert_eq!(pick_audio(None, &devices), Some("1".to_string()));
+  }
+
+  #[test]
+  fn default_audio_falls_back_to_the_first_device_when_every_one_is_virtual() {
+    let devices = [device("0", "NDI Audio")];
+    assert_eq!(pick_audio(None, &devices), Some("0".to_string()));
+  }
+
+  #[test]
+  fn default_audio_is_the_first_device_when_none_are_virtual() {
+    let devices = [device("0", "Behringer UMC204HD"), device("1", "MacBook Pro Microphone")];
+    assert_eq!(pick_audio(None, &devices), Some("0".to_string()));
+  }
+
+  #[test]
+  fn an_explicit_choice_is_never_overridden_even_if_virtual() {
+    let devices = [device("0", "NDI Audio"), device("1", "MacBook Pro Microphone")];
+    assert_eq!(pick_audio(Some("0"), &devices), Some("0".to_string()));
+    assert_eq!(pick_audio(Some("none"), &devices), None);
+    assert_eq!(pick_audio(Some(""), &devices), None);
   }
 }

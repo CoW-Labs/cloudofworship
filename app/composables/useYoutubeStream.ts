@@ -120,7 +120,9 @@ const readSavedSettings = (): SavedSettings => {
   }
 }
 
-const AUDIO_DEFAULT_LABEL = "Default (first available)"
+// "First available" undersold it: the backend skips a virtual NDI audio
+// device when picking this, so it's not always literally the first one.
+const AUDIO_DEFAULT_LABEL = "Default"
 const AUDIO_NONE_LABEL = "No audio"
 
 // The running in-page capture (one per app), kept outside reactive state.
