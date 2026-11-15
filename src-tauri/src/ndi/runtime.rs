@@ -27,6 +27,14 @@ pub struct NdiRuntime {
   pub version: String,
 }
 
+#[cfg(test)]
+impl NdiRuntime {
+  /// The loaded library, so a benchmark can resolve receive-side symbols.
+  pub fn library(&self) -> &Library {
+    &self.library
+  }
+}
+
 static RUNTIME: OnceLock<NdiRuntime> = OnceLock::new();
 
 pub fn load() -> Result<&'static NdiRuntime, NdiErrorInfo> {

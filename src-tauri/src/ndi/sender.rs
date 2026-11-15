@@ -7,21 +7,22 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 use super::ffi::{
-  NdiSendCreate, NdiSendInstance, NdiVideoFrameV2, FOURCC_BGRA, FRAME_FORMAT_PROGRESSIVE,
-  TIMECODE_SYNTHESIZE,
+  NdiSendCreate, NdiSendInstance, NdiVideoFrameV2, FOURCC_BGRA, FOURCC_NV12,
+  FRAME_FORMAT_PROGRESSIVE, TIMECODE_SYNTHESIZE,
 };
-use super::pipeline::{CapturedFrame, FrameMailbox};
+use super::pipeline::{CapturedFrame, FrameFormat, FrameMailbox};
+use super::quality::NdiQuality;
 use super::runtime::NdiRuntime;
-use super::status::{NdiErrorCode, NdiErrorInfo, NdiPhase, StatusSink, FRAME_RATE, SOURCE_NAME};
+use super::status::{NdiErrorCode, NdiErrorInfo, NdiPhase, StatusSink, SOURCE_NAME};
 
-struct NdiSender {
+pub(super) struct NdiSender {
   runtime: &'static NdiRuntime,
   instance: NdiSendInstance,
   _source_name: CString,
 }
 
 impl NdiSender {
-  fn new(runtime: &'static NdiRuntime) -> Result<Self, NdiErrorInfo> {
+  pub(super) fn new(runtime: &'static NdiRuntime) -> Result<Self, NdiErrorInfo> {
     let (source_name, create) = sender_configuration()?;
     let instance = unsafe { (runtime.functions.send_create)(&create) };
     if instance.is_null() {
@@ -38,7 +39,7 @@ impl NdiSender {
     })
   }
 
-  fn send(&self, frame: &mut CapturedFrame) -> Result<(), NdiErrorInfo> {
+  pub(super) fn send(&self, frame: &mut CapturedFrame, fps: u32) -> Result<(), NdiErrorInfo> {
     let width = i32::try_from(frame.width)
       .map_err(|_| NdiErrorInfo::internal("The captured frame width exceeds the NDI limit."))?;
     let height = i32::try_from(frame.height)
@@ -46,20 +47,23 @@ impl NdiSender {
     let stride = i32::try_from(frame.stride)
       .map_err(|_| NdiErrorInfo::internal("The captured frame stride exceeds the NDI limit."))?;
     let required = frame
-      .stride
-      .checked_mul(frame.height as usize)
+      .format
+      .len(frame.height as usize, frame.stride)
       .ok_or_else(|| NdiErrorInfo::internal("The captured frame size overflowed."))?;
     if frame.pixels.len() < required {
       return Err(NdiErrorInfo::internal(
-        "The captured frame buffer is smaller than its stride and height.",
+        "The captured frame buffer is smaller than its format, stride and height.",
       ));
     }
 
     let ndi_frame = NdiVideoFrameV2 {
       xres: width,
       yres: height,
-      four_cc: FOURCC_BGRA,
-      frame_rate_n: FRAME_RATE as i32,
+      four_cc: match frame.format {
+        FrameFormat::Bgra => FOURCC_BGRA,
+        FrameFormat::Nv12 => FOURCC_NV12,
+      },
+      frame_rate_n: fps as i32,
       frame_rate_d: 1,
       picture_aspect_ratio: 0.0,
       frame_format_type: FRAME_FORMAT_PROGRESSIVE,
@@ -73,7 +77,7 @@ impl NdiSender {
     Ok(())
   }
 
-  fn connection_count(&self) -> u32 {
+  pub(super) fn connection_count(&self) -> u32 {
     let count = unsafe { (self.runtime.functions.send_connections)(self.instance, 0) };
     count.max(0) as u32
   }
@@ -99,12 +103,13 @@ impl Drop for NdiSender {
 
 pub fn run_sender(
   runtime: &'static NdiRuntime,
+  quality: NdiQuality,
   mailbox: Arc<FrameMailbox>,
   stop: Arc<AtomicBool>,
   status: StatusSink,
   ready: SyncSender<Result<(), NdiErrorInfo>>,
 ) {
-  let result = run_sender_inner(runtime, &mailbox, &stop, &status, &ready);
+  let result = run_sender_inner(runtime, quality, &mailbox, &stop, &status, &ready);
   if let Err(error) = result {
     let _ = ready.try_send(Err(error.clone()));
     if !stop.load(Ordering::Acquire) {
@@ -117,6 +122,7 @@ pub fn run_sender(
 
 fn run_sender_inner(
   runtime: &'static NdiRuntime,
+  quality: NdiQuality,
   mailbox: &FrameMailbox,
   stop: &AtomicBool,
   status: &StatusSink,
@@ -124,7 +130,7 @@ fn run_sender_inner(
 ) -> Result<(), NdiErrorInfo> {
   let sender = NdiSender::new(runtime)?;
   let mut current = mailbox.wait_first(Duration::from_secs(5), stop)?;
-  sender.send(&mut current)?;
+  sender.send(&mut current, quality.fps)?;
   let mut frames_sent = 1_u64;
   status.update(|value| {
     value.width = Some(current.width);
@@ -139,7 +145,7 @@ fn run_sender_inner(
     // No capture update means a static/minimized window. Re-send the current
     // owned frame and let clock_video pace it at 30 fps.
     mailbox.replace_with_latest(&mut current);
-    sender.send(&mut current)?;
+    sender.send(&mut current, quality.fps)?;
     frames_sent = frames_sent.saturating_add(1);
 
     if last_status.elapsed() >= Duration::from_secs(1) {

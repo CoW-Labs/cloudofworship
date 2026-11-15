@@ -184,16 +184,24 @@ const intro = computed(() => {
 const buildTicketMessage = (text: string, slide?: Slide) => {
   const lines = [text, "", `Category: ${category.value}`]
 
+  // Always include slide details, so every ticket — not just song/hymn/
+  // scripture ones — carries enough to find the exact slide the operator saw.
+  if (slide) {
+    lines.push("", "Slide details:")
+    if (slide.name) lines.push(`- Name: ${slide.name}`)
+    if (slide.type) lines.push(`- Type: ${slide.type}`)
+    if (slide.scheduleId) lines.push(`- Schedule: ${slide.scheduleId}`)
+  }
+
   if (song.value?.title) {
-    lines.push(`Song: ${song.value.title}${song.value.artist ? ` — ${song.value.artist}` : ""}`)
+    lines.push(`- Song: ${song.value.title}${song.value.artist ? ` — ${song.value.artist}` : ""}`)
   }
   if (hymn.value?.title) {
-    lines.push(`Hymn: ${hymn.value.number ? `#${hymn.value.number} ` : ""}${hymn.value.title}`)
+    lines.push(`- Hymn: ${hymn.value.number ? `#${hymn.value.number} ` : ""}${hymn.value.title}`)
   }
   if (scripture.value?.label) {
-    lines.push(`Scripture: ${scripture.value.label} (${scripture.value.version || "?"})`)
+    lines.push(`- Scripture: ${scripture.value.label} (${scripture.value.version || "?"})`)
   }
-  if (slide?.type) lines.push(`Slide type: ${slide.type}`)
   if (slide?.contents?.length) {
     lines.push("", "Slide contents:", slide.contents.join("\n").slice(0, 2000))
   }

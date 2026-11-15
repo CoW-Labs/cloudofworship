@@ -19,6 +19,7 @@ const status = (phase: NdiStatus["phase"]): NdiStatus => ({
   width: phase === "broadcasting" ? 1920 : null,
   height: phase === "broadcasting" ? 1080 : null,
   fps: 30,
+  quality: "1080p30",
   framesSent: 0,
   connectionCount: 0,
   lastFrameAgeMs: null,
@@ -82,6 +83,51 @@ describe("NDI desktop command lifecycle", () => {
       "ndi_stop",
       "ndi_start",
     ])
+  })
+
+  it("passes the chosen quality to the start command, and again after a retry", async () => {
+    const calls: Array<[string, Record<string, unknown> | undefined]> = []
+    const client = createNdiCommandClient(
+      {
+        isDesktop: true,
+        async listen() {},
+        async invoke<T>(command: string, args?: Record<string, unknown>) {
+          calls.push([command, args])
+          return status("broadcasting") as T
+        },
+      },
+      vi.fn()
+    )
+
+    await client.start("2160p60")
+    await client.retry("1080p60")
+    expect(calls).toEqual([
+      ["ndi_start", { quality: "2160p60" }],
+      ["ndi_stop", undefined],
+      ["ndi_start", { quality: "1080p60" }],
+    ])
+  })
+
+  it("lists the quality tiers from the desktop app, and none in web mode", async () => {
+    const tiers = [
+      { id: "1080p30", maxWidth: 1920, maxHeight: 1080, fps: 30, available: true, reason: null },
+    ]
+    const desktop = createNdiCommandClient(
+      {
+        isDesktop: true,
+        async listen() {},
+        async invoke<T>() {
+          return tiers as T
+        },
+      },
+      vi.fn()
+    )
+    const web = createNdiCommandClient(
+      { isDesktop: false, invoke: vi.fn(), listen: vi.fn() },
+      vi.fn()
+    )
+    expect(await desktop.tiers()).toEqual(tiers)
+    expect(await web.tiers()).toEqual([])
   })
 
   it("does not listen or invoke commands in web mode", async () => {

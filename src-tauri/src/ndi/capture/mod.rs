@@ -3,6 +3,7 @@ use std::sync::{atomic::AtomicBool, Arc};
 use tauri::AppHandle;
 
 use super::pipeline::FrameMailbox;
+use super::quality::NdiQuality;
 use super::status::{CapturePermission, NdiErrorInfo, StatusSink};
 
 #[cfg(target_os = "macos")]
@@ -23,6 +24,7 @@ pub struct CaptureStarted {
 
 pub struct CaptureContext {
   pub app: AppHandle,
+  pub quality: NdiQuality,
   pub mailbox: Arc<FrameMailbox>,
   pub stop: Arc<AtomicBool>,
   pub status: StatusSink,
