@@ -176,7 +176,6 @@ pub fn run() {
         app.deep_link().register_all()?;
       }
       app.manage(ndi::NdiBridge::new(app.handle().clone()));
-      app.manage(stream::StreamBridge::new(app.handle().clone()));
       app.manage(desktop_update::DesktopUpdateState::default());
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -194,15 +193,6 @@ pub fn run() {
           if let Err(error) = bridge.stop_blocking() {
             log::warn!("failed to stop NDI after the live window closed: {error}");
           }
-        });
-      }
-      // Never let an FFmpeg stream outlive the app: stop it when the main
-      // window closes.
-      if window.label() == "main" && matches!(event, WindowEvent::Destroyed) {
-        let bridge = window.state::<stream::StreamBridge>().inner().clone();
-        tauri::async_runtime::spawn_blocking(move || {
-          bridge.stop_blocking();
-          bridge.stop_audio_meter();
         });
       }
     })
