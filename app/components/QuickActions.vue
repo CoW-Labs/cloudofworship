@@ -338,6 +338,13 @@
       file-type="ppt"
       @close="page = ''"
     />
+    <AddImportedData
+      v-else-if="page === 'import-easyworship'"
+      class="fade-in-right h-full min-h-0"
+      @close="page = ''"
+      @imported="page = 'library'"
+    />
+
     <AddPresentation
       v-else-if="page === 'presentation-pdf'"
       class="fade-in-right h-full min-h-0"
@@ -396,6 +403,7 @@ import { useDebounceFn, useOnline } from "@vueuse/core"
 import fuzzysort from "fuzzysort"
 const db = useIndexedDB()
 const { openFeatureOrUpgrade, requireFeatureAccess } = useSubscription()
+const { isTauri } = useTauri()
 
 // New actions (ActionCard clicks and Enter here) wait on their intro, which
 // this panel hosts for both the desktop operator view and /mobile.
@@ -989,6 +997,11 @@ const validActions = computed(() => {
     if (props.mobile && desktopOnlyActions.includes(action.action)) return false
     if (action.featureFlag === "camera-slide" && !cameraSlideEnabled.value)
       return false
+    // EasyWorship's backup is decoded by a Tauri Rust command — there's no
+    // browser-side way to read a Paradox database, so this only shows up
+    // in the desktop app.
+    if (action.action === appWideActions.importEasyWorshipData && !isTauri)
+      return false
     return true
   })
 })
@@ -1279,6 +1292,10 @@ onEmitter("new-presentation", (data) => {
 
 onEmitter("new-presentation-from-pdf", () => {
   page.value = "presentation-pdf"
+})
+
+onEmitter(appWideActions.importEasyWorshipData, () => {
+  page.value = "import-easyworship"
 })
 
 const handleInputKeydown = (e: KeyboardEvent) => {

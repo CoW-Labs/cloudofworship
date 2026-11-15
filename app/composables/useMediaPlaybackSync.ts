@@ -167,13 +167,58 @@ export const useProjectorPlayback = (slideId: () => string | undefined) => {
   return playing
 }
 
-/** Preview side: make `el` follow the projector's playback of `slideId`. */
+/**
+ * What the Live Output preview's own video is doing. The preview plays by
+ * itself (see useFollowMediaPlayback), so with no projector reporting, the
+ * play/pause control reads this instead of a stored value that only holds the
+ * last button press. Module-level: the preview and the editor toolbar live in
+ * the same window.
+ */
+const previewPlayback = reactive<{ slideId: string | null; playing: boolean }>({
+  slideId: null,
+  playing: false,
+})
+
+/** Whether the Live Output preview is playing `slideId`'s video, or null. */
+export const useLiveOutputPreviewPlaying = (slideId: () => string | undefined) =>
+  computed(() => {
+    const id = slideId()
+    return id && previewPlayback.slideId === id ? previewPlayback.playing : null
+  })
+
+const PREVIEW_EVENTS = ["playing", "pause", "ended"] as const
+
+/**
+ * Preview side: `el` plays by itself, muted, like the projector's video does,
+ * so the Live Output moves with no projector window open. When the projector
+ * does report, `el` is corrected to match it: where it is, whether it is
+ * playing, and its speed.
+ */
 export const useFollowMediaPlayback = (
   el: Ref<HTMLMediaElement | null>,
   slideId: () => string | undefined,
   enabled: () => boolean
 ) => {
   let latest: MediaPlaybackBroadcast | null = null
+
+  const publish = () => {
+    const media = el.value
+    const id = slideId()
+    if (!media || !id || !enabled()) return
+    previewPlayback.slideId = id
+    previewPlayback.playing = !media.paused && !media.ended
+  }
+  watch(
+    el,
+    (current, previous) => {
+      PREVIEW_EVENTS.forEach((name) => previous?.removeEventListener(name, publish))
+      PREVIEW_EVENTS.forEach((name) => current?.addEventListener(name, publish))
+      if (!current && previewPlayback.slideId === slideId()) {
+        previewPlayback.slideId = null
+      }
+    },
+    { immediate: true }
+  )
   // One deferred seek at most: a heartbeat landing while the file is still
   // loading replaces the waiting one rather than stacking another seek on it.
   let pendingSeek: { media: HTMLMediaElement; run: () => void } | null = null
@@ -226,14 +271,14 @@ export const useFollowMediaPlayback = (
     apply()
   })
 
-  // A new slide, or the preview element appearing, starts paused and asks the
-  // projector where it is, so a preview opened mid-clip catches up.
+  // A new slide, or the preview element appearing, asks the projector where it
+  // is, so a preview opened mid-clip catches up. The preview keeps playing on
+  // its own until the projector answers.
   watch(
     [slideId, el] as const,
     ([id, media], previous) => {
       if (!enabled() || !id || !media) return
       if (previous?.[0] !== id) latest = null
-      safePauseMedia(media)
       postCrossWindowNotification<MediaPlaybackRequestBroadcast>({
         kind: "media-playback-request",
         slideId: id,
@@ -245,5 +290,7 @@ export const useFollowMediaPlayback = (
   onBeforeUnmount(() => {
     clearPendingSeek()
     stopListening()
+    PREVIEW_EVENTS.forEach((name) => el.value?.removeEventListener(name, publish))
+    if (previewPlayback.slideId === slideId()) previewPlayback.slideId = null
   })
 }

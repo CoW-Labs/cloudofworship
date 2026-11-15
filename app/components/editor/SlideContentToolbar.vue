@@ -678,7 +678,10 @@ import { personSegmenterState } from "~/utils/personSegmenter"
 import { appWideActions } from "~/utils/constants"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 import { useAppStore } from "~/store/app"
-import { useProjectorPlayback } from "~/composables/useMediaPlaybackSync"
+import {
+  useLiveOutputPreviewPlaying,
+  useProjectorPlayback,
+} from "~/composables/useMediaPlaybackSync"
 import {
   canPreviewMedia,
   useEditorMediaPreview,
@@ -933,7 +936,12 @@ const restartMedia = () => {
 // press (false on a new slide). Before any report, the stored value is all
 // there is (no output window, or a YouTube/Vimeo player, which does not report).
 const appStore = useAppStore()
-const projectorPlaying = useProjectorPlayback(() => props.slide?.id)
+// Only a media slide has play controls, so only it asks the projector where it
+// is; a song or text slide would otherwise post a cross-window message every
+// time it is opened.
+const projectorPlaying = useProjectorPlayback(() =>
+  props.slide?.type === slideTypes.media ? props.slide.id : undefined
+)
 // A video that is not live plays in the editor's own preview instead, silently
 // and without touching the slide, so nothing reaches the projector or a
 // teammate. Once it is live the same buttons drive the projector, and the
@@ -942,11 +950,15 @@ const mediaPreview = useEditorMediaPreview(() => props.slide?.id)
 const previewsHere = computed(
   () => !appStore.isSlideLive(props.slide?.id) && canPreviewMedia(props.slide)
 )
+// With no projector reporting, the Live Output panel's own video is what is
+// moving, and it starts by itself when the slide goes live.
+const livePreviewPlaying = useLiveOutputPreviewPlaying(() => props.slide?.id)
 const mediaIsPlaying = computed(() => {
   if (previewsHere.value) return mediaPreview.playing.value
+  const live = appStore.isSlideLive(props.slide?.id)
   const reported = projectorPlaying.value
-  if (reported !== null && appStore.isSlideLive(props.slide?.id))
-    return reported
+  if (reported !== null && live) return reported
+  if (live && livePreviewPlaying.value !== null) return livePreviewPlaying.value
   return Boolean(props.slide?.slideStyle?.isMediaPlaying)
 })
 

@@ -6,6 +6,29 @@ use std::time::{Duration, Instant};
 
 use super::status::{NdiErrorCode, NdiErrorInfo};
 
+/// How the pixels of a captured frame are laid out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FrameFormat {
+  /// Packed 8-bit B, G, R, A; `stride` bytes per row. (Both captures now send
+  /// NV12; kept for the sender and its tests.)
+  #[allow(dead_code)]
+  Bgra,
+  /// 4:2:0: a full-size luma plane, then one interleaved Cb/Cr plane at half
+  /// the height, both `stride` bytes per row and back to back in one buffer,
+  /// which is the layout the NDI SDK expects.
+  Nv12,
+}
+
+impl FrameFormat {
+  /// Bytes a frame of this size needs.
+  pub fn len(self, height: usize, stride: usize) -> Option<usize> {
+    match self {
+      Self::Bgra => stride.checked_mul(height),
+      Self::Nv12 => stride.checked_mul(height)?.checked_add(stride.checked_mul(height / 2)?),
+    }
+  }
+}
+
 #[derive(Debug)]
 pub struct CapturedFrame {
   #[allow(dead_code)]
@@ -13,6 +36,7 @@ pub struct CapturedFrame {
   pub width: u32,
   pub height: u32,
   pub stride: usize,
+  pub format: FrameFormat,
   pub pixels: Vec<u8>,
   pub captured_at: Instant,
 }
@@ -25,6 +49,16 @@ struct MailboxState {
   closed: bool,
 }
 
+impl MailboxState {
+  /// Keeps a buffer for the next frame. Two are enough for one producer and
+  /// one consumer; more would only hold memory (12 MB each at 4K).
+  fn keep_spare(&mut self, buffer: Vec<u8>) {
+    if self.spare_buffers.len() < 2 {
+      self.spare_buffers.push(buffer);
+    }
+  }
+}
+
 #[derive(Default)]
 pub struct FrameMailbox {
   state: Mutex<MailboxState>,
@@ -32,13 +66,97 @@ pub struct FrameMailbox {
 }
 
 impl FrameMailbox {
+  /// Publishes a packed BGRA frame.
+  #[allow(dead_code)]
   pub fn publish(&self, width: u32, height: u32, stride: usize, pixels: &[u8]) {
-    let Some(required) = stride.checked_mul(height as usize) else {
+    let Some(required) = FrameFormat::Bgra.len(height as usize, stride) else {
       return;
     };
     if width == 0 || height == 0 || stride < width as usize * 4 || pixels.len() < required {
       return;
     }
+    self.store(width, height, stride, FrameFormat::Bgra, |owned| {
+      owned.extend_from_slice(&pixels[..required]);
+    });
+  }
+
+  /// Publishes an NV12 frame from its two planes, which come with whatever row
+  /// padding the capture had. They are packed here into one buffer with rows
+  /// exactly `width` bytes, so the sender can hand it over as it is.
+  pub fn publish_nv12(
+    &self,
+    width: u32,
+    height: u32,
+    luma: &[u8],
+    luma_stride: usize,
+    chroma: &[u8],
+    chroma_stride: usize,
+  ) {
+    let (w, h) = (width as usize, height as usize);
+    // 4:2:0 needs even dimensions.
+    if w == 0 || h == 0 || w % 2 != 0 || h % 2 != 0 {
+      return;
+    }
+    let (Some(luma_needed), Some(chroma_needed)) = (
+      luma_stride.checked_mul(h),
+      chroma_stride.checked_mul(h / 2),
+    ) else {
+      return;
+    };
+    if luma_stride < w || chroma_stride < w || luma.len() < luma_needed || chroma.len() < chroma_needed
+    {
+      return;
+    }
+    self.store(width, height, w, FrameFormat::Nv12, |owned| {
+      owned.reserve(w * h * 3 / 2);
+      // Unpadded planes go across in one copy each; padded ones row by row.
+      if luma_stride == w {
+        owned.extend_from_slice(&luma[..w * h]);
+      } else {
+        for row in 0..h {
+          owned.extend_from_slice(&luma[row * luma_stride..row * luma_stride + w]);
+        }
+      }
+      if chroma_stride == w {
+        owned.extend_from_slice(&chroma[..w * (h / 2)]);
+      } else {
+        for row in 0..h / 2 {
+          owned.extend_from_slice(&chroma[row * chroma_stride..row * chroma_stride + w]);
+        }
+      }
+    });
+  }
+
+  /// Copies a new frame in and makes it the latest. The copy (12 MB at 4K)
+  /// happens outside the lock, so the sender never waits for it: it only
+  /// waits for the two pointer swaps either side.
+  fn store(
+    &self,
+    width: u32,
+    height: u32,
+    stride: usize,
+    format: FrameFormat,
+    fill: impl FnOnce(&mut Vec<u8>),
+  ) {
+    let mut owned = {
+      let mut state = self
+        .state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+      if state.closed {
+        return;
+      }
+      // An unsent latest frame is about to be superseded anyway; reuse its
+      // allocation rather than make a new one.
+      state
+        .latest
+        .take()
+        .map(|frame| frame.pixels)
+        .or_else(|| state.spare_buffers.pop())
+        .unwrap_or_default()
+    };
+    owned.clear();
+    fill(&mut owned);
 
     let mut state = self
       .state
@@ -49,19 +167,17 @@ impl FrameMailbox {
     }
     state.next_sequence = state.next_sequence.wrapping_add(1);
     let sequence = state.next_sequence;
-    let mut owned = state
-      .latest
-      .take()
-      .map(|frame| frame.pixels)
-      .or_else(|| state.spare_buffers.pop())
-      .unwrap_or_default();
-    owned.clear();
-    owned.extend_from_slice(&pixels[..required]);
+    // Another publisher may have landed a frame while this one was copying;
+    // this one is newer, so keep that allocation for later.
+    if let Some(raced) = state.latest.take() {
+      state.keep_spare(raced.pixels);
+    }
     state.latest = Some(CapturedFrame {
       sequence,
       width,
       height,
       stride,
+      format,
       pixels: owned,
       captured_at: Instant::now(),
     });
@@ -120,7 +236,7 @@ impl FrameMailbox {
     let previous = std::mem::replace(current, latest);
     // The sender must retain one frame for static-slide repetition. Once a new
     // frame replaces it, return the old allocation to capture for reuse.
-    state.spare_buffers.push(previous.pixels);
+    state.keep_spare(previous.pixels);
     true
   }
 
@@ -205,6 +321,31 @@ mod tests {
         .len(),
       1
     );
+  }
+
+  #[test]
+  fn nv12_frames_are_packed_to_the_frame_width() {
+    let mailbox = FrameMailbox::default();
+    // 4x2 picture; rows carry 2 bytes of padding (stride 6).
+    let luma = [1, 1, 1, 1, 9, 9, 2, 2, 2, 2, 9, 9];
+    let chroma = [7, 8, 7, 8, 9, 9];
+    mailbox.publish_nv12(4, 2, &luma, 6, &chroma, 6);
+    let frame = mailbox
+      .wait_first(Duration::from_millis(1), &AtomicBool::new(false))
+      .unwrap();
+    assert_eq!(frame.format, FrameFormat::Nv12);
+    assert_eq!(frame.stride, 4);
+    assert_eq!(frame.pixels, [1, 1, 1, 1, 2, 2, 2, 2, 7, 8, 7, 8]);
+    assert_eq!(FrameFormat::Nv12.len(2, 4), Some(12));
+  }
+
+  #[test]
+  fn nv12_with_odd_dimensions_or_short_planes_is_refused() {
+    let mailbox = FrameMailbox::default();
+    mailbox.publish_nv12(3, 2, &[0; 12], 6, &[0; 6], 6);
+    mailbox.publish_nv12(4, 2, &[0; 4], 4, &[0; 4], 4);
+    let result = mailbox.wait_first(Duration::from_millis(5), &AtomicBool::new(false));
+    assert_eq!(result.unwrap_err().code, NdiErrorCode::FirstFrameTimeout);
   }
 
   #[test]

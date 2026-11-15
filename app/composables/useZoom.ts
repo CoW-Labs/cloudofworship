@@ -11,32 +11,27 @@ export const useZoom = () => {
   const zoomStep = 0.1
 
   /**
-   * Set the zoom level for the current window
-   * Uses CSS transform on the body element for compatibility
+   * Set the zoom level for the current window.
+   *
+   * Uses the webview's native page zoom (like Cmd + in a browser), not CSS
+   * `zoom`. CSS zoom on a wrapper either leaves overlays teleported to <body>
+   * unscaled, or scales them while their JS-written top/left get scaled a
+   * second time. Native zoom scales everything, overlays included, and keeps
+   * getBoundingClientRect, innerWidth and fixed positions in the same units.
    */
   const setZoom = async (level: number) => {
     if (!isTauri) return
 
     try {
-      // Clamp zoom level between min and max
-      const clampedLevel = Math.max(minZoom, Math.min(maxZoom, level))
-      
-      // Apply zoom using CSS transform on the body
-      if (typeof document !== 'undefined') {
-        document.body.style.zoom = `${clampedLevel * 100}%`
-        // The locked app shell sizes itself off the body, whose percentage
-        // height resolves against the *unzoomed* html box — so it has to divide
-        // by the zoom factor to still fill exactly one window. See
-        // --app-zoom in public/css/main.css.
-        document.documentElement.style.setProperty(
-          '--app-zoom',
-          String(clampedLevel)
-        )
-        zoomLevel.value = clampedLevel
-        
-        // Store zoom level in localStorage for persistence
-        localStorage.setItem('app-zoom-level', clampedLevel.toString())
-      }
+      // Rounded so repeated 0.1 steps don't drift (1.2000000000000002).
+      const clampedLevel =
+        Math.round(Math.max(minZoom, Math.min(maxZoom, level)) * 100) / 100
+
+      const { getCurrentWebview } = await import('@tauri-apps/api/webview')
+      await getCurrentWebview().setZoom(clampedLevel)
+
+      zoomLevel.value = clampedLevel
+      localStorage.setItem('app-zoom-level', clampedLevel.toString())
     } catch (error) {
       console.error('Failed to set zoom level:', error)
     }

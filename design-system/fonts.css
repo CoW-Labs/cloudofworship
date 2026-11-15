@@ -1,0 +1,36 @@
+/* Cloud of Worship design system — brand fonts. Files live in public/fonts (served at /fonts in the app). */
+@font-face {
+  font-family: "Bricolage Grotesque Condensed";
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+  src: url(../public/fonts/BricolageGrotesque48ptCondensed-ExtraLight.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Bricolage Grotesque Condensed";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(../public/fonts/BricolageGrotesque48ptCondensed-Bold.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Bricolage Grotesque Condensed";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url(../public/fonts/BricolageGrotesque48ptCondensed-ExtraBold.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(../public/fonts/Geist-latin.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Bricolage Grotesque";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(../public/fonts/BricolageGrotesque-latin.woff2) format("woff2");
+}

@@ -129,6 +129,13 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `TOGGLE_DARK_MODE` | `darkMode` | Theme toggled | ✅ Exists |
 | `DEFAULT_FONT_CHANGED` | `fontFamily` | Default font updated | ⚠️ Missing |
 | `SLIDE_THEME_APPLIED` | `themeName` | Pre-built theme applied | ⚠️ Missing |
+| `STREAM_QUALITY_CHANGED` | `quality`, `codec`, `height`, `fps` | Operator picked a YouTube stream quality tier (settings or the pre-flight check); only fires on a real change to an available tier | ✅ Added |
+| `STREAM_QUALITY_UPSCALE_WARNING_SHOWN` | `quality`, `sourceHeight` | The pre-flight check warned that the chosen tier is taller than the live window, so the stream is only an upscale | ✅ Added |
+| `YOUTUBE_STREAM_STARTED` | `source`, `quality` | A YouTube stream started (`quality` is the tier id; sources other than the live window always use the default) | ✅ Added |
+| `YOUTUBE_STREAM_FAILED` | `source`, `quality`, `error` | Starting a YouTube stream failed; `error` is the first 120 characters of the app's own message | ✅ Added |
+| `NDI_QUALITY_CHANGED` | `quality`, `fps`, `height` | Operator picked an NDI size and frame rate in settings; only fires on a real change to an available tier | ✅ Added |
+| `NDI_STARTED` | `quality`, `retry` | NDI broadcasting started (`retry` is true when it was a Retry after an error) | ✅ Added |
+| `NDI_START_FAILED` | `quality`, `error` | NDI could not start; `error` is the app's error code (e.g. `runtimeNotInstalled`, `capturePermissionDenied`) | ✅ Added |
 
 ---
 
@@ -191,6 +198,10 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `SLIDES_IMPORTED` | `format`, `slideCount`, `source` | User imports slides from file | ⚠️ Missing |
 | `SCHEDULE_EXPORTED` | `scheduleId`, `slideCount` | Schedule exported | ⚠️ Missing |
 | `SCHEDULE_IMPORTED` | `scheduleId`, `slideCount` | Schedule imported | ⚠️ Missing |
+| `EASYWORSHIP_IMPORT_OPENED` | - | User opens the "Import from EasyWorship" panel | ✅ Exists |
+| `EASYWORSHIP_IMPORT_ATTEMPTED` | - | User picks a zipped EasyWorship backup and it starts being read | ✅ Exists |
+| `EASYWORSHIP_IMPORT_COMPLETED` | `importedCount`, `skippedDuplicates`, `failedCount`, `totalParsed` | Picked songs from an EasyWorship backup were sent to the library (`failedCount` = network/server failures, or songs left when the connection dropped) | ✅ Exists |
+| `EASYWORSHIP_IMPORT_FAILED` | `error` | EasyWorship import failed (bad file, parse error, network) | ✅ Exists |
 
 ---
 

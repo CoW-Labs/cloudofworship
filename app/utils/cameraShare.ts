@@ -19,7 +19,19 @@ export const CAMERA_SHARE_ICE_SERVERS: RTCIceServer[] = [
 ]
 
 /** One computer sends a camera to at most this many others. */
-export const CAMERA_SHARE_MAX_VIEWERS = 3
+export const CAMERA_SHARE_MAX_VIEWERS = 2
+
+/** Computers with this many threads or fewer send to a single viewer. */
+export const CAMERA_SHARE_LOW_END_THREADS = 4
+
+/**
+ * How many teammates this computer sends a camera to at once. Each one is a
+ * separate video encode on top of the camera and the projector, so a
+ * 4-thread laptop serves one. Where the thread count is unknown (Safari
+ * reports it, Firefox may not), the normal cap applies.
+ */
+export const cameraShareMaxViewers = (threads?: number | null) =>
+  threads && threads <= CAMERA_SHARE_LOW_END_THREADS ? 1 : CAMERA_SHARE_MAX_VIEWERS
 
 /** Previews only: about 540p at 15fps, under 1 Mbps. */
 export const CAMERA_SHARE_HEIGHT = 540
@@ -144,7 +156,7 @@ export const remoteCameraMessage = (state: RemoteCameraState, userName?: string)
   const who = userName ? `${userName}'s computer` : "the camera's computer"
   switch (state) {
     case "busy":
-      return `Camera is already showing on ${CAMERA_SHARE_MAX_VIEWERS} computers`
+      return "Camera is already showing on as many computers as it can serve"
     case "paused":
       return "Preview paused while the camera is on the projector"
     case "missing":

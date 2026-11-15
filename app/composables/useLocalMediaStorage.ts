@@ -146,17 +146,24 @@ const withMediaKeyLock = async <T>(
   if (typeof navigator === "undefined" || !navigator.locks?.request) {
     return task()
   }
+  // Only a lock that refused to be taken may fall back to running the task
+  // unlocked. An error thrown by the task itself (a full disk, a dropped
+  // connection) is the download's own failure; running it again would start a
+  // second full download.
+  let taskStarted = false
   try {
     return await navigator.locks.request(
       `cow-media-download:${key}`,
       signal ? { signal } : {},
-      task
+      () => {
+        taskStarted = true
+        return task()
+      }
     )
   } catch (error) {
     // An aborted wait is the caller's own cancellation: surface it as before.
     if ((error as DOMException)?.name === "AbortError") throw error
-    // Anything the lock itself refused must not stop the download.
-    if (!(error instanceof DOMException)) throw error
+    if (taskStarted || !(error instanceof DOMException)) throw error
     return task()
   }
 }

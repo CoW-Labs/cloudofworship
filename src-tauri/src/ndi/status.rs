@@ -2,8 +2,9 @@ use serde::Serialize;
 use std::sync::{Arc, RwLock};
 use tauri::{AppHandle, Emitter};
 
+use super::quality;
+
 pub const SOURCE_NAME: &str = "CoW Live Output";
-pub const FRAME_RATE: u32 = 30;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,6 +107,8 @@ pub struct NdiStatus {
   pub width: Option<u32>,
   pub height: Option<u32>,
   pub fps: u32,
+  /// The quality tier this session was started with.
+  pub quality: String,
   pub frames_sent: u64,
   pub connection_count: u32,
   pub last_frame_age_ms: Option<u64>,
@@ -124,7 +127,8 @@ impl Default for NdiStatus {
       capture_permission: CapturePermission::Unknown,
       width: None,
       height: None,
-      fps: FRAME_RATE,
+      fps: quality::DEFAULT.fps,
+      quality: quality::DEFAULT.id.to_string(),
       frames_sent: 0,
       connection_count: 0,
       last_frame_age_ms: None,

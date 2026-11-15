@@ -37,6 +37,9 @@ bible-json-converter.ts
 .env*
 bench-runs/
 
+# FFmpeg sidecar, fetched/built by scripts/fetch-ffmpeg.mjs
+src-tauri/binaries/ffmpeg-*
+
 # Internal notes, QA plans, one-off reports and marketing templates: keep out of the repo
 *-report.md
 *-test-plan.csv

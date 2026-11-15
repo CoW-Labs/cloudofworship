@@ -30,17 +30,6 @@ html.app-shell-locked .app-ctn {
   max-height: 100%;
   overflow: hidden;
 }
-
-/* Desktop zoom (Cmd +/- in Tauri) scales the body with CSS zoom, but the body's
-   percentage height still resolves against the unzoomed html box — so at 120%
-   an uncorrected shell would render 120% of the window tall and, with the
-   document locked, the bottom would be unreachable. Dividing by the factor
-   keeps the shell exactly one window tall at any zoom: the UI gets bigger and
-   the panels scroll internally, which is what zooming a desktop app should do. */
-html.app-shell-locked body {
-  height: calc(100% / var(--app-zoom, 1));
-  max-height: calc(100% / var(--app-zoom, 1));
-}
 /* body.tauri {
   zoom: 0.9;
 } */

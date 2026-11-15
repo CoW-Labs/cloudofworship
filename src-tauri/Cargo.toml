@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.4.10"
+version = "1.4.11"
 description = "A Tauri App"
 authors = ["Favour Felix (Cloud of Worship)"]
 license = "AGPL-3.0-only"
@@ -32,6 +32,9 @@ futures-util = "0.3"
 sha2 = "0.10"
 tempfile = "3"
 tauri-plugin-deep-link = "2"
+regex = "1"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tauri-plugin-dialog = "=2.4.2"
 
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
 libloading = "=0.8.9"
@@ -39,6 +42,7 @@ libloading = "=0.8.9"
 [target.'cfg(target_os = "macos")'.dependencies]
 screencapturekit = { version = "=8.0.1", features = ["macos_14_4"] }
 core-graphics = "0.25.0"
+core-foundation = "0.10"
 objc2 = "0.6"
 
 [target.'cfg(target_os = "windows")'.dependencies]

@@ -13,7 +13,7 @@ import {
   CAMERA_SHARE_CONNECT_TIMEOUT_MS,
   CAMERA_SHARE_HOST_TIMEOUT_MS,
   CAMERA_SHARE_ICE_SERVERS,
-  CAMERA_SHARE_MAX_VIEWERS,
+  cameraShareMaxViewers,
   cameraShareEncoding,
   findCameraHost,
   withStartBitrate,
@@ -35,7 +35,7 @@ import {
  * Both sides live at module scope, like useLiveOutputControl: `start()` runs
  * once per operator page (useOperatorSession), while every CameraFeed calls
  * `acquireRemote`. A viewer opens one connection per camera however many
- * feeds show it, and a computer serves at most CAMERA_SHARE_MAX_VIEWERS.
+ * feeds show it, and a computer serves at most cameraShareMaxViewers() (1 on a 4-thread laptop, else 2).
  *
  * The feed sent is the plain camera; the viewer draws mirror, fit and effects
  * itself, as it would for a camera of its own.
@@ -207,7 +207,7 @@ const serve = async (signal: Signal) => {
     if (session.viewer === from && session.camera === camera) endServed(id, false)
   })
   if (isPaused()) return send(from, "paused", sessionId)
-  if (served.size + pending.size >= CAMERA_SHARE_MAX_VIEWERS) {
+  if (served.size + pending.size >= cameraShareMaxViewers(navigator.hardwareConcurrency)) {
     return send(from, "busy", sessionId)
   }
 

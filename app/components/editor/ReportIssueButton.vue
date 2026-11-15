@@ -59,7 +59,12 @@
             <CowButton size="sm" variant="secondary" @click="open = false">
               Cancel
             </CowButton>
-            <CowButton size="sm" :disabled="!message.trim()" @click="submit">
+            <CowButton
+              size="sm"
+              :disabled="!message.trim()"
+              :loading="sending"
+              @click="submit"
+            >
               Send report
             </CowButton>
           </div>
@@ -95,7 +100,9 @@
 </template>
 
 <script setup lang="ts">
+import type { PostHog } from "posthog-js"
 import CoWPopover from "~/components/cow/CoWPopover.vue"
+import { useAuthStore } from "~/store/auth"
 import type {
   Hymn,
   Scripture,
@@ -171,6 +178,37 @@ const intro = computed(() => {
   return "Noticed something wrong? Tell us and we'll look into it."
 })
 
+// posthog.conversations.sendMessage only takes a plain message string (plus
+// name/email traits), so the category and what was on screen are folded into
+// the text itself rather than sent as separate ticket fields.
+const buildTicketMessage = (text: string, slide?: Slide) => {
+  const lines = [text, "", `Category: ${category.value}`]
+
+  // Always include slide details, so every ticket — not just song/hymn/
+  // scripture ones — carries enough to find the exact slide the operator saw.
+  if (slide) {
+    lines.push("", "Slide details:")
+    if (slide.name) lines.push(`- Name: ${slide.name}`)
+    if (slide.type) lines.push(`- Type: ${slide.type}`)
+    if (slide.scheduleId) lines.push(`- Schedule: ${slide.scheduleId}`)
+  }
+
+  if (song.value?.title) {
+    lines.push(`- Song: ${song.value.title}${song.value.artist ? ` — ${song.value.artist}` : ""}`)
+  }
+  if (hymn.value?.title) {
+    lines.push(`- Hymn: ${hymn.value.number ? `#${hymn.value.number} ` : ""}${hymn.value.title}`)
+  }
+  if (scripture.value?.label) {
+    lines.push(`- Scripture: ${scripture.value.label} (${scripture.value.version || "?"})`)
+  }
+  if (slide?.contents?.length) {
+    lines.push("", "Slide contents:", slide.contents.join("\n").slice(0, 2000))
+  }
+
+  return lines.join("\n")
+}
+
 // Each opening starts a fresh report, defaulting to the most specific category.
 watch(open, (isOpen) => {
   if (!isOpen) return
@@ -179,10 +217,13 @@ watch(open, (isOpen) => {
   category.value = categories.value[0] ?? GENERAL_CATEGORY
 })
 
-const submit = () => {
+const sending = ref(false)
+
+const submit = async () => {
   const text = message.value.trim()
-  if (!text) return
+  if (!text || sending.value) return
   const slide = props.slide
+
   usePosthogCapture("ISSUE_REPORTED", {
     message: text,
     category: category.value,
@@ -200,6 +241,30 @@ const submit = () => {
     scripture_label: scripture.value?.label,
     scripture_version: scripture.value?.version,
   })
+
+  sending.value = true
+  try {
+    const { $posthog } = useNuxtApp()
+    const posthog = $posthog as PostHog | undefined
+    if (posthog?.conversations?.isAvailable()) {
+      const authStore = useAuthStore()
+      await posthog.conversations.sendMessage(
+        buildTicketMessage(text, slide),
+        {
+          name: authStore.user?.fullname || undefined,
+          email: authStore.user?.email || undefined,
+        },
+        true
+      )
+    }
+  } catch (err) {
+    console.error("Failed to create issue ticket:", err)
+  } finally {
+    sending.value = false
+  }
+
+  // The event above already recorded the report, so we show success either
+  // way rather than making the operator retry over a ticketing hiccup.
   sent.value = true
 }
 </script>

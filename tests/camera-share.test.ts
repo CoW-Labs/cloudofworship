@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   CAMERA_SHARE_HEIGHT,
   cameraShareEncoding,
+  cameraShareMaxViewers,
   chooseCameraSource,
   findCameraHost,
   withStartBitrate,
@@ -128,5 +129,18 @@ describe("withStartBitrate", () => {
   it("does not add it twice", () => {
     const once = withStartBitrate(sdp, 800)
     expect(withStartBitrate(once, 800)).toBe(once)
+  })
+})
+
+describe("cameraShareMaxViewers", () => {
+  it("serves one viewer on a 4-thread laptop or less, two otherwise", () => {
+    expect(cameraShareMaxViewers(2)).toBe(1)
+    expect(cameraShareMaxViewers(4)).toBe(1)
+    expect(cameraShareMaxViewers(8)).toBe(2)
+  })
+
+  it("uses the normal cap when the thread count is unknown", () => {
+    expect(cameraShareMaxViewers(undefined)).toBe(2)
+    expect(cameraShareMaxViewers(0)).toBe(2)
   })
 })

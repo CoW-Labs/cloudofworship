@@ -102,6 +102,7 @@ export const appWideActions = {
   openShortcutsModal: 'open-shortcuts',
   newPresentation: 'new-presentation',
   newPresentationFromPdf: 'new-presentation-from-pdf',
+  importEasyWorshipData: 'import-easyworship-data',
   promoteActiveSlide: 'promote-active-slide-live',
   selectSlides: 'select-slides',
   selectAllSlides: 'select-all-slides',
@@ -432,6 +433,13 @@ export const quickActionsArr: QuickAction[] = [
     desc: "Import slides from a PDF file",
     action: appWideActions.newPresentationFromPdf,
     meta: "pdf import slides presentation",
+  },
+  {
+    icon: "i-ph-file-zip",
+    name: "Import from EasyWorship",
+    desc: "Add songs from an EasyWorship backup to your library",
+    action: appWideActions.importEasyWorshipData,
+    meta: "easyworship import songs backup zip library paradox",
   },
   // --- Live Control ---
   {
