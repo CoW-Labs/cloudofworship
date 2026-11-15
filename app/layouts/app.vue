@@ -34,7 +34,7 @@
         :active-advert="currentState?.activeAdvert"
       />
       <UpgradePlanModal />
-      <YoutubePreflightModal v-if="isTauriApp" />
+      <YoutubePreflightModal v-if="isTauriApp && youtubeStreamingEnabled" />
       <OnboardingTour />
       <SatisfactionPromptModal ref="satisfactionPrompt" />
     </ClientOnly>
@@ -146,6 +146,7 @@ let pendingYoutubeGoLive = false
 // Set when the operator chose "Live window only" in the pre-flight check.
 let skipYoutubeThisGoLive = false
 const isTauriApp = useTauri().isTauri
+const { isEnabled: youtubeStreamingEnabled } = useFeatureFlags("youtube-streaming")
 let tauriLiveWindowCloseListenerBound = false
 
 const { currentState } = storeToRefs(appStore)
@@ -1179,6 +1180,7 @@ async function startNdiForLiveWindow() {
 function youtubeWillStreamOnGoLive() {
   return (
     useTauri().isTauri &&
+    youtubeStreamingEnabled.value &&
     !skipYoutubeThisGoLive &&
     (pendingYoutubeGoLive || youtubeStream.streamOnGoLive.value) &&
     youtubeStream.hasStreamKey.value

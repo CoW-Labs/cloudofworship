@@ -279,6 +279,7 @@ const {
   streamOnGoLive: youtubeStreamOnGoLive,
   hasStreamKey: youtubeHasKey,
 } = useYoutubeStream()
+const { isEnabled: youtubeStreamingEnabled } = useFeatureFlags("youtube-streaming")
 
 // One-off "go live and stream": opens the live window and starts YouTube.
 // Without a key yet, take the operator to where they add one.
@@ -306,7 +307,7 @@ const goLiveMenuItems = computed(() => [
     onClick: () => useGlobalEmit(appWideActions.goLive),
   },
   // Desktop only, and redundant once "Open live window" already streams.
-  ...(isTauri && !(youtubeStreamOnGoLive.value && youtubeHasKey.value)
+  ...(isTauri && youtubeStreamingEnabled.value && !(youtubeStreamOnGoLive.value && youtubeHasKey.value)
     ? [
         {
           label: "Go live on YouTube",

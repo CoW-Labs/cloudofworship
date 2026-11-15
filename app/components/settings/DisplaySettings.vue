@@ -255,7 +255,7 @@
     </SettingsGroup>
 
     <SettingsGroup
-      v-if="isTauri"
+      v-if="isTauri && youtubeStreamingEnabled"
       title="Stream to YouTube (beta)"
       note="Broadcast your live output (slides/lyrics) and audio straight to YouTube Live. Going live streams the live output window automatically."
     >
@@ -501,6 +501,7 @@ import { useDebounceFn } from "@vueuse/core"
 
 const appStore = useAppStore()
 const { isTauri } = useTauri()
+const { isEnabled: youtubeStreamingEnabled } = useFeatureFlags("youtube-streaming")
 const operatorSurface = isTauri ? "window" : "tab"
 const currentScreen = ref<any>({})
 const allScreens = ref<any>([])
