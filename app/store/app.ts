@@ -501,6 +501,13 @@ export const useAppStore = defineStore("app", {
      * the operator's own update, which reset a pair going live to no pair.
      */
     mirrorLiveProjection(slideId: string, pairId: string | null) {
+      // Most broadcasts repeat what is already here; skip the state snapshot.
+      if (
+        this.currentState.liveSlideId === slideId &&
+        (this.currentState.livePairId ?? null) === pairId
+      ) {
+        return
+      }
       writeWithoutSharing(this.$id, () => {
         if (this.currentState.liveSlideId !== slideId) {
           this.currentState.liveSlideId = slideId
