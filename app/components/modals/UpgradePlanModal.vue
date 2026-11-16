@@ -115,7 +115,7 @@
               <h3
                 class="text-[2.5rem] leading-none font-bold text-gray-900 dark:text-white mb-3"
               >
-                {{ currencySymbol }}0.00
+                {{ formatAmount(0, selectedCurrency, { keepDecimals: true }) }}
               </h3>
               <p class="text-[15px] text-gray-500 dark:text-gray-400">
                 For churches with a single steward
@@ -158,7 +158,11 @@
               <h3
                 class="text-[2.5rem] leading-none font-bold text-gray-900 dark:text-white mb-3"
               >
-                {{ currencySymbol }}{{ displayedTeamPrice.toLocaleString() }}
+                {{
+                  formatAmount(displayedTeamPrice, selectedCurrency, {
+                    keepDecimals: !Number.isInteger(teamPrice),
+                  })
+                }}
               </h3>
               <p
                 class="text-[15px] text-gray-500 dark:text-gray-400 max-w-[34ch]"
@@ -173,10 +177,36 @@
               block
               class="mt-10"
               :loading="loading && selectedTier === 'team'"
+              :disabled="awaitingConfirmation"
               @click="handleContinue"
             >
               Continue
             </CowButton>
+
+            <p
+              v-if="awaitingConfirmation"
+              class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400"
+              role="status"
+            >
+              Waiting for your mobile money payment to go through…
+            </p>
+            <template v-else-if="selectedTier === 'team'">
+              <p
+                v-if="selectedProvider === 'bachs'"
+                class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400"
+              >
+                Pay with mobile money, such as M-Pesa, MTN MoMo or Airtel Money.
+              </p>
+              <button
+                v-if="alternativeOption"
+                type="button"
+                class="mt-2 w-full text-center text-sm text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50"
+                :disabled="loading"
+                @click="switchPaymentOption"
+              >
+                {{ alternativeOption.label }}
+              </button>
+            </template>
           </div>
 
           <!-- RIGHT — Mission visual -->
@@ -248,6 +278,7 @@
 
 <script setup lang="ts">
 import type { PaymentPlan } from "~/composables/usePayment"
+import { providerForCurrency, type BillingCurrency } from "~/utils/billing"
 import { gsap } from "gsap"
 import { useAuthStore } from "~/store/auth"
 
@@ -400,6 +431,7 @@ const animateMissionIn = () => {
 // Use payment composable
 const {
   loading,
+  awaitingConfirmation,
   showSuccessModal,
   successPlanName,
   initiatePayment,
@@ -410,27 +442,25 @@ const {
 const {
   plans,
   selectedCurrency,
+  selectedProvider,
   detectedCurrency,
+  detectedRoute,
   detectCurrency,
+  selectOption,
   fetchPlans,
   getPlanByIntervalAndCurrency,
-  getCurrencySymbol,
+  getPlanPrice,
+  formatAmount,
 } = useSubscriptionPlans()
 
 // Pricing from API
-const yearlyPrice = computed(() => {
-  const plan = getPlanByIntervalAndCurrency("yearly", selectedCurrency.value)
-  if (!plan) return 0
-  if (plan.currency === "USD" && plan.amountCents) return plan.amountCents / 100
-  return plan.amount
-})
+const yearlyPrice = computed(() =>
+  getPlanPrice(getPlanByIntervalAndCurrency("yearly", selectedCurrency.value))
+)
 
-const monthlyPrice = computed(() => {
-  const plan = getPlanByIntervalAndCurrency("monthly", selectedCurrency.value)
-  if (!plan) return 0
-  if (plan.currency === "USD" && plan.amountCents) return plan.amountCents / 100
-  return plan.amount
-})
+const monthlyPrice = computed(() =>
+  getPlanPrice(getPlanByIntervalAndCurrency("monthly", selectedCurrency.value))
+)
 
 const teamPrice = computed(() =>
   selectedPlan.value === "yearly" ? yearlyPrice.value : monthlyPrice.value
@@ -455,12 +485,65 @@ watch(teamPrice, (newPrice) => {
     duration: 0.6,
     ease: "power2.out",
     onUpdate: () => {
-      displayedTeamPrice.value = Math.round(proxy.val * 100) / 100
+      // Whole-number prices (KES 499, UGX 15,500) roll in whole steps.
+      displayedTeamPrice.value = Number.isInteger(newPrice)
+        ? Math.round(proxy.val)
+        : Math.round(proxy.val * 100) / 100
     },
   })
 })
 
-const currencySymbol = computed(() => getCurrencySymbol(selectedCurrency.value))
+/**
+ * The other way to pay that the API offers here: card in USD beside mobile
+ * money, and back again.
+ */
+const alternativeOption = computed(() => {
+  const route = detectedRoute.value
+  if (!route?.fallback) return null
+  const usingPrimary =
+    selectedProvider.value === route.provider &&
+    selectedCurrency.value === route.currency
+  const target = usingPrimary
+    ? route.fallback
+    : { provider: route.provider, currency: route.currency }
+  const price = formatAmount(
+    getPlanPrice(getPlanByIntervalAndCurrency(selectedPlan.value, target.currency)),
+    target.currency
+  )
+  const label =
+    target.provider === "bachs"
+      ? `Pay ${price} with mobile money instead`
+      : target.provider === "dodo"
+      ? `Prefer to pay by card? Pay ${price} in USD`
+      : `Pay ${price} instead`
+  return { ...target, label }
+})
+
+const switchPaymentOption = () => {
+  const option = alternativeOption.value
+  if (!option) return
+  usePosthogCapture("UPGRADE_PAYMENT_OPTION_SWITCHED", {
+    from: selectedProvider.value,
+    to: option.provider,
+    currency: option.currency,
+  })
+  selectOption(option.provider, option.currency)
+}
+
+/** Back to what the API offers first (after a deep link or a switch). */
+const resetToRoute = () => {
+  const route = detectedRoute.value
+  if (route) selectOption(route.provider, route.currency)
+}
+
+/** A signup deep link picks a plan, and with it a currency: pay where it's collected. */
+const selectPlanCurrency = (currency: BillingCurrency) => {
+  const route = detectedRoute.value
+  if (route?.currency === currency) selectOption(route.provider, currency)
+  else if (route?.fallback?.currency === currency)
+    selectOption(route.fallback.provider, currency)
+  else selectOption(providerForCurrency(currency), currency)
+}
 
 const emitter = useNuxtApp().$emitter as any
 
@@ -535,7 +618,7 @@ onMounted(async () => {
         const plan = plans.value.find((p) => p.id === data.planId)
         if (plan) {
           selectedPlan.value = plan.interval
-          selectedCurrency.value = plan.currency
+          selectPlanCurrency(plan.currency)
           selectedTier.value = "team"
 
           usePosthogCapture("UPGRADE_MODAL_OPENED", {
@@ -550,7 +633,7 @@ onMounted(async () => {
         const plan = plans.value.find((p) => p.planCode === data.planCode)
         if (plan) {
           selectedPlan.value = plan.interval
-          selectedCurrency.value = plan.currency
+          selectPlanCurrency(plan.currency)
           selectedTier.value = "team"
 
           usePosthogCapture("UPGRADE_MODAL_OPENED", {
@@ -565,12 +648,16 @@ onMounted(async () => {
       } else {
         applyBillingDefaultExperiment()
         selectedTier.value = "team"
+        resetToRoute()
+        // A different church may have signed in since the modal mounted.
+        detectCurrency().catch(console.error)
         usePosthogCapture("UPGRADE_MODAL_OPENED", {
           source: "feature_gate",
           feature: data?.feature,
           interval: selectedPlan.value,
           billingDefaultVariant: billingDefaultVariant.value,
           currency: selectedCurrency.value,
+          provider: selectedProvider.value,
           autoDetectedCurrency: detectedCurrency.value,
         })
       }
@@ -629,14 +716,19 @@ const handleUpgrade = async () => {
     return
   }
 
+  // Minor units for USD (cents) and NGN (kobo), as before; the main unit for
+  // mobile-money currencies, which have no minor-unit field.
   const amount =
-    selectedCurrency.value === "USD" && planDetails.amountCents
-      ? planDetails?.amountCents || 0
-      : planDetails?.amountKobo || 0
+    selectedCurrency.value === "USD"
+      ? planDetails.amountCents || 0
+      : selectedCurrency.value === "NGN"
+      ? planDetails.amountKobo || 0
+      : planDetails.amount
 
   usePosthogCapture("UPGRADE_INITIATED", {
     plan: selectedPlan.value,
     currency: selectedCurrency.value,
+    provider: selectedProvider.value,
     autoDetectedCurrency: detectedCurrency.value,
     amount: amount,
     planId: planDetails?.id,
@@ -646,10 +738,15 @@ const handleUpgrade = async () => {
 
   await initiatePayment({
     plan: selectedPlan.value,
+    provider: selectedProvider.value,
     currency: selectedCurrency.value,
     onSuccess: async () => {
       visible.value = false
       useChurch().fetchChurch()
+    },
+    // Paid, still settling: close so nobody pays twice. The webhook turns Teams on.
+    onPending: () => {
+      visible.value = false
     },
     onCancel: () => {
       useToast().add({
