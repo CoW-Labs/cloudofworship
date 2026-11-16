@@ -148,7 +148,7 @@ export const usePayment = () => {
 
             case 'checkout.closed':
               loading.value = false
-              usePosthogCapture('PAYMENT_CANCELLED', { plan, amount: planDetails.amount, currency: planDetails.currency })
+              usePosthogCapture('PAYMENT_CANCELLED', { plan, amount: planDetails.amount, currency: planDetails.currency, provider: 'dodo' })
               const { trackPaymentCancelled } = useSendEvent()
               trackPaymentCancelled(planDetails.code, 'User closed Dodo payment overlay')
               useToast().add({ icon: 'i-heroicons-information-circle', title: 'Payment Cancelled', description: 'You can upgrade anytime', color: 'gray' })
@@ -568,7 +568,7 @@ export const usePayment = () => {
           settled = true
           clearTimeout(watchdog)
           loading.value = false
-          usePosthogCapture('PAYMENT_CANCELLED', { plan, amount: planDetails.amount, currency: planDetails.currency })
+          usePosthogCapture('PAYMENT_CANCELLED', { plan, amount: planDetails.amount, currency: planDetails.currency, provider: 'paystack' })
           trackPaymentCancelled(planDetails.code, 'User closed payment modal')
           useToast().add({ icon: 'i-heroicons-information-circle', title: 'Payment Cancelled', description: 'You can upgrade anytime', color: 'gray' })
           onCancel?.()
