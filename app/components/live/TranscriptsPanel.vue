@@ -338,7 +338,7 @@
         <!-- Shown only after scrolling up; follows the viewport's bottom edge -->
         <div
           v-if="!followLatest && (segments.length > 0 || currentTranscript)"
-          class="sticky bottom-5 flex h-0 justify-center"
+          class="sticky bottom-10 flex h-0 justify-center"
         >
           <!-- The lift sits on this wrapper: CowButton moves itself on press -->
           <div class="-translate-y-full">
