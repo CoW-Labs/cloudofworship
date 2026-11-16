@@ -3,7 +3,7 @@ import { useAppStore } from '~/store/app'
 import { useAuthStore } from '~/store/auth'
 import { prewarmScriptureVersion } from '~/composables/useScripture'
 import type { TranscriptSegment, BibleReference } from '~/types/transcript'
-import { appWideActions } from '~/utils/constants'
+import { appWideActions, MAX_TRANSCRIPT_SEGMENTS } from '~/utils/constants'
 import { planVoiceCommand } from '~/utils/voiceCommands'
 
 interface TranscriptionState {
@@ -78,6 +78,10 @@ export default function useDeepgramTranscription() {
   })
 
   const micLevel = ref(0)
+
+  // Lines created since the last clear. `segments` is capped, so analytics
+  // read this to report how long the transcript really was.
+  const segmentsCreated = ref(0)
 
   // Pause keeps the socket (and therefore the session/summary) alive while the
   // mic is muted, so a resumed session continues the same transcript.
@@ -225,6 +229,10 @@ export default function useDeepgramTranscription() {
       timestamp: Date.now(),
       bibleReferences: references,
     })
+    segmentsCreated.value += 1
+    // Keep only the latest lines on screen and in memory.
+    const overflow = state.value.segments.length - MAX_TRANSCRIPT_SEGMENTS
+    if (overflow > 0) state.value.segments.splice(0, overflow)
     state.value.currentTranscript = ''
   }
 
@@ -796,6 +804,7 @@ export default function useDeepgramTranscription() {
 
   const clearTranscript = () => {
     state.value.segments = []
+    segmentsCreated.value = 0
     state.value.currentTranscript = ''
     toast.add({ title: 'Transcript cleared', icon: 'i-bx-trash' })
   }
@@ -826,6 +835,7 @@ export default function useDeepgramTranscription() {
     isReconnecting: computed(() => isReconnecting.value),
     error: computed(() => state.value.error),
     segments: computed(() => state.value.segments),
+    segmentCount: computed(() => segmentsCreated.value),
     currentTranscript: computed(() => state.value.currentTranscript),
     remainingSeconds: computed(() => state.value.remainingSeconds),
     usedSeconds: computed(() => state.value.usedSeconds),
