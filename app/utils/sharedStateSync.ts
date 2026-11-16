@@ -8,6 +8,7 @@ export type SharedStateMessage = {
 }
 
 type SharedStore = {
+  $id?: string
   $state: Record<string, any>
   $patch: (patch: (state: Record<string, any>) => void) => void
 }
@@ -19,6 +20,23 @@ type SharedChannel = {
 
 let sequence = 0
 const nextTimestamp = () => Date.now() * 1000 + (sequence++ % 1000)
+
+const unsharedWriters = new Map<string, (write: () => void) => void>()
+
+/**
+ * Changes this window's copy of a shared store without sending it to the
+ * other windows. For state a window only copies from what it was sent, like
+ * /live copying the live slide id: every message carries the whole state, so
+ * sending that copy could arrive as the newest one and undo the operator's
+ * own, newer update (a pair going live was reset to no pair that way). The
+ * copy still reaches a window that asks for the state later, such as a
+ * reloaded operator window.
+ */
+export const writeWithoutSharing = (storeId: string, write: () => void) => {
+  const writer = unsharedWriters.get(storeId)
+  if (writer) writer(write)
+  else write()
+}
 
 export function synchronizeStore(
   store: SharedStore,
@@ -41,15 +59,28 @@ export function synchronizeStore(
   // Watch the serialized projection, not the complete store. The serializer
   // skips activeSlides before descending into it, so Vue never traverses the
   // corpus or undo history to track their nested dependencies.
-  const stop = watch(serialize, (snapshot) => {
-    if (snapshot === acceptedSnapshot) return
+  const publish = (snapshot: string) => {
     acceptedSnapshot = snapshot
     latestTimestamp = Math.max(nextTimestamp(), latestTimestamp + 1)
     void channel.postMessage({
       timestamp: latestTimestamp,
       state: sharedStateSerializer.deserialize(snapshot),
     })
+  }
+  const stop = watch(serialize, (snapshot) => {
+    if (snapshot === acceptedSnapshot) return
+    publish(snapshot)
   })
+
+  if (store.$id) {
+    unsharedWriters.set(store.$id, (write) => {
+      // A local change not sent yet goes out first, so only `write` is held back.
+      const pending = serialize()
+      if (pending !== acceptedSnapshot) publish(pending)
+      write()
+      acceptedSnapshot = serialize()
+    })
+  }
 
   channel.onmessage = (message) => {
     if (!message) {
@@ -91,5 +122,6 @@ export function synchronizeStore(
   return () => {
     stop()
     channel.onmessage = null
+    if (store.$id) unsharedWriters.delete(store.$id)
   }
 }

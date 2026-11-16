@@ -1,5 +1,6 @@
 import type { Emitter, EventType } from "mitt"
 import type { User } from "~/store/auth"
+import type { BillingCurrency, BillingProvider } from "~/utils/billing"
 
 export interface SubscriptionActiveDetails {
   id: string
@@ -9,14 +10,15 @@ export interface SubscriptionActiveDetails {
   lastPaidAt: string | null
   canceledAt: string | null
   paystackSubscriptionCode: string | null
-  // False for admin-provisioned plans and Paystack bank-transfer payments,
-  // which have no card on a provider subscription to change.
+  // False for admin-provisioned plans, Paystack bank-transfer payments and
+  // mobile money (Bachs), which have no card on a provider subscription to
+  // change. These don't renew themselves: the church pays again.
   canUpdatePaymentMethod?: boolean
   // Set while status is "past-due": Teams stays on until accessEndsAt, and the
   // payment can be retried until retryEndsAt.
   pastDue?: { accessEndsAt: string; retryEndsAt: string } | null
   amount: number | null
-  currency: "NGN" | "USD" | null
+  currency: BillingCurrency | null
   interval: "monthly" | "yearly" | null
 }
 
@@ -25,7 +27,7 @@ export interface SubscriptionBillingRecord {
   plan: string
   status: "active" | "inactive" | "canceled"
   amount: number | null
-  currency: "NGN" | "USD" | null
+  currency: BillingCurrency | null
   lastPaidAt: string | null
   expiresAt: string | null
   canceledAt: string | null
@@ -42,7 +44,7 @@ export interface SubscriptionDetails {
 
 export interface BillingTransaction {
   _id: string
-  provider: "paystack" | "dodo"
+  provider: BillingProvider
   providerReference: string
   status: "successful" | "failed" | "pending" | "reversed"
   kind: "initial_payment" | "renewal" | "unknown"
@@ -445,6 +447,11 @@ export interface BibleVersion {
   name: string
   isDownloaded: boolean
   copyrightContent: string
+  // ISO 3166-1 alpha-2 code (e.g. "gh") and its name, for the flag shown before the version
+  country?: string
+  countryName?: string
+  // Language of the translation, searchable alongside name and country
+  language?: string
 }
 
 export interface Hymn {
@@ -691,6 +698,7 @@ export interface AppSettings {
   bibleVersions: Array<any> // Check app.vue for bible versions array in a list
   animations?: boolean // Transitions between slides (e.g. crossfade)
   microAnimations?: boolean // Micro/text animations within a slide (come-up etc.)
+  keepCameraOn?: boolean // Keep a camera open after its slide leaves the screen. Defaults to true.
   verseTransitionStyle?: "off" | "fade" | "slide-up" // Verse/line-to-line transition within the same slide
   verseTransitionInterval?: number // Duration (seconds) of the verse/line-to-line transition
   footnotes?: boolean

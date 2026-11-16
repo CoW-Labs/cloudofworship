@@ -117,6 +117,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | Event Name | Properties | Description | Status |
 |------------|-----------|-------------|---------|
 | `OPEN_SETTINGS_MODAL` | - | Settings panel opened | ✅ Exists |
+| `KEEP_CAMERA_ON_CHANGED` | `on` | "Keep camera on" performance setting toggled | ✅ Exists |
 | `BIBLE_VERSIONS_SETTINGS_CHANGED` | - | Bible version preferences updated | ✅ Exists |
 | `LIVE_WINDOW_FULLSCREEN_SETTINGS_CHANGED` | - | Fullscreen setting toggled | ✅ Exists |
 | `LINES_PER_SLIDE_SETTINGS_CHANGED` | - | Lines per slide updated | ✅ Exists |
@@ -146,9 +147,10 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `UPGRADE_MODAL_OPENED_AFTER_VERIFICATION` | `source` | Upgrade prompt post-verification | ✅ Exists |
 | `UPGRADE_PROMPT_SHOWN` | `feature`, `location`, `currentCount`, `limit` | Feature limit hit | ✅ Exists |
 | `UPGRADE_INITIATED` | `plan` | User clicks upgrade button | ✅ Exists |
-| `UPGRADE_BUTTON_CLICKED` | `plan`, `price` | Checkout initiated | ✅ Exists |
-| `PAYMENT_CANCELLED` | `plan` | User cancels checkout | ✅ Exists |
-| `PAYMENT_SUCCESSFUL` | `plan`, `amount`, `currency` | Payment completed | ✅ Exists |
+| `UPGRADE_BUTTON_CLICKED` | `plan`, `planCode`, `amount`, `currency`, `discount`, `provider` (`paystack`, `dodo`, `bachs`) | Checkout initiated | ✅ Exists |
+| `PAYMENT_CANCELLED` | `plan`, `amount`, `currency`, `provider` | User cancels checkout | ✅ Exists |
+| `PAYMENT_SUCCESSFUL` | `plan`, `amount`, `currency`, `provider` | Payment completed | ✅ Exists |
+| `PAYMENT_PENDING` | `plan`, `currency`, `provider` | Bachs mobile money paid but not confirmed within a minute; the webhook settles it later | ✅ Exists |
 | `CURRENCY_AUTO_DETECTED` | `currency`, `country` | Currency auto-selected | ✅ Exists |
 | `TEAMS_FEATURE_BLOCKED` | `source` | Free user hits Teams feature | ✅ Exists |
 | `SUBSCRIPTION_CANCELLED` | `plan`, `reason` | User cancels subscription | ⚠️ Missing |

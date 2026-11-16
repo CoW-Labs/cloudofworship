@@ -2,6 +2,7 @@ import { useOnline } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
 import type { BibleVersion } from "~/types"
 import { bibleVersionObjects } from "~/utils/constants"
+import { bibleVersionCountries } from "~/utils/flags"
 import { safeDBOperation } from "~/composables/useIndexedDB"
 
 /**
@@ -100,7 +101,37 @@ export const useBibleVersionManager = () => {
     return hasUndownloaded ? [...downloaded, "+ More Versions"] : downloaded
   })
 
+  /**
+   * True when the query appears in a version's abbreviation, name, country or
+   * language. Country and language come from the API, with the built-in map as
+   * a fallback for lists saved before the API sent them.
+   */
+  const bibleVersionMatches = (version: BibleVersion | undefined, query: string) => {
+    const q = query.trim().toLowerCase()
+    if (!q || !version) return true
+    const extra = bibleVersionCountries[version.id]
+    return [
+      version.id,
+      version.name,
+      version.countryName || extra?.countryName,
+      version.language || extra?.language,
+    ].some((field) => field?.toLowerCase().includes(q))
+  }
+
+  /** Search for the version dropdowns: ids matching the query, "+ More Versions" kept last */
+  const searchBibleVersionIds = (ids: string[], query: string) =>
+    ids.filter(
+      (id) =>
+        id === "+ More Versions" ||
+        bibleVersionMatches(
+          bibleVersionOptions.value.find((v) => v.id === id),
+          query
+        )
+    )
+
   return {
+    bibleVersionMatches,
+    searchBibleVersionIds,
     /** Raw list of all Bible versions with isDownloaded flags */
     bibleVersionOptions,
     /** Filtered + formatted list ready for USelectMenu */

@@ -1,8 +1,11 @@
 <template>
   <div class="select-menu-ctn w-[100px] shrink-0">
+    <!-- The select only runs its search function when the query changes, so
+         re-key it when the list of downloaded versions changes -->
     <CowSelectMenu
+      :key="bibleVersionSelectOptions.join()"
       class="w-full max-w-full border-0 shadow-none"
-      searchable
+      :searchable="(q: string) => searchBibleVersionIds(bibleVersionSelectOptions, q)"
       searchable-placeholder="Search name or abbreviation"
       :popper="{ strategy: 'fixed' }"
       select-class="h-[34px] w-full min-w-0 overflow-hidden bg-white dark:bg-[#171d2b] border-0 shadow-none outline-none rounded-full font-semibold text-gray-900 dark:text-white text-left pl-3 justify-between"
@@ -46,6 +49,12 @@
           class="text-gray-500 dark:text-[#a7afbd]"
         />
       </template>
+      <template #label>
+        <span class="flex items-center gap-2.5 min-w-0">
+          <BibleVersionFlag :version-id="bibleVersion" />
+          <span class="truncate">{{ bibleVersion }}</span>
+        </span>
+      </template>
       <template #option="{ option: version }">
         <span
           v-if="version === '+ More Versions'"
@@ -53,7 +62,10 @@
         >
           Add More
         </span>
-        <span v-else class="truncate">{{ versionLabel(version) }}</span>
+        <span v-else class="flex items-center gap-2.5 min-w-0">
+          <BibleVersionFlag :version-id="version" />
+          <span class="truncate">{{ versionLabel(version) }}</span>
+        </span>
       </template>
     </CowSelectMenu>
   </div>
@@ -81,6 +93,7 @@ const {
   bibleVersionSelectOptions,
   bibleVersionOptions,
   populateBibleVersionOptions,
+  searchBibleVersionIds,
 } = useBibleVersionManager()
 
 // Display the full version name with its abbreviation, e.g. "King James Version (KJV)".

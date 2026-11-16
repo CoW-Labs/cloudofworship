@@ -229,6 +229,7 @@
         v-show="activeTabIndex === 0"
         ref="transcriptContainer"
         class="transcript-content flex-1 min-h-0 p-3 overflow-y-auto"
+        @scroll.passive="onTranscriptScroll"
       >
         <!-- Empty state -->
         <div
@@ -319,10 +320,39 @@
             v-if="currentTranscript"
             class="segment text-sm leading-relaxed text-gray-600 dark:text-[#9aa3b2] italic"
           >
-            {{ currentTranscript }}<span class="animate-pulse">▌</span>
+            {{ currentTranscript }}
           </div>
-          <!-- Always-visible anchor so the cursor is always at the very bottom -->
-          <div ref="transcriptBottom" />
+          <!-- Three pulsing dots while the session is listening -->
+          <div
+            v-if="isTranscribing && !isPaused"
+            class="flex items-center gap-1 py-1"
+            role="status"
+            aria-label="Listening"
+          >
+            <span class="listening-dot" />
+            <span class="listening-dot listening-dot--mid" />
+            <span class="listening-dot" />
+          </div>
+        </div>
+
+        <!-- Shown only after scrolling up; follows the viewport's bottom edge -->
+        <div
+          v-if="!followLatest && (segments.length > 0 || currentTranscript)"
+          class="sticky bottom-10 flex h-0 justify-center"
+        >
+          <!-- The lift sits on this wrapper: CowButton moves itself on press -->
+          <div class="-translate-y-full">
+            <CowButton
+              variant="secondary"
+              size="sm"
+              aria-label="Jump to latest"
+              title="Jump to latest"
+              class="!h-10 !w-10 !p-0"
+              @click="jumpToLatest"
+            >
+              <UIcon name="i-ph-arrow-down" class="h-5 w-5" />
+            </CowButton>
+          </div>
         </div>
       </div>
 
@@ -586,9 +616,16 @@ const maybeAutoOpenLocalReference = (reference: BibleReference) => {
   useGlobalEmit(appWideActions.updateOrCreateBible, reference.shortLabel)
 }
 
+// Watch the newest line's id, not the count: the list is capped, so once it is
+// full the length never changes while new lines keep arriving.
 watch(
-  () => segments.value.length,
+  () => segments.value.at(-1)?.id,
   () => {
+    // Forget lines that have dropped off the capped list.
+    if (parsedSegmentIds.size > segments.value.length * 2) {
+      const live = new Set(segments.value.map((segment) => segment.id))
+      for (const id of parsedSegmentIds) if (!live.has(id)) parsedSegmentIds.delete(id)
+    }
     for (const segment of segments.value) {
       if (parsedSegmentIds.has(segment.id)) continue
       parsedSegmentIds.add(segment.id)
@@ -638,18 +675,73 @@ const copySegment = async (segment: { id: string; text: string }) => {
 onBeforeUnmount(() => clearTimeout(copiedTimer))
 
 const transcriptContainer = ref<HTMLElement | null>(null)
-const transcriptBottom = ref<HTMLElement | null>(null)
 const scripturesContainer = ref<HTMLElement | null>(null)
 
-// Auto-scroll transcript to bottom when new content arrives (newest at bottom)
+// ── Smart auto-scroll ──────────────────────────────────────────────────────
+// Follows the newest text like a chat reply being written. Scrolling up is
+// read as "I am reading this", so following stops until the operator scrolls
+// back to the bottom or presses "Jump to latest".
+const BOTTOM_THRESHOLD_PX = 32
+const followLatest = ref(true)
+let lastScrollTop = 0
+let followFrame = 0
+
+const onTranscriptScroll = () => {
+  const el = transcriptContainer.value
+  if (!el || el.clientHeight === 0) return
+  const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  if (distanceFromBottom <= BOTTOM_THRESHOLD_PX) {
+    followLatest.value = true
+  } else if (el.scrollTop < lastScrollTop) {
+    // Moving up and away from the bottom. New text growing the page never
+    // lowers scrollTop, so only a real scroll up lands here.
+    followLatest.value = false
+  }
+  lastScrollTop = el.scrollTop
+}
+
 const scrollTranscriptToBottom = () => {
-  nextTick(() => {
-    transcriptBottom.value?.scrollIntoView({ behavior: "smooth" })
+  const el = transcriptContainer.value
+  if (!el) return
+  el.scrollTop = el.scrollHeight
+  lastScrollTop = el.scrollTop
+}
+
+// Interim text changes several times a second, so the jump is batched to one
+// per frame and only made while following.
+const followTranscript = () => {
+  if (!followLatest.value || followFrame) return
+  followFrame = requestAnimationFrame(() => {
+    followFrame = 0
+    scrollTranscriptToBottom()
   })
 }
 
-watch(() => segments.value.length, scrollTranscriptToBottom)
-watch(currentTranscript, scrollTranscriptToBottom)
+const jumpToLatest = () => {
+  followLatest.value = true
+  scrollTranscriptToBottom()
+}
+
+watch(() => segments.value.at(-1)?.id, () => nextTick(followTranscript))
+watch(currentTranscript, () => nextTick(followTranscript))
+// A fresh or cleared transcript starts at the bottom again.
+watch(
+  () => segments.value.length === 0,
+  () => {
+    followLatest.value = true
+  }
+)
+watch(isTranscribing, (active) => {
+  if (active) followLatest.value = true
+})
+// The pane is hidden (v-show) while the Scriptures tab is open, so catch up
+// when it comes back.
+watch(activeTabIndex, (index) => {
+  if (index === 0) nextTick(followTranscript)
+})
+onBeforeUnmount(() => {
+  if (followFrame) cancelAnimationFrame(followFrame)
+})
 
 // ── Actions ────────────────────────────────────────────────────────────────
 const openMicSettings = () => {
@@ -689,6 +781,41 @@ const handleScriptureClick = (result: ScriptureResult) => {
 </script>
 
 <style scoped>
+.listening-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  color: rgb(var(--color-primary-500, 147 51 234));
+  opacity: 0.35;
+  animation: listening-pulse 1.2s ease-in-out infinite;
+}
+.listening-dot--mid {
+  width: 8px;
+  height: 8px;
+  animation-delay: 0.2s;
+}
+.listening-dot:last-child {
+  animation-delay: 0.4s;
+}
+@keyframes listening-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listening-dot {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
 /* Session controls open/close on a single width transition. Animating
    grid-template-columns from 0fr → 1fr lets the pill grow to whatever the
    buttons and timer actually measure, with no hardcoded width. */

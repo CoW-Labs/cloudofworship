@@ -833,6 +833,13 @@ export const bibleBooks = [
 ];
 
 // Max chapters per Bible book (aligned with bibleBooks array)
+/**
+ * Most transcript lines kept in the operator window. Older lines drop off the
+ * top so a long sermon does not grow the heap and the panel without limit. The
+ * server keeps the full finalized transcript on the session record.
+ */
+export const MAX_TRANSCRIPT_SEGMENTS = 100
+
 export const bibleBookChapters = [
   50, 40, 27, 36, 34, // Genesis, Exodus, Leviticus, Numbers, Deuteronomy
   24, 21, 4, 31, 24,  // Joshua, Judges, Ruth, 1 Samuel, 2 Samuel

@@ -1,7 +1,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useAppStore } from '~/store/app'
 import type { TranscriptSegment, BibleReference } from '~/types/transcript'
-import { appWideActions } from '~/utils/constants'
+import { appWideActions, MAX_TRANSCRIPT_SEGMENTS } from '~/utils/constants'
 import {
   planVoiceCommand,
   type VoiceCommandPlan,
@@ -440,6 +440,8 @@ export default function useSermonTranscription() {
     }
 
     state.value.segments.push(segment)
+    const overflow = state.value.segments.length - MAX_TRANSCRIPT_SEGMENTS
+    if (overflow > 0) state.value.segments.splice(0, overflow)
     state.value.currentTranscript = ''
   }
 
@@ -506,7 +508,7 @@ export default function useSermonTranscription() {
       usePosthogCapture('TRANSCRIPTION_STOPPED', {
         provider: 'deepgram',
         plan: isTeamsPlan.value ? 'teams' : 'free',
-        segmentCount: deepgram.segments.value.length,
+        segmentCount: deepgram.segmentCount.value,
       })
       return deepgram.stopTranscription()
     }

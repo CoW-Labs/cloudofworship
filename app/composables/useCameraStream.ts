@@ -1,6 +1,8 @@
 import type { CameraSlideData } from "~/types"
 import type { LocalCameraMatch } from "~/utils/cameraShare"
 import { postCrossWindowNotification } from "~/composables/useBroadcastPost"
+import { effectScope, watch } from "vue"
+import { useAppStore } from "~/store/app"
 
 /**
  * Camera streams for camera slides.
@@ -74,6 +76,44 @@ export class CameraStreamError extends Error {
 }
 
 export const CAMERA_RELEASE_GRACE_MS = 20_000
+
+/**
+ * Performance setting "Keep camera on" (on unless switched off). While on, a
+ * camera that leaves the screen stays open instead of stopping after the grace
+ * period, so coming back to it never shows a black frame.
+ */
+const keepCameraOn = () => {
+  try {
+    return useAppStore().currentState.settings.keepCameraOn !== false
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Each window keeps its own cameras, so each one watches the setting and stops
+ * its idle cameras when it is switched off (the /live window included, which
+ * never sees the Settings modal). Detached scope: acquire can run inside a
+ * component, and the watch must outlive it.
+ */
+let keepCameraOnWatched = false
+const watchKeepCameraOn = () => {
+  if (keepCameraOnWatched) return
+  try {
+    const appStore = useAppStore()
+    keepCameraOnWatched = true
+    effectScope(true).run(() => {
+      watch(
+        () => appStore.currentState.settings.keepCameraOn !== false,
+        (on) => {
+          if (!on) releaseIdleCameras()
+        }
+      )
+    })
+  } catch {
+    // No Pinia yet; the next acquire tries again.
+  }
+}
 
 // How long the stream opened to read camera names stays available for the
 // preview that usually follows it.
@@ -391,6 +431,7 @@ const acquire = async (
   data: CameraSettingsInput,
   { assignedOnly = false }: { assignedOnly?: boolean } = {}
 ): Promise<CameraHandle> => {
+  watchKeepCameraOn()
   if (!mediaDevices()?.getUserMedia) throw new CameraStreamError("unsupported")
 
   const resolved = await resolveDevice(data)
@@ -463,6 +504,7 @@ const acquire = async (
     current.refs = Math.max(0, current.refs - 1)
     if (current.refs > 0) return
     if (immediate) evict(current)
+    else if (keepCameraOn()) return
     else if (!current.stopTimer) scheduleStop(current, CAMERA_RELEASE_GRACE_MS)
   }
 
@@ -582,6 +624,11 @@ const releaseAllCameras = () => {
   ;[...cache.values()].forEach(evict)
 }
 
+/** Stops cameras nobody is showing, e.g. when "Keep camera on" is switched off. */
+const releaseIdleCameras = () => {
+  ;[...cache.values()].filter((entry) => entry.refs === 0).forEach(evict)
+}
+
 /** Runs the callback when a camera is plugged in or removed. */
 const onCameraDevicesChange = (callback: () => void) => {
   const devices = mediaDevices()
@@ -605,6 +652,7 @@ const useCameraStream = () => ({
   acquire,
   prewarm,
   releaseAllCameras,
+  releaseIdleCameras,
   onCameraDevicesChange,
 })
 
