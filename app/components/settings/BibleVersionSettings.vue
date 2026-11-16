@@ -6,17 +6,31 @@
     >
       <SettingsRow label="Default Bible version">
         <SettingsSelect
-          searchable
+          :key="downloadedVersionIds.join()"
+          :searchable="(q: string) => searchBibleVersionIds(downloadedVersionIds, q)"
           searchable-placeholder="Search version"
-          :options="
-            bibleVersionOptions
-              ?.filter((version) => version.isDownloaded)
-              .map((version) => version.id)
-          "
+          :options="downloadedVersionIds"
           :model-value="appStore.currentState.settings.defaultBibleVersion"
           @focus="populateBibleVersionOptions()"
           @change="appStore.setDefaultBibleVersion($event)"
-        />
+        >
+          <template #label>
+            <span class="flex items-center gap-2.5 min-w-0">
+              <BibleVersionFlag
+                :version-id="appStore.currentState.settings.defaultBibleVersion"
+              />
+              <span class="truncate">{{
+                appStore.currentState.settings.defaultBibleVersion
+              }}</span>
+            </span>
+          </template>
+          <template #option="{ option }">
+            <span class="flex items-center gap-2.5 min-w-0">
+              <BibleVersionFlag :version-id="option" />
+              <span class="truncate">{{ option }}</span>
+            </span>
+          </template>
+        </SettingsSelect>
       </SettingsRow>
     </SettingsGroup>
 
@@ -59,12 +73,15 @@
           :max="100"
           size="xs"
         />
-        <div class="col min-w-0">
-          <div class="text-sm font-semibold text-gray-800 dark:text-white">
-            {{ bibleVersion?.id }}
-          </div>
-          <div class="text-xs text-gray-500 dark:text-[#9aa3b2] truncate">
-            {{ bibleVersion?.name }}
+        <div class="flex items-center gap-3 min-w-0">
+          <BibleVersionFlag :version-id="bibleVersion?.id" />
+          <div class="col min-w-0">
+            <div class="text-sm font-semibold text-gray-800 dark:text-white">
+              {{ bibleVersion?.id }}
+            </div>
+            <div class="text-xs text-gray-500 dark:text-[#9aa3b2] truncate">
+              {{ bibleVersion?.name }}
+            </div>
           </div>
         </div>
         <CowButton
@@ -108,20 +125,24 @@ const {
   bibleVersionLoading,
   downloadBibleVersion,
   populateBibleVersionOptions,
+  bibleVersionMatches,
+  searchBibleVersionIds,
 } = useBibleVersionManager()
 
 populateBibleVersionOptions()
 
-// Matches the abbreviation or the full name, so "yoruba", "ybcv" and
-// "reina" all find their version
+// Matches the abbreviation, full name, country or language, so "yoruba", "ghana",
+// "ybcv" and "reina" all find their version
 const versionSearch = ref("")
-const filteredBibleVersions = computed(() => {
-  const query = versionSearch.value.trim().toLowerCase()
-  if (!query) return bibleVersionOptions.value ?? []
-  return (bibleVersionOptions.value ?? []).filter(
-    (version) =>
-      version?.id?.toLowerCase().includes(query) ||
-      version?.name?.toLowerCase().includes(query)
+const filteredBibleVersions = computed(() =>
+  (bibleVersionOptions.value ?? []).filter((version) =>
+    bibleVersionMatches(version, versionSearch.value)
   )
-})
+)
+
+const downloadedVersionIds = computed(() =>
+  (bibleVersionOptions.value ?? [])
+    .filter((version) => version.isDownloaded)
+    .map((version) => version.id)
+)
 </script>

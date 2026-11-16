@@ -445,6 +445,11 @@ export interface BibleVersion {
   name: string
   isDownloaded: boolean
   copyrightContent: string
+  // ISO 3166-1 alpha-2 code (e.g. "gh") and its name, for the flag shown before the version
+  country?: string
+  countryName?: string
+  // Language of the translation, searchable alongside name and country
+  language?: string
 }
 
 export interface Hymn {
