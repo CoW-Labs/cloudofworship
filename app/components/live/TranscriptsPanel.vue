@@ -320,7 +320,18 @@
             v-if="currentTranscript"
             class="segment text-sm leading-relaxed text-gray-600 dark:text-[#9aa3b2] italic"
           >
-            {{ currentTranscript }}<span class="animate-pulse">▌</span>
+            {{ currentTranscript }}
+          </div>
+          <!-- Three pulsing dots while the session is listening -->
+          <div
+            v-if="isTranscribing && !isPaused"
+            class="flex items-center gap-1 py-1"
+            role="status"
+            aria-label="Listening"
+          >
+            <span class="listening-dot" />
+            <span class="listening-dot listening-dot--mid" />
+            <span class="listening-dot" />
           </div>
         </div>
 
@@ -333,9 +344,11 @@
             icon="i-ph-arrow-down"
             color="gray"
             variant="solid"
-            size="xs"
-            label="Jump to latest"
-            class="-translate-y-full rounded-full shadow-md ring-1 ring-gray-200 dark:ring-[#2c3446]"
+            size="sm"
+            square
+            aria-label="Jump to latest"
+            title="Jump to latest"
+            class="-translate-y-full rounded-full bg-white/80 shadow-md ring-1 ring-gray-200 backdrop-blur dark:bg-[#222938]/80 dark:ring-[#2c3446]"
             @click="jumpToLatest"
           />
         </div>
@@ -766,6 +779,41 @@ const handleScriptureClick = (result: ScriptureResult) => {
 </script>
 
 <style scoped>
+.listening-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  color: rgb(var(--color-primary-500, 147 51 234));
+  opacity: 0.35;
+  animation: listening-pulse 1.2s ease-in-out infinite;
+}
+.listening-dot--mid {
+  width: 8px;
+  height: 8px;
+  animation-delay: 0.2s;
+}
+.listening-dot:last-child {
+  animation-delay: 0.4s;
+}
+@keyframes listening-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listening-dot {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
 /* Session controls open/close on a single width transition. Animating
    grid-template-columns from 0fr → 1fr lets the pill grow to whatever the
    buttons and timer actually measure, with no hardcoded width. */
