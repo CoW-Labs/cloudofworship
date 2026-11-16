@@ -1,6 +1,9 @@
 // Country flag images keyed by lowercase ISO 3166-1 alpha-2 code (e.g. "gh").
 // Bundled with the app so they work offline and on Windows, which has no emoji flags.
-const flagFiles = import.meta.glob("~/assets/flags/*.svg", {
+// Only the countries in `bibleVersionCountries` are loaded: Vite inlines small
+// SVGs into the startup bundle, and all 257 flags added about 215 KB to it.
+// Add a code here when a version from a new country is added.
+const flagFiles = import.meta.glob("~/assets/flags/{br,cn,de,es,et,fr,gb,gh,id,jp,ke,kr,ng,ru,sa,tw,us}.svg", {
   eager: true,
   query: "?url",
   import: "default",
