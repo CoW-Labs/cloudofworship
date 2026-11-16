@@ -138,6 +138,9 @@ const livePairSlides = computed<Slide[] | null>(() =>
 )
 /** The live slide, or the pair's active member: what the banner and store follow. */
 const primarySlide = computed(() => primaryLiveSlide(livePayload.value))
+/** The pair a live payload shows, from its stamp. Null for a single slide. */
+const livePairIdOf = (payload: LivePayload | undefined) =>
+  isPairPayload(payload) ? payload[0]?.livePair?.pairId ?? null : null
 const lastBroadcastTs = ref(0)
 const lastOverlayBroadcastTs = ref(0)
 
@@ -307,12 +310,11 @@ onMounted(() => {
       livePayload.value = projected.slides?.length
         ? projected.slides
         : projected.slide
-      // The operator owns which pair is live; this window only mirrors the id.
-      if (projected.slideId) {
-        appStore.mirrorLiveSlideId(projected.slideId)
-      } else if (appStore.currentState.liveSlideId) {
-        appStore.setLiveSlide("")
-      }
+      // The operator owns what is live; this window only copies it.
+      appStore.mirrorLiveProjection(
+        projected.slideId || "",
+        projected.slideId ? livePairIdOf(projected.slides) : null
+      )
       return
     }
     // Never resurrect a schedule slide when the projected record is missing,
@@ -392,7 +394,7 @@ onMounted(() => {
         livePayload.value = null
         // Keep the shared store in agreement so a reloading operator window
         // doesn't adopt a stale liveSlideId from this tab via pinia-shared-state.
-        if (appStore.currentState.liveSlideId) appStore.setLiveSlide("")
+        appStore.mirrorLiveProjection("", null)
         return
       }
 
@@ -406,9 +408,12 @@ onMounted(() => {
       // live output preview from currentState.liveSlideId — and on reload it
       // re-adopts state from this /live tab. Without this, that value goes
       // stale here and the operator shows "No Live Slide" after a reload.
-      // Only the id: the operator decides which pair is live, and the shared
-      // state saying so may land after this broadcast.
-      if (primary?.id) appStore.mirrorLiveSlideId(primary.id)
+      // The pair comes from the payload, never from this window's copy of the
+      // shared state, which may not have heard of the pair yet. The copy is
+      // not sent back (see mirrorLiveProjection).
+      if (primary?.id) {
+        appStore.mirrorLiveProjection(primary.id, livePairIdOf(parsed))
+      }
 
       // Track slide presentation
       usePosthogCapture("SLIDE_PRESENTED_LIVE", {

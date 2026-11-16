@@ -19,6 +19,7 @@ import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
 import { defaultStageTimerState } from "~/utils/stageTimer"
 import { clearUndoHistory } from "~/utils/undoHistory"
+import { writeWithoutSharing } from "~/utils/sharedStateSync"
 import posthog from "posthog-js"
 import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
 import {
@@ -493,15 +494,21 @@ export const useAppStore = defineStore("app", {
       }
     },
     /**
-     * Mirrors the live slide id from another window without deciding what is
-     * on screen. The /live window uses it: the operator owns `livePairId`,
-     * and a broadcast arriving before the shared state would otherwise end a
-     * pair it has not heard of yet.
+     * Copies what the /live window was sent (the live slide, and the pair it
+     * belongs to, or null) into this window's state, without deciding what is
+     * on screen. The copy is never sent to the other windows: the operator
+     * owns these ids, and the copy could arrive as the newest state and undo
+     * the operator's own update, which reset a pair going live to no pair.
      */
-    mirrorLiveSlideId(slideId: string) {
-      if (this.currentState.liveSlideId !== slideId) {
-        this.currentState.liveSlideId = slideId
-      }
+    mirrorLiveProjection(slideId: string, pairId: string | null) {
+      writeWithoutSharing(this.$id, () => {
+        if (this.currentState.liveSlideId !== slideId) {
+          this.currentState.liveSlideId = slideId
+        }
+        if ((this.currentState.livePairId ?? null) !== pairId) {
+          this.currentState.livePairId = pairId
+        }
+      })
     },
     setLivePair(pairId: string | null) {
       if ((this.currentState.livePairId ?? null) === pairId) return
