@@ -11,6 +11,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAppStore } from "~/store/app"
 import { bibleVersionObjects } from "~/utils/constants"
 import { bibleVersionCountries, countryFlags } from "~/utils/flags"
 
@@ -18,13 +19,17 @@ import { bibleVersionCountries, countryFlags } from "~/utils/flags"
 // API; the built-in catalogue covers versions saved before the API sent it.
 const props = defineProps<{ versionId: string }>()
 
-const { bibleVersionOptions } = useBibleVersionManager()
+// Read the store directly: a dropdown shows a flag per version, and a version
+// manager per flag would set up its own state each time.
+const appStore = useAppStore()
 
-const version = computed(
-  () =>
-    bibleVersionOptions.value.find((v) => v.id === props.versionId) ||
+const version = computed(() => {
+  const stored = appStore.currentState.settings.bibleVersions
+  return (
+    (Array.isArray(stored) ? stored : []).find((v) => v?.id === props.versionId) ||
     bibleVersionObjects.find((v) => v.id === props.versionId)
-)
+  )
+})
 const fallback = computed(() => bibleVersionCountries[props.versionId])
 const country = computed(() =>
   (version.value?.country || fallback.value?.country || "").toLowerCase()
