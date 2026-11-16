@@ -103,6 +103,11 @@
                 <!-- STORAGE SETTINGS -->
                 <StorageSettings v-else-if="activeTab === 'Storage Settings'" />
 
+                <!-- PERFORMANCE SETTINGS -->
+                <PerformanceSettings
+                  v-else-if="activeTab === 'Performance Settings'"
+                />
+
                 <!-- OTHER SETTINGS -->
                 <OtherSettings v-else-if="activeTab === 'Other Settings'" />
               </Transition>
@@ -137,6 +142,7 @@ const tabs = [
   { name: "Blank Settings", active: false },
   { name: "Bible Slide Settings", active: false },
   { name: "Storage Settings", active: false },
+  { name: "Performance Settings", active: false },
   { name: "Other Settings", active: false },
 ]
 const activeTab = ref(props.page || "Slide Settings")

@@ -117,6 +117,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | Event Name | Properties | Description | Status |
 |------------|-----------|-------------|---------|
 | `OPEN_SETTINGS_MODAL` | - | Settings panel opened | ✅ Exists |
+| `KEEP_CAMERA_ON_CHANGED` | `on` | "Keep camera on" performance setting toggled | ✅ Exists |
 | `BIBLE_VERSIONS_SETTINGS_CHANGED` | - | Bible version preferences updated | ✅ Exists |
 | `LIVE_WINDOW_FULLSCREEN_SETTINGS_CHANGED` | - | Fullscreen setting toggled | ✅ Exists |
 | `LINES_PER_SLIDE_SETTINGS_CHANGED` | - | Lines per slide updated | ✅ Exists |

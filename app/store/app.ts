@@ -180,6 +180,7 @@ export const useAppStore = defineStore("app", {
           },
           animations: true,
           microAnimations: true,
+          keepCameraOn: true,
           verseTransitionStyle: "off",
           verseTransitionInterval: 0.3,
           footnotes: false,
