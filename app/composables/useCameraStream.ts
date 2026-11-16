@@ -1,6 +1,7 @@
 import type { CameraSlideData } from "~/types"
 import type { LocalCameraMatch } from "~/utils/cameraShare"
 import { postCrossWindowNotification } from "~/composables/useBroadcastPost"
+import { effectScope, watch } from "vue"
 import { useAppStore } from "~/store/app"
 
 /**
@@ -86,6 +87,31 @@ const keepCameraOn = () => {
     return useAppStore().currentState.settings.keepCameraOn !== false
   } catch {
     return true
+  }
+}
+
+/**
+ * Each window keeps its own cameras, so each one watches the setting and stops
+ * its idle cameras when it is switched off (the /live window included, which
+ * never sees the Settings modal). Detached scope: acquire can run inside a
+ * component, and the watch must outlive it.
+ */
+let keepCameraOnWatched = false
+const watchKeepCameraOn = () => {
+  if (keepCameraOnWatched) return
+  try {
+    const appStore = useAppStore()
+    keepCameraOnWatched = true
+    effectScope(true).run(() => {
+      watch(
+        () => appStore.currentState.settings.keepCameraOn !== false,
+        (on) => {
+          if (!on) releaseIdleCameras()
+        }
+      )
+    })
+  } catch {
+    // No Pinia yet; the next acquire tries again.
   }
 }
 
@@ -405,6 +431,7 @@ const acquire = async (
   data: CameraSettingsInput,
   { assignedOnly = false }: { assignedOnly?: boolean } = {}
 ): Promise<CameraHandle> => {
+  watchKeepCameraOn()
   if (!mediaDevices()?.getUserMedia) throw new CameraStreamError("unsupported")
 
   const resolved = await resolveDevice(data)
