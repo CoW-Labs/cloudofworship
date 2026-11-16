@@ -604,8 +604,9 @@ const LOCAL_AUTO_LIVE_COOLDOWN_MS = 1500
 
 const maybeAutoOpenLocalReference = (reference: BibleReference) => {
   if (!(appStore.currentState.settings.transcriptionAutoActions ?? true)) return
-  // A chapter-only mention is a click target, never an automatic go-live
-  if (reference.chapterOnly) return
+  // A chapter-only mention, or a verse placed from context, is a click target,
+  // never an automatic go-live
+  if (reference.chapterOnly || reference.inferred) return
   if (reference.shortLabel === lastLocalAutoLiveReference) return
 
   const now = Date.now()
@@ -767,6 +768,7 @@ const handleReferenceClick = (reference: BibleReference) => {
   usePosthogCapture("TRANSCRIPTION_BIBLE_REFERENCE_CLICKED", {
     reference: reference.shortLabel,
     chapterOnly: !!reference.chapterOnly,
+    inferred: !!reference.inferred,
   })
   useGlobalEmit(appWideActions.updateOrCreateBible, reference.shortLabel)
 }

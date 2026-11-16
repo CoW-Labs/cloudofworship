@@ -124,6 +124,8 @@ export default function useSermonTranscription() {
 
   // Web Speech API recognition instance
   let recognition: SpeechRecognition | null = null
+  // Remembers the passage being read, so a bare "verse 26" can be placed
+  let referenceTracker = createReferenceTracker()
   let finalTranscriptBuffer = ''
 
   // Paused sessions keep `isTranscribing` true so the transcript (and its
@@ -389,6 +391,7 @@ export default function useSermonTranscription() {
       }
 
       // Start recognition
+      referenceTracker = createReferenceTracker()
       recognition.start()
 
       toast.add({
@@ -430,7 +433,7 @@ export default function useSermonTranscription() {
       if (plan) executeVoiceCommand(plan)
     }
 
-    const references = useBibleReferenceParser(cleanedText)
+    const references = referenceTracker.parse(cleanedText, { isFinal: true })
 
     const segment: TranscriptSegment = {
       id: useObjectID(),
@@ -564,6 +567,7 @@ export default function useSermonTranscription() {
     })
     state.value.segments = []
     state.value.currentTranscript = ''
+    referenceTracker = createReferenceTracker()
     toast.add({ title: 'Transcript cleared', icon: 'i-bx-trash' })
   }
 

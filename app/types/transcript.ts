@@ -7,6 +7,9 @@ export interface BibleReference {
   // Only a chapter was said ("Joshua chapter 14"). It points at verse 1 and is
   // listed for a click, but never goes live on its own.
   chapterOnly?: boolean
+  // Placed from context rather than said outright (a bare "verse 26" read against
+  // the passage just before it). Listed for a click, never put live on its own.
+  inferred?: boolean
 }
 
 export interface TranscriptSegment {
