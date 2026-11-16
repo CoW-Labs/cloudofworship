@@ -338,19 +338,21 @@
         <!-- Shown only after scrolling up; follows the viewport's bottom edge -->
         <div
           v-if="!followLatest && (segments.length > 0 || currentTranscript)"
-          class="sticky bottom-1 flex h-0 justify-center"
+          class="sticky bottom-5 flex h-0 justify-center"
         >
-          <UButton
-            icon="i-ph-arrow-down"
-            color="gray"
-            variant="solid"
-            size="sm"
-            square
-            aria-label="Jump to latest"
-            title="Jump to latest"
-            class="-translate-y-full rounded-full bg-white/80 shadow-md ring-1 ring-gray-200 backdrop-blur dark:bg-[#222938]/80 dark:ring-[#2c3446]"
-            @click="jumpToLatest"
-          />
+          <!-- The lift sits on this wrapper: CowButton moves itself on press -->
+          <div class="-translate-y-full">
+            <CowButton
+              variant="secondary"
+              size="sm"
+              aria-label="Jump to latest"
+              title="Jump to latest"
+              class="!h-10 !w-10 !p-0"
+              @click="jumpToLatest"
+            >
+              <UIcon name="i-ph-arrow-down" class="h-5 w-5" />
+            </CowButton>
+          </div>
         </div>
       </div>
 
