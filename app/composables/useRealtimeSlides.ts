@@ -108,20 +108,31 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
    * slide are ignored as ever; a pending one takes the new copy, which carries
    * the server `_id` and the media URLs.
    */
-  const mergeIntoPendingSlide = (incoming: Slide) => {
-    const existing = appStore.activeSlides.find((s) => s.id === incoming.id)
-    if (!existing?.pendingUpload) return false
-    const merged = dropClearedPending({
-      ...existing,
-      ...incoming,
-      pendingUpload: incoming.pendingUpload ?? null,
+  const mergeIntoPendingSlides = (incoming: Slide[]) => {
+    const byId = appStore.activeSlidesById
+    const merges = new Map<string, Slide>()
+    incoming.forEach((slide) => {
+      const existing = byId.get(slide.id)
+      if (!existing?.pendingUpload) return
+      merges.set(
+        slide.id,
+        dropClearedPending({
+          ...existing,
+          ...slide,
+          pendingUpload: slide.pendingUpload ?? null,
+        })
+      )
     })
-    // Replace the slide outright: a merge would let the cleared key survive.
+    if (!merges.size) return 0
+    // Replace the slides outright (a merge would let the cleared key survive),
+    // in one pass: each replacement re-renders the whole grid.
     appStore.setActiveSlides(
-      appStore.activeSlides.map((s) => (s.id === merged.id ? merged : s))
+      appStore.activeSlides.map((s) => merges.get(s.id) ?? s)
     )
-    enqueueCoalescedSlideShadowPut(merged, { syncState: "synced" })
-    return true
+    merges.forEach((merged) =>
+      enqueueCoalescedSlideShadowPut(merged, { syncState: "synced" })
+    )
+    return merges.size
   }
 
   /** A placeholder just arrived: start its clock and count it. */
@@ -239,7 +250,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             notePendingArrival(newSlide)
             options.onSlideCreated?.(newSlide, data.createdByName, data.createdBy)
           } else {
-            mergeIntoPendingSlide(newSlide)
+            mergeIntoPendingSlides([newSlide])
           }
         }
         break
@@ -376,11 +387,12 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           // Same guard as the single-slide case, scoped to just the slides
           // this delivery actually added — a repeat delivery whose slides are
           // all already on the schedule gets no toast at all.
+          const knownIds = appStore.activeSlidesById
           const alreadyKnown = newSlides.filter((slide: Slide) =>
-            appStore.activeSlides.some((s) => s.id === slide.id)
+            knownIds.has(slide.id)
           )
           const actuallyAdded = appStore.appendActiveSlides(newSlides)
-          alreadyKnown.forEach((slide: Slide) => mergeIntoPendingSlide(slide))
+          mergeIntoPendingSlides(alreadyKnown)
           if (actuallyAdded.length) {
             actuallyAdded.forEach(notePendingArrival)
             options.onBatchSlidesCreated?.(

@@ -12,14 +12,12 @@ import { reactive } from "vue"
  * grid's `v-memo`. In memory only: a reload starts clean and the slide's own
  * `pendingUpload` state says what to show.
  */
-type UploadProgressEntry = {
-  /** 0..1 */
-  fraction: number
-  /** Last time this value moved, for spotting a creator that went quiet. */
-  updatedAt: number
-}
-
-const uploads = reactive<Record<string, UploadProgressEntry>>({})
+// Fraction (0..1) per slide. Written only when the whole percent changes: an
+// upload reports bytes many times a second, and each write re-renders the card.
+const uploads = reactive<Record<string, number>>({})
+// Last time each slide's upload moved. Not reactive: cards check it on their
+// own clock, so a fresh timestamp alone must not re-render anything.
+const lastMoved = new Map<string, number>()
 
 /** A pending slide silent for this long reads as "waiting for the owner". */
 export const UPLOAD_STALE_AFTER_MS = 45_000
@@ -35,22 +33,27 @@ export default function useSlideUploadProgress() {
     if (!slideId || !Number.isFinite(fraction)) return
     const next = Math.min(1, Math.max(0, fraction))
     const current = uploads[slideId]
-    // Never move backwards: a retried part restarts its own counter, but the
-    // slide as a whole has not lost the bytes already in the cloud.
-    if (current && next < current.fraction) {
-      uploads[slideId] = { fraction: current.fraction, updatedAt: Date.now() }
-      return
+    lastMoved.set(slideId, Date.now())
+    if (current !== undefined) {
+      // Never move backwards: a retried part restarts its own counter, but the
+      // slide as a whole has not lost the bytes already in the cloud.
+      if (next <= current) return
+      // The same whole percent draws the same bar.
+      if (next < 1 && Math.round(next * 100) === Math.round(current * 100)) {
+        return
+      }
     }
-    uploads[slideId] = { fraction: next, updatedAt: Date.now() }
+    uploads[slideId] = next
   }
 
   const clearUploadProgress = (slideId: string) => {
+    lastMoved.delete(slideId)
     delete uploads[slideId]
   }
 
   /** 0..1, or `null` when nothing has been reported for this slide yet. */
   const uploadFractionFor = (slideId?: string | null): number | null =>
-    slideId && uploads[slideId] ? uploads[slideId]!.fraction : null
+    slideId && uploads[slideId] !== undefined ? uploads[slideId]! : null
 
   /** Whole percent for display, or `null` when unknown. */
   const uploadPercentFor = (slideId?: string | null): number | null => {
@@ -58,8 +61,9 @@ export default function useSlideUploadProgress() {
     return fraction === null ? null : Math.round(fraction * 100)
   }
 
+  /** Not reactive: read it on a clock (see SlideCard, PreviewContent). */
   const lastUploadUpdateFor = (slideId?: string | null): number | null =>
-    slideId && uploads[slideId] ? uploads[slideId]!.updatedAt : null
+    (slideId && lastMoved.get(slideId)) || null
 
   return {
     uploads,

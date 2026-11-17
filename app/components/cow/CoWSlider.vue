@@ -114,6 +114,9 @@ onBeforeUnmount(() => {
   width: 100%;
   height: var(--cow-slider-size);
   border-radius: 999px;
+  /* The fill and handle ease width and left while dragging; keep that layout
+     and paint inside the slider. */
+  contain: layout paint;
   background: var(--cow-slider-track);
   box-shadow:
     inset 0 2px 4px var(--cow-slider-track-shadow),

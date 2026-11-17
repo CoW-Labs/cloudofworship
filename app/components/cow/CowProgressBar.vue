@@ -46,6 +46,9 @@ const clamped = computed(() => {
   width: 100%;
   height: var(--cow-progress-size);
   overflow: hidden;
+  /* The fill eases its width, so keep each frame's layout and paint inside the
+     bar instead of the slide card around it. */
+  contain: layout paint;
   border-radius: 999px;
   background: var(--cow-progress-track);
   box-shadow:

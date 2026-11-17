@@ -30,6 +30,9 @@ import useSlideUploadProgress from "~/composables/useSlideUploadProgress"
  */
 const PROGRESS_EMIT_INTERVAL_MS = 2000
 
+/** Well inside UPLOAD_STALE_AFTER_MS, so a slow upload never reads as quiet. */
+const PROGRESS_HEARTBEAT_MS = 15_000
+
 const lastProgressEmit = new Map<string, number>()
 const lastProgressPercent = new Map<string, number>()
 
@@ -90,8 +93,16 @@ export const reportUploadProgress = (
   const percent = Math.round(fraction * 100)
   if (!force && fraction < 1) {
     if (now - last < PROGRESS_EMIT_INTERVAL_MS) return
-    // The same whole percent is nothing new to show.
-    if (lastProgressPercent.get(slideId) === percent) return
+    // The same whole percent is nothing new to show, but a big file on a slow
+    // line can sit on one percent for minutes. Teammates read silence as a
+    // closed laptop (see UPLOAD_STALE_AFTER_MS), so still say "alive" now and
+    // then.
+    if (
+      lastProgressPercent.get(slideId) === percent &&
+      now - last < PROGRESS_HEARTBEAT_MS
+    ) {
+      return
+    }
   }
 
   const socket = liveSocket()
@@ -150,12 +161,16 @@ export const settlePendingSlides = async (outcomes: UploadOutcome[]) => {
   const { clearUploadProgress } = useSlideUploadProgress()
   const owner = currentUploadOwner()
 
+  // Settle every slide here first, in one go. Interleaved with the awaits below,
+  // a batch of 30 images would re-render the grid and rewrite the store once
+  // per slide on separate ticks.
+  const settledHere: { outcome: UploadOutcome; pendingUpload: PendingUpload | null; local: Slide }[] = []
   for (const outcome of outcomes) {
     clearUploadProgress(outcome.slideId)
     lastProgressEmit.delete(outcome.slideId)
     lastProgressPercent.delete(outcome.slideId)
 
-    const local = appStore.activeSlides.find((s) => s.id === outcome.slideId)
+    const local = appStore.activeSlidesById.get(outcome.slideId)
     if (!local) continue
 
     const pendingUpload: PendingUpload | null = outcome.deviceOnly
@@ -163,17 +178,20 @@ export const settlePendingSlides = async (outcomes: UploadOutcome[]) => {
       : null
     const serverId = outcome.serverSlide?._id
 
-    applyPendingState(
+    const settled = applyPendingState(
       outcome.slideId,
       pendingUpload,
       serverId ? { _id: serverId } : {}
     )
+    settledHere.push({ outcome, pendingUpload, local: settled ?? local })
+  }
 
+  // Then tell teammates.
+  for (const { outcome, pendingUpload, local } of settledHere) {
     try {
-      const settled = appStore.activeSlides.find((s) => s.id === outcome.slideId)
       const source = outcome.serverSlide
-        ? { ...(settled ?? local), ...outcome.serverSlide, pendingUpload }
-        : { ...(settled ?? local), pendingUpload }
+        ? { ...local, ...outcome.serverSlide, pendingUpload }
+        : { ...local, pendingUpload }
       const safe = await toSocketSafeSlide(source as Slide)
       const socket = liveSocket()
       if (!socket) continue
