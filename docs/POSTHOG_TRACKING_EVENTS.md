@@ -99,6 +99,11 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `INVITED_USERS_EMAIL_SENT` | - | Invitation email sent | ✅ Exists |
 | `SLIDE_LOCKED_BY_USER` | `slideId`, `userId` | Real-time collaborative lock acquired | ⚠️ Missing |
 | `SLIDE_EDITING_CONFLICT` | `slideId` | User tried to edit locked slide | ⚠️ Missing |
+| `SLIDE_UPLOAD_STARTED` | `slideType`, `count` | A media or presentation slide was shared with the team before its files finished uploading. `count` is files (media) or pages (deck) | ✅ Added |
+| `SLIDE_UPLOAD_COMPLETED` | `slideType`, `count`, `durationMs` | Every file of the slide reached the cloud and teammates got the finished slide | ✅ Added |
+| `SLIDE_UPLOAD_FAILED` | `slideType`, `count`, `reason` | Some files could not upload, so the slide stays on this device. `reason`: `offline`, `quota`, `disabled`, `upload-error`, `save-failed` | ✅ Added |
+| `PENDING_SLIDE_RECEIVED` | `slideType` | A teammate's slide arrived while its files were still uploading | ✅ Added |
+| `SLIDE_UPLOAD_RETRIED` | `slideType`, `outcome` | Retry tapped on a slide that stayed behind. `outcome`: `completed`, `failed`, `quota`, `no-files` | ✅ Added |
 
 ---
 

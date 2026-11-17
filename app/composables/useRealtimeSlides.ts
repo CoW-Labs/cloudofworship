@@ -14,6 +14,9 @@ import {
   projectLiveSlide,
 } from "~/composables/useSlidePairs"
 import { livePairChanged } from "~/utils/slidePairs"
+import useSlideUploadProgress from "~/composables/useSlideUploadProgress"
+import { applyPendingState } from "~/composables/usePendingSlideState"
+import { hasCloudMedia, stayedBehindFromSync } from "~/utils/pendingUpload"
 
 interface RealtimeSlidesOptions {
   onSlideCreated?: (slide: Slide, createdByName: string, createdBy?: string) => void
@@ -71,6 +74,64 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   const slideMatchesId = (slide: Slide | undefined, ...ids: Array<string | null | undefined>) => {
     if (!slide) return false
     return ids.some((id) => Boolean(id) && (slide.id === id || slide._id === id))
+  }
+
+  const { setUploadProgress, clearUploadProgress } = useSlideUploadProgress()
+
+  /** Fields that ride along on a socket message but are not part of a slide. */
+  const stripSocketMeta = (slide: any) => {
+    delete slide.createdBy
+    delete slide.createdByName
+    delete slide.updatedBy
+    delete slide.updatedByName
+    delete slide.timestamp
+    delete slide.tabId
+    delete slide.uploadSettled
+    return slide as Slide
+  }
+
+  /**
+   * A slide that is no longer pending carries `pendingUpload: null`, which only
+   * exists to overwrite the old value in a merge. Leave no key behind.
+   */
+  const dropClearedPending = (slide: Slide) => {
+    if (slide.pendingUpload == null) {
+      delete slide.pendingUpload
+      clearUploadProgress(slide.id)
+    }
+    return slide
+  }
+
+  /**
+   * A slide this device already holds as a placeholder arrives again as a plain
+   * create (the owner's slide was saved after reconnecting). Repeats of a normal
+   * slide are ignored as ever; a pending one takes the new copy, which carries
+   * the server `_id` and the media URLs.
+   */
+  const mergeIntoPendingSlide = (incoming: Slide) => {
+    const existing = appStore.activeSlides.find((s) => s.id === incoming.id)
+    if (!existing?.pendingUpload) return false
+    const merged = dropClearedPending({
+      ...existing,
+      ...incoming,
+      pendingUpload: incoming.pendingUpload ?? null,
+    })
+    // Replace the slide outright: a merge would let the cleared key survive.
+    appStore.setActiveSlides(
+      appStore.activeSlides.map((s) => (s.id === merged.id ? merged : s))
+    )
+    enqueueCoalescedSlideShadowPut(merged, { syncState: "synced" })
+    return true
+  }
+
+  /** A placeholder just arrived: start its clock and count it. */
+  const notePendingArrival = (slide: Slide) => {
+    if (slide.pendingUpload?.state !== 'uploading') return
+    // Saved as synced, not as an unsaved local slide of this user: nothing here
+    // has to send it anywhere, and the next refresh clears it if it never lands.
+    enqueueCoalescedSlideShadowPut(slide, { syncState: 'synced' })
+    setUploadProgress(slide.id, 0)
+    usePosthogCapture('PENDING_SLIDE_RECEIVED', { slideType: slide.type })
   }
 
   const clearLiveSlideIfDeleted = (slide: Slide) => {
@@ -165,13 +226,20 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           delete (newSlide as any).createdByName
           delete (newSlide as any).timestamp
           delete (newSlide as any).tabId
+          // A slide that arrives with no media and no word on why is one whose
+          // files stayed on its owner's device, not an empty slide.
+          const stayedBehind = stayedBehindFromSync(newSlide)
+          if (stayedBehind) newSlide.pendingUpload = stayedBehind
 
           // A slide already on the schedule (this delivery is a repeat —
           // a reconnect replaying it, two of the sender's own sockets in
           // the room) is not new, so it gets no second "X added…" toast.
           const wasNew = appStore.appendActiveSlide(newSlide)
           if (wasNew) {
+            notePendingArrival(newSlide)
             options.onSlideCreated?.(newSlide, data.createdByName, data.createdBy)
+          } else {
+            mergeIntoPendingSlide(newSlide)
           }
         }
         break
@@ -195,10 +263,21 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             delete (updatedSlide as any).updatedByName
             delete (updatedSlide as any).timestamp
             delete (updatedSlide as any).tabId
+            delete (updatedSlide as any).uploadSettled
 
             // Merge with existing slide to preserve local-only properties
             const existingSlide = appStore.activeSlides[slideIndex]
-            const mergedSlide = { ...existingSlide, ...updatedSlide }
+            const mergedSlide = dropClearedPending({
+              ...existingSlide,
+              ...updatedSlide,
+              // A slide that stayed behind and now arrives with its media in
+              // the cloud is whole, even if the sender said nothing about it.
+              ...(existingSlide?.pendingUpload?.state === 'device-only' &&
+              updatedSlide.pendingUpload === undefined &&
+              hasCloudMedia(updatedSlide)
+                ? { pendingUpload: null }
+                : {}),
+            })
 
             // Reassign the array reference (not an in-place splice) so shallow
             // watchers re-fire. PreviewContent keeps a filtered copy of the
@@ -211,6 +290,11 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             enqueueCoalescedSlideShadowPut(mergedSlide, {
               syncState: "synced",
             })
+            // An upload that started over (the owner tapped Retry) gets a fresh
+            // clock here, so it is not mistaken for one that went quiet.
+            if (mergedSlide.pendingUpload?.state === 'uploading') {
+              setUploadProgress(mergedSlide.id, 0)
+            }
             options.onSlideUpdated?.(mergedSlide, data.updatedByName)
             const addedSongs = songsAddedToSetlist(existingSlide, mergedSlide)
             if (addedSongs.length) {
@@ -232,7 +316,25 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
               appStore.setActiveOverlaySlide(overlaySlide)
               useBroadcastOverlayPost(appWideActions.showSlideOverlay, overlaySlide)
             }
+          } else if (data.uploadSettled && data.type) {
+            // The owner finished uploading a slide this device never received
+            // as a placeholder (it joined late, or missed the message). The
+            // finished slide is complete, so add it. Only this flagged update
+            // may add a slide: any other update for an unknown id stays ignored.
+            const addedSlide = dropClearedPending(
+              stripSocketMeta({ ...data, id: data.id || slideId }) as Slide
+            )
+            delete (addedSlide as any).slideId
+            if (appStore.appendActiveSlide(addedSlide)) {
+              options.onSlideCreated?.(addedSlide, data.updatedByName, data.updatedBy)
+            }
           }
+        }
+        break
+
+      case 'slide-upload-progress':
+        if (data?.slideId && typeof data.progress === 'number') {
+          setUploadProgress(String(data.slideId), data.progress)
         }
         break
 
@@ -267,13 +369,20 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             delete slide.createdByName
             delete slide.timestamp
             delete slide.tabId
+            const stayedBehind = stayedBehindFromSync(slide)
+            if (stayedBehind) slide.pendingUpload = stayedBehind
             return slide
           })
           // Same guard as the single-slide case, scoped to just the slides
           // this delivery actually added — a repeat delivery whose slides are
           // all already on the schedule gets no toast at all.
+          const alreadyKnown = newSlides.filter((slide: Slide) =>
+            appStore.activeSlides.some((s) => s.id === slide.id)
+          )
           const actuallyAdded = appStore.appendActiveSlides(newSlides)
+          alreadyKnown.forEach((slide: Slide) => mergeIntoPendingSlide(slide))
           if (actuallyAdded.length) {
+            actuallyAdded.forEach(notePendingArrival)
             options.onBatchSlidesCreated?.(
               actuallyAdded,
               data.createdByName,
@@ -506,6 +615,26 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         options.onUserLeft?.(data.userId, data.userName)
         if (data.onlineUsers) {
           onlineUsers.value = data.onlineUsers
+        }
+        // Someone who left mid-upload will not finish it from here. Their
+        // media is only on their device now, so stop showing a progress bar.
+        if (
+          data.userId &&
+          !(data.onlineUsers || []).some((u: OnlineUser) => u.userId === data.userId)
+        ) {
+          appStore.activeSlides
+            .filter(
+              (slide) =>
+                slide.pendingUpload?.state === 'uploading' &&
+                slide.pendingUpload.ownerId === data.userId
+            )
+            .forEach((slide) => {
+              clearUploadProgress(slide.id)
+              applyPendingState(slide.id, {
+                ...slide.pendingUpload!,
+                state: 'device-only',
+              })
+            })
         }
         break
 

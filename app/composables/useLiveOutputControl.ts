@@ -3,6 +3,7 @@ import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import { resolveLiveOutputDestination } from "~/utils/liveOutputRouting"
 import { projectLiveSlide } from "~/composables/useSlidePairs"
+import { isLockedByUpload } from "~/utils/pendingUpload"
 
 /**
  * Driving one device's live output from another — specifically, a phone on
@@ -480,6 +481,8 @@ export const useLiveOutputControl = () => {
     const slide = findSlide(slideId)
     if (!slide) return
     if (slide.slideMode === "overlay") return
+    // A teammate's slide that is still uploading has no media to put on screen.
+    if (isLockedByUpload(slide, useAuthStore().user?._id)) return
     // A slide made on Teams stays in the schedule after the plan lapses, but
     // it no longer goes live.
     if (!requireSlideAccess(slide)) return

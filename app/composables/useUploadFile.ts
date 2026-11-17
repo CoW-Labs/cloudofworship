@@ -1,4 +1,5 @@
 import { useAuthStore } from "~/store/auth"
+import { useAuthToken } from "~/composables/useAuthToken"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared types
@@ -22,7 +23,7 @@ export type UploadFileResult = {
 export type UploadFileOptions = {
   /** Original filename. Falls back to `(file as File).name` then a generated name. */
   name?: string
-  /** Progress callback, `fraction` is 0..1 (part-granular for large uploads). */
+  /** Progress callback, `fraction` is 0..1 (byte-level, across all parts in flight). */
   onProgress?: (fraction: number) => void
   /** Abort the whole upload (cancels in-flight parts and aborts the S3 upload). */
   signal?: AbortSignal
@@ -115,40 +116,108 @@ const usesDirectPath = (file: Blob): boolean =>
 // Path A — direct upload (small non-media files)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * POST one file with XMLHttpRequest, the only browser API that reports how many
+ * bytes have left. Mirrors what `useAPIFetch` adds for a request (base URL,
+ * bearer token, dev token) and what it does on a 401, and rejects with the same
+ * `{ statusCode, data: { message } }` shape `$fetch` errors have, so the retry
+ * rules below do not care which one produced the error.
+ */
+const xhrPostForm = (
+  path: string,
+  formData: FormData,
+  options?: UploadFileOptions
+): Promise<UploadFileResult> =>
+  new Promise((resolve, reject) => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return reject(new Error("No internet connection"))
+    }
+    if (options?.signal?.aborted) return reject(abortError())
+
+    const config = useRuntimeConfig()
+    const authStore = useAuthStore()
+    const token = useAuthToken().getToken()
+
+    const xhr = new XMLHttpRequest()
+    xhr.open("POST", `${config.public.BASE_URL}${path}`)
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`)
+    if (config.public.NODE_ENV === "development") {
+      xhr.setRequestHeader("x-dev-token", String(config.public.DEV_TOKEN))
+    }
+    xhr.responseType = "json"
+
+    const onAbort = () => xhr.abort()
+    options?.signal?.addEventListener("abort", onAbort, { once: true })
+    const cleanup = () => options?.signal?.removeEventListener("abort", onAbort)
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || !event.total) return
+      // The last bit belongs to the server's reply, so it is not "done" yet.
+      options?.onProgress?.(Math.min(0.99, event.loaded / event.total))
+    }
+
+    xhr.onload = () => {
+      cleanup()
+      if (xhr.status >= 200 && xhr.status < 300 && xhr.response) {
+        return resolve(xhr.response as UploadFileResult)
+      }
+      if (xhr.status === 401) {
+        authStore.signOut()
+        useToast().add({
+          title: "Your session has expired",
+          color: "red",
+          icon: "i-bx-error",
+        })
+      }
+      const body = (xhr.response || {}) as { message?: string }
+      const error: ApiError = {
+        statusCode: xhr.status,
+        data: { message: body.message },
+        message: body.message || `Upload failed: ${xhr.status}`,
+      }
+      reject(error)
+    }
+    xhr.onerror = () => {
+      cleanup()
+      reject(new Error("Network error during upload"))
+    }
+    xhr.onabort = () => {
+      cleanup()
+      reject(abortError())
+    }
+
+    xhr.send(formData)
+  })
+
 const directUpload = async (
   churchId: string,
   file: Blob,
-  name: string
+  name: string,
+  options?: UploadFileOptions
 ): Promise<UploadFileResult> => {
   for (let attempt = 1; ; attempt++) {
     const formData = new FormData()
     formData.append("file", file, name)
 
-    const { data, error } = await useAPIFetch<UploadFileResult, ApiError>(
-      `/church/${churchId}/files`,
-      {
-        method: "POST",
-        body: formData,
-        // do NOT set Content-Type — the browser adds the multipart boundary
-        // The attempt is part of the key so a retry is a new request, not
-        // the cached failure of the last one.
-        key: `upload-file-${name}-${file.size}-${attempt}`,
-      }
-    )
-
-    if (!error.value && data.value) return data.value
+    let failure: ApiError | null = null
+    try {
+      return await xhrPostForm(`/church/${churchId}/files`, formData, options)
+    } catch (err) {
+      if (options?.signal?.aborted) throw err
+      failure = err as ApiError
+    }
 
     const canRetry =
       attempt < DIRECT_MAX_ATTEMPTS &&
       navigator.onLine &&
-      (!error.value || isRetryableUploadError(error.value))
+      isRetryableUploadError(failure)
     if (!canRetry) {
-      if (error.value) {
-        throw new Error(errorMessage(error.value, "File upload failed"))
-      }
-      throw new Error("File upload completed without a response")
+      throw new Error(errorMessage(failure, "File upload failed"))
     }
-    await wait(DIRECT_RETRY_DELAYS_MS[attempt - 1] ?? 3000)
+    await waitUnlessAborted(
+      DIRECT_RETRY_DELAYS_MS[attempt - 1] ?? 3000,
+      options?.signal
+    )
   }
 }
 
@@ -167,6 +236,45 @@ type InitiateResponse = {
 type CompletedPart = { PartNumber: number; ETag: string }
 
 /**
+ * PUT one part to its presigned URL with XMLHttpRequest, so progress inside the
+ * part is reported (fetch only says when a whole part is done, which for a
+ * 60 MB video is twice). Resolves with the status and ETag; a dropped request
+ * rejects.
+ */
+const xhrPutPart = (
+  url: string,
+  chunk: Blob,
+  signal?: AbortSignal,
+  onBytes?: (loaded: number) => void
+): Promise<{ status: number; etag: string | null }> =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError())
+    const xhr = new XMLHttpRequest()
+    // No auth header, no Content-Type override: the URL is already signed.
+    xhr.open("PUT", url)
+    const onAbort = () => xhr.abort()
+    signal?.addEventListener("abort", onAbort, { once: true })
+    const cleanup = () => signal?.removeEventListener("abort", onAbort)
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onBytes?.(event.loaded)
+    }
+    xhr.onload = () => {
+      cleanup()
+      resolve({ status: xhr.status, etag: xhr.getResponseHeader("ETag") })
+    }
+    xhr.onerror = () => {
+      cleanup()
+      reject(new Error("Network error during part upload"))
+    }
+    xhr.onabort = () => {
+      cleanup()
+      reject(abortError())
+    }
+    xhr.send(chunk)
+  })
+
+/**
  * PUT a single part straight to the presigned S3 URL and return its ETag. A
  * dropped request, a 5xx, 408 or 429 is retried; any other 4xx (an expired or
  * rejected presigned URL) and a missing ETag fail the same way every time.
@@ -174,25 +282,27 @@ type CompletedPart = { PartNumber: number; ETag: string }
 const putPart = async (
   url: string,
   chunk: Blob,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onBytes?: (loaded: number) => void
 ): Promise<string> => {
   let lastError: unknown
   for (let attempt = 0; attempt < PART_MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       await waitUnlessAborted(PART_RETRY_DELAYS_MS[attempt - 1] ?? 3000, signal)
     }
+    // A retried part starts over.
+    onBytes?.(0)
 
-    let res: Response
+    let res: { status: number; etag: string | null }
     try {
-      // No auth header, no Content-Type override — the URL is already signed.
-      res = await fetch(url, { method: "PUT", body: chunk, signal })
+      res = await xhrPutPart(url, chunk, signal, onBytes)
     } catch (err) {
       if (signal?.aborted) throw err
       lastError = err
       continue
     }
 
-    if (!res.ok) {
+    if (res.status < 200 || res.status >= 300) {
       lastError = new Error(`Part upload failed: ${res.status}`)
       if (res.status >= 500 || res.status === 408 || res.status === 429) {
         continue
@@ -200,21 +310,20 @@ const putPart = async (
       throw lastError
     }
 
-    const etag = res.headers.get("ETag")
-    if (!etag) {
+    if (!res.etag) {
       // Not a client bug: the bucket CORS config is missing ExposeHeaders:[ETag].
       throw new Error(
         "S3 did not expose the ETag header (bucket CORS ExposeHeaders must include ETag)"
       )
     }
-    return etag
+    return res.etag
   }
   throw lastError instanceof Error
     ? lastError
     : new Error("Part upload failed after retries")
 }
 
-/** Upload every part with bounded concurrency; report part-granular progress. */
+/** Upload every part with bounded concurrency; report byte-level progress. */
 const uploadParts = async (
   file: Blob,
   partUrls: string[],
@@ -225,6 +334,16 @@ const uploadParts = async (
   const parts = new Array<CompletedPart>(total)
   let completed = 0
   let cursor = 0
+
+  // Bytes sent so far for each part, so the parts in flight add up to one
+  // percentage for the whole file.
+  const sentByPart = new Array<number>(total).fill(0)
+  const reportProgress = () => {
+    if (!options?.onProgress || !file.size) return
+    const sent = sentByPart.reduce((sum, bytes) => sum + bytes, 0)
+    // Not 100% until the server has joined the parts (see multipartUpload).
+    options.onProgress(Math.min(0.99, sent / file.size))
+  }
 
   // One failed part fails the upload. Cancel the parts still in flight and
   // stop the rest, rather than spend the church's bandwidth mid-service on an
@@ -242,11 +361,15 @@ const uploadParts = async (
       if (signal.aborted) throw abortError()
       const start = index * partSize
       const chunk = file.slice(start, start + partSize)
-      const etag = await putPart(partUrls[index] as string, chunk, signal)
+      const etag = await putPart(partUrls[index] as string, chunk, signal, (loaded) => {
+        sentByPart[index] = loaded
+        reportProgress()
+      })
       // Parts are 1-indexed on the completion call.
       parts[index] = { PartNumber: index + 1, ETag: etag }
+      sentByPart[index] = chunk.size
       completed++
-      options?.onProgress?.(completed / total)
+      reportProgress()
     }
   }
 
@@ -310,6 +433,7 @@ const multipartUpload = async (
     if (!doneData.value) {
       throw new Error("Upload completed without a response")
     }
+    options?.onProgress?.(1)
     return doneData.value
   } catch (err) {
     // Best-effort cleanup so the reserved storage is released on failure/cancel.
@@ -350,7 +474,7 @@ const useUploadFile = async (
   const name = resolveName(file, options)
 
   if (usesDirectPath(file)) {
-    const result = await directUpload(churchId, file, name)
+    const result = await directUpload(churchId, file, name, options)
     options?.onProgress?.(1)
     return result
   }

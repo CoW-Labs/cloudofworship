@@ -73,6 +73,7 @@
                 slide.id,
                 slide.updatedAt,
                 slide.name,
+                slide.pendingUpload?.state,
                 isGridCardSelected(slide),
                 bulkSelectSlides,
                 bulkSelectedSlides.includes(slide?.id),
@@ -180,9 +181,19 @@ import { go } from "fuzzysort"
 import type { Emitter } from "mitt"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
 import {
+  abortSlideUpload,
   slidesCreatingInBackground,
   slidesDeletedWhileCreating,
 } from "~/composables/useSlideCreation"
+import { settleOrphanedUploads } from "~/composables/usePendingSlideUpload"
+import {
+  applyPendingState,
+  markStayedBehindFromLocalRecords,
+} from "~/composables/usePendingSlideState"
+import { isLockedByUpload, stayedBehindFromSync } from "~/utils/pendingUpload"
+import useSlideUploadProgress, {
+  UPLOAD_GIVEN_UP_AFTER_MS,
+} from "~/composables/useSlideUploadProgress"
 import { onSocketConnected } from "~/composables/useSocketIO"
 import { reportSongSearchPick } from "~/composables/useSongSearchLog"
 import { isSongPending, setSongPending } from "~/composables/useSongs"
@@ -739,6 +750,8 @@ const makeSlideActive = (
     position?: number
   }
 ) => {
+  // A teammate's slide that is still uploading has nothing to edit or show.
+  if (isLockedByUpload(slide, authStore.user?._id)) return
   activeSlide.value = slide
   if (options?.newlyCreated) {
     // "Preview / edit" on a card comes through here too, with a slide that is
@@ -1054,6 +1067,7 @@ const mediaTypeFor = (slide: Slide) =>
     : (slide.data as ExtendedFileT)?.type || slide.backgroundType || "unknown"
 
 const handleTakeLiveAction = async (slide: Slide) => {
+  if (isLockedByUpload(slide, authStore.user?._id)) return
   // When this device is driving another device's screen, that device projects
   // from its own copy of the media, so neither the download below nor the "not
   // saved locally" gate after it belongs here — a phone has no reason to pull a
@@ -2427,12 +2441,20 @@ const uploadOfflineSlides = async () => {
   // memory from the schedule being left (mid-switch) waits for its own. A
   // slide whose media flow is still running is that flow's to create.
   const activeScheduleId = appStore.currentState.activeSchedule?._id
+  // A slide of mine still marked "uploading" with no flow running is left over
+  // from a reload mid-upload: its media is only on this device now.
+  settleOrphanedUploads((id) => slidesCreatingInBackground.has(id))
   const offlineSlides = appStore.activeSlides.filter(
     (slide) =>
       slide._id === undefined &&
       slide.scheduleId &&
       slide.scheduleId === activeScheduleId &&
-      !slidesCreatingInBackground.has(slide.id)
+      !slidesCreatingInBackground.has(slide.id) &&
+      // A teammate's slide that is still uploading, or only on their device, is
+      // theirs to create. Sending it from here would save it without its media.
+      (!slide.pendingUpload ||
+        (slide.pendingUpload.state === "device-only" &&
+          slide.pendingUpload.ownerId === authStore.user?._id))
   )
   if (offlineSlides.length === 0) return
 
@@ -2538,7 +2560,36 @@ watch(online, (isOnline) => {
 const stopOfflineSlideUploadOnConnect = onSocketConnected(() =>
   uploadOfflineSlides()
 )
+
+// A teammate's upload that has gone quiet for good (their laptop closed, their
+// connection lost) must not lock the slide forever. After a while it reads as
+// "only on their device" and can be deleted like any other slide. A slide that
+// arrived with no progress yet starts its clock the first time it is seen here.
+const { uploadFractionFor } = useSlideUploadProgress()
+const giveUpOnQuietUploads = () => {
+  const { lastUploadUpdateFor, setUploadProgress, clearUploadProgress } =
+    useSlideUploadProgress()
+  const now = Date.now()
+  appStore.activeSlides.forEach((slide) => {
+    if (!isLockedByUpload(slide, authStore.user?._id)) return
+    const last = lastUploadUpdateFor(slide.id)
+    if (last === null) {
+      setUploadProgress(slide.id, 0)
+      return
+    }
+    if (now - last > UPLOAD_GIVEN_UP_AFTER_MS) {
+      clearUploadProgress(slide.id)
+      applyPendingState(slide.id, {
+        ...slide.pendingUpload!,
+        state: "device-only",
+      })
+    }
+  })
+}
+const quietUploadTimer = setInterval(giveUpOnQuietUploads, 15_000)
+
 onBeforeUnmount(() => {
+  clearInterval(quietUploadTimer)
   clearTimeout(offlineSlideUploadTimer)
   stopOfflineSlideUploadOnConnect()
 })
@@ -2645,12 +2696,24 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
           }
         }
       })
+      // The server does not keep `pendingUpload`, but each slide's sync records
+      // say whether its files reached the cloud. A slide whose files stayed on
+      // their owner's device gets its "Stayed behind" tag back after a reload.
+      tempSlides.forEach((slide) => {
+        const stayedBehind = stayedBehindFromSync(slide, authStore.user)
+        if (stayedBehind) slide.pendingUpload = stayedBehind
+      })
       // Sort slides by index
       tempSlides = [...tempSlides].sort((a, b) => a.index - b.index)
 
+      // What this device was showing before the server's list replaces it.
+      const slidesShownBeforeRefresh = appStore.slidesBySchedule[scheduleId] || []
       const scheduleSnapshot = mergeServerAndPendingScheduleSlides(
         tempSlides,
-        appStore.slidesBySchedule[scheduleId] || []
+        slidesShownBeforeRefresh,
+        (slide) =>
+          slide.pendingUpload?.ownerId === authStore.user?._id ||
+          uploadFractionFor(slide.id) !== null
       )
       appStore.setActiveSlides(
         replaceScheduleSlidesInCorpus(
@@ -2660,6 +2723,25 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
         )
       )
       void resolveScheduleMedia(scheduleId)
+      void markStayedBehindFromLocalRecords(authStore.user)
+      // A teammate's placeholder left over from before this reload was dropped
+      // from the snapshot above. Its saved copy is "pending", which the refresh
+      // below keeps on purpose, so it would flash back on every reload. Delete
+      // it for real.
+      const keptSlideIds = new Set(scheduleSnapshot.map((slide) => slide.id))
+      const abandonedPlaceholderIds = slidesShownBeforeRefresh
+        .filter(
+          (slide) =>
+            !slide._id && slide.pendingUpload && !keptSlideIds.has(slide.id)
+        )
+        .map((slide) => slide.id)
+      if (abandonedPlaceholderIds.length) {
+        void enqueueSlideShadowWrite(
+          "drop abandoned placeholders",
+          (repository) =>
+            repository.deleteSlides(scheduleId, abandonedPlaceholderIds)
+        )
+      }
       void enqueueSlideShadowWrite(
         "refresh schedule snapshot",
         (repository) =>
@@ -3069,6 +3151,7 @@ const deleteSlide = async (
   // create it, or it comes back once the upload finishes.
   if (slidesCreatingInBackground.has(clientSlideId)) {
     slidesDeletedWhileCreating.add(clientSlideId)
+    abortSlideUpload(clientSlideId)
   }
 
   // Clear countdown animation if slide is a countdown slide before deleting

@@ -1,4 +1,6 @@
-import useUploadFile from "~/composables/useUploadFile"
+import useUploadFile, {
+  type UploadFileOptions,
+} from "~/composables/useUploadFile"
 
 type UploadImageResponseT = {
   message: string
@@ -20,8 +22,11 @@ type UploadImageResponseT = {
  * multipart path. Kept as a named helper so existing image call sites read
  * clearly and don't have to know about the routing.
  */
-const useUploadImage = async (image: Blob): Promise<UploadImageResponseT> => {
-  return useUploadFile(image)
+const useUploadImage = async (
+  image: Blob,
+  options?: UploadFileOptions
+): Promise<UploadImageResponseT> => {
+  return useUploadFile(image, options)
 }
 
 export default useUploadImage

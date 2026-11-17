@@ -45,7 +45,10 @@ export const mergeIndexedAndLegacyScheduleSlides = (
 /** Server records replace synced local records, while unsaved local slides survive. */
 export const mergeServerAndPendingScheduleSlides = (
   serverSlides: readonly Slide[],
-  localSlides: readonly Slide[]
+  localSlides: readonly Slide[],
+  // Decides whether a local slide that is still marked as uploading is worth
+  // keeping. Leave it out to keep every one.
+  keepPendingSlide?: (slide: Slide) => boolean
 ) => {
   const merged = new Map<string, Slide>()
   serverSlides.forEach((slide) => {
@@ -54,7 +57,17 @@ export const mergeServerAndPendingScheduleSlides = (
   })
   localSlides.forEach((slide) => {
     const key = slideKey(slide)
-    if (key && !slide._id && !merged.has(key)) merged.set(key, slide)
+    if (key && !slide._id && !merged.has(key)) {
+      // A teammate's slide left over from before this device reloaded is
+      // theirs to finish. Kept here it would be treated as an unsaved slide of
+      // this user. It reaches this device through the server list, or the
+      // owner's finishing update, instead. A placeholder seen live in this
+      // session is kept: the owner's upload is still running.
+      if (slide.pendingUpload && keepPendingSlide && !keepPendingSlide(slide)) {
+        return
+      }
+      merged.set(key, slide)
+    }
   })
   return sortSlides([...merged.values()])
 }
