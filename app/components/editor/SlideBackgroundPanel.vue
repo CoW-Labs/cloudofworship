@@ -98,7 +98,7 @@
       <BgStyle
         v-else
         background-panel
-        class="m-3 md:m-0 md:absolute md:left-3 md:top-9"
+        class="m-3 md:m-0 md:absolute md:left-3 md:right-3 md:top-9"
       />
     </section>
   </div>
@@ -162,7 +162,7 @@ const panelSizes: Record<SectionKey, PanelSize> = {
   video: { width: 753, height: 314 },
   colour: { width: 401, height: 200 },
   gradient: { width: 401, height: 200 },
-  style: { width: 390, height: 183 },
+  style: { width: 440, height: 192 },
 }
 
 const initialSection = (): SectionKey => {

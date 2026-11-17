@@ -633,6 +633,8 @@ export interface SlideStyle {
   mediaCommandAt?: number
   mediaSeekPosition?: number // 0 or -1, -1 means not at the beginning
   isMediaMuted?: boolean
+  /** 0 to 1, missing means full volume */
+  mediaVolume?: number
   windowPadding?: {
     left?: number
     right?: number

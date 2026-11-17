@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="backgroundPanel"
-    class="h-[114px] w-[198px] rounded-xl bg-white px-[17px] py-[14px] shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
+    class="h-auto rounded-xl bg-white px-[17px] py-[14px] shadow-sm ring-1 ring-gray-200/70 dark:bg-[#222838] dark:shadow-none dark:ring-0"
   >
     <label
       class="block text-[12px] leading-[17px] text-gray-500 dark:text-[#9BA3B2]"
@@ -10,8 +10,7 @@
     </label>
     <CoWSlider
       v-model="blur"
-      class="mt-[4px] w-[164px]"
-      :step="0.05"
+      class="mt-[4px]"
       :min="0"
       :max="15"
       aria-label="Background blur"
@@ -24,7 +23,7 @@
     </label>
     <CoWSlider
       v-model="brightness"
-      class="mt-[4px] w-[164px]"
+      class="mt-[4px]"
       :min="20"
       :max="100"
       aria-label="Background brightness"
@@ -36,7 +35,6 @@
       <label class="text-xs font-semibold mb-2 block"> Background Blur </label>
       <CoWSlider
         v-model="blur"
-        :step="0.05"
         :min="0"
         :max="15"
         aria-label="Background blur"

@@ -171,6 +171,8 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `VIMEO_VIDEO_ADDED` | `videoUrl` | Vimeo video embedded | ⚠️ Missing |
 | `TEMPLATE_BROWSED` | - | User opens templates gallery | ⚠️ Missing |
 | `TEMPLATE_APPLIED` | `templateName`, `slideType` | Pre-designed template applied | ⚠️ Missing |
+| `MEDIA_MUTE_TOGGLED` | `muted`, `slideType` | Mute button in the volume popover pressed (also the mute shortcut) | ✅ Added |
+| `MEDIA_VOLUME_CHANGED` | `volume`, `muted`, `slideType` | Volume slider settled on a level (debounced 800ms) | ✅ Added |
 | `GO_LIVE_MEDIA_STREAMED` | `mediaType` | Go Live waited 3s for a slide's media to be saved on this computer, then put it on screen streaming the cloud copy | ✅ Added |
 | `GO_LIVE_MEDIA_SAVED_LATE` | `mediaType`, `seconds` | After a streamed Go Live, the local copy finished saving (`seconds` from Go Live) | ✅ Added |
 | `GO_LIVE_MEDIA_SAVE_FAILED` | `mediaType`, `seconds` | After a streamed Go Live, the local copy could not be saved; the screen keeps streaming | ✅ Added |
