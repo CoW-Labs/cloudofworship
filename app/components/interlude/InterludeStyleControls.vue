@@ -81,7 +81,6 @@
             v-model="local[slider.key]"
             :min="slider.range.min"
             :max="slider.range.max"
-            :step="0.05"
             :aria-label="`Animation ${slider.label.toLowerCase()}`"
           />
         </div>

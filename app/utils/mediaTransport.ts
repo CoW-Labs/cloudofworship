@@ -1,6 +1,7 @@
 import useIndexedDB from "~/composables/useIndexedDB"
 import type { Slide } from "~/types"
 import { slideTypes } from "~/utils/constants"
+import { cloudKeysForSlide } from "~/utils/pendingUpload"
 
 export const isSessionMediaUrl = (value: unknown): value is string => {
   if (typeof value !== "string") return false
@@ -29,6 +30,9 @@ export const toTransportSafeSlide = async (slide: Slide): Promise<Slide> => {
       ...page,
     })),
   }
+  // Client-only upload state: it never goes to the REST API, the library or
+  // the stage feed. The socket path puts it back (see toSocketSafeSlide).
+  delete safe.pendingUpload
   const data = safe.data && typeof safe.data === "object" ? (safe.data as any) : null
   if (data) delete data.blob
 
@@ -101,6 +105,37 @@ export const toTransportSafeSlide = async (slide: Slide): Promise<Slide> => {
   return safe
 }
 
+/**
+ * Puts this device's record of each file (in the cloud, or still only here) on
+ * the slide. A slide saved to the server this way remembers, for every device
+ * and after any reload, which of its files stayed behind. Used when a slide is
+ * first saved, because by then its URLs are already swapped for cloud ones and
+ * the usual path would skip the records.
+ */
+export const withCloudSyncRecords = async (slide: Slide): Promise<Slide> => {
+  const keys = cloudKeysForSlide(slide)
+  if (!keys.length) return slide
+  const records = await useIndexedDB().mediaCloudSync.bulkGet(keys)
+  const mediaCloudSync = { ...(slide.mediaCloudSync || {}) }
+  records.forEach((record) => {
+    if (record) mediaCloudSync[record.key] = record
+  })
+  return Object.keys(mediaCloudSync).length ? { ...slide, mediaCloudSync } : slide
+}
+
+/**
+ * The copy of a slide that goes to teammates over the socket. The same as
+ * {@link toTransportSafeSlide}, except it keeps `pendingUpload`, which is how a
+ * teammate knows the slide is still uploading and must not be used yet.
+ */
+export const toSocketSafeSlide = async (slide: Slide): Promise<Slide> => {
+  const safe = await toTransportSafeSlide(slide)
+  // `null` travels too: it is how a teammate who missed the finish learns of it
+  // from the next edit.
+  if (slide.pendingUpload !== undefined) safe.pendingUpload = slide.pendingUpload
+  return safe
+}
+
 export const toTransportSafePayload = async (payload: any): Promise<any> => {
   if (Array.isArray(payload)) {
     return await Promise.all(payload.map((item) => toTransportSafePayload(item)))
@@ -113,17 +148,17 @@ export const toTransportSafePayload = async (payload: any): Promise<any> => {
       "presentationObjects" in payload ||
       "data" in payload)
   ) {
-    return await toTransportSafeSlide(payload as Slide)
+    return await toSocketSafeSlide(payload as Slide)
   }
 
   const safe = { ...payload }
   if (Array.isArray(payload.slides)) {
     safe.slides = await Promise.all(
-      payload.slides.map((slide: Slide) => toTransportSafeSlide(slide))
+      payload.slides.map((slide: Slide) => toSocketSafeSlide(slide))
     )
   }
   if (payload.slide) {
-    safe.slide = await toTransportSafeSlide(payload.slide)
+    safe.slide = await toSocketSafeSlide(payload.slide)
   }
   return safe
 }

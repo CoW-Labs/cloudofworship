@@ -293,27 +293,53 @@
           (slide?.data as any)?.type === 'vimeo')
       "
             >
-              <CowTooltip
-                text="Mute / unmute media"
-                :shortcut="shortcutIds.muteMedia"
+              <UPopover
+                v-model:open="volumeOpen"
+                mode="click"
+                :popper="{ placement: 'bottom', strategy: 'fixed' }"
+                :ui="{
+                  rounded: 'rounded-2xl',
+                  shadow: 'shadow-xl',
+                  container: 'z-50',
+                }"
               >
-                <UButton
-                  @click="toggleMediaMute"
-                  :class="[
-                    'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
-                  ]"
-                  :icon="
-                    slide.slideStyle?.isMediaMuted
-                      ? 'i-tabler-volume'
-                      : 'i-tabler-volume-off'
-                  "
-                  variant="ghost"
-                  color="gray"
-                  >{{
-                    slide.slideStyle?.isMediaMuted ? "Unmute" : "Mute"
-                  }}</UButton
+                <CowTooltip
+                  text="Volume"
+                  :shortcut="shortcutIds.muteMedia"
+                  :prevent="volumeOpen"
                 >
-              </CowTooltip>
+                  <UButton
+                    :class="[
+                      'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+                    ]"
+                    :icon="volumeIcon"
+                    :aria-expanded="volumeOpen"
+                    variant="ghost"
+                    color="gray"
+                    >Volume</UButton
+                  >
+                </CowTooltip>
+                <template #panel>
+                  <div class="flex w-52 items-center gap-3 overflow-hidden rounded-2xl p-3">
+                    <UButton
+                      :icon="mediaMuted ? 'i-tabler-volume-off' : 'i-tabler-volume'"
+                      :aria-label="mediaMuted ? 'Unmute' : 'Mute'"
+                      class="shrink-0 rounded-full"
+                      variant="ghost"
+                      color="gray"
+                      @click="toggleMediaMute"
+                    />
+                    <CoWSlider
+                      class="flex-1"
+                      :model-value="mediaMuted ? 0 : mediaVolumePercent"
+                      :min="0"
+                      :max="100"
+                      aria-label="Volume"
+                      @update:model-value="onVolumeInput"
+                    />
+                  </div>
+                </template>
+              </UPopover>
               <CowTooltip text="Repeat media">
                 <UButton
                   @click="
@@ -984,7 +1010,43 @@ const toggleMediaPlayback = () => {
 
 // The mute setting belongs to the live output. The editor's preview is always
 // silent, so unmuting while it plays says where the sound will be heard.
+const volumeOpen = ref(false)
+const mediaMuted = computed(() => Boolean(props.slide?.slideStyle?.isMediaMuted))
+const mediaVolumePercent = computed(() =>
+  Math.round((props.slide?.slideStyle?.mediaVolume ?? 1) * 100)
+)
+const volumeIcon = computed(() =>
+  mediaMuted.value || mediaVolumePercent.value === 0
+    ? "i-tabler-volume-off"
+    : mediaVolumePercent.value < 50
+      ? "i-tabler-volume-2"
+      : "i-tabler-volume"
+)
+// Dragging sets the level; dragging off zero unmutes, dragging to zero mutes.
+let volumeCaptureTimer: ReturnType<typeof setTimeout> | undefined
+const onVolumeInput = (percent: number) => {
+  const volume = Math.round(percent) / 100
+  const muted = volume === 0
+  if (volume === (props.slide?.slideStyle?.mediaVolume ?? 1) && muted === mediaMuted.value) return
+  if (volumeCaptureTimer) clearTimeout(volumeCaptureTimer)
+  volumeCaptureTimer = setTimeout(() => {
+    usePosthogCapture("MEDIA_VOLUME_CHANGED", {
+      volume,
+      muted,
+      slideType: props.slide?.type,
+    })
+  }, 800)
+  emit("update-style", {
+    ...props.slide.slideStyle,
+    mediaVolume: muted ? props.slide?.slideStyle?.mediaVolume ?? 1 : volume,
+    isMediaMuted: muted,
+  })
+}
 const toggleMediaMute = () => {
+  usePosthogCapture("MEDIA_MUTE_TOGGLED", {
+    muted: !props.slide?.slideStyle?.isMediaMuted,
+    slideType: props.slide?.type,
+  })
   const unmuting = Boolean(props.slide?.slideStyle?.isMediaMuted)
   emit("update-style", {
     ...props.slide.slideStyle,

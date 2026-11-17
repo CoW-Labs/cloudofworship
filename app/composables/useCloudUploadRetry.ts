@@ -4,6 +4,11 @@ import useLocalMediaStorage from "~/composables/useLocalMediaStorage"
 import useUploadFile from "~/composables/useUploadFile"
 import { tabSessionId } from "./useRealtimeSlides"
 import {
+  announceUploading,
+  reportUploadProgress,
+  settlePendingSlides,
+} from "~/composables/usePendingSlideUpload"
+import {
   cloudRetryDueAt,
   isCloudRetryDue,
   isCloudRetryDueOnReconnect,
@@ -63,18 +68,24 @@ const armBackoffSweep = (
 const needsUpload = (
   record?: MediaCloudSyncRecord,
   force = false,
-  reconnected = false
+  reconnected = false,
+  manual = false
 ) =>
   !!record &&
-  record.reason !== "quota" &&
-  record.reason !== "disabled" &&
-  (record.status === "failed" ||
-    (record.status === "local-only" && record.reason === "offline") ||
-    isStrandedPending(record)) &&
-  (force ||
-    (reconnected
-      ? isCloudRetryDueOnReconnect(record)
-      : isCloudRetryDue(record)))
+  // The operator tapped Retry on a slide that stayed behind: anything not in
+  // the cloud is theirs to send, whatever the reason it stayed behind (they may
+  // have freed space, or changed their mind about video).
+  (manual
+    ? record.status !== "uploaded"
+    : record.reason !== "quota" &&
+      record.reason !== "disabled" &&
+      (record.status === "failed" ||
+        (record.status === "local-only" && record.reason === "offline") ||
+        isStrandedPending(record)) &&
+      (force ||
+        (reconnected
+          ? isCloudRetryDueOnReconnect(record)
+          : isCloudRetryDue(record))))
 
 /** When the earliest of these pages still waiting out a backoff comes due. */
 const earliestBackoffEnd = (
@@ -126,9 +137,17 @@ export default function useCloudUploadRetry() {
       force?: boolean
       // The connection just came back: retry pages not tried in the last minute.
       reconnected?: boolean
+      // The operator tapped Retry on the slide itself. Sends videos too, ignores
+      // the storage and video opt-out reasons, and shows progress to the team.
+      manual?: boolean
     } = {}
   ): Promise<CloudRetryResult> => {
-    const { knownRecords, force = false, reconnected = false } = options
+    const {
+      knownRecords,
+      force = false,
+      reconnected = false,
+      manual = false,
+    } = options
     const result: CloudRetryResult = {
       uploaded: 0,
       failed: 0,
@@ -141,6 +160,12 @@ export default function useCloudUploadRetry() {
     if (!slide?._id || !navigator.onLine || inFlight.has(slideId)) return result
 
     inFlight.add(slideId)
+    // A slide teammates were told stayed behind, or one being retried by hand,
+    // reports how it ended. Others (a page of a slide that is otherwise fine)
+    // just patch the server copy as before.
+    const tracked = manual || slide.pendingUpload?.state === "device-only"
+    let announced = false
+    let settled = false
     try {
       const db = useIndexedDB()
       const keys = cloudKeysFor(slide)
@@ -149,7 +174,7 @@ export default function useCloudUploadRetry() {
         ? keys.map((key) => knownRecords!.get(key))
         : await db.mediaCloudSync.bulkGet(keys)
       const pending = keys.filter((_, index) =>
-        needsUpload(records[index], force, reconnected)
+        needsUpload(records[index], force, reconnected, manual)
       )
       if (!pending.length) return result
 
@@ -158,7 +183,19 @@ export default function useCloudUploadRetry() {
       // too heavy to push again behind the operator's back.
       const queue = pending
         .map((key, index) => ({ key, file: files[index] }))
-        .filter(({ file }) => file && file.kind !== "video")
+        .filter(({ file }) => file && (manual || file.kind !== "video"))
+
+      if (manual && queue.length) {
+        announced = true
+        await announceUploading(slideId)
+      }
+      // Each file's share of the whole, so the bar moves through a deck.
+      const sentByKey = new Map<string, number>()
+      const reportShare = (key: string, fraction: number) => {
+        sentByKey.set(key, fraction)
+        const sent = [...sentByKey.values()].reduce((sum, v) => sum + v, 0)
+        reportUploadProgress(slideId, Math.min(0.99, sent / queue.length))
+      }
 
       const uploadPage = async (
         key: string,
@@ -175,12 +212,16 @@ export default function useCloudUploadRetry() {
             : new Blob([bytes], { type: file.mimeType })
           const uploaded = await useUploadFile(blob, {
             name: file.originalName,
+            onProgress: announced
+              ? (fraction) => reportShare(key, fraction)
+              : undefined,
           })
           await localMedia.setCloudSyncState(key, {
             groupId: slide.id,
             status: "uploaded",
             remoteUrl: uploaded.file.url,
           })
+          if (announced) reportShare(key, 1)
           result.uploaded++
         } catch (err) {
           const reason = mediaCloudFailureReason(err)
@@ -225,23 +266,49 @@ export default function useCloudUploadRetry() {
         )
       }
 
+      let patched: Slide | undefined
       if (result.uploaded) {
         // Re-read the slide: the operator may have edited it while pages
         // were uploading, and that edit must not be overwritten.
         const latest = findActiveSlide(slideId) || slide
-        const safe = await toTransportSafeSlide(latest)
+        patched = await toTransportSafeSlide(latest)
         const { updateSlide } = useSlides()
-        const saved = await updateSlide(latest, safe)
+        const saved = await updateSlide(latest, patched)
+
         const socket = useNuxtApp().$socketio as any
-        if (saved && socket?.connected) {
+        if (!tracked && saved && socket?.connected) {
           socket.emit("update-slide", {
-            ...safe,
+            ...patched,
             slideId: latest.id,
             tabId: tabSessionId,
           })
         }
       }
+
+      // A slide that stayed behind is whole once every file is in the cloud.
+      // Say how it ended either way, so teammates' cards stop showing a bar
+      // (or the old "Stayed behind") that is no longer true.
+      if (tracked && (announced || result.uploaded)) {
+        const latest = findActiveSlide(slideId) || slide
+        const allKeys = cloudKeysFor(latest)
+        const allRecords = allKeys.length
+          ? await db.mediaCloudSync.bulkGet(allKeys)
+          : []
+        const complete =
+          allKeys.length > 0 &&
+          allRecords.every((record) => record?.status === "uploaded")
+        settled = true
+        await settlePendingSlides([
+          { slideId, deviceOnly: !complete, serverSlide: patched },
+        ])
+      }
     } finally {
+      // Announced but never settled (an error part way): back to stayed behind.
+      if (announced && !settled) {
+        await settlePendingSlides([{ slideId, deviceOnly: true }]).catch(
+          () => {}
+        )
+      }
       inFlight.delete(slideId)
     }
     return result

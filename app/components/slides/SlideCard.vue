@@ -12,8 +12,8 @@
         'pair-drop-candidate': isPairCandidate && !isPairDropTarget,
       },
     ]"
-    :draggable="!selectable"
-    @contextmenu.prevent="moreActionsMenuRef?.open()"
+    :draggable="!selectable && !isLocked"
+    @contextmenu.prevent="!isLocked && moreActionsMenuRef?.open()"
     @dragstart="onSlideDragStart"
     @dragend="onSlideDragEnd"
     @dragover="onSlideDragOver"
@@ -31,8 +31,8 @@
           'w-full h-full transition-all text-left rounded-lg overflow-hidden',
           { 'opacity-70 ': selectable },
         ]"
-        @click="$emit('click')"
-        @dblclick.prevent="$emit('take-live')"
+        @click="!isLocked && $emit('click')"
+        @dblclick.prevent="!isLocked && $emit('take-live')"
       >
         <DeferredSlidePreview
           preview-class="slide-preview text-white overflow-hidden md-preview"
@@ -51,6 +51,32 @@
           class="media-loading inset-0 rounded-lg"
           :ui="skeletonUi"
         />
+        <!-- CLOUD UPLOAD — bottom left. While files are going to the cloud the
+             card shows how far along they are: "Uploading" on the device that is
+             sending them, "Syncing" on every other. That takes the place of the
+             "only on a device" note, which shows only once nothing is moving.
+             Clicks pass through; a teammate's card ignores them anyway while it
+             is locked (see isLockedByUpload). -->
+        <div
+          v-if="isUploading"
+          class="upload-status absolute bottom-2 right-12 z-[5] flex flex-col gap-1 pointer-events-none"
+          :class="editingBy ? 'left-11' : 'left-2'"
+          role="status"
+        >
+          <span class="text-[11px] font-semibold leading-none text-white">{{
+            uploadLabel
+          }}</span>
+          <CowProgressBar :value="uploadPercent ?? 0" on-dark />
+        </div>
+        <!-- STAYED BEHIND — the media never left its owner's device, so there is
+             nothing to draw. A faint icon says so, instead of a blank card. The
+             label and Retry sit below, outside this button. -->
+        <div
+          v-else-if="deviceOnlyLabel"
+          class="absolute inset-0 z-[4] flex items-center justify-center pointer-events-none"
+        >
+          <UIcon name="i-ph-cloud-slash" class="w-7 h-7 text-white/40" />
+        </div>
         <div
           class="overlay-gradient absolute inset-0"
           :class="{ 'border-4 border-primary': selected }"
@@ -109,6 +135,36 @@
       </button>
     </CowTooltip>
 
+    <!-- STAYED BEHIND label, bottom left, once nothing is uploading. The device
+         that owns the files can send them again; nobody else has them. A real
+         button, so it sits outside the card's own button. -->
+    <div
+      v-if="deviceOnlyLabel && !isUploading"
+      class="absolute bottom-2 right-12 z-[5] flex items-center gap-1.5 pointer-events-none"
+      :class="editingBy ? 'left-11' : 'left-2'"
+    >
+      <span
+        class="min-w-0 truncate rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white"
+      >
+        {{ deviceOnlyLabel }}
+      </span>
+      <CowTooltip v-if="canRetryHere" text="Upload it again">
+        <button
+          type="button"
+          class="pointer-events-auto grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/90 text-primary-700 transition hover:bg-white disabled:opacity-60"
+          aria-label="Retry upload"
+          :disabled="isRetrying"
+          @click.stop="retryUpload"
+        >
+          <UIcon
+            :name="isRetrying ? 'i-ph-spinner-gap-bold' : 'i-ph-upload-simple-bold'"
+            class="h-3.5 w-3.5"
+            :class="{ 'animate-spin': isRetrying }"
+          />
+        </button>
+      </CowTooltip>
+    </div>
+
     <!-- SLIDE PAIR — the pair icon and one dot per member. The card previews
          the member this window is editing; a dot switches to another, which
          loads it in the editor with its own controls. What is on screen does
@@ -159,6 +215,7 @@
 
     <!-- SLIDE ACTIONS MENU -->
     <div
+      v-if="!isLocked"
       class="actions absolute bottom-2 right-2 flex gap-1"
       :class="{ 'menu-open': actionsMenuOpen }"
     >
@@ -190,8 +247,11 @@
     v-else
     class="group slide-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-[#171d2b] rounded-lg hover:bg-white dark:hover:bg-[#2b3242] transition-all cursor-pointer relative"
     :id="slide?.id"
+    :class="{ 'opacity-60 cursor-not-allowed': isLocked }"
     @click="
-      slide?.slideMode === 'overlay'
+      isLocked
+        ? undefined
+        : slide?.slideMode === 'overlay'
         ? handleOverlayAction()
         : goLive(slide?.id || '0')
     "
@@ -216,9 +276,21 @@
         :slide-mode="slide?.slideMode"
         class="mt-1"
       />
+      <div v-if="isUploading" class="mt-1 w-28" role="status">
+        <p class="mb-1 text-xs leading-none text-gray-500 dark:text-gray-400">
+          {{ uploadLabel }}
+        </p>
+        <CowProgressBar :value="uploadPercent ?? 0" />
+      </div>
+      <p
+        v-else-if="deviceOnlyLabel"
+        class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+      >
+        {{ deviceOnlyLabel }}
+      </p>
     </div>
     <!-- DELETE SLIDE BUTTON -->
-    <div class="actions absolute bottom-2 right-2 flex gap-1">
+    <div v-if="!isLocked" class="actions absolute bottom-2 right-2 flex gap-1">
       <CowTooltip text="Preview / edit slide">
         <UButton
           size="xs"
@@ -247,8 +319,16 @@ import {
 } from "~/utils/slidePairs"
 import { draggingSlideId, editingMemberOf } from "~/composables/useSlidePairs"
 import { useAppStore } from "~/store/app"
+import { useAuthStore } from "~/store/auth"
+import { useIntervalFn } from "@vueuse/core"
+import useIndexedDB from "~/composables/useIndexedDB"
+import { cloudKeysForSlide, isLockedByUpload } from "~/utils/pendingUpload"
+import useSlideUploadProgress, {
+  UPLOAD_STALE_AFTER_MS,
+} from "~/composables/useSlideUploadProgress"
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const { currentState } = storeToRefs(appStore)
 
 // Gates the overlay action below. The rest of the card's gating moved to
@@ -299,8 +379,10 @@ const isSlideDrag = (event: DragEvent) =>
 
 const acceptsPairDrop = (sourceId: string | null) => {
   if (!props.gridType || props.selectable || !sourceId) return false
+  if (isLocked.value) return false
   const source = appStore.activeSlidesById.get(sourceId)
   if (!source || sourceId === props.slide.id) return false
+  if (isLockedByUpload(source, authStore.user?._id)) return false
   if (props.pair) {
     if (props.pair.slideIds.includes(sourceId)) return false
     const cameras = pairMembers.value.filter(isCameraSlide)
@@ -360,6 +442,10 @@ const copyForDragImage = (node: Node): Node => {
 
 const onSlideDragStart = (event: DragEvent) => {
   if (!props.gridType || props.selectable || !event.dataTransfer) return
+  if (isLocked.value) {
+    event.preventDefault()
+    return
+  }
   event.dataTransfer.setData(SLIDE_DRAG_TYPE, props.slide.id)
   event.dataTransfer.effectAllowed = "link"
   // The browser snapshots the whole card for the drag image, which would drag
@@ -465,6 +551,145 @@ const gridCardHint = computed(() =>
     : "Click to preview · Double-click to take live · Drag onto a camera slide to pair"
 )
 
+// ── Cloud upload of this slide's media ──────────────────────────────────────
+// A slide can reach this device before its files reach the cloud. Its owner
+// keeps using it as normal. Everyone else sees who is sending it and how far
+// along they are, and cannot use it until it is finished (see isLockedByUpload).
+const { uploadPercentFor, lastUploadUpdateFor } = useSlideUploadProgress()
+
+const upload = computed(() => props.slide?.pendingUpload ?? null)
+const isOwnUpload = computed(
+  () => !!upload.value && upload.value.ownerId === authStore.user?._id
+)
+const isLocked = computed(() =>
+  isLockedByUpload(props.slide, authStore.user?._id)
+)
+
+// Ticks only while a teammate's upload is on screen, to notice it going quiet.
+const uploadClock = ref(Date.now())
+const { pause: pauseUploadClock, resume: resumeUploadClock } = useIntervalFn(
+  () => (uploadClock.value = Date.now()),
+  5000,
+  { immediate: false }
+)
+watch(
+  isLocked,
+  (locked) => {
+    if (locked) {
+      uploadClock.value = Date.now()
+      resumeUploadClock()
+    } else {
+      pauseUploadClock()
+    }
+  },
+  { immediate: true }
+)
+
+const isUploadQuiet = computed(() => {
+  const last = lastUploadUpdateFor(props.slide?.id)
+  return last !== null && uploadClock.value - last > UPLOAD_STALE_AFTER_MS
+})
+
+const isUploading = computed(() => upload.value?.state === "uploading")
+const uploadPercent = computed(() => uploadPercentFor(props.slide?.id))
+const ownerName = computed(() => upload.value?.ownerName || "a teammate")
+
+// The sender is uploading; everyone else is syncing what the sender uploads.
+const uploadLabel = computed(() => {
+  if (!isUploading.value) return null
+  if (!isOwnUpload.value && isUploadQuiet.value) {
+    return `Waiting for ${ownerName.value}`
+  }
+  const verb = isOwnUpload.value ? "Uploading" : "Syncing"
+  return uploadPercent.value ? `${verb} ${uploadPercent.value}%` : verb
+})
+
+// Only shown when nothing is moving: an upload in progress comes first. The
+// media is only on its owner's device, but "Stayed behind" says it in two words
+// from either side of the screen.
+const deviceOnlyLabel = computed(() =>
+  upload.value?.state === "device-only" ? "Stayed behind" : null
+)
+
+// Whether this device is the one holding the files. Being the same account is
+// not enough: the same person's other computer, or a reload on a device that
+// lost its local copy, has nothing to send. A file saved on this device with no
+// cloud copy is the proof.
+const canRetryHere = ref(false)
+watch(
+  () => [props.slide?.id, upload.value?.state] as const,
+  async ([slideId, state]) => {
+    if (!slideId || state !== "device-only") {
+      canRetryHere.value = false
+      return
+    }
+    const rows = await useIndexedDB().localMediaFiles.bulkGet(
+      cloudKeysForSlide(props.slide)
+    )
+    // The slide may have changed while the read was running.
+    if (props.slide?.id !== slideId) return
+    canRetryHere.value = rows.some((row) => !!row && !row.remoteUrl)
+  },
+  { immediate: true }
+)
+
+// Sends a slide that stayed behind to the cloud again. Only the device that has
+// the files can do it, which is why the button shows for the owner alone.
+const toast = useToast()
+const isRetrying = ref(false)
+const retryUpload = async () => {
+  if (isRetrying.value) return
+  if (!navigator.onLine) {
+    toast.add({ title: "You're offline", description: "Retry once you're back.", icon: "i-bx-wifi-off" })
+    return
+  }
+  if (!props.slide._id) {
+    toast.add({ title: "Saving this slide first", description: "Try again in a moment.", icon: "i-bx-cloud" })
+    return
+  }
+  isRetrying.value = true
+  try {
+    const result = await useCloudUploadRetry().retrySlideUploads(props.slide.id, {
+      manual: true,
+    })
+    const outcome = result.quotaExceeded
+      ? "quota"
+      : result.failed
+      ? "failed"
+      : result.uploaded
+      ? "completed"
+      : "no-files"
+    usePosthogCapture("SLIDE_UPLOAD_RETRIED", {
+      slideType: props.slide.type,
+      outcome,
+    })
+    if (outcome === "quota") {
+      toast.add({
+        title: "Cloud storage is full",
+        description: "Free some up, then retry.",
+        icon: "i-bx-cloud",
+        color: "amber",
+      })
+    } else if (outcome === "failed") {
+      toast.add({
+        title: "Still stuck",
+        description: "It's safe on this device. Try again soon.",
+        icon: "i-bx-cloud",
+        color: "amber",
+      })
+    } else if (outcome === "no-files") {
+      toast.add({
+        title: "Can't find the files here",
+        description: "Retry from the device that added them.",
+        icon: "i-bx-cloud",
+        color: "amber",
+      })
+    }
+  } finally {
+    isRetrying.value = false
+  }
+}
+
 // Every cache key this card's preview depends on. A media slide's own file is
 // stored under the slide id, a deck stores one key per page, and backgrounds
 // store under their own key — which is usually the schedule-wide default, so a
@@ -500,7 +725,11 @@ const mediaProgress = computed<number | null>(() => {
   return null
 })
 
-const isMediaLoading = computed(() => mediaProgress.value !== null)
+// A slide whose files are still uploading has no finished media to draw yet,
+// so it gets the same loading shimmer as one waiting on a download.
+const isMediaLoading = computed(
+  () => mediaProgress.value !== null || isUploading.value
+)
 
 // Matches CowSkeleton, so a card waiting on its media reads the same as the
 // placeholder cards the grid shows while a schedule loads. Position is left to

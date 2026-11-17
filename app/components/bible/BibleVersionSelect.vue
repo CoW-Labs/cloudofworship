@@ -50,10 +50,7 @@
         />
       </template>
       <template #label>
-        <span class="flex items-center gap-2.5 min-w-0">
-          <BibleVersionFlag :version-id="bibleVersion" />
-          <span class="truncate">{{ bibleVersion }}</span>
-        </span>
+        <span class="truncate">{{ bibleVersion }}</span>
       </template>
       <template #option="{ option: version }">
         <span

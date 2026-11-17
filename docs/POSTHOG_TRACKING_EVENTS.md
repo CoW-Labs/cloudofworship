@@ -99,6 +99,11 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `INVITED_USERS_EMAIL_SENT` | - | Invitation email sent | ✅ Exists |
 | `SLIDE_LOCKED_BY_USER` | `slideId`, `userId` | Real-time collaborative lock acquired | ⚠️ Missing |
 | `SLIDE_EDITING_CONFLICT` | `slideId` | User tried to edit locked slide | ⚠️ Missing |
+| `SLIDE_UPLOAD_STARTED` | `slideType`, `count` | A media or presentation slide was shared with the team before its files finished uploading. `count` is files (media) or pages (deck) | ✅ Added |
+| `SLIDE_UPLOAD_COMPLETED` | `slideType`, `count`, `durationMs` | Every file of the slide reached the cloud and teammates got the finished slide | ✅ Added |
+| `SLIDE_UPLOAD_FAILED` | `slideType`, `count`, `reason` | Some files could not upload, so the slide stays on this device. `reason`: `offline`, `quota`, `disabled`, `upload-error`, `save-failed` | ✅ Added |
+| `PENDING_SLIDE_RECEIVED` | `slideType` | A teammate's slide arrived while its files were still uploading | ✅ Added |
+| `SLIDE_UPLOAD_RETRIED` | `slideType`, `outcome` | Retry tapped on a slide that stayed behind. `outcome`: `completed`, `failed`, `quota`, `no-files` | ✅ Added |
 
 ---
 
@@ -166,6 +171,8 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `VIMEO_VIDEO_ADDED` | `videoUrl` | Vimeo video embedded | ⚠️ Missing |
 | `TEMPLATE_BROWSED` | - | User opens templates gallery | ⚠️ Missing |
 | `TEMPLATE_APPLIED` | `templateName`, `slideType` | Pre-designed template applied | ⚠️ Missing |
+| `MEDIA_MUTE_TOGGLED` | `muted`, `slideType` | Mute button in the volume popover pressed (also the mute shortcut) | ✅ Added |
+| `MEDIA_VOLUME_CHANGED` | `volume`, `muted`, `slideType` | Volume slider settled on a level (debounced 800ms) | ✅ Added |
 | `GO_LIVE_MEDIA_STREAMED` | `mediaType` | Go Live waited 3s for a slide's media to be saved on this computer, then put it on screen streaming the cloud copy | ✅ Added |
 | `GO_LIVE_MEDIA_SAVED_LATE` | `mediaType`, `seconds` | After a streamed Go Live, the local copy finished saving (`seconds` from Go Live) | ✅ Added |
 | `GO_LIVE_MEDIA_SAVE_FAILED` | `mediaType`, `seconds` | After a streamed Go Live, the local copy could not be saved; the screen keeps streaming | ✅ Added |
@@ -225,7 +232,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `TRANSCRIPTION_STARTED` | `provider` (`deepgram`\|`web-speech-api`), `plan` (`teams`\|`free`) | User starts a transcription session | ✅ Added |
 | `TRANSCRIPTION_STOPPED` | `provider`, `plan`, `segmentCount` | User stops a transcription session | ✅ Added |
 | `TRANSCRIPTION_CLEARED` | `provider`, `plan`, `segmentCount` | User clears the transcript | ✅ Added |
-| `TRANSCRIPTION_BIBLE_REFERENCE_CLICKED` | `reference`, `chapterOnly` | User clicks an inline Bible reference in the transcript. `chapterOnly` is true when only a chapter was said ("Joshua chapter 14"), which opens verse 1 | ✅ Added |
+| `TRANSCRIPTION_BIBLE_REFERENCE_CLICKED` | `reference`, `chapterOnly`, `inferred` | User clicks an inline Bible reference in the transcript. `chapterOnly` is true when only a chapter was said ("Joshua chapter 14", "in Philippians 2"), which opens verse 1. `inferred` is true when the verse was placed from context (a bare "verse 26", or "Isaiah 35," joined to a following "4 to 6") rather than said outright | ✅ Added |
 | `TRANSCRIPTION_SCRIPTURE_SUGGESTION_CLICKED` | `reference`, `displayLabel` | User clicks a scripture in the Scriptures tab | ✅ Added |
 | `TRANSCRIPTION_MIC_SETTINGS_OPENED` | `isTranscribing` | User opens Microphone Settings from the transcript panel's More menu (operator window only) | ✅ Added |
 

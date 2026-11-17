@@ -17,7 +17,17 @@ import { withInterludeData } from "~/utils/interlude/slide"
 import { withCameraData, type CameraSettings } from "~/utils/camera"
 import { tabSessionId } from "./useRealtimeSlides"
 import { mediaCloudFailureReason } from "~/utils/mediaCloudSync"
-import { isSessionMediaUrl, toTransportSafeSlide } from "~/utils/mediaTransport"
+import {
+  isSessionMediaUrl,
+  toTransportSafeSlide,
+  withCloudSyncRecords,
+} from "~/utils/mediaTransport"
+import {
+  broadcastPendingSlides,
+  markUploading,
+  reportUploadProgress,
+  settlePendingSlides,
+} from "~/composables/usePendingSlideUpload"
 
 /**
  * Composable for creating different types of slides
@@ -39,6 +49,18 @@ export const slidesCreatingInBackground = new Set<string>()
  * Undo takes a slide back out of here (see PreviewContent.putBackSlides).
  */
 export const slidesDeletedWhileCreating = new Set<string>()
+
+/**
+ * One AbortController per slide whose files are uploading, so deleting the
+ * slide stops the upload instead of letting it finish into storage nobody uses.
+ */
+const uploadAborters = new Map<string, AbortController>()
+
+/** Stops the cloud upload of a slide that is being deleted. No-op otherwise. */
+export const abortSlideUpload = (slideId: string) => {
+  uploadAborters.get(slideId)?.abort()
+  uploadAborters.delete(slideId)
+}
 
 /** Deletes the server copy of a slide the operator removed mid-create. */
 const discardCreatedSlide = async (created: Slide) => {
@@ -144,6 +166,8 @@ export default function useSlideCreation() {
     if (!slideToDuplicate) return null
     const tempSlide = { ...slideToDuplicate }
     delete tempSlide._id
+    // The copy has no upload of its own running, whatever the original is doing.
+    delete tempSlide.pendingUpload
     tempSlide.id = useObjectID()
     // An interlude's data carries its own id, so the copy gets a fresh one.
     if (tempSlide.type === slideTypes.interlude && tempSlide.data) {
@@ -484,8 +508,32 @@ export default function useSlideCreation() {
 
     newSlides.forEach((slide) => slidesCreatingInBackground.add(slide.id))
 
-      // ── Step 2 — background: upload → server create → socket broadcast ────
+    // Files that have to reach the cloud make a pending slide: teammates get it
+    // now, with a progress bar, instead of after the upload. External video
+    // (YouTube, Vimeo) has nothing to upload and is shared once it is saved.
+    const pendingSlides = newSlides.filter(
+      (slide, index) =>
+        !!capturedBlobs[index] && !(files[index] as any)?.isExternal
+    )
+    const pendingIds = new Set(pendingSlides.map((slide) => slide.id))
+    pendingSlides.forEach((slide) => {
+      markUploading(slide)
+      uploadAborters.set(slide.id, new AbortController())
+    })
+
+      // ── Step 2 — background: share → upload → server create → settle ──────
       ; (async () => {
+        const startedAt = Date.now()
+        const uploadedIds = new Set<string>()
+        const serverById = new Map<string, Slide>()
+        let failureReason: string | null = null
+        if (pendingSlides.length) {
+          void broadcastPendingSlides(pendingSlides)
+          usePosthogCapture("SLIDE_UPLOAD_STARTED", {
+            slideType: slideTypes.media,
+            count: pendingSlides.length,
+          })
+        }
         try {
           const { isTeamsPlan } = useSubscription()
 
@@ -572,6 +620,7 @@ export default function useSlideCreation() {
                   (isVideo && uploadVideos) ||
                   blob.type?.includes("audio"))
               if (isVideo && !uploadVideos) {
+                failureReason = failureReason ?? "disabled"
                 await localMedia.setCloudSyncState(newSlides[index]!.id, {
                   groupId: newSlides[index]!.id,
                   status: "local-only",
@@ -584,9 +633,16 @@ export default function useSlideCreation() {
                 // videos (which exceed 5 MB / are media) through the presigned
                 // multipart path. Pass the original filename so the server-side
                 // record and multipart initiation carry a meaningful name.
-                const uploaded = await useUploadFile(blob, { name: file.name })
+                const slideId = newSlides[index]!.id
+                const uploaded = await useUploadFile(blob, {
+                  name: file.name,
+                  signal: uploadAborters.get(slideId)?.signal,
+                  onProgress: (fraction) => reportUploadProgress(slideId, fraction),
+                })
                 return { uploaded, index }
               } catch (err) {
+                // Deleted while uploading: nothing to record, nothing to say.
+                if ((err as Error)?.name === "AbortError") return null
                 const storedSlide = newSlides[index]
                 if (storedSlide) {
                   await localMedia.setCloudSyncState(storedSlide.id, {
@@ -599,6 +655,7 @@ export default function useSlideCreation() {
                 if (/quota|storage limit|storage full/i.test(String(err))) {
                   quotaExceeded = true
                 } else {
+                  failureReason = "upload-error"
                   console.error("Image upload failed for", file.name, err)
                 }
                 return null
@@ -613,6 +670,7 @@ export default function useSlideCreation() {
             for (const res of results) {
               if (!res?.uploaded) continue
               remoteUrls.set(res.index, res.uploaded.file.url)
+              uploadedIds.add(newSlides[res.index]!.id)
               const storedSlide = newSlides[res.index]
               if (storedSlide) {
                 await localMedia.setCloudSyncState(storedSlide.id, {
@@ -625,6 +683,7 @@ export default function useSlideCreation() {
           } else {
             // Offline: mark images as stranded so the reconnect sweep uploads
             // them, instead of leaving no trace that they never left the device.
+            failureReason = "offline"
             for (const [index, blob] of compressedBlobs.entries()) {
               const storedSlide = newSlides[index]
               if (!storedSlide || !blob?.type?.includes("image")) continue
@@ -637,6 +696,7 @@ export default function useSlideCreation() {
           }
 
           if (quotaExceeded) {
+            failureReason = "quota"
             toast.add({
               title: isTeamsPlan.value
                 ? "Cloud storage full"
@@ -674,8 +734,11 @@ export default function useSlideCreation() {
           })
 
           // A slide deleted while its media uploaded stays deleted.
-          const slidesToCreate = sanitizedSlides.filter(
-            (slide) => !slidesDeletedWhileCreating.has(slide.id)
+          const slidesToCreate = await Promise.all(
+            sanitizedSlides
+              .filter((slide) => !slidesDeletedWhileCreating.has(slide.id))
+              // So the saved slide remembers which files stayed behind.
+              .map((slide) => withCloudSyncRecords(slide))
           )
           if (!slidesToCreate.length) return
 
@@ -695,18 +758,21 @@ export default function useSlideCreation() {
           kept.forEach((serverSlide) => {
             const local = newSlides.find((s) => s.id === serverSlide.id)
             if (local && serverSlide._id) local._id = serverSlide._id
+            serverById.set(serverSlide.id, serverSlide)
           })
 
-          // 2f — Broadcast to other clients only after server confirms creation
-          const nuxtApp = useNuxtApp()
-          const socket = nuxtApp.$socketio as any
-          if (socket?.connected && kept.length > 0) {
+          // 2f — Broadcast to other clients only after server confirms creation.
+          // Pending slides were shared up front and are settled in `finally`.
+          const unshared = kept.filter((s) => !pendingIds.has(s.id))
+          const socket = useNuxtApp().$socketio as any
+          if (socket?.connected && unshared.length > 0) {
             socket.emit("batch-create-slides", {
-              slides: kept.map((s) => ({ ...s })),
+              slides: unshared.map((s) => ({ ...s })),
               tabId: tabSessionId,
             })
           }
         } catch (err) {
+          failureReason = failureReason ?? "save-failed"
           console.error("createMultipleMediaSlides background flow failed", err)
           toast.add({
             title: "Error saving media slides",
@@ -714,10 +780,43 @@ export default function useSlideCreation() {
             color: "red",
           })
         } finally {
-          newSlides.forEach((slide) => {
-            slidesCreatingInBackground.delete(slide.id)
-            slidesDeletedWhileCreating.delete(slide.id)
-          })
+          // 2g — Tell teammates how the upload ended: finished, or only on this
+          // device. Runs before the in-flight markers go, so the offline sweep
+          // cannot send a half-made copy meanwhile.
+          try {
+            await settlePendingSlides(
+              pendingSlides.map((slide) => ({
+                slideId: slide.id,
+                deviceOnly: !uploadedIds.has(slide.id),
+                serverSlide: serverById.get(slide.id),
+              }))
+            )
+            if (pendingSlides.length) {
+              const incomplete = pendingSlides.filter(
+                (slide) => !uploadedIds.has(slide.id)
+              ).length
+              if (incomplete) {
+                usePosthogCapture("SLIDE_UPLOAD_FAILED", {
+                  slideType: slideTypes.media,
+                  count: incomplete,
+                  reason: failureReason ?? "upload-error",
+                })
+              }
+              if (incomplete < pendingSlides.length) {
+                usePosthogCapture("SLIDE_UPLOAD_COMPLETED", {
+                  slideType: slideTypes.media,
+                  count: pendingSlides.length - incomplete,
+                  durationMs: Date.now() - startedAt,
+                })
+              }
+            }
+          } finally {
+            newSlides.forEach((slide) => {
+              slidesCreatingInBackground.delete(slide.id)
+              slidesDeletedWhileCreating.delete(slide.id)
+              uploadAborters.delete(slide.id)
+            })
+          }
         }
       })()
 
@@ -767,6 +866,19 @@ export default function useSlideCreation() {
 
     slidesCreatingInBackground.add(tempSlide.id)
 
+    // A deck that has to be uploaded is shared with teammates now, as a pending
+    // slide, and finished when its pages are in the cloud. A deck from the
+    // library already lives there, so it is shared once it is saved.
+    const isPending = !options?.reuseHostedPages
+    if (isPending) {
+      markUploading(tempSlide)
+      uploadAborters.set(tempSlide.id, new AbortController())
+    }
+    const startedAt = Date.now()
+    let allPagesUploaded = false
+    let failureReason: string | null = null
+    let createdOnServer: Slide | null = null
+
       // ── Step 2 — background ───────────────────────────────────────────────
       ; (async () => {
         const { isTeamsPlan } = useSubscription()
@@ -774,12 +886,23 @@ export default function useSlideCreation() {
         const nuxtApp = useNuxtApp()
         const socket = nuxtApp.$socketio as any
 
+        if (isPending) {
+          void broadcastPendingSlides([tempSlide])
+          usePosthogCapture("SLIDE_UPLOAD_STARTED", {
+            slideType: slideTypes.presentation,
+            count: presentationObjects.length,
+          })
+        }
+
         beginLocalSave(tempSlide.id)
+        let pagesProcessed = 0
         let localSaveFailed = false
         let quotaExceeded = false
         let cloudFailedPages = 0
         const remotePageUrls = new Map<number, string>()
         for (const obj of presentationObjects) {
+          // Deleted while its pages uploaded: stop spending bandwidth on it.
+          if (slidesDeletedWhileCreating.has(tempSlide.id)) break
           const hostedUrl =
             options?.reuseHostedPages &&
             /^https?:\/\//.test(obj.imageUrl ?? "") &&
@@ -827,7 +950,14 @@ export default function useSlideCreation() {
               )
             } else if (navigator.onLine) {
               try {
-                const uploaded = await useUploadImage(blob)
+                const uploaded = await useUploadImage(blob, {
+                  signal: uploadAborters.get(tempSlide.id)?.signal,
+                  onProgress: (fraction) =>
+                    reportUploadProgress(
+                      tempSlide.id,
+                      (pagesProcessed + fraction) / presentationObjects.length
+                    ),
+                })
                 remotePageUrls.set(obj.page, uploaded.file.url)
                 await localMedia.setCloudSyncState(
                   `${tempSlide.id}-page-${obj.page}`,
@@ -838,6 +968,8 @@ export default function useSlideCreation() {
                   }
                 )
               } catch (uploadErr) {
+                // Deleted while uploading: the loop stops on its next turn.
+                if ((uploadErr as Error)?.name === "AbortError") continue
                 await localMedia.setCloudSyncState(
                   `${tempSlide.id}-page-${obj.page}`,
                   {
@@ -849,8 +981,10 @@ export default function useSlideCreation() {
                 )
                 if (/quota|storage limit|storage full/i.test(String(uploadErr))) {
                   quotaExceeded = true
+                  failureReason = "quota"
                 } else {
                   cloudFailedPages++
+                  failureReason = "upload-error"
                   console.error(`Cloud upload failed for page ${obj.page}:`, uploadErr)
                 }
               }
@@ -858,6 +992,7 @@ export default function useSlideCreation() {
               // Record the page as stranded rather than skipping it silently,
               // so the reconnect sweep knows to upload it later.
               cloudFailedPages++
+              failureReason = "offline"
               await localMedia.setCloudSyncState(
                 `${tempSlide.id}-page-${obj.page}`,
                 { groupId: tempSlide.id, status: "local-only", reason: "offline" }
@@ -871,10 +1006,16 @@ export default function useSlideCreation() {
               console.warn(`Presentation page ${obj.page} kept in the cloud only:`, err)
             } else {
               localSaveFailed = true
+              failureReason = "save-failed"
               console.error(`Failed to process presentation page ${obj.page}:`, err)
             }
+          } finally {
+            pagesProcessed++
           }
         }
+        allPagesUploaded = presentationObjects.every((obj) =>
+          remotePageUrls.has(obj.page)
+        )
         if (localSaveFailed) {
           failLocalSave(
             tempSlide.id,
@@ -904,11 +1045,11 @@ export default function useSlideCreation() {
           ...obj,
           imageUrl: remotePageUrls.get(obj.page) || "",
         }))
-        const serverSlide: Slide = {
+        const serverSlide: Slide = await withCloudSyncRecords({
           ...tempSlide,
           presentationObjects: serverPresentationObjects,
           background: remotePageUrls.get(1) || "",
-        }
+        })
         // Deleted while its pages uploaded: it stays deleted.
         if (slidesDeletedWhileCreating.has(tempSlide.id)) return
 
@@ -929,9 +1070,11 @@ export default function useSlideCreation() {
 
         // Backfill the server-assigned _id onto the local object
         if (createdSlide._id) tempSlide._id = createdSlide._id
+        createdOnServer = createdSlide
 
-        // 2d — Notify other clients that this slide now exists
-        if (socket?.connected) {
+        // 2d — Notify other clients that this slide now exists. A pending slide
+        // was shared up front and is settled below.
+        if (!isPending && socket?.connected) {
           socket.emit("create-slide", { ...createdSlide, tabId: tabSessionId })
         }
 
@@ -964,9 +1107,41 @@ export default function useSlideCreation() {
           })
           if (navigator.onLine) setTimeout(() => void retry(false), 15_000)
         }
-      })().finally(() => {
-        slidesCreatingInBackground.delete(tempSlide.id)
-        slidesDeletedWhileCreating.delete(tempSlide.id)
+      })().finally(async () => {
+        try {
+          if (isPending) {
+            // Tell teammates how the upload ended, before the in-flight marker
+            // goes, so the offline sweep cannot send a half-made copy meanwhile.
+            await settlePendingSlides([
+              {
+                slideId: tempSlide.id,
+                deviceOnly: !allPagesUploaded,
+                serverSlide: createdOnServer ?? undefined,
+              },
+            ])
+            if (!slidesDeletedWhileCreating.has(tempSlide.id)) {
+              if (allPagesUploaded) {
+                usePosthogCapture("SLIDE_UPLOAD_COMPLETED", {
+                  slideType: slideTypes.presentation,
+                  count: presentationObjects.length,
+                  durationMs: Date.now() - startedAt,
+                })
+              } else {
+                usePosthogCapture("SLIDE_UPLOAD_FAILED", {
+                  slideType: slideTypes.presentation,
+                  count: presentationObjects.length,
+                  reason: failureReason ?? "upload-error",
+                })
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("Could not settle the presentation upload:", err)
+        } finally {
+          slidesCreatingInBackground.delete(tempSlide.id)
+          slidesDeletedWhileCreating.delete(tempSlide.id)
+          uploadAborters.delete(tempSlide.id)
+        }
       })
 
     usePosthogCapture("NEW_PRESENTATION_SLIDE_CREATED", {

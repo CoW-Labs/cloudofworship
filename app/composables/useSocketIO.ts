@@ -461,6 +461,11 @@ export const useSocketIO = (options: SocketIOOptions) => {
         onMessage?.('slide-deleted', { action: 'slide-deleted', data })
       })
 
+      // How far a teammate's media upload has got, for a slide shared early.
+      socket.on('slide-upload-progress', (data) => {
+        onMessage?.('slide-upload-progress', { action: 'slide-upload-progress', data })
+      })
+
       socket.on('slides-batch-created', (data) => {
         onMessage?.('slides-batch-created', { action: 'slides-batch-created', data })
       })

@@ -112,6 +112,21 @@ export interface Slide {
    * audio without looking the pair up. Never persisted.
    */
   livePair?: LivePairStamp
+  /**
+   * Client-only. A media or presentation slide whose files are still going to
+   * the cloud. Teammates receive the slide straight away in this state and
+   * cannot use it until the creator sends the finished slide (`null`). The
+   * percentage is not stored here, see `useSlideUploadProgress`. Never sent to
+   * the REST API or saved to the library.
+   */
+  pendingUpload?: PendingUpload | null
+}
+
+export interface PendingUpload {
+  /** `uploading`: the creator's upload is running. `device-only`: it could not finish, so the media is only on the creator's device. */
+  state: "uploading" | "device-only"
+  ownerId: string
+  ownerName: string
 }
 
 export type SlidePairLayout =
@@ -618,6 +633,8 @@ export interface SlideStyle {
   mediaCommandAt?: number
   mediaSeekPosition?: number // 0 or -1, -1 means not at the beginning
   isMediaMuted?: boolean
+  /** 0 to 1, missing means full volume */
+  mediaVolume?: number
   windowPadding?: {
     left?: number
     right?: number

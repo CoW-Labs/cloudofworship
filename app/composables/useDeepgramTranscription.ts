@@ -212,6 +212,15 @@ export default function useDeepgramTranscription() {
     }
   }
 
+  // Reference offsets are relative to the line they were parsed from, so they
+  // are only valid on a segment whose text matches that line.
+  let pendingServerReferences: BibleReference[] | null = null
+  const referencesFitText = (text: string, refs: BibleReference[]) =>
+    refs.every(ref =>
+      ref.endIndex <= text.length
+      && text.slice(ref.startIndex, ref.endIndex).toLowerCase() === ref.text.toLowerCase(),
+    )
+
   const createSegmentFromText = (text: string, refsFromServer?: BibleReference[]) => {
     if (!text?.trim()) return
     const cleaned = text?.trim()
@@ -219,9 +228,15 @@ export default function useDeepgramTranscription() {
     // Server-parsed references are authoritative when present.
     // Fall back to the client parser only if the server didn't send any —
     // useful during dev/local where the backend may be older.
+    // References the server sent while this line was still being spoken wait in
+    // `pendingServerReferences`; take them only if they fit this exact text.
+    const pending = pendingServerReferences
+    pendingServerReferences = null
     const references = refsFromServer && refsFromServer.length > 0
       ? refsFromServer
-      : useBibleReferenceParser(cleaned)
+      : pending && referencesFitText(cleaned, pending)
+        ? pending
+        : useBibleReferenceParser(cleaned)
 
     state.value.segments.push({
       id: useObjectID(),
@@ -246,9 +261,20 @@ export default function useDeepgramTranscription() {
   const applyServerReferences = (references: BibleReference[], meta: ReferenceMessageMeta = {}) => {
     if (!references?.length) return
 
+    // Interim references describe the line still being spoken, not the last
+    // finished one, so they must not be written onto the previous segment.
     const lastSegment = state.value.segments[state.value.segments.length - 1]
-    if (lastSegment) {
+    const lineInProgress = !!state.value.currentTranscript?.trim() && !meta.isFinal && !meta.speechFinal
+    const finalForLast = !!(meta.isFinal || meta.speechFinal)
+    if (
+      lastSegment && !lineInProgress
+      && (referencesFitText(lastSegment.text, references)
+        || (finalForLast && references.every(ref => ref.endIndex <= lastSegment.text.length)))
+    ) {
       lastSegment.bibleReferences = references
+      pendingServerReferences = null
+    } else {
+      pendingServerReferences = references
     }
 
     // Auto go-live with the first reference if cooldown has elapsed. Repeated
@@ -256,8 +282,9 @@ export default function useDeepgramTranscription() {
     // final result that corrects the provisional reference is allowed through.
     // A chapter-only mention ("Joshua chapter 14") stays a click target: interim
     // text can say the chapter before the verse, and a casual mention should not
-    // move the projector.
-    const firstReference = references.find((reference) => !reference.chapterOnly)
+    // move the projector. An inferred reference (a verse placed from context) is
+    // a click target too: the server guessed which passage it belongs to.
+    const firstReference = references.find((reference) => !reference.chapterOnly && !reference.inferred)
     if (!firstReference) return
 
     const nextReference = firstReference.shortLabel

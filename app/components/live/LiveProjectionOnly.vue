@@ -1337,6 +1337,10 @@ const effectiveMuted = computed(
     !props.fullScreen ||
     !!props.slide?.slideStyle?.isMediaMuted
 )
+const mediaVolume = computed(() => {
+  const v = props.slide?.slideStyle?.mediaVolume
+  return typeof v === "number" ? Math.min(1, Math.max(0, v)) : 1
+})
 const sendEmbedMute = () => {
   const data = props.slide?.data as ExternalVideo | undefined
   const target = iframe.value?.contentWindow
@@ -1352,10 +1356,21 @@ const sendEmbedMute = () => {
         }),
         "*"
       )
+      if (!effectiveMuted.value) {
+        safePostMessage(
+          target,
+          JSON.stringify({
+            event: "command",
+            func: "setVolume",
+            args: [Math.round(mediaVolume.value * 100)],
+          }),
+          "*"
+        )
+      }
     } else {
       safePostMessage(
         target,
-        JSON.stringify({ method: "setVolume", value: effectiveMuted.value ? 0 : 1 }),
+        JSON.stringify({ method: "setVolume", value: effectiveMuted.value ? 0 : mediaVolume.value }),
         "*"
       )
     }
@@ -1366,6 +1381,19 @@ const sendEmbedMute = () => {
 watch(effectiveMuted, (muted, wasMuted) => {
   if (muted !== wasMuted) sendEmbedMute()
 })
+// Files take the level straight on the element; embeds through their API.
+const applyMediaVolume = () => {
+  if (video.value) video.value.volume = mediaVolume.value
+  if (audio.value) audio.value.volume = mediaVolume.value
+}
+watch(
+  [mediaVolume, video, audio, () => props.slide?.id],
+  () => {
+    applyMediaVolume()
+    if (!effectiveMuted.value) sendEmbedMute()
+  },
+  { flush: "post", immediate: true }
+)
 
 // Hand a playing video or audio file over to whichever element shows this
 // slide next, so moving between a single slide and a pair (or hiding a pair
