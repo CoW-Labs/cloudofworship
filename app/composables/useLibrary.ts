@@ -2,8 +2,8 @@ import { useAuthStore } from '~/store/auth'
 import { useAppStore } from '~/store/app'
 import type { LibraryItem, Slide, Song } from '~/types'
 import { liveQuery } from 'dexie'
-import { useObservable } from '@vueuse/rxjs'
 import { useOnline } from '@vueuse/core'
+import type { ShallowRef } from 'vue'
 import fuzzysort from 'fuzzysort'
 import { safeDBGet } from './useIndexedDB'
 import { isSongNewer } from '~/utils/songVersion'
@@ -19,6 +19,92 @@ let libraryRefreshInFlight: Promise<void> | null = null
 // won't change on retry, so those aren't re-posted on every sync this session.
 const songUploadsInFlight = new Set<string>()
 const songUploadsRejected = new Set<string>()
+
+type LibraryKind = 'song' | 'slide'
+
+// One live query per kind, shared by every useLibrary() caller. Each call used
+// to open its own full-table query that re-read and re-sorted every song and
+// slide on any write to the table. Per-kind queries over the `type` index only
+// re-run when that kind's rows change, so saving a slide no longer re-reads the
+// song catalogue. The lists are shallow: nothing mutates items in place, and
+// deep proxies over thousands of lyric records are pure overhead.
+const sharedLibrary: Record<LibraryKind, ShallowRef<LibraryItem[]>> = {
+  song: shallowRef<LibraryItem[]>([]),
+  slide: shallowRef<LibraryItem[]>([]),
+}
+const librarySubscribed: Record<LibraryKind, boolean> = {
+  song: false,
+  slide: false,
+}
+
+const libraryStamp = (item: LibraryItem) =>
+  item.updatedAt || item.createdAt || ''
+
+const ensureLibrarySubscriptions = () => {
+  if (!import.meta.client) return
+  ;(['song', 'slide'] as LibraryKind[]).forEach((kind) => {
+    if (librarySubscribed[kind]) return
+    librarySubscribed[kind] = true
+    liveQuery(async () => {
+      // Sorted here, not through the `updatedAt` index: a record with no
+      // `updatedAt` (a catalogue song written by a script, say) is left out of
+      // an index, so ordering by it would drop that song from the Library.
+      const data = await useIndexedDB()
+        .library.where('type')
+        .equals(libraryTypes[kind])
+        .toArray()
+      return data.sort((a, b) =>
+        libraryStamp(a) < libraryStamp(b)
+          ? 1
+          : libraryStamp(a) > libraryStamp(b)
+            ? -1
+            : 0
+      )
+    }).subscribe({
+      next: (items) => {
+        sharedLibrary[kind].value = items
+      },
+      error: (error) => {
+        // Let the next useLibrary() call resubscribe (a closed connection, say).
+        console.warn(`Library ${kind} live query stopped:`, error)
+        librarySubscribed[kind] = false
+      },
+    })
+  })
+}
+
+// Fuzzy-search targets, prepared once per list. fuzzysort re-parses every key
+// of every item on each keystroke unless it is handed prepared strings, and
+// resolving nested paths like `content.title` does the same work again.
+type LibrarySearchTarget = {
+  item: LibraryItem
+  id: Fuzzysort.Prepared
+  kind: Fuzzysort.Prepared
+  title: Fuzzysort.Prepared
+  name: Fuzzysort.Prepared
+  artist: Fuzzysort.Prepared
+}
+const librarySearchTargets = new WeakMap<LibraryItem[], LibrarySearchTarget[]>()
+const LIBRARY_SEARCH_LIMIT = 200
+
+const searchTargetsFor = (items: LibraryItem[]): LibrarySearchTarget[] => {
+  const cached = librarySearchTargets.get(items)
+  if (cached) return cached
+  const prep = (value: unknown) => fuzzysort.prepare(String(value ?? ''))
+  const targets = items.map((item) => {
+    const content: any = item.content || {}
+    return {
+      item,
+      id: prep(item.id),
+      kind: prep(content.type),
+      title: prep(content.title),
+      name: prep(content.name),
+      artist: prep(content.artist),
+    }
+  })
+  librarySearchTargets.set(items, targets)
+  return targets
+}
 
 export default function useLibrary() {
   const authStore = useAuthStore()
@@ -62,28 +148,17 @@ export default function useLibrary() {
   // `library` table (including the delete+put during a refresh), so flipping
   // the skeleton on each emission causes a visible flash. `loading` is owned by
   // the fetch/refresh functions instead.
-  const libraryItems = useObservable<LibraryItem[]>(
-    liveQuery(async () => {
-      // Sorted here, not through the `updatedAt` index: a record with no
-      // `updatedAt` (a catalogue song written by a script, say) is left out of
-      // an index, so ordering by it would drop that song from the Library.
-      const data = await useIndexedDB().library.toArray()
-      const stamp = (item: LibraryItem) => item.updatedAt || item.createdAt || ''
-      return data.sort((a, b) => (stamp(a) < stamp(b) ? 1 : stamp(a) > stamp(b) ? -1 : 0))
-    }) as any
-  )
+  ensureLibrarySubscriptions()
 
-  // Computed: Filter songs from library
-  const savedSongs = computed(() => {
-    return (
-      libraryItems?.value?.filter((item) => item.type === libraryTypes.song) || []
-    )
-  })
+  const savedSongs = sharedLibrary.song
+  const savedSlides = sharedLibrary.slide
 
-  // Computed: Filter slides from library
-  const savedSlides = computed(() => {
-    return libraryItems?.value?.filter((item) => item.type === libraryTypes.slide) || []
-  })
+  // Both lists together, kept for callers that want everything. Nothing in the
+  // hot path reads it, so the concat only runs when someone does.
+  const libraryItems = computed<LibraryItem[]>(() => [
+    ...savedSongs.value,
+    ...savedSlides.value,
+  ])
 
   /**
    * Fetch saved slides from the API and cache them in IndexedDB.
@@ -663,32 +738,29 @@ export default function useLibrary() {
   /**
    * Search library items using fuzzy search
    */
-  const searchLibraryItems = (query: string = ''): LibraryItem[] => {
+  const searchLibraryItems = (
+    query: string = '',
+    kind?: LibraryKind
+  ): LibraryItem[] => {
     if (!query || query.length < 2) {
       return []
     }
 
-    // Cast LibraryItem to Fuzzysort.Prepared to avoid errors
-    const tempLibraryItems = [...(libraryItems.value || [])].map(
-      (item) => item as unknown as Fuzzysort.Prepared
-    )
+    // Only the list being looked at is searched when the caller says which.
+    const items = kind
+      ? sharedLibrary[kind].value
+      : [...sharedLibrary.song.value, ...sharedLibrary.slide.value]
 
-    let results: Array<Fuzzysort.Result> | any = fuzzysort.go(
+    const results = fuzzysort.go(
       query,
-      tempLibraryItems,
+      searchTargetsFor(items),
       {
-        keys: [
-          'id',
-          'content.type',
-          'content.title',
-          'content.name',
-          'content.artist',
-        ],
+        keys: ['id', 'kind', 'title', 'name', 'artist'],
+        limit: LIBRARY_SEARCH_LIMIT,
       }
     )
 
-    results = results?.map((result: Fuzzysort.Result | any) => result.obj)
-    return results as LibraryItem[]
+    return results.map((result) => result.obj.item)
   }
 
   /**

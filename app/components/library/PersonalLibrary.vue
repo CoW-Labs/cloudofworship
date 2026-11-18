@@ -32,7 +32,6 @@
           v-model="searchInput"
           class="w-[100%] cow-search-input"
           @input="onSearchInput"
-          @input.capture="searching = true"
           @keyup.enter="null"
         >
           <template #leading>
@@ -144,10 +143,11 @@
             <RecycleScroller
               v-else
               class="h-[calc(100vh-300px)]"
-              :items="savedSlides"
+              :items="shownSlides"
               :item-size="84"
               key-field="id"
               v-slot="{ item: slide }"
+              @scroll-end="loadMoreSlides"
             >
               <ListSlideCard
                 :key="slide.content.id"
@@ -342,14 +342,23 @@ const loadMoreSongs = () => {
   if (libraryEndIndex.value >= (savedSongs.value?.length || 0)) return
   libraryEndIndex.value += 15
 }
-const searchedLibraryItems = ref<any[]>([])
-// Search is local (fuzzysort over IndexedDB), so it keeps its own flag rather
-// than touching `loading`, which tracks the network sync.
-const searching = ref(false)
+// Slide rows are taller and heavier than song rows, so the first page is
+// smaller; more load as the list is scrolled to its end.
+const slidesEndIndex = ref<number>(20)
+// A stable array between pages, so an unrelated re-render does not hand the
+// scroller a fresh list to diff.
+const shownSlides = computed(() =>
+  (savedSlides.value || []).slice(0, slidesEndIndex.value)
+)
+const loadMoreSlides = () => {
+  if (slidesEndIndex.value >= (savedSlides.value?.length || 0)) return
+  slidesEndIndex.value += 20
+}
+const searchedLibraryItems = shallowRef<any[]>([])
 // The cached library renders straight away; the skeleton only covers a sync
-// when this device has nothing saved for the open tab yet.
+// when this device has nothing saved for the open tab yet. Search is local and
+// synchronous, so it never shows one.
 const showSkeleton = computed(() => {
-  if (searching.value) return true
   const cached =
     activeLibraryTab.value === 0 ? savedSongs.value : savedSlides.value
   return loading.value && !cached?.length
@@ -437,19 +446,25 @@ const editSong = (song: Song) => {
 const performSearch = (query: string = "") => {
   if (!query || query.length < 2) {
     searchedLibraryItems.value = []
-    searching.value = false
     return
   }
 
-  const results = searchLibraryItems(query)
-  searchedLibraryItems.value = results
-  searching.value = false
+  // Search only the open tab: the other list's results would be filtered out
+  // below anyway.
+  searchedLibraryItems.value = searchLibraryItems(
+    query,
+    activeLibraryTab.value === 0 ? "song" : "slide"
+  )
 }
 
+// Cheap now (prepared keys, one list, capped results), so a short debounce
+// keeps results close behind typing.
 const onSearchInput = useDebounceFn(() => {
-  searching.value = true
   performSearch(searchInput.value)
-}, 500)
+}, 150)
+
+// The results belong to the tab they were searched in.
+watch(activeLibraryTab, () => performSearch(searchInput.value))
 
 onMounted(() => {
   // Re-sync in the background only if the last sync is stale; don't hold the

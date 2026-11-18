@@ -1,35 +1,35 @@
 <template>
   <Transition name="fade-sm">
+    <!-- Poster ground (purple-500) with night ink: the brand's loud band.
+         Same in light and dark, as the design system keeps poster tokens. -->
     <div
       v-if="showBanner"
-      class="subscription-expiry-banner w-full shrink-0 bg-amber-50 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-700 px-4 py-2 flex items-center justify-between gap-4 text-sm"
+      class="subscription-expiry-banner w-full shrink-0 bg-purple-500 text-[#0c0f19] px-4 py-2 flex items-center justify-between gap-4 text-sm"
     >
-      <div
-        class="flex items-center gap-2 text-amber-800 dark:text-amber-200 w-full"
-      >
+      <div class="flex items-center gap-2 w-full">
         <Icon name="i-bx-time-five" class="w-4 h-4 shrink-0" />
-        <span class="block w-[100%] text-center">
-          Your <strong>Teams</strong> subscription
-          <strong>{{ expiryLabel }}</strong
-          >. Renew to keep access to all premium features.
+        <span class="block w-[100%] text-center font-medium">
+          Your <strong class="font-semibold">Teams</strong> plan
+          <strong class="font-semibold">{{ expiryLabel }}</strong
+          >. Renew before Sunday notices.
         </span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <UButton
-          size="xs"
-          color="amber"
-          variant="solid"
+        <button
+          type="button"
+          class="h-7 px-4 rounded-full bg-[#0c0f19] text-white text-xs font-medium shadow-[0_3px_0_0_#1f232c] hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c0f19]"
           @click="openUpgradePlanModal"
         >
           Renew
-        </UButton>
-        <UButton
-          size="xs"
-          color="amber"
-          variant="ghost"
-          icon="i-mdi-close"
+        </button>
+        <button
+          type="button"
+          aria-label="Dismiss"
+          class="size-7 grid place-items-center rounded-full hover:bg-[#0c0f19]/10 transition"
           @click="dismiss"
-        />
+        >
+          <Icon name="i-mdi-close" class="w-4 h-4" />
+        </button>
       </div>
     </div>
   </Transition>
