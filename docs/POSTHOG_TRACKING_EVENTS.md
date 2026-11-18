@@ -88,6 +88,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `GO_LIVE_BUTTON_CLICKED` | - | User opens live projection window | ✅ Exists |
 | `CLOSE_LIVE_WINDOW_BUTTON_CLICKED` | - | Live window closed | ✅ Exists |
 | `SLIDE_PRESENTED_LIVE` | `slideType`, `slideLayout`, `slideId` | Slide broadcasted to live output | ✅ Added |
+| `SLIDES_OUTPUT_OPENED` | `platform` (`web` or `desktop`) | Go Live opened the slides-only display on its assigned screen | ✅ Added |
 | `SLIDES_REORDERED` | `slideCount` | User reorders slides in live output | ✅ Added |
 | `LIVE_SESSION_STARTED` | `scheduleId`, `slideCount` | First slide goes live in a session | ⚠️ Missing |
 | `LIVE_SESSION_ENDED` | `scheduleId`, `sessionDuration`, `totalSlides` | Live window closed after session | ⚠️ Missing |
@@ -137,6 +138,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `FOOTNOTES_SETTINGS_CHANGED` | - | Footnote display toggled | ✅ Exists |
 | `SONG_AND_HYMN_LABELS_SETTINGS_CHANGED` | - | Label display preferences changed | ✅ Exists |
 | `TRANSITION_INTERVAL_SETTINGS_CHANGED` | - | Slide transition timing updated | ✅ Exists |
+| `DISPLAY_ROLE_CHANGED` | `role` (`Live display`, `Stage display`, `Slides-only display` or `none`), `previousRole` | A screen was given or lost a role in Display settings | ✅ Added |
 | `WINDOW_PADDING_SETTINGS_CHANGED` | - | Display padding adjusted | ✅ Exists |
 | `DEFAULT_BACKGROUND_SETTINGS_CHANGED` | - | Default slide background set | ✅ Exists |
 | `TOGGLE_DARK_MODE` | `darkMode` | Theme toggled | ✅ Exists |

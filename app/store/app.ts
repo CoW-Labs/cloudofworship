@@ -226,6 +226,8 @@ export const useAppStore = defineStore("app", {
         mainDisplayScreen: null,
         stageDisplayLabel: "",
         stageDisplayScreen: null,
+        slidesDisplayLabel: "",
+        slidesDisplayScreen: null,
         stageTimer: defaultStageTimerState(),
         defaultMicrophoneId: "",
         defaultCameraId: "",
@@ -755,6 +757,12 @@ export const useAppStore = defineStore("app", {
     },
     setStageDisplayScreen(screen: Screen | null) {
       this.currentState.stageDisplayScreen = screen
+    },
+    setSlidesDisplayLabel(label: string) {
+      this.currentState.slidesDisplayLabel = label
+    },
+    setSlidesDisplayScreen(screen: Screen | null) {
+      this.currentState.slidesDisplayScreen = screen
     },
     /**
      * Replace the stage timer wholesale. The reading is derived from these

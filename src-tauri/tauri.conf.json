@@ -36,7 +36,7 @@
       "capabilities": [
         {
           "identifier": "main-capability",
-          "windows": ["main", "live-output", "stage-display"],
+          "windows": ["main", "live-output", "stage-display", "slides-output"],
           "permissions": [
             "core:default",
             "core:webview:allow-create-webview-window",

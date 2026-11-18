@@ -828,6 +828,10 @@ export interface AppState {
   // operator has not assigned one — the stage display then opens in a new tab.
   stageDisplayLabel: string
   stageDisplayScreen: Screen | null
+  // Screen the Slides-only display opens on at Go Live. Empty when none is
+  // assigned, in which case Go Live opens only the live output.
+  slidesDisplayLabel: string
+  slidesDisplayScreen: Screen | null
   // The stage display's clock — a count-up timer for the service, or a
   // countdown the operator sent to the stage only. Driven from quick actions
   // so the same clock runs on every stage screen at once.

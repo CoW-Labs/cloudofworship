@@ -5,7 +5,8 @@
   "windows": [
     "main",
     "live-output",
-    "stage-display"
+    "stage-display",
+    "slides-output"
   ],
   "permissions": [
     "core:default",
