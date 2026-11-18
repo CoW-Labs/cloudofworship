@@ -555,6 +555,7 @@ import {
 import { editingMemberOf, livePayloadForSlide } from "~/composables/useSlidePairs"
 import { tabSessionId } from "~/composables/useRealtimeSlides"
 import { shortcutIds } from "~/utils/shortcuts"
+import { canvasHasSelection } from "~/composables/useCanvasEditor"
 import { recordUndoStep } from "~/utils/undoHistory"
 
 const appStore = useAppStore()
@@ -929,6 +930,7 @@ const previousSlide = computed(() => {
 onMounted(() => {
   shortcutCleanups.push(
     useRegisteredShortcut(shortcutIds.nextSlide, () => {
+      if (canvasHasSelection()) return false
       if (nextSlide.value) {
         setLiveSlide(nextSlide.value.id)
         return true
@@ -938,6 +940,7 @@ onMounted(() => {
   )
   shortcutCleanups.push(
     useRegisteredShortcut(shortcutIds.previousSlide, () => {
+      if (canvasHasSelection()) return false
       if (previousSlide.value) {
         setLiveSlide(previousSlide.value.id)
         return true

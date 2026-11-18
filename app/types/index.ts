@@ -654,7 +654,46 @@ export interface SlideStyle {
   theme?: string // Theme ID for slide styling (e.g., for Bible slides)
   overlayPlacement?: OverlayPosition
   overlayScale?: number
+  /**
+   * Free-form text layout. When present (and not empty) each box places one
+   * block of the slide's text, or its own text, instead of the layout's flow.
+   * Absent means the slide still follows the layout, padding and alignment.
+   */
+  textBoxes?: TextBox[]
+  /** Colour of the slide's text (a hex). Missing means the slide's own. */
+  textColor?: string
 }
+
+/**
+ * One block of text on a slide's canvas. Position and size are fractions of
+ * the slide (0 to 1), so a layout looks the same on every screen.
+ */
+export interface TextBox {
+  id: string
+  x: number
+  y: number
+  w: number
+  h: number
+  z?: number
+  /** Index into `slide.contents`, or "custom" for a box that holds its own text. */
+  source: number | "custom"
+  /** The text of a custom box. */
+  html?: string
+  /** Scales this box's text against the slide's font size. 100 is unchanged. */
+  fontSizePercent?: number
+  alignment?: "left" | "center" | "right"
+  /** This box's text colour (a hex). Missing follows the slide's. */
+  color?: string
+  /** Per-box text styles. Missing follows the slide's own setting; false turns it off here. */
+  bold?: boolean
+  uppercase?: boolean
+  outlined?: boolean
+  linesBackground?: boolean
+  /** This box's font family. Missing follows the slide's. */
+  font?: string
+}
+
+export type TransitionType = "fade" | "drift" | "breathe" | "cascade"
 
 export type OverlayPosition =
   | "top-left"

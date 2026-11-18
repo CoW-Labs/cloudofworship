@@ -44,20 +44,6 @@
           <ItalicIcon class="w-4 h-4" />
         </UButton>
       </CowTooltip>
-      <CowTooltip text="Strikethrough" shortcut="strike">
-        <UButton
-          @click="runCommand((chain) => chain.toggleStrike())"
-          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
-          :class="{
-            'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
-              editor.isActive('strike'),
-          }"
-          variant="ghost"
-          color="gray"
-        >
-          <StrikethroughIcon class="w-4 h-4" />
-        </UButton>
-      </CowTooltip>
       <!-- <UButton
       @click="editor.chain().focus().toggleCode().run()"
       :disabled="!editor.can().chain().focus().toggleCode().run()"
@@ -72,45 +58,6 @@
         :editor="editor"
         @change="onFontSizeChange"
       />
-      <CowTooltip text="Normal text" shortcut="paragraph">
-        <UButton
-          @click="setParagraph()"
-          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
-          :class="{
-            'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
-              editor.isActive('paragraph'),
-          }"
-          icon="i-bx-paragraph"
-          variant="ghost"
-          color="gray"
-        />
-      </CowTooltip>
-      <CowTooltip text="Bullet list" shortcut="bullet-list">
-        <UButton
-          @click="runCommand((chain) => chain.toggleBulletList())"
-          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
-          :class="{
-            'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
-              editor.isActive('bulletList'),
-          }"
-          icon="i-bx-list-ul"
-          variant="ghost"
-          color="gray"
-        />
-      </CowTooltip>
-      <CowTooltip text="Numbered list" shortcut="ordered-list">
-        <UButton
-          @click="runCommand((chain) => chain.toggleOrderedList())"
-          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
-          :class="{
-            'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
-              editor.isActive('orderedList'),
-          }"
-          icon="i-bx-list-ol"
-          variant="ghost"
-          color="gray"
-        />
-      </CowTooltip>
       <div
         class="button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 flex items-center gap-1"
       >
@@ -201,32 +148,151 @@
           />
         </template>
       </UPopover>
-      <CowTooltip text="Quote" shortcut="blockquote">
-        <UButton
-          @click="runCommand((chain) => chain.toggleBlockquote())"
-          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
-          :class="{
-            'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
-              editor.isActive('blockquote'),
-          }"
-          icon="i-bx-bxs-quote-right"
-          variant="ghost"
-          color="gray"
-        />
-      </CowTooltip>
-      <CowTooltip text="Code block" shortcut="code-block">
-        <UButton
-          @click="runCommand((chain) => chain.toggleCodeBlock())"
-          class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
-          :class="{
-            'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
-              editor.isActive('codeBlock'),
-          }"
-          icon="i-bx-code-curly"
-          variant="ghost"
-          color="gray"
-        />
-      </CowTooltip>
+      <!-- TEXT BOXES: free-form text on the slide's canvas -->
+      <div
+        v-if="canvasAvailable"
+        class="button-group bg-gray-100 dark:bg-[#171d2b] rounded-full mx-1 p-1 flex items-center gap-1"
+      >
+        <CowTooltip text="Add text box">
+          <UButton
+            @click="addTextBox"
+            :disabled="!canvasCanAdd"
+            class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
+            icon="i-ph-textbox"
+            aria-label="Add text box"
+            variant="ghost"
+            color="gray"
+          />
+        </CowTooltip>
+        <CowTooltip v-if="canvasHasLayout" text="Reset text layout">
+          <UButton
+            @click="resetTextLayout"
+            class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
+            icon="i-ph-arrow-counter-clockwise"
+            aria-label="Reset text layout"
+            variant="ghost"
+            color="gray"
+          />
+        </CowTooltip>
+      </div>
+      <!-- MORE: the less-used block formats -->
+      <UPopover
+        v-model:open="morePopoverOpen"
+        mode="click"
+        :popper="{ placement: 'bottom', strategy: 'fixed' }"
+        :ui="{
+          rounded: 'rounded-full',
+          shadow: 'shadow-xl',
+          container: 'z-50',
+        }"
+        @update:open="onMorePopoverOpenChange"
+      >
+        <CowTooltip text="More" :prevent="morePopoverOpen">
+          <UButton
+            class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+            :class="{
+              'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+                morePopoverOpen,
+            }"
+            icon="i-ph-dots-three-bold"
+            aria-label="More formatting"
+            variant="ghost"
+            color="gray"
+          />
+        </CowTooltip>
+        <template #panel>
+          <div
+            class="flex items-center gap-1 px-2 py-1 rounded-full overflow-hidden"
+            @mousedown.prevent
+          >
+            <CowTooltip text="Strikethrough" shortcut="strike">
+              <UButton
+                @click="onMoreCommand(() => runCommand((chain) => chain.toggleStrike()))"
+                class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+                :class="{
+                  'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+                    editor.isActive('strike'),
+                }"
+                aria-label="Strikethrough"
+                variant="ghost"
+                color="gray"
+              >
+                <StrikethroughIcon class="w-4 h-4" />
+              </UButton>
+            </CowTooltip>
+            <CowTooltip text="Normal text" shortcut="paragraph">
+              <UButton
+                @click="onMoreCommand(() => setParagraph())"
+                class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+              :class="{
+                'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+                  editor.isActive('paragraph'),
+              }"
+                icon="i-bx-paragraph"
+                aria-label="Normal text"
+                variant="ghost"
+                color="gray"
+              />
+            </CowTooltip>
+            <CowTooltip text="Bullet list" shortcut="bullet-list">
+              <UButton
+                @click="onMoreCommand(() => runCommand((chain) => chain.toggleBulletList()))"
+                class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+              :class="{
+                'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+                  editor.isActive('bulletList'),
+              }"
+                icon="i-bx-list-ul"
+                aria-label="Bullet list"
+                variant="ghost"
+                color="gray"
+              />
+            </CowTooltip>
+            <CowTooltip text="Numbered list" shortcut="ordered-list">
+              <UButton
+                @click="onMoreCommand(() => runCommand((chain) => chain.toggleOrderedList()))"
+                class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+              :class="{
+                'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+                  editor.isActive('orderedList'),
+              }"
+                icon="i-bx-list-ol"
+                aria-label="Numbered list"
+                variant="ghost"
+                color="gray"
+              />
+            </CowTooltip>
+            <CowTooltip text="Quote" shortcut="blockquote">
+              <UButton
+                @click="onMoreCommand(() => runCommand((chain) => chain.toggleBlockquote()))"
+                class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+              :class="{
+                'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+                  editor.isActive('blockquote'),
+              }"
+                icon="i-bx-bxs-quote-right"
+                aria-label="Quote"
+                variant="ghost"
+                color="gray"
+              />
+            </CowTooltip>
+            <CowTooltip text="Code block" shortcut="code-block">
+              <UButton
+                @click="onMoreCommand(() => runCommand((chain) => chain.toggleCodeBlock()))"
+                class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+              :class="{
+                'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
+                  editor.isActive('codeBlock'),
+              }"
+                icon="i-bx-code-curly"
+                aria-label="Code block"
+                variant="ghost"
+                color="gray"
+              />
+            </CowTooltip>
+          </div>
+        </template>
+      </UPopover>
     </div>
     </div>
     <CowScrollFade
@@ -243,42 +309,29 @@
 import type { Editor } from "@tiptap/core"
 import { asFontFamily } from "~/utils/fontFamily"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
+import { useCanvasEditor } from "~/composables/useCanvasEditor"
+import { textColorPalette } from "~/utils/textColors"
 
 const props = defineProps<{
   editor?: Editor
+  /** The slide being edited, so the toolbar can reach its text boxes. */
+  slideId?: string
 }>()
+
+const {
+  available: canvasAvailable,
+  canAdd: canvasCanAdd,
+  hasLayout: canvasHasLayout,
+  add: addTextBox,
+  reset: resetTextLayout,
+} = useCanvasEditor(() => props.slideId)
 
 const scrollStrip = ref<HTMLElement | null>(null)
 const { start: fadeStart, end: fadeEnd } = useScrollEdgeFade(scrollStrip)
 const savedSelection = ref<{ from: number; to: number } | null>(null)
 const colorPaletteOpen = ref(false)
 const fontMenuOpen = ref(false)
-const textColorPalette = [
-  "#FFFFFF",
-  "#DDE1E8",
-  "#818CF8",
-  "#E8D1F8",
-  "#BD7AEA",
-  "#7209B7",
-  "#FCEFD4",
-  "#F6D08E",
-  "#EFAD3E",
-  "#F79009",
-  "#F97066",
-  "#B42318",
-  "#D1FADF",
-  "#32D583",
-  "#14B8A6",
-  "#027A48",
-  "#D1E0FF",
-  "#528BFF",
-  "#2970FF",
-  "#004EEB",
-  "#22D3EE",
-  "#3B4252",
-  "#131724",
-  "#0D0F1A",
-]
+const morePopoverOpen = ref(false)
 
 const isEditorReady = computed(() => {
   const editor = props.editor
@@ -379,6 +432,16 @@ const onColorPaletteOpenChange = (open: boolean) => {
   }
 
   onFontMenuClose()
+}
+
+const onMorePopoverOpenChange = (open: boolean) => {
+  if (open) saveSelection()
+}
+
+// Run a command from the More popover, then close it.
+const onMoreCommand = (run: () => void) => {
+  run()
+  morePopoverOpen.value = false
 }
 
 const runCommand = (

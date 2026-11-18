@@ -58,6 +58,13 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `SLIDE_EDITED` | `slideType`, `slideId` | Slide content modified | ⚠️ Missing |
 | `SLIDE_BACKGROUND_CHANGED` | `backgroundType`, `slideType` | Slide background updated | ⚠️ Missing |
 | `SLIDE_LAYOUT_CHANGED` | `oldLayout`, `newLayout`, `slideType` | Slide layout changed | ⚠️ Missing |
+| `CANVAS_BOX_MOVED` | `slideType`, `method` (`keyboard` only; omitted for a drag) | A text box was moved on the slide canvas; one event per drop, never per pointer move | ✅ Added |
+| `CANVAS_BOX_RESIZED` | `slideType` | A text box was resized from a corner; one event per drop | ✅ Added |
+| `CANVAS_BOX_ADDED` | `slideType` | A custom text box was added to a slide | ✅ Added |
+| `CANVAS_BOX_DELETED` | `slideType` | A custom text box was deleted | ✅ Added |
+| `CANVAS_BOX_STYLED` | `slideType`, `property` (`alignment`, `fontSizePercent`, `color`, `bold`, `uppercase`, `outlined`, `linesBackground` or `font`) | A toolbar text style change was applied to the selected text box | ✅ Added |
+| `SLIDE_TEXT_COLOR_CHANGED` | `slideType` | A text colour was picked for a song, hymn, setlist or Bible slide; a pick while a text box is selected is `CANVAS_BOX_STYLED` instead | ✅ Added |
+| `CANVAS_LAYOUT_RESET` | `slideType` | A slide's text boxes were removed, returning it to its own layout | ✅ Added |
 
 ---
 

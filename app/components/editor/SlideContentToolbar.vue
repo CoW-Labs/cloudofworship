@@ -197,34 +197,6 @@
             </CowTooltip>
 
             <!-- TEXT STYLE TOGGLES: kept together at the front of the strip -->
-            <!-- SLIDE CONTENT AUTO-FIT CONTROLS -->
-            <CowTooltip
-              text="Fit each line on one row"
-              v-if="
-                slide?.type === slideTypes?.song ||
-                slide?.type === slideTypes?.songSetlist ||
-                slide?.type === slideTypes?.hymn
-              "
-            >
-              <UButton
-                @click="
-                  $emit('update-style', {
-                    ...slide.slideStyle,
-                    autoFitLines: !slide?.slideStyle?.autoFitLines,
-                  })
-                "
-                class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
-                :class="{
-                  'toolbar-toggle-active': slide?.slideStyle?.autoFitLines,
-                }"
-                :aria-pressed="Boolean(slide?.slideStyle?.autoFitLines)"
-                aria-label="Fit each line on one row"
-                icon="i-tabler-arrow-autofit-width"
-                variant="ghost"
-                color="gray"
-              />
-            </CowTooltip>
-
             <!-- SONG TRANSLATION: only when the song on screen has one -->
             <CowTooltip v-if="hasSongTranslation" text="Show translation">
               <UButton
@@ -447,72 +419,6 @@
               @change="$emit('update-lines-per-slide', $event)"
             />
 
-            <FontSelect
-              v-if="
-                !(
-                  slide?.type === slideTypes?.media ||
-                  slide?.type === slideTypes?.presentation
-                )
-              "
-              size="lg"
-              :selected-font="slide?.slideStyle?.font"
-              class="min-w-[150px] top-[-4px]"
-              @change="$emit('update-font', $event)"
-            />
-
-            <!-- SLIDE CONTENT LINE HEIGHT CONTROLS -->
-            <CowTooltip
-              v-if="
-                !(
-                  slide?.type === slideTypes.text ||
-                  slide?.type === slideTypes.media ||
-                  slide?.type === slideTypes.presentation
-                )
-              "
-              text="Set line spacing"
-            >
-              <CowSelectMenu
-                v-model="lineSpacing"
-                size="md"
-                :select-class="`h-10 border-0 shadow-none outline-none text-center w-[120px] bg-gray-100 dark:bg-[#222938] dark:text-white rounded-full`"
-                variant="none"
-                color="gray"
-                clear-search-on-close
-                :popper="{ strategy: 'fixed' }"
-                :ui-menu="{
-                  width: 'w-[140px]',
-                  input: 'text-xs',
-                  empty: 'text-xs',
-                  option: {
-                    size: 'text-xs',
-                  },
-                }"
-                :options="Object.values(lineSpacingTypes)"
-                @change="
-                  $emit('update-style', {
-                    ...slide.slideStyle,
-                    lineSpacing: $event,
-                  })
-                "
-              >
-                <template #option="{ option: lineSpacing }">
-                  <span
-                    v-if="lineSpacing?.length"
-                    class="truncate capitalize"
-                    >{{ lineSpacing }}</span
-                  >
-                </template>
-                <template #label>
-                  <ParagraphSpacingIcon class="w-4 h-4" />
-                  <span
-                    v-if="lineSpacing?.length"
-                    class="truncate capitalize"
-                    >{{ lineSpacing }}</span
-                  >
-                </template>
-              </CowSelectMenu>
-            </CowTooltip>
-
             <!-- COUNTDOWN SLIDE CONTROLS -->
             <div
               v-if="slide?.type === slideTypes.countdown"
@@ -548,6 +454,41 @@
                 />
               </CowTooltip>
             </div>
+
+            <!-- TEXT COLOUR: the same swatches as the text slide toolbar -->
+            <UPopover
+              v-if="supportsTextStyling"
+              v-model:open="colorPaletteOpen"
+              mode="click"
+              :popper="{ placement: 'bottom', strategy: 'fixed' }"
+              :ui="{
+                ring: 'ring-0',
+                background: 'bg-transparent',
+                shadow: 'shadow-xl',
+              }"
+            >
+              <CowTooltip text="Text colour" :prevent="colorPaletteOpen">
+                <button
+                  type="button"
+                  class="toolbar-color-btn"
+                  :aria-label="`Change text color, current color ${currentTextColor}`"
+                >
+                  <span
+                    class="h-[15px] w-[15px] rounded-full ring-1 ring-black/15 dark:ring-white/25"
+                    :style="{ backgroundColor: currentTextColor }"
+                  ></span>
+                </button>
+              </CowTooltip>
+              <template #panel>
+                <BgColorSelection
+                  background-panel
+                  color-purpose="text"
+                  :colors="textColorPalette"
+                  :value="currentTextColor"
+                  @select="onTextColor($event.color)"
+                />
+              </template>
+            </UPopover>
 
             <!-- SLIDE CONTENT ALIGNMENT -->
             <div
@@ -630,6 +571,24 @@
               </CowTooltip>
             </div>
 
+            <!-- TEXT BOXES: boxes on these slides can be moved and resized; adding
+                 new ones is only offered on text slides for now. -->
+            <div
+              v-if="canvasAvailable && canvasHasLayout"
+              class="button-group rounded-md p-1 flex items-center gap-1"
+            >
+              <CowTooltip text="Reset text layout">
+                <UButton
+                  @click="resetTextLayout"
+                  class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+                  icon="i-ph-arrow-counter-clockwise"
+                  aria-label="Reset text layout"
+                  variant="ghost"
+                  color="gray"
+                />
+              </CowTooltip>
+            </div>
+
             <!-- SONG CONTROLS -->
             <div
               v-if="
@@ -663,6 +622,127 @@
                 >
               </CowTooltip>
             </div>
+            <!-- MORE: font, line spacing and auto-fit live behind one button -->
+            <UPopover
+              v-if="hasMoreItems"
+              v-model:open="morePopoverOpen"
+              mode="click"
+              :popper="{ placement: 'bottom-end', strategy: 'fixed' }"
+              :ui="{
+                rounded: 'rounded-full',
+                shadow: 'shadow-xl',
+                container: 'z-50',
+              }"
+            >
+              <CowTooltip text="More" :prevent="morePopoverOpen">
+                <UButton
+                  class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+                  :class="{ 'toolbar-toggle-active': morePopoverOpen }"
+                  :aria-expanded="morePopoverOpen"
+                  icon="i-ph-dots-three-bold"
+                  aria-label="More formatting"
+                  variant="ghost"
+                  color="gray"
+                />
+              </CowTooltip>
+              <template #panel>
+                <div class="flex items-center gap-1 rounded-full px-3 py-2">
+            <FontSelect
+              v-if="
+                !(
+                  slide?.type === slideTypes?.media ||
+                  slide?.type === slideTypes?.presentation
+                )
+              "
+              size="lg"
+              :selected-font="slide?.slideStyle?.font"
+              class="min-w-[150px]"
+              @change="$emit('update-font', $event)"
+            />
+
+            <!-- SLIDE CONTENT LINE HEIGHT CONTROLS -->
+            <CowTooltip
+              v-if="
+                !(
+                  slide?.type === slideTypes.text ||
+                  slide?.type === slideTypes.media ||
+                  slide?.type === slideTypes.presentation
+                )
+              "
+              text="Set line spacing"
+            >
+              <CowSelectMenu
+                v-model="lineSpacing"
+                size="md"
+                :select-class="`h-10 border-0 shadow-none outline-none text-center w-[120px] bg-gray-100 dark:bg-[#222938] dark:text-white rounded-full`"
+                variant="none"
+                color="gray"
+                clear-search-on-close
+                :popper="{ strategy: 'fixed' }"
+                :ui-menu="{
+                  width: 'w-[140px]',
+                  input: 'text-xs',
+                  empty: 'text-xs',
+                  option: {
+                    size: 'text-xs',
+                  },
+                }"
+                :options="Object.values(lineSpacingTypes)"
+                @change="
+                  $emit('update-style', {
+                    ...slide.slideStyle,
+                    lineSpacing: $event,
+                  })
+                "
+              >
+                <template #option="{ option: lineSpacing }">
+                  <span
+                    v-if="lineSpacing?.length"
+                    class="truncate capitalize"
+                    >{{ lineSpacing }}</span
+                  >
+                </template>
+                <template #label>
+                  <ParagraphSpacingIcon class="w-4 h-4" />
+                  <span
+                    v-if="lineSpacing?.length"
+                    class="truncate capitalize"
+                    >{{ lineSpacing }}</span
+                  >
+                </template>
+              </CowSelectMenu>
+            </CowTooltip>
+
+            <CowTooltip
+              text="Fit each line on one row"
+              v-if="
+                slide?.type === slideTypes?.song ||
+                slide?.type === slideTypes?.songSetlist ||
+                slide?.type === slideTypes?.hymn
+              "
+            >
+              <UButton
+                @click="
+                  $emit('update-style', {
+                    ...slide.slideStyle,
+                    autoFitLines: !slide?.slideStyle?.autoFitLines,
+                  })
+                "
+                class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
+                :class="{
+                  'toolbar-toggle-active': slide?.slideStyle?.autoFitLines,
+                }"
+                :aria-pressed="Boolean(slide?.slideStyle?.autoFitLines)"
+                aria-label="Fit each line on one row"
+                icon="i-tabler-arrow-autofit-width"
+                variant="ghost"
+                color="gray"
+              />
+            </CowTooltip>
+
+                </div>
+              </template>
+            </UPopover>
           </template>
         </div>
       </div>
@@ -700,6 +780,8 @@ import {
   lightLeakSliders,
   type CameraEffectChoice,
 } from "~/utils/camera"
+import { useCanvasEditor } from "~/composables/useCanvasEditor"
+import { textColorPalette } from "~/utils/textColors"
 import { personSegmenterState } from "~/utils/personSegmenter"
 import { appWideActions } from "~/utils/constants"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
@@ -730,6 +812,30 @@ const isLoading = ref<boolean>(false)
 const scrollStrip = ref<HTMLElement | null>(null)
 const { start: fadeStart, end: fadeEnd } = useScrollEdgeFade(scrollStrip)
 const seekTime = ref<number>(0)
+const morePopoverOpen = ref(false)
+
+// The colour of the slide's text, or of the selected text box (the editor
+// shows a box's own values here while one is selected).
+const colorPaletteOpen = ref(false)
+const currentTextColor = computed(() => {
+  const color = props.slide?.slideStyle?.textColor || "#FFFFFF"
+  return color.toUpperCase()
+})
+const onTextColor = (color: string) => {
+  colorPaletteOpen.value = false
+  if (color.toUpperCase() === currentTextColor.value) return
+  emit("update-style", { ...props.slide.slideStyle, textColor: color })
+  usePosthogCapture("SLIDE_TEXT_COLOR_CHANGED", { slideType: props.slide?.type })
+}
+
+// The slide's text boxes. The canvas has no controls of its own; the reset
+// button here and the add and reset buttons on the text slide toolbar are its
+// only buttons.
+const {
+  available: canvasAvailable,
+  hasLayout: canvasHasLayout,
+  reset: resetTextLayout,
+} = useCanvasEditor(() => props.slide?.id)
 
 const countdownIsPlaying = computed(
   () =>
@@ -1091,6 +1197,22 @@ const supportsLineBackground = computed(
     )
 )
 
+// The More button only shows when at least one of its controls applies.
+const hasMoreItems = computed(() => {
+  const type = props.slide?.type
+  const hasFit =
+    type === slideTypes.song ||
+    type === slideTypes.songSetlist ||
+    type === slideTypes.hymn
+  const hasFont = !(type === slideTypes.media || type === slideTypes.presentation)
+  const hasSpacing = !(
+    type === slideTypes.text ||
+    type === slideTypes.media ||
+    type === slideTypes.presentation
+  )
+  return !isCamera.value && (hasFit || hasFont || hasSpacing)
+})
+
 const supportsAlignment = computed(
   () =>
     !isCamera.value &&
@@ -1198,6 +1320,27 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   border-radius: 9999px;
   color: rgb(75 85 99); /* gray-600 */
+}
+.toolbar-color-btn {
+  height: 26px;
+  width: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: rgb(243 244 246);
+  transition: background-color 150ms ease;
+}
+.toolbar-color-btn:hover {
+  background: rgb(229 231 235);
+}
+:global(html.dark) .toolbar-color-btn {
+  background: #171d2b;
+}
+:global(html.dark) .toolbar-color-btn:hover {
+  background: #2b3242;
 }
 .toolbar-toggle-active {
   background-color: rgb(229 231 235) !important;

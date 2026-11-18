@@ -1,6 +1,38 @@
 <template>
+  <!-- Free-form layout: every block is placed by its own box. The blocks are
+       direct children of the container, as in the flow layouts, so the
+       stylesheet's `.slide-layout-ctn > div` rules keep applying. -->
   <div
-    v-if="slide?.layout === slideLayoutTypes.heading_sub"
+    v-if="boxes"
+    class="slide-layout-ctn slide-boxes relative h-[100%]"
+    :style="boxesContainerStyle"
+  >
+    <template v-for="box in boxes" :key="box.id">
+      <div
+        v-if="contentVisible"
+        :key="boxContentKey(box)"
+        :ref="box.source === fitSlot ? setAutoFitEl : undefined"
+        class="content slide-box absolute flex flex-col justify-center"
+        :class="[
+          inheritedFontClass,
+          box.source === 'custom' ? '' : verseTransitionClass,
+          boxThemeClass(box),
+          boxStyleClasses(box),
+          { 'balanced-wrap': !usesTipTapTextStyles },
+        ]"
+        :style="[
+          boxFrameStyle(box),
+          box.source === 'custom' ? {} : verseTransitionStyleVar,
+          box.source === fitSlot ? autoFitStyleFor(box) : {},
+        ]"
+        :data-box="box.id"
+        v-html="boxHtml(box)"
+      ></div>
+    </template>
+  </div>
+
+  <div
+    v-else-if="slide?.layout === slideLayoutTypes.heading_sub"
     class="slide-layout-ctn flex flex-col gap-2 h-[100%] justify-center"
     :style="`padding: ${padding.top}cqw ${padding.right}cqw ${padding.bottom}cqw ${padding.left}cqw;`"
   >
@@ -237,11 +269,11 @@
   >
     <div
       v-if="hasCountdownTitle"
-      class="content jost"
+      class="content jost countdown-title"
       v-html="getSlideContentHtml(slide?.contents?.[1])"
     ></div>
     <div
-      class="content"
+      class="content countdown-time"
       :class="[useURLFriendlyString(slide?.slideStyle?.font || 'Inter')]"
       v-html="getSlideContentHtml(slide?.contents?.[2])"
     ></div>
@@ -284,7 +316,8 @@ import {
   songOnSlide,
   withSongTranslation,
 } from "~/utils/songTranslation"
-import type { Countdown, Slide } from "~/types"
+import type { Countdown, Slide, TextBox } from "~/types"
+import { boxFrameStyle, boxStyleClasses, lyricsSlot, textBoxesOf } from "~/utils/textBoxes"
 import useTheme, { type BibleTheme } from "~/composables/useTheme"
 import {
   cancelLayoutJob,
@@ -327,6 +360,68 @@ const fullTextLayoutStyle = computed(() => {
   return `${paddingStyle} font-size: ${fontSize}cqw;`
 })
 
+// ── Free-form text boxes ────────────────────────────────────────────────────
+// Placed by fractions of the slide, so one layout fits every screen. Only the
+// slide's saved boxes count: a slide without any renders through its layout.
+// A member of a slide pair is sized by the pair's own caption fit instead, so
+// it ignores its boxes while it is in one.
+const boxes = computed(() =>
+  props.slide?.livePair ? null : textBoxesOf(props.slide)
+)
+const fitSlot = computed(() => lyricsSlot(props.slide))
+
+// The container sets the base size the way the flow layouts do, so a box's own
+// size scales from it.
+const boxesContainerStyle = computed(() => {
+  if (usesTipTapTextStyles.value) return ""
+  const layout = props.slide?.layout
+  if (
+    layout !== slideLayoutTypes.full_text &&
+    layout !== slideLayoutTypes.bible &&
+    layout !== slideLayoutTypes.countdown
+  )
+    return ""
+  const size =
+    (props.slide?.slideStyle?.fontSize || 0) *
+    ((props.slide?.slideStyle?.fontSizePercent ||
+      currentState.value.settings.slideStyles.fontSizePercent ||
+      100) /
+      100)
+  return `font-size: ${size}cqw;`
+})
+
+// Auto-fit shrinks by a percentage of the size the box already has.
+const autoFitStyleFor = (box: TextBox) => {
+  const fitted = (autoFitStyle.value as { fontSize?: string }).fontSize
+  if (!fitted) return {}
+  return {
+    fontSize: `${(parseFloat(fitted) * (box.fontSizePercent || 100)) / 100}%`,
+  }
+}
+
+const boxThemeClass = (box: TextBox) => {
+  if (props.slide?.layout === slideLayoutTypes.countdown) {
+    return box.source === 1 ? ["jost", "countdown-title"] : ["countdown-time"]
+  }
+  if (props.slide?.layout !== slideLayoutTypes.bible || box.source === "custom")
+    return ""
+  return box.source === 1
+    ? ["bible-label", bibleThemeClasses.value.label]
+    : [
+        "bible-content",
+        useURLFriendlyString(props.slide?.slideStyle?.font || "Inter"),
+        bibleThemeClasses.value.content,
+      ]
+}
+
+const boxContentKey = (box: TextBox) =>
+  box.source === "custom" ? `custom-${box.id}` : contentKey(box.source)
+
+const boxHtml = (box: TextBox) =>
+  box.source === "custom"
+    ? box.html ?? ""
+    : getSlideContentHtml(props.slide?.contents?.[box.source], box.linesBackground)
+
 const lineBackgroundSelector =
   "p:not(.scripture-label):not(.song-label):not(.countdown-label):not(.copyright-content), h1, h2, h3, h4"
 
@@ -338,13 +433,15 @@ const translationLookup = computed(() => {
   return song && translation ? buildTranslationLookup(song, translation) : null
 })
 
-const getSlideContentHtml = (rawContent = "") => {
+// `lines` is a box's own line-background choice; missing follows the slide.
+const getSlideContentHtml = (rawContent = "", lines?: boolean) => {
+  const wantsLines = lines ?? props.slide?.slideStyle?.textLinesBackground
   const content = translationLookup.value
     ? withSongTranslation(rawContent, translationLookup.value)
     : rawContent
   if (
     usesTipTapTextStyles.value ||
-    !props.slide?.slideStyle?.textLinesBackground ||
+    !wantsLines ||
     !content
   ) {
     return content
@@ -445,6 +542,9 @@ const verseTransitionStyleVar = computed(() => {
 // it. The size is set by the longest line that *can* fit.
 const AUTO_FIT_MIN_SCALE = 0.6
 const autoFitEl = ref<HTMLElement | null>(null)
+const setAutoFitEl = (el: unknown) => {
+  autoFitEl.value = el instanceof HTMLElement ? el : null
+}
 const autoFitScale = ref(1)
 // Lyrics only: the toolbar offers the toggle on song, setlist and hymn
 // slides, and the Bible layout shares this markup for scripture.
@@ -471,6 +571,9 @@ const autoFitStyle = computed(() =>
  * label positions) are taken off.
  */
 const availableWidth = (el: HTMLElement) => {
+  // A text box has a width of its own and does not shrink to its text, so the
+  // box itself is the measure.
+  if (el.dataset.box) return el.clientWidth
   const parent = el.parentElement
   if (!parent) return el.clientWidth
   const style = getComputedStyle(parent)
@@ -591,7 +694,7 @@ watch(
 watch(
   () => [autoFitEl.value, autoFitEnabled.value] as const,
   ([el, enabled], _old, onCleanup) => {
-    const parent = el?.parentElement
+    const parent = el?.dataset.box ? el : el?.parentElement
     if (!enabled || !parent || typeof ResizeObserver === "undefined") return
     const observer = new ResizeObserver(() => scheduleFit())
     observer.observe(parent)

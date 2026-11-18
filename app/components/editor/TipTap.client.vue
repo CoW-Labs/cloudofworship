@@ -1,6 +1,24 @@
 <template>
+  <!-- Free-form layout: each box carries one of the editors below (or its own
+       text), so a text slide is edited in place wherever its boxes sit. -->
   <div
-    v-if="slide?.layout === slideLayoutTypes.heading_sub"
+    v-if="boxes"
+    class="slide-layout-ctn slide-boxes relative h-[100%]"
+  >
+    <div
+      v-for="box in boxes"
+      :key="box.id"
+      class="slide-box absolute flex flex-col justify-center"
+      :class="boxStyleClasses(box)"
+      :style="boxFrameStyle(box)"
+      :data-box="box.id"
+    >
+      <TiptapEditorContent v-if="editorForBox(box)" :editor="editorForBox(box) ?? undefined" />
+      <div v-else v-html="box.html ?? ''"></div>
+    </div>
+  </div>
+  <div
+    v-else-if="slide?.layout === slideLayoutTypes.heading_sub"
     :class="inheritsGlobalTextStyles ? {
       'outlined-live-content': slide?.slideStyle?.textOutlined,
       'bold-live-content': slide?.slideStyle?.textBold,
@@ -120,7 +138,8 @@
 </template>
 
 <script setup lang="ts">
-import type { Slide } from "~/types"
+import type { Slide, TextBox } from "~/types"
+import { boxFrameStyle, boxStyleClasses, textBoxesOf } from "~/utils/textBoxes"
 import { useAppStore } from "~/store/app"
 import { Color } from "@tiptap/extension-color"
 import { Highlight as TiptapHighlight } from "@tiptap/extension-highlight"
@@ -139,6 +158,23 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits(["update", "change-focused-editor"])
+
+const boxes = computed(() => textBoxesOf(props.slide))
+// The editor behind a box's content slot, matching the flow layouts below.
+const editorForBox = (box: TextBox) => {
+  if (box.source === "custom") return null
+  const readOnly =
+    props.slide.layout === slideLayoutTypes.bible ||
+    props.slide.type === slideTypes.song ||
+    props.slide.type === slideTypes.hymn
+  if (box.source === 0)
+    return props.slide.layout === slideLayoutTypes.bible
+      ? uneditableEditorOne.value
+      : editorOne.value
+  if (box.source === 1)
+    return readOnly ? uneditableEditorTwo.value : editorTwo.value
+  return null
+}
 const appStore = useAppStore()
 const inheritsGlobalTextStyles = computed(
   () => props.slide.type !== slideTypes.text
@@ -532,6 +568,13 @@ const uneditableEditorThree = ref(
 </script>
 
 <style>
+/* Free-form boxes are framed by the user, so the editors inside them carry no
+   inherited horizontal padding (the flow layouts keep their px-4). */
+.slide-boxes .tiptap-editor {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* Notion-like editor styles */
 .tiptap-editor {
   color: #ffffff;

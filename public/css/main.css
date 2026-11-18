@@ -726,6 +726,61 @@ html.dark .cow-search-input input::placeholder {
   -ms-border-radius: 6px;
   -o-border-radius: 6px;
 }
+/* Per-box text styles. They sit on the box itself, so they win over the
+   slide-wide rules above and apply to whichever box carries them. */
+.box-bold,
+.box-bold * {
+  font-weight: 850;
+}
+.box-bold-off,
+.box-bold-off * {
+  font-weight: normal !important;
+}
+.box-upper,
+.box-upper * {
+  text-transform: uppercase !important;
+}
+.box-upper-off,
+.box-upper-off * {
+  text-transform: none !important;
+}
+.box-outlined,
+.box-outlined * {
+  text-shadow: -4px -4px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000,
+    -4px 2px 0 #000;
+}
+.box-outlined-off,
+.box-outlined-off * {
+  text-shadow: none !important;
+}
+.box-lines-bg p,
+.box-lines-bg h1,
+.box-lines-bg h2,
+.box-lines-bg h3,
+.box-lines-bg h4 {
+  display: inline;
+  background: #000000;
+  padding: 0.06em 0.22em;
+  line-height: 150%;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  border-radius: 6px;
+}
+.box-lines-bg-off p,
+.box-lines-bg-off h1,
+.box-lines-bg-off h2,
+.box-lines-bg-off h3,
+.box-lines-bg-off h4,
+.box-lines-bg-off .text-lines-background-highlight {
+  display: revert !important;
+  background: none !important;
+  padding: 0 !important;
+  line-height: inherit;
+}
+.box-font,
+.box-font * {
+  font-family: var(--box-font) !important;
+}
 .uppercase-live-content > .slide-layout-ctn > div:nth-child(1),
 .uppercase-live-content > div:nth-child(1) > .tiptap,
 .uppercase-live-content > div:nth-child(1) > .tiptap > p {
@@ -764,11 +819,10 @@ html.dark .cow-search-input input::placeholder {
   -moz-border-radius: 0;
   -ms-border-radius: 0;
   -o-border-radius: 0;
-  transition: 0.5s;
-  -webkit-transition: 0.5s;
-  -moz-transition: 0.5s;
-  -ms-transition: 0.5s;
-  -o-transition: 0.5s;
+  /* Paint-only properties. Sizes, padding and box positions must snap: an
+     animated font-size or inset re-lays the text out every frame, in every
+     window showing the slide, and would race the auto-fit measurements. */
+  transition: color 0.5s, background-color 0.5s, opacity 0.5s;
 }
 .tiptap.live-content .scripture-content {
   font-weight: 500;
