@@ -515,6 +515,9 @@ const verseTransitionClass = computed(() => {
   const style = currentState.value.settings.verseTransitionStyle ?? "off"
   if (style === "slide-up") return "verse-transition-translate-up"
   if (style === "fade") return "verse-transition-fade"
+  if (style === "drift") return "verse-transition-drift"
+  if (style === "breathe") return "verse-transition-breathe"
+  if (style === "cascade") return "verse-transition-cascade"
   return ""
 })
 

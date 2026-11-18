@@ -1,4 +1,4 @@
-import type { BibleVersion, QuickAction } from "~/types"
+import type { BibleVersion, QuickAction, TransitionType } from "~/types"
 
 export const slideTypes = {
   song: 'song',
@@ -809,11 +809,25 @@ export const MAX_PPT_FILE_SIZE = 5 * 1024 * 1024
 // Slide-to-slide transition types for the live projection.
 // `fade` is the only implemented type today; extend with slide/zoom/cut later.
 export const transitionTypes = {
-  fade: 'fade', // default
-  // slide: 'slide',
-  // zoom: 'zoom',
-  // cut: 'cut',
-}
+  fade: "fade", // default
+  drift: "drift",
+  breathe: "breathe",
+  cascade: "cascade",
+} as const
+
+export const transitionTypeOptions = [
+  { key: transitionTypes.fade, label: "Fade" },
+  { key: transitionTypes.drift, label: "Drift" },
+  { key: transitionTypes.breathe, label: "Breathe" },
+  { key: transitionTypes.cascade, label: "Cascade" },
+]
+
+/** Extra enter time for Cascade's staggered blocks (see main.css). */
+export const CASCADE_STAGGER_SECONDS = 0.18
+
+export const isTransitionType = (value: unknown): value is TransitionType =>
+  typeof value === "string" &&
+  (Object.values(transitionTypes) as string[]).includes(value)
 
 export const bibleBooks = [
   "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",

@@ -654,6 +654,8 @@ export interface SlideStyle {
   theme?: string // Theme ID for slide styling (e.g., for Bible slides)
   overlayPlacement?: OverlayPosition
   overlayScale?: number
+  /** Overrides the global slide transition when this slide goes live. */
+  transition?: TransitionType
   /**
    * Free-form text layout. When present (and not empty) each box places one
    * block of the slide's text, or its own text, instead of the layout's flow.
@@ -755,7 +757,7 @@ export interface AppSettings {
   animations?: boolean // Transitions between slides (e.g. crossfade)
   microAnimations?: boolean // Micro/text animations within a slide (come-up etc.)
   keepCameraOn?: boolean // Keep a camera open after its slide leaves the screen. Defaults to true.
-  verseTransitionStyle?: "off" | "fade" | "slide-up" // Verse/line-to-line transition within the same slide
+  verseTransitionStyle?: VerseTransitionStyle // Verse/line-to-line transition within the same slide
   verseTransitionInterval?: number // Duration (seconds) of the verse/line-to-line transition
   footnotes?: boolean
   songAndHymnLabelsVisibility: boolean
@@ -772,6 +774,7 @@ export interface AppSettings {
 
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number
+  transitionType?: TransitionType // Default slide-to-slide transition. Missing means fade.
   alertLimit?: number
   notificationSounds?: boolean // Chime with teammate toasts. Defaults to true.
   // Settings for the "Blank" screen. The key keeps its old name because it is
@@ -845,3 +848,13 @@ export interface AppState {
     { userId: string; userName: string; avatar?: string; theme?: string }
   >
 }
+
+// Verse/line-to-line transition styles. drift, breathe and cascade mirror the
+// slide transitions of the same name.
+export type VerseTransitionStyle =
+  | "off"
+  | "fade"
+  | "slide-up"
+  | "drift"
+  | "breathe"
+  | "cascade"

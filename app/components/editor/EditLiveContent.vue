@@ -234,6 +234,8 @@
                         ? cameraPopoverSize.width
                         : tab.key === 'pair'
                         ? pairSectionSize.width
+                        : tab.key === 'transition'
+                        ? transitionPopoverSize.width
                         : layoutPopoverSize.width
                     "
                     :max-height="
@@ -247,6 +249,8 @@
                         ? cameraPopoverSize.height
                         : tab.key === 'pair'
                         ? pairSectionSize.height
+                        : tab.key === 'transition'
+                        ? transitionPopoverSize.height
                         : layoutPopoverSize.height
                     "
                     :boundary-overflow="120"
@@ -340,6 +344,12 @@
                             @update:model-value="patchCamera"
                           />
                         </div>
+                        <SlideTransitionPanel
+                          v-else-if="tab.key === 'transition'"
+                          :value="slide?.slideStyle?.transition"
+                          @select="onSelectTransition"
+                          @resize="transitionPopoverSize = $event"
+                        />
                         <BibleThemeSelection
                           v-else
                           :value="slide?.slideStyle?.theme"
@@ -683,6 +693,7 @@ import type {
   SongSetlistData,
   SongSetlistItem,
   TextBox,
+  TransitionType,
 } from "~/types"
 import { escapePriority } from "~/composables/useEscapeKey"
 import {
@@ -878,6 +889,7 @@ type PanelKey =
   | "interlude"
   | "camera"
   | "pair"
+  | "transition"
 type PopoverSize = { width: number; height: number }
 const activePanel = ref<PanelKey | null>(null)
 const getInitialBackgroundPopoverSize = (): PopoverSize =>
@@ -890,6 +902,7 @@ const backgroundPopoverSize = ref<PopoverSize>(
 )
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+const transitionPopoverSize = ref<PopoverSize>({ width: 640, height: 168 })
 const interludePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const cameraPopoverSize = ref<PopoverSize>({ width: 380, height: 260 })
 const pairPopoverSize = ref<PopoverSize>({ width: 380, height: 360 })
@@ -2001,6 +2014,21 @@ const onSelectTheme = (themeId: string) => {
     },
   }
   emit("slide-update", tempSlide)
+}
+
+// null clears the override so the slide follows the global setting again.
+const onSelectTransition = (type: TransitionType | null) => {
+  if (!props.slide) return
+  const { transition: _previous, ...rest } = props.slide.slideStyle ?? {}
+  if ((props.slide.slideStyle?.transition ?? null) === type) return
+  emit("slide-update", {
+    ...props.slide,
+    slideStyle: type ? { ...rest, transition: type } : rest,
+  })
+  usePosthogCapture("SLIDE_TRANSITION_CHANGED", {
+    transitionType: type ?? "default",
+    scope: "slide",
+  })
 }
 
 const onUpdateSlideContent = (editorIndex: number, content: string) => {

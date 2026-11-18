@@ -384,6 +384,31 @@ html.dark .cow-search-input input::placeholder {
   -webkit-backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
 }
+.verse-transition-drift,
+.verse-transition-breathe,
+.verse-transition-cascade {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+/* Same moves as the slide transitions: drift rises a hair, breathe settles
+   from slightly larger, cascade staggers the blocks (heading, then words). */
+.verse-transition-drift {
+  animation: verse-drift 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+.verse-transition-breathe {
+  animation: verse-breathe 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+.verse-transition-cascade {
+  animation: verse-drift 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.slide-layout-ctn > .verse-transition-cascade:nth-child(2) {
+  animation-delay: 0.09s;
+}
+.slide-layout-ctn > .verse-transition-cascade:nth-child(n + 3) {
+  animation-delay: 0.18s;
+}
 .fade-in-right {
   animation: fade-in-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   -webkit-animation: fade-in-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)
@@ -429,6 +454,88 @@ html.dark .cow-search-input input::placeholder {
   inset: 0;
 }
 
+/* DRIFT / BREATHE / CASCADE. The face crossfades exactly like fade; only the
+   incoming text (.slide-text) moves. The background never moves or scales:
+   a blurred one is a backdrop-filter, which would re-blur every frame. Only
+   transform and opacity animate, so after the first frame it is compositor
+   work. The .slide-text rules carry `.slide-face` to outrank
+   `.tiptap.live-content`, which sits later in this file. */
+.cow-slide-drift-enter-active,
+.cow-slide-drift-leave-active,
+.cow-slide-breathe-enter-active,
+.cow-slide-breathe-leave-active,
+.cow-slide-cascade-enter-active,
+.cow-slide-cascade-leave-active {
+  transition: opacity var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: opacity;
+}
+.cow-slide-drift-enter-from,
+.cow-slide-drift-leave-to,
+.cow-slide-breathe-enter-from,
+.cow-slide-breathe-leave-to,
+.cow-slide-cascade-enter-from,
+.cow-slide-cascade-leave-to {
+  opacity: 0;
+}
+.cow-slide-drift-leave-active,
+.cow-slide-breathe-leave-active,
+.cow-slide-cascade-leave-active {
+  position: absolute;
+  inset: 0;
+}
+
+/* Drift: the new words rise the last few pixels into place. */
+.slide-face.cow-slide-drift-enter-active .slide-text {
+  transition: transform var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+.slide-face.cow-slide-drift-enter-from .slide-text {
+  transform: translateY(1.2%);
+}
+
+/* Breathe: the new words settle from a hair larger, like a slow exhale. */
+.slide-face.cow-slide-breathe-enter-active .slide-text {
+  transition: transform var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+.slide-face.cow-slide-breathe-enter-from .slide-text {
+  transform: scale(1.015);
+}
+
+/* Cascade: the slide's blocks arrive one after another (heading, then words;
+   scripture, then its reference). Blocks, not lyric lines: lines are split by
+   <br>, and wrapping them would change what auto-fit measures. The delays are
+   added to the explicit Vue duration in LiveProjectionOnly. */
+.slide-face.cow-slide-cascade-enter-active .slide-text .slide-layout-ctn > :not(.rotate-180) {
+  transition: opacity var(--cow-transition-duration, 0.7s)
+      cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transform var(--cow-transition-duration, 0.7s)
+      cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.slide-face.cow-slide-cascade-enter-active .slide-text .slide-layout-ctn > :not(.rotate-180):nth-child(2) {
+  transition-delay: 0.09s;
+}
+.slide-face.cow-slide-cascade-enter-active .slide-text .slide-layout-ctn > :not(.rotate-180):nth-child(n + 3) {
+  transition-delay: 0.18s;
+}
+.slide-face.cow-slide-cascade-enter-from .slide-text .slide-layout-ctn > :not(.rotate-180) {
+  opacity: 0;
+  transform: translateY(4%);
+}
+
+/* Only while a transition is running (Vue's classes are on the face), so the
+   rotated Bible labels keep their rotation the rest of the time. */
+@media (prefers-reduced-motion: reduce) {
+  .slide-face[class*="cow-slide-"] .slide-text,
+  .slide-face[class*="cow-slide-"] .slide-text .slide-layout-ctn > :not(.rotate-180) {
+    transform: none !important;
+    transition-delay: 0s !important;
+  }
+}
+
 .no-animations {
   .come-up-1 {
     animation: none;
@@ -439,7 +546,10 @@ html.dark .cow-search-input input::placeholder {
     -webkit-animation: none;
   }
   .verse-transition-translate-up,
-  .verse-transition-fade {
+  .verse-transition-fade,
+  .verse-transition-drift,
+  .verse-transition-breathe,
+  .verse-transition-cascade {
     animation: none;
     -webkit-animation: none;
   }
@@ -466,6 +576,28 @@ html.dark .cow-search-input input::placeholder {
     -moz-transform: translateY(0) translateZ(0);
     -ms-transform: translateY(0) translateZ(0);
     -o-transform: translateY(0) translateZ(0);
+  }
+}
+
+@keyframes verse-drift {
+  0% {
+    opacity: 0;
+    transform: translateY(1.2%) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+  }
+}
+
+@keyframes verse-breathe {
+  0% {
+    opacity: 0;
+    transform: scale(1.015) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
   }
 }
 

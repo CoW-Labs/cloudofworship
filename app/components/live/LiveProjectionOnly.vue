@@ -36,7 +36,7 @@
              operator's preview open the camera; every other screen, including
              the public livestream page that also renders full screen, gets a
              placeholder. -->
-        <Transition :name="transitionName">
+        <Transition :name="transitionName" :duration="transitionTiming">
           <div
             v-if="displayedSlide?.type === slideTypes.camera"
             :key="displayedSlide.id"
@@ -213,7 +213,7 @@
       <!-- Keyed by the displayed slide id so a slide change swaps the whole
            face via the crossfade, while same-slide edits (e.g. Bible verse
            navigation) keep the same key and update in place with no crossfade. -->
-      <Transition :name="transitionName" appear>
+      <Transition :name="transitionName" :duration="transitionTiming" appear>
         <div
           v-if="displayedSlide"
           :key="displayedSlide?.id"
@@ -283,7 +283,7 @@
             :key="displayedSlide?._id"
             :content-visible="true"
             :slide="displayedSlide"
-            class="relative z-10"
+            class="slide-text relative z-10"
             :class="[
               embedded
                 ? 'h-full'
@@ -926,9 +926,23 @@ const interludeExit = ref<InterludeExitSignal | null>(null)
 provide(interludeExitKey, interludeExit)
 let slideChangeToken = 0
 
-// Resolve the Vue transition name from the transition type. Only `fade` is
-// implemented today; future types (slide/zoom/cut) plug in here + one CSS block.
-const transitionName = computed(() => `cow-slide-${transitionTypes.fade}`)
+// The global transition style applies to every slide (a slide's own
+// `slideStyle.transition` is ignored for now). Both enter and leave use the new
+// name; every type leaves the same way (a plain fade).
+const transitionType = computed(() => {
+  const global = currentState.value.settings.transitionType
+  return isTransitionType(global) ? global : transitionTypes.fade
+})
+const transitionName = computed(() => `cow-slide-${transitionType.value}`)
+// Explicit timing, so Vue does not read getComputedStyle on every slide change
+// to find out how long the CSS transition runs.
+const transitionTiming = computed(() => {
+  if (!currentState.value.settings.animations) return 0
+  const ms = Math.round(transitionDuration.value * 1000)
+  return transitionType.value === transitionTypes.cascade
+    ? { enter: ms + CASCADE_STAGGER_SECONDS * 1000, leave: ms }
+    : ms
+})
 const isLivePageFullScreen = computed(
   () => props.fullScreen && route.path === "/live"
 )

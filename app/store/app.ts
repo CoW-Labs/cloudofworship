@@ -1,5 +1,6 @@
 import { defineStore } from "pinia"
 import type {
+  VerseTransitionStyle,
   Alert,
   AppSettings,
   BackgroundVideo,
@@ -14,6 +15,7 @@ import type {
   SlideBackgroundKey,
   StageTimerState,
   SlidePair,
+  TransitionType,
 } from "~/types/index"
 import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
@@ -195,6 +197,7 @@ export const useAppStore = defineStore("app", {
           uploadVideosToCloud: true,
           // motionlessSlides: true,
           transitionInterval: 0.7,
+          transitionType: "fade",
           slideStyles: {
             blur: 0.5,
             brightness: 50,
@@ -646,6 +649,9 @@ export const useAppStore = defineStore("app", {
         transcriptionVoiceBibleVersionCommands:
           settings.transcriptionVoiceBibleVersionCommands ?? true,
         uploadVideosToCloud: settings.uploadVideosToCloud ?? true,
+        // An API that predates this field omits it; keep the local choice.
+        transitionType:
+          settings.transitionType ?? this.currentState.settings.transitionType,
       }
     },
     setSlideStyles(styles: SlideStyle) {
@@ -828,7 +834,7 @@ export const useAppStore = defineStore("app", {
       }
       usePosthogCapture("MICRO_ANIMATIONS_SETTINGS_CHANGED")
     },
-    setVerseTransitionStyle(verseTransitionStyle: "off" | "fade" | "slide-up") {
+    setVerseTransitionStyle(verseTransitionStyle: VerseTransitionStyle) {
       this.currentState.settings = {
         ...this.currentState.settings,
         verseTransitionStyle: verseTransitionStyle,
@@ -878,6 +884,14 @@ export const useAppStore = defineStore("app", {
         transitionInterval: interval,
       }
       usePosthogCapture("TRANSITION_INTERVAL_SETTINGS_CHANGED")
+    },
+    setTransitionType(transitionType: TransitionType) {
+      if ((this.currentState.settings.transitionType ?? "fade") === transitionType) return
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        transitionType,
+      }
+      usePosthogCapture("SLIDE_TRANSITION_CHANGED", { transitionType, scope: "global" })
     },
     setWindowPadding(padding: {
       left?: number

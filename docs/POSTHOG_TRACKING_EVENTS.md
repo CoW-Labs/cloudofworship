@@ -138,6 +138,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `FOOTNOTES_SETTINGS_CHANGED` | - | Footnote display toggled | ✅ Exists |
 | `SONG_AND_HYMN_LABELS_SETTINGS_CHANGED` | - | Label display preferences changed | ✅ Exists |
 | `TRANSITION_INTERVAL_SETTINGS_CHANGED` | - | Slide transition timing updated | ✅ Exists |
+| `SLIDE_TRANSITION_CHANGED` | `transitionType`, `scope` (`global` or `slide`) | The slide transition style was changed in settings or for one slide (`default` when a slide goes back to following settings) | ✅ Added |
 | `DISPLAY_ROLE_CHANGED` | `role` (`Live display`, `Stage display`, `Slides-only display` or `none`), `previousRole` | A screen was given or lost a role in Display settings | ✅ Added |
 | `WINDOW_PADDING_SETTINGS_CHANGED` | - | Display padding adjusted | ✅ Exists |
 | `DEFAULT_BACKGROUND_SETTINGS_CHANGED` | - | Default slide background set | ✅ Exists |
