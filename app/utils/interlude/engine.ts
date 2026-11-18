@@ -11,6 +11,8 @@
  * top-level utils, and helpers like `clamp` would collide app-wide.
  */
 
+import { getInterludeTheme } from "./themes"
+
 export const INTRO = 2.4
 export const LOOP = 8
 export const WIPE = 0.5
@@ -1116,7 +1118,126 @@ export const interludeVariants: InterludeVariant[] = [
       layer(P.c[1]!, sp * 0.28, sp * 0.18, 0.9)
     },
   },
+  {
+    id: "christmas",
+    name: "Christmas",
+    symbol: "Soft snowfall under a string of lights",
+    best: "Advent, carol services, Christmas Eve and Day",
+    textBackground: false,
+    palettes: [
+      {
+        name: "Midnight Pine",
+        bg: "#0b2a1d",
+        c: ["#d9344f", "#f6c453", "#3fae6a", "#fff7e6"],
+        glow: "#f6c453",
+        ink: "#fff7e6",
+        plate: "#0b2a1d",
+        chipBg: "#f6c453",
+        chipInk: "#0b2a1d",
+      },
+      {
+        name: "Candle Cream",
+        bg: "#f7eddb",
+        c: ["#c0273b", "#d9a32b", "#2f7d4f", "#9db8cc"],
+        glow: "#d9a32b",
+        ink: "#1d3a2b",
+        plate: "#f7eddb",
+        chipBg: "#c0273b",
+        chipInk: "#fff7e6",
+      },
+    ],
+    draw(c, S, P) {
+      const n = P.c.length
+      const m = S.m * S.k
+      const snow = glowSprite(P.c[3 % n]!)
+
+      // Snowfall. Every flake is a plain function of time and its index, so
+      // there is nothing to allocate or keep between frames, and the fall
+      // carries on past the loop without a seam. Each is one stamped sprite.
+      const fadeIn = S.enter(0.2, 1.6)
+      const flakes = 110
+      for (let i = 0; i < flakes; i++) {
+        const depth = noise(i, 1)
+        const r = m * (0.006 + depth * 0.016)
+        const reach = S.h + r * 4
+        const sway = S.w * 0.012 * (0.4 + depth)
+        const x =
+          (((noise(i, 2) * S.w +
+            Math.sin(S.T * (0.4 + noise(i, 3) * 0.6) + noise(i, 4) * TAU) *
+              sway) %
+            S.w) +
+            S.w) %
+          S.w
+        const y =
+          ((noise(i, 5) * reach + S.T * S.h * (0.035 + depth * 0.08)) % reach) -
+          r * 2
+        c.globalAlpha = fadeIn * (0.25 + depth * 0.6)
+        c.drawImage(snow, x - r, y - r, r * 2, r * 2)
+      }
+
+      // A string of lights hung across the top, each bulb on its own twinkle.
+      const drop = S.enter(0.1, 1.3, eOutBack)
+      if (drop <= 0.001) {
+        c.globalAlpha = 1
+        return
+      }
+      const sag = S.h * 0.07 * S.k
+      const top = S.h * 0.05 * S.k - (1 - drop) * S.h * 0.25
+      c.globalAlpha = 0.6 * drop
+      c.strokeStyle = P.c[2 % n]!
+      c.lineWidth = Math.max(1, m * 0.004)
+      c.beginPath()
+      c.moveTo(-8, top)
+      c.quadraticCurveTo(S.cx, top + sag * 2, S.w + 8, top)
+      c.stroke()
+
+      const bulbs = 15
+      for (let i = 0; i < bulbs; i++) {
+        const t = (i + 0.5) / bulbs
+        const x = lerp(-8, S.w + 8, t)
+        const y = top + 4 * sag * t * (1 - t)
+        const twinkle =
+          0.55 + 0.45 * Math.sin(S.T * (1.1 + noise(i, 6) * 1.4) + noise(i, 7) * TAU)
+        const size = m * 0.09
+        c.globalAlpha = drop * twinkle
+        c.drawImage(glowSprite(P.c[i % 3]!), x - size / 2, y - size / 2, size, size)
+      }
+      c.globalAlpha = 1
+    },
+  },
 ]
+
+// Deterministic pseudo-random in 0..1 from an index and a salt, so artwork can
+// scatter shapes without keeping state between frames.
+const noise = (i: number, salt: number) => {
+  const x = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453
+  return x - Math.floor(x)
+}
+
+// Soft round sprites, drawn once per colour and then only stamped. A gradient
+// built every frame for every flake would cost far more than the stamp.
+const sprites = new Map<string, HTMLCanvasElement | OffscreenCanvas>()
+const glowSprite = (color: string) => {
+  let sprite = sprites.get(color)
+  if (!sprite) {
+    const size = 64
+    sprite = newCanvas(size, size)
+    const g = sprite.getContext("2d") as CanvasRenderingContext2D | null
+    if (!g) return sprite
+    const r = size / 2
+    const fill = g.createRadialGradient(r, r, 0, r, r, r)
+    fill.addColorStop(0, hexA(color, 1))
+    fill.addColorStop(0.35, hexA(color, 0.55))
+    fill.addColorStop(1, hexA(color, 0))
+    g.fillStyle = fill
+    g.fillRect(0, 0, size, size)
+    // Colours repeat across palettes, but a long session could still pick
+    // many; keep the cache small.
+    if (sprites.size >= 48) sprites.delete(sprites.keys().next().value!)
+    sprites.set(color, sprite)
+  }
+  return sprite
+}
 
 export const DEFAULT_INTERLUDE_VARIANT = interludeVariants[0]!.id
 
@@ -1208,18 +1329,24 @@ const partnerColor = (hex: string) => {
   return fromHsl([(h + 0.375) % 1, Math.max(s, 0.6), l])
 }
 
+/**
+ * Applies `fn` to every colour of a palette, telling it which role the colour
+ * plays: the ground and text are role 0, bands and labels role 1, the glow
+ * role 2 when there is one. The artwork's own colours take the roles in turn.
+ */
 const mapPalette = (
   p: InterludePalette,
-  fn: (hex: string, role: "a" | "b") => string
+  fn: (hex: string, role: number) => string,
+  roleCount = 2
 ): InterludePalette => ({
   ...p,
-  bg: fn(p.bg, "a"),
-  c: p.c.map((x, i) => fn(x, i % 2 ? "b" : "a")),
-  ink: fn(p.ink, "a"),
-  plate: fn(p.plate, "a"),
-  chipBg: fn(p.chipBg, "b"),
-  chipInk: fn(p.chipInk, "a"),
-  glow: p.glow && fn(p.glow, "a"),
+  bg: fn(p.bg, 0),
+  c: p.c.map((x, i) => fn(x, i % roleCount)),
+  ink: fn(p.ink, 0),
+  plate: fn(p.plate, 0),
+  chipBg: fn(p.chipBg, 1 % roleCount),
+  chipInk: fn(p.chipInk, 0),
+  glow: p.glow && fn(p.glow, roleCount > 2 ? 2 : 0),
 })
 
 /**
@@ -1243,16 +1370,19 @@ const flipPalette = (p: InterludePalette): InterludePalette => ({
  */
 const tintPalette = (
   p: InterludePalette,
-  roles: { a: string; b: string },
+  roles: string[],
   drawsHeading?: boolean
 ): InterludePalette => {
-  const a = toHsl(roles.a)
-  const b = toHsl(roles.b)
-  const out = mapPalette(p, (hex, role) => {
-    const [, s, l] = toHsl(hex)
-    const [uh, us] = role === "a" ? a : b
-    return fromHsl([uh, s < 0.12 ? s : us, l])
-  })
+  const hsl = roles.map(toHsl)
+  const out = mapPalette(
+    p,
+    (hex, role) => {
+      const [, s, l] = toHsl(hex)
+      const [uh, us] = hsl[role]!
+      return fromHsl([uh, s < 0.12 ? s : us, l])
+    },
+    roles.length
+  )
   // Hues differ in brightness at the same lightness (yellow versus blue), so
   // fall back to plain light or dark text where the tint lost its contrast.
   const readable = (ink: string, under: string) =>
@@ -1273,14 +1403,24 @@ const tintPalette = (
  * The variant with the slide's tone and colours applied. Returns the variant
  * itself when nothing is customised. With one tone both palette slots hold
  * the same object, which tells the renderer to skip the drop wipe.
+ *
+ * Colours come from a curated theme when the slide has one, else from the
+ * single colour older slides were saved with, which gets a partner derived
+ * from it.
  */
 export function customizeInterludeVariant(
   v: InterludeVariant,
-  opts: { tone?: InterludeTone; color?: string | null }
+  opts: { tone?: InterludeTone; color?: string | null; themeId?: string | null }
 ): InterludeVariant {
   const tone = opts.tone ?? "mix"
+  const theme = getInterludeTheme(opts.themeId)
   const primary = isHex(opts.color) ? opts.color : null
-  if (tone === "mix" && !primary) return v
+  const roles: string[] | null = theme
+    ? theme.colors
+    : primary
+      ? [primary, partnerColor(primary)]
+      : null
+  if (tone === "mix" && !roles) return v
   let [first, second] = v.palettes
   if (tone !== "mix") {
     // Variants differ in which palette is the lighter one, and some have two
@@ -1295,22 +1435,13 @@ export function customizeInterludeVariant(
     first = second =
       (tone === "light" ? l < 0.35 : l > 0.65) ? flipPalette(pick) : pick
   }
-  if (primary) {
-    const colors = { primary, secondary: partnerColor(primary) }
+  if (roles) {
     const single = first === second
-    first = tintPalette(
-      first,
-      { a: colors.primary, b: colors.secondary },
-      v.drawsHeading
-    )
-    // The drop swaps the roles, so the loop still changes colour.
+    first = tintPalette(first, roles, v.drawsHeading)
+    // The drop turns the roles over by one, so the loop still changes colour.
     second = single
       ? first
-      : tintPalette(
-          second,
-          { a: colors.secondary, b: colors.primary },
-          v.drawsHeading
-        )
+      : tintPalette(second, [...roles.slice(1), roles[0]!], v.drawsHeading)
   }
   return { ...v, palettes: [first, second] }
 }

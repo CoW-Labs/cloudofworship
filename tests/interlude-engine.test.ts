@@ -35,12 +35,14 @@ describe("interlude variants", () => {
     expect(interludeVariants.map((v) => v.id)).toEqual([
       "cow-original",
       "gathering",
+      "rolling-stone",
       "selah",
       "open-heavens",
       "still-waters",
       "lilies",
       "jubilee",
       "fellowship",
+      "christmas",
     ])
   })
 
@@ -51,6 +53,15 @@ describe("interlude variants", () => {
 
   it("draws every variant through the intro, the loop and both palettes", () => {
     const ctx = stubContext()
+    // Sprites and text strips are drawn once onto a canvas of their own; Node
+    // has none, so hand them the same stub.
+    const g = globalThis as { OffscreenCanvas?: unknown }
+    g.OffscreenCanvas ??= class {
+      constructor(public width: number, public height: number) {}
+      getContext() {
+        return ctx
+      }
+    }
     for (const variant of interludeVariants) {
       for (let T = 0; T < INTRO + LOOP * 2; T += 0.37) {
         expect(() =>

@@ -583,6 +583,7 @@
             <iframe
               v-if="previewEmbedSrc"
               ref="previewIframe"
+              :data-media-editor="slide?.id"
               :src="previewEmbedSrc"
               class="h-full w-full absolute inset-0"
               frameborder="0"
@@ -595,6 +596,7 @@
           <video
             v-else-if="slide?.backgroundType === backgroundTypes.video"
             ref="previewVideo"
+            :data-media-editor="slide?.id"
             :src="slide?.background"
             :loop="!!slide?.slideStyle?.repeatMedia"
             muted

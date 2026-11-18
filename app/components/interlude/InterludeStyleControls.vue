@@ -4,61 +4,44 @@
          panel section already gives them a heading. -->
     <DefineControls>
       <div class="interlude-style-controls flex flex-col gap-4">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <button
-            type="button"
-            class="flex items-center gap-2 text-xs text-gray-600 dark:text-[#9BA3B2]"
-            :aria-expanded="pickerOpen"
-            :aria-label="
-              modelValue.color
-                ? `Change theme colour, current colour ${modelValue.color}`
-                : 'Pick a theme colour'
-            "
-            @click="pickerOpen = !pickerOpen"
-          >
-            <span
-              class="h-7 w-7 shrink-0 rounded-md ring-1 ring-black/10 dark:ring-white/15"
-              :class="{ 'interlude-style-swatch--empty': !modelValue.color }"
-              :style="
-                modelValue.color ? { backgroundColor: modelValue.color } : {}
+        <!-- Curated colour themes. Each recolours whichever animation is
+             picked and keeps its light and shade, so any theme suits any
+             animation. The first cell leaves the animation's own colours. -->
+        <div>
+          <p class="mb-1.5 text-[12px] leading-[17px] text-gray-500 dark:text-[#9BA3B2]">
+            Colours
+          </p>
+          <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <button
+              v-for="option in themeOptions"
+              :key="option.id ?? 'default'"
+              type="button"
+              class="group min-w-0 rounded-xl p-1.5 text-left ring-1 transition-shadow"
+              :class="
+                option.selected
+                  ? 'bg-white ring-2 ring-primary-500 dark:bg-[#222838]'
+                  : 'bg-white/70 ring-gray-200 hover:ring-gray-300 dark:bg-[#222838] dark:ring-white/10 dark:hover:ring-white/20'
               "
-            />
-            {{ modelValue.color ? "Theme colour" : "Pick a theme colour" }}
-          </button>
-          <button
-            v-if="modelValue.color"
-            type="button"
-            class="text-xs text-primary-600 hover:underline dark:text-[#d9a4ff]"
-            aria-label="Reset to the animation's colours"
-            @click="update({ color: null })"
-          >
-            Reset
-          </button>
-        </div>
-        <!-- The app's colour swatches, as the slide background uses. Inline,
-             not a popover: the editor's Interlude panel closes on any click
-             outside it, and a popover panel renders outside. Only hue and
-             saturation are taken, so pale and deep swatches tint alike. -->
-        <!-- Opens by growing to its height (grid rows 0fr → 1fr) and fading
-             in, so the controls below slide down rather than jump. The
-             negative margin takes back the column's gap while it is shut. -->
-        <div
-          class="grid transition-all duration-200 ease-out motion-reduce:transition-none"
-          :class="
-            pickerOpen
-              ? 'grid-rows-[1fr] opacity-100'
-              : '-mt-4 grid-rows-[0fr] opacity-0'
-          "
-          :inert="!pickerOpen"
-        >
-          <div class="min-h-0 overflow-hidden p-px">
-            <BgColorSelection
-              background-panel
-              fill
-              color-purpose="theme"
-              :value="modelValue.color ?? undefined"
-              @select="setColor($event.color)"
-            />
+              :aria-pressed="option.selected"
+              :aria-label="`${option.name} colours`"
+              @click="pickTheme(option)"
+            >
+              <span class="flex h-7 w-full overflow-hidden rounded-md">
+                <span
+                  v-if="!option.colors.length"
+                  class="interlude-style-swatch--empty h-full w-full"
+                />
+                <span
+                  v-for="(colour, i) in option.colors"
+                  :key="i"
+                  class="h-full flex-1"
+                  :style="{ backgroundColor: colour }"
+                />
+              </span>
+              <span class="mt-1 block truncate px-0.5 text-[11px] leading-4 text-gray-700 dark:text-[#d4d9e3]">
+                {{ option.name }}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -115,10 +98,11 @@ import {
   INTERLUDE_SPEED,
   interludeScale,
 } from "~/utils/interlude/engine"
+import { getInterludeTheme, interludeThemes } from "~/utils/interlude/themes"
 
 export type InterludeStyle = Pick<
   InterludeSlideData,
-  "color" | "tone" | "size" | "speed"
+  "themeId" | "color" | "tone" | "size" | "speed"
 >
 
 const props = defineProps<{
@@ -169,9 +153,53 @@ watchDebounced(
   { debounce: 250 }
 )
 
+// A slide saved with the old single colour keeps it, shown as its own cell
+// until another is picked.
+const legacyColour = computed(() =>
+  !props.modelValue.themeId && props.modelValue.color
+    ? props.modelValue.color
+    : null
+)
+
+const themeOptions = computed(() => [
+  {
+    id: null as string | null,
+    name: "Animation's own",
+    colors: [] as string[],
+    selected: !props.modelValue.themeId && !legacyColour.value,
+    legacy: false,
+  },
+  ...(legacyColour.value
+    ? [
+        {
+          id: null as string | null,
+          name: "Custom colour",
+          colors: [legacyColour.value],
+          selected: true,
+          legacy: true,
+        },
+      ]
+    : []),
+  ...interludeThemes.map((theme) => ({
+    id: theme.id as string | null,
+    name: theme.name,
+    colors: [...theme.colors],
+    selected: props.modelValue.themeId === theme.id,
+    legacy: false,
+  })),
+])
+
+const pickTheme = (option: { id: string | null; selected: boolean; legacy: boolean }) => {
+  if (option.legacy || option.selected) return
+  update({ themeId: option.id, color: null })
+  usePosthogCapture("INTERLUDE_THEME_CHANGED", { themeId: option.id ?? "default" })
+}
+
 const summary = computed(() => {
   const parts: string[] = []
-  if (props.modelValue.color) parts.push("Theme colour")
+  const theme = getInterludeTheme(props.modelValue.themeId)
+  if (theme) parts.push(theme.name)
+  else if (legacyColour.value) parts.push("Custom colour")
   const tone = props.modelValue.tone ?? "mix"
   if (tone !== "mix") parts.push(toneLabels[tone])
   const { size, speed } = scalesOf()
@@ -185,11 +213,6 @@ const onTone = (label: string) => {
   if (entry) update({ tone: entry[0] as InterludeStyle["tone"] })
 }
 
-const pickerOpen = ref(false)
-const setColor = (color: string) => {
-  pickerOpen.value = false
-  if (props.modelValue.color !== color) update({ color })
-}
 </script>
 
 <style scoped>

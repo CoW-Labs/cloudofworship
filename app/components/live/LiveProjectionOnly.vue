@@ -180,6 +180,7 @@
             (slide?.data as any)?.type !== 'vimeo'
           "
           ref="previewVideo"
+          :data-media-live="slide?.id"
           :src="slide?.background"
           :loop="
             slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
@@ -465,6 +466,7 @@ import useCameraShare from "~/composables/useCameraShare"
 import {
   useFollowMediaPlayback,
   useReportMediaPlayback,
+  useReportExternalPlayback,
 } from "~/composables/useMediaPlaybackSync"
 import type { Ref } from "vue"
 import {
@@ -1136,6 +1138,15 @@ watch(playableVideo, async (next, previous) => {
 // is a full-screen copy that must not pass for it.
 useReportMediaPlayback(
   video,
+  () => props.slide?.id,
+  () => props.fullScreen && route.path === "/live"
+)
+useReportExternalPlayback(
+  iframe,
+  () => {
+    const type = (props.slide?.data as ExternalVideo | undefined)?.type
+    return type === "youtube" || type === "vimeo" ? type : undefined
+  },
   () => props.slide?.id,
   () => props.fullScreen && route.path === "/live"
 )

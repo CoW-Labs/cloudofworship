@@ -4,6 +4,11 @@ import useBroadcastMessage, {
   broadcastNoticeKind,
 } from "~/composables/useBroadcastMessage"
 import { safePauseMedia, safePlayMedia } from "~/utils/browserSafety"
+import {
+  listenToExternalPlayer,
+  rememberExternalDuration,
+  type ExternalPlayerTime,
+} from "~/utils/externalPlayerClock"
 
 /**
  * Mirrors a projected video's playback onto the operator's Live Output preview.
@@ -28,6 +33,8 @@ export type MediaPlaybackBroadcast = {
   /** Wall-clock ms when `time` was read. */
   at: number
   rate: number
+  /** Length in seconds, when known. YouTube and Vimeo report it this way. */
+  duration?: number
 }
 
 export type MediaPlaybackRequestBroadcast = {
@@ -135,6 +142,118 @@ export const useReportMediaPlayback = (
 }
 
 /**
+ * Projector side, for a YouTube or Vimeo player: the same reports as a file
+ * video sends, plus the length, read from the player over postMessage. Sent
+ * when it starts, stops or jumps, and on the heartbeat while it plays, never on
+ * each of the player's own frequent time updates.
+ */
+export const useReportExternalPlayback = (
+  iframe: Ref<HTMLIFrameElement | null>,
+  type: () => "youtube" | "vimeo" | undefined,
+  slideId: () => string | undefined,
+  enabled: () => boolean
+) => {
+  let player: ReturnType<typeof listenToExternalPlayer> | null = null
+  let heartbeat: ReturnType<typeof setInterval> | null = null
+  let last: ExternalPlayerTime | null = null
+  let sent: MediaPlaybackBroadcast | null = null
+
+  const report = () => {
+    const id = slideId()
+    if (!id || !last || last.time === null || !enabled()) return
+    sent = {
+      kind: "media-playback",
+      slideId: id,
+      playing: last.playing,
+      time: last.time,
+      at: last.at,
+      rate: 1,
+      ...(last.duration ? { duration: last.duration } : {}),
+    }
+    postCrossWindowNotification<MediaPlaybackBroadcast>(sent)
+  }
+
+  const syncHeartbeat = () => {
+    const playing = !!last?.playing
+    if (playing && !heartbeat) heartbeat = setInterval(report, HEARTBEAT_MS)
+    if (!playing && heartbeat) {
+      clearInterval(heartbeat)
+      heartbeat = null
+    }
+  }
+
+  const onChange = (state: ExternalPlayerTime) => {
+    last = state
+    const expected = sent
+      ? sent.time + (sent.playing ? (state.at - sent.at) / 1000 : 0)
+      : null
+    const jumped =
+      expected === null || state.time === null || Math.abs(state.time - expected) > 1.5
+    if (
+      !sent ||
+      sent.playing !== state.playing ||
+      (state.duration && sent.duration !== state.duration) ||
+      jumped
+    )
+      report()
+    syncHeartbeat()
+  }
+
+  const stop = () => {
+    player?.stop()
+    player = null
+    last = sent = null
+    if (heartbeat) clearInterval(heartbeat)
+    heartbeat = null
+  }
+
+  watch(
+    () => [iframe.value, type(), enabled()] as const,
+    ([el, kind, on]) => {
+      stop()
+      if (el && kind && on) player = listenToExternalPlayer(el, kind, onChange)
+    },
+    { immediate: true }
+  )
+
+  const stopListening = useBroadcastMessage((data) => {
+    if (!enabled()) return
+    const payload = readPayload(data)
+    if (isPlaybackRequest(payload) && payload.slideId === slideId()) {
+      player?.refresh()
+      report()
+    }
+  })
+
+  onBeforeUnmount(() => {
+    stop()
+    stopListening()
+  })
+}
+
+/** Operator side: ask the projector to report `slideId` now. */
+export const requestProjectorPlayback = (slideId: string) =>
+  postCrossWindowNotification<MediaPlaybackRequestBroadcast>({
+    kind: "media-playback-request",
+    slideId,
+  })
+
+// The projector's last report for each slide, so the seek track can say where
+// a file with no element in this window (audio) has got to.
+const lastReports = new Map<string, MediaPlaybackBroadcast>()
+
+/**
+ * Where the projector's copy of `slideId` is now, in seconds: its last report,
+ * moved on by the time since if it was playing. Null before it has reported.
+ */
+export const projectorPosition = (slideId?: string): number | null => {
+  const report = slideId ? lastReports.get(slideId) : undefined
+  if (!report) return null
+  const elapsed = report.playing ? ((Date.now() - report.at) / 1000) * report.rate : 0
+  return Math.max(0, report.time + elapsed)
+}
+
+/**
  * Operator side: whether the projector is playing `slideId`'s video or audio
  * right now, or null before it has said (not live, no output window, or a
  * YouTube/Vimeo player, which does not report). The stored `isMediaPlaying` is
@@ -147,6 +266,12 @@ export const useProjectorPlayback = (slideId: () => string | undefined) => {
   const stopListening = useBroadcastMessage((data) => {
     const payload = readPayload(data)
     if (!isPlayback(payload) || payload.slideId !== slideId()) return
+    // One entry per slide played; a long service plays many, so keep the
+    // newest few.
+    lastReports.delete(payload.slideId)
+    lastReports.set(payload.slideId, payload)
+    if (payload.duration) rememberExternalDuration(payload.slideId, payload.duration)
+    if (lastReports.size > 32) lastReports.delete(lastReports.keys().next().value!)
     playing.value = payload.playing
   })
 

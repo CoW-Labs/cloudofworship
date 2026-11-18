@@ -12,6 +12,7 @@ export const defaultInterludeData = (): Omit<InterludeSlideData, "id"> => ({
   heading: "Welcome Home",
   subtitle: "We'll begin shortly",
   textBackground: "auto",
+  themeId: null,
   color: null,
   tone: "mix",
   size: 1,
@@ -23,6 +24,7 @@ export const interludeVariantFor = (data?: Partial<InterludeSlideData>) =>
   customizeInterludeVariant(getInterludeVariant(data?.variant), {
     tone: data?.tone,
     color: data?.color,
+    themeId: data?.themeId,
   })
 
 /**

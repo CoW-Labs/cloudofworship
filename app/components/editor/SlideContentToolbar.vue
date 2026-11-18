@@ -364,36 +364,73 @@
                   >Restart</UButton
                 >
               </CowTooltip>
-              <div
-                class="flex items-center gap-1 bg-gray-100 dark:bg-[#171d2b] rounded-md px-2"
+              <UPopover
+                v-model:open="seekOpen"
+                mode="click"
+                :popper="{ placement: 'bottom', strategy: 'fixed' }"
+                :ui="{
+                  rounded: 'rounded-2xl',
+                  shadow: 'shadow-xl',
+                  container: 'z-50',
+                }"
               >
-                <CowTooltip text="Seek to specific time">
-                  <UInput
-                    v-model="seekTime"
-                    type="number"
-                    placeholder="Seconds"
-                    class="w-[80px]"
-                    :ui="{
-                      base: 'bg-transparent',
-                      rounded: 'rounded-md',
-                      size: { sm: 'text-xs' },
-                    }"
-                    size="sm"
-                    min="0"
-                    @keyup.enter="handleSeek"
-                  />
-                </CowTooltip>
-                <CowTooltip text="Go to time">
+                <CowTooltip text="Seek" :prevent="seekOpen">
                   <UButton
-                    @click="handleSeek"
-                    class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900"
-                    icon="i-tabler-player-skip-forward"
+                    :class="[
+                      'rounded-full text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] p-2 hover:bg-gray-100 dark:hover:bg-[#2b3242] hover:text-gray-900',
+                      { 'toolbar-toggle-active': seekOpen },
+                    ]"
+                    icon="i-ph-fast-forward"
+                    :aria-expanded="seekOpen"
                     variant="ghost"
                     color="gray"
-                    size="xs"
-                  />
+                    >Seek</UButton
+                  >
                 </CowTooltip>
-              </div>
+                <template #panel>
+                  <div class="flex w-64 flex-col gap-2 overflow-hidden rounded-2xl p-3">
+                    <!-- A file says how long it is, so it gets a track. A
+                         YouTube or Vimeo video does not, so it keeps a field
+                         for the second to jump to. -->
+                    <template v-if="seekDuration">
+                      <CoWSlider
+                        :model-value="seekTime"
+                        :min="0"
+                        :max="seekDuration"
+                        :step="0.1"
+                        aria-label="Seek"
+                        @update:model-value="onSeekInput"
+                      />
+                      <div
+                        class="flex justify-between px-1 text-xs tabular-nums text-gray-500 dark:text-[#9BA3B2]"
+                      >
+                        <span>{{ formatClock(seekTime) }}</span>
+                        <span>{{ formatClock(seekDuration) }}</span>
+                      </div>
+                    </template>
+                    <div v-else class="flex items-center gap-2">
+                      <UInput
+                        v-model="seekTime"
+                        type="number"
+                        placeholder="Seconds"
+                        class="flex-1"
+                        size="sm"
+                        min="0"
+                        aria-label="Seconds to jump to"
+                        @keyup.enter="handleSeek"
+                      />
+                      <UButton
+                        variant="ghost"
+                        color="gray"
+                        class="shrink-0 rounded-full"
+                        icon="i-tabler-player-skip-forward"
+                        aria-label="Go to time"
+                        @click="handleSeek"
+                      />
+                    </div>
+                  </div>
+                </template>
+              </UPopover>
             </template>
             <FontSizeSelect
               v-if="
@@ -780,6 +817,7 @@ import {
   lightLeakSliders,
   type CameraEffectChoice,
 } from "~/utils/camera"
+import { useDebounceFn, useIntervalFn } from "@vueuse/core"
 import { useCanvasEditor } from "~/composables/useCanvasEditor"
 import { textColorPalette } from "~/utils/textColors"
 import { personSegmenterState } from "~/utils/personSegmenter"
@@ -787,6 +825,14 @@ import { appWideActions } from "~/utils/constants"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 import { useAppStore } from "~/store/app"
 import {
+  listenToExternalPlayer,
+  knownExternalDuration,
+  rememberExternalDuration,
+  type ExternalPlayerTime,
+} from "~/utils/externalPlayerClock"
+import {
+  projectorPosition,
+  requestProjectorPlayback,
   useLiveOutputPreviewPlaying,
   useProjectorPlayback,
 } from "~/composables/useMediaPlaybackSync"
@@ -1034,16 +1080,222 @@ const refreshSongLyrics = async () => {
   emit("update-song-lyrics", song)
 }
 
-const handleSeek = () => {
-  if (seekTime.value >= 0) {
-    // Not live: moves the editor's own preview and nothing else.
-    if (previewsHere.value) {
-      mediaPreview.seekTo(Number(seekTime.value))
-      return
-    }
-    useGlobalEmit(appWideActions.mediaSeek, seekTime.value.toString())
-    emit("update-media-seek", seekTime.value)
+// Jumps the video: the editor's own copy when the slide is not live, the
+// projector when it is.
+const seekTo = (seconds: number) => {
+  const target = Math.max(0, seconds)
+  if (previewsHere.value) {
+    mediaPreview.seekTo(target)
+    return
   }
+  useGlobalEmit(appWideActions.mediaSeek, target.toString())
+  emit("update-media-seek", target)
+}
+
+const handleSeek = () => {
+  if (seekTime.value >= 0) seekTo(Number(seekTime.value))
+}
+
+// ─── SEEK TRACK ──────────────────────────────────────────────────────────────
+// Nothing here runs until the popover opens. While it is open the track reads
+// the video this window already has (the editor's copy, or the Live Output's
+// once the slide is live) four times a second. Audio has no copy here, so it
+// follows the projector's last report. A file's length comes from the video,
+// or from a metadata-only probe of the file. YouTube and Vimeo are read from
+// their players over postMessage (see below); before either has played once
+// their length is unknown, so they show a field for the second instead.
+const seekOpen = ref(false)
+const seekDuration = ref(0)
+let seekElement: HTMLMediaElement | null = null
+let probedDuration = 0
+let probe: HTMLMediaElement | null = null
+// The track holds still while it is being dragged, and for a moment after.
+let seekHeldUntil = 0
+
+const findSeekElement = () => {
+  const id = props.slide?.id
+  if (!id) return null
+  const attribute = appStore.isSlideLive(id) ? "data-media-live" : "data-media-editor"
+  return document.querySelector<HTMLMediaElement>(`[${attribute}="${CSS.escape(id)}"]`)
+}
+
+const dropProbe = () => {
+  if (!probe) return
+  probe.onloadedmetadata = null
+  probe.removeAttribute("src")
+  probe.load()
+  probe = null
+}
+
+const probeDuration = () => {
+  probedDuration = 0
+  const data = props.slide?.data as { url?: string; type?: string } | undefined
+  const url = data?.url || props.slide?.background
+  if (!url || data?.type === "youtube" || data?.type === "vimeo") return
+  dropProbe()
+  const el = document.createElement(data?.type?.includes("audio") ? "audio" : "video")
+  el.preload = "metadata"
+  el.muted = true
+  el.onloadedmetadata = () => {
+    probedDuration = Number.isFinite(el.duration) ? el.duration : 0
+    tickSeek()
+    dropProbe()
+  }
+  el.src = url
+  probe = el
+}
+
+// ─── YouTube and Vimeo ───
+// No <video> to read, so the editor's preview player is asked over postMessage
+// while the popover is open, and a live one is read from the projector's
+// reports, which carry the length. A length heard once is remembered, so the
+// bar shows the next time even before a player has loaded.
+const externalType = computed(() => {
+  const type = (props.slide?.data as { type?: string } | undefined)?.type
+  return type === "youtube" || type === "vimeo" ? type : null
+})
+let previewPlayer: ReturnType<typeof listenToExternalPlayer> | null = null
+let previewFrame: HTMLIFrameElement | null = null
+let previewClock: ExternalPlayerTime | null = null
+
+const dropPreviewPlayer = () => {
+  previewPlayer?.stop()
+  previewPlayer = previewFrame = previewClock = null
+}
+
+// The preview player appears only once it is played, which may be after the
+// popover opened, so this is looked for again on each tick until found.
+const followPreviewPlayer = () => {
+  const type = externalType.value
+  const id = props.slide?.id
+  if (!type || !id || appStore.isSlideLive(id)) return dropPreviewPlayer()
+  const frame = document.querySelector<HTMLIFrameElement>(
+    `iframe[data-media-editor="${CSS.escape(id)}"]`
+  )
+  if (frame === previewFrame) return
+  dropPreviewPlayer()
+  if (!frame) return
+  previewFrame = frame
+  previewPlayer = listenToExternalPlayer(frame, type, (state) => {
+    previewClock = state
+    if (state.duration) rememberExternalDuration(id, state.duration)
+  })
+}
+
+const externalPosition = () => {
+  const clock = previewClock
+  if (clock && clock.time !== null) {
+    return clock.time + (clock.playing ? (Date.now() - clock.at) / 1000 : 0)
+  }
+  return projectorPosition(props.slide?.id)
+}
+
+const tickSeek = () => {
+  if (Date.now() < seekHeldUntil) return
+  if (externalType.value) {
+    followPreviewPlayer()
+    const duration =
+      previewClock?.duration || knownExternalDuration(props.slide?.id)
+    if (!duration) return
+    seekDuration.value = duration
+    const time = externalPosition()
+    if (time !== null) seekTime.value = Math.min(time, duration)
+    return
+  }
+  const el = seekElement
+  const duration =
+    el && Number.isFinite(el.duration) && el.duration > 0
+      ? el.duration
+      : probedDuration
+  if (!duration) return
+  seekDuration.value = duration
+  const time =
+    el && Number.isFinite(el.currentTime)
+      ? el.currentTime
+      : projectorPosition(props.slide?.id)
+  if (time !== null) seekTime.value = Math.min(time, duration)
+}
+
+const { pause: stopSeekTicker, resume: startSeekTicker } = useIntervalFn(
+  tickSeek,
+  250,
+  { immediate: false }
+)
+
+watch(seekOpen, (open) => {
+  if (!open) {
+    stopSeekTicker()
+    dropProbe()
+    dropPreviewPlayer()
+    return
+  }
+  seekHeldUntil = 0
+  seekDuration.value = 0
+  const id = props.slide?.id
+  if (externalType.value) {
+    seekElement = null
+    // Until a player reports, start the handle at the beginning rather than
+    // where it was left last time.
+    seekTime.value = 0
+    // A live player reports on its heartbeat; ask now so the bar is current.
+    if (id && appStore.isSlideLive(id)) requestProjectorPlayback(id)
+  } else {
+    seekElement = findSeekElement()
+    if (!(seekElement && seekElement.duration > 0)) probeDuration()
+  }
+  tickSeek()
+  startSeekTicker()
+})
+watch(
+  () => props.slide?.id,
+  () => (seekOpen.value = false)
+)
+onBeforeUnmount(() => {
+  dropProbe()
+  dropPreviewPlayer()
+})
+
+// A preview seeks as the handle moves, which is cheap. A live seek reaches the
+// projector, the store and teammates, so it waits for the handle to settle.
+const seekLive = useDebounceFn((seconds: number) => seekTo(seconds), 150)
+const reportSeek = useDebounceFn(
+  () =>
+    usePosthogCapture("MEDIA_SEEKED", {
+      method: "track",
+      live: appStore.isSlideLive(props.slide?.id),
+    }),
+  800
+)
+// A drag reports far more often than a video can seek, and each seek asks the
+// decoder to find a frame. The preview takes the newest position once a frame.
+let previewSeekFrame = 0
+let previewSeekTarget = 0
+const seekPreviewSoon = (seconds: number) => {
+  previewSeekTarget = seconds
+  if (previewSeekFrame) return
+  previewSeekFrame = requestAnimationFrame(() => {
+    previewSeekFrame = 0
+    seekTo(previewSeekTarget)
+  })
+}
+onBeforeUnmount(() => cancelAnimationFrame(previewSeekFrame))
+
+const onSeekInput = (seconds: number) => {
+  seekTime.value = seconds
+  seekHeldUntil = Date.now() + 700
+  if (previewsHere.value) seekPreviewSoon(seconds)
+  else seekLive(seconds)
+  reportSeek()
+}
+
+const formatClock = (value: number) => {
+  const total = Math.max(0, Math.floor(Number(value) || 0))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const seconds = String(total % 60).padStart(2, "0")
+  return hours
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`
+    : `${minutes}:${seconds}`
 }
 
 const restartMedia = () => {

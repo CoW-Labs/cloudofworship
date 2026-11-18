@@ -292,8 +292,13 @@ export interface InterludeSlideData {
   /** "auto" follows the variant's default. */
   textBackground: "auto" | "on" | "off"
   /**
-   * Tints the animation from one colour (its partner colour is derived);
-   * null keeps the variant's own colours.
+   * A curated colour theme (see utils/interlude/themes). Wins over `color`;
+   * null or missing keeps the variant's own colours.
+   */
+  themeId?: string | null
+  /**
+   * Older slides: tints the animation from one colour (its partner colour is
+   * derived). New slides use a theme instead.
    */
   color?: string | null
   /** "mix" plays both palettes; "light" / "dark" hold one. Default "mix". */

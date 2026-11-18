@@ -89,6 +89,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `CLOSE_LIVE_WINDOW_BUTTON_CLICKED` | - | Live window closed | ✅ Exists |
 | `SLIDE_PRESENTED_LIVE` | `slideType`, `slideLayout`, `slideId` | Slide broadcasted to live output | ✅ Added |
 | `SLIDES_OUTPUT_OPENED` | `platform` (`web` or `desktop`) | Go Live opened the slides-only display on its assigned screen | ✅ Added |
+| `MEDIA_SEEKED` | `method` (`track`), `live` | The seek track in a media slide's toolbar was moved; one event per drag, after it settles | ✅ Added |
 | `SLIDES_REORDERED` | `slideCount` | User reorders slides in live output | ✅ Added |
 | `LIVE_SESSION_STARTED` | `scheduleId`, `slideCount` | First slide goes live in a session | ⚠️ Missing |
 | `LIVE_SESSION_ENDED` | `scheduleId`, `sessionDuration`, `totalSlides` | Live window closed after session | ⚠️ Missing |
@@ -232,6 +233,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `LYRICS_EDITOR_OPENED` | `songId` | User opens lyrics editor | ⚠️ Missing |
 | `LYRICS_EDITED` | `songId` | User modifies song lyrics | ⚠️ Missing |
 | `CUSTOM_VERSE_ORDER_APPLIED` | `songId`, `verseOrder` | User reorders verses | ⚠️ Missing |
+| `INTERLUDE_THEME_CHANGED` | `themeId` (`default` for the animation's own colours) | A colour theme was picked for an interlude slide | ✅ Added |
 
 ---
 
