@@ -70,7 +70,7 @@
               v-else
               ref="songsScrollerRef"
               class="h-full"
-              :items="savedSongs?.slice(0, libraryEndIndex)"
+              :items="orderedSongs.slice(0, libraryEndIndex)"
               :item-size="64"
               key-field="id"
               v-slot="{ item: song, index }"
@@ -81,6 +81,7 @@
                 :action="turnToLibrarySongAction(song.content as Song)"
                 :icon-override="SongsIcon"
                 compact
+                actions-bottom
                 show-subtext
                 :active="hasInteracted && index === focusedActionIndex"
                 :class="{
@@ -91,6 +92,11 @@
                 @mouseenter="onRowMouseEnter(index)"
               >
                 <template #actions>
+                  <UIcon
+                    v-if="isPinned(song.id)"
+                    name="i-ph-push-pin-fill"
+                    class="w-3.5 h-3.5 mr-1 text-gray-400 dark:text-[#7d8695]"
+                  />
                   <MoreActionsMenu v-slot="{ close }" flush>
                     <UButton
                       variant="ghost"
@@ -105,6 +111,29 @@
                     >
                       <template #leading><EditIcon class="w-4 h-4" /></template>
                       Edit
+                    </UButton>
+                    <UButton
+                      variant="ghost"
+                      color="gray"
+                      block
+                      @click="
+                        () => {
+                          togglePin(song.id, 'song')
+                          close()
+                        }
+                      "
+                    >
+                      <template #leading>
+                        <UIcon
+                          :name="
+                            isPinned(song.id)
+                              ? 'i-ph-push-pin-slash'
+                              : 'i-ph-push-pin'
+                          "
+                          class="w-4 h-4"
+                        />
+                      </template>
+                      {{ isPinned(song.id) ? "Unpin" : "Pin to top" }}
                     </UButton>
                     <ConfirmDialog
                       button-label="Delete"
@@ -142,17 +171,22 @@
             />
             <RecycleScroller
               v-else
+              ref="songsScrollerRef"
               class="h-[calc(100vh-300px)]"
               :items="shownSlides"
-              :item-size="84"
+              :item-size="80"
               key-field="id"
-              v-slot="{ item: slide }"
+              v-slot="{ item: slide, index }"
               @scroll-end="loadMoreSlides"
             >
               <ListSlideCard
                 :key="slide.content.id"
                 :slide="(slide.content as Slide)"
                 :truncate="true"
+                :active="hasInteracted && index === focusedActionIndex"
+                :pinned="isPinned(slide.id)"
+                @toggle-pin="togglePin(slide.id, 'slide')"
+                @hover="onRowMouseEnter(index)"
                 @delete-slide="deleteSlide($event)"
               />
             </RecycleScroller>
@@ -184,6 +218,7 @@
                 :action="turnToLibrarySongAction(song.content as Song)"
                 :icon-override="SongsIcon"
                 compact
+                actions-bottom
                 show-subtext
                 :highlight-query="searchInput"
                 :active="hasInteracted && index === focusedActionIndex"
@@ -195,6 +230,11 @@
                 @mouseenter="onRowMouseEnter(index)"
               >
                 <template #actions>
+                  <UIcon
+                    v-if="isPinned(song.id)"
+                    name="i-ph-push-pin-fill"
+                    class="w-3.5 h-3.5 mr-1 text-gray-400 dark:text-[#7d8695]"
+                  />
                   <MoreActionsMenu v-slot="{ close }" flush>
                     <UButton
                       variant="ghost"
@@ -209,6 +249,29 @@
                     >
                       <template #leading><EditIcon class="w-4 h-4" /></template>
                       Edit
+                    </UButton>
+                    <UButton
+                      variant="ghost"
+                      color="gray"
+                      block
+                      @click="
+                        () => {
+                          togglePin(song.id, 'song')
+                          close()
+                        }
+                      "
+                    >
+                      <template #leading>
+                        <UIcon
+                          :name="
+                            isPinned(song.id)
+                              ? 'i-ph-push-pin-slash'
+                              : 'i-ph-push-pin'
+                          "
+                          class="w-4 h-4"
+                        />
+                      </template>
+                      {{ isPinned(song.id) ? "Unpin" : "Pin to top" }}
                     </UButton>
                     <ConfirmDialog
                       button-label="Delete"
@@ -245,16 +308,22 @@
             />
             <RecycleScroller
               v-else
+              ref="songsScrollerRef"
               class="h-[calc(100vh-300px)]"
               :items="savedSlidesSearchResults"
-              :item-size="84"
+              :item-size="80"
               key-field="id"
-              v-slot="{ item: slide }"
+              v-slot="{ item: slide, index }"
             >
               <ListSlideCard
                 :key="slide.content.id"
                 :slide="slide.content"
                 :truncate="true"
+                :highlight-query="searchInput"
+                :active="hasInteracted && index === focusedActionIndex"
+                :pinned="isPinned(slide.id)"
+                @toggle-pin="togglePin(slide.id, 'slide')"
+                @hover="onRowMouseEnter(index)"
                 @delete-slide="deleteSlide($event)"
               />
             </RecycleScroller>
@@ -287,6 +356,7 @@
 import type { QuickAction, Slide, Song } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
 import SongsIcon from "~/components/svgs/SongsIcon.vue"
+import { useAppStore } from "~/store/app"
 
 const props = defineProps<{
   page: string
@@ -337,6 +407,9 @@ const searchInput = ref<string>("")
 const page = ref<string>(props.page || "")
 const songToEdit = ref<Song | undefined>(props.songToEdit)
 const newSongTitle = ref<string>(props.newSongTitle || "")
+const { isPinned, togglePin, sortPinned, syncPins } = useLibraryPins()
+const orderedSongs = computed(() => sortPinned(savedSongs.value))
+const orderedSlides = computed(() => sortPinned(savedSlides.value))
 const libraryEndIndex = ref<number>(15)
 const loadMoreSongs = () => {
   if (libraryEndIndex.value >= (savedSongs.value?.length || 0)) return
@@ -348,7 +421,7 @@ const slidesEndIndex = ref<number>(20)
 // A stable array between pages, so an unrelated re-render does not hand the
 // scroller a fresh list to diff.
 const shownSlides = computed(() =>
-  (savedSlides.value || []).slice(0, slidesEndIndex.value)
+  orderedSlides.value.slice(0, slidesEndIndex.value)
 )
 const loadMoreSlides = () => {
   if (slidesEndIndex.value >= (savedSlides.value?.length || 0)) return
@@ -363,6 +436,7 @@ const showSkeleton = computed(() => {
     activeLibraryTab.value === 0 ? savedSongs.value : savedSlides.value
   return loading.value && !cached?.length
 })
+const { currentState } = storeToRefs(useAppStore())
 const quickActions = ref<HTMLDivElement | null>(null)
 const focusedActionIndex = ref(0)
 const hasInteracted = ref(false)
@@ -398,12 +472,28 @@ const visibleLibrarySongs = computed<Song[]>(() => {
   if (activeLibraryTab.value !== 0) return []
   const items =
     searchInput.value.length < 2
-      ? savedSongs.value?.slice(0, libraryEndIndex.value)
+      ? orderedSongs.value.slice(0, libraryEndIndex.value)
       : savedSongsSearchResults.value
   return (items || []).map((item: any) => item.content as Song)
 })
 
-watch([visibleLibrarySongs, activeLibraryTab], () => {
+// The same for the slides tab
+const visibleLibrarySlides = computed<Slide[]>(() => {
+  if (activeLibraryTab.value !== 1) return []
+  const items =
+    searchInput.value.length < 2
+      ? shownSlides.value
+      : savedSlidesSearchResults.value
+  return (items || []).map((item: any) => item.content as Slide)
+})
+
+const visibleCount = computed(() =>
+  activeLibraryTab.value === 0
+    ? visibleLibrarySongs.value.length
+    : visibleLibrarySlides.value.length
+)
+
+watch([visibleLibrarySongs, visibleLibrarySlides, activeLibraryTab], () => {
   focusChangeSource.value = "mouse"
   focusedActionIndex.value = 0
   hasInteracted.value = false
@@ -470,6 +560,7 @@ onMounted(() => {
   // Re-sync in the background only if the last sync is stale; don't hold the
   // keyboard handler below hostage to a slow network.
   refreshLibraryIfStale()
+  syncPins()
 
   quickActions.value?.addEventListener("keydown", (e) => {
     if (e.defaultPrevented) {
@@ -488,7 +579,7 @@ onMounted(() => {
       case "ArrowDown":
         hasInteracted.value = true
         focusChangeSource.value = "keyboard"
-        focusedActionIndex.value < visibleLibrarySongs.value.length - 1
+        focusedActionIndex.value < visibleCount.value - 1
           ? (focusedActionIndex.value += 1)
           : null
         break
@@ -498,7 +589,26 @@ onMounted(() => {
         focusedActionIndex.value > 0 ? (focusedActionIndex.value -= 1) : null
         break
       case "Enter": {
-        const song = visibleLibrarySongs.value?.[focusedActionIndex.value]
+        if (activeLibraryTab.value === 1) {
+          const slide = visibleLibrarySlides.value?.[focusedActionIndex.value]
+          if (!slide) return
+          useGlobalEmit(`new-${slide.type}`, [
+            slide.type === slideTypes.media
+              ? {
+                  ...slide.data,
+                  url: slide.background,
+                  fromSaved: true,
+                  scheduleId: currentState.value?.activeSchedule?._id,
+                }
+              : {
+                  ...slide,
+                  fromSaved: true,
+                  scheduleId: currentState.value?.activeSchedule?._id,
+                },
+          ])
+          break
+        }
+        const song =visibleLibrarySongs.value?.[focusedActionIndex.value]
         if (!song) return
         useGlobalEmit("new-song", { ...song, fromSaved: true })
         break

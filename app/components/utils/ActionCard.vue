@@ -101,7 +101,8 @@
 
     <div
       v-if="$slots.actions"
-      class="actions flex absolute right-2 top-1/2 -translate-y-1/2"
+      class="actions flex items-center absolute right-2"
+      :class="actionsBottom ? 'bottom-1' : 'top-1/2 -translate-y-1/2'"
     >
       <slot name="actions" />
     </div>
@@ -170,6 +171,8 @@ const props = defineProps<{
   action: QuickAction
   actionSuffix?: String
   compact?: boolean
+  // Sit the actions on the card's bottom edge instead of its middle.
+  actionsBottom?: boolean
   showSubtext?: boolean
   iconOverride?: Component
   active?: boolean
