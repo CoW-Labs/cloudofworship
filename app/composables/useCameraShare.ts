@@ -7,6 +7,7 @@ import useCameraStream, {
   type CameraSettingsInput,
 } from "~/composables/useCameraStream"
 import useCameraOnAir from "~/composables/useCameraOnAir"
+import { currentPerformanceSettings } from "~/composables/usePerformanceSettings"
 import { useLocalOutputPresence } from "~/composables/useLiveOutputControl"
 import {
   CAMERA_SHARE_ANNOUNCE_MS,
@@ -164,6 +165,13 @@ const pending = new Map<string, { viewer: string; cancelled: boolean }>()
 const isPaused = () =>
   cameraCaptureIsExclusive() && !!outputPresent?.value && !!cameraOnAir?.value
 
+/**
+ * Performance setting "Share cameras with teammates". Each viewer costs this
+ * computer an encode of the camera, so a slow machine can opt out: it
+ * announces no cameras, refuses requests, and drops viewers it is serving.
+ */
+const sharingEnabled = () => currentPerformanceSettings().shareCameraWithTeam
+
 const endServed = (sessionId: string, notify: boolean) => {
   const session = served.get(sessionId)
   if (!session) return
@@ -196,7 +204,7 @@ const capSender = (sender: RTCRtpSender, encoding: RTCRtpEncodingParameters) => 
 const serve = async (signal: Signal) => {
   const { from, sessionId } = signal
   if (served.has(sessionId) || pending.has(sessionId)) return
-  if (!canConnect()) return send(from, "missing", sessionId)
+  if (!canConnect() || !sharingEnabled()) return send(from, "missing", sessionId)
   const data: CameraSettingsInput = {
     deviceId: signal.deviceId || "",
     deviceLabel: signal.deviceLabel || "",
@@ -316,8 +324,9 @@ const announce = async ({ wantReplies = false }: { wantReplies?: boolean } = {})
   } catch {
     cameras = []
   }
-  // An engine without WebRTC cannot send what it has.
-  if (!canConnect()) cameras = []
+  // An engine without WebRTC cannot send what it has, and a computer that
+  // switched sharing off offers nothing (and takes back what it announced).
+  if (!canConnect() || !sharingEnabled()) cameras = []
   // A computer with no cameras has nothing to say, unless it is taking back
   // ones it announced before, or asking teammates to say theirs.
   if (!cameras.length && !lastAnnouncedCameras && !wantReplies) return
@@ -614,7 +623,14 @@ const start = () => {
     }
   )
   const stopProjecting = watch(() => outputPresent?.value, () => announce())
-  stopWatchers = [stopDevices, stopPause, stopProjecting]
+  const stopSharing = watch(
+    () => sharingEnabled(),
+    (enabled) => {
+      if (!enabled) pauseServing()
+      announce({ wantReplies: enabled })
+    }
+  )
+  stopWatchers = [stopDevices, stopPause, stopProjecting, stopSharing]
 }
 
 const stop = () => {

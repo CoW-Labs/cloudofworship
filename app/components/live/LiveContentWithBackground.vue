@@ -76,7 +76,7 @@
         slide?.type === slideTypes.presentation ||
         slide?.type === slideTypes.camera
           ? ''
-          : `backdrop-filter: blur(${slideStyles.blur}px) brightness(${slideStyles.brightness}%);`
+          : foregroundDimStyle
       "
     />
   </div>
@@ -98,6 +98,19 @@ const currentPresentationPageUrl = computed(() => {
 })
 
 const backgroundStyle = computed(() => useSlideBackground(props.slide))
+
+// Blur and dim the background behind the words. With "Reduce visual effects"
+// the blur is dropped and the dim becomes a flat colour, which costs nothing
+// per frame (a backdrop filter re-reads everything behind it).
+const { settings: performanceSettings } = usePerformanceSettings()
+const foregroundDimStyle = computed(() =>
+  performanceSettings.value.reduceEffects
+    ? `background-color: rgba(0, 0, 0, ${Math.min(
+        1,
+        Math.max(0, 1 - (props.slideStyles.brightness ?? 100) / 100)
+      )});`
+    : `backdrop-filter: blur(${props.slideStyles.blur}px) brightness(${props.slideStyles.brightness}%);`
+)
 
 watch(
   () => props.slide,

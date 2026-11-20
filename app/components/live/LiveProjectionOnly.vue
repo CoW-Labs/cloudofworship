@@ -524,6 +524,7 @@ const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
 const route = useRoute()
 const { currentState } = storeToRefs(appStore)
+const { settings: performanceSettings } = usePerformanceSettings()
 const emit = defineEmits(["activate-fullscreen"])
 
 const props = withDefaults(
@@ -1104,6 +1105,8 @@ watch(playableVideo, async (next, previous) => {
   await nextTick()
   const element = mediaElement()
   if (!element) return
+  // A still preview stays on its first frame whatever the source does.
+  if (!props.fullScreen && performanceSettings.value.stillPreviewVideo) return
 
   if (resumeAt > 0) {
     const seek = () => {
@@ -1153,7 +1156,7 @@ useReportExternalPlayback(
 useFollowMediaPlayback(
   previewVideo,
   () => props.slide?.id,
-  () => !props.fullScreen
+  () => !props.fullScreen && !performanceSettings.value.stillPreviewVideo
 )
 
 const computeBackgroundStyles = (slide: Slide): string => {
@@ -1163,9 +1166,14 @@ const computeBackgroundStyles = (slide: Slide): string => {
   ) {
     return useSlideBackground(slide)
   }
-  return `${useSlideBackground(slide)}; filter: blur(${
-    props.slideStyles.blur
-  }px) brightness(${props.slideStyles.brightness}%);`
+  // "Reduce visual effects" drops the blur, which is a full-screen convolution
+  // on every frame of a video background; the dimming stays.
+  const blur = performanceSettings.value.reduceEffects
+    ? ""
+    : `blur(${props.slideStyles.blur}px) `
+  return `${useSlideBackground(slide)}; filter: ${blur}brightness(${
+    props.slideStyles.brightness
+  }%);`
 }
 
 const backgroundStyles = computed(() => {
@@ -1198,7 +1206,10 @@ watch(
 
       // The operator's preview copy follows the seek too.
       if (!props.fullScreen) {
-        if (previewVideo.value) previewVideo.value.currentTime = newSeekPosition
+        // A still preview never plays, so there is nothing to keep in step.
+        if (previewVideo.value && !performanceSettings.value.stillPreviewVideo) {
+          previewVideo.value.currentTime = newSeekPosition
+        }
         return
       }
 
@@ -1281,6 +1292,9 @@ watch(
 
       // The operator's preview copy: muted, no embedded players to command.
       if (!props.fullScreen) {
+        // "Still preview": the operator's copy stays on its first frame, so
+        // the machine decodes the video once (for the projector), not twice.
+        if (performanceSettings.value.stillPreviewVideo) return
         if (isPlaying) safePlayMedia(previewVideo.value)
         else if (isPlaying !== undefined && slide.type === slideTypes.media) {
           safePauseMedia(previewVideo.value)
@@ -1453,7 +1467,9 @@ onMounted(() => {
   if (props.fullScreen) {
     safePlayMedia(video.value)
   } else if (
-    // The preview plays on its own, unless the operator paused this clip.
+    // The preview plays on its own, unless the operator paused this clip or
+    // chose a still preview.
+    !performanceSettings.value.stillPreviewVideo &&
     !(
       props.slide?.slideStyle?.mediaCommandAt &&
       props.slide?.slideStyle?.isMediaPlaying === false

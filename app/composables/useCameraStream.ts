@@ -3,6 +3,7 @@ import type { LocalCameraMatch } from "~/utils/cameraShare"
 import { postCrossWindowNotification } from "~/composables/useBroadcastPost"
 import { effectScope, watch } from "vue"
 import { useAppStore } from "~/store/app"
+import { currentPerformanceSettings } from "~/composables/usePerformanceSettings"
 
 /**
  * Camera streams for camera slides.
@@ -109,6 +110,12 @@ const watchKeepCameraOn = () => {
           if (!on) releaseIdleCameras()
         }
       )
+      // Switching the camera quality cap re-sizes the cameras already open, in
+      // place (no reopen, no black frame on the projector).
+      watch(
+        () => appStore.currentState.settings.cameraResolution === "720p",
+        () => cache.forEach((entry) => applyResolution(entry, true))
+      )
     })
   } catch {
     // No Pinia yet; the next acquire tries again.
@@ -140,6 +147,22 @@ const RESOLUTION_SIZE: Record<CameraResolution, MediaTrackConstraints> = {
   inset: { width: { ideal: 1280 }, height: { ideal: 720 } },
 }
 
+/**
+ * Performance setting "Camera quality: 720p". A 1080p feed is four times the
+ * pixels of a 360p one to capture, decode and draw, and again for every
+ * teammate it is sent to. Capped, every camera opens at 1280x720 and stays
+ * there, whatever size a holder asks for.
+ */
+const cameraIsCapped = () => currentPerformanceSettings().cameraResolution === "720p"
+
+const captureConstraints = (): MediaTrackConstraints =>
+  cameraIsCapped()
+    ? { ...CAPTURE_CONSTRAINTS, ...RESOLUTION_SIZE.inset }
+    : CAPTURE_CONSTRAINTS
+
+const resolutionSize = (resolution: CameraResolution) =>
+  cameraIsCapped() ? RESOLUTION_SIZE.inset : RESOLUTION_SIZE[resolution]
+
 interface CacheEntry {
   key: string
   deviceId: string
@@ -155,7 +178,7 @@ interface CacheEntry {
 }
 
 /** Runs the stream at the most any holder needs. Best effort. */
-const applyResolution = (entry: CacheEntry) => {
+const applyResolution = (entry: CacheEntry, force = false) => {
   const wanted: CameraResolution = [...entry.needs.values()].some(
     (need) => need === "full"
   )
@@ -163,12 +186,12 @@ const applyResolution = (entry: CacheEntry) => {
     : entry.needs.size
     ? "inset"
     : entry.resolution
-  if (wanted === entry.resolution) return
+  if (wanted === entry.resolution && !force) return
   entry.resolution = wanted
   const track = entry.stream?.getVideoTracks()[0]
   if (!track?.applyConstraints) return
   track
-    .applyConstraints({ ...track.getConstraints(), ...RESOLUTION_SIZE[wanted] })
+    .applyConstraints({ ...track.getConstraints(), ...resolutionSize(wanted) })
     .catch(() => {
       // A camera that cannot switch keeps the size it has.
     })
@@ -400,8 +423,9 @@ const localCameraMatch = async (
 }
 
 const openStream = async (deviceId: string) => {
+  const constraints = captureConstraints()
   const video = (frameRate: MediaTrackConstraints["frameRate"]) => ({
-    ...CAPTURE_CONSTRAINTS,
+    ...constraints,
     frameRate,
     ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
   })
@@ -409,7 +433,7 @@ const openStream = async (deviceId: string) => {
   try {
     return await mediaDevices()!.getUserMedia({
       audio: false,
-      video: video(CAPTURE_CONSTRAINTS.frameRate),
+      video: video(constraints.frameRate),
     })
   } catch (error) {
     // Chromium drops frames to meet a frame-rate cap; Safari may refuse a
