@@ -1140,6 +1140,23 @@ html.dark .cow-search-input input::placeholder {
     -1px 1px 0 #000;
 }
 
+/* A free-layout box's own font size. Reference labels set a fixed size, so the
+   box's percentage reaches them through --box-scale. Only boxes the user has
+   resized carry .box-scaled, and this sits before the preview rules below so
+   the thumbnails keep their own sizes. */
+.tiptap.live-content .box-scaled .scripture-label {
+  font-size: calc(2cqw * var(--box-scale));
+}
+.box-scaled.bible-label-large .scripture-label {
+  font-size: calc(3vw * var(--box-scale)) !important;
+}
+.box-scaled.bible-label-xlarge .scripture-label {
+  font-size: calc(4vw * var(--box-scale)) !important;
+}
+.bible-theme-side .box-scaled .scripture-label {
+  font-size: calc(1.5vw * var(--box-scale)) !important;
+}
+
 /* LIVE CONTENT MD PREVIEW */
 .md-preview .slide-layout-ctn {
   min-height: 95px;

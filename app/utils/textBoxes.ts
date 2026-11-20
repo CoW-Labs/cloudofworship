@@ -195,7 +195,12 @@ export const boxFrameStyle = (box: TextBox) => ({
   ...(box.alignment ? { textAlign: box.alignment } : {}),
   ...(box.color ? { color: box.color } : {}),
   ...(box.fontSizePercent && box.fontSizePercent !== 100
-    ? { fontSize: `${box.fontSizePercent}%` }
+    ? {
+        fontSize: `${box.fontSizePercent}%`,
+        // Labels such as the Bible reference carry their own fixed size, so
+        // inheriting the box's size does nothing for them; they scale by this.
+        "--box-scale": `${box.fontSizePercent / 100}`,
+      }
     : {}),
   ...(box.font ? { "--box-font": `"${box.font.replace(/["\\]/g, "")}", sans-serif` } : {}),
 })
@@ -214,4 +219,5 @@ export const boxStyleClasses = (box: TextBox) => [
   box.linesBackground === true && "box-lines-bg",
   box.linesBackground === false && "box-lines-bg-off",
   box.font && "box-font",
+  !!box.fontSizePercent && box.fontSizePercent !== 100 && "box-scaled",
 ]
