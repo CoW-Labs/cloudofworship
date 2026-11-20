@@ -172,6 +172,24 @@
       @update:model-value="(open: boolean) => { if (!open) pairPicker = null }"
       @pick="onPairPicked"
     />
+
+    <!-- Shown once, the first time a slide that can use Free layout is made. -->
+    <FeatureIntroductionModal
+      ref="freeLayoutIntroModal"
+      feature-key="free-layout"
+      title="Free layout"
+      description="Place text anywhere, like a lower or upper third."
+      :points="[
+        {
+          title: 'Drag and resize',
+          body: 'Drag a box to move it, pull a corner to resize. Reset text layout undoes it.',
+        },
+      ]"
+    >
+      <template #hero>
+        <FreeLayoutIntroAnimation />
+      </template>
+    </FeatureIntroductionModal>
   </div>
 </template>
 
@@ -263,6 +281,15 @@ import {
   isNotFoundError,
 } from "~/utils/apiErrors"
 import posthog from "posthog-js"
+import { supportsTextBoxes } from "~/utils/textBoxes"
+
+// Free layout's one-time intro. `show()` does nothing once it has been seen.
+const freeLayoutIntroModal = ref<{ show: () => boolean } | null>(null)
+const introduceFreeLayout = async () => {
+  // The slide is in the schedule first, so the editor is already open behind it.
+  await nextTick()
+  freeLayoutIntroModal.value?.show()
+}
 
 // Incoming realtime slide events are handled once, centrally, in pages/index.vue
 // (via useRealtimeSlides wired to the live socket). That handler mutates the
@@ -759,6 +786,7 @@ const makeSlideActive = (
     const added = !appStore.activeSlidesById.has(slide.id)
     appStore.appendActiveSlide(slide, options.position)
     if (added) recordSlideMembership("Add slide", [slide], true)
+    if (added && supportsTextBoxes(slide)) introduceFreeLayout()
     // Lets the mobile route dismiss the Quick Actions sheet the slide was
     // created from, so it does not stay stacked over the editor.
     if (props.mobile) emit("slide-created")
@@ -1387,7 +1415,22 @@ const scrollToSlide = (slideId?: string) => {
 }
 
 // LISTEN TO EVENTS
-const emitter = useNuxtApp().$emitter as Emitter<any>
+// Every handler registered below is taken off the shared emitter when this
+// panel unmounts. Without that, leaving the operator page and coming back (for
+// example a visit to /update) stacks a second copy of each handler, and one
+// "new-song" would then create the slide twice.
+const sharedEmitter = useNuxtApp().$emitter as Emitter<any>
+const emitterHandlers: [any, (event?: any) => void][] = []
+const emitter = {
+  on(type: any, handler: (event?: any) => void) {
+    sharedEmitter.on(type, handler)
+    emitterHandlers.push([type, handler])
+  },
+}
+onBeforeUnmount(() => {
+  emitterHandlers.forEach(([type, handler]) => sharedEmitter.off(type, handler))
+  emitterHandlers.length = 0
+})
 emitter.on("new-slide", () => {
   const newSlide = createTextSlide()
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
@@ -3253,7 +3296,12 @@ const deleteMultipleSlides = (slideIds: Array<string>) => {
 }
 
 const onUpdateSlide = (slide: Slide, meta?: SlideUpdateMeta) => {
-  // Always pause countdown slide before updating it
+  // Always pause countdown slide before updating it, remembering whether it
+  // was actually running so an edit never starts one that was paused.
+  const countdownWasRunning =
+    slide.type === slideTypes.countdown &&
+    activeCountdownInterval.value !== null &&
+    activeCountdownSlideId.value === slide.id
   if (slide.type === slideTypes.countdown) {
     // pause the active countdown animation so edits don't conflict
     stopCountdown()
@@ -3285,8 +3333,8 @@ const onUpdateSlide = (slide: Slide, meta?: SlideUpdateMeta) => {
     showSlideOverlay(updatedSlide, { capture: false })
   }
 
-  // When updating of countdown slide is done, resume timer
-  if (updatedSlide.type === slideTypes.countdown) {
+  // Resume only a timer that was running before the edit
+  if (updatedSlide.type === slideTypes.countdown && countdownWasRunning) {
     startCountdown(updatedSlide)
   }
 }

@@ -40,7 +40,7 @@
     <DisplayWindowBanner
       v-if="!isFullScreen && !isTauri"
       floating
-      label="Live Output"
+      :label="isSlidesOutput ? 'Slides Output' : 'Live Output'"
       :active="!!primarySlide"
       :shortcut="primarySlide ? undefined : ''"
       :hint="
@@ -76,7 +76,7 @@
         :slide-label="false"
         :slide-styles="currentState.settings.slideStyles"
         :audio-muted="mostUpdatedLiveSlide?.slideStyle?.isMediaMuted!!"
-        camera-mode="capture"
+        :camera-mode="isSlidesOutput ? 'placeholder' : 'capture'"
       />
     </Transition>
     <!-- </Transition> -->
@@ -97,8 +97,10 @@ import type {
 import { resolveLiveSlideBroadcast } from "~/composables/useBroadcastPost"
 import {
   continueAsSolo,
+  isCameraSlide,
   isPairPayload,
   liveSlideIds,
+  pairRoles,
   patchLivePayload,
   primaryLiveSlide,
 } from "~/utils/slidePairs"
@@ -130,11 +132,29 @@ const mediaRecorderInterval = ref()
 const FPS = 10
 // What is on screen: one slide, a slide pair's members, or null for blank.
 const livePayload = ref<LivePayload>(null)
+
+// `/live?output=slides` is the Slides-only display: the same feed as the live
+// output, minus the camera. A camera slide leaves it black, and a pair shows
+// only its non-camera member. This window never opens or prewarms a camera, so
+// it costs nothing while a camera slide is live, and it leaves the shared store
+// and the analytics to the live window, which already does both.
+const route = useRoute()
+const isSlidesOutput = route.query.output === "slides"
+
+const shownPayload = computed<LivePayload>(() => {
+  const payload = livePayload.value
+  if (!isSlidesOutput || !payload) return payload
+  if (isPairPayload(payload)) {
+    const { text } = pairRoles(payload)
+    return text && !isCameraSlide(text) ? text : null
+  }
+  return isCameraSlide(payload) ? null : payload
+})
 const mostUpdatedLiveSlide = computed<Slide | null>(() =>
-  isPairPayload(livePayload.value) ? null : livePayload.value
+  isPairPayload(shownPayload.value) ? null : shownPayload.value
 )
 const livePairSlides = computed<Slide[] | null>(() =>
-  isPairPayload(livePayload.value) ? livePayload.value : null
+  isPairPayload(shownPayload.value) ? shownPayload.value : null
 )
 /** The live slide, or the pair's active member: what the banner and store follow. */
 const primarySlide = computed(() => primaryLiveSlide(livePayload.value))
@@ -169,6 +189,68 @@ const lastLocalizedBySlide = new Map<
   string,
   { mediaKey: string; media: LocalizedMedia }
 >()
+// Both maps above would otherwise grow for the whole service: every new video
+// or presentation adds object URLs (and a full page list) that were only freed
+// on unmount. Keep the most recently used few and release the rest. Map
+// insertion order is the recency order (hits and writes re-insert).
+const MAX_LOCALIZED_MEDIA = 12
+
+const urlsOfMedia = (media: LocalizedMedia, into: Set<string>) => {
+  if (media.background) into.add(media.background)
+  if (media.dataUrl) into.add(media.dataUrl)
+  media.presentationObjects?.forEach((page) => {
+    if (page.imageUrl) into.add(page.imageUrl)
+  })
+}
+
+const urlsOnScreen = () => {
+  const urls = new Set<string>()
+  const current = livePayload.value as Slide | Slide[] | null | undefined
+  ;(Array.isArray(current) ? current : [current]).forEach((slide) => {
+    if (!slide) return
+    if (slide.background) urls.add(slide.background)
+    const dataUrl = (slide.data as any)?.url
+    if (dataUrl) urls.add(dataUrl)
+    slide.presentationObjects?.forEach((page) => {
+      if (page.imageUrl) urls.add(page.imageUrl)
+    })
+  })
+  return urls
+}
+
+const touchLocalizedMedia = (sig: string, media: LocalizedMedia) => {
+  localizedLiveMedia.delete(sig)
+  localizedLiveMedia.set(sig, media)
+}
+
+const evictLocalizedMedia = () => {
+  if (localizedLiveMedia.size <= MAX_LOCALIZED_MEDIA) return
+  const protectedUrls = urlsOnScreen()
+  const evicted: LocalizedMedia[] = []
+  for (const [sig, media] of localizedLiveMedia) {
+    if (localizedLiveMedia.size <= MAX_LOCALIZED_MEDIA) break
+    const urls = new Set<string>()
+    urlsOfMedia(media, urls)
+    if ([...urls].some((url) => protectedUrls.has(url))) continue
+    localizedLiveMedia.delete(sig)
+    evicted.push(media)
+  }
+  if (!evicted.length) return
+  // Drop the per-slide copies that point at an evicted entry.
+  for (const [slideId, last] of lastLocalizedBySlide) {
+    if (evicted.includes(last.media)) lastLocalizedBySlide.delete(slideId)
+  }
+  // Release only URLs no surviving entry (or the screen) still uses.
+  const keep = urlsOnScreen()
+  localizedLiveMedia.forEach((media) => urlsOfMedia(media, keep))
+  lastLocalizedBySlide.forEach((last) => urlsOfMedia(last.media, keep))
+  const release = new Set<string>()
+  evicted.forEach((media) => urlsOfMedia(media, release))
+  release.forEach((url) => {
+    if (!keep.has(url)) localMedia.releasePlaybackUrl(url)
+  })
+}
+
 const slideMediaKey = (slide: Slide) =>
   `${slide.backgroundVideoKey ?? ""}|${slide.backgroundImageKey ?? ""}`
 const reusableLocalizedMedia = (slide: Slide): LocalizedMedia | null => {
@@ -275,6 +357,15 @@ const toggleFullScreen = () => {
   }
 }
 
+const blockFindShortcut = (event: KeyboardEvent) => {
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    (event.key === "f" || event.key === "F")
+  ) {
+    event.preventDefault()
+  }
+}
+
 onMounted(() => {
   window.addEventListener("fullscreenchange", checkFullScreen)
   window.addEventListener("webkitfullscreenchange", checkFullScreen)
@@ -282,14 +373,7 @@ onMounted(() => {
   window.addEventListener("MSFullscreenChange", checkFullScreen)
 
   // Prevent default action on specific keys
-  document.addEventListener("keydown", function (event) {
-    if (
-      (event.ctrlKey || event.metaKey) &&
-      (event.key === "f" || event.key === "F")
-    ) {
-      event.preventDefault()
-    }
-  })
+  document.addEventListener("keydown", blockFindShortcut)
 
   // Shortcut to go full screen
   useRegisteredShortcut(shortcutIds.fullscreen, toggleFullScreen)
@@ -311,10 +395,11 @@ onMounted(() => {
         ? projected.slides
         : projected.slide
       // The operator owns what is live; this window only copies it.
-      appStore.mirrorLiveProjection(
-        projected.slideId || "",
-        projected.slideId ? livePairIdOf(projected.slides) : null
-      )
+      if (!isSlidesOutput)
+        appStore.mirrorLiveProjection(
+          projected.slideId || "",
+          projected.slideId ? livePairIdOf(projected.slides) : null
+        )
       return
     }
     // Never resurrect a schedule slide when the projected record is missing,
@@ -358,7 +443,7 @@ onMounted(() => {
           : envelope.payload
 
       if (isCameraPrewarmBroadcast(payload)) {
-        prewarmCamera(payload.data)
+        if (!isSlidesOutput) prewarmCamera(payload.data)
         return
       }
 
@@ -394,7 +479,7 @@ onMounted(() => {
         livePayload.value = null
         // Keep the shared store in agreement so a reloading operator window
         // doesn't adopt a stale liveSlideId from this tab via pinia-shared-state.
-        appStore.mirrorLiveProjection("", null)
+        if (!isSlidesOutput) appStore.mirrorLiveProjection("", null)
         return
       }
 
@@ -411,19 +496,20 @@ onMounted(() => {
       // The pair comes from the payload, never from this window's copy of the
       // shared state, which may not have heard of the pair yet. The copy is
       // not sent back (see mirrorLiveProjection).
-      if (primary?.id) {
+      if (primary?.id && !isSlidesOutput) {
         appStore.mirrorLiveProjection(primary.id, livePairIdOf(parsed))
       }
 
       // Track slide presentation
-      usePosthogCapture("SLIDE_PRESENTED_LIVE", {
-        slideType: primary?.type,
-        slideLayout: primary?.layout,
-        slideId: primary?.id,
-        ...(isPairPayload(parsed)
-          ? { pairLayout: primary?.livePair?.layout, pairSize: parsed.length }
-          : {}),
-      })
+      if (!isSlidesOutput)
+        usePosthogCapture("SLIDE_PRESENTED_LIVE", {
+          slideType: primary?.type,
+          slideLayout: primary?.layout,
+          slideId: primary?.id,
+          ...(isPairPayload(parsed)
+            ? { pairLayout: primary?.livePair?.layout, pairSize: parsed.length }
+            : {}),
+        })
 
       // For media-bearing slides, swap in a local object URL so the projection
       // never depends on the operator tab's blob: URL (which dies when that tab
@@ -435,6 +521,7 @@ onMounted(() => {
         const sig = mediaSignature(slide)
         const cached = localizedLiveMedia.get(sig) ?? reusableLocalizedMedia(slide)
         if (cached) {
+          if (localizedLiveMedia.has(sig)) touchLocalizedMedia(sig, cached)
           applyLocalizedMedia(slide, cached)
         } else {
           pendingRehydrate.push({ slide, sig })
@@ -481,7 +568,8 @@ onMounted(() => {
             presentationObjects: rehydrated.presentationObjects,
           }
           if (cacheable) {
-            localizedLiveMedia.set(sig, localized)
+            touchLocalizedMedia(sig, localized)
+            lastLocalizedBySlide.delete(rehydrated.id)
             lastLocalizedBySlide.set(rehydrated.id, {
               mediaKey: slideMediaKey(rehydrated),
               media: localized,
@@ -500,6 +588,8 @@ onMounted(() => {
             applyLocalizedMedia(next, localized)
             livePayload.value = patchLivePayload(current, next)
           }
+          // After the screen holds the new URLs, so those stay protected.
+          if (cacheable) evictLocalizedMedia()
         }
 
         rehydrateSlideMediaWithStatus(updatedSlide, {
@@ -537,6 +627,7 @@ onBeforeUnmount(() => {
   urls.forEach((url) => localMedia.releasePlaybackUrl(url))
   localizedLiveMedia.clear()
   lastLocalizedBySlide.clear()
+  document.removeEventListener("keydown", blockFindShortcut)
   window.removeEventListener("fullscreenchange", checkFullScreen)
   window.removeEventListener("webkitfullscreenchange", checkFullScreen)
   window.removeEventListener("mozfullscreenchange", checkFullScreen)

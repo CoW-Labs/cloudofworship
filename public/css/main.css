@@ -384,6 +384,31 @@ html.dark .cow-search-input input::placeholder {
   -webkit-backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
 }
+.verse-transition-drift,
+.verse-transition-breathe,
+.verse-transition-cascade {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+/* Same moves as the slide transitions: drift rises a hair, breathe settles
+   from slightly larger, cascade staggers the blocks (heading, then words). */
+.verse-transition-drift {
+  animation: verse-drift 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+.verse-transition-breathe {
+  animation: verse-breathe 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+.verse-transition-cascade {
+  animation: verse-drift 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.slide-layout-ctn > .verse-transition-cascade:nth-child(2) {
+  animation-delay: 0.09s;
+}
+.slide-layout-ctn > .verse-transition-cascade:nth-child(n + 3) {
+  animation-delay: 0.18s;
+}
 .fade-in-right {
   animation: fade-in-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   -webkit-animation: fade-in-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)
@@ -429,6 +454,88 @@ html.dark .cow-search-input input::placeholder {
   inset: 0;
 }
 
+/* DRIFT / BREATHE / CASCADE. The face crossfades exactly like fade; only the
+   incoming text (.slide-text) moves. The background never moves or scales:
+   a blurred one is a backdrop-filter, which would re-blur every frame. Only
+   transform and opacity animate, so after the first frame it is compositor
+   work. The .slide-text rules carry `.slide-face` to outrank
+   `.tiptap.live-content`, which sits later in this file. */
+.cow-slide-drift-enter-active,
+.cow-slide-drift-leave-active,
+.cow-slide-breathe-enter-active,
+.cow-slide-breathe-leave-active,
+.cow-slide-cascade-enter-active,
+.cow-slide-cascade-leave-active {
+  transition: opacity var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: opacity;
+}
+.cow-slide-drift-enter-from,
+.cow-slide-drift-leave-to,
+.cow-slide-breathe-enter-from,
+.cow-slide-breathe-leave-to,
+.cow-slide-cascade-enter-from,
+.cow-slide-cascade-leave-to {
+  opacity: 0;
+}
+.cow-slide-drift-leave-active,
+.cow-slide-breathe-leave-active,
+.cow-slide-cascade-leave-active {
+  position: absolute;
+  inset: 0;
+}
+
+/* Drift: the new words rise the last few pixels into place. */
+.slide-face.cow-slide-drift-enter-active .slide-text {
+  transition: transform var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+.slide-face.cow-slide-drift-enter-from .slide-text {
+  transform: translateY(1.2%);
+}
+
+/* Breathe: the new words settle from a hair larger, like a slow exhale. */
+.slide-face.cow-slide-breathe-enter-active .slide-text {
+  transition: transform var(--cow-transition-duration, 0.7s)
+    cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+.slide-face.cow-slide-breathe-enter-from .slide-text {
+  transform: scale(1.015);
+}
+
+/* Cascade: the slide's blocks arrive one after another (heading, then words;
+   scripture, then its reference). Blocks, not lyric lines: lines are split by
+   <br>, and wrapping them would change what auto-fit measures. The delays are
+   added to the explicit Vue duration in LiveProjectionOnly. */
+.slide-face.cow-slide-cascade-enter-active .slide-text .slide-layout-ctn > :not(.rotate-180) {
+  transition: opacity var(--cow-transition-duration, 0.7s)
+      cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transform var(--cow-transition-duration, 0.7s)
+      cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.slide-face.cow-slide-cascade-enter-active .slide-text .slide-layout-ctn > :not(.rotate-180):nth-child(2) {
+  transition-delay: 0.09s;
+}
+.slide-face.cow-slide-cascade-enter-active .slide-text .slide-layout-ctn > :not(.rotate-180):nth-child(n + 3) {
+  transition-delay: 0.18s;
+}
+.slide-face.cow-slide-cascade-enter-from .slide-text .slide-layout-ctn > :not(.rotate-180) {
+  opacity: 0;
+  transform: translateY(4%);
+}
+
+/* Only while a transition is running (Vue's classes are on the face), so the
+   rotated Bible labels keep their rotation the rest of the time. */
+@media (prefers-reduced-motion: reduce) {
+  .slide-face[class*="cow-slide-"] .slide-text,
+  .slide-face[class*="cow-slide-"] .slide-text .slide-layout-ctn > :not(.rotate-180) {
+    transform: none !important;
+    transition-delay: 0s !important;
+  }
+}
+
 .no-animations {
   .come-up-1 {
     animation: none;
@@ -439,7 +546,10 @@ html.dark .cow-search-input input::placeholder {
     -webkit-animation: none;
   }
   .verse-transition-translate-up,
-  .verse-transition-fade {
+  .verse-transition-fade,
+  .verse-transition-drift,
+  .verse-transition-breathe,
+  .verse-transition-cascade {
     animation: none;
     -webkit-animation: none;
   }
@@ -466,6 +576,28 @@ html.dark .cow-search-input input::placeholder {
     -moz-transform: translateY(0) translateZ(0);
     -ms-transform: translateY(0) translateZ(0);
     -o-transform: translateY(0) translateZ(0);
+  }
+}
+
+@keyframes verse-drift {
+  0% {
+    opacity: 0;
+    transform: translateY(1.2%) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+  }
+}
+
+@keyframes verse-breathe {
+  0% {
+    opacity: 0;
+    transform: scale(1.015) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
   }
 }
 
@@ -726,6 +858,61 @@ html.dark .cow-search-input input::placeholder {
   -ms-border-radius: 6px;
   -o-border-radius: 6px;
 }
+/* Per-box text styles. They sit on the box itself, so they win over the
+   slide-wide rules above and apply to whichever box carries them. */
+.box-bold,
+.box-bold * {
+  font-weight: 850;
+}
+.box-bold-off,
+.box-bold-off * {
+  font-weight: normal !important;
+}
+.box-upper,
+.box-upper * {
+  text-transform: uppercase !important;
+}
+.box-upper-off,
+.box-upper-off * {
+  text-transform: none !important;
+}
+.box-outlined,
+.box-outlined * {
+  text-shadow: -4px -4px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000,
+    -4px 2px 0 #000;
+}
+.box-outlined-off,
+.box-outlined-off * {
+  text-shadow: none !important;
+}
+.box-lines-bg p,
+.box-lines-bg h1,
+.box-lines-bg h2,
+.box-lines-bg h3,
+.box-lines-bg h4 {
+  display: inline;
+  background: #000000;
+  padding: 0.06em 0.22em;
+  line-height: 150%;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  border-radius: 6px;
+}
+.box-lines-bg-off p,
+.box-lines-bg-off h1,
+.box-lines-bg-off h2,
+.box-lines-bg-off h3,
+.box-lines-bg-off h4,
+.box-lines-bg-off .text-lines-background-highlight {
+  display: revert !important;
+  background: none !important;
+  padding: 0 !important;
+  line-height: inherit;
+}
+.box-font,
+.box-font * {
+  font-family: var(--box-font) !important;
+}
 .uppercase-live-content > .slide-layout-ctn > div:nth-child(1),
 .uppercase-live-content > div:nth-child(1) > .tiptap,
 .uppercase-live-content > div:nth-child(1) > .tiptap > p {
@@ -764,11 +951,10 @@ html.dark .cow-search-input input::placeholder {
   -moz-border-radius: 0;
   -ms-border-radius: 0;
   -o-border-radius: 0;
-  transition: 0.5s;
-  -webkit-transition: 0.5s;
-  -moz-transition: 0.5s;
-  -ms-transition: 0.5s;
-  -o-transition: 0.5s;
+  /* Paint-only properties. Sizes, padding and box positions must snap: an
+     animated font-size or inset re-lays the text out every frame, in every
+     window showing the slide, and would race the auto-fit measurements. */
+  transition: color 0.5s, background-color 0.5s, opacity 0.5s;
 }
 .tiptap.live-content .scripture-content {
   font-weight: 500;
@@ -952,6 +1138,23 @@ html.dark .cow-search-input input::placeholder {
 .lg-preview .outlined-live-content > .slide-layout-ctn > div {
   text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000,
     -1px 1px 0 #000;
+}
+
+/* A free-layout box's own font size. Reference labels set a fixed size, so the
+   box's percentage reaches them through --box-scale. Only boxes the user has
+   resized carry .box-scaled, and this sits before the preview rules below so
+   the thumbnails keep their own sizes. */
+.tiptap.live-content .box-scaled .scripture-label {
+  font-size: calc(2cqw * var(--box-scale));
+}
+.box-scaled.bible-label-large .scripture-label {
+  font-size: calc(3vw * var(--box-scale)) !important;
+}
+.box-scaled.bible-label-xlarge .scripture-label {
+  font-size: calc(4vw * var(--box-scale)) !important;
+}
+.bible-theme-side .box-scaled .scripture-label {
+  font-size: calc(1.5vw * var(--box-scale)) !important;
 }
 
 /* LIVE CONTENT MD PREVIEW */
@@ -1192,4 +1395,15 @@ html.dark {
 .song-content .song-translation,
 .tiptap.live-content .song-translation {
   color: #d9a4ff !important;
+}
+
+/* Performance setting "Reduce visual effects" (plugins/performance-mode). A
+   backdrop filter re-blurs everything behind it on every frame, which is the
+   costly part of frosted glass on integrated graphics. The panels keep their
+   translucent colour, so they stay readable without the blur. */
+html.cow-reduce-effects *,
+html.cow-reduce-effects *::before,
+html.cow-reduce-effects *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }

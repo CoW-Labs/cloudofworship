@@ -58,6 +58,13 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `SLIDE_EDITED` | `slideType`, `slideId` | Slide content modified | ⚠️ Missing |
 | `SLIDE_BACKGROUND_CHANGED` | `backgroundType`, `slideType` | Slide background updated | ⚠️ Missing |
 | `SLIDE_LAYOUT_CHANGED` | `oldLayout`, `newLayout`, `slideType` | Slide layout changed | ⚠️ Missing |
+| `CANVAS_BOX_MOVED` | `slideType`, `method` (`keyboard` only; omitted for a drag) | A text box was moved on the slide canvas; one event per drop, never per pointer move | ✅ Added |
+| `CANVAS_BOX_RESIZED` | `slideType` | A text box was resized from a corner; one event per drop | ✅ Added |
+| `CANVAS_BOX_ADDED` | `slideType` | A custom text box was added to a slide | ✅ Added |
+| `CANVAS_BOX_DELETED` | `slideType` | A custom text box was deleted | ✅ Added |
+| `CANVAS_BOX_STYLED` | `slideType`, `property` (`alignment`, `fontSizePercent`, `color`, `bold`, `uppercase`, `outlined`, `linesBackground` or `font`) | A toolbar text style change was applied to the selected text box | ✅ Added |
+| `SLIDE_TEXT_COLOR_CHANGED` | `slideType` | A text colour was picked for a song, hymn, setlist or Bible slide; a pick while a text box is selected is `CANVAS_BOX_STYLED` instead | ✅ Added |
+| `CANVAS_LAYOUT_RESET` | `slideType` | A slide's text boxes were removed, returning it to its own layout | ✅ Added |
 
 ---
 
@@ -81,6 +88,8 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `GO_LIVE_BUTTON_CLICKED` | - | User opens live projection window | ✅ Exists |
 | `CLOSE_LIVE_WINDOW_BUTTON_CLICKED` | - | Live window closed | ✅ Exists |
 | `SLIDE_PRESENTED_LIVE` | `slideType`, `slideLayout`, `slideId` | Slide broadcasted to live output | ✅ Added |
+| `SLIDES_OUTPUT_OPENED` | `platform` (`web` or `desktop`) | Go Live opened the slides-only display on its assigned screen | ✅ Added |
+| `MEDIA_SEEKED` | `method` (`track`), `live` | The seek track in a media slide's toolbar was moved; one event per drag, after it settles | ✅ Added |
 | `SLIDES_REORDERED` | `slideCount` | User reorders slides in live output | ✅ Added |
 | `LIVE_SESSION_STARTED` | `scheduleId`, `slideCount` | First slide goes live in a session | ⚠️ Missing |
 | `LIVE_SESSION_ENDED` | `scheduleId`, `sessionDuration`, `totalSlides` | Live window closed after session | ⚠️ Missing |
@@ -114,6 +123,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `LIBRARY_SLIDE_LOADED` | `slideType` | Slide loaded from library | ⚠️ Missing |
 | `LIBRARY_SONG_SAVED` | `songTitle`, `artist` | Song saved to personal library | ⚠️ Missing |
 | `LIBRARY_SONG_LOADED` | `songTitle` | Song loaded from library | ⚠️ Missing |
+| `LIBRARY_ITEM_PIN_CHANGED` | `kind`, `pinned` | Library song or slide pinned to or unpinned from the top | ✅ Exists |
 | `LIBRARY_ITEM_DELETED` | `itemType` | Library item deleted | ⚠️ Missing |
 
 ---
@@ -123,6 +133,12 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 |------------|-----------|-------------|---------|
 | `OPEN_SETTINGS_MODAL` | - | Settings panel opened | ✅ Exists |
 | `KEEP_CAMERA_ON_CHANGED` | `on` | "Keep camera on" performance setting toggled | ✅ Exists |
+| `PERFORMANCE_SETTINGS_OPENED` | `lite` | Performance tab opened; `lite` is whether Lite mode was already on | ✅ Exists |
+| `LITE_MODE_CHANGED` | `on` | "Lite mode" switched on or off (sets reduce effects, still preview video and 720p cameras together) | ✅ Exists |
+| `REDUCE_EFFECTS_CHANGED` | `on` | "Reduce visual effects" toggled | ✅ Exists |
+| `STILL_PREVIEW_VIDEO_CHANGED` | `on` | "Still video in preview" toggled | ✅ Exists |
+| `CAMERA_RESOLUTION_CHANGED` | `resolution` (`auto` \| `720p`) | "Camera quality" changed | ✅ Exists |
+| `CAMERA_SHARING_CHANGED` | `on` | "Share cameras with teammates" toggled | ✅ Exists |
 | `BIBLE_VERSIONS_SETTINGS_CHANGED` | - | Bible version preferences updated | ✅ Exists |
 | `LIVE_WINDOW_FULLSCREEN_SETTINGS_CHANGED` | - | Fullscreen setting toggled | ✅ Exists |
 | `LINES_PER_SLIDE_SETTINGS_CHANGED` | - | Lines per slide updated | ✅ Exists |
@@ -130,6 +146,8 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `FOOTNOTES_SETTINGS_CHANGED` | - | Footnote display toggled | ✅ Exists |
 | `SONG_AND_HYMN_LABELS_SETTINGS_CHANGED` | - | Label display preferences changed | ✅ Exists |
 | `TRANSITION_INTERVAL_SETTINGS_CHANGED` | - | Slide transition timing updated | ✅ Exists |
+| `SLIDE_TRANSITION_CHANGED` | `transitionType`, `scope` (`global` or `slide`) | The slide transition style was changed in settings or for one slide (`default` when a slide goes back to following settings) | ✅ Added |
+| `DISPLAY_ROLE_CHANGED` | `role` (`Live display`, `Stage display`, `Slides-only display` or `none`), `previousRole` | A screen was given or lost a role in Display settings | ✅ Added |
 | `WINDOW_PADDING_SETTINGS_CHANGED` | - | Display padding adjusted | ✅ Exists |
 | `DEFAULT_BACKGROUND_SETTINGS_CHANGED` | - | Default slide background set | ✅ Exists |
 | `TOGGLE_DARK_MODE` | `darkMode` | Theme toggled | ✅ Exists |
@@ -222,6 +240,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `LYRICS_EDITOR_OPENED` | `songId` | User opens lyrics editor | ⚠️ Missing |
 | `LYRICS_EDITED` | `songId` | User modifies song lyrics | ⚠️ Missing |
 | `CUSTOM_VERSE_ORDER_APPLIED` | `songId`, `verseOrder` | User reorders verses | ⚠️ Missing |
+| `INTERLUDE_THEME_CHANGED` | `themeId` (`default` for the animation's own colours) | A colour theme was picked for an interlude slide | ✅ Added |
 
 ---
 

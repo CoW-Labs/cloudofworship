@@ -1,5 +1,6 @@
 import { defineStore } from "pinia"
 import type {
+  VerseTransitionStyle,
   Alert,
   AppSettings,
   BackgroundVideo,
@@ -14,6 +15,7 @@ import type {
   SlideBackgroundKey,
   StageTimerState,
   SlidePair,
+  TransitionType,
 } from "~/types/index"
 import type { Emitter, EventType } from "mitt"
 import { bibleVersionObjects } from "~/utils/constants"
@@ -22,6 +24,7 @@ import { clearUndoHistory } from "~/utils/undoHistory"
 import { writeWithoutSharing } from "~/utils/sharedStateSync"
 import posthog from "posthog-js"
 import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
+import { preserveDevicePerformanceSettings } from "~/utils/performanceSettings"
 import {
   cancelAllPendingSlideShadowPuts,
   cancelPendingScheduleShadowPuts,
@@ -182,6 +185,10 @@ export const useAppStore = defineStore("app", {
           animations: true,
           microAnimations: true,
           keepCameraOn: true,
+          reduceEffects: false,
+          stillPreviewVideo: false,
+          cameraResolution: "auto",
+          shareCameraWithTeam: true,
           verseTransitionStyle: "off",
           verseTransitionInterval: 0.3,
           footnotes: false,
@@ -195,6 +202,7 @@ export const useAppStore = defineStore("app", {
           uploadVideosToCloud: true,
           // motionlessSlides: true,
           transitionInterval: 0.7,
+          transitionType: "fade",
           slideStyles: {
             blur: 0.5,
             brightness: 50,
@@ -226,6 +234,8 @@ export const useAppStore = defineStore("app", {
         mainDisplayScreen: null,
         stageDisplayLabel: "",
         stageDisplayScreen: null,
+        slidesDisplayLabel: "",
+        slidesDisplayScreen: null,
         stageTimer: defaultStageTimerState(),
         defaultMicrophoneId: "",
         defaultCameraId: "",
@@ -637,13 +647,19 @@ export const useAppStore = defineStore("app", {
     },
     setAppSettings(settings: AppSettings) {
       this.currentState.settings = {
-        ...preserveDeviceNdiSetting(this.currentState.settings, settings),
+        ...preserveDevicePerformanceSettings(
+          this.currentState.settings,
+          preserveDeviceNdiSetting(this.currentState.settings, settings)
+        ),
         // NDI is a device capability, not an account preference. Preserve the
         // local value when server-backed settings or sign-out defaults omit it.
         transcriptionAutoActions: settings.transcriptionAutoActions ?? true,
         transcriptionVoiceBibleVersionCommands:
           settings.transcriptionVoiceBibleVersionCommands ?? true,
         uploadVideosToCloud: settings.uploadVideosToCloud ?? true,
+        // An API that predates this field omits it; keep the local choice.
+        transitionType:
+          settings.transitionType ?? this.currentState.settings.transitionType,
       }
     },
     setSlideStyles(styles: SlideStyle) {
@@ -756,6 +772,12 @@ export const useAppStore = defineStore("app", {
     setStageDisplayScreen(screen: Screen | null) {
       this.currentState.stageDisplayScreen = screen
     },
+    setSlidesDisplayLabel(label: string) {
+      this.currentState.slidesDisplayLabel = label
+    },
+    setSlidesDisplayScreen(screen: Screen | null) {
+      this.currentState.slidesDisplayScreen = screen
+    },
     /**
      * Replace the stage timer wholesale. The reading is derived from these
      * three fields, so start/stop/restart are single writes rather than a
@@ -820,7 +842,7 @@ export const useAppStore = defineStore("app", {
       }
       usePosthogCapture("MICRO_ANIMATIONS_SETTINGS_CHANGED")
     },
-    setVerseTransitionStyle(verseTransitionStyle: "off" | "fade" | "slide-up") {
+    setVerseTransitionStyle(verseTransitionStyle: VerseTransitionStyle) {
       this.currentState.settings = {
         ...this.currentState.settings,
         verseTransitionStyle: verseTransitionStyle,
@@ -870,6 +892,14 @@ export const useAppStore = defineStore("app", {
         transitionInterval: interval,
       }
       usePosthogCapture("TRANSITION_INTERVAL_SETTINGS_CHANGED")
+    },
+    setTransitionType(transitionType: TransitionType) {
+      if ((this.currentState.settings.transitionType ?? "fade") === transitionType) return
+      this.currentState.settings = {
+        ...this.currentState.settings,
+        transitionType,
+      }
+      usePosthogCapture("SLIDE_TRANSITION_CHANGED", { transitionType, scope: "global" })
     },
     setWindowPadding(padding: {
       left?: number

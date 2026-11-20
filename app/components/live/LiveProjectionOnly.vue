@@ -36,7 +36,7 @@
              operator's preview open the camera; every other screen, including
              the public livestream page that also renders full screen, gets a
              placeholder. -->
-        <Transition :name="transitionName">
+        <Transition :name="transitionName" :duration="transitionTiming">
           <div
             v-if="displayedSlide?.type === slideTypes.camera"
             :key="displayedSlide.id"
@@ -180,6 +180,7 @@
             (slide?.data as any)?.type !== 'vimeo'
           "
           ref="previewVideo"
+          :data-media-live="slide?.id"
           :src="slide?.background"
           :loop="
             slide?.type !== slideTypes.media || slide?.slideStyle?.repeatMedia
@@ -213,7 +214,7 @@
       <!-- Keyed by the displayed slide id so a slide change swaps the whole
            face via the crossfade, while same-slide edits (e.g. Bible verse
            navigation) keep the same key and update in place with no crossfade. -->
-      <Transition :name="transitionName" appear>
+      <Transition :name="transitionName" :duration="transitionTiming" appear>
         <div
           v-if="displayedSlide"
           :key="displayedSlide?.id"
@@ -283,7 +284,7 @@
             :key="displayedSlide?._id"
             :content-visible="true"
             :slide="displayedSlide"
-            class="relative z-10"
+            class="slide-text relative z-10"
             :class="[
               embedded
                 ? 'h-full'
@@ -465,6 +466,7 @@ import useCameraShare from "~/composables/useCameraShare"
 import {
   useFollowMediaPlayback,
   useReportMediaPlayback,
+  useReportExternalPlayback,
 } from "~/composables/useMediaPlaybackSync"
 import type { Ref } from "vue"
 import {
@@ -522,6 +524,7 @@ const emitter = useNuxtApp().$emitter as Emitter<any>
 const appStore = useAppStore()
 const route = useRoute()
 const { currentState } = storeToRefs(appStore)
+const { settings: performanceSettings } = usePerformanceSettings()
 const emit = defineEmits(["activate-fullscreen"])
 
 const props = withDefaults(
@@ -926,9 +929,23 @@ const interludeExit = ref<InterludeExitSignal | null>(null)
 provide(interludeExitKey, interludeExit)
 let slideChangeToken = 0
 
-// Resolve the Vue transition name from the transition type. Only `fade` is
-// implemented today; future types (slide/zoom/cut) plug in here + one CSS block.
-const transitionName = computed(() => `cow-slide-${transitionTypes.fade}`)
+// The global transition style applies to every slide (a slide's own
+// `slideStyle.transition` is ignored for now). Both enter and leave use the new
+// name; every type leaves the same way (a plain fade).
+const transitionType = computed(() => {
+  const global = currentState.value.settings.transitionType
+  return isTransitionType(global) ? global : transitionTypes.fade
+})
+const transitionName = computed(() => `cow-slide-${transitionType.value}`)
+// Explicit timing, so Vue does not read getComputedStyle on every slide change
+// to find out how long the CSS transition runs.
+const transitionTiming = computed(() => {
+  if (!currentState.value.settings.animations) return 0
+  const ms = Math.round(transitionDuration.value * 1000)
+  return transitionType.value === transitionTypes.cascade
+    ? { enter: ms + CASCADE_STAGGER_SECONDS * 1000, leave: ms }
+    : ms
+})
 const isLivePageFullScreen = computed(
   () => props.fullScreen && route.path === "/live"
 )
@@ -1088,6 +1105,8 @@ watch(playableVideo, async (next, previous) => {
   await nextTick()
   const element = mediaElement()
   if (!element) return
+  // A still preview stays on its first frame whatever the source does.
+  if (!props.fullScreen && performanceSettings.value.stillPreviewVideo) return
 
   if (resumeAt > 0) {
     const seek = () => {
@@ -1125,10 +1144,19 @@ useReportMediaPlayback(
   () => props.slide?.id,
   () => props.fullScreen && route.path === "/live"
 )
+useReportExternalPlayback(
+  iframe,
+  () => {
+    const type = (props.slide?.data as ExternalVideo | undefined)?.type
+    return type === "youtube" || type === "vimeo" ? type : undefined
+  },
+  () => props.slide?.id,
+  () => props.fullScreen && route.path === "/live"
+)
 useFollowMediaPlayback(
   previewVideo,
   () => props.slide?.id,
-  () => !props.fullScreen
+  () => !props.fullScreen && !performanceSettings.value.stillPreviewVideo
 )
 
 const computeBackgroundStyles = (slide: Slide): string => {
@@ -1138,9 +1166,14 @@ const computeBackgroundStyles = (slide: Slide): string => {
   ) {
     return useSlideBackground(slide)
   }
-  return `${useSlideBackground(slide)}; filter: blur(${
-    props.slideStyles.blur
-  }px) brightness(${props.slideStyles.brightness}%);`
+  // "Reduce visual effects" drops the blur, which is a full-screen convolution
+  // on every frame of a video background; the dimming stays.
+  const blur = performanceSettings.value.reduceEffects
+    ? ""
+    : `blur(${props.slideStyles.blur}px) `
+  return `${useSlideBackground(slide)}; filter: ${blur}brightness(${
+    props.slideStyles.brightness
+  }%);`
 }
 
 const backgroundStyles = computed(() => {
@@ -1173,7 +1206,10 @@ watch(
 
       // The operator's preview copy follows the seek too.
       if (!props.fullScreen) {
-        if (previewVideo.value) previewVideo.value.currentTime = newSeekPosition
+        // A still preview never plays, so there is nothing to keep in step.
+        if (previewVideo.value && !performanceSettings.value.stillPreviewVideo) {
+          previewVideo.value.currentTime = newSeekPosition
+        }
         return
       }
 
@@ -1256,6 +1292,9 @@ watch(
 
       // The operator's preview copy: muted, no embedded players to command.
       if (!props.fullScreen) {
+        // "Still preview": the operator's copy stays on its first frame, so
+        // the machine decodes the video once (for the projector), not twice.
+        if (performanceSettings.value.stillPreviewVideo) return
         if (isPlaying) safePlayMedia(previewVideo.value)
         else if (isPlaying !== undefined && slide.type === slideTypes.media) {
           safePauseMedia(previewVideo.value)
@@ -1428,7 +1467,9 @@ onMounted(() => {
   if (props.fullScreen) {
     safePlayMedia(video.value)
   } else if (
-    // The preview plays on its own, unless the operator paused this clip.
+    // The preview plays on its own, unless the operator paused this clip or
+    // chose a still preview.
+    !performanceSettings.value.stillPreviewVideo &&
     !(
       props.slide?.slideStyle?.mediaCommandAt &&
       props.slide?.slideStyle?.isMediaPlaying === false

@@ -292,8 +292,13 @@ export interface InterludeSlideData {
   /** "auto" follows the variant's default. */
   textBackground: "auto" | "on" | "off"
   /**
-   * Tints the animation from one colour (its partner colour is derived);
-   * null keeps the variant's own colours.
+   * A curated colour theme (see utils/interlude/themes). Wins over `color`;
+   * null or missing keeps the variant's own colours.
+   */
+  themeId?: string | null
+  /**
+   * Older slides: tints the animation from one colour (its partner colour is
+   * derived). New slides use a theme instead.
    */
   color?: string | null
   /** "mix" plays both palettes; "light" / "dark" hold one. Default "mix". */
@@ -654,7 +659,48 @@ export interface SlideStyle {
   theme?: string // Theme ID for slide styling (e.g., for Bible slides)
   overlayPlacement?: OverlayPosition
   overlayScale?: number
+  /** Overrides the global slide transition when this slide goes live. */
+  transition?: TransitionType
+  /**
+   * Free-form text layout. When present (and not empty) each box places one
+   * block of the slide's text, or its own text, instead of the layout's flow.
+   * Absent means the slide still follows the layout, padding and alignment.
+   */
+  textBoxes?: TextBox[]
+  /** Colour of the slide's text (a hex). Missing means the slide's own. */
+  textColor?: string
 }
+
+/**
+ * One block of text on a slide's canvas. Position and size are fractions of
+ * the slide (0 to 1), so a layout looks the same on every screen.
+ */
+export interface TextBox {
+  id: string
+  x: number
+  y: number
+  w: number
+  h: number
+  z?: number
+  /** Index into `slide.contents`, or "custom" for a box that holds its own text. */
+  source: number | "custom"
+  /** The text of a custom box. */
+  html?: string
+  /** Scales this box's text against the slide's font size. 100 is unchanged. */
+  fontSizePercent?: number
+  alignment?: "left" | "center" | "right"
+  /** This box's text colour (a hex). Missing follows the slide's. */
+  color?: string
+  /** Per-box text styles. Missing follows the slide's own setting; false turns it off here. */
+  bold?: boolean
+  uppercase?: boolean
+  outlined?: boolean
+  linesBackground?: boolean
+  /** This box's font family. Missing follows the slide's. */
+  font?: string
+}
+
+export type TransitionType = "fade" | "drift" | "breathe" | "cascade"
 
 export type OverlayPosition =
   | "top-left"
@@ -716,7 +762,13 @@ export interface AppSettings {
   animations?: boolean // Transitions between slides (e.g. crossfade)
   microAnimations?: boolean // Micro/text animations within a slide (come-up etc.)
   keepCameraOn?: boolean // Keep a camera open after its slide leaves the screen. Defaults to true.
-  verseTransitionStyle?: "off" | "fade" | "slide-up" // Verse/line-to-line transition within the same slide
+  // Device-local performance settings (see utils/performanceSettings.ts). Never
+  // synced to the backend; a missing value means the default.
+  reduceEffects?: boolean // No background blur or frosted glass. Defaults to false.
+  stillPreviewVideo?: boolean // Operator preview shows a still frame of videos. Defaults to false.
+  cameraResolution?: "auto" | "720p" // Cap camera capture at 720p. Defaults to "auto".
+  shareCameraWithTeam?: boolean // Let teammates view this computer's cameras. Defaults to true.
+  verseTransitionStyle?: VerseTransitionStyle // Verse/line-to-line transition within the same slide
   verseTransitionInterval?: number // Duration (seconds) of the verse/line-to-line transition
   footnotes?: boolean
   songAndHymnLabelsVisibility: boolean
@@ -733,6 +785,7 @@ export interface AppSettings {
 
   motionlessSlides?: boolean // deprecated
   transitionInterval?: number
+  transitionType?: TransitionType // Default slide-to-slide transition. Missing means fade.
   alertLimit?: number
   notificationSounds?: boolean // Chime with teammate toasts. Defaults to true.
   // Settings for the "Blank" screen. The key keeps its old name because it is
@@ -789,6 +842,10 @@ export interface AppState {
   // operator has not assigned one — the stage display then opens in a new tab.
   stageDisplayLabel: string
   stageDisplayScreen: Screen | null
+  // Screen the Slides-only display opens on at Go Live. Empty when none is
+  // assigned, in which case Go Live opens only the live output.
+  slidesDisplayLabel: string
+  slidesDisplayScreen: Screen | null
   // The stage display's clock — a count-up timer for the service, or a
   // countdown the operator sent to the stage only. Driven from quick actions
   // so the same clock runs on every stage screen at once.
@@ -802,3 +859,13 @@ export interface AppState {
     { userId: string; userName: string; avatar?: string; theme?: string }
   >
 }
+
+// Verse/line-to-line transition styles. drift, breathe and cascade mirror the
+// slide transitions of the same name.
+export type VerseTransitionStyle =
+  | "off"
+  | "fade"
+  | "slide-up"
+  | "drift"
+  | "breathe"
+  | "cascade"

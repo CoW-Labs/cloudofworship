@@ -10,8 +10,8 @@ import { useAppStore } from "~/store/app"
  *  - One synchronous property read and one small event every 15 minutes. No
  *    snapshot, no serialising of state, nothing that walks the heap.
  *  - Only while the tab is visible, so a backgrounded tab does no work at all.
- *  - Only for the two windows worth watching: the operator console ("/") and
- *    the projector ("/live"). The projector runs for a whole service without
+ *  - Only for the windows worth watching: the operator console ("/"), the
+ *    projector ("/live") and the slides-only display ("/live?output=slides"). The projector runs for a whole service without
  *    anyone touching it, which is exactly where a slow leak would hide.
  *  - Chromium only (Chrome, Edge, and the Windows desktop app's WebView2).
  *    Safari, Firefox and the macOS desktop app do not expose heap sizes, so
@@ -30,7 +30,7 @@ const SAMPLE_INTERVAL_MS = 15 * 60_000
 
 const MB = 1024 * 1024
 
-type MemoryWindow = "operator" | "live"
+type MemoryWindow = "operator" | "live" | "slides"
 
 interface ChromiumMemory {
   usedJSHeapSize: number
@@ -48,7 +48,11 @@ const readHeap = (): ChromiumMemory | null => {
 const currentWindow = (): MemoryWindow | null => {
   const path = window.location.pathname
   if (path === "/") return "operator"
-  if (path.startsWith("/live")) return "live"
+  if (path.startsWith("/live")) {
+    return new URLSearchParams(window.location.search).get("output") === "slides"
+      ? "slides"
+      : "live"
+  }
   return null
 }
 

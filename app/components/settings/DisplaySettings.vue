@@ -437,6 +437,8 @@
             ? 'ring-2 ring-primary-500'
             : currentState.stageDisplayLabel === screen.id
             ? 'ring-2 ring-purple-300 dark:ring-purple-400/70'
+            : currentState.slidesDisplayLabel === screen.id
+            ? 'ring-2 ring-sky-300 dark:ring-sky-400/70'
             : 'ring-1 ring-gray-200 dark:ring-white/10'
         "
       >
@@ -696,7 +698,7 @@ const externalScreens = computed(() => {
 
 const secondaryScreensNote = computed(() => {
   if (externalScreens.value.length > 1) {
-    return "Pick the screen for the live output, and the screen for the stage display your musicians and speakers read from."
+    return "Pick the screen for the live output, the stage display your musicians and speakers read from, and an optional slides-only screen that skips the camera."
   }
   return "Pick the screen for the live output. Connect another screen to give the stage display one of its own — until then it opens in a new tab."
 })
@@ -718,64 +720,81 @@ const toStoredScreen = (screen: any): Screen | any => ({
   pixelDepth: screen.pixelDepth,
 })
 
-const screenRoleOptions = ["Not assigned", "Live display", "Stage display"]
+const screenRoleOptions = [
+  "Not assigned",
+  "Live display",
+  "Stage display",
+  "Slides-only display",
+]
 
 // Mirrors the ring colours used to highlight a screen's card, so the role
 // select reads as the same signal in a different shape.
 const roleDotClass = (role: string) => {
   if (role === "Live display") return "bg-primary-500"
   if (role === "Stage display") return "bg-purple-300 dark:bg-purple-400/70"
+  if (role === "Slides-only display") return "bg-sky-400 dark:bg-sky-300/80"
   return "bg-gray-300 dark:bg-[#3a4254]"
 }
 
-const getScreenRole = (screen: any) => {
-  if (currentState.value.mainDisplayLabel === screen.id) return "Live display"
-  if (currentState.value.stageDisplayLabel === screen.id) return "Stage display"
-  return "Not assigned"
-}
+// Each role stores the screen's id and a snapshot of the screen, through its
+// own pair of setters. A screen holds at most one role, so a table lets the
+// code clear whichever role it held without a branch per pair of roles.
+const screenRoles = [
+  {
+    name: "Live display",
+    label: () => currentState.value.mainDisplayLabel,
+    set: (id: string, screen: any) => {
+      appStore.setMainDisplayLabel(id)
+      appStore.setMainDisplayScreen(screen)
+    },
+    assigned: (name: string) => `${name} is now the live display`,
+  },
+  {
+    name: "Stage display",
+    label: () => currentState.value.stageDisplayLabel,
+    set: (id: string, screen: any) => {
+      appStore.setStageDisplayLabel(id)
+      appStore.setStageDisplayScreen(screen)
+    },
+    assigned: (name: string) => `Stage display will open on ${name}`,
+  },
+  {
+    name: "Slides-only display",
+    label: () => currentState.value.slidesDisplayLabel,
+    set: (id: string, screen: any) => {
+      appStore.setSlidesDisplayLabel(id)
+      appStore.setSlidesDisplayScreen(screen)
+    },
+    assigned: (name: string) =>
+      `Slides-only display will open on ${name} when you go live`,
+  },
+]
 
-// A screen holds at most one role, so assigning a new one here clears
-// whichever role it previously held rather than needing a separate toggle
-// pair (and the disabled-state juggling that came with it).
-const setScreenRole = (screen: any, role: string) => {
+const getScreenRole = (screen: any) =>
+  screenRoles.find((role) => role.label() === screen.id)?.name ??
+  "Not assigned"
+
+const setScreenRole = (screen: any, roleName: string) => {
   const previousRole = getScreenRole(screen)
-  if (role === previousRole) return
+  if (roleName === previousRole) return
 
-  if (role === "Live display") {
-    appStore.setMainDisplayLabel(screen.id)
-    appStore.setMainDisplayScreen(toStoredScreen(screen))
-    if (previousRole === "Stage display") {
-      appStore.setStageDisplayLabel("")
-      appStore.setStageDisplayScreen(null)
-    }
-    useToast().add({
-      title: `${screen.label || "This screen"} is now the live display`,
-      icon: "i-bx-check-circle",
-    })
-  } else if (role === "Stage display") {
-    appStore.setStageDisplayLabel(screen.id)
-    appStore.setStageDisplayScreen(toStoredScreen(screen))
-    if (previousRole === "Live display") {
-      appStore.setMainDisplayLabel("")
-      appStore.setMainDisplayScreen(null)
-    }
-    useToast().add({
-      title: `Stage display will open on ${screen.label || "this screen"}`,
-      icon: "i-bx-check-circle",
-    })
+  screenRoles.find((role) => role.name === previousRole)?.set("", null)
+
+  const next = screenRoles.find((role) => role.name === roleName)
+  const name = screen.label || "This screen"
+  if (next) {
+    next.set(screen.id, toStoredScreen(screen))
+    useToast().add({ title: next.assigned(name), icon: "i-bx-check-circle" })
   } else {
-    if (previousRole === "Live display") {
-      appStore.setMainDisplayLabel("")
-      appStore.setMainDisplayScreen(null)
-    } else {
-      appStore.setStageDisplayLabel("")
-      appStore.setStageDisplayScreen(null)
-    }
     useToast().add({
-      title: `${screen.label || "This screen"} is no longer assigned`,
+      title: `${name} is no longer assigned`,
       icon: "i-bx-check-circle",
     })
   }
+  usePosthogCapture("DISPLAY_ROLE_CHANGED", {
+    role: next ? next.name : "none",
+    previousRole,
+  })
 }
 
 const getDisplayDetails = async () => {

@@ -282,6 +282,30 @@
         />
       </SettingsRow>
 
+      <SettingsRow
+        v-if="appStore.currentState.settings.animations"
+        label="Transition style"
+        description="How one slide hands over to the next. Applies to every slide."
+        :disabled="!hasAccessToAnimations"
+      >
+        <SettingsSelect
+          :options="transitionTypeOptions"
+          value-attribute="key"
+          option-attribute="label"
+          :model-value="appStore.currentState.settings.transitionType || 'fade'"
+          :disabled="!hasAccessToAnimations"
+          @change="
+            (key: TransitionType) => {
+              if (!hasAccessToAnimations) {
+                handleUpgradeClick()
+                return
+              }
+              appStore.setTransitionType(key)
+            }
+          "
+        />
+      </SettingsRow>
+
       <SettingsSlider
         v-if="appStore.currentState.settings.animations"
         label="Transition interval"
@@ -413,6 +437,7 @@
 
 <script setup lang="ts">
 import { useAppStore } from "~/store/app"
+import type { TransitionType } from "~/types"
 const appStore = useAppStore()
 
 type PaddingSide = "top" | "right" | "bottom" | "left"
@@ -451,6 +476,9 @@ const verseTransitionStyleOptions = [
   { key: "off", label: "Off" },
   { key: "fade", label: "Fade" },
   { key: "slide-up", label: "Slide up" },
+  { key: "drift", label: "Drift" },
+  { key: "breathe", label: "Breathe" },
+  { key: "cascade", label: "Cascade" },
 ]
 
 // Show teams badge if feature is locked

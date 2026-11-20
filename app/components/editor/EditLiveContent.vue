@@ -234,6 +234,8 @@
                         ? cameraPopoverSize.width
                         : tab.key === 'pair'
                         ? pairSectionSize.width
+                        : tab.key === 'transition'
+                        ? transitionPopoverSize.width
                         : layoutPopoverSize.width
                     "
                     :max-height="
@@ -247,6 +249,8 @@
                         ? cameraPopoverSize.height
                         : tab.key === 'pair'
                         ? pairSectionSize.height
+                        : tab.key === 'transition'
+                        ? transitionPopoverSize.height
                         : layoutPopoverSize.height
                     "
                     :boundary-overflow="120"
@@ -340,6 +344,12 @@
                             @update:model-value="patchCamera"
                           />
                         </div>
+                        <SlideTransitionPanel
+                          v-else-if="tab.key === 'transition'"
+                          :value="slide?.slideStyle?.transition"
+                          @select="onSelectTransition"
+                          @resize="transitionPopoverSize = $event"
+                        />
                         <BibleThemeSelection
                           v-else
                           :value="slide?.slideStyle?.theme"
@@ -409,6 +419,7 @@
       <TipTapToolbar
         v-if="slide?.type === slideTypes.text"
         :editor="focusedEditor"
+        :slide-id="slide?.id"
       />
       <SlideContentToolbar
         v-else-if="
@@ -416,9 +427,9 @@
           !isEmptySongSetlist &&
           slide.type !== slideTypes.interlude
         "
-        :slide="slide"
+        :slide="toolbarSlide!"
         @update-camera="patchCamera({ ...cameraInput, ...$event })"
-        @update-style="onUpdateSlideStyle($event, false)"
+        @update-style="onToolbarStyle($event)"
         @update-song-lyrics="onUpdateSongLyrics($event)"
         @update-font="onUpdateFont($event)"
         @update-lines-per-slide="onUpdateSongLines($event)"
@@ -572,6 +583,7 @@
             <iframe
               v-if="previewEmbedSrc"
               ref="previewIframe"
+              :data-media-editor="slide?.id"
               :src="previewEmbedSrc"
               class="h-full w-full absolute inset-0"
               frameborder="0"
@@ -584,6 +596,7 @@
           <video
             v-else-if="slide?.backgroundType === backgroundTypes.video"
             ref="previewVideo"
+            :data-media-editor="slide?.id"
             :src="slide?.background"
             :loop="!!slide?.slideStyle?.repeatMedia"
             muted
@@ -596,9 +609,12 @@
             @ended="mediaPreview.report(false)"
           ></video>
           <div class="bg-black opacity-30 absolute inset-0"></div>
+          <!-- Text slides keep typing in place, inside boxes that can be moved
+               by their edge. -->
           <div
             v-if="slide?.type === slideTypes.text"
             class="text-slide-editor-preview"
+            :class="{ 'canvas-stage': canvasSupported }"
           >
             <TipTap
               :slide="slide"
@@ -606,6 +622,26 @@
               @change-focused-editor="focusedEditor = $event"
               :layout="slide?.layout"
               editable
+            />
+            <CanvasSlideEditor
+              v-if="canvasSupported"
+              pass-through
+              :slide="slide"
+              @update-style="onUpdateSlideStyle($event)"
+            />
+          </div>
+          <!-- Everything else is arranged on the canvas: the slide as the
+               projector shows it, with its text boxes to grab. -->
+          <div v-else-if="canvasSupported" class="canvas-stage absolute inset-0 z-10">
+            <LiveContent
+              :slide="slide"
+              :padding="editorPreviewPadding"
+              :content-visible="true"
+              class="canvas-preview"
+            />
+            <CanvasSlideEditor
+              :slide="slide"
+              @update-style="onUpdateSlideStyle($event)"
             />
           </div>
           <LiveContent
@@ -658,6 +694,8 @@ import type {
   Song,
   SongSetlistData,
   SongSetlistItem,
+  TextBox,
+  TransitionType,
 } from "~/types"
 import { escapePriority } from "~/composables/useEscapeKey"
 import {
@@ -677,6 +715,8 @@ import {
 import { songOnSlide } from "~/utils/songTranslation"
 import { isSongNewer } from "~/utils/songVersion"
 import { pairBackgroundOf } from "~/utils/slidePairs"
+import { supportsTextBoxes } from "~/utils/textBoxes"
+import { useCanvasEditor } from "~/composables/useCanvasEditor"
 import type { SlideUpdateMeta } from "~/utils/undoHistory"
 import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
 import useCameraOnAir from "~/composables/useCameraOnAir"
@@ -851,6 +891,7 @@ type PanelKey =
   | "interlude"
   | "camera"
   | "pair"
+  | "transition"
 type PopoverSize = { width: number; height: number }
 const activePanel = ref<PanelKey | null>(null)
 const getInitialBackgroundPopoverSize = (): PopoverSize =>
@@ -863,6 +904,7 @@ const backgroundPopoverSize = ref<PopoverSize>(
 )
 const scripturePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const layoutPopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
+const transitionPopoverSize = ref<PopoverSize>({ width: 640, height: 168 })
 const interludePopoverSize = ref<PopoverSize>({ width: 753, height: 330 })
 const cameraPopoverSize = ref<PopoverSize>({ width: 380, height: 260 })
 const pairPopoverSize = ref<PopoverSize>({ width: 380, height: 360 })
@@ -971,6 +1013,78 @@ useResizeObserver(cameraPanelContent, ([entry]) => {
 // while hovered or while the interlude panel is open for picking a variant.
 // InterludeView already forces static under prefers-reduced-motion.
 const previewHovered = ref(false)
+
+// Whether this slide's text can be arranged on the canvas.
+const canvasSupported = computed(() => supportsTextBoxes(props.slide))
+
+// While a box is selected the toolbar shows that box's size, alignment and
+// colour and changes them, instead of the slide's. A box that has set none of
+// them follows the slide, so the toolbar shows the slide's.
+const canvas = useCanvasEditor(() => props.slide?.id)
+const toolbarSlide = computed(() => {
+  const box = canvas.selected.value
+  const slide = props.slide
+  if (!slide || !box) return slide
+  return {
+    ...slide,
+    slideStyle: {
+      ...slide.slideStyle,
+      alignment: box.alignment ?? slide.slideStyle?.alignment,
+      fontSizePercent: box.fontSizePercent ?? slide.slideStyle?.fontSizePercent,
+      textColor: box.color ?? slide.slideStyle?.textColor,
+      textBold: box.bold ?? slide.slideStyle?.textBold,
+      textOutlined: box.outlined ?? slide.slideStyle?.textOutlined,
+      textLinesBackground:
+        box.linesBackground ?? slide.slideStyle?.textLinesBackground,
+      lettercase:
+        box.uppercase === undefined
+          ? slide.slideStyle?.lettercase
+          : box.uppercase
+            ? "uppercase"
+            : "",
+      font: box.font ?? slide.slideStyle?.font,
+    },
+  }
+})
+const onToolbarStyle = (style: SlideStyle) => {
+  const slide = props.slide
+  if (!canvas.selected.value || !slide) return onUpdateSlideStyle(style, false)
+
+  // The toolbar sends the whole style it was given, which now carries the
+  // box's own values. Only what it actually changed counts.
+  const shown = toolbarSlide.value?.slideStyle ?? {}
+  const changed = (Object.keys(style) as (keyof SlideStyle)[]).filter(
+    (key) => style[key] !== shown[key]
+  )
+  if (!changed.length) return
+  const perBox: (keyof SlideStyle)[] = [
+    "alignment",
+    "fontSizePercent",
+    "textColor",
+    "textBold",
+    "textOutlined",
+    "textLinesBackground",
+    "lettercase",
+  ]
+  if (changed.every((key) => perBox.includes(key))) {
+    const patch: Partial<TextBox> = {}
+    if (changed.includes("alignment"))
+      patch.alignment = style.alignment as TextBox["alignment"]
+    if (changed.includes("fontSizePercent"))
+      patch.fontSizePercent = style.fontSizePercent
+    if (changed.includes("textColor")) patch.color = style.textColor
+    if (changed.includes("textBold")) patch.bold = !!style.textBold
+    if (changed.includes("textOutlined")) patch.outlined = !!style.textOutlined
+    if (changed.includes("textLinesBackground"))
+      patch.linesBackground = !!style.textLinesBackground
+    if (changed.includes("lettercase"))
+      patch.uppercase = style.lettercase === "uppercase"
+    if (canvas.patchSelected(patch)) return
+  }
+  const real = { ...slide.slideStyle } as Record<string, unknown>
+  changed.forEach((key) => (real[key] = style[key]))
+  onUpdateSlideStyle(real as SlideStyle, false)
+}
 provide(
   interludeModeKey,
   computed(() =>
@@ -1068,12 +1182,11 @@ const visibleTabs = computed(() => {
       label: "Background",
       hint: "Set an image, video or colour behind this slide",
     })
-  if (isBible)
-    tabs.push({
-      key: "layout",
-      label: "Layout",
-      hint: "Change how the verse and reference are arranged",
-    })
+  // The Bible "Layout" tab (Classic / Overlay themes) is hidden for now: free
+  // layout covers where the reference sits. BibleThemeSelection and
+  // onSelectTheme are kept for when it returns.
+  // The transition style is global for now (Settings > Slides), so there is no
+  // per-slide Transition tab. SlideTransitionPanel is kept for when it returns.
   return tabs
 })
 
@@ -1553,8 +1666,11 @@ const handleVoiceBibleVersionChange = (version: string) => {
 }
 
 onMounted(() => {
+  // With a text box selected the arrow keys nudge it, so they are not verse
+  // navigation until the box is deselected.
   shortcutCleanups.push(
     useRegisteredShortcut(shortcutIds.nextVerse, () => {
+      if (canvas.selected.value) return false
       if (props.slide?.type === slideTypes.presentation) {
         handleNextPage()
         return true
@@ -1570,6 +1686,7 @@ onMounted(() => {
   )
   shortcutCleanups.push(
     useRegisteredShortcut(shortcutIds.previousVerse, () => {
+      if (canvas.selected.value) return false
       if (props.slide?.type === slideTypes.presentation) {
         handlePreviousPage()
         return true
@@ -1901,6 +2018,21 @@ const onSelectTheme = (themeId: string) => {
   emit("slide-update", tempSlide)
 }
 
+// null clears the override so the slide follows the global setting again.
+const onSelectTransition = (type: TransitionType | null) => {
+  if (!props.slide) return
+  const { transition: _previous, ...rest } = props.slide.slideStyle ?? {}
+  if ((props.slide.slideStyle?.transition ?? null) === type) return
+  emit("slide-update", {
+    ...props.slide,
+    slideStyle: type ? { ...rest, transition: type } : rest,
+  })
+  usePosthogCapture("SLIDE_TRANSITION_CHANGED", {
+    transitionType: type ?? "default",
+    scope: "slide",
+  })
+}
+
 const onUpdateSlideContent = (editorIndex: number, content: string) => {
   slideContents.value[editorIndex] = content
   const tempSlide: Slide = {
@@ -1919,6 +2051,7 @@ const onUpdateSlideContent = (editorIndex: number, content: string) => {
 const onUpdateFont = (value: unknown) => {
   const font = asFontFamily(value, "EditLiveContent.update-font")
   if (!font || !props.slide) return
+  if (canvas.patchSelected({ font })) return
   onUpdateSlideStyle({ ...props.slide.slideStyle, font })
 }
 
@@ -2324,6 +2457,32 @@ const predictVerseInput = (
   pointer-events: auto !important;
   user-select: text !important;
   cursor: text;
+}
+
+/* On the canvas the slide is shown at the size the projector shows it, so a
+   box sits where it will be. The 88% inset above is for plain editing. */
+.text-slide-editor-preview.canvas-stage {
+  transform: none;
+}
+/* The canvas draws the one outline, so the editor's own ring is dropped. */
+.text-slide-editor-preview.canvas-stage :deep(.tiptap-editor),
+.text-slide-editor-preview.canvas-stage :deep(.tiptap-editor:hover),
+.text-slide-editor-preview.canvas-stage :deep(.tiptap-editor:focus),
+.text-slide-editor-preview.canvas-stage :deep(.slide-layout-ctn),
+.text-slide-editor-preview.canvas-stage :deep(.slide-layout-ctn > *),
+.text-slide-editor-preview.canvas-stage :deep(.slide-layout-ctn > *:hover) {
+  box-shadow: none !important;
+  outline: none !important;
+  background-color: transparent !important;
+}
+/* The editor's base .tiptap style draws its own pale border and padding, which
+   showed as a second box inside the canvas box. */
+.text-slide-editor-preview.canvas-stage :deep(.tiptap) {
+  border-color: transparent !important;
+}
+.canvas-preview {
+  position: absolute;
+  inset: 0;
 }
 
 .text-slide-editor-preview :deep(.tiptap-editor) {

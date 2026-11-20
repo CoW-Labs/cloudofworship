@@ -27,6 +27,7 @@
         slide?.slideStyle?.lineSpacing === lineSpacingTypes.single,
     }"
     class="live-content tiptap border-none w-[100%] h-[100%] pointer-events-none"
+    :style="textColorStyle"
     :id="slide?.name"
   >
     <!-- <div
@@ -55,6 +56,14 @@ const props = defineProps<{
 // settings continue to style generated content such as songs and scripture.
 const inheritsGlobalTextStyles = computed(
   () => props.slide.type !== slideTypes.text
+)
+
+// A picked text colour reaches the lyrics, verses and labels by inheritance;
+// nothing in them sets its own. Text slides colour their own text in TipTap.
+const textColorStyle = computed(() =>
+  inheritsGlobalTextStyles.value && props.slide?.slideStyle?.textColor
+    ? { color: props.slide.slideStyle.textColor }
+    : undefined
 )
 
 const emit = defineEmits(["slide-update", "update-live-output-slides"])

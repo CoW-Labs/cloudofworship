@@ -197,6 +197,7 @@ const textsOf = (): InterludeTexts => ({
 })
 const draft = reactive<InterludeTexts>(textsOf())
 const styleOf = (): InterludeStyle => ({
+  themeId: slideData.value.themeId,
   color: slideData.value.color,
   tone: slideData.value.tone,
   size: slideData.value.size,

@@ -498,10 +498,18 @@ emitter.on("go-live", async (options?: { youtube?: boolean }) => {
     skipYoutubeThisGoLive = choice === "window-only"
   }
 
+  let browserLiveOpening: Promise<void> | undefined
   if (isTauri) {
     await openTauriLiveWindow()
   } else {
-    openWindows()
+    browserLiveOpening = openWindows()
+  }
+
+  // Go Live is unchanged unless a screen is assigned to the slides-only
+  // display. Only then wait for the live window, which owns the screen prompt.
+  if (appStore.currentState.slidesDisplayLabel) {
+    await browserLiveOpening
+    await openSlidesOutput()
   }
 
   // One flow: once the live window is up, also start the YouTube stream if the
@@ -1545,6 +1553,8 @@ async function closeAllWindows() {
     })
   }
   windowRefs.value = []
+  // The slides-only display belongs to the live session, so it ends with it.
+  await closeSlidesOutput()
 }
 
 /**
@@ -1849,6 +1859,120 @@ async function openStageDisplayWindow() {
   }
 }
 
+// ── SLIDES-ONLY DISPLAY ─────────────────────────────────────────────────────
+// Opens at Go Live, but only on a screen the operator assigned it in Display
+// Settings. With none assigned, or that screen unplugged, Go Live does exactly
+// what it always did. It is not in `windowRefs` (closing it by hand must not
+// close the live output), but it does close with the live output.
+let slidesWindowRef: Window | null = null
+const SLIDES_OUTPUT_PATH = "/live?output=slides"
+
+async function openSlidesOutput() {
+  const targetId = appStore.currentState.slidesDisplayLabel
+  // The live output owns its screen outright, as it does for the stage display.
+  if (!targetId || targetId === appStore.currentState.mainDisplayLabel) return
+
+  const { isTauri } = useTauri()
+  try {
+    const opened = isTauri
+      ? await openTauriSlidesWindow(targetId)
+      : await openSlidesOutputWindow(targetId)
+    if (opened) usePosthogCapture("SLIDES_OUTPUT_OPENED", { platform: isTauri ? "desktop" : "web" })
+  } catch (error) {
+    console.warn("Could not open the slides-only display:", error)
+  }
+}
+
+async function openTauriSlidesWindow(targetId: string): Promise<boolean> {
+  const { WebviewWindow, getAllWebviewWindows } = await import(
+    "@tauri-apps/api/webviewWindow"
+  )
+  const existing = (await getAllWebviewWindows()).find(
+    (window: any) => window.label === "slides-output"
+  )
+  if (existing) return false
+
+  const { availableMonitors } = await import("@tauri-apps/api/window")
+  const monitor: any = ((await availableMonitors()) || []).find(
+    (candidate: any) => useScreenId(candidate) === targetId
+  )
+  if (!monitor) return false
+
+  // Physical pixels in, logical units out, as for the live window.
+  const scale = monitor.scaleFactor || 1
+  const slidesWindow = new WebviewWindow("slides-output", {
+    url: SLIDES_OUTPUT_PATH,
+    title: "Cloud of Worship - Slides Display",
+    alwaysOnTop: false,
+    resizable: true,
+    closable: true,
+    decorations: false,
+    fullscreen: true,
+    x: monitor.position.x / scale,
+    y: monitor.position.y / scale,
+    width: monitor.size.width / scale,
+    height: monitor.size.height / scale,
+  })
+  await slidesWindow.once("tauri://error", (event: any) => {
+    console.error("Slides-only display window failed to open:", event)
+  })
+  return true
+}
+
+async function openSlidesOutputWindow(targetId: string): Promise<boolean> {
+  // Placing a window on another screen needs the Window Management API, and
+  // Go Live has just asked for it. Without it there is no screen to target.
+  if ((await getScreenAccess()) !== "granted") return false
+  if (slidesWindowRef && !slidesWindowRef.closed) return false
+
+  const screenDetails = await (window as any).getScreenDetails()
+  const target = (screenDetails?.screens || []).find(
+    (screen: any) => useScreenId(screen) === targetId
+  )
+  if (!target) return false
+
+  const features = `left=${target.availLeft},top=${target.availTop},width=${target.availWidth},height=${target.availHeight}`
+  slidesWindowRef = window.open(
+    `${window.location.origin}${SLIDES_OUTPUT_PATH}`,
+    "_blank",
+    features
+  )
+  if (!slidesWindowRef) {
+    useToast().add({
+      title:
+        "The slides-only display was blocked. Allow popups for this site and go live again.",
+      icon: "i-bx-info-circle",
+      color: "red",
+    })
+    return false
+  }
+  return true
+}
+
+async function closeSlidesOutput() {
+  const { isTauri } = useTauri()
+  if (isTauri) {
+    try {
+      const { getAllWebviewWindows } = await import(
+        "@tauri-apps/api/webviewWindow"
+      )
+      const existing = (await getAllWebviewWindows()).find(
+        (window: any) => window.label === "slides-output"
+      )
+      await existing?.close()
+    } catch (error) {
+      console.log("Slides-only window already closed:", error)
+    }
+    return
+  }
+  try {
+    if (slidesWindowRef && !slidesWindowRef.closed) slidesWindowRef.close()
+  } catch (error) {
+    console.log("Error closing the slides-only window:", error)
+  }
+  slidesWindowRef = null
+}
+
 // The web build ties the live popup's lifetime to the operator tab via
 // `beforeunload` inside openWindows(). Desktop windows never fire that, so the
 // projection window would outlive the control center it belongs to.
@@ -1874,7 +1998,7 @@ const satisfactionPrompt = ref<{
 
 // Asking on the very first launch reads as noise; by the tenth open the
 // operator has run a service or two and has an opinion worth collecting.
-const APP_OPENS_BEFORE_FEEDBACK = 10
+const APP_OPENS_BEFORE_FEEDBACK = 15
 const APP_OPENS_KEY = "cow_app_open_count"
 const feedbackPromptTimers = new Set<ReturnType<typeof setTimeout>>()
 

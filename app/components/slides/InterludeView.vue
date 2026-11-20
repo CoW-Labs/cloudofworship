@@ -84,6 +84,7 @@ const variant = computed(() =>
   customizeInterludeVariant(getInterludeVariant(data.value?.variant), {
     tone: data.value?.tone,
     color: data.value?.color,
+    themeId: data.value?.themeId,
   })
 )
 const size = computed(() => interludeScale(data.value?.size, INTERLUDE_SIZE))
