@@ -94,18 +94,17 @@
 const STORAGE_KEY = "cow_satisfaction_prompt"
 
 /*
-  Cadence, keyed off how the last showing ended:
-  - dismissed (closed without answering), or answered "yes" — ask again in a
-    month.
-  - answered "no" — come back weekly until they tell us what's wrong; a
-    churning operator is worth the nudge.
-  - sent feedback — done, never ask again. Actually writing to us is the only
-    thing that retires the prompt for good.
+  Cadence, keyed off how the last showing ended. It is stored per device, so a
+  church with several computers sees it once on each; keep the gaps long:
+  - dismissed (closed without answering) — ask again in 90 days.
+  - answered "yes" — they were sent to the review page; never ask again.
+  - answered "no" and skipped the feedback box — ask again in 60 days.
+  - sent feedback — done, never ask again.
 */
 const COOLDOWN_DAYS: Record<PromptStatus, number | null> = {
-  dismissed: 30,
-  "answered-yes": 30,
-  "answered-no": 7,
+  dismissed: 90,
+  "answered-yes": null,
+  "answered-no": 60,
   "feedback-sent": null,
 }
 
