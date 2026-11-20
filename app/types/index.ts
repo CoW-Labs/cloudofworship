@@ -762,6 +762,12 @@ export interface AppSettings {
   animations?: boolean // Transitions between slides (e.g. crossfade)
   microAnimations?: boolean // Micro/text animations within a slide (come-up etc.)
   keepCameraOn?: boolean // Keep a camera open after its slide leaves the screen. Defaults to true.
+  // Device-local performance settings (see utils/performanceSettings.ts). Never
+  // synced to the backend; a missing value means the default.
+  reduceEffects?: boolean // No background blur or frosted glass. Defaults to false.
+  stillPreviewVideo?: boolean // Operator preview shows a still frame of videos. Defaults to false.
+  cameraResolution?: "auto" | "720p" // Cap camera capture at 720p. Defaults to "auto".
+  shareCameraWithTeam?: boolean // Let teammates view this computer's cameras. Defaults to true.
   verseTransitionStyle?: VerseTransitionStyle // Verse/line-to-line transition within the same slide
   verseTransitionInterval?: number // Duration (seconds) of the verse/line-to-line transition
   footnotes?: boolean

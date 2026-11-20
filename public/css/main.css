@@ -1379,3 +1379,14 @@ html.dark {
 .tiptap.live-content .song-translation {
   color: #d9a4ff !important;
 }
+
+/* Performance setting "Reduce visual effects" (plugins/performance-mode). A
+   backdrop filter re-blurs everything behind it on every frame, which is the
+   costly part of frosted glass on integrated graphics. The panels keep their
+   translucent colour, so they stay readable without the blur. */
+html.cow-reduce-effects *,
+html.cow-reduce-effects *::before,
+html.cow-reduce-effects *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}

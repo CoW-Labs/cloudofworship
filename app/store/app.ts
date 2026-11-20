@@ -24,6 +24,7 @@ import { clearUndoHistory } from "~/utils/undoHistory"
 import { writeWithoutSharing } from "~/utils/sharedStateSync"
 import posthog from "posthog-js"
 import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
+import { preserveDevicePerformanceSettings } from "~/utils/performanceSettings"
 import {
   cancelAllPendingSlideShadowPuts,
   cancelPendingScheduleShadowPuts,
@@ -184,6 +185,10 @@ export const useAppStore = defineStore("app", {
           animations: true,
           microAnimations: true,
           keepCameraOn: true,
+          reduceEffects: false,
+          stillPreviewVideo: false,
+          cameraResolution: "auto",
+          shareCameraWithTeam: true,
           verseTransitionStyle: "off",
           verseTransitionInterval: 0.3,
           footnotes: false,
@@ -642,7 +647,10 @@ export const useAppStore = defineStore("app", {
     },
     setAppSettings(settings: AppSettings) {
       this.currentState.settings = {
-        ...preserveDeviceNdiSetting(this.currentState.settings, settings),
+        ...preserveDevicePerformanceSettings(
+          this.currentState.settings,
+          preserveDeviceNdiSetting(this.currentState.settings, settings)
+        ),
         // NDI is a device capability, not an account preference. Preserve the
         // local value when server-backed settings or sign-out defaults omit it.
         transcriptionAutoActions: settings.transcriptionAutoActions ?? true,

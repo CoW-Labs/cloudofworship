@@ -123,6 +123,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `LIBRARY_SLIDE_LOADED` | `slideType` | Slide loaded from library | ⚠️ Missing |
 | `LIBRARY_SONG_SAVED` | `songTitle`, `artist` | Song saved to personal library | ⚠️ Missing |
 | `LIBRARY_SONG_LOADED` | `songTitle` | Song loaded from library | ⚠️ Missing |
+| `LIBRARY_ITEM_PIN_CHANGED` | `kind`, `pinned` | Library song or slide pinned to or unpinned from the top | ✅ Exists |
 | `LIBRARY_ITEM_DELETED` | `itemType` | Library item deleted | ⚠️ Missing |
 
 ---
@@ -132,6 +133,12 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 |------------|-----------|-------------|---------|
 | `OPEN_SETTINGS_MODAL` | - | Settings panel opened | ✅ Exists |
 | `KEEP_CAMERA_ON_CHANGED` | `on` | "Keep camera on" performance setting toggled | ✅ Exists |
+| `PERFORMANCE_SETTINGS_OPENED` | `lite` | Performance tab opened; `lite` is whether Lite mode was already on | ✅ Exists |
+| `LITE_MODE_CHANGED` | `on` | "Lite mode" switched on or off (sets reduce effects, still preview video and 720p cameras together) | ✅ Exists |
+| `REDUCE_EFFECTS_CHANGED` | `on` | "Reduce visual effects" toggled | ✅ Exists |
+| `STILL_PREVIEW_VIDEO_CHANGED` | `on` | "Still video in preview" toggled | ✅ Exists |
+| `CAMERA_RESOLUTION_CHANGED` | `resolution` (`auto` \| `720p`) | "Camera quality" changed | ✅ Exists |
+| `CAMERA_SHARING_CHANGED` | `on` | "Share cameras with teammates" toggled | ✅ Exists |
 | `BIBLE_VERSIONS_SETTINGS_CHANGED` | - | Bible version preferences updated | ✅ Exists |
 | `LIVE_WINDOW_FULLSCREEN_SETTINGS_CHANGED` | - | Fullscreen setting toggled | ✅ Exists |
 | `LINES_PER_SLIDE_SETTINGS_CHANGED` | - | Lines per slide updated | ✅ Exists |
