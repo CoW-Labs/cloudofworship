@@ -289,12 +289,12 @@
   >
     <div
       v-if="contentVisible && slide?.contents?.[1]"
-      class="content jost"
+      class="content jost time-label"
       v-html="getSlideContentHtml(slide.contents[1])"
     ></div>
     <div
       v-if="contentVisible"
-      class="content leading-none opacity-95"
+      class="content leading-none opacity-95 time-clock"
       :class="[useURLFriendlyString(slide?.slideStyle?.font || 'Inter')]"
     >
       {{ formattedTime }}
@@ -378,11 +378,13 @@ const boxesContainerStyle = computed(() => {
   if (
     layout !== slideLayoutTypes.full_text &&
     layout !== slideLayoutTypes.bible &&
-    layout !== slideLayoutTypes.countdown
+    layout !== slideLayoutTypes.countdown &&
+    layout !== slideLayoutTypes.time
   )
     return ""
   const size =
-    (props.slide?.slideStyle?.fontSize || 0) *
+    (props.slide?.slideStyle?.fontSize ||
+      (layout === slideLayoutTypes.time ? 17.5 : 0)) *
     ((props.slide?.slideStyle?.fontSizePercent ||
       currentState.value.settings.slideStyles.fontSizePercent ||
       100) /
@@ -400,6 +402,14 @@ const autoFitStyleFor = (box: TextBox) => {
 }
 
 const boxThemeClass = (box: TextBox) => {
+  if (props.slide?.layout === slideLayoutTypes.time) {
+    return box.source === 1
+      ? ["jost", "time-label"]
+      : [
+          "time-clock leading-none opacity-95",
+          useURLFriendlyString(props.slide?.slideStyle?.font || "Inter"),
+        ]
+  }
   if (props.slide?.layout === slideLayoutTypes.countdown) {
     return box.source === 1 ? ["jost", "countdown-title"] : ["countdown-time"]
   }
@@ -417,10 +427,14 @@ const boxThemeClass = (box: TextBox) => {
 const boxContentKey = (box: TextBox) =>
   box.source === "custom" ? `custom-${box.id}` : contentKey(box.source)
 
+// The clock's own box reads the shared minute clock, so it costs no timer of
+// its own (a countdown's box reads its ticking contents the same way).
 const boxHtml = (box: TextBox) =>
   box.source === "custom"
     ? box.html ?? ""
-    : getSlideContentHtml(props.slide?.contents?.[box.source], box.linesBackground)
+    : props.slide?.layout === slideLayoutTypes.time && box.source === 2
+      ? formattedTime.value
+      : getSlideContentHtml(props.slide?.contents?.[box.source], box.linesBackground)
 
 const lineBackgroundSelector =
   "p:not(.scripture-label):not(.song-label):not(.countdown-label):not(.copyright-content), h1, h2, h3, h4"

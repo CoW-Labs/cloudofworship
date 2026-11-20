@@ -1,13 +1,14 @@
 import type { Slide, TextBox } from "~/types"
 import { slideLayoutTypes, slideTypes } from "~/utils/constants"
 
-/** Layouts whose text a canvas can place. Interludes and clocks keep their own. */
+/** Layouts whose text a canvas can place. Interludes keep their own. */
 const BOX_LAYOUTS: string[] = [
   slideLayoutTypes.heading_sub,
   slideLayoutTypes.full_text,
   slideLayoutTypes.two_column,
   slideLayoutTypes.bible,
   slideLayoutTypes.countdown,
+  slideLayoutTypes.time,
 ]
 
 export const MIN_BOX_SIZE = 0.05
@@ -34,8 +35,9 @@ export const textBoxesOf = (slide?: Slide | null): TextBox[] | null => {
 export const lyricsSlot = (slide?: Slide | null) =>
   slide?.layout === slideLayoutTypes.bible
     ? 0
-    : slide?.layout === slideLayoutTypes.countdown
-      ? -1 // a countdown has no lyrics to fit
+    : slide?.layout === slideLayoutTypes.countdown ||
+        slide?.layout === slideLayoutTypes.time
+      ? -1 // a countdown or clock has no lyrics to fit
       : 1
 
 const clamp = (value: number, min: number, max: number) =>
@@ -118,6 +120,8 @@ export const slotOfBlock = (
   if (block.classList.contains("bible-content")) return 0
   if (block.classList.contains("countdown-title")) return 1
   if (block.classList.contains("countdown-time")) return 2
+  if (block.classList.contains("time-label")) return 1
+  if (block.classList.contains("time-clock")) return 2
   return layout === slideLayoutTypes.full_text ? 1 : index
 }
 
