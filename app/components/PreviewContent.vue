@@ -1415,7 +1415,22 @@ const scrollToSlide = (slideId?: string) => {
 }
 
 // LISTEN TO EVENTS
-const emitter = useNuxtApp().$emitter as Emitter<any>
+// Every handler registered below is taken off the shared emitter when this
+// panel unmounts. Without that, leaving the operator page and coming back (for
+// example a visit to /update) stacks a second copy of each handler, and one
+// "new-song" would then create the slide twice.
+const sharedEmitter = useNuxtApp().$emitter as Emitter<any>
+const emitterHandlers: [any, (event?: any) => void][] = []
+const emitter = {
+  on(type: any, handler: (event?: any) => void) {
+    sharedEmitter.on(type, handler)
+    emitterHandlers.push([type, handler])
+  },
+}
+onBeforeUnmount(() => {
+  emitterHandlers.forEach(([type, handler]) => sharedEmitter.off(type, handler))
+  emitterHandlers.length = 0
+})
 emitter.on("new-slide", () => {
   const newSlide = createTextSlide()
   makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
