@@ -76,3 +76,17 @@ export const externalPlayerMessage = (
       return JSON.stringify({ method: "setVolume", value: command.muted ? 0 : 1 })
   }
 }
+
+/**
+ * The payload "new-media" takes for a saved media slide. YouTube and Vimeo
+ * slides keep their link in `data.url`; `background` is only a placeholder
+ * image, so it must not replace the link, and the slide has to be flagged
+ * external so no upload is attempted.
+ */
+export const savedMediaPayload = (slide: {
+  data?: unknown
+  background?: string
+}) =>
+  isExternalVideoData(slide.data)
+    ? { ...slide.data, isExternal: true }
+    : { ...(slide.data as object), url: slide.background }

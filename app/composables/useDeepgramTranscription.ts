@@ -28,6 +28,13 @@ const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 10_000]
 const MAX_RECONNECT_ATTEMPTS = 20
 // 30 s of 16 kHz linear16.
 const MAX_BUFFERED_AUDIO_BYTES = 30 * 32_000
+// A connection must stay up this long before the retry count starts over. A
+// socket that opens and drops straight away would otherwise reset the count
+// every time and retry once a second, forever.
+const STABLE_CONNECTION_MS = 30_000
+// Held audio is replayed at about 5x real time, not in one burst.
+const FLUSH_CHUNKS_PER_TICK = 8
+const FLUSH_TICK_MS = 50
 
 interface ReferenceMessageMeta {
   isFinal?: boolean
@@ -98,6 +105,8 @@ export default function useDeepgramTranscription() {
   let stopRequested = false
   let reconnectAttempt = 0
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let stableTimer: ReturnType<typeof setTimeout> | null = null
+  let flushTimer: ReturnType<typeof setInterval> | null = null
   let bufferedAudio: ArrayBuffer[] = []
   let bufferedBytes = 0
   let audioContext: AudioContext | null = null
@@ -450,12 +459,16 @@ export default function useDeepgramTranscription() {
           if (msg.period) state.value.period = msg.period
           if (msg.limit) state.value.limitSeconds = msg.limit
           socketReady = true
+          if (stableTimer) clearTimeout(stableTimer)
+          stableTimer = setTimeout(() => {
+            stableTimer = null
+            reconnectAttempt = 0
+          }, STABLE_CONNECTION_MS)
 
           // A reconnected session picks up where the dropped one left off:
           // the mic, timers and transcript are all still running.
           if (isReconnecting.value) {
             isReconnecting.value = false
-            reconnectAttempt = 0
             if (isPaused.value) sendControlFrame('Pause')
             flushBufferedAudio()
             toast.add({ title: 'Transcription reconnected', icon: 'i-bx-check-circle', timeout: 3000 })
@@ -519,6 +532,16 @@ export default function useDeepgramTranscription() {
           state.value.remainingSeconds = 0
           showLimitReachedToast(msg.message)
           stopTranscription()
+        } else if (msg.type === 'low_time') {
+          // Teams only: a heads-up before the week's minutes run out mid-sermon.
+          if (typeof msg.remainingSeconds === 'number') state.value.remainingSeconds = msg.remainingSeconds
+          toast.add({
+            title: `${msg.minutesLeft} minutes of transcription left this week`,
+            description: 'Transcription stops when they run out. They reset on Monday.',
+            icon: 'i-bx-time',
+            color: 'amber',
+            timeout: 8000,
+          })
         } else if (msg.type === 'error') {
           state.value.error = msg.message
           toast.add({
@@ -558,6 +581,7 @@ export default function useDeepgramTranscription() {
     socket.onclose = async (event) => {
       if (ws !== socket) return
       const wasReady = socketReady
+      if (stableTimer) { clearTimeout(stableTimer); stableTimer = null }
       ws = null
       socketReady = false
       // The server records this session as the socket closes, so later usage
@@ -627,12 +651,13 @@ export default function useDeepgramTranscription() {
    * spoken during a short drop still reach the new session.
    */
   const sendAudio = (audio: ArrayBuffer) => {
-    if (socketReady && ws?.readyState === WebSocket.OPEN) {
+    if (socketReady && ws?.readyState === WebSocket.OPEN && !flushTimer) {
       ws.send(audio)
       lastAudioSentAt = Date.now()
       return
     }
-    if (!isReconnecting.value) return
+    // While held audio is replaying, live audio queues behind it to stay in order.
+    if (!isReconnecting.value && !flushTimer) return
     bufferedAudio.push(audio)
     bufferedBytes += audio.byteLength
     while (bufferedBytes > MAX_BUFFERED_AUDIO_BYTES && bufferedAudio.length) {
@@ -641,10 +666,26 @@ export default function useDeepgramTranscription() {
   }
 
   const flushBufferedAudio = () => {
-    const chunks = bufferedAudio
-    bufferedAudio = []
-    bufferedBytes = 0
-    for (const chunk of chunks) sendAudio(chunk)
+    if (flushTimer) clearInterval(flushTimer)
+    flushTimer = setInterval(() => {
+      if (!(socketReady && ws?.readyState === WebSocket.OPEN)) {
+        // Dropped again mid-replay: keep the rest for the next session.
+        clearInterval(flushTimer!)
+        flushTimer = null
+        return
+      }
+      const batch = bufferedAudio.splice(0, FLUSH_CHUNKS_PER_TICK)
+      for (const chunk of batch) {
+        bufferedBytes -= chunk.byteLength
+        ws.send(chunk)
+        lastAudioSentAt = Date.now()
+      }
+      if (!bufferedAudio.length) {
+        bufferedBytes = 0
+        clearInterval(flushTimer!)
+        flushTimer = null
+      }
+    }, FLUSH_TICK_MS)
   }
 
   /**
@@ -790,6 +831,8 @@ export default function useDeepgramTranscription() {
     if (usageSyncTimer) { clearInterval(usageSyncTimer); usageSyncTimer = null }
     if (keepAliveTimer) { clearInterval(keepAliveTimer); keepAliveTimer = null }
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    if (stableTimer) { clearTimeout(stableTimer); stableTimer = null }
+    if (flushTimer) { clearInterval(flushTimer); flushTimer = null }
     isReconnecting.value = false
     reconnectAttempt = 0
     bufferedAudio = []
