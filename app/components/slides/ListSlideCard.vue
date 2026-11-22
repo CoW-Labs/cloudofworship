@@ -98,13 +98,14 @@ const props = defineProps<{
 
 defineEmits(["delete-slide", "hover", "toggle-pin"])
 
+import { savedMediaPayload } from "~/utils/externalVideo"
+
 const addSlide = () => {
   const slide = props.slide
   useGlobalEmit(`new-${slide?.type}`, [
     slide?.type === slideTypes.media
       ? {
-          ...slide?.data,
-          url: slide.background,
+          ...savedMediaPayload(slide),
           fromSaved: true,
           scheduleId: currentState.value?.activeSchedule?._id,
         }

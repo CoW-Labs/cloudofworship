@@ -357,6 +357,7 @@ import type { QuickAction, Slide, Song } from "~/types"
 import { useDebounceFn } from "@vueuse/core"
 import SongsIcon from "~/components/svgs/SongsIcon.vue"
 import { useAppStore } from "~/store/app"
+import { savedMediaPayload } from "~/utils/externalVideo"
 
 const props = defineProps<{
   page: string
@@ -595,8 +596,7 @@ onMounted(() => {
           useGlobalEmit(`new-${slide.type}`, [
             slide.type === slideTypes.media
               ? {
-                  ...slide.data,
-                  url: slide.background,
+                  ...savedMediaPayload(slide),
                   fromSaved: true,
                   scheduleId: currentState.value?.activeSchedule?._id,
                 }
