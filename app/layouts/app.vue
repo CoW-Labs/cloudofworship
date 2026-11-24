@@ -1348,6 +1348,21 @@ async function openTauriLiveWindow() {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
 
     // Get available monitors
+/**
+ * A window created with `fullscreen: true` goes full screen on the screen the
+ * app is on, whatever x/y it was given (macOS), so output windows are created
+ * windowed on their screen and made full screen from there.
+ */
+async function fullscreenOnScreen(win: any, x: number, y: number) {
+  try {
+    const { LogicalPosition } = await import("@tauri-apps/api/dpi")
+    await win.setPosition(new LogicalPosition(x, y))
+    await win.setFullscreen(true)
+  } catch (error) {
+    console.warn("Could not make the output window full screen:", error)
+  }
+}
+
     const { availableMonitors, currentMonitor } = await import(
       "@tauri-apps/api/window"
     )
@@ -1470,7 +1485,9 @@ async function openTauriLiveWindow() {
       decorations: !isFullscreen, // Show decorations only when not fullscreen
       resizable: true,
       closable: true,
-      fullscreen: isFullscreen,
+      // Full screen is applied once the window is on its screen (see
+      // fullscreenOnScreen); asked for at creation, macOS ignores x/y.
+      fullscreen: false,
       x: targetMonitor.position.x / scale,
       y: targetMonitor.position.y / scale,
       width: targetMonitor.size.width / scale,
@@ -1486,6 +1503,13 @@ async function openTauriLiveWindow() {
     console.error("Error opening Tauri window:", error)
     useToast().add({
       title: "Failed to open live window",
+      if (isFullscreen) {
+        await fullscreenOnScreen(
+          liveWindow,
+          targetMonitor.position.x / scale,
+          targetMonitor.position.y / scale
+        )
+      }
       description: "Please try again or check your display settings",
       icon: "i-bx-error-circle",
       color: "red",
@@ -1788,7 +1812,7 @@ async function openTauriStageWindow() {
       ...(monitor
         ? {
             decorations: false,
-            fullscreen: true,
+            fullscreen: false,
             x: monitor.position.x / scale,
             y: monitor.position.y / scale,
             width: monitor.size.width / scale,
@@ -1803,6 +1827,15 @@ async function openTauriStageWindow() {
   } catch (error) {
     console.error("Error opening stage display window:", error)
     useToast().add({
+    if (monitor) {
+      await stageWindow.once("tauri://created", () =>
+        fullscreenOnScreen(
+          stageWindow,
+          monitor.position.x / scale,
+          monitor.position.y / scale
+        )
+      )
+    }
       title: "Failed to open the stage display",
       description: "Please try again or check your display settings",
       icon: "i-bx-error-circle",
@@ -1907,7 +1940,7 @@ async function openTauriSlidesWindow(targetId: string): Promise<boolean> {
     resizable: true,
     closable: true,
     decorations: false,
-    fullscreen: true,
+    fullscreen: false,
     x: monitor.position.x / scale,
     y: monitor.position.y / scale,
     width: monitor.size.width / scale,
@@ -1920,6 +1953,13 @@ async function openTauriSlidesWindow(targetId: string): Promise<boolean> {
 }
 
 async function openSlidesOutputWindow(targetId: string): Promise<boolean> {
+  await slidesWindow.once("tauri://created", () =>
+    fullscreenOnScreen(
+      slidesWindow,
+      monitor.position.x / scale,
+      monitor.position.y / scale
+    )
+  )
   // Placing a window on another screen needs the Window Management API, and
   // Go Live has just asked for it. Without it there is no screen to target.
   if ((await getScreenAccess()) !== "granted") return false

@@ -12,6 +12,7 @@
     "core:default",
     "core:window:allow-close",
     "core:window:allow-destroy",
+    "core:window:allow-set-fullscreen",
     "shell:allow-open"
   ]
 }

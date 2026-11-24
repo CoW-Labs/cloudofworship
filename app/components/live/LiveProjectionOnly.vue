@@ -1485,9 +1485,22 @@ const computePadding = (padding: number | undefined) => {
   return ((padding || 24) * 6) / 24
 }
 
-const activateFullScreen = () => {
+const activateFullScreen = async () => {
   const route = useRoute()
   if (props.fullScreen && route.name === "live") {
+    // The desktop app's window goes full screen itself; the browser's
+    // fullscreen only applies to a page in a browser.
+    if (useTauri().isTauri) {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window")
+        const win = getCurrentWindow()
+        await win.setFullscreen(!(await win.isFullscreen()))
+        emit("activate-fullscreen")
+      } catch (error) {
+        console.warn("Could not toggle the live window's fullscreen:", error)
+      }
+      return
+    }
     if (document.fullscreenElement) {
       exitFullscreenSafely()
     } else {

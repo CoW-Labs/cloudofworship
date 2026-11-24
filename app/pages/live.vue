@@ -38,7 +38,7 @@
     </div>
 
     <DisplayWindowBanner
-      v-if="!isFullScreen && !isTauri"
+      v-if="!isFullScreen"
       floating
       :label="isSlidesOutput ? 'Slides Output' : 'Live Output'"
       :active="!!primarySlide"
@@ -341,15 +341,34 @@ useHead({
   ],
 })
 
-const checkFullScreen = () => {
-  if (document.fullscreenElement) {
-    isFullScreen.value = true
-  } else {
-    isFullScreen.value = false
+// On desktop the window itself goes full screen (the browser's own fullscreen
+// doesn't apply to it), so that is the state to read and to toggle.
+const tauriWindow = async () =>
+  (await import("@tauri-apps/api/window")).getCurrentWindow()
+
+const checkFullScreen = async () => {
+  if (isTauri) {
+    try {
+      isFullScreen.value = await (await tauriWindow()).isFullscreen()
+    } catch (error) {
+      console.warn("Could not read the live window's fullscreen state:", error)
+    }
+    return
   }
+  isFullScreen.value = !!document.fullscreenElement
 }
 
-const toggleFullScreen = () => {
+const toggleFullScreen = async () => {
+  if (isTauri) {
+    try {
+      const win = await tauriWindow()
+      await win.setFullscreen(!(await win.isFullscreen()))
+      await checkFullScreen()
+    } catch (error) {
+      console.warn("Could not toggle the live window's fullscreen:", error)
+    }
+    return
+  }
   if (document.fullscreenElement) {
     exitFullscreenSafely()
   } else {
@@ -371,6 +390,8 @@ onMounted(() => {
   window.addEventListener("webkitfullscreenchange", checkFullScreen)
   window.addEventListener("mozfullscreenchange", checkFullScreen)
   window.addEventListener("MSFullscreenChange", checkFullScreen)
+  // A desktop window going full screen (or leaving it) resizes the window.
+  if (isTauri) window.addEventListener("resize", checkFullScreen)
 
   // Prevent default action on specific keys
   document.addEventListener("keydown", blockFindShortcut)
@@ -632,6 +653,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("webkitfullscreenchange", checkFullScreen)
   window.removeEventListener("mozfullscreenchange", checkFullScreen)
   window.removeEventListener("MSFullscreenChange", checkFullScreen)
+  window.removeEventListener("resize", checkFullScreen)
 })
 </script>
 
