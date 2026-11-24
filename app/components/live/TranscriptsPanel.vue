@@ -155,7 +155,7 @@
             "
           >
             <template #leading><SettingsIcon class="w-4 h-4" /></template>
-            Microphone settings
+            Audio/Video settings
           </UButton>
           <UButton
             color="gray"
@@ -749,7 +749,7 @@ const openMicSettings = () => {
   usePosthogCapture("TRANSCRIPTION_MIC_SETTINGS_OPENED", {
     isTranscribing: isTranscribing.value,
   })
-  useGlobalEmit(appWideActions.openSettings, "Microphone Settings")
+  useGlobalEmit(appWideActions.openSettings, "Audio/Video Settings")
 }
 
 const handleClear = () => {

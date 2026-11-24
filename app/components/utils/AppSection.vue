@@ -69,8 +69,7 @@
             @confirm="$emit(secondaryButton.action)"
           >
           </ConfirmDialog>
-          <!-- Direct button when live (no popover); while streaming, the
-               YouTube badge beside it opens the live stream stats. -->
+          <!-- Direct button when live (no popover) -->
           <div
             v-if="
               secondaryButton.visible &&
@@ -92,27 +91,6 @@
               />
               End Live Session
             </CowButton>
-            <UPopover v-if="youtubeIsStreaming" mode="click">
-              <button
-                class="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-1 text-[10px] font-semibold uppercase leading-none text-white hover:bg-red-700"
-                :title="
-                  youtubeStatus.phase === 'reconnecting'
-                    ? 'YouTube connection lost — reconnecting. Click for stream stats.'
-                    : 'Streaming to YouTube. Click for stream stats.'
-                "
-              >
-                <span
-                  class="h-1.5 w-1.5 rounded-full bg-white"
-                  :class="youtubeStatus.phase === 'reconnecting' ? 'animate-pulse' : ''"
-                />
-                YouTube
-              </button>
-              <template #panel>
-                <div class="p-4">
-                  <YoutubeStreamStats />
-                </div>
-              </template>
-            </UPopover>
           </div>
 
           <button
@@ -273,32 +251,27 @@ const canOpenStageDisplay = computed(() =>
 )
 
 const { isTauri } = useTauri()
-const {
-  status: youtubeStatus,
-  isStreaming: youtubeIsStreaming,
-  streamOnGoLive: youtubeStreamOnGoLive,
-  hasStreamKey: youtubeHasKey,
-} = useYoutubeStream()
-const { isEnabled: youtubeStreamingEnabled } = useFeatureFlags("youtube-streaming")
+const { streamOnGoLive, hasStreamKey: hasKey } = useStreamOutput()
+const { isEnabled: streamingEnabled } = useFeatureFlags("live-streaming")
 
-// One-off "go live and stream": opens the live window and starts YouTube.
+// One-off "go live and stream": opens the live window and starts the stream.
 // Without a key yet, take the operator to where they add one.
-const goLiveOnYoutube = () => {
+const goLiveAndStream = () => {
   if (props.isLiveWindowActive) return
   secondaryActionPopoverOpen.value = false
-  if (!youtubeHasKey.value) {
-    useGlobalEmit(appWideActions.openSettings, "Display Settings")
+  if (!hasKey.value) {
+    useGlobalEmit(appWideActions.openSettings, "Live Stream Settings")
     return
   }
-  useGlobalEmit(appWideActions.goLive, { youtube: true })
+  useGlobalEmit(appWideActions.goLive, { stream: true })
 }
 
 const goLiveMenuItems = computed(() => [
   {
     label: "Open live window",
     desc:
-      youtubeStreamOnGoLive.value && youtubeHasKey.value
-        ? "Opens the live display and streams it to YouTube"
+      streamOnGoLive.value && hasKey.value
+        ? "Opens the live display and streams it"
         : "Opens another browser window with the live display",
     icon: "",
     svgIcon: "GoLiveIcon",
@@ -307,18 +280,18 @@ const goLiveMenuItems = computed(() => [
     onClick: () => useGlobalEmit(appWideActions.goLive),
   },
   // Desktop only, and redundant once "Open live window" already streams.
-  ...(isTauri && youtubeStreamingEnabled.value && !(youtubeStreamOnGoLive.value && youtubeHasKey.value)
+  ...(isTauri && streamingEnabled.value && !(streamOnGoLive.value && hasKey.value)
     ? [
         {
-          label: "Go live on YouTube",
-          desc: youtubeHasKey.value
-            ? "Opens the live display and streams it to YouTube"
-            : "Add your stream key in Display Settings first",
+          label: "Go live and stream",
+          desc: hasKey.value
+            ? "Opens the live display and streams it"
+            : "Add your stream key in Live Stream Settings first",
           icon: "i-ph-broadcast",
           svgIcon: undefined,
           disabled: props.isLiveWindowActive,
           locked: false,
-          onClick: goLiveOnYoutube,
+          onClick: goLiveAndStream,
         },
       ]
     : []),

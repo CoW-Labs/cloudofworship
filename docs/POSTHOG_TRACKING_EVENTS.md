@@ -155,8 +155,9 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `SLIDE_THEME_APPLIED` | `themeName` | Pre-built theme applied | ⚠️ Missing |
 | `STREAM_QUALITY_CHANGED` | `quality`, `codec`, `height`, `fps` | Operator picked a YouTube stream quality tier (settings or the pre-flight check); only fires on a real change to an available tier | ✅ Added |
 | `STREAM_QUALITY_UPSCALE_WARNING_SHOWN` | `quality`, `sourceHeight` | The pre-flight check warned that the chosen tier is taller than the live window, so the stream is only an upscale | ✅ Added |
-| `YOUTUBE_STREAM_STARTED` | `source`, `quality` | A YouTube stream started (`quality` is the tier id; sources other than the live window always use the default) | ✅ Added |
-| `YOUTUBE_STREAM_FAILED` | `source`, `quality`, `error` | Starting a YouTube stream failed; `error` is the first 120 characters of the app's own message | ✅ Added |
+| `STREAM_STARTED` | `source`, `quality` | A live stream started (`quality` is the tier id; sources other than the live window always use the default) | ✅ Added |
+| `STREAM_FAILED` | `source`, `quality`, `error` | Starting a live stream failed; `error` is the first 120 characters of the app's own message | ✅ Added |
+| `STREAM_KEY_UPDATE_LINK_CLICKED` | `from` | Operator clicked "Update stream key" in the pre-flight check; it closes the check and opens Live Stream Settings | ✅ Added |
 | `NDI_QUALITY_CHANGED` | `quality`, `fps`, `height` | Operator picked an NDI size and frame rate in settings; only fires on a real change to an available tier | ✅ Added |
 | `NDI_STARTED` | `quality`, `retry` | NDI broadcasting started (`retry` is true when it was a Retry after an error) | ✅ Added |
 | `NDI_START_FAILED` | `quality`, `error` | NDI could not start; `error` is the app's error code (e.g. `runtimeNotInstalled`, `capturePermissionDenied`) | ✅ Added |
@@ -253,7 +254,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `TRANSCRIPTION_CLEARED` | `provider`, `plan`, `segmentCount` | User clears the transcript | ✅ Added |
 | `TRANSCRIPTION_BIBLE_REFERENCE_CLICKED` | `reference`, `chapterOnly`, `inferred` | User clicks an inline Bible reference in the transcript. `chapterOnly` is true when only a chapter was said ("Joshua chapter 14", "in Philippians 2"), which opens verse 1. `inferred` is true when the verse was placed from context (a bare "verse 26", or "Isaiah 35," joined to a following "4 to 6") rather than said outright | ✅ Added |
 | `TRANSCRIPTION_SCRIPTURE_SUGGESTION_CLICKED` | `reference`, `displayLabel` | User clicks a scripture in the Scriptures tab | ✅ Added |
-| `TRANSCRIPTION_MIC_SETTINGS_OPENED` | `isTranscribing` | User opens Microphone Settings from the transcript panel's More menu (operator window only) | ✅ Added |
+| `TRANSCRIPTION_MIC_SETTINGS_OPENED` | `isTranscribing` | User opens Audio/Video Settings from the transcript panel's More menu (operator window only) | ✅ Added |
 
 ---
 

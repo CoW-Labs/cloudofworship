@@ -79,9 +79,13 @@
                 />
                 <!-- DISPLAY SETTINGS -->
                 <DisplaySettings v-else-if="activeTab === 'Display Settings'" />
+                <!-- LIVE STREAM SETTINGS -->
+                <StreamSettings
+                  v-else-if="activeTab === 'Live Stream Settings'"
+                />
                 <!-- CAMERA & MIC SETTINGS -->
                 <CameraAndMicSettings
-                  v-else-if="activeTab === 'Microphone Settings'"
+                  v-else-if="activeTab === 'Audio/Video Settings'"
                 />
                 <!-- SLIDE SETTINGS -->
                 <SlideSettings
@@ -132,11 +136,15 @@ const { appVersion } = useAppVersion()
 const { fetchUserSettings, saveSettingsLocally, debouncedSaveSettings } =
   useUserSettings()
 const settingsModalOpen = ref(props.isOpen)
-const tabs = [
+const { isTauri } = useTauri()
+const tabs = computed(() => [
   { name: "Account/Profile Settings", active: false },
   { name: "Subscription Settings", active: false },
   { name: "Display Settings", active: false },
-  { name: "Microphone Settings", active: false },
+  ...(isTauri
+    ? [{ name: "Live Stream Settings", active: false }]
+    : []),
+  { name: "Audio/Video Settings", active: false },
   { name: "Slide Settings", active: false },
   { name: "Slide Background Settings", active: false },
   { name: "Blank Settings", active: false },
@@ -144,7 +152,7 @@ const tabs = [
   { name: "Storage Settings", active: false },
   { name: "Performance Settings", active: false },
   { name: "Other Settings", active: false },
-]
+])
 const activeTab = ref(props.page || "Slide Settings")
 
 watch(

@@ -66,14 +66,10 @@ export interface StreamPlan {
 
 export const DEFAULT_STREAM_QUALITY = "720p30"
 
-const formatTierMbps = (kbps: number) => {
-  const mbps = kbps / 1000
-  return Number.isInteger(mbps) ? `${mbps}` : mbps.toFixed(1)
-}
-
-// "720p 30 fps · 2.5 Mbps"; 2160 reads as 4K.
+// "720p 30 fps"; 2160 reads as 4K. The bitrate lives in the pre-flight hint,
+// not in the label.
 export const tierLabel = (tier: StreamTier) =>
-  `${tier.height === 2160 ? "4K" : `${tier.height}p`} ${tier.fps} fps · ${formatTierMbps(tier.videoKbps)} Mbps`
+  `${tier.height === 2160 ? "4K" : `${tier.height}p`} ${tier.fps} fps`
 
 // The operator's answer to the pre-flight check.
 export type PreflightChoice = "stream" | "window-only" | "cancel"
@@ -101,7 +97,7 @@ const UPLOAD_TEST_MAX_CHUNK = 16 * 1024 * 1024
 
 // The operator's stream setup survives restarts. It stays on this device only
 // (the settings panel says so) — never synced to the account.
-const SETTINGS_KEY = "cow-youtube-stream-settings"
+const SETTINGS_KEY = "cow-stream-settings"
 interface SavedSettings {
   streamKey?: string
   streamOnGoLive?: boolean
@@ -158,7 +154,7 @@ const isGestureError = (error: unknown) =>
   error instanceof DOMException &&
   (error.name === "InvalidAccessError" || /gesture/i.test(error.message))
 
-export const useYoutubeStream = () => {
+export const useStreamOutput = () => {
   const { isTauri } = useTauri()
   const isDesktop = isTauri && import.meta.client
   // Events fire after awaits, where Nuxt's context is gone, so each capture
@@ -167,31 +163,31 @@ export const useYoutubeStream = () => {
   const track = (event: string, properties?: Record<string, unknown>) =>
     nuxtApp.runWithContext(() => usePosthogCapture(event, properties))
 
-  const status = useState<StreamStatus>("yt-stream-status", idleStatus)
-  const isInvoking = useState<boolean>("yt-stream-pending", () => false)
-  const streamKey = useState<string>("yt-stream-key", () => "")
-  const source = useState<StreamSource>("yt-stream-source", () => "live-window")
+  const status = useState<StreamStatus>("stream-status", idleStatus)
+  const isInvoking = useState<boolean>("stream-pending", () => false)
+  const streamKey = useState<string>("stream-key", () => "")
+  const source = useState<StreamSource>("stream-source", () => "live-window")
   // When true, going live (opening the projection window) also starts the
   // YouTube stream automatically — one action, no separate trip to the panel.
-  const streamOnGoLive = useState<boolean>("yt-stream-on-go-live", () => false)
-  const audioDevices = useState<AudioDevice[]>("yt-stream-audio-devices", () => [])
+  const streamOnGoLive = useState<boolean>("stream-on-go-live", () => false)
+  const audioDevices = useState<AudioDevice[]>("stream-audio-devices", () => [])
   // The chosen audio input's index; "" means "no audio", null means "default".
-  const audioDevice = useState<string | null>("yt-stream-audio-device", () => null)
+  const audioDevice = useState<string | null>("stream-audio-device", () => null)
   // True when starting failed only because the window picker needs a fresh
   // click; the UI then shows a "choose the live window" button.
-  const needsPicker = useState<boolean>("yt-stream-needs-picker", () => false)
-  const stats = useState<StreamStats | null>("yt-stream-stats", () => null)
+  const needsPicker = useState<boolean>("stream-needs-picker", () => false)
+  const stats = useState<StreamStats | null>("stream-stats", () => null)
   // The pre-flight meter's latest reading (dB), null when nothing's arriving.
-  const meterDb = useState<number | null>("yt-stream-meter-db", () => null)
+  const meterDb = useState<number | null>("stream-meter-db", () => null)
   // Show the pre-flight check before each YouTube stream.
-  const checkBeforeStreaming = useState<boolean>("yt-stream-check-first", () => true)
-  const preflightOpen = useState<boolean>("yt-stream-preflight-open", () => false)
+  const checkBeforeStreaming = useState<boolean>("stream-check-first", () => true)
+  const preflightOpen = useState<boolean>("stream-preflight-open", () => false)
   // The chosen quality tier, an id the backend knows (e.g. "1080p60").
-  const quality = useState<string>("yt-stream-quality", () => DEFAULT_STREAM_QUALITY)
+  const quality = useState<string>("stream-quality", () => DEFAULT_STREAM_QUALITY)
   // The tiers this computer offers, and the live window's height, from the
   // backend's plan. Empty until the plan has been read once.
-  const tiers = useState<StreamTier[]>("yt-stream-tiers", () => [])
-  const sourceHeight = useState<number | null>("yt-stream-source-height", () => null)
+  const tiers = useState<StreamTier[]>("stream-tiers", () => [])
+  const sourceHeight = useState<number | null>("stream-source-height", () => null)
 
   if (isDesktop && !settingsHydrated) {
     settingsHydrated = true
@@ -406,7 +402,7 @@ export const useYoutubeStream = () => {
     } catch (error) {
       if (isGestureError(error)) {
         needsPicker.value = true
-        throw new Error("Choose the live output window to start the YouTube stream.")
+        throw new Error("Choose the live output window to start the stream.")
       }
       if (error instanceof DOMException && error.name === "NotAllowedError") {
         throw new Error("Window sharing was cancelled, so the stream didn't start.")
@@ -503,14 +499,14 @@ export const useYoutubeStream = () => {
           quality: quality.value,
         })
       }
-      track("YOUTUBE_STREAM_STARTED", {
+      track("STREAM_STARTED", {
         source: source.value,
         quality: source.value === "live-window" ? quality.value : DEFAULT_STREAM_QUALITY,
       })
     } catch (error) {
       stopCapture()
       status.value = { phase: "error", error: messageOf(error) }
-      track("YOUTUBE_STREAM_FAILED", {
+      track("STREAM_FAILED", {
         source: source.value,
         quality: quality.value,
         error: messageOf(error).slice(0, 120),
@@ -537,7 +533,7 @@ export const useYoutubeStream = () => {
   }
 
   // Asks the operator to confirm the pre-flight check; resolves with their
-  // choice. The check itself lives in YoutubePreflightModal.
+  // choice. The check itself lives in StreamPreflightModal.
   const requestPreflight = () => {
     resolvePreflightChoice?.("cancel")
     preflightOpen.value = true

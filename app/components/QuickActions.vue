@@ -598,7 +598,7 @@ const quickSearchSuggestionsByAction = {
     "Display Settings",
     "Profile Settings",
     "Slide Background Settings",
-    "Microphone Settings",
+    "Audio/Video Settings",
     "Subscription Settings",
     "Overlay Settings",
     "Blank Settings",

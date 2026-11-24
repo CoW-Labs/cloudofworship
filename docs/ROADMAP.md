@@ -66,7 +66,8 @@ Score each item 1 to 5 for Reach and Impact, then note effort (S under a week, M
 ## Next
 
 - **Credits section** and **pin library items.** Both are small, so slot them in between larger items.
-- **YouTube streaming.** Run the full path in the real app on macOS and Windows, release to a handful of Teams churches, and judge it by `YOUTUBE_STREAM_STARTED` against `YOUTUBE_STREAM_FAILED`. Do not build more quality tiers until people use the ones we have.
+- **YouTube streaming.** Run the full path in the real app on macOS and Windows, release to a handful of Teams churches, and judge it by `STREAM_STARTED` against `STREAM_FAILED`. Do not build more quality tiers until people use the ones we have.
+- **Monthly song-use email for licensing.** Email each church the songs it used in the last month, so it can report them to its licence body (CCLI, OneLicense). Scope: build the list from songs that went live, not songs that were only added or searched. Open points: who gets it (church admins only), whether to send automatically or offer it in the app too, and how it fits the existing email rules (one sender, contact-history check, short and plain). It also supports the licensing answer on `/content-licenses`.
 - **Pillar.** Write the one-page PRD first (see the template below), including cost per use and what happens if it fails mid-service.
 - **Sign-up funnel.** Look at the drop between account created and verified, and the resend pattern.
 - **Paywall review.** Countdown is the most blocked feature (126 blocks, 51 previews). Song search has the best preview-to-upgrade rate (15 of 177). Decide whether the current split is right.
