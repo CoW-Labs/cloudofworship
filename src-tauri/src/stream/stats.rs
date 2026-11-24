@@ -132,15 +132,16 @@ pub fn spawn_reporter(
 }
 
 /// Reads an FFmpeg process's stderr: loudness lines feed `on_level`, anything
-/// else (warnings) goes to the dev console as before.
+/// else (warnings, errors) goes to the app log, where a dev-console print
+/// would be lost whenever the app is opened normally.
 pub fn read_levels(stderr: impl Read + Send + 'static, on_level: impl Fn(f32) + Send + 'static) {
   let _ = std::thread::Builder::new().name("cow-stream-stderr".into()).spawn(move || {
     for line in BufReader::new(stderr).lines() {
       let Ok(line) = line else { break };
       if let Some(db) = parse_level(&line) {
         on_level(db);
-      } else if !line.starts_with("frame:") {
-        eprintln!("{line}");
+      } else if !line.starts_with("frame:") && !line.trim().is_empty() {
+        log::warn!("ffmpeg encoder: {line}");
       }
     }
   });

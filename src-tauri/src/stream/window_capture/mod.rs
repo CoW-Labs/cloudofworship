@@ -334,11 +334,12 @@ impl Health {
     let seconds = elapsed.as_secs_f64();
     log::info!(
       "stream health: window {:.1} new fps, sent {:.1} fps, {} slow writes, \
-       {} upload stalls so far",
+       {} upload stalls so far, {} KB handed to the uploader so far",
       (published - self.published) as f64 / seconds,
       self.sent as f64 / seconds,
       self.slow,
-      sink.stats.upload_stalls.load(Ordering::Relaxed)
+      sink.stats.upload_stalls.load(Ordering::Relaxed),
+      sink.stats.sent_bytes.load(Ordering::Relaxed) / 1024
     );
     *self = Self { published, ..Self::new() };
   }

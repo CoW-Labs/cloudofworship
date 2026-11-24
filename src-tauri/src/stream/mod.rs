@@ -20,7 +20,7 @@
 //! the network, so a dropped connection restarts just the pusher while the
 //! encoder (and the page's recording) keeps running — TS can be joined mid-way.
 
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -350,13 +350,16 @@ impl StreamBridge {
     let spawner: Spawner = {
       let pusher_input = pusher_input.clone();
       let args = pusher_args(&url);
+      let secrets: Vec<String> = args.iter().filter_map(|a| key_in_url(a)).collect();
       Arc::new(move || {
         let mut child = ffmpeg_command()
           .args(&args)
           .stdin(Stdio::piped())
           .stdout(Stdio::null())
-          .stderr(Stdio::inherit())
+          .stderr(Stdio::piped())
           .spawn()?;
+        log::info!("stream: FFmpeg pusher started (pid {})", child.id());
+        log_ffmpeg_stderr("pusher", &mut child, secrets.clone());
         *pusher_input.lock().unwrap_or_else(|p| p.into_inner()) = child.stdin.take();
         Ok(child)
       })
@@ -522,7 +525,13 @@ impl StreamBridge {
             }
             match slot.as_mut().map(|p| p.try_wait()) {
               Some(Ok(None)) => {} // still running
-              _ => {
+              exited => {
+                if let Some(Ok(Some(status))) = &exited {
+                  log::warn!(
+                    "stream: FFmpeg exited ({status}) after {}s",
+                    started.elapsed().as_secs()
+                  );
+                }
                 *slot = None;
                 break;
               }
@@ -706,15 +715,56 @@ fn ffmpeg_command() -> Command {
   command
 }
 
-/// Spawns FFmpeg with output silenced except stderr, which is inherited to the
-/// dev console (`-loglevel warning` keeps the key-bearing URL banner out of it).
+/// Spawns FFmpeg with output silenced except stderr, which goes to the app log
+/// (`-loglevel warning` keeps the key-bearing URL banner out of it).
 fn spawn_ffmpeg(args: &[String]) -> std::io::Result<Child> {
-  ffmpeg_command()
+  let mut child = ffmpeg_command()
     .args(args)
     .stdin(Stdio::null())
     .stdout(Stdio::null())
-    .stderr(Stdio::inherit())
-    .spawn()
+    .stderr(Stdio::piped())
+    .spawn()?;
+  log_ffmpeg_stderr("stream", &mut child, args.iter().filter_map(|a| key_in_url(a)).collect());
+  Ok(child)
+}
+
+/// The stream key at the end of an RTMP(S) URL, if `text` is one.
+fn key_in_url(text: &str) -> Option<String> {
+  if !(text.starts_with("rtmp://") || text.starts_with("rtmps://")) {
+    return None;
+  }
+  let key = text.rsplit('/').next()?;
+  (!key.is_empty() && key.len() >= 8).then(|| key.to_string())
+}
+
+/// Copies FFmpeg's warnings and errors into the app log, so a refused key or a
+/// dropped connection shows up there instead of vanishing with the process.
+/// The stream key is replaced before anything is written, and a noisy process
+/// is cut off after MAX_FFMPEG_LOG_LINES so it can't flood the log.
+fn log_ffmpeg_stderr(label: &'static str, child: &mut Child, secrets: Vec<String>) {
+  const MAX_FFMPEG_LOG_LINES: usize = 200;
+  let Some(stderr) = child.stderr.take() else { return };
+  let _ = std::thread::Builder::new()
+    .name("cow-ffmpeg-log".into())
+    .spawn(move || {
+      let mut logged = 0usize;
+      for line in std::io::BufReader::new(stderr).split(b'\n').map_while(Result::ok) {
+        let mut text = String::from_utf8_lossy(&line).trim().to_string();
+        if text.is_empty() {
+          continue;
+        }
+        for secret in &secrets {
+          text = text.replace(secret.as_str(), "<key>");
+        }
+        if logged == MAX_FFMPEG_LOG_LINES {
+          log::warn!("ffmpeg {label}: more output suppressed");
+        }
+        if logged <= MAX_FFMPEG_LOG_LINES {
+          log::warn!("ffmpeg {label}: {text}");
+        }
+        logged += 1;
+      }
+    });
 }
 
 /// Builds the FFmpeg *input* arguments for the chosen source. This is where the
@@ -1112,6 +1162,12 @@ fn window_encoder_args(
       ["-probesize", "262144", "-analyzeduration", "0", "-f", demuxer].map(String::from),
     );
     args.extend(["-framerate".to_string(), quality.fps.to_string()]);
+    // Raw H.264 packets arrive with no timestamps at all, so FFmpeg's input
+    // scheduler sees the video as stuck at zero and stops reading the audio
+    // device as "too far ahead": a handful of audio packets get through, then
+    // none, and the pusher sends video only. Stamp each frame by its position
+    // as it's read so both inputs advance together.
+    args.extend(["-bsf:v".to_string(), format!("setts=ts=N/({}*TB)", quality.fps)]);
   } else {
     // Windows' GPU hands over NV12 at the final size; the macOS fallback
     // pipes BGRA, also at the final size.
@@ -1159,6 +1215,13 @@ fn window_encoder_args(
     "dump_extra=freq=keyframe".to_string()
   };
   args.extend(["-bsf:v".to_string(), video_filters]);
+  // Video and audio come from separate inputs on separate clocks, and the
+  // muxer holds one track back until the other catches up: by default up to
+  // 10 seconds, long enough that the pusher gives up on the audio while it
+  // probes the stream. Cap the wait at 2 seconds. (Not 0: that means wait
+  // forever for a packet on every track, so a silent audio input would hold
+  // all the video back.)
+  args.extend(["-max_interleave_delta", "2000000"].map(String::from));
   args.extend(["-flush_packets", "1", "-f", "mpegts", "pipe:1"].map(String::from));
   args
 }
@@ -1169,6 +1232,10 @@ fn window_encoder_args(
 fn pusher_args(url: &str) -> Vec<String> {
   let mut args = [
     "-hide_banner", "-loglevel", "warning",
+    // Without limits FFmpeg keeps reading until it has 5 MB of this stream,
+    // which a still slide takes minutes to produce, so nothing is sent until
+    // then. Bound the look by time and size instead.
+    "-analyzeduration", "5000000", "-probesize", "2000000",
     "-f", "mpegts", "-i", "pipe:0",
     "-c", "copy",
     "-rw_timeout", "8000000",

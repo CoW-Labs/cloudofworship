@@ -70,8 +70,10 @@ pub(super) fn locate(app: &AppHandle, quality: StreamQuality) -> Result<Target, 
     found.is_on_screen()
   );
 
-  let aspect = if frame.size.height > 0.0 { frame.size.width / frame.size.height } else { 16.0 / 9.0 };
-  let width = quality.width_for(aspect);
+  // The picture is always the chosen quality's own size (1920x1080 for 1080p),
+  // whatever shape the window is. A window that isn't 16:9 keeps its shape
+  // inside it, with black bars, rather than changing the size we send.
+  let width = quality.width_for(16.0 / 9.0);
   let height = quality.height;
 
   // Prefer encoding on the GPU straight from capture surfaces. If this Mac
@@ -113,6 +115,7 @@ pub(super) fn start(window: SCWindow, sink: Arc<Sink>) -> Result<SCStream, Strin
     .with_height(height)
     .with_pixel_format(pixel_format)
     .with_scales_to_fit(true)
+    .with_preserves_aspect_ratio(true)
     .with_shows_cursor(false)
     .with_ignores_shadows_single_window(true)
     .with_queue_depth(queue_depth)
