@@ -4,6 +4,7 @@ import type { Song } from '~/types'
 import { safeDBGet } from './useIndexedDB'
 // import songsObj from '../public/songs.json'
 import useURLFriendlyString from './useURLFriendlyString'
+import { SECTION_LABEL } from '~/utils/songTranslation'
 
 const addIdToReturnedSongs = (songs: Array<Song>) => {
   return songs?.map((song) => ({

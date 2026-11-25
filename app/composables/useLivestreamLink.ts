@@ -1,5 +1,6 @@
 import type { ComputedRef } from "vue"
 import { useAppStore } from "~/store/app"
+import { shareableAppOrigin } from "~/composables/useScheduleLink"
 
 /**
  * A shareable viewer link for the active schedule, and copying it to the
