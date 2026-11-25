@@ -290,6 +290,7 @@ import {
 } from "~/composables/useSlideResync"
 import posthog from "posthog-js"
 import { supportsTextBoxes } from "~/utils/textBoxes"
+import { preserveActiveVerse, trackActiveVerseNavigation } from "~/utils/activeVerseNavigation"
 
 // Free layout's one-time intro. `show()` does nothing once it has been seen.
 const freeLayoutIntroModal = ref<{ show: () => boolean } | null>(null)
@@ -712,6 +713,7 @@ const windowHeight = ref<number>(0)
 const activeSlide = ref<Slide>()
 const { currentState } = storeToRefs(appStore)
 // Drives the slide-grid skeleton. Kept separate from appStore.slidesLoading
+const activeVerseNavigation = trackActiveVerseNavigation(activeSlide)
 // (which only tracks the network request) so the skeleton stays up through
 // the local `slides` ref sync + grid render that happens after the fetch
 // resolves, not just the fetch itself.
@@ -773,9 +775,12 @@ const cleanupSlideDatabaseNotifications = useSlideDatabaseNotifications(() => {
     }
     appStore.setActiveSlides(
       replaceScheduleSlidesInCorpus(
+    const navigation = activeVerseNavigation.current
         appStore.activeSlides,
         scheduleId,
-        storedSlides
+        navigation
+          ? storedSlides.map((slide) => preserveActiveVerse(slide, navigation))
+          : storedSlides
       )
     )
     void resolveScheduleMedia(scheduleId)
@@ -3391,6 +3396,7 @@ const carriesPreviewSong = (slide: Slide) =>
   (slide.type === slideTypes.songSetlist &&
     getSetlistData(slide).songs.some((item) => item.song?.isPreview))
 
+  if (meta?.navigation) activeVerseNavigation.remember()
 // Deletes the step's slides that are still on the schedule, keeping their
 // media on this device while the step can bring them back. Returns copies of
 // what was deleted, or null when nothing was left to delete.
@@ -3662,7 +3668,10 @@ const gotoAction = async (
 ) => {
   if (!activeSlide.value) return
 
-  const updatedSlide = await gotoVerse(activeSlide.value, title, version)
+  const source = activeSlide.value
+  const updatedSlide = await gotoVerse(source, title, version)
+  if (activeSlide.value?.id !== source.id ||
+    activeSlide.value?.scheduleId !== source.scheduleId) return
   if (updatedSlide) {
     activeSlide.value = updatedSlide
     appStore.updateSlideInActiveSlides(updatedSlide)
@@ -3722,6 +3731,8 @@ const editorBindings = computed(() => ({
 const editorHandlers = {
   "slide-update": (slide: Slide, meta?: SlideUpdateMeta) =>
     onUpdateSlide(slide, meta),
+    if (options.durable) activeVerseNavigation.clear()
+    else activeVerseNavigation.remember()
   "inactive-slide-update": (slide: Slide) => onUpdateInactiveSlide(slide),
   // EditLiveContent emits `goto-verse` as (title, version) — forward both, or
   // the Bible version silently falls back to the slide's current one.
