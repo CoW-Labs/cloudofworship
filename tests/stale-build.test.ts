@@ -12,6 +12,10 @@ const RELEASE_VERSION = "v1.1.5"
 
 // The plugin imports this composable directly, so a global stub cannot replace
 // it. Keep the release name separate from the build ids in these tests.
+// The prompt is the navbar "Update ready" chip, not a toast.
+const markWebUpdateReady = vi.fn()
+vi.mock("~/composables/useAppUpdater", () => ({ markWebUpdateReady }))
+
 vi.mock("~/composables/useAppVersion", () => ({
   default: () => ({ appVersion: RELEASE_VERSION }),
 }))
@@ -30,6 +34,7 @@ const installPlugin = async (options?: {
   const values = options?.sessionValues ?? new Map<string, string>()
   const reload = vi.fn()
   const toastAdd = vi.fn()
+  markWebUpdateReady.mockClear()
   const windowListeners = new Map<string, () => void>()
   const documentListeners = new Map<string, () => void>()
   const timers: Array<{ fn: () => void; ms: number; kind: string }> = []
@@ -52,6 +57,8 @@ const installPlugin = async (options?: {
   })
   vi.stubGlobal("document", {
     visibilityState: "visible",
+    // Vue's DOM runtime makes a <template> when it loads.
+    createElement: () => ({}),
     addEventListener: (name: string, handler: () => void) =>
       documentListeners.set(name, handler),
   })
@@ -242,7 +249,7 @@ describe("stale build detection", () => {
     // A reload there blanks the congregation screen, and a toast there is shown
     // to the congregation.
     expect(harness.reload).not.toHaveBeenCalled()
-    expect(harness.toastAdd).not.toHaveBeenCalled()
+    expect(markWebUpdateReady).not.toHaveBeenCalled()
   })
 
   it("asks instead of reloading when a reload already failed to move the version", async () => {
@@ -252,6 +259,6 @@ describe("stale build detection", () => {
     await harness.runFirstCheck()
 
     expect(harness.reload).not.toHaveBeenCalled()
-    expect(harness.toastAdd).toHaveBeenCalledTimes(1)
+    expect(markWebUpdateReady).toHaveBeenCalledTimes(1)
   })
 })

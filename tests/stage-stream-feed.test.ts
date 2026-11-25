@@ -9,6 +9,14 @@ import { slideTypes } from "~/utils/constants"
 
 const mocks = vi.hoisted(() => ({ store: null as any, chapter: vi.fn() }))
 vi.mock("~/store/app", () => ({ useAppStore: () => mocks.store }))
+vi.mock("~/store/auth", () => ({ useAuthStore: () => ({ user: { _id: "user" } }) }))
+// The session's pair and camera wiring is not what these tests cover.
+vi.mock("~/composables/useSlidePairs", () => ({ livePayloadForSlide: (slide: unknown) => slide }))
+vi.mock("~/composables/useCameraShare", () => ({
+  default: () => ({
+    handleMessage: vi.fn(), onConnected: vi.fn(), reset: vi.fn(), start: vi.fn(), stop: vi.fn(),
+  }),
+}))
 vi.mock("~/composables/useScripture", () => ({ getChapterVerseCount: mocks.chapter }))
 vi.mock("~/composables/useHymn", () => ({ splitVerseByLines: (text: string) => [text] }))
 
@@ -32,6 +40,11 @@ beforeEach(() => {
     useScriptureLabel: (label: string) => label.replace("Genesis ", "1:"),
     useScripture: async () => ({ label: "Genesis 1:2", content: "Next verse" }),
     useToast: () => ({ add: vi.fn() }),
+    // A teammate toast is a function the session calls with a user id.
+    useTeammateToast: () => vi.fn(),
+    useSlideMediaCache: () => ({ rehydrateSlideMediaWithStatus: vi.fn(async () => ({})) }),
+    usePosthogCapture: vi.fn(),
+    useRoute: () => ({ path: "/", query: {}, params: {} }),
     onMounted: vi.fn(),
     onBeforeUnmount: vi.fn(),
   })) vi.stubGlobal(name, value)

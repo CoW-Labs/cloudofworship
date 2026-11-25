@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest"
+import { readFileSync } from "node:fs"
+import { runInNewContext } from "node:vm"
 import {
   externalEmbedUrl,
   externalPlayerMessage,
@@ -11,7 +13,7 @@ describe("externalEmbedUrl", () => {
   it("builds the YouTube address from watch, short and shorts links", () => {
     const options = { muted: true, loop: false, origin }
     const expected =
-      "https://www.youtube.com/embed/abc123?autoplay=1&controls=1&rel=0&enablejsapi=1&origin=https://app.example.com&mute=1"
+      "https://app.example.com/embed/youtube.html?v=abc123&mute=1"
     for (const url of [
       "https://www.youtube.com/watch?v=abc123&t=4",
       "https://youtu.be/abc123?si=x",
@@ -21,12 +23,30 @@ describe("externalEmbedUrl", () => {
     }
   })
 
-  it("adds the playlist a YouTube loop needs and unmutes on request", () => {
+  it("passes loop and mute settings to the YouTube wrapper", () => {
     const url = externalEmbedUrl(
       { url: "https://youtu.be/abc123", type: "youtube" },
       { muted: false, loop: true, origin }
     )
-    expect(url).toContain("&mute=0&loop=1&playlist=abc123")
+    expect(url).toBe("https://app.example.com/embed/youtube.html?v=abc123&mute=0&loop=1")
+  })
+
+  it("builds the nested player with a playlist for looping", () => {
+    const html = readFileSync(new URL("../public/embed/youtube.html", import.meta.url), "utf8")
+    const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1]
+    expect(script).toBeTruthy()
+    const frame: Record<string, any> = {}
+    runInNewContext(script!, {
+      URLSearchParams,
+      location: { search: "?v=abc123&mute=0&loop=1", origin },
+      document: { createElement: () => frame, body: { appendChild: () => {} } },
+      window: { addEventListener: () => {} },
+    })
+    const player = new URL(frame.src)
+    expect(player.origin + player.pathname).toBe("https://www.youtube.com/embed/abc123")
+    expect(player.searchParams.get("playlist")).toBe("abc123")
+    expect(player.searchParams.get("loop")).toBe("1")
+    expect(player.searchParams.get("mute")).toBe("0")
   })
 
   it("builds the Vimeo address", () => {

@@ -68,7 +68,7 @@ describe("LiveProjectionRepository", () => {
         revision: "revision-stale",
         slideId: "live-slide",
       })
-    ).resolves.toEqual({ matched: false, slide: null })
+    ).resolves.toEqual({ matched: false, payload: null, slide: null })
   })
 
   it("rejects stale or mismatched restore records", async () => {

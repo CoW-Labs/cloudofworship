@@ -12,6 +12,10 @@ beforeEach(() => {
     useSubscription: () => ({ hasAccessToFeature: () => true, isTeamsPlan: ref(true) }),
     useRuntimeConfig: () => ({ public: { APP_URL: "https://app.cloudofworship.com/" } }),
     useToast: () => ({ add: vi.fn() }),
+    useUsageQuotas: () => ({
+      usage: ref(null), isMetered: ref(false), refresh: vi.fn(),
+      livestreamSessionsLeft: ref(null), livestreamSessionsLimit: ref(null),
+    }),
   })) vi.stubGlobal(name, value)
   scope = effectScope()
 })
