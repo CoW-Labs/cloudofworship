@@ -102,6 +102,8 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 |------------|-----------|-------------|---------|
 | `REMOTE_CONTROL_CONNECTED` | `scheduleId` | Remote device connected via WebSocket | ✅ Added |
 | `REMOTE_CONTROL_DISCONNECTED` | `scheduleId` | Remote disconnected | ✅ Added |
+| `SLIDE_CONFLICT_DETECTED` | `slideType` | A saved edit was refused because a teammate saved the same slide first; both versions are kept and the choice dialog opens | ✅ Added |
+| `SLIDE_CONFLICT_RESOLVED` | `resolution` (`mine` / `theirs`), `slideType` | Person chose which version of a conflicted slide to keep | ✅ Added |
 | `REMOTE_CONTROL_RECONNECTED` | `scheduleId`, `retryCount` | Remote reconnected after failure | ⚠️ Missing |
 | `REMOTE_SLIDE_CHANGED` | `slideId`, `slideType` | Slide changed via remote control | ⚠️ Missing |
 | `TEAM_MEMBER_INVITED` | `role` | Invitation sent to team member | ✅ Exists |

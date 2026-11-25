@@ -1,3 +1,5 @@
+import type { Slide } from "~/types"
+
 export const getAPIErrorStatus = (error: unknown): number | undefined => {
   const err = error as any
   return err?.statusCode ?? err?.status ?? err?.response?.status
@@ -8,9 +10,20 @@ export const getAPIErrorMessage = (error: unknown, fallback: string) => {
   return err?.data?.message ?? err?.message ?? fallback
 }
 
-export const isForbiddenError = (error: unknown) => getAPIErrorStatus(error) === 403
+export const isForbiddenError = (error: unknown) =>
+  getAPIErrorStatus(error) === 403
 
-export const isNotFoundError = (error: unknown) => getAPIErrorStatus(error) === 404
+export const isConflictError = (error: unknown) =>
+  getAPIErrorStatus(error) === 409
+
+/** The server's current copy, which a 409 on a slide save carries. */
+export const getConflictSlide = (error: unknown): Slide | null => {
+  const data = (error as { data?: { code?: string; slide?: Slide } })?.data
+  return data?.code === "SLIDE_CONFLICT" ? data.slide ?? null : null
+}
+
+export const isNotFoundError = (error: unknown) =>
+  getAPIErrorStatus(error) === 404
 
 /**
  * True when the request never reached the server — flaky wifi, a backgrounded

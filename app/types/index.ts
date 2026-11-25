@@ -99,6 +99,12 @@ export interface Slide {
   saved?: boolean
   createdAt?: string
   updatedAt?: string
+  /**
+   * Server-owned edit counter. An edit sends the `rev` it started from as
+   * `baseRev`, so the API can refuse a write made on a stale copy. Not
+   * `updatedAt`: the client stamps that locally on every edit.
+   */
+  rev?: number
   presentationObjects?: PresentationObject[] // only for presentation slides
   presentationPageIndex?: number // 0-based index of the currently displayed page
   slideMode?: "slide" | "overlay"

@@ -27,7 +27,7 @@ import { preserveDeviceNdiSetting } from "~/utils/ndiSettings"
 import { preserveDevicePerformanceSettings } from "~/utils/performanceSettings"
 import {
   cancelAllPendingSlideShadowPuts,
-  cancelPendingScheduleShadowPuts,
+  flushSlideShadowWrites,
   cancelPendingSlideShadowPut,
   enqueueSlideShadowWrite,
 } from "~/composables/useSlideRepository"
@@ -461,10 +461,11 @@ export const useAppStore = defineStore("app", {
       const scheduleId =
         slides[0]?.scheduleId || this.currentState.activeSchedule?._id
       if (scheduleId) {
-        cancelPendingScheduleShadowPuts(scheduleId)
+        void flushSlideShadowWrites()
         enqueueSlideShadowWrite("replace schedule slides", (repository) =>
           repository.replaceScheduleSlides(scheduleId, slides, {
             removeMissing: true,
+            updatePendingOrder: true,
           })
         )
       }

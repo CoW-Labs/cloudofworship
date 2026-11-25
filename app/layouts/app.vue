@@ -34,6 +34,7 @@
         :active-advert="currentState?.activeAdvert"
       />
       <UpgradePlanModal />
+      <SlideConflictModal />
       <StreamPreflightModal v-if="isTauriApp && streamingEnabled" />
       <OnboardingTour />
       <SatisfactionPromptModal ref="satisfactionPrompt" />

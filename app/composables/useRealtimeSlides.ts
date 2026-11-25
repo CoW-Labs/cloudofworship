@@ -6,6 +6,7 @@ import type { Socket } from "socket.io-client"
 import {
   enqueueCoalescedSlideShadowPut,
   enqueueSlideShadowWrite,
+  getPendingSlideDraft,
 } from "~/composables/useSlideRepository"
 import {
   drivenMemberOf,
@@ -17,6 +18,8 @@ import { livePairChanged } from "~/utils/slidePairs"
 import useSlideUploadProgress from "~/composables/useSlideUploadProgress"
 import { applyPendingState } from "~/composables/usePendingSlideState"
 import { hasCloudMedia, stayedBehindFromSync } from "~/utils/pendingUpload"
+import { baseRevFor, forgetOwnSlideRev } from "~/utils/slideRev"
+import { hasSlideConflict } from "~/composables/useSlideResync"
 
 interface RealtimeSlidesOptions {
   onSlideCreated?: (slide: Slide, createdByName: string, createdBy?: string) => void
@@ -220,7 +223,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
   /**
    * Handle incoming WebSocket messages
    */
-  const handleWebSocketMessage = (message: any) => {
+  const handleWebSocketMessage = async (message: any) => {
     const { action, data } = message
 
     switch (action) {
@@ -264,8 +267,15 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
         // Update slide in store
         if (data && (data.id || data._id || data.slideId)) {
           const slideId = data.slideId || data.id || data._id
+          const candidate = appStore.activeSlides.find(
+            (slide) => slideMatchesId(slide, slideId, data._id)
+          )
+          if (candidate && (
+            hasSlideConflict(candidate._id) ||
+            await getPendingSlideDraft(candidate.scheduleId, candidate.id)
+          )) return
           const slideIndex = appStore.activeSlides.findIndex(
-            (s) => slideMatchesId(s, slideId, data._id)
+            (slide) => slideMatchesId(slide, slideId, data._id)
           )
 
           if (slideIndex !== -1) {
@@ -275,12 +285,24 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             delete (updatedSlide as any).timestamp
             delete (updatedSlide as any).tabId
             delete (updatedSlide as any).uploadSettled
+            delete (updatedSlide as any).revisionConfirmed
 
             // Merge with existing slide to preserve local-only properties
-            const existingSlide = appStore.activeSlides[slideIndex]
+            const existingSlide = appStore.activeSlides[slideIndex]!
+            if (hasSlideConflict(existingSlide._id)) return
+            const existingRev = baseRevFor(existingSlide)
+            if (updatedSlide.rev !== undefined && existingRev !== null &&
+              updatedSlide.rev < existingRev) return
+            // Typing events are speculative. Only the REST acknowledgement
+            // can attach a new server revision to the content in the event.
+            if (!data.revisionConfirmed) {
+              updatedSlide.rev = updatedSlide.rev === existingRev ? updatedSlide.rev : undefined
+            }
+            forgetOwnSlideRev(existingSlide._id)
             const mergedSlide = dropClearedPending({
               ...existingSlide,
               ...updatedSlide,
+              index: existingSlide.index,
               // A slide that stayed behind and now arrives with its media in
               // the cloud is whole, even if the sender said nothing about it.
               ...(existingSlide?.pendingUpload?.state === 'device-only' &&
@@ -300,6 +322,7 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
             appStore.setActiveSlides(nextSlides)
             enqueueCoalescedSlideShadowPut(mergedSlide, {
               syncState: "synced",
+              preservePending: true,
             })
             // An upload that started over (the owner tapped Retry) gets a fresh
             // clock here, so it is not mistaken for one that went quiet.
@@ -414,15 +437,24 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
           // keeps a filtered copy synced via `watch(() => activeSlides)`)
           // re-fire. In-place splices update LiveOutput (a computed) but leave
           // the preview grid and editor stale.
+          const incoming: Slide[] = data.slides
+          const blocked = await Promise.all(incoming.map(async (slide) => {
+            const current = appStore.activeSlidesById.get(slide.id)
+            return current && (hasSlideConflict(current._id) ||
+              await getPendingSlideDraft(current.scheduleId, current.id))
+          }))
           const nextSlides = [...appStore.activeSlides]
-          let changed = false
-          data.slides.forEach((updatedSlide: Slide) => {
+          const mergedSlides: Slide[] = []
+          incoming.forEach((updatedSlide, index) => {
+            if (blocked[index]) return
             const slideIndex = nextSlides.findIndex(
               (s) => s.id === updatedSlide.id || s._id === updatedSlide._id
             )
             if (slideIndex !== -1) {
               const existingSlide = nextSlides[slideIndex]
-              const mergedSlide = { ...existingSlide, ...updatedSlide }
+              if (!existingSlide || hasSlideConflict(existingSlide._id)) return
+              forgetOwnSlideRev(existingSlide._id)
+              const mergedSlide = { ...existingSlide, ...updatedSlide, rev: existingSlide.rev }
               nextSlides.splice(slideIndex, 1, mergedSlide)
               if (
                 appStore.currentState.activeOverlaySlide?.id === mergedSlide.id
@@ -434,18 +466,18 @@ export const useRealtimeSlides = (options: RealtimeSlidesOptions = {}) => {
                   overlaySlide
                 )
               }
-              changed = true
+              mergedSlides.push(mergedSlide)
             }
           })
-          if (changed) {
+          if (mergedSlides.length) {
             appStore.setActiveSlides(nextSlides)
             enqueueSlideShadowWrite(
               "realtime batch slide update",
               (repository) =>
-                repository.putSlides(data.slides, { syncState: "synced" })
+                repository.putSlides(mergedSlides, { syncState: "synced", preservePending: true })
             )
+            options.onBatchSlidesUpdated?.(mergedSlides, data.updatedByName)
           }
-          options.onBatchSlidesUpdated?.(data.slides, data.updatedByName)
         }
         break
 
