@@ -278,7 +278,6 @@ import {
 import {
   getAPIErrorMessage,
   getAPIErrorStatus,
-  isConflictError,
   isNetworkError,
   isNotFoundError,
 } from "~/utils/apiErrors"
@@ -711,9 +710,9 @@ const onVResizeEnd = () => {
 // Component state
 const windowHeight = ref<number>(0)
 const activeSlide = ref<Slide>()
+const activeVerseNavigation = trackActiveVerseNavigation(activeSlide)
 const { currentState } = storeToRefs(appStore)
 // Drives the slide-grid skeleton. Kept separate from appStore.slidesLoading
-const activeVerseNavigation = trackActiveVerseNavigation(activeSlide)
 // (which only tracks the network request) so the skeleton stays up through
 // the local `slides` ref sync + grid render that happens after the fetch
 // resolves, not just the fetch itself.
@@ -773,9 +772,9 @@ const cleanupSlideDatabaseNotifications = useSlideDatabaseNotifications(() => {
     ) {
       return
     }
+    const navigation = activeVerseNavigation.current
     appStore.setActiveSlides(
       replaceScheduleSlidesInCorpus(
-    const navigation = activeVerseNavigation.current
         appStore.activeSlides,
         scheduleId,
         navigation
@@ -3097,13 +3096,12 @@ const persistSlideOnline = useThrottleFn(
 
       // Runtime-only navigation has no durable draft to resolve. Never let
       // it write through a pending conflict.
-      const baseRev = baseRevFor(slide)
       return await runSlideSave(slide._id, async () => {
         if (hasSlideConflict(slide._id) ||
           await getPendingSlideDraft(slide.scheduleId, slide.id)) return null
         const { data, error } = await useAPIFetch<Slide>(
           slideUpdatePath(activeChurchId, slide.scheduleId, slide._id!),
-          { method: "PUT", body: await toSlideUpdatePayload(slide, baseRev) }
+          { method: "PUT", body: await toSlideUpdatePayload(slide) }
         )
         if (!error.value) {
           noteSlideRev(slide._id, data.value?.rev)
@@ -3114,7 +3112,7 @@ const persistSlideOnline = useThrottleFn(
           return data.value
         }
         if (isNotFoundError(error.value)) appStore.removeActiveSlide(slide)
-        else if (!isConflictError(error.value) && !isNetworkError(error.value)) {
+        else if (!isNetworkError(error.value)) {
           reportSlideUpdateFailure(slide, error.value, false)
         }
         return null
@@ -3339,6 +3337,7 @@ const onUpdateSlide = (slide: Slide, meta?: SlideUpdateMeta) => {
   // applied on the projector and silently reverted in the editor preview.
   appStore.updateSlideInActiveSlides(updatedSlide)
   makeSlideActive(updatedSlide)
+  if (meta?.navigation) activeVerseNavigation.remember()
 
   updateSlideOnline(updatedSlide)
   updateLiveOutput(updatedSlide)
@@ -3396,7 +3395,6 @@ const carriesPreviewSong = (slide: Slide) =>
   (slide.type === slideTypes.songSetlist &&
     getSetlistData(slide).songs.some((item) => item.song?.isPreview))
 
-  if (meta?.navigation) activeVerseNavigation.remember()
 // Deletes the step's slides that are still on the schedule, keeping their
 // media on this device while the step can bring them back. Returns copies of
 // what was deleted, or null when nothing was left to delete.
@@ -3674,6 +3672,8 @@ const gotoAction = async (
     activeSlide.value?.scheduleId !== source.scheduleId) return
   if (updatedSlide) {
     activeSlide.value = updatedSlide
+    if (options.durable) activeVerseNavigation.clear()
+    else activeVerseNavigation.remember()
     appStore.updateSlideInActiveSlides(updatedSlide)
     updateLiveOutput(activeSlide.value)
     // Regular verse navigation is live runtime state and skips IndexedDB.
@@ -3731,8 +3731,6 @@ const editorBindings = computed(() => ({
 const editorHandlers = {
   "slide-update": (slide: Slide, meta?: SlideUpdateMeta) =>
     onUpdateSlide(slide, meta),
-    if (options.durable) activeVerseNavigation.clear()
-    else activeVerseNavigation.remember()
   "inactive-slide-update": (slide: Slide) => onUpdateInactiveSlide(slide),
   // EditLiveContent emits `goto-verse` as (title, version) — forward both, or
   // the Bible version silently falls back to the slide's current one.

@@ -53,6 +53,7 @@ const STATUS_EVENT: &str = "stream://status";
 
 /// Event sent when a local recording is ready to open.
 const RECORDING_EVENT: &str = "stream://recording";
+const RECORDING_ERROR_EVENT: &str = "stream://recording-error";
 
 /// YouTube's RTMP ingest host and port, for the pre-flight reachability check.
 const YOUTUBE_INGEST_HOST: &str = "a.rtmp.youtube.com:1935";
@@ -200,6 +201,7 @@ struct Feed {
 struct Recording {
   path: PathBuf,
   writer: Option<JoinHandle<()>>,
+  incomplete: Arc<AtomicBool>,
 }
 
 /// How a (re)spawn of the supervised process is done. Shared so reconnects run
@@ -270,7 +272,7 @@ impl StreamBridge {
         audio_device.as_deref(),
         quality,
         mixer_settings.unwrap_or_default(),
-        self.recording_path(recording_name.as_deref()),
+        self.recording_path(recording_name.as_deref())?,
       );
     }
 
@@ -437,6 +439,19 @@ impl StreamBridge {
   ) -> Result<(), String> {
     self.stop_locked();
 
+    // A requested recording must be writable before we report a live session.
+    let (recording_tx, recording) = match recording {
+      Some(path) => {
+        let incomplete = Arc::new(AtomicBool::new(false));
+        let app = self.inner.app.clone();
+        let (tx, writer) = start_recording_writer(&path, incomplete.clone(), move |message| {
+          let _ = app.emit(RECORDING_ERROR_EVENT, message);
+        })?;
+        (Some(tx), Some(Recording { path, writer: Some(writer), incomplete }))
+      }
+      None => (None, None),
+    };
+
     let mut encoder = ffmpeg_command()
       .args(encoder_args)
       .stdin(Stdio::piped())
@@ -488,17 +503,6 @@ impl StreamBridge {
     // The local copy is written on its own thread, so a slow disk can never
     // hold up the upload: chunks go through a bounded queue and are dropped
     // (from the copy only) if the disk can't keep up.
-    let (recording_tx, recording) = match recording {
-      Some(path) => match start_recording_writer(&path) {
-        Some((tx, writer)) => {
-          log::info!("stream: recording a local copy to {}", path.display());
-          (Some(tx), Some(Recording { path, writer: Some(writer) }))
-        }
-        None => (None, None),
-      },
-      None => (None, None),
-    };
-
     // Encoder → pusher. A failed write means the pusher died (network); drop
     // its stdin and keep draining the encoder until the supervisor brings up a
     // replacement. Encoder EOF while not stopping means the feed itself broke.
@@ -506,6 +510,7 @@ impl StreamBridge {
       let bridge = self.clone();
       let stopping = stopping.clone();
       let counters = counters.clone();
+      let incomplete = recording.as_ref().map(|recording| recording.incomplete.clone());
       std::thread::Builder::new()
         .name("cow-stream-forwarder".into())
         .spawn(move || {
@@ -518,7 +523,11 @@ impl StreamBridge {
             };
             if let Some(tx) = &recording_tx {
               if tx.try_send(buffer[..read].to_vec()).is_err() {
+                if let Some(incomplete) = &incomplete { incomplete.store(true, Ordering::Release); }
                 recording_drops += 1;
+                if recording_drops == 1 {
+                  let _ = bridge.inner.app.emit(RECORDING_ERROR_EVENT, "The recording could not keep up with the stream and may be incomplete.");
+                }
                 if recording_drops == 1 || recording_drops % 500 == 0 {
                   log::warn!(
                     "stream: the disk can't keep up; {recording_drops} chunks missing from the local copy (the stream is unaffected)"
@@ -1431,37 +1440,40 @@ fn pusher_args(url: &str) -> Vec<String> {
 /// Where a local copy of the stream goes: Movies/Cloud of Worship, named by
 /// the page (it knows the local time). `None` when recording is off.
 impl StreamBridge {
-  fn recording_path(&self, name: Option<&str>) -> Option<PathBuf> {
+  fn recording_path(&self, name: Option<&str>) -> Result<Option<PathBuf>, String> {
     use tauri::Manager;
-    let name = name?.trim();
+    let Some(name) = name else { return Ok(None) };
+    let name = name.trim();
     if name.is_empty() {
-      return None;
+      return Err("A recording name is required.".into());
     }
     let clean: String = name
       .chars()
       .map(|c| if c.is_alphanumeric() || " -_.".contains(c) { c } else { '-' })
       .collect();
-    let folder = self.inner.app.path().video_dir().ok()?.join("Cloud of Worship");
-    if let Err(e) = std::fs::create_dir_all(&folder) {
-      log::warn!("stream: could not create the recordings folder ({e})");
-      return None;
-    }
-    Some(folder.join(format!("{clean}.ts")))
+    let folder = self.inner.app.path().video_dir()
+      .map_err(|e| format!("Could not find the recordings folder ({e})."))?
+      .join("Cloud of Worship");
+    std::fs::create_dir_all(&folder)
+      .map_err(|e| format!("Could not create the recordings folder ({e})."))?;
+    Ok(Some(folder.join(format!("{clean}.ts"))))
   }
 }
 
 /// Opens the recording file and a thread that appends whatever the encoder
 /// produces. The queue holds about 20 seconds of stream.
-fn start_recording_writer(
+fn start_recording_writer<F>(
   path: &std::path::Path,
-) -> Option<(std::sync::mpsc::SyncSender<Vec<u8>>, JoinHandle<()>)> {
-  let file = match std::fs::File::create(path) {
-    Ok(file) => file,
-    Err(e) => {
-      log::warn!("stream: could not start the local recording ({e})");
-      return None;
-    }
-  };
+  incomplete: Arc<AtomicBool>,
+  report_error: F,
+) -> Result<(std::sync::mpsc::SyncSender<Vec<u8>>, JoinHandle<()>), String>
+where F: Fn(String) + Send + 'static {
+  // Never overwrite either a previous transport or a completed recording.
+  if path.with_extension("mp4").exists() {
+    return Err("A recording with this name already exists. Try again.".into());
+  }
+  let file = std::fs::OpenOptions::new().write(true).create_new(true).open(path)
+    .map_err(|e| format!("Could not start the local recording ({e})."))?;
   let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(512);
   let writer = std::thread::Builder::new()
     .name("cow-stream-recording".into())
@@ -1474,25 +1486,37 @@ fn start_recording_writer(
         }
         if let Err(e) = file.write_all(&chunk) {
           log::warn!("stream: the local recording stopped ({e})");
+          incomplete.store(true, Ordering::Release);
+          report_error(format!("The local recording stopped ({e})."));
           failed = true;
         }
       }
-      let _ = file.flush();
+      if let Err(e) = file.flush() {
+        incomplete.store(true, Ordering::Release);
+        report_error(format!("Could not finish writing the local recording ({e})."));
+      }
     })
-    .ok()?;
-  Some((tx, writer))
+    .map_err(|e| format!("Could not start the recording writer ({e})."))?;
+  Ok((tx, writer))
 }
 
 /// Closes the transport-stream copy and turns it into an MP4 any player
 /// opens, without re-encoding. Runs in the background so ending the stream
 /// is never held up; the .ts is kept if anything goes wrong.
-fn finish_recording(app: &AppHandle, mut recording: Recording) {
-  // The sender was dropped with the forwarder, so the writer drains and ends.
-  if let Some(writer) = recording.writer.take() {
-    let _ = writer.join();
-  }
+fn finish_recording_async<F>(mut recording: Recording, finish: F) -> std::io::Result<JoinHandle<()>>
+where F: FnOnce(Recording) + Send + 'static {
+  std::thread::Builder::new().name("cow-recording-remux".into()).spawn(move || {
+    if let Some(writer) = recording.writer.take() {
+      let _ = writer.join();
+    }
+    finish(recording);
+  })
+}
+
+fn finish_recording(app: &AppHandle, recording: Recording) {
   let app = app.clone();
-  let _ = std::thread::Builder::new().name("cow-recording-remux".into()).spawn(move || {
+  let error_app = app.clone();
+  if let Err(error) = finish_recording_async(recording, move |recording| {
     let transport = recording.path.clone();
     let mp4 = transport.with_extension("mp4");
     let size = std::fs::metadata(&transport).map(|m| m.len()).unwrap_or(0);
@@ -1520,13 +1544,19 @@ fn finish_recording(app: &AppHandle, mut recording: Recording) {
       }
     };
     log::info!("stream: local recording saved to {}", saved.display());
-    let _ = app.emit(RECORDING_EVENT, RecordingSaved { path: saved.to_string_lossy().into_owned() });
-  });
+    let _ = app.emit(RECORDING_EVENT, RecordingSaved {
+      path: saved.to_string_lossy().into_owned(),
+      incomplete: recording.incomplete.load(Ordering::Acquire),
+    });
+  }) {
+    let _ = error_app.emit(RECORDING_ERROR_EVENT, format!("Could not finish the recording ({error})."));
+  }
 }
 
 #[derive(Clone, Serialize)]
 struct RecordingSaved {
   path: String,
+  incomplete: bool,
 }
 
 /// Receives one recorded chunk from the page as a raw (binary) IPC body.
@@ -1778,6 +1808,47 @@ pub async fn stream_check_youtube() -> Result<u32, String> {
 #[cfg(test)]
 mod tests {
   use super::{parse_dshow_audio, pick_audio, AudioDevice};
+
+  #[test]
+  fn recording_writer_drains_and_refuses_to_overwrite() {
+    use std::sync::{Arc, atomic::AtomicBool};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("service.ts");
+    let (tx, writer) = super::start_recording_writer(&path, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+    tx.send(b"first ".to_vec()).unwrap();
+    tx.send(b"recording".to_vec()).unwrap();
+    drop(tx);
+    writer.join().unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), b"first recording");
+    assert!(super::start_recording_writer(&path, Arc::new(AtomicBool::new(false)), |_| {}).is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), b"first recording");
+    std::fs::remove_file(&path).unwrap();
+    std::fs::write(path.with_extension("mp4"), b"finished recording").unwrap();
+    assert!(super::start_recording_writer(&path, Arc::new(AtomicBool::new(false)), |_| {}).is_err());
+    assert!(super::start_recording_writer(&dir.path().join("missing/service.ts"), Arc::new(AtomicBool::new(false)), |_| {}).is_err());
+  }
+
+  #[test]
+  fn slow_recording_writer_does_not_block_stop() {
+    use std::sync::{Arc, atomic::AtomicBool, mpsc};
+    use std::time::{Duration, Instant};
+    let (release, wait) = mpsc::channel::<()>();
+    let (finished, result) = mpsc::channel::<()>();
+    let writer = std::thread::spawn(move || { wait.recv().unwrap(); });
+    let recording = super::Recording {
+      path: std::path::PathBuf::new(),
+      writer: Some(writer),
+      incomplete: Arc::new(AtomicBool::new(false)),
+    };
+    let start = Instant::now();
+    let finalizer = super::finish_recording_async(recording, move |_| { finished.send(()).unwrap(); }).unwrap();
+    let elapsed = start.elapsed();
+    assert!(result.try_recv().is_err(), "finalizer must wait for the writer");
+    release.send(()).unwrap();
+    result.recv_timeout(Duration::from_secs(2)).unwrap();
+    finalizer.join().unwrap();
+    println!("Starting finalization took {:.3} ms while the writer was blocked", elapsed.as_secs_f64() * 1000.0);
+  }
 
   #[test]
   fn parses_dshow_audio_devices() {

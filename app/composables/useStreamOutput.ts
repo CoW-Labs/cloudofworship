@@ -102,6 +102,7 @@ const UPLOAD_TEST_MAX_CHUNK = 16 * 1024 * 1024
 // The operator's stream setup survives restarts. It stays on this device only
 // (the settings panel says so) — never synced to the account.
 const SETTINGS_KEY = "cow-stream-settings"
+const LEGACY_SETTINGS_KEY = "cow-youtube-stream-settings"
 interface SavedSettings {
   streamKey?: string
   streamOnGoLive?: boolean
@@ -113,9 +114,15 @@ interface SavedSettings {
 }
 let settingsHydrated = false
 
-const readSavedSettings = (): SavedSettings => {
+export const readSavedStreamSettings = (): SavedSettings => {
   try {
-    return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") as SavedSettings
+    const current = localStorage.getItem(SETTINGS_KEY)
+    const legacy = current === null ? localStorage.getItem(LEGACY_SETTINGS_KEY) : null
+    const saved = JSON.parse(current ?? legacy ?? "{}") as SavedSettings
+    if (legacy !== null) {
+      try { localStorage.setItem(SETTINGS_KEY, legacy) } catch {}
+    }
+    return saved
   } catch {
     return {}
   }
@@ -203,7 +210,7 @@ export const useStreamOutput = () => {
 
   if (isDesktop && !settingsHydrated) {
     settingsHydrated = true
-    const saved = readSavedSettings()
+    const saved = readSavedStreamSettings()
     if (typeof saved.streamKey === "string") streamKey.value = saved.streamKey
     if (typeof saved.streamOnGoLive === "boolean") streamOnGoLive.value = saved.streamOnGoLive
     if (saved.audioDevice !== undefined) audioDevice.value = saved.audioDevice
@@ -357,10 +364,10 @@ export const useStreamOutput = () => {
               listen<{ db: number }>("stream://audio-level", (message) => {
                 meterDb.value = message.payload.db
               }),
-              listen<{ path: string }>("stream://recording", (message) => {
+              listen<{ path: string; incomplete?: boolean }>("stream://recording", (message) => {
                 const saved = message.payload.path
                 useToast().add({
-                  title: "Stream recording saved",
+                  title: message.payload.incomplete ? "Incomplete recording saved" : "Stream recording saved",
                   description: saved.replace(/^.*\/Movies\//, "Movies/"),
                   icon: "i-ph-record",
                   timeout: 10000,
@@ -382,6 +389,16 @@ export const useStreamOutput = () => {
                   ],
                 })
                 track("STREAM_RECORDING_SAVED")
+              }),
+              listen<string>("stream://recording-error", (message) => {
+                isRecording.value = false
+                useToast().add({
+                  title: "Recording problem",
+                  description: message.payload,
+                  icon: "i-bx-error",
+                  color: "red",
+                  timeout: 0,
+                })
               }),
             ])
           )
@@ -517,7 +534,7 @@ export const useStreamOutput = () => {
   const recordingName = () => {
     const now = new Date()
     const pad = (n: number) => String(n).padStart(2, "0")
-    return `Cloud of Worship ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}-${pad(now.getMinutes())}`
+    return `Cloud of Worship ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${now.getMilliseconds().toString().padStart(3, "0")}`
   }
 
   const startNativeWindowCapture = async (recordOnly = false) => {
@@ -535,6 +552,9 @@ export const useStreamOutput = () => {
       return started
     } catch (error) {
       if (recordOnly || !messageOf(error).includes("isn't available on this OS")) throw error
+      if (recordLocally.value) {
+        throw new Error("Local recording is not available for window sharing on this computer.")
+      }
       return startLiveWindowCapture()
     }
   }
@@ -551,6 +571,9 @@ export const useStreamOutput = () => {
       } else if (source.value === "live-window") {
         status.value = await startNativeWindowCapture()
       } else {
+        if (recordLocally.value) {
+          throw new Error("Local recording is available for the live window, not the test pattern.")
+        }
         status.value = await invokeTauri<StreamStatus>("stream_start", {
           streamKey: streamKey.value,
           source: source.value,

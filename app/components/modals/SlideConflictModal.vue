@@ -1,6 +1,9 @@
 <template>
+  <button v-if="deferred && current" type="button" class="fixed bottom-4 right-4 z-50 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-lg" @click="deferred = false">
+    Resolve slide conflicts ({{ conflicts.length }})
+  </button>
   <UModal
-    :model-value="!!current"
+    :model-value="!!current && !deferred"
     prevent-close
     :ui="{
       rounded: 'rounded-2xl',
@@ -61,6 +64,9 @@
         {{ resolutionError }}
       </p>
       <div class="flex items-center justify-end gap-3 mt-6">
+        <CowButton variant="secondary" size="md" :disabled="resolving" @click="deferred = true">
+          Resolve later
+        </CowButton>
         <CowButton
           variant="secondary"
           size="md"
@@ -87,10 +93,12 @@ import { useSlideConflicts } from "~/composables/useSlideResync"
 
 const { conflicts, resolveKeepMine, resolveKeepTheirs } = useSlideConflicts()
 const resolving = ref(false)
+const deferred = ref(false)
 const resolutionError = ref("")
 const current = computed(() => conflicts.value[0] || null)
 watch(current, () => {
   resolutionError.value = ""
+  if (!current.value) deferred.value = false
 })
 
 const clean = (html: string) =>
