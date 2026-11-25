@@ -219,6 +219,21 @@ fn keep_rendering_when_hidden(window: &tauri::WebviewWindow) {
   }
 }
 
+/// True when the live window is on the desktop (Space) that is showing.
+pub(super) fn live_window_visible(app: &AppHandle) -> Option<bool> {
+  let window = app.get_webview_window(LIVE_WINDOW_LABEL)?;
+  let pointer = window.ns_window().ok()? as usize;
+  let (sender, receiver) = mpsc::sync_channel(1);
+  window
+    .run_on_main_thread(move || {
+      let object = unsafe { &*(pointer as *const AnyObject) };
+      let on_active_space: bool = unsafe { objc2::msg_send![object, isOnActiveSpace] };
+      let _ = sender.send(on_active_space);
+    })
+    .ok()?;
+  receiver.recv_timeout(Duration::from_millis(500)).ok()
+}
+
 fn appkit_window_number(window: &tauri::WebviewWindow) -> Result<isize, String> {
   let pointer = window
     .ns_window()

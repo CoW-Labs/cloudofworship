@@ -157,9 +157,15 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `SLIDE_THEME_APPLIED` | `themeName` | Pre-built theme applied | ⚠️ Missing |
 | `STREAM_QUALITY_CHANGED` | `quality`, `codec`, `height`, `fps` | Operator picked a YouTube stream quality tier (settings or the pre-flight check); only fires on a real change to an available tier | ✅ Added |
 | `STREAM_QUALITY_UPSCALE_WARNING_SHOWN` | `quality`, `sourceHeight` | The pre-flight check warned that the chosen tier is taller than the live window, so the stream is only an upscale | ✅ Added |
-| `STREAM_STARTED` | `source`, `quality` | A live stream started (`quality` is the tier id; sources other than the live window always use the default) | ✅ Added |
+| `STREAM_STARTED` | `source`, `quality`, `recordOnly` | A live stream started (`quality` is the tier id; sources other than the live window always use the default; `recordOnly` is true when the live window is only being recorded and nothing is sent to YouTube) | ✅ Added |
 | `STREAM_FAILED` | `source`, `quality`, `error` | Starting a live stream failed; `error` is the first 120 characters of the app's own message | ✅ Added |
 | `STREAM_KEY_UPDATE_LINK_CLICKED` | `from` | Operator clicked "Update stream key" in the pre-flight check; it closes the check and opens Live Stream Settings | ✅ Added |
+| `AUDIO_MIXER_OPENED` | none | Operator opened the audio mixer from the broadcast status bar | ✅ Added |
+| `AUDIO_MIXER_LEVEL_CHANGED` | `source` (`mic` or `app`), `percent` | Operator let go of a mixer slider (once per drag, not per step) | ✅ Added |
+| `AUDIO_MIXER_MUTE_CHANGED` | `source`, `muted` | Operator muted or unmuted the microphone or the app audio in the mixer | ✅ Added |
+| `STREAM_RECORDING_CHANGED` | `on` | Operator ticked or unticked "Also record this stream on this computer" in the pre-flight check | ✅ Added |
+| `STREAM_RECORDING_SAVED` | none | A local copy of a stream finished and was saved as an MP4 | ✅ Added |
+| `STREAM_RECORDING_REVEALED` | none | "Show in Finder / folder" was clicked on the recording-saved toast | ✅ Added |
 | `NDI_QUALITY_CHANGED` | `quality`, `fps`, `height` | Operator picked an NDI size and frame rate in settings; only fires on a real change to an available tier | ✅ Added |
 | `NDI_STARTED` | `quality`, `retry` | NDI broadcasting started (`retry` is true when it was a Retry after an error) | ✅ Added |
 | `NDI_START_FAILED` | `quality`, `error` | NDI could not start; `error` is the app's error code (e.g. `runtimeNotInstalled`, `capturePermissionDenied`) | ✅ Added |

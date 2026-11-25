@@ -1202,11 +1202,18 @@ function willStreamOnGoLive() {
 }
 
 async function startYoutubeForLiveWindow() {
-  if (!willStreamOnGoLive()) return
+  // "Live window only" with the recording box ticked: save a copy of the live
+  // window without sending anything to YouTube.
+  const recordOnly =
+    skipStreamThisGoLive &&
+    streamOutput.recordLocally.value &&
+    useTauri().isTauri &&
+    streamingEnabled.value
+  if (!willStreamOnGoLive() && !recordOnly) return
   // Let the freshly opened live window finish its full-screen transition
   // before capturing it, so the capture picks up its final shape.
   await new Promise((resolve) => setTimeout(resolve, 2000))
-  const status = await streamOutput.start()
+  const status = await streamOutput.start({ recordOnly })
   if (status.phase === "error" && streamOutput.needsPicker.value) {
     offerStreamWindowPicker(status.error)
     return

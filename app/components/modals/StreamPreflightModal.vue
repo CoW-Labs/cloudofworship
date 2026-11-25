@@ -54,7 +54,9 @@
         </div>
       </div>
 
-      <ul class="mt-4 divide-y divide-gray-100 dark:divide-white/5">
+      <ul
+        class="mt-4 divide-y divide-gray-100 border-b border-gray-100 dark:divide-white/5 dark:border-white/5"
+      >
         <li v-for="row in rows" :key="row.key" class="py-3">
           <div class="flex items-center gap-3">
             <div class="min-w-0 flex-1">
@@ -107,7 +109,7 @@
             />
             <span
               v-else
-              class="truncate text-right text-sm text-gray-500 dark:text-[#9aa3b2]"
+              class="w-44 shrink-0 truncate text-right text-sm tabular-nums text-gray-500 dark:text-[#9aa3b2]"
             >
               {{ row.value }}
             </span>
@@ -141,6 +143,12 @@
       <label
         class="mt-3 flex items-center gap-2 text-xs text-gray-500 dark:text-[#9aa3b2]"
       >
+        <UCheckbox v-model="recordLocally" @update:model-value="onRecordChanged" />
+        Also record this stream on this computer
+      </label>
+      <label
+        class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-[#9aa3b2]"
+      >
         <UCheckbox v-model="checkBeforeStreaming" />
         Check before every stream
       </label>
@@ -151,7 +159,7 @@
           size="md"
           @click="answerPreflight('window-only')"
         >
-          Live window only
+          {{ recordLocally ? "Live window and record" : "Live window only" }}
         </CowButton>
         <CowButton
           variant="primary"
@@ -174,6 +182,9 @@
 import type { StreamPlan } from "~/composables/useStreamOutput"
 import { appWideActions } from "~/utils/constants"
 
+const onRecordChanged = (on: boolean) =>
+  usePosthogCapture("STREAM_RECORDING_CHANGED", { on })
+
 type CheckState = "checking" | "ok" | "warn" | "fail"
 
 interface Row {
@@ -188,6 +199,7 @@ const {
   preflightOpen,
   answerPreflight,
   checkBeforeStreaming,
+  recordLocally,
   qualityChoices,
   qualityChoice,
   setQualityChoice,

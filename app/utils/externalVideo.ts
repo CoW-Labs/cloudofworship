@@ -25,6 +25,25 @@ const youtubeId = (url: string) => {
   return url.split("v=")[1]?.split("&")[0] || ""
 }
 
+// The address the desktop app's own pages come from (tauri://localhost) is not
+// one YouTube accepts as an embedder: the player answers "Error 153, video
+// player configuration error". So YouTube is shown through a small relay page
+// on a real web address (public/embed/youtube.html) that hosts the player and
+// passes messages both ways. A browser, or a dev server, already has a web
+// address and uses its own copy of the page.
+const WEB_APP_ORIGIN = "https://app.cloudofworship.com"
+const embedHost = (origin: string) => {
+  try {
+    const { protocol, hostname } = new URL(origin)
+    // Windows serves the desktop app from http://tauri.localhost: still not an
+    // address YouTube accepts.
+    const isWeb = (protocol === "https:" || protocol === "http:") && hostname !== "tauri.localhost"
+    return isWeb ? origin : WEB_APP_ORIGIN
+  } catch {
+    return WEB_APP_ORIGIN
+  }
+}
+
 /** The player's address. Sound changes go through `externalPlayerMessage`. */
 export const externalEmbedUrl = (
   data: ExternalVideo,
@@ -34,8 +53,8 @@ export const externalEmbedUrl = (
   if (data.type === "youtube") {
     const videoId = youtubeId(data.url)
     const muteParam = muted ? "&mute=1" : "&mute=0"
-    const loopParam = loop ? `&loop=1&playlist=${videoId}` : ""
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0&enablejsapi=1&origin=${origin}${muteParam}${loopParam}`
+    const loopParam = loop ? "&loop=1" : ""
+    return `${embedHost(origin)}/embed/youtube.html?v=${encodeURIComponent(videoId)}${muteParam}${loopParam}`
   }
   if (data.type === "vimeo") {
     const videoId = data.url.split("vimeo.com/")[1]?.split("?")[0] || ""

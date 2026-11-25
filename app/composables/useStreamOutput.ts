@@ -1,3 +1,5 @@
+import { useAudioMixer } from "~/composables/useAudioMixer"
+
 // Frontend control for the desktop (Tauri) YouTube streaming feature. Talks to
 // the Rust `stream` module's stream_start/stream_stop/stream_status commands and
 // listens on the `stream://status` event. Mirrors useNdiBroadcast's shape:
@@ -76,6 +78,8 @@ export type PreflightChoice = "stream" | "window-only" | "cancel"
 
 const idleStatus = (): StreamStatus => ({ phase: "idle", error: null })
 
+const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent)
+
 const messageOf = (error: unknown): string =>
   typeof error === "string"
     ? error
@@ -105,6 +109,7 @@ interface SavedSettings {
   source?: StreamSource
   checkBeforeStreaming?: boolean
   quality?: string
+  recordLocally?: boolean
 }
 let settingsHydrated = false
 
@@ -181,6 +186,13 @@ export const useStreamOutput = () => {
   const meterDb = useState<number | null>("stream-meter-db", () => null)
   // Show the pre-flight check before each YouTube stream.
   const checkBeforeStreaming = useState<boolean>("stream-check-first", () => true)
+  // Keep a copy of the broadcast on this computer (Movies/Cloud of Worship).
+  const recordLocally = useState<boolean>("stream-record-locally", () => false)
+  // True while the running session is also saving a copy on this computer.
+  const isRecording = useState<boolean>("stream-recording-active", () => false)
+  // True when the session only records: the live window is captured and saved,
+  // and nothing is sent to YouTube.
+  const isRecordOnly = useState<boolean>("stream-record-only", () => false)
   const preflightOpen = useState<boolean>("stream-preflight-open", () => false)
   // The chosen quality tier, an id the backend knows (e.g. "1080p60").
   const quality = useState<string>("stream-quality", () => DEFAULT_STREAM_QUALITY)
@@ -200,7 +212,8 @@ export const useStreamOutput = () => {
       checkBeforeStreaming.value = saved.checkBeforeStreaming
     }
     if (typeof saved.quality === "string") quality.value = saved.quality
-    watch([streamKey, streamOnGoLive, audioDevice, source, checkBeforeStreaming, quality], () => {
+    if (typeof saved.recordLocally === "boolean") recordLocally.value = saved.recordLocally
+    watch([streamKey, streamOnGoLive, audioDevice, source, checkBeforeStreaming, quality, recordLocally], () => {
       try {
         localStorage.setItem(
           SETTINGS_KEY,
@@ -211,6 +224,7 @@ export const useStreamOutput = () => {
             source: source.value,
             checkBeforeStreaming: checkBeforeStreaming.value,
             quality: quality.value,
+            recordLocally: recordLocally.value,
           } satisfies SavedSettings)
         )
       } catch {
@@ -333,6 +347,8 @@ export const useStreamOutput = () => {
                 if (message.payload.phase === "idle" || message.payload.phase === "error") {
                   stopCapture()
                   stats.value = null
+                  isRecording.value = false
+                  isRecordOnly.value = false
                 }
               }),
               listen<StreamStats>("stream://stats", (message) => {
@@ -340,6 +356,32 @@ export const useStreamOutput = () => {
               }),
               listen<{ db: number }>("stream://audio-level", (message) => {
                 meterDb.value = message.payload.db
+              }),
+              listen<{ path: string }>("stream://recording", (message) => {
+                const saved = message.payload.path
+                useToast().add({
+                  title: "Stream recording saved",
+                  description: saved.replace(/^.*\/Movies\//, "Movies/"),
+                  icon: "i-ph-record",
+                  timeout: 10000,
+                  actions: [
+                    {
+                      label: isMac ? "Show in Finder" : "Show in folder",
+                      click: () => {
+                        track("STREAM_RECORDING_REVEALED")
+                        void invokeTauri("reveal_in_file_manager", { path: saved }).catch((error) =>
+                          useToast().add({
+                            title: "Couldn't open the folder",
+                            description: messageOf(error),
+                            icon: "i-bx-error",
+                            color: "red",
+                          })
+                        )
+                      },
+                    },
+                  ],
+                })
+                track("STREAM_RECORDING_SAVED")
               }),
             ])
           )
@@ -470,26 +512,43 @@ export const useStreamOutput = () => {
 
   // Native capture by window ID; falls back to the in-page picker capture on
   // systems where the backend doesn't support it yet.
-  const startNativeWindowCapture = async () => {
+  const mixer = useAudioMixer()
+  // "Cloud of Worship 2026-11-25 09-30", in the computer's own time.
+  const recordingName = () => {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return `Cloud of Worship ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}-${pad(now.getMinutes())}`
+  }
+
+  const startNativeWindowCapture = async (recordOnly = false) => {
     try {
-      return await invokeTauri<StreamStatus>("stream_start", {
-        streamKey: streamKey.value,
+      const name = recordLocally.value || recordOnly ? recordingName() : null
+      const started = await invokeTauri<StreamStatus>("stream_start", {
+        streamKey: recordOnly ? "" : streamKey.value,
         source: "native-window",
         audioDevice: audioDevice.value,
         quality: quality.value,
+        mixerSettings: mixer.settingsForStart(),
+        recordingName: name,
       })
+      isRecording.value = Boolean(name)
+      return started
     } catch (error) {
-      if (!messageOf(error).includes("isn't available on this OS")) throw error
+      if (recordOnly || !messageOf(error).includes("isn't available on this OS")) throw error
       return startLiveWindowCapture()
     }
   }
 
-  const start = async () => {
+  const start = async (options: { recordOnly?: boolean } = {}) => {
     if (!isDesktop) return status.value
     isInvoking.value = true
+    const recordOnly = options.recordOnly === true
     try {
       stopCapture()
-      if (source.value === "live-window") {
+      if (recordOnly) {
+        status.value = await startNativeWindowCapture(true)
+        isRecordOnly.value = true
+      } else if (source.value === "live-window") {
         status.value = await startNativeWindowCapture()
       } else {
         status.value = await invokeTauri<StreamStatus>("stream_start", {
@@ -500,11 +559,14 @@ export const useStreamOutput = () => {
         })
       }
       track("STREAM_STARTED", {
+        recordOnly,
         source: source.value,
         quality: source.value === "live-window" ? quality.value : DEFAULT_STREAM_QUALITY,
       })
     } catch (error) {
       stopCapture()
+      isRecording.value = false
+      isRecordOnly.value = false
       status.value = { phase: "error", error: messageOf(error) }
       track("STREAM_FAILED", {
         source: source.value,
@@ -528,6 +590,8 @@ export const useStreamOutput = () => {
       status.value = { phase: "error", error: messageOf(error) }
     } finally {
       isInvoking.value = false
+      isRecording.value = false
+      isRecordOnly.value = false
     }
     return status.value
   }
@@ -632,6 +696,9 @@ export const useStreamOutput = () => {
     stats: readonly(stats),
     meterDb: readonly(meterDb),
     checkBeforeStreaming,
+    recordLocally,
+    isRecording: readonly(isRecording),
+    isRecordOnly: readonly(isRecordOnly),
     quality,
     qualityChoices,
     qualityChoice,

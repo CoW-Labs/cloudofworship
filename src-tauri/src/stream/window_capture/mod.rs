@@ -191,6 +191,19 @@ pub fn source_height(app: &AppHandle) -> Option<u32> {
   platform::source_height(app)
 }
 
+/// Whether the live window is on the desktop the operator is looking at.
+pub fn live_window_visible(app: &AppHandle) -> Option<bool> {
+  #[cfg(target_os = "macos")]
+  {
+    platform::live_window_visible(app)
+  }
+  #[cfg(not(target_os = "macos"))]
+  {
+    let _ = app;
+    None
+  }
+}
+
 /// Starts capturing `target` and pacing its frames into `input` (the encoder's
 /// stdin).
 pub fn start(
