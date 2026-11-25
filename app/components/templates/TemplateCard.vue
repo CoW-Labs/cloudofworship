@@ -1,72 +1,55 @@
 <template>
-  <button
-    class="group template-card flex w-[100%] text-left gap-3 p-2 border-t first:border-t-0 border-gray-100 dark:border-[#171d2b] rounded-lg hover:bg-white dark:hover:bg-[#2b3242] transition-all cursor-pointer relative"
-    @click="$emit('use-template', template)"
+  <div
+    class="template-card group relative flex min-w-0 flex-col gap-1.5"
+    :style="{ contentVisibility: 'auto', containIntrinsicSize: 'auto 180px' }"
   >
-    <!-- TEMPLATE PREVIEW -->
-    <div
-      class="template-preview w-28 min-w-28 h-20 text-white overflow-hidden sm-preview relative rounded"
+    <button
+      type="button"
+      class="block w-full overflow-hidden rounded-lg text-left shadow-sm ring-1 ring-gray-200/70 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:ring-white/10"
+      :aria-label="`Use ${template.name}`"
+      @click="$emit('use', template)"
     >
-      <LiveContentWithBackground
-        v-if="slideData"
-        :slide="slideData"
-        :slide-styles="currentState?.settings?.slideStyles"
-      />
-      <div
-        v-else
-        class="w-full h-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center"
+      <TemplatePreview :design="template.design" />
+    </button>
+
+    <div class="min-w-0 px-0.5">
+      <h4 class="flex items-center gap-1.5 text-sm font-semibold">
+        <span class="truncate">{{ template.name }}</span>
+        <span
+          v-if="template.design.motion"
+          class="shrink-0 rounded-full bg-primary-100 px-1.5 py-px text-[10px] font-medium text-primary-700 dark:bg-primary-950 dark:text-primary-300"
+          title="Slow motion on the projector"
+        >
+          Motion
+        </span>
+      </h4>
+      <p
+        v-if="template.description"
+        class="line-clamp-2 text-xs text-gray-500 dark:text-[#9aa3b2]"
       >
-        <IconWrapper name="i-bx-slideshow" size="8" class="text-white/50" />
-      </div>
+        {{ template.description }}
+      </p>
     </div>
 
-    <!-- TEMPLATE INFO -->
-    <div class="flex-1 flex flex-col justify-between py-1">
-      <div>
-        <h4 class="font-semibold text-sm line-clamp-1">
-          {{ template.name }}
-        </h4>
-        <p
-          v-if="template.description"
-          class="text-xs text-gray-600 dark:text-gray-400 line-clamp-1 mt-1"
-        >
-          {{ template.description }}
-        </p>
-      </div>
-      <div class="flex items-center gap-2 mt-1">
-        <SlideChip
-          v-if="slideData"
-          :slide-type="slideData.type"
-          class="text-[10px]"
-        />
-        <span
-          class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 capitalize"
-        >
-          {{ template.category }}
-        </span>
-      </div>
-    </div>
-  </button>
+    <button
+      v-if="canDelete"
+      type="button"
+      class="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white opacity-0 transition focus-visible:opacity-100 group-hover:opacity-100"
+      :aria-label="`Delete ${template.name}`"
+      @click.stop="$emit('delete', template)"
+    >
+      <CloseIcon class="h-3.5 w-3.5" />
+    </button>
+  </div>
 </template>
 
 <script setup lang="ts">
-import type { Template, Slide } from "~/types"
-import { useAppStore } from "~/store/app"
+import type { Template } from "~/types"
 
-const appStore = useAppStore()
-const { currentState } = storeToRefs(appStore)
-
-const props = defineProps<{
+defineProps<{
   template: Template
+  canDelete?: boolean
 }>()
 
-defineEmits(["use-template"])
-
-// Extract slide data from template
-const slideData = computed(() => {
-  if (typeof props.template.slideId === "object") {
-    return props.template.slideId as Slide
-  }
-  return null
-})
+defineEmits<{ use: [Template]; delete: [Template] }>()
 </script>

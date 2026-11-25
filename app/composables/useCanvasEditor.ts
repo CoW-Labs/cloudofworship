@@ -14,6 +14,8 @@ import type { TextBox } from "~/types"
  */
 export interface CanvasSelection {
   id: string
+  source?: TextBox["source"]
+  italic?: boolean
   alignment?: TextBox["alignment"]
   fontSizePercent?: number
   color?: string
@@ -22,6 +24,14 @@ export interface CanvasSelection {
   outlined?: boolean
   linesBackground?: boolean
   font?: string
+  /** What the box draws once the slide's and template's styles apply. */
+  shown?: {
+    bold: boolean
+    italic: boolean
+    alignment: "left" | "center" | "right"
+    font?: string
+    color?: string
+  }
 }
 
 interface CanvasState {

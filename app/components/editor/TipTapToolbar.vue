@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="isEditorReady"
+    v-if="isEditorReady || boxMode"
     class="editor-floating-toolbar absolute z-10 top-[46px] left-2 right-2 flex"
     @mousedown.capture="onToolbarMouseDown"
   >
@@ -18,11 +18,11 @@
     >
       <CowTooltip text="Bold" shortcut="bold">
         <UButton
-          @click="runCommand((chain) => chain.toggleBold())"
+          @click="boxMode ? boxToggle('bold') : toggleBold()"
           class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
           :class="{
             'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
-              editor.isActive('bold'),
+              isOn('bold'),
           }"
           variant="ghost"
           color="gray"
@@ -32,11 +32,11 @@
       </CowTooltip>
       <CowTooltip text="Italic" shortcut="italic">
         <UButton
-          @click="runCommand((chain) => chain.toggleItalic())"
+          @click="boxMode ? boxToggle('italic') : runCommand((chain) => chain.toggleItalic())"
           class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
           :class="{
             'bg-gray-200 dark:bg-[#171d2b] text-gray-900 dark:text-white':
-              editor.isActive('italic'),
+              isOn('italic'),
           }"
           variant="ghost"
           color="gray"
@@ -48,7 +48,7 @@
       @click="editor.chain().focus().toggleCode().run()"
       :disabled="!editor.can().chain().focus().toggleCode().run()"
       :class="{
-        'bg-primary text-white dark:text-primary-900': editor.isActive('code'),
+        'bg-primary text-white dark:text-primary-900': isOn('code'),
       }"
       icon="i-bx-code"
       variant="ghost"
@@ -56,6 +56,7 @@
       <TipTapFontSizeSelect
         class="mx-1"
         :editor="editor"
+        :value="boxMode ? selectedBox?.fontSizePercent ?? 100 : undefined"
         @change="onFontSizeChange"
       />
       <div
@@ -63,11 +64,11 @@
       >
         <CowTooltip text="Align left" shortcut="align-left">
           <UButton
-            @click="runCommand((chain) => chain.setTextAlign('left'))"
+            @click="boxMode ? patchBox({ alignment: 'left' }) : runCommand((chain) => chain.setTextAlign('left'))"
             class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
             :class="{
               'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                editor.isActive({ textAlign: 'left' }),
+                isOn({ textAlign: 'left' }),
             }"
             variant="ghost"
             color="gray"
@@ -77,11 +78,11 @@
         </CowTooltip>
         <CowTooltip text="Align centre" shortcut="align-center">
           <UButton
-            @click="runCommand((chain) => chain.setTextAlign('center'))"
+            @click="boxMode ? patchBox({ alignment: 'center' }) : runCommand((chain) => chain.setTextAlign('center'))"
             class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
             :class="{
               'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                editor.isActive({ textAlign: 'center' }),
+                isOn({ textAlign: 'center' }),
             }"
             variant="ghost"
             color="gray"
@@ -91,11 +92,11 @@
         </CowTooltip>
         <CowTooltip text="Align right" shortcut="align-right">
           <UButton
-            @click="runCommand((chain) => chain.setTextAlign('right'))"
+            @click="boxMode ? patchBox({ alignment: 'right' }) : runCommand((chain) => chain.setTextAlign('right'))"
             class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-200 dark:hover:bg-[#2b3242]"
             :class="{
               'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                editor.isActive({ textAlign: 'right' }),
+                isOn({ textAlign: 'right' }),
             }"
             variant="ghost"
             color="gray"
@@ -106,7 +107,8 @@
       </div>
       <CowTooltip text="Font" :prevent="fontMenuOpen">
         <TipTapFontSelect
-          :editor="editor"
+          :editor="editor!"
+          :value="fontShown"
           size="md"
           :disabled="false"
           @change="onFontFamilyChange($event)"
@@ -177,6 +179,7 @@
       </div>
       <!-- MORE: the less-used block formats -->
       <UPopover
+        v-if="!boxMode"
         v-model:open="morePopoverOpen"
         mode="click"
         :popper="{ placement: 'bottom', strategy: 'fixed' }"
@@ -211,7 +214,7 @@
                 class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
                 :class="{
                   'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                    editor.isActive('strike'),
+                    isOn('strike'),
                 }"
                 aria-label="Strikethrough"
                 variant="ghost"
@@ -226,7 +229,7 @@
                 class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
               :class="{
                 'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                  editor.isActive('paragraph'),
+                  isOn('paragraph'),
               }"
                 icon="i-bx-paragraph"
                 aria-label="Normal text"
@@ -240,7 +243,7 @@
                 class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
               :class="{
                 'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                  editor.isActive('bulletList'),
+                  isOn('bulletList'),
               }"
                 icon="i-bx-list-ul"
                 aria-label="Bullet list"
@@ -254,7 +257,7 @@
                 class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
               :class="{
                 'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                  editor.isActive('orderedList'),
+                  isOn('orderedList'),
               }"
                 icon="i-bx-list-ol"
                 aria-label="Numbered list"
@@ -268,7 +271,7 @@
                 class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
               :class="{
                 'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                  editor.isActive('blockquote'),
+                  isOn('blockquote'),
               }"
                 icon="i-bx-bxs-quote-right"
                 aria-label="Quote"
@@ -282,7 +285,7 @@
                 class="toolbar-icon-btn text-gray-600 dark:text-[#a7afbd] dark:hover:text-[#d5dae3] hover:bg-gray-100 dark:hover:bg-[#2b3242]"
               :class="{
                 'bg-gray-200 dark:bg-[#2b3242] text-gray-900 dark:text-white':
-                  editor.isActive('codeBlock'),
+                  isOn('codeBlock'),
               }"
                 icon="i-bx-code-curly"
                 aria-label="Code block"
@@ -307,6 +310,7 @@
 
 <script setup lang="ts">
 import type { Editor } from "@tiptap/core"
+import type { TextBox } from "~/types"
 import { asFontFamily } from "~/utils/fontFamily"
 import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 import { useCanvasEditor } from "~/composables/useCanvasEditor"
@@ -324,7 +328,81 @@ const {
   hasLayout: canvasHasLayout,
   add: addTextBox,
   reset: resetTextLayout,
+  selected: selectedBox,
+  patchSelected,
 } = useCanvasEditor(() => props.slideId)
+
+// A text box that holds its own words (a template's labels and headings) has
+// no editor to type styles into, so while one is selected every control styles
+// that box instead. A box that reads the slide's own text keeps its editor.
+const boxMode = computed(() => selectedBox.value?.source === "custom")
+const patchBox = (patch: Partial<TextBox>) => {
+  patchSelected(patch)
+}
+// What the selected box draws, read from the page by the canvas, so a box
+// that follows the slide or its template still shows its real look.
+const shown = computed(() => selectedBox.value?.shown)
+const boxToggle = (key: "bold" | "italic") =>
+  patchBox({ [key]: !(shown.value?.[key] ?? selectedBox.value?.[key]) })
+// The box an editor's words sit in, when it is selected and bold as a whole.
+const slotBoxBold = computed(
+  () =>
+    !boxMode.value &&
+    typeof selectedBox.value?.source === "number" &&
+    selectedBox.value?.bold === true
+)
+const isOn = (name: string | Record<string, string>) => {
+  if (boxMode.value) {
+    const box = selectedBox.value
+    if (name === "bold") return shown.value?.bold ?? !!box?.bold
+    if (name === "italic") return shown.value?.italic ?? !!box?.italic
+    if (typeof name === "object" && "textAlign" in name)
+      return (box?.alignment ?? shown.value?.alignment ?? "left") === name.textAlign
+    return false
+  }
+  if (name === "bold" && slotBoxBold.value) return true
+  return !!props.editor?.isActive(name as never)
+}
+
+// Bold has to beat two things a template brings: a weight written on the
+// words themselves (the thin half of a headline), and a box that is bold as a
+// whole, which no mark inside it could undo. The first is cleared from the
+// words Bold touches; the second moves into the words, so Bold can then turn
+// it off wherever it is asked to.
+const clearWeight = (chain: any) =>
+  chain.setMark("textStyle", { fontWeight: null }).removeEmptyTextStyle()
+const toggleBold = () => {
+  const editor = props.editor
+  if (!editor || !isEditorReady.value) return
+  if (slotBoxBold.value) {
+    const docSize = editor.state.doc.content.size
+    const selection = savedSelection.value ?? editor.state.selection
+    patchBox({ bold: undefined })
+    runCommand((chain) =>
+      clearWeight(
+        chain
+          .setTextSelection({ from: 0, to: docSize })
+          .setBold()
+          .setTextSelection({ from: selection.from, to: selection.to })
+          .unsetBold()
+      )
+    )
+    return
+  }
+  runCommand((chain) => clearWeight(chain.toggleBold()))
+}
+
+// The font the toolbar names: the box's, for a box with no editor; otherwise
+// the one on the words at the caret, falling back to what the box draws.
+const plainFont = (value?: string) =>
+  value?.split(",")[0]?.trim().replace(/^["']|["']$/g, "") || undefined
+const fontShown = computed(() => {
+  if (boxMode.value) return selectedBox.value?.font ?? shown.value?.font
+  const onWords = plainFont(
+    props.editor?.getAttributes("textStyle")?.fontFamily as string | undefined
+  )
+  return onWords ?? selectedBox.value?.font ?? shown.value?.font
+})
 
 const scrollStrip = ref<HTMLElement | null>(null)
 const { start: fadeStart, end: fadeEnd } = useScrollEdgeFade(scrollStrip)
@@ -358,6 +436,8 @@ watch(
 
 // Computed property for current text color
 const currentColor = computed(() => {
+  if (boxMode.value)
+    return (selectedBox.value?.color || shown.value?.color || "#FFFFFF").toUpperCase()
   if (!isEditorReady.value) return "#FFFFFF"
   const color = props.editor?.getAttributes("textStyle").color || "#FFFFFF"
   return color.startsWith("#") ? color.toUpperCase() : color
@@ -403,7 +483,8 @@ const onToolbarMouseDown = (event: MouseEvent) => {
 // highlighted. It only re-focuses — it never blurs — so it triggers no save.
 const reassertSelection = () => {
   const editor = props.editor
-  if (!editor || !isEditorReady.value) return
+  // Focusing an editor would move the canvas selection off the selected box.
+  if (boxMode.value || !editor || !isEditorReady.value) return
 
   const chain = editor.chain().focus()
   const selection = savedSelection.value
@@ -490,10 +571,16 @@ const runCommand = (
 const onFontFamilyChange = (value: unknown) => {
   const font = asFontFamily(value, "TipTapToolbar.font-select")
   if (!font) return
+  if (boxMode.value) return patchBox({ font })
   runCommand((chain) => chain.setFontFamily(font), { restoreFocus: true })
 }
 
 const onColorChange = (color: string) => {
+  if (boxMode.value) {
+    patchBox({ color })
+    colorPaletteOpen.value = false
+    return
+  }
   runCommand((chain) => chain.setColor(color), { restoreFocus: true })
   colorPaletteOpen.value = false
 }
@@ -508,6 +595,7 @@ const DEFAULT_FONT_SIZE = 100
 // caret sits in matches what people expect from a slide editor; the caret is
 // put back where it was so the collapse isn't visible.
 const onFontSizeChange = (percent: number) => {
+  if (boxMode.value) return patchBox({ fontSizePercent: percent })
   const editor = props.editor
   if (!editor || !isEditorReady.value) return
 

@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { showsDesignedBackground } from "~/utils/templates/apply"
 import type { CameraSlideData, Slide, SlideStyle } from "~/types"
 const appMounted = ref<boolean>(false)
 const foregroundContentVisible = ref<boolean>(true)
@@ -104,7 +105,9 @@ const backgroundStyle = computed(() => useSlideBackground(props.slide))
 // per frame (a backdrop filter re-reads everything behind it).
 const { settings: performanceSettings } = usePerformanceSettings()
 const foregroundDimStyle = computed(() =>
-  performanceSettings.value.reduceEffects
+  showsDesignedBackground(props.slide)
+    ? ""
+    : performanceSettings.value.reduceEffects
     ? `background-color: rgba(0, 0, 0, ${Math.min(
         1,
         Math.max(0, 1 - (props.slideStyles.brightness ?? 100) / 100)

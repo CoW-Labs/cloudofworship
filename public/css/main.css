@@ -865,8 +865,12 @@ html.dark .cow-search-input input::placeholder {
   font-weight: 850;
 }
 .box-bold-off,
-.box-bold-off * {
+.box-bold-off *:not([style*="font-weight"]) {
   font-weight: normal !important;
+}
+.box-italic,
+.box-italic * {
+  font-style: italic;
 }
 .box-upper,
 .box-upper * {
@@ -909,10 +913,29 @@ html.dark .cow-search-input input::placeholder {
   padding: 0 !important;
   line-height: inherit;
 }
+/* The box's font is a starting point: words the editor has given a font of
+   their own keep it. */
 .box-font,
-.box-font * {
+.box-font *:not([style*="font-family"]) {
   font-family: var(--box-font) !important;
 }
+/* Free layout boxes are placed as fractions of the slide, so their text has to
+   scale with the slide too. The slide card and thumbnail rules below size flow
+   text by the viewport, which would shrink a text slide's boxes; this keeps
+   every preview a true miniature of the projector (3cqw, line height 1.5).
+   Bible and song slides set their own size inline, which still wins. */
+.live-output .tiptap.live-content > .slide-boxes {
+  font-size: 3cqw;
+  line-height: 1.5;
+}
+/* Boxes are fractions of the whole slide, which is also the frame the free
+   layout editor draws them on. The text container's fixed 0.75rem padding
+   would shrink that frame: unnoticeable on a projector, but a quarter of a
+   thumbnail. So a slide laid out in boxes has no padding of its own. */
+.live-output .tiptap.live-content:has(> .slide-boxes) {
+  padding: 0;
+}
+
 .uppercase-live-content > .slide-layout-ctn > div:nth-child(1),
 .uppercase-live-content > div:nth-child(1) > .tiptap,
 .uppercase-live-content > div:nth-child(1) > .tiptap > p {
@@ -1406,4 +1429,25 @@ html.cow-reduce-effects *::before,
 html.cow-reduce-effects *::after {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+}
+
+/* A template with "reveal" motion eases its text in on the projector: the first
+   box, then the next a beat later. Opacity and transform only. */
+@keyframes template-reveal-in {
+  from { opacity: 0; transform: translate3d(0, 1.6cqh, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.template-reveal .slide-boxes > .slide-box {
+  animation: template-reveal-in 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.template-reveal .slide-boxes > .slide-box:nth-child(2) {
+  animation-delay: 0.22s;
+}
+.template-reveal .slide-boxes > .slide-box:nth-child(n + 3) {
+  animation-delay: 0.4s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .template-reveal .slide-boxes > .slide-box {
+    animation: none;
+  }
 }

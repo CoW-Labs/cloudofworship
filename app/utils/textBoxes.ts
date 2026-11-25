@@ -212,6 +212,7 @@ export const boxFrameStyle = (box: TextBox) => ({
 export const boxStyleClasses = (box: TextBox) => [
   box.bold === true && "box-bold",
   box.bold === false && "box-bold-off",
+  box.italic === true && "box-italic",
   box.uppercase === true && "box-upper",
   box.uppercase === false && "box-upper-off",
   box.outlined === true && "box-outlined",
@@ -221,3 +222,23 @@ export const boxStyleClasses = (box: TextBox) => [
   box.font && "box-font",
   !!box.fontSizePercent && box.fontSizePercent !== 100 && "box-scaled",
 ]
+
+/** Removes the given CSS properties from every inline style in some html. */
+export const stripInline = (html: string, props: string[]) => {
+  let out = html.replace(/style="([^"]*)"/g, (_m, css: string) => {
+    const kept = css
+      .split(";")
+      .filter(
+        (d) => d.trim() && !props.includes(d.split(":")[0]!.trim().toLowerCase())
+      )
+      .join(";")
+    return kept ? `style="${kept}"` : ""
+  })
+  // Unwrap spans left bare, innermost first so nesting stays valid.
+  const bare = /<span\s*>((?:(?!<span)[\s\S])*?)<\/span>/g
+  for (let prev = ""; prev !== out; ) {
+    prev = out
+    out = out.replace(bare, "$1")
+  }
+  return out
+}

@@ -126,13 +126,7 @@
     </UButton>
 
     <UButton
-      v-if="
-        (slide?.type === slideTypes.text ||
-          slide?.type === slideTypes.media ||
-          slide?.type === slideTypes.bible) &&
-        slide?.slideMode !== 'overlay' &&
-        authStore.user?.role === 'superadmin'
-      "
+      v-if="canSaveAsTemplate"
       variant="ghost"
       color="gray"
       block
@@ -145,6 +139,23 @@
     >
       <template #leading><TemplatesIcon class="w-4 h-4" /></template>
       Save as Template
+    </UButton>
+
+    <!-- A verse or a song keeps its words and takes a template's look. -->
+    <UButton
+      v-if="canApplyTemplate"
+      variant="ghost"
+      color="gray"
+      block
+      @click.stop.prevent="
+        () => {
+          handleApplyTemplateClick()
+          close()
+        }
+      "
+    >
+      <template #leading><TemplatesIcon class="w-4 h-4" /></template>
+      Apply a Template
     </UButton>
 
     <!-- Pairs need a camera, so a camera slide is where a pair starts: pick
@@ -227,6 +238,8 @@ import type { Slide, Song, SongSetlistData } from "~/types"
 import { useAuthStore } from "~/store/auth"
 import { useAppStore } from "~/store/app"
 import { canBePairTarget, isCameraSlide } from "~/utils/slidePairs"
+import { textBoxesOf } from "~/utils/textBoxes"
+import { lookOf } from "~/utils/templates/apply"
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -361,6 +374,29 @@ const handleDownloadMediaClick = async () => {
   } finally {
     downloadingMedia.value = false
   }
+}
+
+// Only a slide with free layout boxes has a layout worth keeping. Teams
+// churches save freely; others reach the upgrade modal from the click.
+const { isEnabled: templatesEnabled } = useFeatureFlags("view-slide-templates")
+
+const canSaveAsTemplate = computed(
+  () =>
+    templatesEnabled.value &&
+    (props.slide?.type === slideTypes.text ||
+      props.slide?.type === slideTypes.bible ||
+      props.slide?.type === slideTypes.song ||
+      props.slide?.type === slideTypes.hymn) &&
+    props.slide?.slideMode !== "overlay" &&
+    !!textBoxesOf(props.slide)
+)
+
+const canApplyTemplate = computed(
+  () => templatesEnabled.value && !!lookOf(props.slide)
+)
+
+const handleApplyTemplateClick = () => {
+  useGlobalEmit(appWideActions.newTemplates, { lookSlideId: props.slide.id })
 }
 
 const handleSaveAsTemplateClick = () => {

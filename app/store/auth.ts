@@ -4,6 +4,7 @@ import posthog from 'posthog-js'
 import type { SubscriptionDetails } from '~/types'
 import { identifyPosthogUser } from '~/utils/posthogIdentity'
 import { normalizeSubscriptionDetails } from '~/utils/billing'
+import { useTemplateStore } from './template'
 
 
 export interface User {
@@ -79,6 +80,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = user
 
       if (isDifferentUser || isDifferentChurch) {
+        useTemplateStore().clear()
         this.church = null
         this.planVerifiedAt = null
         this.subscriptionDetails = null
@@ -121,6 +123,7 @@ export const useAuthStore = defineStore('auth', {
     },
     signOut() {
       const appStore = useAppStore()
+      useTemplateStore().clear()
       const { isTauri } = useTauri()
 
       this.token = null

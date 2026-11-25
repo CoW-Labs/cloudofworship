@@ -289,7 +289,7 @@
           <div
             v-for="segment in segments"
             :key="segment.id"
-            class="segment group relative -mx-2 rounded-lg py-1 pl-2 pr-10 text-sm leading-relaxed transition-colors hover:bg-gray-100 dark:hover:bg-[#222938]"
+            class="segment group relative -mx-2 rounded-lg py-1 pl-2 pr-[4.5rem] text-sm leading-relaxed transition-colors hover:bg-gray-100 dark:hover:bg-[#222938]"
           >
             <TranscriptText
               :text="segment.text"
@@ -298,9 +298,20 @@
             />
             <!-- Pinned to the far right of the row, level with the line, while it is highlighted -->
             <div
-              class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+              class="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
               :class="{ '!opacity-100': copiedSegmentId === segment.id }"
             >
+              <UTooltip v-if="templatesEnabled" text="Make a slide with a template">
+                <UButton
+                  icon="i-ph-palette-light"
+                  color="gray"
+                  variant="solid"
+                  size="2xs"
+                  aria-label="Make a slide with a template"
+                  class="shadow-sm ring-1 ring-gray-200 dark:ring-[#2c3446]"
+                  @click.stop="openTemplates(segment)"
+                />
+              </UTooltip>
               <UTooltip :text="copiedSegmentId === segment.id ? 'Copied' : 'Copy line'">
                 <UButton
                   :icon="
@@ -674,6 +685,14 @@ const copySegment = async (segment: { id: string; text: string }) => {
   copiedTimer = setTimeout(() => (copiedSegmentId.value = null), 1500)
 }
 onBeforeUnmount(() => clearTimeout(copiedTimer))
+
+// The palette sends the line to the templates gallery, which makes a slide
+// with it as the main text.
+const { isEnabled: templatesEnabled } = useFeatureFlags("view-slide-templates")
+const openTemplates = (segment: { id: string; text: string }) => {
+  useGlobalEmit(appWideActions.newTemplates, { text: segment.text })
+  usePosthogCapture("TRANSCRIPT_LINE_TEMPLATE_OPENED")
+}
 
 const transcriptContainer = ref<HTMLElement | null>(null)
 const scripturesContainer = ref<HTMLElement | null>(null)

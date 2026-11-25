@@ -39,6 +39,9 @@ export const appWideActions = {
   newVimeoVideo: 'new-vimeo-video',
   newLibrary: 'new-library',
   newTemplates: 'new-templates',
+  // Use a template as a new slide, or as the look of a verse or song.
+  newTemplateSlide: 'new-template-slide',
+  applyTemplateLook: 'apply-template-look',
   newAlert: 'new-alert',
   addSong: 'add-song',
   songUpdated: 'song-updated',
@@ -211,16 +214,16 @@ export const quickActionsArr: QuickAction[] = [
     tier: "free",
     // type: slideTypes.text
   },
-  // Slide templates are hidden for everyone for now.
-  // {
-  //   icon: "i-bx-slideshow",
-  //   name: "Slide Templates",
-  //   desc: "Use pre-made, fancy slide templates",
-  //   action: appWideActions.newTemplates,
-  //   meta: "template preset saved design layout",
-  //   tier: "teams",
-  //   // type: slideTypes.text
-  // },
+  {
+    icon: "i-ph-palette-light",
+    name: "Slide Templates",
+    desc: "Start from a designed slide, or give a verse a new look",
+    action: appWideActions.newTemplates,
+    meta: "template preset saved design layout look style poster lower third",
+    tier: "teams",
+    // Staff only for now; the flag is targeted in PostHog.
+    featureFlag: 'view-slide-templates',
+  },
   {
     icon: "i-bx-trash",
     name: "Remove Alert",

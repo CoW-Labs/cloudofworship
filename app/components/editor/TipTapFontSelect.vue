@@ -59,6 +59,8 @@ const props = defineProps<{
   size: string
   disabled: boolean
   editor: Editor
+  /** The font to name, when the parent knows it better than the editor. */
+  value?: string
 }>()
 
 /**
@@ -79,7 +81,13 @@ defineEmits<{
 const appStore = useAppStore()
 const { currentState } = storeToRefs(appStore)
 const fonts = ref<string[]>(appFonts)
-const font = ref<string>("Inter")
+const font = ref<string>(props.value || "Inter")
+watch(
+  () => props.value,
+  (value) => {
+    if (value) font.value = value
+  }
+)
 
 // const emitter = useNuxtApp().$emitter as Emitter<any>
 // watch(

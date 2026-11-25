@@ -210,16 +210,78 @@ export interface LivePairStamp extends SlidePairBackground {
  */
 export type LivePayload = Slide | Slide[] | null
 
+/**
+ * Slide templates. A template is a snapshot of a slide's look, never a pointer
+ * to a slide, so deleting the slide it came from cannot break it.
+ */
+export type TemplateCategory =
+  | "worship"
+  | "sermon"
+  | "announcement"
+  | "prayer"
+  | "general"
+  | "live"
+
+/** A verse or a song can take a template's look and keep its own words. */
+export type TemplateLook = "scripture" | "song" | "text"
+
+/**
+ * What a box takes when a template is applied as a look to a verse or a song:
+ * the main words, or the reference. A box without a role is dropped, so a
+ * template that is a look needs nothing else to look finished.
+ */
+export type TemplateBoxRole = "body" | "ref"
+
+export interface TemplateBox extends TextBox {
+  role?: TemplateBoxRole
+  /** A short label for the box in the editor and in documentation. */
+  name?: string
+}
+
+/** A background that moves on the projector. See utils/templates/motion.ts. */
+export type TemplateMotion =
+  | "aurora"
+  | "orbit"
+  | "rays"
+  | "breathe"
+  | "candle"
+  | "rise"
+  | "pulse"
+  | "settle"
+  | "daybreak"
+  | "confetti"
+  | "ping"
+  | "reveal"
+
+export interface TemplateDesign {
+  backgroundType: "solid" | "gradient" | "image"
+  /** A colour, a CSS gradient, or the URL of a static image. */
+  background: string
+  textColor?: string
+  font?: string
+  transition?: TransitionType
+  /** Slow motion drawn over the background on the projector only. */
+  motion?: TemplateMotion
+  /**
+   * The same picture without the shapes the motion draws itself. The projector
+   * uses it while the motion runs; cards and previews use `background`.
+   */
+  motionBackground?: string
+  boxes: TemplateBox[]
+}
+
 export interface Template {
+  /** Starters are `starter:<key>`; a church's own come from the API. */
   _id: string
   name: string
   description?: string
-  slideId: string | Slide
-  createdBy: string
-  category: 'announcement' | 'worship' | 'sermon' | 'prayer' | 'general'
-  thumbnail?: string
-  createdAt: string
-  updatedAt: string
+  category: TemplateCategory
+  source: "starter" | "church"
+  design: TemplateDesign
+  looks: TemplateLook[]
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 // ── Schedule starter templates ──────────────────────────────────────────────
@@ -675,6 +737,16 @@ export interface SlideStyle {
   textBoxes?: TextBox[]
   /** Colour of the slide's text (a hex). Missing means the slide's own. */
   textColor?: string
+  /**
+   * The background is part of a template's design, so it is shown as it is:
+   * the app-wide background brightness and blur, meant for photos behind
+   * words, would grey it out. Only template slides set this.
+   */
+  designedBackground?: boolean
+  /** Motion a template gave the background; shown while that background stays. */
+  backgroundMotion?: TemplateMotion
+  /** The picture to show while that motion runs. */
+  backgroundMotionBase?: string
 }
 
 /**
@@ -699,6 +771,7 @@ export interface TextBox {
   color?: string
   /** Per-box text styles. Missing follows the slide's own setting; false turns it off here. */
   bold?: boolean
+  italic?: boolean
   uppercase?: boolean
   outlined?: boolean
   linesBackground?: boolean

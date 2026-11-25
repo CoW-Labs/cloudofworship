@@ -1,0 +1,2 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="a" cx=".5" cy="1.15" r=".9"><stop offset="0" stop-color="#6b2fa8" stop-opacity=".85"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+<rect width="160" height="90" fill="#000"/><rect width="160" height="90" fill="url(#a)"/><ellipse cx="40" cy="92" rx="50" ry="12" fill="#a855f7" opacity=".18"/><ellipse cx="124" cy="94" rx="56" ry="14" fill="#60a5fa" opacity=".12"/></svg>

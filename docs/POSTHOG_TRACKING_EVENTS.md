@@ -196,8 +196,14 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `MEDIA_UPLOADED` | `mediaType`, `fileSize`, `source` | User uploads image/video | ⚠️ Missing |
 | `YOUTUBE_VIDEO_ADDED` | `videoUrl` | YouTube video embedded | ⚠️ Missing |
 | `VIMEO_VIDEO_ADDED` | `videoUrl` | Vimeo video embedded | ⚠️ Missing |
-| `TEMPLATE_BROWSED` | - | User opens templates gallery | ⚠️ Missing |
-| `TEMPLATE_APPLIED` | `templateName`, `slideType` | Pre-designed template applied | ⚠️ Missing |
+| `TEMPLATES_PAGE_OPENED` | `hasAccess`, `mode` | Slide Templates gallery opened; `mode` is `new-slide`, `look` when restyling a verse or song, or `text-line` when opened from a transcript line | ✅ Added |
+| `NEW_TEMPLATE_SLIDE_CREATED` | `templateId`, `source`, `category`, `from`? | A template was used to make a new slide; `source` is `starter` or `church`; `from` is `transcript` when made from a sermon transcript line | ✅ Added |
+| `TRANSCRIPT_LINE_TEMPLATE_OPENED` | none | The palette on a sermon transcript line was clicked, opening the gallery with that line as the text | ✅ Added |
+| `TEMPLATE_LOOK_APPLIED` | `templateId`, `source`, `look` | A verse or song slide took a template's look and kept its words; `look` is `scripture` or `song` | ✅ Added |
+| `SAVE_AS_TEMPLATE_OPENED` | `slideType`, `hasBoxes` | "Save as Template" opened on a slide; `hasBoxes` is false when the slide has no free layout yet | ✅ Added |
+| `TEMPLATE_SAVED` | `category`, `slideType`, `keptText`, `boxCount` | A church saved a slide as its own template | ✅ Added |
+| `TEMPLATE_SAVE_FAILED` | `error` | Saving a template failed | ✅ Added |
+| `TEMPLATE_DELETED` | `templateId` | A church deleted one of its own templates | ✅ Added |
 | `MEDIA_MUTE_TOGGLED` | `muted`, `slideType` | Mute button in the volume popover pressed (also the mute shortcut) | ✅ Added |
 | `MEDIA_VOLUME_CHANGED` | `volume`, `muted`, `slideType` | Volume slider settled on a level (debounced 800ms) | ✅ Added |
 | `GO_LIVE_MEDIA_STREAMED` | `mediaType` | Go Live waited 3s for a slide's media to be saved on this computer, then put it on screen streaming the cloud copy | ✅ Added |
@@ -291,7 +297,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 
 ### Medium Priority (Engagement Metrics)
 6. `LIBRARY_SLIDE_LOADED` / `LIBRARY_SONG_LOADED` - Library re-use patterns
-7. `TEMPLATE_APPLIED` - Template feature adoption
+7. `NEW_TEMPLATE_SLIDE_CREATED` - Template feature adoption
 8. `HYMN_SEARCH_PERFORMED` / `SONG_LYRICS_SEARCH_PERFORMED` - Search behavior
 9. `SCHEDULE_DELETED` / `SCHEDULE_RENAMED` - Schedule management patterns
 10. `SLIDE_BACKGROUND_CHANGED` - Customization depth

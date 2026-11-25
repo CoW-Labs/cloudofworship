@@ -4,100 +4,79 @@
       <template #header>
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold">Save as Template</h3>
-          <UButton
-            color="gray"
-            variant="ghost"
-            @click="isOpen = false"
-          >
-            <template #leading><CloseIcon class="w-5 h-5" /></template>
+          <UButton color="gray" variant="ghost" aria-label="Close" @click="isOpen = false">
+            <template #leading><CloseIcon class="h-5 w-5" /></template>
           </UButton>
         </div>
       </template>
 
-      <!-- Superadmin Check -->
-      <div v-if="!isSuperAdmin" class="space-y-4">
-        <div
-          class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-4"
-        >
-          <div class="flex items-start gap-3">
-            <InfoIcon
-              class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5"
-            />
-            <div>
-              <h4 class="font-semibold text-amber-900 dark:text-amber-100">
-                Superadmin Access Required
-              </h4>
-              <p class="text-sm text-amber-800 dark:text-amber-200 mt-1">
-                Only superadmin users can create templates. Please contact your
-                administrator if you need to create templates.
-              </p>
-            </div>
-          </div>
+      <!-- A template keeps a slide's layout, so the slide needs free layout boxes. -->
+      <div v-if="!design" class="space-y-3 text-sm">
+        <p>
+          Templates keep where the text sits, so this slide needs free layout
+          first.
+        </p>
+        <p class="text-gray-500 dark:text-[#9aa3b2]">
+          Open the slide's editor, choose Free layout, place your text, then
+          save it again.
+        </p>
+        <div class="flex justify-end pt-2">
+          <UButton label="Got it" size="lg" @click="isOpen = false" />
         </div>
       </div>
 
       <div v-else class="space-y-4">
-        <!-- Template Name -->
-        <UFormGroup label="Template Name" size="lg" required>
+        <div class="overflow-hidden rounded-lg ring-1 ring-gray-200/70 dark:ring-white/10">
+          <TemplatePreview :design="design" />
+        </div>
+
+        <UFormGroup label="Name" size="lg" required>
           <UInput
-            v-model="templateData.name"
-            placeholder="e.g., Welcome Slide, Prayer Template"
+            v-model="name"
+            placeholder="e.g. Sunday welcome, Youth night"
+            maxlength="60"
           />
         </UFormGroup>
 
-        <!-- Description -->
-        <UFormGroup label="Description" size="lg" help="Optional">
-          <UTextarea
-            v-model="templateData.description"
-            placeholder="Brief description of this template"
-            :rows="3"
-            variant="none"
-            color="gray"
-            autoresize
-          />
-        </UFormGroup>
-
-        <!-- Category -->
         <UFormGroup label="Category" size="lg" required>
           <CowSelectMenu
-            v-model="templateData.category"
+            v-model="category"
             :options="categories"
             placeholder="Select category"
             size="lg"
           />
         </UFormGroup>
 
-        <!-- Info Banner -->
-        <div
-          class="active-alert rounded-md bg-primary-100 dark:bg-primary-900 p-4"
+        <label class="flex cursor-pointer items-start gap-2 text-sm">
+          <input v-model="keepText" type="checkbox" class="mt-1" />
+          <span>
+            Keep this slide's words
+            <span class="block text-xs text-gray-500 dark:text-[#9aa3b2]">
+              Off by default, so last week's notice does not come back.
+            </span>
+          </span>
+        </label>
+
+        <p
+          v-if="slide && losesPicture(slide)"
+          class="text-xs text-amber-700 dark:text-amber-400"
         >
-          <div
-            class="text-sm text-primary-500 font-semibold flex items-center gap-2"
-          >
-            <InfoIcon class="w-4 h-4" />
-            Note
-          </div>
-          <p class="mt-2 text-sm">
-            Templates are <span class="font-bold">public by default</span> and
-            will be available to all users. Create reusable slide designs that
-            help your community.
-          </p>
-        </div>
-        <div class="flex justify-end gap-2 pt-8">
+          Your own background picture is not kept. The template uses a dark
+          background instead.
+        </p>
+
+        <p class="text-xs text-gray-500 dark:text-[#9aa3b2]">
+          Your whole church can use it from Slide Templates, under Mine.
+        </p>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <UButton label="Cancel" color="gray" variant="ghost" size="lg" @click="isOpen = false" />
           <UButton
-            label="Cancel"
-            color="gray"
-            variant="ghost"
-            size="lg"
-            @click="isOpen = false"
-          />
-          <UButton
-            v-if="isSuperAdmin"
             label="Save Template"
             icon="i-bx-save"
             size="lg"
             :loading="saving"
-            :disabled="!templateData.name || !templateData.category"
+            :disabled="!name.trim() || !category"
             @click="saveTemplate"
           />
         </div>
@@ -107,20 +86,16 @@
 </template>
 
 <script setup lang="ts">
-import type { Slide } from "~/types"
-import { useTemplateStore } from "~/store/template"
-import { useAuthStore } from "~/store/auth"
+import type { Slide, TemplateCategory } from "~/types"
+import { designFromSlide, losesPicture } from "~/utils/templates/apply"
 
 const props = defineProps<{
   slide: Slide | null
   modelValue: boolean
 }>()
-
 const emit = defineEmits(["update:modelValue", "saved"])
 
 const toast = useToast()
-const templateStore = useTemplateStore()
-const authStore = useAuthStore()
 const { createTemplate } = useTemplates()
 
 const isOpen = computed({
@@ -128,80 +103,69 @@ const isOpen = computed({
   set: (value) => emit("update:modelValue", value),
 })
 
-const isSuperAdmin = computed(() => authStore.user?.role === "superadmin")
+const categories: TemplateCategory[] = [
+  "worship",
+  "sermon",
+  "announcement",
+  "prayer",
+  "general",
+  "live",
+]
 
-const categories = ["general", "worship", "sermon", "announcement", "prayer"]
-
-const templateData = ref({
-  name: "",
-  description: "",
-  category: "general",
-})
-
+const name = ref("")
+const category = ref<TemplateCategory>("general")
+const keepText = ref(false)
 const saving = ref(false)
 
-// Reset form when slide changes
+// What would be saved, drawn live so the church sees what it is keeping.
+const design = computed(() =>
+  props.slide ? designFromSlide(props.slide, { keepText: keepText.value }) : null
+)
+
 watch(
-  () => props.slide,
-  (newSlide) => {
-    if (newSlide) {
-      templateData.value.name = `${newSlide.name} Template`
-    }
+  () => props.modelValue,
+  (open) => {
+    if (!open) return
+    name.value = props.slide?.name ?? ""
+    category.value = "general"
+    keepText.value = false
+    usePosthogCapture("SAVE_AS_TEMPLATE_OPENED", {
+      slideType: props.slide?.type,
+      hasBoxes: !!design.value,
+    })
   }
 )
 
 const saveTemplate = async () => {
-  if (
-    !props.slide ||
-    !templateData.value.name ||
-    !templateData.value.category
-  ) {
-    return
-  }
-
+  if (!design.value || saving.value) return
   saving.value = true
-
   try {
-    const template = await createTemplate({
-      slideId: props.slide._id || props.slide.id,
-      name: templateData.value.name,
-      description: templateData.value.description,
-      category: templateData.value.category,
+    await createTemplate({
+      name: name.value.trim(),
+      category: category.value,
+      design: design.value,
     })
-
-    if (template) {
-      templateStore.addTemplate(template)
-
-      // Reset form
-      templateData.value = {
-        name: "",
-        description: "",
-        category: "general",
-      }
-
-      emit("saved")
-      isOpen.value = false
-    }
+    usePosthogCapture("TEMPLATE_SAVED", {
+      category: category.value,
+      slideType: props.slide?.type,
+      keptText: keepText.value,
+      boxCount: design.value.boxes.length,
+    })
+    toast.add({ icon: "i-bx-check", title: "Template saved" })
+    emit("saved")
+    isOpen.value = false
   } catch (error) {
-    console.error("Failed to save template:", error)
+    usePosthogCapture("TEMPLATE_SAVE_FAILED", {
+      error: error instanceof Error ? error.message : "unknown",
+    })
     toast.add({
       icon: "i-bx-error",
-      title: "Failed to save template",
+      title: "Could not save the template",
+      description: "Check your connection and try again.",
       color: "red",
     })
   } finally {
     saving.value = false
   }
 }
-
-// Reset form when modal closes
-watch(isOpen, (value) => {
-  if (!value) {
-    templateData.value = {
-      name: "",
-      description: "",
-      category: "general",
-    }
-  }
-})
 </script>

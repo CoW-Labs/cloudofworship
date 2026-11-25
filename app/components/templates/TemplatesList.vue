@@ -1,251 +1,316 @@
 <template>
-  <div
-    class="templates-main min-h-[80vh] h-[100%] flex flex-col"
-    ref="templatesContainer"
-  >
-    <!-- CATEGORY TABS -->
-    <!-- <UTabs :items="categoryTabs" @change="activeCategory = $event">
-      <template #default="{ item }">
-        <div class="flex gap-2 capitalize">
-          <IconWrapper :name="item.icon" size="4" />
-          {{ item.label }}s
-        </div>
-      </template>
-    </UTabs> -->
-
+  <div class="templates-main flex h-full min-h-[80vh] flex-col">
     <CowTeamsPreviewNotice
       v-if="!hasAccessToFeature('new-templates')"
       feature="new-templates"
       class="mb-2"
     />
 
-    <!-- Superadmin Info Banner -->
-    <div
-      v-if="authStore.user?.role === 'superadmin'"
-      class="mb-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3"
-    >
-      <div class="flex items-start gap-2">
-        <IconWrapper
-          name="i-bx-shield"
-          size="4"
-          class="text-blue-600 dark:text-blue-400 mt-0.5"
-        />
-        <p class="text-xs text-blue-800 dark:text-blue-200">
-          As a superadmin, you can create, edit, and delete templates.
-        </p>
-      </div>
-    </div>
+    <UTabs :items="tabs" @change="selectTab(tabIds[$event]!)" />
 
     <div
-      class="rounded-xl bg-[#f1f3f6] dark:bg-[#222938] p-1.5 flex flex-col flex-1 min-h-0"
+      class="flex min-h-0 flex-1 flex-col rounded-xl bg-[#f1f3f6] p-1.5 dark:bg-[#222938]"
     >
       <!-- SEARCH AND CLOSE -->
-      <div class="flex gap-2 come-up-1">
+      <div class="come-up-1 flex gap-2">
         <UInput
-          :placeholder="`Search ${categoryTabs[activeCategory].label} templates`"
-          v-model="searchInput"
-          class="w-[100%] cow-search-input"
-          @input="onSearchInput"
-          @input.capture="loading = true"
+          v-model="search"
+          :placeholder="`Search ${tab === 'community' ? 'community' : 'your'} templates`"
+          class="cow-search-input w-[100%]"
         >
           <template #leading>
-            <SearchIcon class="w-4 h-4 text-gray-400 dark:text-[#9aa3b2]" />
+            <SearchIcon class="h-4 w-4 text-gray-400 dark:text-[#9aa3b2]" />
           </template>
         </UInput>
         <CowButton
           variant="secondary"
           size="2xs"
-          class="!px-2.5 !py-0 max-h-[40px] rounded-lg"
+          class="max-h-[40px] rounded-lg !px-2.5 !py-0"
+          aria-label="Close templates"
           @click="$emit('close')"
         >
-          <CloseIcon class="w-4 h-4" />
+          <CloseIcon class="h-4 w-4" />
         </CowButton>
       </div>
 
-      <!-- LOADING STATE -->
+      <!-- SOURCE BANNER: what the slide is being made from. Same tinted card as
+           CowTeamsPreviewNotice (soft fill, inset ring, rounded-2xl), with plain
+           text so purple only marks the icon and the pill action. -->
       <div
-        v-if="loading"
-        class="actions-ctn -mx-1.5 mt-1.5 overflow-y-auto max-h-[calc(100vh-350px)]"
+        v-if="lookSlide || text"
+        class="mt-1.5 flex items-center gap-2.5 rounded-2xl bg-primary-500/10 px-3 py-2 text-gray-900 ring-1 ring-inset ring-primary-500/30 dark:bg-primary-500/15 dark:text-white"
       >
-        <CowSkeleton variant="block" :count="10" :height="100" />
+        <UIcon
+          name="i-tabler-wand"
+          class="h-4 w-4 shrink-0 text-primary-600 dark:text-primary-300"
+        />
+        <p class="min-w-0 flex-1 truncate text-xs font-medium">
+          <template v-if="lookSlide">
+            New look for <strong class="font-semibold">{{ lookSlide.name }}</strong>
+          </template>
+          <template v-else>
+            Slide from <strong class="font-semibold">“{{ text }}”</strong>
+          </template>
+        </p>
+        <!-- Same flat pill surface as the navbar's Discord and theme buttons. -->
+        <button
+          type="button"
+          class="shrink-0 whitespace-nowrap rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 transition-colors hover:text-gray-900 dark:bg-[#171d2b] dark:text-gray-300 dark:hover:text-white"
+          @click="lookSlide ? $emit('clear-look') : $emit('clear-text')"
+        >
+          {{ lookSlide ? "Start fresh" : "Clear" }}
+        </button>
       </div>
 
-      <!-- TEMPLATES DISPLAY -->
-      <template v-else>
-        <template v-if="searchInput.length < 2">
-          <div
-            class="actions-ctn -mx-1.5 mt-1.5 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
-          >
-            <EmptyState
-              v-if="displayedTemplates?.length === 0"
-              icon="i-tabler-layout-grid"
-              sub="No templates available yet."
-              desc="Templates help you quickly create beautiful slides"
-            />
-            <RecycleScroller
-              v-else
-              class="h-[calc(100vh-300px)]"
-              :items="displayedTemplates"
-              :item-size="110"
-              key-field="_id"
-              v-slot="{ item: template }"
-            >
-              <TemplateCard
-                :key="template._id"
-                :template="template"
-                @use-template="useTemplate($event)"
-              />
-            </RecycleScroller>
-          </div>
-        </template>
+      <!-- CATEGORY FILTERS -->
+      <div class="come-up-1 relative mt-1.5">
+      <div
+        ref="chipRow"
+        class="cow-chip-row flex items-center gap-1 overflow-x-auto pb-0.5"
+      >
+        <button
+          v-for="item in categories"
+          :key="item.id"
+          type="button"
+          :aria-pressed="category === item.id"
+          class="shrink-0 rounded-full px-2.5 py-1 text-xs capitalize transition"
+          :class="chipClass(category === item.id)"
+          @click="category = item.id"
+        >
+          {{ item.id }}
+        </button>
+      </div>
+      <CowScrollFade
+        :start="chipFadeStart"
+        :end="chipFadeEnd"
+        :color="isDark ? '#222938' : '#f1f3f6'"
+      />
+      </div>
 
-        <!-- SEARCH RESULTS -->
-        <template v-else>
-          <div
-            class="actions-ctn -mx-1.5 mt-1.5 overflow-x-hidden max-h-[calc(100vh-300px)] come-up-1"
-          >
-            <EmptyState
-              v-if="searchResults?.length === 0"
-              icon="i-tabler-search"
-              sub="No templates found matching your query"
-            />
-            <RecycleScroller
-              v-else
-              class="h-[calc(100vh-300px)]"
-              :items="searchResults"
-              :item-size="110"
-              key-field="_id"
-              v-slot="{ item: template }"
-            >
-              <TemplateCard
-                :key="template._id"
-                :template="template"
-                @use-template="useTemplate($event)"
-              />
-            </RecycleScroller>
-          </div>
-        </template>
-      </template>
+      <!-- DELETE CONFIRMATION -->
+      <div
+        v-if="pendingDelete"
+        class="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800 dark:bg-red-950 dark:text-red-200"
+        role="alert"
+      >
+        <span class="min-w-0 truncate">
+          Delete <strong>{{ pendingDelete.name }}</strong>? It cannot be undone.
+        </span>
+        <span class="flex shrink-0 gap-3 font-semibold">
+          <button type="button" class="underline" @click="confirmDelete">
+            Delete
+          </button>
+          <button type="button" @click="pendingDelete = null">Keep</button>
+        </span>
+      </div>
+
+      <!-- GRID -->
+      <div
+        class="actions-ctn -mx-1.5 mt-2 flex-1 overflow-y-auto overflow-x-hidden px-1.5"
+        :style="{ maxHeight: 'calc(100vh - 330px)' }"
+      >
+        <CowSkeleton v-if="loading" variant="block" :count="6" :height="120" />
+        <div v-else-if="tab === 'mine' && templateStore.error" class="p-4 text-sm text-gray-600 dark:text-gray-300">
+          Could not load your templates.
+          <button type="button" class="underline" @click="selectTab('mine')">Try again</button>
+        </div>
+        <EmptyState
+          v-else-if="!visible.length"
+          icon="i-tabler-layout-grid"
+          :sub="emptyText.sub"
+          :desc="emptyText.desc"
+        />
+        <!-- Cards fill the panel's width: one column when it is narrow, more
+             when it is wide, never smaller than a readable 220px. -->
+        <div
+          v-else
+          class="grid gap-x-3 gap-y-4 pb-3"
+          :style="{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 220px), 1fr))' }"
+        >
+          <TemplateCard
+            v-for="template in visible"
+            :key="template._id"
+            :template="template"
+            :can-delete="tab === 'mine'"
+            @use="useTemplate"
+            @delete="pendingDelete = $event"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { Template, Slide } from "~/types"
+import type { Template } from "~/types"
 import { useTemplateStore } from "~/store/template"
-import { useAuthStore } from "~/store/auth"
-import { useDebounceFn } from "@vueuse/core"
 import { useAppStore } from "~/store/app"
-import fuzzysort from "fuzzysort"
 import { appWideActions } from "~/utils/constants"
+import { lookOf } from "~/utils/templates/apply"
+import useScrollEdgeFade from "~/composables/useScrollEdgeFade"
 
-const emit = defineEmits(["close"])
+// The category chips scroll sideways; fade the edge that has more past it.
+const chipRow = ref<HTMLElement | null>(null)
+// Same colour as the panel behind the chips, so the fade blends into it.
+const colorMode = useColorMode()
+const isDark = computed(() => colorMode.value === "dark")
+const { start: chipFadeStart, end: chipFadeEnd } = useScrollEdgeFade(chipRow)
+
+const props = defineProps<{
+  /** The verse or song slide being restyled. Its words are kept. */
+  lookSlideId?: string
+  /** A transcript line to make into a new slide, as its main text. */
+  text?: string
+}>()
+const emit = defineEmits<{
+  close: []
+  "clear-look": []
+  "clear-text": []
+}>()
+
 const toast = useToast()
+const appStore = useAppStore()
 const templateStore = useTemplateStore()
-const authStore = useAuthStore()
 const { hasAccessToFeature, requireFeatureAccess } = useSubscription()
-const { fetchTemplates } = useTemplates()
+const { loadStarters, loadChurchTemplates, deleteTemplate } = useTemplates()
 
-const categoryTabs = [
-  { label: "all", icon: "i-bx-grid-alt" },
-  { label: "worship", icon: "i-bx-music" },
-  { label: "sermon", icon: "i-bx-book-open" },
-  { label: "announcement", icon: "i-bx-bell" },
-  { label: "prayer", icon: "i-bx-heart" },
-  { label: "general", icon: "i-bx-slideshow" },
+type Tab = "community" | "mine"
+const tabIds: Tab[] = ["community", "mine"]
+const tabs = [
+  { label: "Community", icon: "i-ph-palette-light" },
+  { label: "Mine", icon: "i-bx-user" },
 ]
+const categories = [
+  "all",
+  "worship",
+  "sermon",
+  "announcement",
+  "prayer",
+  "general",
+  "live",
+].map((id) => ({ id }))
 
-const activeCategory = ref<number>(0)
-const searchInput = ref<string>("")
-const loading = ref<boolean>(true)
-const searchResults = ref<Template[]>([])
-const templatesContainer = ref<HTMLDivElement | null>(null)
+const tab = ref<Tab>("community")
+const category = ref("all")
+const search = ref("")
+const loading = ref(true)
+const starters = shallowRef<Template[]>([])
+const pendingDelete = ref<Template | null>(null)
 
-// Fetch templates on mount
+const lookSlide = computed(() =>
+  props.lookSlideId
+    ? appStore.activeSlidesById.get(props.lookSlideId) ?? null
+    : null
+)
+// Words handed in become a text slide, so only templates that restyle text fit.
+const lookKind = computed(() =>
+  lookSlide.value ? lookOf(lookSlide.value) : props.text ? "text" : null
+)
+
 onMounted(async () => {
-  loading.value = true
-  try {
-    const templates = await fetchTemplates()
-    if (templates) {
-      templateStore.setTemplates(templates)
-    }
-  } catch (error) {
-    console.error("Failed to load templates:", error)
-    toast.add({
-      icon: "i-bx-error",
-      title: "Failed to load templates",
-      color: "red",
-    })
-  } finally {
-    loading.value = false
-  }
-})
-
-// Computed templates based on category
-const displayedTemplates = computed(() => {
-  const category = categoryTabs[activeCategory.value].label
-  if (category === "all") {
-    return templateStore.allTemplates
-  }
-  return templateStore.templatesByCategory(category)
-})
-
-// Search functionality
-const onSearchInput = useDebounceFn(() => {
-  if (searchInput.value.length < 2) {
-    searchResults.value = []
-    loading.value = false
-    return
-  }
-
-  const results = fuzzysort.go(searchInput.value, templateStore.allTemplates, {
-    keys: ["name", "description", "category"],
-    threshold: -10000,
+  usePosthogCapture("TEMPLATES_PAGE_OPENED", {
+    hasAccess: hasAccessToFeature("new-templates"),
+    mode: props.lookSlideId ? "look" : props.text ? "text-line" : "new-slide",
   })
-
-  searchResults.value = results.map((result) => result.obj)
+  starters.value = await loadStarters()
   loading.value = false
-}, 300)
+})
 
-// Use template - emit event similar to saved slides
+const selectTab = async (id: Tab) => {
+  tab.value = id
+  if (id === "mine" && !templateStore.loaded) {
+    loading.value = true
+    await loadChurchTemplates()
+    loading.value = false
+  }
+}
+
+const chipClass = (on: boolean) =>
+  on
+    ? "bg-primary-600 text-white"
+    : "bg-white text-gray-700 hover:bg-gray-100 dark:bg-[#2b3242] dark:text-[#d5dae3] dark:hover:bg-[#343c50]"
+
+const visible = computed<Template[]>(() => {
+  const source = tab.value === "community" ? starters.value : templateStore.church
+  const query = search.value.trim().toLowerCase()
+  return source
+    .filter((t) => category.value === "all" || t.category === category.value)
+    .filter(
+      (t) =>
+        !query ||
+        t.name.toLowerCase().includes(query) ||
+        (t.description ?? "").toLowerCase().includes(query)
+    )
+    .filter((t) => !lookKind.value || t.looks.includes(lookKind.value))
+})
+
+const emptyText = computed(() =>
+  tab.value === "mine"
+    ? {
+        sub: "No templates of your own yet.",
+        desc: "Open a slide's menu and choose Save as Template to keep its look.",
+      }
+    : lookSlide.value
+      ? {
+          sub: "No starter gives this slide a new look.",
+          desc: "Try making a new slide instead.",
+        }
+      : { sub: "No templates match.", desc: "Try another category or search." }
+)
+
 const useTemplate = (template: Template) => {
   if (!requireFeatureAccess("new-templates")) return
-
-  const slide = template.slideId as Slide
-
-  if (!slide) {
-    toast.add({
-      icon: "i-bx-error",
-      title: "Template slide not found",
-      color: "red",
+  if (lookSlide.value && lookKind.value) {
+    useGlobalEmit(appWideActions.applyTemplateLook, {
+      slideId: lookSlide.value.id,
+      template,
     })
-    return
+    usePosthogCapture("TEMPLATE_LOOK_APPLIED", {
+      templateId: template._id,
+      source: template.source,
+      look: lookKind.value,
+    })
+  } else if (props.text) {
+    useGlobalEmit(appWideActions.newTemplateSlide, {
+      template,
+      text: props.text,
+    })
+    usePosthogCapture("NEW_TEMPLATE_SLIDE_CREATED", {
+      templateId: template._id,
+      source: template.source,
+      category: template.category,
+      from: "transcript",
+    })
+  } else {
+    useGlobalEmit(appWideActions.newTemplateSlide, { template })
+    usePosthogCapture("NEW_TEMPLATE_SLIDE_CREATED", {
+      templateId: template._id,
+      source: template.source,
+      category: template.category,
+    })
   }
-
-  // Emit the slide to be used similar to saved slides
-  useGlobalEmit(`new-${slide.type}`, [
-    {
-      ...slide,
-      fromTemplate: true,
-      scheduleId: useAppStore().currentState?.activeSchedule?._id,
-    },
-  ])
-
   emit("close")
 }
 
-// Watch category changes
-watch(activeCategory, () => {
-  searchInput.value = ""
-  searchResults.value = []
-})
+const confirmDelete = async () => {
+  const template = pendingDelete.value
+  pendingDelete.value = null
+  if (!template) return
+  const ok = await deleteTemplate(template._id)
+  if (ok) usePosthogCapture("TEMPLATE_DELETED", { templateId: template._id })
+  toast.add({
+    icon: ok ? "i-bx-check" : "i-bx-error",
+    title: ok ? "Template deleted" : "Could not delete the template",
+    color: ok ? undefined : "red",
+  })
+}
 </script>
 
 <style scoped>
+
 .templates-main {
   animation: slideUp 0.3s ease-out;
 }
-
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -254,6 +319,17 @@ watch(activeCategory, () => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+.cow-chip-row {
+  scrollbar-width: none;
+}
+.cow-chip-row::-webkit-scrollbar {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .templates-main {
+    animation: none;
   }
 }
 </style>

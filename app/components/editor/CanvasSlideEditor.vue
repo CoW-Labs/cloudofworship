@@ -83,6 +83,7 @@
 <script setup lang="ts">
 import { useDebounceFn } from "@vueuse/core"
 import type { Slide, SlideStyle, TextBox } from "~/types"
+import type { CanvasSelection } from "~/composables/useCanvasEditor"
 import { useBoxGesture, type BoxHandle } from "~/composables/useBoxGesture"
 import {
   claimCanvasEditor,
@@ -99,6 +100,7 @@ import {
   newCustomBox,
   roundBox,
   slotOfBlock,
+  stripInline,
   textBoxesOf,
   textToHtml,
 } from "~/utils/textBoxes"
@@ -296,12 +298,31 @@ const resetLayout = () => {
 }
 
 // Size and alignment of the selected box come from the toolbars.
+// A template's words carry inline styles of their own. They are only a
+// starting point, so a change from the toolbar replaces them instead of being
+// outranked by them.
+const INLINE_FOR: Partial<Record<keyof TextBox, string>> = {
+  bold: "font-weight",
+  fontSizePercent: "font-size",
+  color: "color",
+  font: "font-family",
+}
+const withoutInlineStyles = (box: TextBox, patch: Partial<TextBox>) => {
+  if (!box.html) return patch
+  const props = (Object.keys(patch) as (keyof TextBox)[])
+    .map((key) => INLINE_FOR[key])
+    .filter((p): p is string => !!p)
+  return props.length ? { ...patch, html: stripInline(box.html, props) } : patch
+}
+
 const patchSelected = (patch: Partial<TextBox>) => {
   const box = selected.value
   if (!box) return
   commit(
     current.value.map((other) =>
-      other.id === box.id ? roundBox(clampBox({ ...other, ...patch })) : other
+      other.id === box.id
+        ? roundBox(clampBox({ ...other, ...withoutInlineStyles(other, patch) }))
+        : other
     )
   )
   usePosthogCapture("CANVAS_BOX_STYLED", {
@@ -531,6 +552,33 @@ watch(
 )
 
 // ── What the toolbars see ───────────────────────────────────────────────────
+// What the selected box actually draws, read from the page once per change.
+// A box that sets no style of its own follows the slide and the template, so
+// its own fields alone cannot say whether it is bold or which font it uses.
+const toHex = (rgb: string) => {
+  const parts = rgb.match(/\d+(\.\d+)?/g)?.map(Number)
+  if (!parts || parts.length < 3) return undefined
+  return `#${parts
+    .slice(0, 3)
+    .map((n) => Math.round(n).toString(16).padStart(2, "0"))
+    .join("")}`.toUpperCase()
+}
+const shownStyle = (id: string): CanvasSelection["shown"] => {
+  const block = realBlock(id)
+  if (!block) return undefined
+  // The words sit inside the box, so read the first text element in it.
+  const text = block.querySelector<HTMLElement>("p, span, strong, em") ?? block
+  const style = getComputedStyle(text)
+  const align = getComputedStyle(block).textAlign
+  return {
+    bold: Number(style.fontWeight) >= 600,
+    italic: style.fontStyle === "italic",
+    alignment: align === "center" ? "center" : align === "right" || align === "end" ? "right" : "left",
+    font: style.fontFamily.split(",")[0]?.trim().replace(/^["']|["']$/g, ""),
+    color: toHex(style.color),
+  }
+}
+
 watch(
   () => [
     selected.value?.id,
@@ -538,18 +586,28 @@ watch(
     selected.value?.fontSizePercent,
     selected.value?.color,
     selected.value?.bold,
+    selected.value?.italic,
+    selected.value?.source,
     selected.value?.uppercase,
     selected.value?.outlined,
     selected.value?.linesBackground,
     selected.value?.font,
     current.value.length,
     !!stored.value,
+    // A box that sets nothing follows the slide, so the slide's own styles
+    // change what it shows too.
+    props.slide.slideStyle?.font,
+    props.slide.slideStyle?.textBold,
+    props.slide.slideStyle?.textColor,
+    props.slide.slideStyle?.alignment,
   ],
   () =>
     publishCanvasEditor({
       selected: selected.value
         ? {
             id: selected.value.id,
+            source: selected.value.source,
+            italic: selected.value.italic,
             alignment: selected.value.alignment,
             fontSizePercent: selected.value.fontSizePercent,
             color: selected.value.color,
@@ -558,12 +616,14 @@ watch(
             outlined: selected.value.outlined,
             linesBackground: selected.value.linesBackground,
             font: selected.value.font,
+            shown: shownStyle(selected.value.id),
           }
         : null,
       canAdd: canAddBox(current.value),
       hasLayout: !!stored.value,
     }),
-  { immediate: true }
+  // After the DOM has the new styles, so what is read is what is drawn.
+  { immediate: true, flush: "post" }
 )
 
 let observer: ResizeObserver | null = null

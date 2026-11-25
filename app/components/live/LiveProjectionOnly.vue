@@ -3,6 +3,7 @@
     class="live-output-ctn w-[100%] relative"
     :class="{
       'no-animations': currentState.settings.microAnimations === false,
+      'template-reveal': motionKind === 'reveal',
       'h-full min-h-0': embedded,
       'min-h-[220px]': !embedded,
     }"
@@ -254,6 +255,14 @@
             :style="backgroundStyles"
           ></div>
 
+          <!-- A template's motion, on the projector window only. -->
+          <LazyTemplateMotion
+            v-if="motionKind && motionKind !== 'reveal'"
+            :kind="motionKind"
+            :pulse="motionPulse.n"
+            :pulse-at="motionPulse.at"
+          />
+
           <!-- An interlude paints an opaque canvas, so its label has to sit
                above the content instead of showing through it. -->
           <div
@@ -444,6 +453,12 @@
 </template>
 
 <script setup lang="ts">
+import { useStreamOnAir } from "~/composables/useStreamOnAir"
+import {
+  motionBackgroundOf,
+  motionOf,
+  showsDesignedBackground,
+} from "~/utils/templates/apply"
 import type { Emitter } from "mitt"
 import { useAppStore } from "~/store/app"
 import type {
@@ -1162,7 +1177,9 @@ useFollowMediaPlayback(
 const computeBackgroundStyles = (slide: Slide): string => {
   if (
     slide?.type === slideTypes.media ||
-    slide?.type === slideTypes.presentation
+    slide?.type === slideTypes.presentation ||
+    // A template's background is designed; dimming it would grey it out.
+    showsDesignedBackground(slide)
   ) {
     return useSlideBackground(slide)
   }
@@ -1176,10 +1193,45 @@ const computeBackgroundStyles = (slide: Slide): string => {
   }%);`
 }
 
+// A template's motion runs in the /live window only: cards, thumbnails and the
+// operator's preview show the still background, so a long schedule never has
+// more than one thing moving. "Reduce visual effects" (Lite mode) and turning
+// animations off both freeze it. So does a livestream: the stream captures
+// this window, and a picture that changes every frame costs the encoder far
+// more than a still one between slides.
+const streamOnAir = useStreamOnAir()
+const motionKind = computed(() =>
+  props.cameraMode === "capture" &&
+  !streamOnAir.value &&
+  !performanceSettings.value.reduceEffects &&
+  currentState.value.settings.animations
+    ? motionOf(displayedSlide.value)
+    : null
+)
+// Counts a change of slide or of its words (the next verse on a Bible slide
+// keeps the same slide), so the motion can surge and settle.
+const motionPulse = reactive({ n: 0, at: 0 })
+watch(
+  // Read only while motion runs, so other slides pay nothing for it.
+  () =>
+    motionKind.value
+      ? [displayedSlide.value?.id, displayedSlide.value?.contents?.join("\u0001")]
+      : null,
+  (next, prev) => {
+    if (!next) return
+    if (!prev?.[0] || !next[0]) return
+    motionPulse.n++
+    motionPulse.at = performance.now()
+  }
+)
+
 const backgroundStyles = computed(() => {
-  return displayedSlide.value
-    ? computeBackgroundStyles(displayedSlide.value)
-    : ""
+  const slide = displayedSlide.value
+  if (!slide) return ""
+  // While a template's motion runs it draws its own circles, so the picture
+  // behind it is the same art without them.
+  const base = motionKind.value ? motionBackgroundOf(slide) : null
+  return computeBackgroundStyles(base ? { ...slide, background: base } : slide)
 })
 
 // Separate watcher for media seeking (not debounced - needs to be immediate)

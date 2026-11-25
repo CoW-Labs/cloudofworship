@@ -290,6 +290,8 @@ import {
 import posthog from "posthog-js"
 import { supportsTextBoxes } from "~/utils/textBoxes"
 import { preserveActiveVerse, trackActiveVerseNavigation } from "~/utils/activeVerseNavigation"
+import { applyLook, bibleSampleOf, slideFromTemplate } from "~/utils/templates/apply"
+import type { Template } from "~/types"
 
 // Free layout's one-time intro. `show()` does nothing once it has been seen.
 const freeLayoutIntroModal = ref<{ show: () => boolean } | null>(null)
@@ -1532,6 +1534,61 @@ emitter.on("new-text", (slide: Slide[] | Slide) => {
   broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
 })
+
+// A template becomes an ordinary slide, so editing, going live, syncing, pairs
+// and undo need nothing of their own: a text slide, or a Bible slide when the
+// template is made for scripture.
+emitter.on(
+  appWideActions.newTemplateSlide,
+  (payload: { template: Template; text?: string }) => {
+    if (!payload?.template) return
+    // Words from a transcript line go in as the main text of a text slide.
+    if (payload.text) {
+      const styled = slideFromTemplate(createTextSlide(), payload.template, {
+        text: payload.text,
+      })
+      makeSlideActive(styled, { goLive: false, newlyCreated: true })
+      broadcastSlideCreated(styled)
+      uploadOfflineSlides()
+      return
+    }
+    const sample = bibleSampleOf(payload.template)
+    const newSlide =
+      (sample &&
+        applyLook(
+          createBibleSlide({
+            label: sample.label,
+            labelShortFormat: sample.label,
+            version: "KJV",
+            content: sample.content,
+          }),
+          payload.template
+        )) ||
+      slideFromTemplate(createTextSlide(), payload.template)
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
+  }
+)
+
+// A verse or song keeps its words and takes the template's boxes and
+// background. It goes through the same path as any edit, so it is undoable.
+emitter.on(
+  appWideActions.applyTemplateLook,
+  (payload: { slideId: string; template: Template }) => {
+    const slide = appStore.activeSlidesById.get(payload?.slideId)
+    const restyled = slide && applyLook(slide, payload.template)
+    if (!restyled) {
+      toast.add({
+        icon: "i-bx-info-circle",
+        title: "This template cannot restyle that slide",
+      })
+      return
+    }
+    onUpdateInactiveSlide(restyled)
+    toast.add({ icon: "i-bx-check", title: "New look applied. Undo to go back." })
+  }
+)
 
 emitter.on("new-bible", async (data: string) => {
   if (data) {
