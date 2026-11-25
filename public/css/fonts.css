@@ -1420,3 +1420,30 @@
     U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
     U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
+
+/* Bricolage Grotesque Condensed: the brand's headline face, used by the
+   starter templates. Three weights only, about 36 KB each, loaded when a slide
+   uses it. */
+@font-face {
+  font-family: "Bricolage Grotesque Condensed";
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+  src: url(../fonts/BricolageGrotesque48ptCondensed-ExtraLight.woff2)
+    format("woff2");
+}
+@font-face {
+  font-family: "Bricolage Grotesque Condensed";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(../fonts/BricolageGrotesque48ptCondensed-Bold.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Bricolage Grotesque Condensed";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url(../fonts/BricolageGrotesque48ptCondensed-ExtraBold.woff2)
+    format("woff2");
+}

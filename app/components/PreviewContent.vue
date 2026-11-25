@@ -219,6 +219,7 @@ import {
   enqueueCoalescedSlideShadowPut,
   enqueueSlideShadowWrite,
   flushSlideShadowWrites,
+  getPendingSlideDraft,
   useSlideRepository,
 } from "~/composables/useSlideRepository"
 import {
@@ -280,8 +281,17 @@ import {
   isNetworkError,
   isNotFoundError,
 } from "~/utils/apiErrors"
+import { baseRevFor, noteSlideRev, runSlideSave } from "~/utils/slideRev"
+import {
+  hasSlideConflict,
+  savePendingSlide,
+  scheduleSlideResync,
+} from "~/composables/useSlideResync"
 import posthog from "posthog-js"
 import { supportsTextBoxes } from "~/utils/textBoxes"
+import { preserveActiveVerse, trackActiveVerseNavigation } from "~/utils/activeVerseNavigation"
+import { applyLook, bibleSampleOf, slideFromTemplate } from "~/utils/templates/apply"
+import type { Template } from "~/types"
 
 // Free layout's one-time intro. `show()` does nothing once it has been seen.
 const freeLayoutIntroModal = ref<{ show: () => boolean } | null>(null)
@@ -553,6 +563,22 @@ const broadcastSlideUpdate = async (action: string, data: any) => {
   socket.emit(action, { ...safeData, tabId: tabSessionId })
 }
 
+const previewNuxtApp = useNuxtApp()
+const broadcastSavedSlide = async (slide: Slide) => {
+  if (!online.value || isMediaVideoSlide(slide) ||
+    appStore.currentState.activeSchedule?._id !== slide.scheduleId ||
+    await getPendingSlideDraft(slide.scheduleId, slide.id)) return
+  const socket = previewNuxtApp.$socketio as any
+  if (!socket?.connected || appStore.currentState.activeSchedule?._id !== slide.scheduleId) return
+  // The REST response already contains transport-safe content.
+  socket.emit("update-slide", {
+    ...slide,
+    slideId: slide.id,
+    tabId: tabSessionId,
+    revisionConfirmed: true,
+  })
+}
+
 /**
  * Broadcast a single slide creation for immediate real-time feedback
  */
@@ -686,6 +712,7 @@ const onVResizeEnd = () => {
 // Component state
 const windowHeight = ref<number>(0)
 const activeSlide = ref<Slide>()
+const activeVerseNavigation = trackActiveVerseNavigation(activeSlide)
 const { currentState } = storeToRefs(appStore)
 // Drives the slide-grid skeleton. Kept separate from appStore.slidesLoading
 // (which only tracks the network request) so the skeleton stays up through
@@ -695,7 +722,18 @@ const isLoadingSlides = ref(false)
 const slideRepository = useSlideRepository()
 // Replays only slide PUTs explicitly marked after a network failure. The
 // installer is process-wide and idempotent.
-const { flushPendingSlides, markSlideUnsynced } = useSlideResync()
+const { flushPendingSlides } = useSlideResync((slide, acceptedTheirs) => {
+  if (acceptedTheirs) {
+    slideEditGeneration += 1
+    updateLiveOutput(slide)
+    if (appStore.currentState.activeOverlaySlide?.id === slide.id) {
+      showSlideOverlay(slide, { capture: false })
+    }
+  }
+  void broadcastSavedSlide(slide).catch((error) =>
+    console.warn("Unable to relay the saved slide:", error)
+  )
+})
 const scheduleSlideHydrator = createScheduleSlideHydrator({
   repository: slideRepository,
   getActiveScheduleId: () => appStore.currentState.activeSchedule?._id,
@@ -736,11 +774,14 @@ const cleanupSlideDatabaseNotifications = useSlideDatabaseNotifications(() => {
     ) {
       return
     }
+    const navigation = activeVerseNavigation.current
     appStore.setActiveSlides(
       replaceScheduleSlidesInCorpus(
         appStore.activeSlides,
         scheduleId,
-        storedSlides
+        navigation
+          ? storedSlides.map((slide) => preserveActiveVerse(slide, navigation))
+          : storedSlides
       )
     )
     void resolveScheduleMedia(scheduleId)
@@ -1493,6 +1534,61 @@ emitter.on("new-text", (slide: Slide[] | Slide) => {
   broadcastSlideCreated(newSlide)
   uploadOfflineSlides()
 })
+
+// A template becomes an ordinary slide, so editing, going live, syncing, pairs
+// and undo need nothing of their own: a text slide, or a Bible slide when the
+// template is made for scripture.
+emitter.on(
+  appWideActions.newTemplateSlide,
+  (payload: { template: Template; text?: string }) => {
+    if (!payload?.template) return
+    // Words from a transcript line go in as the main text of a text slide.
+    if (payload.text) {
+      const styled = slideFromTemplate(createTextSlide(), payload.template, {
+        text: payload.text,
+      })
+      makeSlideActive(styled, { goLive: false, newlyCreated: true })
+      broadcastSlideCreated(styled)
+      uploadOfflineSlides()
+      return
+    }
+    const sample = bibleSampleOf(payload.template)
+    const newSlide =
+      (sample &&
+        applyLook(
+          createBibleSlide({
+            label: sample.label,
+            labelShortFormat: sample.label,
+            version: "KJV",
+            content: sample.content,
+          }),
+          payload.template
+        )) ||
+      slideFromTemplate(createTextSlide(), payload.template)
+    makeSlideActive(newSlide, { goLive: false, newlyCreated: true })
+    broadcastSlideCreated(newSlide)
+    uploadOfflineSlides()
+  }
+)
+
+// A verse or song keeps its words and takes the template's boxes and
+// background. It goes through the same path as any edit, so it is undoable.
+emitter.on(
+  appWideActions.applyTemplateLook,
+  (payload: { slideId: string; template: Template }) => {
+    const slide = appStore.activeSlidesById.get(payload?.slideId)
+    const restyled = slide && applyLook(slide, payload.template)
+    if (!restyled) {
+      toast.add({
+        icon: "i-bx-info-circle",
+        title: "This template cannot restyle that slide",
+      })
+      return
+    }
+    onUpdateInactiveSlide(restyled)
+    toast.add({ icon: "i-bx-check", title: "New look applied. Undo to go back." })
+  }
+)
 
 emitter.on("new-bible", async (data: string) => {
   if (data) {
@@ -2442,7 +2538,7 @@ const mergeSlideIds = (
 ): Slide[] => {
   // Build a map of id -> _id from successfully inserted slides
   const insertedMap = new Map(
-    insertedSlides.map((slide) => [slide.id, slide._id])
+    insertedSlides.map((slide) => [slide.id, slide])
   )
 
   // Duplicate slides already exist on the server — their _id equals their id
@@ -2451,8 +2547,10 @@ const mergeSlideIds = (
 
   return offlineSlides.map((slide) => {
     const copy = { ...slide }
-    if (insertedMap.has(copy.id)) {
-      copy._id = insertedMap.get(copy.id)
+    const inserted = insertedMap.get(copy.id)
+    if (inserted) {
+      copy._id = inserted._id
+      copy.rev = inserted.rev ?? 0
     } else if (duplicateSet.has(copy.id)) {
       // Already exists on server, _id is the same as id
       copy._id = copy.id
@@ -2531,7 +2629,7 @@ const uploadOfflineSlides = async () => {
         if (!current || !reconciled._id || current.updatedAt === sent?.updatedAt) {
           return reconciled
         }
-        const merged = { ...current, _id: reconciled._id }
+        const merged = { ...current, _id: reconciled._id, rev: reconciled.rev }
         editedDuringUpload.push(merged)
         return merged
       })
@@ -2550,6 +2648,7 @@ const uploadOfflineSlides = async () => {
           syncState: "pending",
           requestResync: needsSlideResync(slide),
         })
+        scheduleSlideResync()
         persistSlideOnline(slide, true)
       })
 
@@ -2662,23 +2761,11 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
   appStore.setSlidesLoading(true)
 
   try {
-    // A server snapshot must not replace a locally queued failed edit. Replay
-    // first; if it still cannot be delivered, retain the local view and let the
-    // retry timer handle it instead of fetching stale server content.
     await flushPendingSlides()
     if (
       requestGeneration !== networkRefreshGeneration ||
       requestEditGeneration !== slideEditGeneration
-    ) {
-      return
-    }
-    const hasPendingUpdate = (await slideRepository.getPendingSlides()).some(
-      (record) => record.slide.scheduleId === scheduleId && record.serverId
-    )
-    if (hasPendingUpdate) {
-      console.warn("Skipping slide refresh while local edits await resync")
-      return
-    }
+    ) return
 
     const { data, error } = await useAPIFetch(
       `/church/${authStore.user?.churchId}/schedules/${scheduleId}/slides`
@@ -2746,6 +2833,23 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
         const stayedBehind = stayedBehindFromSync(slide, authStore.user)
         if (stayedBehind) slide.pendingUpload = stayedBehind
       })
+      const drafts = (await slideRepository.getPendingSlides()).filter(
+        (record) => record.scheduleId === scheduleId && record.serverId
+      )
+      if (
+        requestGeneration !== networkRefreshGeneration ||
+        requestEditGeneration !== slideEditGeneration
+      ) return
+      const serverIds = new Set(tempSlides.map((slide) => slide.id))
+      const draftsById = new Map(drafts.map(({ slide }) => [slide.id, slide]))
+      // Preserve the local copy of a conflicted slide without blocking fresh
+      // content and reorder changes elsewhere in the schedule.
+      tempSlides = tempSlides.map((slide) => {
+        const draft = draftsById.get(slide.id)
+        return draft ? { ...draft, index: slide.index } : slide
+      })
+      tempSlides.push(...drafts.filter(({ id }) => !serverIds.has(id)).map(({ slide }) => slide))
+
       // Sort slides by index
       tempSlides = [...tempSlides].sort((a, b) => a.index - b.index)
 
@@ -2790,6 +2894,7 @@ const retrieveSlidesOnline = async (scheduleId: string) => {
         (repository) =>
           repository.replaceScheduleSlides(scheduleId, scheduleSnapshot, {
             removeMissing: true,
+            updatePendingOrder: true,
             syncState: (slide) => (slide._id ? "synced" : "pending"),
           })
       ).then(async () => {
@@ -2958,6 +3063,7 @@ const broadcastSlideEdit = useThrottleFn(
     // id-keyed updates apply even before batch upload assigns an `_id`.
     broadcastSlideUpdate("update-slide", {
       ...slide,
+      rev: baseRevFor(slide) ?? undefined,
       slideId: slide.id,
     })
   },
@@ -3002,8 +3108,8 @@ const reportSlideUpdateFailure = (slide: Slide, error: any, durable: boolean) =>
     icon: "i-bx-error",
     title: "This slide didn't save",
     description: durable
-      ? "Your change is still on this device and will retry automatically."
-      : "Your change is still on this device.",
+      ? "Your edit is saved on this device."
+      : "The server could not save the change.",
     color: "red",
   })
 }
@@ -3026,88 +3132,53 @@ const persistSlideOnline = useThrottleFn(
     // Offline, the edit exists only in this browser. Queue it so
     // useSlideResync replays it once the connection returns.
     if (!online.value) {
-      if (durable) await markSlideUnsynced(slide)
+      if (durable) await flushSlideShadowWrites()
       return
     }
 
-    // Capture the exact durable revision represented by this request. Flushing
-    // here removes the race between the 500ms IndexedDB coalescer and a fast
-    // successful PUT.
-    let localRevision: number | undefined
-    if (durable) {
-      await flushSlideShadowWrites()
-      localRevision = (
-        await slideRepository.getStoredSlide(slide.scheduleId, slide.id)
-      )?.localRevision
-    }
-
-    let data: any, error: any
     try {
-      ;({ data, error } = await useAPIFetch(
-        slideUpdatePath(activeChurchId, slide.scheduleId, slide._id),
-        {
-          method: "PUT",
-          body: await toSlideUpdatePayload(slide),
+      if (durable) {
+        const result = await savePendingSlide(activeChurchId, slide.scheduleId, slide.id, slide._id)
+        if (result.status === "saved") {
+          reportedSlideUpdateFailures.delete(slideFailureKey(slide))
+          appStore.setLastSynced(new Date().toISOString())
+          return result.slide
         }
-      ))
-    } catch (err) {
-      console.error("Failed to update slide online:", err)
-      // A throw from the fetch wrapper itself leaves `error` unset — treat it as
-      // the failure it is rather than falling through to the success branch and
-      // stamping a sync that never happened.
-      error = { value: err }
-    }
-
-    if (!error?.value) {
-      // Saving again clears the once-per-slide report guard, so a slide that
-      // recovers and later breaks for a different reason is reported afresh.
-      reportedSlideUpdateFailures.delete(slideFailureKey(slide))
-      if (durable && localRevision !== undefined) {
-        await slideRepository.markSlideSyncState(
-          slide.scheduleId,
-          slide.id,
-          "synced",
-          localRevision
-        )
+        if (result.status === "missing") appStore.removeActiveSlide(slide)
+        if (result.status === "failed" && !isNetworkError(result.error)) {
+          reportSlideUpdateFailure(slide, result.error, true)
+        }
+        return null
       }
-      appStore.setLastSynced(new Date().toISOString())
-      return data?.value
-    }
 
-    if (isNotFoundError(error.value)) {
-      appStore.removeActiveSlide(slide)
+      // Runtime-only navigation has no durable draft to resolve. Never let
+      // it write through a pending conflict.
+      return await runSlideSave(slide._id, async () => {
+        if (hasSlideConflict(slide._id) ||
+          await getPendingSlideDraft(slide.scheduleId, slide.id)) return null
+        const { data, error } = await useAPIFetch<Slide>(
+          slideUpdatePath(activeChurchId, slide.scheduleId, slide._id!),
+          { method: "PUT", body: await toSlideUpdatePayload(slide) }
+        )
+        if (!error.value) {
+          noteSlideRev(slide._id, data.value?.rev)
+          if (data.value) void broadcastSavedSlide(data.value).catch((error) =>
+            console.warn("Unable to relay the saved slide:", error)
+          )
+          appStore.setLastSynced(new Date().toISOString())
+          return data.value
+        }
+        if (isNotFoundError(error.value)) appStore.removeActiveSlide(slide)
+        else if (!isNetworkError(error.value)) {
+          reportSlideUpdateFailure(slide, error.value, false)
+        }
+        return null
+      })
+    } catch (error) {
+      if (durable) scheduleSlideResync()
+      reportSlideUpdateFailure(slide, error, durable)
       return null
     }
-
-    // The request never reached the server. Nothing here is recoverable by
-    // throwing: this runs detached inside a throttle, so the rejection is
-    // unhandled and only ever lands in error tracking.
-    //
-    // This edit now exists only in this browser. The API's socket layer is a
-    // pure relay that writes nothing, so the realtime broadcast does not save
-    // it for us, and an operator who stops editing after this point loses the
-    // change outright. Mark it pending so useSlideResync replays it once the
-    // connection recovers.
-    if (durable && isNetworkError(error.value)) {
-      console.warn("Slide sync deferred — request did not reach the server")
-      await markSlideUnsynced(slide)
-      return null
-    }
-
-    // Runtime-only state, such as ordinary Bible verse navigation, is not
-    // stored durably and therefore has no safe snapshot to replay.
-    if (isNetworkError(error.value)) return null
-
-    // Everything left reached the server and was rejected by it — a 500, or a
-    // payload the API would not accept. Retrying the identical body will not
-    // fix a rejected payload, but the edit is still only in this browser, so a
-    // durable slide is queued for replay exactly as a dropped request is: the
-    // resync sends it again once the operator (or a fix) changes something.
-    if (durable) {
-      await markSlideUnsynced(slide)
-    }
-    reportSlideUpdateFailure(slide, error.value, durable)
-    return null
   },
   2000,
   true
@@ -3127,6 +3198,7 @@ const updateSlideOnline = (
       syncState: "pending",
       requestResync: needsSlideResync(slide),
     })
+    if (needsSlideResync(slide)) scheduleSlideResync()
   }
   announceEditing(slide?.id)
   broadcastSlideEdit(slide)
@@ -3322,6 +3394,7 @@ const onUpdateSlide = (slide: Slide, meta?: SlideUpdateMeta) => {
   // applied on the projector and silently reverted in the editor preview.
   appStore.updateSlideInActiveSlides(updatedSlide)
   makeSlideActive(updatedSlide)
+  if (meta?.navigation) activeVerseNavigation.remember()
 
   updateSlideOnline(updatedSlide)
   updateLiveOutput(updatedSlide)
@@ -3650,9 +3723,14 @@ const gotoAction = async (
 ) => {
   if (!activeSlide.value) return
 
-  const updatedSlide = await gotoVerse(activeSlide.value, title, version)
+  const source = activeSlide.value
+  const updatedSlide = await gotoVerse(source, title, version)
+  if (activeSlide.value?.id !== source.id ||
+    activeSlide.value?.scheduleId !== source.scheduleId) return
   if (updatedSlide) {
     activeSlide.value = updatedSlide
+    if (options.durable) activeVerseNavigation.clear()
+    else activeVerseNavigation.remember()
     appStore.updateSlideInActiveSlides(updatedSlide)
     updateLiveOutput(activeSlide.value)
     // Regular verse navigation is live runtime state and skips IndexedDB.

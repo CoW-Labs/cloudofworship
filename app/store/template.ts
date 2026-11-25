@@ -1,55 +1,48 @@
 import { defineStore } from "pinia"
 import type { Template } from "~/types"
 
+/**
+ * A church's own templates, held in memory only. Nothing here is persisted:
+ * the old store wrote every template, with its whole slide, to localStorage on
+ * each change, and that is serialised again on every write. Starters are not
+ * here either; they ship in the app and load when the gallery opens.
+ */
 export const useTemplateStore = defineStore("template", {
   state: () => ({
-    templates: [] as Template[],
+    church: [] as Template[],
+    loaded: false,
     loading: false,
-    selectedCategory: "general" as string,
+    error: false,
+    generation: 0,
   }),
 
-  getters: {
-    allTemplates: (state) => state.templates,
-    
-    templatesByCategory: (state) => (category: string) => {
-      return state.templates.filter((template) => template.category === category)
-    },
-  },
-
   actions: {
-    setTemplates(templates: Template[]) {
-      this.templates = templates
+    setChurchTemplates(templates: Template[]) {
+      this.church = templates
+      this.loaded = true
+      this.error = false
     },
 
     addTemplate(template: Template) {
-      this.templates.unshift(template)
+      this.church = [template, ...this.church]
     },
 
-    updateTemplate(templateId: string, updatedData: Partial<Template>) {
-      const index = this.templates.findIndex((t) => t._id === templateId)
-      if (index !== -1) {
-        this.templates[index] = { ...this.templates[index], ...updatedData }
-      }
+    updateTemplate(templateId: string, updated: Partial<Template>) {
+      this.church = this.church.map((template) =>
+        template._id === templateId ? { ...template, ...updated } : template
+      )
     },
 
     removeTemplate(templateId: string) {
-      this.templates = this.templates.filter((t) => t._id !== templateId)
+      this.church = this.church.filter((template) => template._id !== templateId)
     },
 
-    setLoading(loading: boolean) {
-      this.loading = loading
+    clear() {
+      this.generation++
+      this.church = []
+      this.loaded = false
+      this.loading = false
+      this.error = false
     },
-
-    setSelectedCategory(category: string) {
-      this.selectedCategory = category
-    },
-
-    clearTemplates() {
-      this.templates = []
-    },
-  },
-
-  persist: {
-    storage: piniaPluginPersistedstate.localStorage(),
   },
 })

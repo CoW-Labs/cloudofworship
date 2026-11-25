@@ -1,6 +1,7 @@
 import type { Slide } from "~/types"
 import { backgroundTypes, slideTypes } from "~/utils/constants"
 import { toTransportSafeSlide } from "~/utils/mediaTransport"
+import { baseRevFor } from "~/utils/slideRev"
 
 /**
  * Shared shape of a slide update sent to the API.
@@ -25,13 +26,16 @@ export const isMediaVideoSlide = (slide: Slide) =>
  * The API derives these from the route and the stored document, and rejects or
  * mis-stores them when they arrive in the body.
  */
-export const toSlideUpdatePayload = async (slide: Slide) => {
+export const toSlideUpdatePayload = async (
+  slide: Slide,
+  baseRev = baseRevFor(slide)
+) => {
   // A video slide's edits are its settings (loop, mute, fill). The API $sets
   // only what it is sent, so leaving the video fields out keeps a save from
   // touching the upload flow's URL and key. Sending nothing at all, as before,
   // let the server copy undo those settings on the next reload.
   if (isMediaVideoSlide(slide)) {
-    return { name: slide.name, slideStyle: slide.slideStyle }
+    return { name: slide.name, slideStyle: slide.slideStyle, baseRev }
   }
 
   // A rehydrated slide carries this device's playback URLs (blob:, and
@@ -42,6 +46,13 @@ export const toSlideUpdatePayload = async (slide: Slide) => {
   delete payload.id
   delete payload.churchId
   delete payload.type
+  // The counter is the server's to write; only the base goes back.
+  delete payload.rev
+  delete payload.index
+  delete payload.scheduleId
+  delete payload.saved
+  delete payload.libraryOnly
+  payload.baseRev = baseRev
 
   if (payload.backgroundType !== backgroundTypes.video) {
     payload.backgroundVideoKey = null

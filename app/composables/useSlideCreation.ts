@@ -511,10 +511,17 @@ export default function useSlideCreation() {
     // Files that have to reach the cloud make a pending slide: teammates get it
     // now, with a progress bar, instead of after the upload. External video
     // (YouTube, Vimeo) has nothing to upload and is shared once it is saved.
-    const pendingSlides = newSlides.filter(
-      (slide, index) =>
-        !!capturedBlobs[index] && !(files[index] as any)?.isExternal
-    )
+    // A video with the cloud-upload setting off has nothing to upload either,
+    // so it skips the "Uploading" state entirely instead of sitting in it
+    // until the whole background flow settles.
+    const uploadVideosToCloud =
+      appStore.currentState.settings.uploadVideosToCloud !== false
+    const pendingSlides = newSlides.filter((slide, index) => {
+      const blob = capturedBlobs[index]
+      if (!blob || (files[index] as any)?.isExternal) return false
+      if (blob.type?.includes("video") && !uploadVideosToCloud) return false
+      return true
+    })
     const pendingIds = new Set(pendingSlides.map((slide) => slide.id))
     pendingSlides.forEach((slide) => {
       markUploading(slide)
@@ -603,8 +610,7 @@ export default function useSlideCreation() {
           // Videos are the heaviest thing a church can push to the cloud, so
           // they get their own opt-out (Settings → Storage). Off means the video
           // stays device-local; images and audio are unaffected.
-          const uploadVideos =
-            appStore.currentState.settings.uploadVideosToCloud !== false
+          const uploadVideos = uploadVideosToCloud
           if (navigator.onLine) {
             const uploadPromises = files.map(async (file: ExtendedFileT, index: number) => {
               const blob = compressedBlobs[index]

@@ -191,6 +191,19 @@ pub fn source_height(app: &AppHandle) -> Option<u32> {
   platform::source_height(app)
 }
 
+/// Whether the live window is on the desktop the operator is looking at.
+pub fn live_window_visible(app: &AppHandle) -> Option<bool> {
+  #[cfg(target_os = "macos")]
+  {
+    platform::live_window_visible(app)
+  }
+  #[cfg(not(target_os = "macos"))]
+  {
+    let _ = app;
+    None
+  }
+}
+
 /// Starts capturing `target` and pacing its frames into `input` (the encoder's
 /// stdin).
 pub fn start(
@@ -334,11 +347,12 @@ impl Health {
     let seconds = elapsed.as_secs_f64();
     log::info!(
       "stream health: window {:.1} new fps, sent {:.1} fps, {} slow writes, \
-       {} upload stalls so far",
+       {} upload stalls so far, {} KB handed to the uploader so far",
       (published - self.published) as f64 / seconds,
       self.sent as f64 / seconds,
       self.slow,
-      sink.stats.upload_stalls.load(Ordering::Relaxed)
+      sink.stats.upload_stalls.load(Ordering::Relaxed),
+      sink.stats.sent_bytes.load(Ordering::Relaxed) / 1024
     );
     *self = Self { published, ..Self::new() };
   }

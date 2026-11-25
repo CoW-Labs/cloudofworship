@@ -20,7 +20,8 @@
 //! the network, so a dropped connection restarts just the pusher while the
 //! encoder (and the page's recording) keeps running — TS can be joined mid-way.
 
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
+use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -32,6 +33,8 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Emitter, State};
 
 mod keep_awake;
+#[cfg(target_os = "macos")]
+mod mixer;
 mod quality;
 mod stats;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -47,6 +50,10 @@ const YOUTUBE_INGEST_BASE: &str = "rtmp://a.rtmp.youtube.com/live2";
 
 /// Event name the frontend listens on for live status changes.
 const STATUS_EVENT: &str = "stream://status";
+
+/// Event sent when a local recording is ready to open.
+const RECORDING_EVENT: &str = "stream://recording";
+const RECORDING_ERROR_EVENT: &str = "stream://recording-error";
 
 /// YouTube's RTMP ingest host and port, for the pre-flight reachability check.
 const YOUTUBE_INGEST_HOST: &str = "a.rtmp.youtube.com:1935";
@@ -105,6 +112,45 @@ pub struct AudioDevice {
   pub name: String,
 }
 
+/// The operator's saved mixer levels, sent with the start request so the
+/// stream opens at the levels they left.
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MixerSettings {
+  pub mic_gain: f32,
+  pub mic_muted: bool,
+  pub app_gain: f32,
+  pub app_muted: bool,
+}
+
+impl Default for MixerSettings {
+  fn default() -> Self {
+    Self { mic_gain: 1.0, mic_muted: false, app_gain: 1.0, app_muted: false }
+  }
+}
+
+#[cfg(target_os = "macos")]
+pub use mixer::MixerState;
+#[cfg(not(target_os = "macos"))]
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MixerState {
+  pub active: bool,
+}
+#[cfg(not(target_os = "macos"))]
+impl MixerState {
+  pub fn inactive() -> Self {
+    Self { active: false }
+  }
+}
+
+/// The running audio mixer. Only macOS has one for now; elsewhere the stream
+/// takes its audio input device directly, as before.
+#[cfg(target_os = "macos")]
+type MixerHandle = Arc<mixer::Mixer>;
+#[cfg(not(target_os = "macos"))]
+type MixerHandle = ();
+
 #[derive(Clone)]
 pub struct StreamBridge {
   inner: Arc<Inner>,
@@ -145,6 +191,17 @@ struct Feed {
   reporter: Option<JoinHandle<()>>,
   /// Keeps macOS from napping the app (and the Mac from sleeping) while live.
   _awake: Option<keep_awake::KeepAwake>,
+  /// Mixes the microphone and the app's own audio into the encoder.
+  mixer: Option<MixerHandle>,
+  /// The local copy of the stream (MPEG-TS while live, MP4 once it ends) and
+  /// the thread that writes it.
+  recording: Option<Recording>,
+}
+
+struct Recording {
+  path: PathBuf,
+  writer: Option<JoinHandle<()>>,
+  incomplete: Arc<AtomicBool>,
 }
 
 /// How a (re)spawn of the supervised process is done. Shared so reconnects run
@@ -183,28 +240,40 @@ impl StreamBridge {
     source: String,
     audio_device: Option<String>,
     quality: Option<String>,
+    mixer_settings: Option<MixerSettings>,
+    recording_name: Option<String>,
   ) -> Result<StreamStatus, String> {
     let _op = self.inner.operation.lock().unwrap_or_else(|p| p.into_inner());
     // The broadcast takes over the audio input from the pre-flight meter.
     self.stop_audio_meter();
 
     let key = stream_key.trim();
-    if key.is_empty() {
+    // No key but a local copy asked for: record the live window without sending
+    // anything to YouTube. Same capture, encoder and mixer; the pusher just
+    // discards what it is given.
+    let record_only = key.is_empty() && source == "native-window" && recording_name.is_some();
+    if key.is_empty() && !record_only {
       return Err("A YouTube stream key is required.".into());
     }
 
-    let url = ingest_url(key);
+    let url = if record_only { RECORD_ONLY.to_string() } else { ingest_url(key) };
 
     // Only the native window feed can deliver more than the default; the other
     // sources are capped by what they capture.
     let default = quality::DEFAULT;
     if source == "browser" {
-      self.start_feed_locked(url, browser_encoder_args(default), default)?;
+      self.start_feed_locked(url, browser_encoder_args(default), default, None)?;
       return Ok(self.set_status(StreamPhase::Live, None));
     }
     if source == "native-window" {
       let quality = StreamQuality::by_id(quality.as_deref());
-      return self.start_window_feed_locked(url, audio_device.as_deref(), quality);
+      return self.start_window_feed_locked(
+        url,
+        audio_device.as_deref(),
+        quality,
+        mixer_settings.unwrap_or_default(),
+        self.recording_path(recording_name.as_deref())?,
+      );
     }
 
     // Resolve the whole FFmpeg command once (before tearing down any running
@@ -259,11 +328,50 @@ impl StreamBridge {
     url: String,
     audio: Option<&str>,
     quality: StreamQuality,
+    mixer_settings: MixerSettings,
+    recording: Option<PathBuf>,
   ) -> Result<StreamStatus, String> {
     // Find the window and audio device before touching a running stream.
     let target = window_capture::locate(&self.inner.app, quality)?;
     let audio = resolve_audio_device(audio)?;
-    self.start_feed_locked(url, window_encoder_args(&target, quality, audio), quality)?;
+
+    // On macOS the mixer owns the audio: the microphone and the app's own
+    // sound go through it, and the encoder reads the mix from a local socket.
+    #[cfg(target_os = "macos")]
+    let (mixer, mixer_port) = {
+      let mixer = mixer::Mixer::start(self.inner.app.clone(), audio.clone(), mixer_settings)?;
+      let port = mixer.port();
+      (Some(mixer), Some(port))
+    };
+    #[cfg(not(target_os = "macos"))]
+    let (mixer, mixer_port): (Option<MixerHandle>, Option<u16>) = {
+      let _ = mixer_settings;
+      (None, None)
+    };
+
+    let started = self.start_feed_locked(
+      url,
+      window_encoder_args(&target, quality, audio, mixer_port),
+      quality,
+      recording,
+    );
+    if let Err(error) = started {
+      #[cfg(target_os = "macos")]
+      if let Some(mixer) = &mixer {
+        mixer.stop();
+      }
+      return Err(error);
+    }
+    if let Some(feed) = self
+      .inner
+      .session
+      .lock()
+      .unwrap_or_else(|p| p.into_inner())
+      .as_mut()
+      .and_then(|s| s.feed.as_mut())
+    {
+      feed.mixer = mixer;
+    }
 
     let (input, stopping, counters) = {
       let session = self.inner.session.lock().unwrap_or_else(|p| p.into_inner());
@@ -313,6 +421,8 @@ impl StreamBridge {
     _url: String,
     _audio: Option<&str>,
     _quality: StreamQuality,
+    _mixer_settings: MixerSettings,
+    _recording: Option<PathBuf>,
   ) -> Result<StreamStatus, String> {
     Err("Native live window capture isn't available on this OS yet.".into())
   }
@@ -325,8 +435,22 @@ impl StreamBridge {
     url: String,
     encoder_args: Vec<String>,
     quality: StreamQuality,
+    recording: Option<PathBuf>,
   ) -> Result<(), String> {
     self.stop_locked();
+
+    // A requested recording must be writable before we report a live session.
+    let (recording_tx, recording) = match recording {
+      Some(path) => {
+        let incomplete = Arc::new(AtomicBool::new(false));
+        let app = self.inner.app.clone();
+        let (tx, writer) = start_recording_writer(&path, incomplete.clone(), move |message| {
+          let _ = app.emit(RECORDING_ERROR_EVENT, message);
+        })?;
+        (Some(tx), Some(Recording { path, writer: Some(writer), incomplete }))
+      }
+      None => (None, None),
+    };
 
     let mut encoder = ffmpeg_command()
       .args(encoder_args)
@@ -350,13 +474,16 @@ impl StreamBridge {
     let spawner: Spawner = {
       let pusher_input = pusher_input.clone();
       let args = pusher_args(&url);
+      let secrets: Vec<String> = args.iter().filter_map(|a| key_in_url(a)).collect();
       Arc::new(move || {
         let mut child = ffmpeg_command()
           .args(&args)
           .stdin(Stdio::piped())
           .stdout(Stdio::null())
-          .stderr(Stdio::inherit())
+          .stderr(Stdio::piped())
           .spawn()?;
+        log::info!("stream: FFmpeg pusher started (pid {})", child.id());
+        log_ffmpeg_stderr("pusher", &mut child, secrets.clone());
         *pusher_input.lock().unwrap_or_else(|p| p.into_inner()) = child.stdin.take();
         Ok(child)
       })
@@ -373,6 +500,9 @@ impl StreamBridge {
     let stopping = Arc::new(AtomicBool::new(false));
     let child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(Some(first)));
 
+    // The local copy is written on its own thread, so a slow disk can never
+    // hold up the upload: chunks go through a bounded queue and are dropped
+    // (from the copy only) if the disk can't keep up.
     // Encoder → pusher. A failed write means the pusher died (network); drop
     // its stdin and keep draining the encoder until the supervisor brings up a
     // replacement. Encoder EOF while not stopping means the feed itself broke.
@@ -380,15 +510,31 @@ impl StreamBridge {
       let bridge = self.clone();
       let stopping = stopping.clone();
       let counters = counters.clone();
+      let incomplete = recording.as_ref().map(|recording| recording.incomplete.clone());
       std::thread::Builder::new()
         .name("cow-stream-forwarder".into())
         .spawn(move || {
           let mut buffer = vec![0u8; 64 * 1024];
+          let mut recording_drops: u64 = 0;
           loop {
             let read = match encoded.read(&mut buffer) {
               Ok(0) | Err(_) => break,
               Ok(n) => n,
             };
+            if let Some(tx) = &recording_tx {
+              if tx.try_send(buffer[..read].to_vec()).is_err() {
+                if let Some(incomplete) = &incomplete { incomplete.store(true, Ordering::Release); }
+                recording_drops += 1;
+                if recording_drops == 1 {
+                  let _ = bridge.inner.app.emit(RECORDING_ERROR_EVENT, "The recording could not keep up with the stream and may be incomplete.");
+                }
+                if recording_drops == 1 || recording_drops % 500 == 0 {
+                  log::warn!(
+                    "stream: the disk can't keep up; {recording_drops} chunks missing from the local copy (the stream is unaffected)"
+                  );
+                }
+              }
+            }
             let mut slot = pusher_input.lock().unwrap_or_else(|p| p.into_inner());
             if let Some(stdin) = slot.as_mut() {
               let writing = std::time::Instant::now();
@@ -437,6 +583,8 @@ impl StreamBridge {
           counters,
           reporter,
           _awake: keep_awake::KeepAwake::begin("Streaming the live output to YouTube"),
+          mixer: None,
+          recording,
         }),
       });
     Ok(())
@@ -522,7 +670,13 @@ impl StreamBridge {
             }
             match slot.as_mut().map(|p| p.try_wait()) {
               Some(Ok(None)) => {} // still running
-              _ => {
+              exited => {
+                if let Some(Ok(Some(status))) = &exited {
+                  log::warn!(
+                    "stream: FFmpeg exited ({status}) after {}s",
+                    started.elapsed().as_secs()
+                  );
+                }
                 *slot = None;
                 break;
               }
@@ -607,7 +761,27 @@ impl StreamBridge {
       if let Some(reporter) = feed.reporter.take() {
         let _ = reporter.join();
       }
+      if let Some(recording) = feed.recording.take() {
+        finish_recording(&self.inner.app, recording);
+      }
+      // The encoder is gone, so the mixer's socket is closed; stop its threads
+      // and the app audio capture.
+      #[cfg(target_os = "macos")]
+      if let Some(mixer) = feed.mixer.take() {
+        mixer.stop();
+      }
     }
+  }
+
+  fn mixer(&self) -> Option<MixerHandle> {
+    self
+      .inner
+      .session
+      .lock()
+      .unwrap_or_else(|p| p.into_inner())
+      .as_ref()
+      .and_then(|s| s.feed.as_ref())
+      .and_then(|f| f.mixer.clone())
   }
 
   /// Starts the pre-flight audio meter on the chosen input: FFmpeg measures
@@ -706,15 +880,56 @@ fn ffmpeg_command() -> Command {
   command
 }
 
-/// Spawns FFmpeg with output silenced except stderr, which is inherited to the
-/// dev console (`-loglevel warning` keeps the key-bearing URL banner out of it).
+/// Spawns FFmpeg with output silenced except stderr, which goes to the app log
+/// (`-loglevel warning` keeps the key-bearing URL banner out of it).
 fn spawn_ffmpeg(args: &[String]) -> std::io::Result<Child> {
-  ffmpeg_command()
+  let mut child = ffmpeg_command()
     .args(args)
     .stdin(Stdio::null())
     .stdout(Stdio::null())
-    .stderr(Stdio::inherit())
-    .spawn()
+    .stderr(Stdio::piped())
+    .spawn()?;
+  log_ffmpeg_stderr("stream", &mut child, args.iter().filter_map(|a| key_in_url(a)).collect());
+  Ok(child)
+}
+
+/// The stream key at the end of an RTMP(S) URL, if `text` is one.
+fn key_in_url(text: &str) -> Option<String> {
+  if !(text.starts_with("rtmp://") || text.starts_with("rtmps://")) {
+    return None;
+  }
+  let key = text.rsplit('/').next()?;
+  (!key.is_empty() && key.len() >= 8).then(|| key.to_string())
+}
+
+/// Copies FFmpeg's warnings and errors into the app log, so a refused key or a
+/// dropped connection shows up there instead of vanishing with the process.
+/// The stream key is replaced before anything is written, and a noisy process
+/// is cut off after MAX_FFMPEG_LOG_LINES so it can't flood the log.
+fn log_ffmpeg_stderr(label: &'static str, child: &mut Child, secrets: Vec<String>) {
+  const MAX_FFMPEG_LOG_LINES: usize = 200;
+  let Some(stderr) = child.stderr.take() else { return };
+  let _ = std::thread::Builder::new()
+    .name("cow-ffmpeg-log".into())
+    .spawn(move || {
+      let mut logged = 0usize;
+      for line in std::io::BufReader::new(stderr).split(b'\n').map_while(Result::ok) {
+        let mut text = String::from_utf8_lossy(&line).trim().to_string();
+        if text.is_empty() {
+          continue;
+        }
+        for secret in &secrets {
+          text = text.replace(secret.as_str(), "<key>");
+        }
+        if logged == MAX_FFMPEG_LOG_LINES {
+          log::warn!("ffmpeg {label}: more output suppressed");
+        }
+        if logged <= MAX_FFMPEG_LOG_LINES {
+          log::warn!("ffmpeg {label}: {text}");
+        }
+        logged += 1;
+      }
+    });
 }
 
 /// Builds the FFmpeg *input* arguments for the chosen source. This is where the
@@ -1088,6 +1303,7 @@ fn window_encoder_args(
   target: &window_capture::Target,
   quality: StreamQuality,
   audio: Option<String>,
+  mixer_port: Option<u16>,
 ) -> Vec<String> {
   // How many input packets FFmpeg may queue while the encoder catches up.
   // Compressed frames are small, so 64 costs nothing. A raw frame is a whole
@@ -1112,6 +1328,12 @@ fn window_encoder_args(
       ["-probesize", "262144", "-analyzeduration", "0", "-f", demuxer].map(String::from),
     );
     args.extend(["-framerate".to_string(), quality.fps.to_string()]);
+    // Raw H.264 packets arrive with no timestamps at all, so FFmpeg's input
+    // scheduler sees the video as stuck at zero and stops reading the audio
+    // device as "too far ahead": a handful of audio packets get through, then
+    // none, and the pusher sends video only. Stamp each frame by its position
+    // as it's read so both inputs advance together.
+    args.extend(["-bsf:v".to_string(), format!("setts=ts=N/({}*TB)", quality.fps)]);
   } else {
     // Windows' GPU hands over NV12 at the final size; the macOS fallback
     // pipes BGRA, also at the final size.
@@ -1125,11 +1347,20 @@ fn window_encoder_args(
     ]);
   }
   args.extend(["-i".to_string(), "pipe:0".to_string()]);
-  if let Some(device) = &audio {
+  if let Some(port) = mixer_port {
+    // The mixer's output: steady 48 kHz stereo floats, silence included. No
+    // wall-clock stamping here: on a raw stream it stops audio from arriving
+    // at all (measured), and the samples already carry their own timing.
+    args.extend(
+      ["-thread_queue_size", "1024", "-f", "f32le", "-ar", "48000", "-ac", "2"]
+        .map(String::from),
+    );
+    args.extend(["-i".to_string(), format!("tcp://127.0.0.1:{port}")]);
+  } else if let Some(device) = &audio {
     args.extend(audio_input_args(device));
   }
   args.extend(["-map", "0:v:0"].map(String::from));
-  if audio.is_some() {
+  if audio.is_some() || mixer_port.is_some() {
     // Also measures loudness for the live audio meter (see stats.rs).
     args.extend([
       "-map".to_string(),
@@ -1159,6 +1390,13 @@ fn window_encoder_args(
     "dump_extra=freq=keyframe".to_string()
   };
   args.extend(["-bsf:v".to_string(), video_filters]);
+  // Video and audio come from separate inputs on separate clocks, and the
+  // muxer holds one track back until the other catches up: by default up to
+  // 10 seconds, long enough that the pusher gives up on the audio while it
+  // probes the stream. Cap the wait at 2 seconds. (Not 0: that means wait
+  // forever for a packet on every track, so a silent audio input would hold
+  // all the video back.)
+  args.extend(["-max_interleave_delta", "2000000"].map(String::from));
   args.extend(["-flush_packets", "1", "-f", "mpegts", "pipe:1"].map(String::from));
   args
 }
@@ -1166,9 +1404,28 @@ fn window_encoder_args(
 /// Pusher: copies the encoder's MPEG-TS to YouTube without re-encoding. This is
 /// the only process that touches the network, so it's the one the supervisor
 /// restarts on a connection drop.
+/// Stands in for the ingest address when the session only records. The pusher
+/// then reads the stream and throws it away, so the rest of the pipeline (and
+/// its health numbers) behave exactly as when streaming.
+const RECORD_ONLY: &str = "record-only";
+
 fn pusher_args(url: &str) -> Vec<String> {
+  if url == RECORD_ONLY {
+    return [
+      "-hide_banner", "-loglevel", "warning",
+      "-analyzeduration", "5000000", "-probesize", "2000000",
+      "-f", "mpegts", "-i", "pipe:0",
+      "-c", "copy", "-f", "null", "-",
+    ]
+    .map(String::from)
+    .to_vec();
+  }
   let mut args = [
     "-hide_banner", "-loglevel", "warning",
+    // Without limits FFmpeg keeps reading until it has 5 MB of this stream,
+    // which a still slide takes minutes to produce, so nothing is sent until
+    // then. Bound the look by time and size instead.
+    "-analyzeduration", "5000000", "-probesize", "2000000",
     "-f", "mpegts", "-i", "pipe:0",
     "-c", "copy",
     "-rw_timeout", "8000000",
@@ -1178,6 +1435,128 @@ fn pusher_args(url: &str) -> Vec<String> {
   .to_vec();
   args.push(url.to_string());
   args
+}
+
+/// Where a local copy of the stream goes: Movies/Cloud of Worship, named by
+/// the page (it knows the local time). `None` when recording is off.
+impl StreamBridge {
+  fn recording_path(&self, name: Option<&str>) -> Result<Option<PathBuf>, String> {
+    use tauri::Manager;
+    let Some(name) = name else { return Ok(None) };
+    let name = name.trim();
+    if name.is_empty() {
+      return Err("A recording name is required.".into());
+    }
+    let clean: String = name
+      .chars()
+      .map(|c| if c.is_alphanumeric() || " -_.".contains(c) { c } else { '-' })
+      .collect();
+    let folder = self.inner.app.path().video_dir()
+      .map_err(|e| format!("Could not find the recordings folder ({e})."))?
+      .join("Cloud of Worship");
+    std::fs::create_dir_all(&folder)
+      .map_err(|e| format!("Could not create the recordings folder ({e})."))?;
+    Ok(Some(folder.join(format!("{clean}.ts"))))
+  }
+}
+
+/// Opens the recording file and a thread that appends whatever the encoder
+/// produces. The queue holds about 20 seconds of stream.
+fn start_recording_writer<F>(
+  path: &std::path::Path,
+  incomplete: Arc<AtomicBool>,
+  report_error: F,
+) -> Result<(std::sync::mpsc::SyncSender<Vec<u8>>, JoinHandle<()>), String>
+where F: Fn(String) + Send + 'static {
+  // Never overwrite either a previous transport or a completed recording.
+  if path.with_extension("mp4").exists() {
+    return Err("A recording with this name already exists. Try again.".into());
+  }
+  let file = std::fs::OpenOptions::new().write(true).create_new(true).open(path)
+    .map_err(|e| format!("Could not start the local recording ({e})."))?;
+  let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(512);
+  let writer = std::thread::Builder::new()
+    .name("cow-stream-recording".into())
+    .spawn(move || {
+      let mut file = std::io::BufWriter::with_capacity(256 * 1024, file);
+      let mut failed = false;
+      while let Ok(chunk) = rx.recv() {
+        if failed {
+          continue;
+        }
+        if let Err(e) = file.write_all(&chunk) {
+          log::warn!("stream: the local recording stopped ({e})");
+          incomplete.store(true, Ordering::Release);
+          report_error(format!("The local recording stopped ({e})."));
+          failed = true;
+        }
+      }
+      if let Err(e) = file.flush() {
+        incomplete.store(true, Ordering::Release);
+        report_error(format!("Could not finish writing the local recording ({e})."));
+      }
+    })
+    .map_err(|e| format!("Could not start the recording writer ({e})."))?;
+  Ok((tx, writer))
+}
+
+/// Closes the transport-stream copy and turns it into an MP4 any player
+/// opens, without re-encoding. Runs in the background so ending the stream
+/// is never held up; the .ts is kept if anything goes wrong.
+fn finish_recording_async<F>(mut recording: Recording, finish: F) -> std::io::Result<JoinHandle<()>>
+where F: FnOnce(Recording) + Send + 'static {
+  std::thread::Builder::new().name("cow-recording-remux".into()).spawn(move || {
+    if let Some(writer) = recording.writer.take() {
+      let _ = writer.join();
+    }
+    finish(recording);
+  })
+}
+
+fn finish_recording(app: &AppHandle, recording: Recording) {
+  let app = app.clone();
+  let error_app = app.clone();
+  if let Err(error) = finish_recording_async(recording, move |recording| {
+    let transport = recording.path.clone();
+    let mp4 = transport.with_extension("mp4");
+    let size = std::fs::metadata(&transport).map(|m| m.len()).unwrap_or(0);
+    if size == 0 {
+      let _ = std::fs::remove_file(&transport);
+      return;
+    }
+    let result = ffmpeg_command()
+      .args(["-hide_banner", "-loglevel", "error", "-y", "-i"])
+      .arg(&transport)
+      .args(["-c", "copy", "-movflags", "+faststart"])
+      .arg(&mp4)
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .status();
+    let saved = match result {
+      Ok(status) if status.success() => {
+        let _ = std::fs::remove_file(&transport);
+        mp4
+      }
+      _ => {
+        log::warn!("stream: could not make an MP4 of the recording; keeping {}", transport.display());
+        transport
+      }
+    };
+    log::info!("stream: local recording saved to {}", saved.display());
+    let _ = app.emit(RECORDING_EVENT, RecordingSaved {
+      path: saved.to_string_lossy().into_owned(),
+      incomplete: recording.incomplete.load(Ordering::Acquire),
+    });
+  }) {
+    let _ = error_app.emit(RECORDING_ERROR_EVENT, format!("Could not finish the recording ({error})."));
+  }
+}
+
+#[derive(Clone, Serialize)]
+struct RecordingSaved {
+  path: String,
+  incomplete: bool,
 }
 
 /// Receives one recorded chunk from the page as a raw (binary) IPC body.
@@ -1203,10 +1582,12 @@ pub async fn stream_start(
   source: String,
   audio_device: Option<String>,
   quality: Option<String>,
+  mixer_settings: Option<MixerSettings>,
+  recording_name: Option<String>,
 ) -> Result<StreamStatus, String> {
   let bridge = state.inner().clone();
   tauri::async_runtime::spawn_blocking(move || {
-    bridge.start_blocking(stream_key, source, audio_device, quality)
+    bridge.start_blocking(stream_key, source, audio_device, quality, mixer_settings, recording_name)
   })
   .await
   .map_err(|e| format!("The stream start task failed: {e}"))?
@@ -1227,6 +1608,55 @@ pub async fn stream_stop(state: State<'_, StreamBridge>) -> Result<StreamStatus,
   tauri::async_runtime::spawn_blocking(move || bridge.stop_blocking())
     .await
     .map_err(|e| format!("The stream stop task failed: {e}"))
+}
+
+/// Whether the live window is on the desktop the operator is looking at. A
+/// window on another desktop (a full-screen live window on a one-screen
+/// computer, while the operator works in the control window) is not painted
+/// by the system, so its stream and recording freeze. `None` when this
+/// computer can't say.
+#[tauri::command]
+pub fn stream_live_window_visible(app: AppHandle) -> Option<bool> {
+  window_capture::live_window_visible(&app)
+}
+
+/// The mixer's levels and what it is capturing, for the panel. Inactive when
+/// nothing is streaming or this computer has no mixer.
+#[tauri::command]
+pub fn stream_mixer_state(state: State<'_, StreamBridge>) -> MixerState {
+  #[cfg(target_os = "macos")]
+  if let Some(mixer) = state.mixer() {
+    return mixer.state();
+  }
+  let _ = state;
+  MixerState::inactive()
+}
+
+/// Changes one source's level or mute while live. `source` is "mic" or "app".
+#[tauri::command]
+pub fn stream_mixer_set(
+  state: State<'_, StreamBridge>,
+  source: String,
+  gain: Option<f32>,
+  muted: Option<bool>,
+) -> Result<(), String> {
+  #[cfg(target_os = "macos")]
+  if let Some(mixer) = state.mixer() {
+    return mixer.set(&source, gain, muted);
+  }
+  let _ = (state, source, gain, muted);
+  Err("The audio mixer isn't running.".into())
+}
+
+/// Turns the live level readings on while the panel is open and off after, so
+/// nothing is emitted that nobody is looking at.
+#[tauri::command]
+pub fn stream_mixer_levels(state: State<'_, StreamBridge>, on: bool) {
+  #[cfg(target_os = "macos")]
+  if let Some(mixer) = state.mixer() {
+    mixer.set_levels(on);
+  }
+  let _ = (state, on);
 }
 
 #[tauri::command]
@@ -1378,6 +1808,47 @@ pub async fn stream_check_youtube() -> Result<u32, String> {
 #[cfg(test)]
 mod tests {
   use super::{parse_dshow_audio, pick_audio, AudioDevice};
+
+  #[test]
+  fn recording_writer_drains_and_refuses_to_overwrite() {
+    use std::sync::{Arc, atomic::AtomicBool};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("service.ts");
+    let (tx, writer) = super::start_recording_writer(&path, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+    tx.send(b"first ".to_vec()).unwrap();
+    tx.send(b"recording".to_vec()).unwrap();
+    drop(tx);
+    writer.join().unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), b"first recording");
+    assert!(super::start_recording_writer(&path, Arc::new(AtomicBool::new(false)), |_| {}).is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), b"first recording");
+    std::fs::remove_file(&path).unwrap();
+    std::fs::write(path.with_extension("mp4"), b"finished recording").unwrap();
+    assert!(super::start_recording_writer(&path, Arc::new(AtomicBool::new(false)), |_| {}).is_err());
+    assert!(super::start_recording_writer(&dir.path().join("missing/service.ts"), Arc::new(AtomicBool::new(false)), |_| {}).is_err());
+  }
+
+  #[test]
+  fn slow_recording_writer_does_not_block_stop() {
+    use std::sync::{Arc, atomic::AtomicBool, mpsc};
+    use std::time::{Duration, Instant};
+    let (release, wait) = mpsc::channel::<()>();
+    let (finished, result) = mpsc::channel::<()>();
+    let writer = std::thread::spawn(move || { wait.recv().unwrap(); });
+    let recording = super::Recording {
+      path: std::path::PathBuf::new(),
+      writer: Some(writer),
+      incomplete: Arc::new(AtomicBool::new(false)),
+    };
+    let start = Instant::now();
+    let finalizer = super::finish_recording_async(recording, move |_| { finished.send(()).unwrap(); }).unwrap();
+    let elapsed = start.elapsed();
+    assert!(result.try_recv().is_err(), "finalizer must wait for the writer");
+    release.send(()).unwrap();
+    result.recv_timeout(Duration::from_secs(2)).unwrap();
+    finalizer.join().unwrap();
+    println!("Starting finalization took {:.3} ms while the writer was blocked", elapsed.as_secs_f64() * 1000.0);
+  }
 
   #[test]
   fn parses_dshow_audio_devices() {

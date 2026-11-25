@@ -5,6 +5,7 @@ import {
   createSlideRepository,
   enqueueCoalescedSlideShadowPut,
   flushSlideShadowWrites,
+  getPendingSlideDraft,
 } from "~/composables/useSlideRepository"
 import type { Slide } from "~/types"
 
@@ -50,6 +51,67 @@ describe("SlideRepository", () => {
     })
   })
 
+  it("keeps pending drafts through both coalesced and durable remote updates", async () => {
+    const repository = createSlideRepository()
+    const draft = slide("one", "sunday", 0, {
+      _id: "server-one",
+      rev: 4,
+      contents: ["My edit"],
+    })
+    const remote = { ...draft, rev: 5, contents: ["Their edit"] }
+    enqueueCoalescedSlideShadowPut(draft, {
+      syncState: "pending",
+      requestResync: true,
+    })
+    enqueueCoalescedSlideShadowPut(remote, {
+      syncState: "synced",
+      preservePending: true,
+    })
+    expect(await getPendingSlideDraft("sunday", "one")).toMatchObject(draft)
+
+    await flushSlideShadowWrites()
+    await repository.putSlide(remote, {
+      syncState: "synced",
+      preservePending: true,
+    })
+    await repository.replaceScheduleSlides(
+      "sunday",
+      [{ ...remote, index: 7 }],
+      {
+        updatePendingOrder: true,
+      }
+    )
+
+    expect(await repository.getPendingSlides()).toMatchObject([
+      { slide: { ...draft, index: 7 }, resyncRequestedAt: expect.any(String) },
+    ])
+  })
+
+  it("only replaces the exact draft revision shown in a conflict", async () => {
+    const repository = createSlideRepository()
+    const draft = slide("one", "sunday", 0, {
+      _id: "server-one",
+      contents: ["Mine"],
+    })
+    const theirs = { ...draft, contents: ["Theirs"], rev: 5 }
+    await repository.putSlide(draft, {
+      syncState: "pending",
+      requestResync: true,
+    })
+    await repository.putSlide(
+      { ...draft, contents: ["Newer draft"] },
+      { syncState: "pending" }
+    )
+
+    await expect(repository.replacePendingSlide(theirs, 1)).resolves.toBe(false)
+    expect(await repository.getPendingSlides()).toMatchObject([
+      { localRevision: 2, slide: { contents: ["Newer draft"] } },
+    ])
+    await expect(repository.replacePendingSlide(theirs, 2)).resolves.toBe(true)
+    expect(await repository.getPendingSlides()).toEqual([])
+    expect(await repository.getSlide("sunday", "one")).toEqual(theirs)
+  })
+
   it("increments the local revision for a changed slide", async () => {
     const repository = createSlideRepository()
     await repository.putSlide(slide("one", "sunday", 0))
@@ -57,9 +119,7 @@ describe("SlideRepository", () => {
       slide("one", "sunday", 0, { contents: ["updated"] })
     )
 
-    expect(
-      await repository.getStoredSlide("sunday", "one")
-    ).toMatchObject({
+    expect(await repository.getStoredSlide("sunday", "one")).toMatchObject({
       localRevision: 2,
       slide: { contents: ["updated"] },
     })
@@ -105,9 +165,8 @@ describe("SlideRepository", () => {
     const first = slide("one", "sunday", 0, { _id: "server-one" })
     await repository.putSlide(first, { syncState: "pending" })
     await repository.markSlideSyncState("sunday", "one", "pending")
-    const firstRevision = (
-      await repository.getStoredSlide("sunday", "one")
-    )!.localRevision
+    const firstRevision = (await repository.getStoredSlide("sunday", "one"))!
+      .localRevision
 
     await repository.putSlide(
       { ...first, contents: ["newer edit"] },
@@ -287,6 +346,8 @@ describe("SlideRepository", () => {
 
     await flushSlideShadowWrites()
 
-    expect(await useIndexedDB().slides.get(["sunday", "deleted"])).toBeUndefined()
+    expect(
+      await useIndexedDB().slides.get(["sunday", "deleted"])
+    ).toBeUndefined()
   })
 })

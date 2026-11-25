@@ -715,7 +715,7 @@ import {
 import { songOnSlide } from "~/utils/songTranslation"
 import { isSongNewer } from "~/utils/songVersion"
 import { pairBackgroundOf } from "~/utils/slidePairs"
-import { supportsTextBoxes } from "~/utils/textBoxes"
+import { stripInline, supportsTextBoxes } from "~/utils/textBoxes"
 import { useCanvasEditor } from "~/composables/useCanvasEditor"
 import type { SlideUpdateMeta } from "~/utils/undoHistory"
 import { cameraCaptureIsExclusive } from "~/composables/useCameraStream"
@@ -1046,6 +1046,15 @@ const toolbarSlide = computed(() => {
     },
   }
 })
+const INLINE_PROP: Partial<Record<keyof SlideStyle, string>> = {
+  textBold: "font-weight",
+  fontSizePercent: "font-size",
+  textColor: "color",
+  font: "font-family",
+}
+const inlineProps = (keys: (keyof SlideStyle)[]) =>
+  keys.map((key) => INLINE_PROP[key]).filter((p): p is string => !!p)
+// Removes the given CSS properties from every inline style in a piece of html.
 const onToolbarStyle = (style: SlideStyle) => {
   const slide = props.slide
   if (!canvas.selected.value || !slide) return onUpdateSlideStyle(style, false)
@@ -1065,6 +1074,7 @@ const onToolbarStyle = (style: SlideStyle) => {
     "textOutlined",
     "textLinesBackground",
     "lettercase",
+    "font",
   ]
   if (changed.every((key) => perBox.includes(key))) {
     const patch: Partial<TextBox> = {}
@@ -1079,6 +1089,27 @@ const onToolbarStyle = (style: SlideStyle) => {
       patch.linesBackground = !!style.textLinesBackground
     if (changed.includes("lettercase"))
       patch.uppercase = style.lettercase === "uppercase"
+    if (changed.includes("font")) patch.font = style.font
+    // A template's words carry inline styles of their own (a thin half of a
+    // headline, a bigger size). They are only a starting point, so a toolbar
+    // change replaces them instead of being outranked by them.
+    const stripped = inlineProps(changed)
+    const selectedBox = canvas.selected.value
+    if (stripped.length && selectedBox) {
+      const box = slide.slideStyle?.textBoxes?.find(
+        (b) => b.id === selectedBox.id
+      )
+      if (box && typeof box.source === "number") {
+        const contents = [...(slide.contents ?? [])]
+        const html = contents[box.source]
+        if (html && stripInline(html, stripped) !== html) {
+          contents[box.source] = stripInline(html, stripped)
+          emit("slide-update", { ...slide, contents })
+        }
+      } else if (box?.html) {
+        patch.html = stripInline(box.html, stripped)
+      }
+    }
     if (canvas.patchSelected(patch)) return
   }
   const real = { ...slide.slideStyle } as Record<string, unknown>
@@ -2474,6 +2505,26 @@ const predictVerseInput = (
   box-shadow: none !important;
   outline: none !important;
   background-color: transparent !important;
+}
+/* Free layout boxes are fractions of the slide, so their text is sized the way
+   the projector sizes it (3cqw, line height 1.5); otherwise the editor drew it a
+   third smaller than the screen does. The editor holding a box's main words
+   takes the box's own size and colour instead of the editor's white 1rem, and
+   drops the padding that pushed it off where the projector puts it. */
+.text-slide-editor-preview.canvas-stage :deep(.slide-boxes) {
+  font-size: 3cqw;
+  line-height: 1.5;
+}
+.text-slide-editor-preview.canvas-stage :deep(.slide-boxes .tiptap-editor),
+.text-slide-editor-preview.canvas-stage :deep(.slide-boxes .ProseMirror),
+.text-slide-editor-preview.canvas-stage :deep(.slide-boxes .ProseMirror p) {
+  font-size: inherit;
+  line-height: inherit;
+  /* The editors set white inline; inside a box the box's colour wins. */
+  color: inherit !important;
+}
+.text-slide-editor-preview.canvas-stage :deep(.slide-boxes .ProseMirror) {
+  padding: 0;
 }
 /* The editor's base .tiptap style draws its own pale border and padding, which
    showed as a second box inside the canvas box. */

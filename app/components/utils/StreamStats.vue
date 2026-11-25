@@ -56,11 +56,11 @@
 </template>
 
 <script setup lang="ts">
-// Live numbers for the running YouTube stream (emitted once a second by the
+// Live numbers for the running stream (emitted once a second by the
 // desktop app's stats reporter). "Sending" drops well below the target on still
 // slides, which is normal: the encoder only spends data on what changes, so
 // health is judged by frame rate, delayed frames and reconnects instead.
-const { stats, status } = useYoutubeStream()
+const { stats, status } = useStreamOutput()
 
 // Quieter than this reads as silence.
 const SILENT_DB = -60
@@ -74,7 +74,7 @@ const health = computed(() => {
     return {
       label: "Reconnecting",
       dot: "bg-amber-500 animate-pulse",
-      hint: "The connection to YouTube dropped. Retrying automatically.",
+      hint: "The stream connection dropped. Retrying automatically.",
     }
   }
   const current = stats.value
@@ -87,7 +87,7 @@ const health = computed(() => {
       }
     }
   }
-  return { label: "Live on YouTube", dot: "bg-green-500", hint: "" }
+  return { label: "Live", dot: "bg-green-500", hint: "" }
 })
 
 const audioPercent = computed(() => {

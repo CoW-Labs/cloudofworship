@@ -144,6 +144,26 @@ mod tests {
   }
 }
 
+/// Shows a file in Finder (macOS), File Explorer (Windows) or the file manager
+/// (Linux). Only an existing file is accepted, and the path is passed as an
+/// argument, never through a shell.
+#[tauri::command]
+fn reveal_in_file_manager(path: String) -> Result<(), String> {
+  let target = std::path::PathBuf::from(&path);
+  if !target.exists() {
+    return Err("That file isn't there any more.".into());
+  }
+  #[cfg(target_os = "macos")]
+  let result = std::process::Command::new("open").arg("-R").arg(&target).spawn();
+  #[cfg(target_os = "windows")]
+  let result = std::process::Command::new("explorer").arg(format!("/select,{}", target.display())).spawn();
+  #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+  let result = std::process::Command::new("xdg-open")
+    .arg(target.parent().unwrap_or(&target))
+    .spawn();
+  result.map(|_| ()).map_err(|e| format!("Could not open the file manager ({e})."))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let builder = tauri::Builder::default();
@@ -176,6 +196,7 @@ pub fn run() {
         app.deep_link().register_all()?;
       }
       app.manage(ndi::NdiBridge::new(app.handle().clone()));
+      app.manage(stream::StreamBridge::new(app.handle().clone()));
       app.manage(desktop_update::DesktopUpdateState::default());
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -187,6 +208,15 @@ pub fn run() {
       Ok(())
     })
     .on_window_event(|window, event| {
+      // Never let an FFmpeg stream outlive the app: stop it when the main
+      // window closes.
+      if window.label() == "main" && matches!(event, WindowEvent::Destroyed) {
+        let bridge = window.state::<stream::StreamBridge>().inner().clone();
+        tauri::async_runtime::spawn_blocking(move || {
+          bridge.stop_blocking();
+          bridge.stop_audio_meter();
+        });
+      }
       if window.label() == "live-output" && matches!(event, WindowEvent::Destroyed) {
         let bridge = window.state::<ndi::NdiBridge>().inner().clone();
         tauri::async_runtime::spawn_blocking(move || {
@@ -211,7 +241,12 @@ pub fn run() {
       stream::stream_start,
       stream::stream_stop,
       stream::stream_status,
+      stream::stream_mixer_state,
+      stream::stream_mixer_set,
+      stream::stream_mixer_levels,
       stream::stream_audio_devices,
+      stream::stream_live_window_visible,
+      reveal_in_file_manager,
       stream::stream_feed,
       stream::stream_audio_meter_start,
       stream::stream_audio_meter_stop,

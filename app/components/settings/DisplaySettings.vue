@@ -43,363 +43,6 @@
     </SettingsGroup>
 
     <SettingsGroup
-      title="Live Window Settings"
-      note="Configure how the live output window opens."
-    >
-      <SettingsRow
-        v-if="isTauri"
-        label="Open in fullscreen mode"
-        description="When enabled, the live window opens in fullscreen without window decorations. When disabled, it opens as a resizable window with title bar controls."
-      >
-        <CowToggle
-          bare
-          label="Open in fullscreen mode"
-          :model-value="currentState.settings.liveWindowFullscreen"
-          @update:model-value="
-            (value: boolean) => {
-              appStore.setLiveWindowFullscreen(value)
-              useToast().add({
-                title: value
-                  ? 'Live window will open in fullscreen'
-                  : 'Live window will open as resizable window',
-                icon: 'i-bx-check-circle',
-              })
-            }
-          "
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        :label="`Close live window when this ${operatorSurface} is closed`"
-        :description="`When enabled, the live output window closes automatically if you close the control center ${operatorSurface}.`"
-      >
-        <CowToggle
-          bare
-          :label="`Close live window when this ${operatorSurface} is closed`"
-          :model-value="currentState.settings.closeLiveWindowWithOperator"
-          @update:model-value="
-            (value: boolean) => {
-              appStore.setCloseLiveWindowWithOperator(value)
-              useToast().add({
-                title: value
-                  ? `Live window will close with this ${operatorSurface}`
-                  : `Live window will stay open when this ${operatorSurface} is closed`,
-                icon: 'i-bx-check-circle',
-              })
-            }
-          "
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        label="Let a team member's phone control this output"
-        description="When enabled, someone on the mobile app can pick this device and take slides live on the screen it is driving. They can only do that while the live window is open here, and you will see who is controlling it above the slide schedule. This preference is stored on this device only."
-      >
-        <CowToggle
-          bare
-          label="Let a team member's phone control this output"
-          :model-value="currentState.settings.allowRemoteControl !== false"
-          @update:model-value="
-            (value: boolean) => {
-              appStore.setAllowRemoteControl(value)
-              useToast().add({
-                title: value
-                  ? 'Mobile devices can control this live output'
-                  : 'Only this device can change its live output',
-                icon: 'i-bx-check-circle',
-              })
-            }
-          "
-        />
-      </SettingsRow>
-    </SettingsGroup>
-
-    <SettingsGroup
-      v-if="isTauri"
-      title="NDI Live Output"
-      note="Publish the live window to NDI receivers on your local network. NDI 5 or 6 must be installed separately."
-    >
-      <SettingsRow
-        label="Broadcast live output over NDI"
-        description="When enabled, broadcasting starts after the desktop live window opens. This preference is stored on this device only."
-      >
-        <CowToggle
-          bare
-          label="Broadcast live output over NDI"
-          :model-value="currentState.settings.ndiEnabled ?? false"
-          @update:model-value="handleNdiToggle"
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        v-if="ndiQualityChoices.length"
-        label="NDI quality"
-        description="Size and frame rate sent to receivers. Never larger than your live window. 4K and 60 fps need a wired gigabit network and a receiver that can keep up. Changes apply the next time NDI starts."
-      >
-        <SettingsSelect
-          width="w-full sm:w-[300px]"
-          :options="ndiQualityChoices"
-          :model-value="ndiQualityChoice"
-          :disabled="ndiStatus.phase === 'broadcasting' || ndiStatus.phase === 'starting'"
-          @change="(label: string) => setNdiQualityChoice(label)"
-        />
-      </SettingsRow>
-
-      <div
-        class="rounded-2xl bg-white dark:bg-[#131a27] ring-1 ring-gray-200 dark:ring-white/10 p-4"
-      >
-        <div class="flex items-center justify-between gap-3 mb-3">
-          <div class="flex items-center gap-2 min-w-0">
-            <span
-              class="w-2.5 h-2.5 rounded-full shrink-0"
-              :class="ndiPhaseDotClass"
-            />
-            <span class="text-sm font-semibold">{{ ndiPhaseLabel }}</span>
-            <span
-              v-if="ndiStatus.stalled"
-              class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-            >
-              Stalled
-            </span>
-          </div>
-          <Icon
-            v-if="ndiBusy"
-            name="i-lucide-loader-2"
-            class="w-4 h-4 animate-spin text-primary-500"
-          />
-        </div>
-
-        <dl class="grid grid-cols-2 gap-x-5 gap-y-3 text-xs">
-          <div class="min-w-0">
-            <dt class="text-gray-500 dark:text-[#9aa3b2]">Source</dt>
-            <dd class="mt-0.5 font-semibold truncate">
-              {{ ndiStatus.sourceName }}
-            </dd>
-          </div>
-          <div class="min-w-0">
-            <dt class="text-gray-500 dark:text-[#9aa3b2]">Resolution</dt>
-            <dd class="mt-0.5 font-semibold">
-              {{ ndiResolution }}
-            </dd>
-          </div>
-          <div class="min-w-0">
-            <dt class="text-gray-500 dark:text-[#9aa3b2]">NDI runtime</dt>
-            <dd
-              class="mt-0.5 font-semibold truncate"
-              :title="ndiStatus.runtimePath || undefined"
-            >
-              {{ ndiStatus.runtimeVersion || "Not detected" }}
-            </dd>
-          </div>
-          <div>
-            <dt class="text-gray-500 dark:text-[#9aa3b2]">Receivers</dt>
-            <dd class="mt-0.5 font-semibold">
-              {{ ndiStatus.connectionCount }}
-            </dd>
-          </div>
-        </dl>
-
-        <div
-          v-if="ndiStatus.error"
-          class="mt-4 rounded-xl bg-red-50 dark:bg-red-900/20 p-3 text-xs text-red-800 dark:text-red-200"
-        >
-          <p class="font-semibold">{{ ndiStatus.error.message }}</p>
-          <p v-if="ndiStatus.error.hint" class="mt-1 leading-relaxed">
-            {{ ndiStatus.error.hint }}
-          </p>
-        </div>
-
-        <div
-          v-else-if="showWindowsNetworkHint"
-          class="mt-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 p-3 text-xs leading-relaxed text-amber-800 dark:text-amber-200"
-        >
-          No receiver is connected. If your NDI receiver cannot find this
-          source, allow Cloud of Worship on Windows Firewall and confirm the
-          network is marked Private.
-        </div>
-
-        <div
-          v-if="showNdiActions"
-          class="mt-4 flex flex-wrap items-center gap-2"
-        >
-          <CowButton
-            v-if="ndiStatus.error?.recoverable && currentState.settings.ndiEnabled"
-            variant="secondary"
-            size="2xs"
-            class="!px-3.5 !py-1.5 text-xs"
-            :loading="ndiBusy"
-            @click="retryNdi"
-          >
-            Retry
-          </CowButton>
-          <CowButton
-            v-if="runtimeMissing"
-            variant="secondary"
-            size="2xs"
-            class="!px-3.5 !py-1.5 text-xs"
-            @click="useOpenExternal('https://ndi.video/tools/')"
-          >
-            Install NDI runtime
-          </CowButton>
-          <CowButton
-            v-if="capturePermissionNeeded"
-            variant="secondary"
-            size="2xs"
-            class="!px-3.5 !py-1.5 text-xs"
-            @click="openNdiCaptureSettings"
-          >
-            Open Screen Recording settings
-          </CowButton>
-        </div>
-      </div>
-    </SettingsGroup>
-
-    <SettingsGroup
-      v-if="isTauri && youtubeStreamingEnabled"
-      title="Stream to YouTube (beta)"
-      note="Broadcast your live output (slides/lyrics) and audio straight to YouTube Live. Going live streams the live output window automatically."
-    >
-      <SettingsRow
-        label="YouTube stream key"
-        description="From YouTube Studio → Create → Go Live → Stream settings. Stored on this device only."
-        stacked
-      >
-        <CowInput
-          v-model="youtubeStreamKey"
-          label="YouTube stream key"
-          type="password"
-          placeholder="xxxx-xxxx-xxxx-xxxx"
-          :disabled="youtubeIsStreaming"
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        label="Stream to YouTube when I go live"
-        description="When on, clicking Go Live opens the live window and starts the YouTube stream automatically — one action."
-      >
-        <CowToggle
-          bare
-          label="Stream to YouTube when I go live"
-          :model-value="youtubeStreamOnGoLive"
-          :disabled="youtubeIsStreaming"
-          @update:model-value="(on) => (youtubeStreamOnGoLive = on)"
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        label="Audio source"
-        description="Which audio goes to the broadcast — pick your mixer/soundboard input for clean sound, not the built-in mic."
-      >
-        <SettingsSelect
-          width="w-full sm:w-[240px]"
-          :options="youtubeAudioChoices"
-          :model-value="youtubeAudioChoice"
-          :disabled="youtubeIsStreaming"
-          @change="(label: string) => setYoutubeAudioChoice(label)"
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        v-if="youtubeQualityChoices.length"
-        label="Stream quality"
-        :description="youtubeQualityNote"
-      >
-        <SettingsSelect
-          width="w-full sm:w-[300px]"
-          :options="youtubeQualityChoices"
-          :model-value="youtubeQualityChoice"
-          :disabled="youtubeIsStreaming"
-          @change="(label: string) => setYoutubeQualityChoice(label)"
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        label="Check before streaming"
-        description="Before each YouTube stream, test your upload speed, the YouTube connection and your audio level."
-      >
-        <CowToggle
-          bare
-          label="Check before streaming"
-          :model-value="youtubeCheckFirst"
-          @update:model-value="(on) => (youtubeCheckFirst = on)"
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        label="Send a test pattern instead"
-        description="Broadcasts color bars and a tone rather than your live output — handy to confirm the YouTube connection first."
-      >
-        <CowToggle
-          bare
-          label="Send a test pattern instead"
-          :model-value="youtubeSource === 'test'"
-          :disabled="youtubeIsStreaming"
-          @update:model-value="(on) => (youtubeSource = on ? 'test' : 'live-window')"
-        />
-      </SettingsRow>
-
-      <div
-        class="rounded-2xl bg-white dark:bg-[#131a27] ring-1 ring-gray-200 dark:ring-white/10 p-4"
-      >
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex items-center gap-2 min-w-0">
-            <span
-              class="w-2.5 h-2.5 rounded-full shrink-0"
-              :class="youtubePhaseDotClass"
-            />
-            <span class="text-sm font-semibold">{{ youtubePhaseLabel }}</span>
-          </div>
-          <Icon
-            v-if="youtubeBusy"
-            name="i-lucide-loader-2"
-            class="w-4 h-4 animate-spin text-primary-500"
-          />
-        </div>
-
-        <div
-          v-if="youtubeStatus.phase === 'reconnecting'"
-          class="mt-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 p-3 text-xs text-amber-800 dark:text-amber-200"
-        >
-          <p class="font-semibold">{{ youtubeStatus.error || "Reconnecting…" }}</p>
-        </div>
-        <div
-          v-else-if="youtubeStatus.phase === 'error' && youtubeStatus.error"
-          class="mt-4 rounded-xl bg-red-50 dark:bg-red-900/20 p-3 text-xs text-red-800 dark:text-red-200"
-        >
-          <p class="font-semibold">{{ youtubeStatus.error }}</p>
-        </div>
-
-        <YoutubeStreamStats
-          v-if="youtubeIsStreaming && youtubeSource !== 'test'"
-          class="mt-4 !w-full"
-        />
-
-        <div class="mt-4 flex flex-wrap items-center gap-2">
-          <CowButton
-            v-if="!youtubeIsStreaming"
-            size="2xs"
-            class="!px-3.5 !py-1.5 text-xs"
-            :loading="youtubeBusy"
-            :disabled="!youtubeStreamKey.trim()"
-            @click="startYoutube"
-          >
-            Go live
-          </CowButton>
-          <CowButton
-            v-else
-            variant="secondary"
-            size="2xs"
-            class="!px-3.5 !py-1.5 text-xs"
-            :loading="youtubeBusy"
-            @click="endYoutube"
-          >
-            Stop streaming
-          </CowButton>
-        </div>
-      </div>
-    </SettingsGroup>
-
-    <SettingsGroup
       v-if="allScreens?.length"
       title="Secondary Screens"
       :note="secondaryScreensNote"
@@ -494,6 +137,78 @@
         </SettingsSelect>
       </div>
     </SettingsGroup>
+
+    <SettingsGroup
+      title="Live Window Settings"
+      note="Configure how the live output window opens."
+    >
+      <SettingsRow
+        v-if="isTauri"
+        label="Open in fullscreen mode"
+        description="When enabled, the live window opens in fullscreen without window decorations. When disabled, it opens as a resizable window with title bar controls."
+      >
+        <CowToggle
+          bare
+          label="Open in fullscreen mode"
+          :model-value="currentState.settings.liveWindowFullscreen"
+          @update:model-value="
+            (value: boolean) => {
+              appStore.setLiveWindowFullscreen(value)
+              useToast().add({
+                title: value
+                  ? 'Live window will open in fullscreen'
+                  : 'Live window will open as resizable window',
+                icon: 'i-bx-check-circle',
+              })
+            }
+          "
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        :label="`Close live window when this ${operatorSurface} is closed`"
+        :description="`When enabled, the live output window closes automatically if you close the control center ${operatorSurface}.`"
+      >
+        <CowToggle
+          bare
+          :label="`Close live window when this ${operatorSurface} is closed`"
+          :model-value="currentState.settings.closeLiveWindowWithOperator"
+          @update:model-value="
+            (value: boolean) => {
+              appStore.setCloseLiveWindowWithOperator(value)
+              useToast().add({
+                title: value
+                  ? `Live window will close with this ${operatorSurface}`
+                  : `Live window will stay open when this ${operatorSurface} is closed`,
+                icon: 'i-bx-check-circle',
+              })
+            }
+          "
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Let a team member's phone control this output"
+        description="When enabled, someone on the mobile app can pick this device and take slides live on the screen it is driving. They can only do that while the live window is open here, and you will see who is controlling it above the slide schedule. This preference is stored on this device only."
+      >
+        <CowToggle
+          bare
+          label="Let a team member's phone control this output"
+          :model-value="currentState.settings.allowRemoteControl !== false"
+          @update:model-value="
+            (value: boolean) => {
+              appStore.setAllowRemoteControl(value)
+              useToast().add({
+                title: value
+                  ? 'Mobile devices can control this live output'
+                  : 'Only this device can change its live output',
+                icon: 'i-bx-check-circle',
+              })
+            }
+          "
+        />
+      </SettingsRow>
+    </SettingsGroup>
   </div>
 </template>
 
@@ -503,191 +218,11 @@ import { useDebounceFn } from "@vueuse/core"
 
 const appStore = useAppStore()
 const { isTauri } = useTauri()
-const { isEnabled: youtubeStreamingEnabled } = useFeatureFlags("youtube-streaming")
 const operatorSurface = isTauri ? "window" : "tab"
 const currentScreen = ref<any>({})
 const allScreens = ref<any>([])
 const { currentState } = storeToRefs(appStore)
 const isLoading = ref(false)
-const {
-  status: ndiStatus,
-  isInvoking: ndiBusy,
-  initialize: initializeNdi,
-  start: startNdi,
-  stop: stopNdi,
-  retry: retryNdiCommand,
-  openCaptureSettings: openCaptureSettings,
-  qualityChoices: ndiQualityChoices,
-  qualityChoice: ndiQualityChoice,
-  setQualityChoice: setNdiQualityChoice,
-} = useNdiBroadcast()
-
-const {
-  status: youtubeStatus,
-  isInvoking: youtubeBusy,
-  isStreaming: youtubeIsStreaming,
-  streamKey: youtubeStreamKey,
-  source: youtubeSource,
-  streamOnGoLive: youtubeStreamOnGoLive,
-  audioChoices: youtubeAudioChoices,
-  audioChoice: youtubeAudioChoice,
-  setAudioChoice: setYoutubeAudioChoice,
-  checkBeforeStreaming: youtubeCheckFirst,
-  qualityChoices: youtubeQualityChoices,
-  qualityChoice: youtubeQualityChoice,
-  setQualityChoice: setYoutubeQualityChoice,
-  qualityIsUpscaled: youtubeQualityUpscaled,
-  sourceHeight: youtubeSourceHeight,
-  initialize: initializeYoutube,
-  start: startYoutube,
-  end: endYoutube,
-} = useYoutubeStream()
-
-onMounted(() => {
-  initializeYoutube()
-})
-
-const youtubeQualityNote = computed(() =>
-  youtubeQualityUpscaled.value
-    ? `Your live window is ${youtubeSourceHeight.value}p, so this quality is an upscale. It won't look sharper than 1080p.`
-    : "Higher qualities need a faster upload and a stronger computer. Some are greyed out on computers that can't make them."
-)
-
-const youtubePhaseLabel = computed(
-  () =>
-    ({
-      idle: "Not streaming",
-      live: "Live on YouTube",
-      reconnecting: "Reconnecting…",
-      error: "Needs attention",
-    })[youtubeStatus.value.phase]
-)
-
-const youtubePhaseDotClass = computed(() => ({
-  "bg-gray-400": youtubeStatus.value.phase === "idle",
-  "bg-green-500": youtubeStatus.value.phase === "live",
-  "bg-amber-500 animate-pulse": youtubeStatus.value.phase === "reconnecting",
-  "bg-red-500": youtubeStatus.value.phase === "error",
-}))
-
-const ndiPhaseLabel = computed(() => {
-  if (ndiStatus.value.stalled) return "Broadcasting last frame"
-  return {
-    idle: "Not broadcasting",
-    starting: "Starting",
-    broadcasting: "Broadcasting",
-    error: "Needs attention",
-    unsupported: "Unsupported on this system",
-  }[ndiStatus.value.phase]
-})
-
-const ndiPhaseDotClass = computed(() => ({
-  "bg-gray-400": ndiStatus.value.phase === "idle",
-  "bg-amber-500 animate-pulse": ndiStatus.value.phase === "starting",
-  "bg-green-500": ndiStatus.value.phase === "broadcasting" && !ndiStatus.value.stalled,
-  "bg-amber-500": ndiStatus.value.phase === "broadcasting" && ndiStatus.value.stalled,
-  "bg-red-500": ndiStatus.value.phase === "error",
-  "bg-gray-500": ndiStatus.value.phase === "unsupported",
-}))
-
-const ndiResolution = computed(() =>
-  ndiStatus.value.width && ndiStatus.value.height
-    ? `${ndiStatus.value.width} x ${ndiStatus.value.height} at ${ndiStatus.value.fps} fps`
-    : `Waiting for live output at ${ndiStatus.value.fps} fps`
-)
-const runtimeMissing = computed(
-  () => ndiStatus.value.error?.code === "runtimeNotInstalled"
-)
-const capturePermissionNeeded = computed(() =>
-  ["required", "denied"].includes(ndiStatus.value.capturePermission)
-)
-const showWindowsNetworkHint = computed(
-  () =>
-    import.meta.client &&
-    navigator.userAgent.includes("Windows") &&
-    ndiStatus.value.phase === "broadcasting" &&
-    ndiStatus.value.connectionCount === 0
-)
-const showNdiActions = computed(
-  () =>
-    Boolean(ndiStatus.value.error?.recoverable) ||
-    runtimeMissing.value ||
-    capturePermissionNeeded.value
-)
-
-const liveWindowIsOpen = async () => {
-  const { getAllWebviewWindows } = await import(
-    "@tauri-apps/api/webviewWindow"
-  )
-  return (await getAllWebviewWindows()).some(
-    (window) => window.label === "live-output"
-  )
-}
-
-const handleNdiToggle = async (enabled: boolean) => {
-  appStore.setNdiEnabled(enabled)
-  if (!enabled) {
-    try {
-      await stopNdi()
-    } catch (error) {
-      console.warn("Could not stop NDI cleanly:", error)
-    }
-    return
-  }
-
-  if (!(await liveWindowIsOpen())) {
-    useToast().add({
-      title: "NDI will start with the live window",
-      icon: "i-bx-check-circle",
-    })
-    return
-  }
-  try {
-    await startNdi()
-  } catch (error: any) {
-    useToast().add({
-      title: "NDI could not start",
-      description: error?.message,
-      icon: "i-bx-error-circle",
-      color: "red",
-    })
-  }
-}
-
-const retryNdi = async () => {
-  if (!(await liveWindowIsOpen())) {
-    useToast().add({
-      title: "Open the live window before retrying NDI",
-      icon: "i-bx-info-circle",
-      color: "amber",
-    })
-    return
-  }
-  try {
-    await retryNdiCommand()
-  } catch (error: any) {
-    useToast().add({
-      title: "NDI retry failed",
-      description: error?.message,
-      icon: "i-bx-error-circle",
-      color: "red",
-    })
-  }
-}
-
-const openNdiCaptureSettings = async () => {
-  try {
-    await openCaptureSettings()
-  } catch (error: any) {
-    useToast().add({
-      title: "Could not open Screen Recording settings",
-      description: error?.message,
-      icon: "i-bx-error-circle",
-      color: "red",
-    })
-  }
-}
-
 let screenDetails: any
 
 const externalScreens = computed(() => {
@@ -893,7 +428,6 @@ const getBrowserDisplays = async () => {
 const debouncedGetDisplayDetails = useDebounceFn(getDisplayDetails, 500)
 
 onMounted(async () => {
-  if (isTauri) await initializeNdi()
   await getDisplayDetails()
 
   addEventListener("resize", async () => {

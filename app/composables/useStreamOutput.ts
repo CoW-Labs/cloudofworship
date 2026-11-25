@@ -1,3 +1,5 @@
+import { useAudioMixer } from "~/composables/useAudioMixer"
+
 // Frontend control for the desktop (Tauri) YouTube streaming feature. Talks to
 // the Rust `stream` module's stream_start/stream_stop/stream_status commands and
 // listens on the `stream://status` event. Mirrors useNdiBroadcast's shape:
@@ -66,19 +68,17 @@ export interface StreamPlan {
 
 export const DEFAULT_STREAM_QUALITY = "720p30"
 
-const formatTierMbps = (kbps: number) => {
-  const mbps = kbps / 1000
-  return Number.isInteger(mbps) ? `${mbps}` : mbps.toFixed(1)
-}
-
-// "720p 30 fps · 2.5 Mbps"; 2160 reads as 4K.
+// "720p 30 fps"; 2160 reads as 4K. The bitrate lives in the pre-flight hint,
+// not in the label.
 export const tierLabel = (tier: StreamTier) =>
-  `${tier.height === 2160 ? "4K" : `${tier.height}p`} ${tier.fps} fps · ${formatTierMbps(tier.videoKbps)} Mbps`
+  `${tier.height === 2160 ? "4K" : `${tier.height}p`} ${tier.fps} fps`
 
 // The operator's answer to the pre-flight check.
 export type PreflightChoice = "stream" | "window-only" | "cancel"
 
 const idleStatus = (): StreamStatus => ({ phase: "idle", error: null })
+
+const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent)
 
 const messageOf = (error: unknown): string =>
   typeof error === "string"
@@ -101,7 +101,8 @@ const UPLOAD_TEST_MAX_CHUNK = 16 * 1024 * 1024
 
 // The operator's stream setup survives restarts. It stays on this device only
 // (the settings panel says so) — never synced to the account.
-const SETTINGS_KEY = "cow-youtube-stream-settings"
+const SETTINGS_KEY = "cow-stream-settings"
+const LEGACY_SETTINGS_KEY = "cow-youtube-stream-settings"
 interface SavedSettings {
   streamKey?: string
   streamOnGoLive?: boolean
@@ -109,12 +110,19 @@ interface SavedSettings {
   source?: StreamSource
   checkBeforeStreaming?: boolean
   quality?: string
+  recordLocally?: boolean
 }
 let settingsHydrated = false
 
-const readSavedSettings = (): SavedSettings => {
+export const readSavedStreamSettings = (): SavedSettings => {
   try {
-    return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") as SavedSettings
+    const current = localStorage.getItem(SETTINGS_KEY)
+    const legacy = current === null ? localStorage.getItem(LEGACY_SETTINGS_KEY) : null
+    const saved = JSON.parse(current ?? legacy ?? "{}") as SavedSettings
+    if (legacy !== null) {
+      try { localStorage.setItem(SETTINGS_KEY, legacy) } catch {}
+    }
+    return saved
   } catch {
     return {}
   }
@@ -158,7 +166,7 @@ const isGestureError = (error: unknown) =>
   error instanceof DOMException &&
   (error.name === "InvalidAccessError" || /gesture/i.test(error.message))
 
-export const useYoutubeStream = () => {
+export const useStreamOutput = () => {
   const { isTauri } = useTauri()
   const isDesktop = isTauri && import.meta.client
   // Events fire after awaits, where Nuxt's context is gone, so each capture
@@ -167,35 +175,42 @@ export const useYoutubeStream = () => {
   const track = (event: string, properties?: Record<string, unknown>) =>
     nuxtApp.runWithContext(() => usePosthogCapture(event, properties))
 
-  const status = useState<StreamStatus>("yt-stream-status", idleStatus)
-  const isInvoking = useState<boolean>("yt-stream-pending", () => false)
-  const streamKey = useState<string>("yt-stream-key", () => "")
-  const source = useState<StreamSource>("yt-stream-source", () => "live-window")
+  const status = useState<StreamStatus>("stream-status", idleStatus)
+  const isInvoking = useState<boolean>("stream-pending", () => false)
+  const streamKey = useState<string>("stream-key", () => "")
+  const source = useState<StreamSource>("stream-source", () => "live-window")
   // When true, going live (opening the projection window) also starts the
   // YouTube stream automatically — one action, no separate trip to the panel.
-  const streamOnGoLive = useState<boolean>("yt-stream-on-go-live", () => false)
-  const audioDevices = useState<AudioDevice[]>("yt-stream-audio-devices", () => [])
+  const streamOnGoLive = useState<boolean>("stream-on-go-live", () => false)
+  const audioDevices = useState<AudioDevice[]>("stream-audio-devices", () => [])
   // The chosen audio input's index; "" means "no audio", null means "default".
-  const audioDevice = useState<string | null>("yt-stream-audio-device", () => null)
+  const audioDevice = useState<string | null>("stream-audio-device", () => null)
   // True when starting failed only because the window picker needs a fresh
   // click; the UI then shows a "choose the live window" button.
-  const needsPicker = useState<boolean>("yt-stream-needs-picker", () => false)
-  const stats = useState<StreamStats | null>("yt-stream-stats", () => null)
+  const needsPicker = useState<boolean>("stream-needs-picker", () => false)
+  const stats = useState<StreamStats | null>("stream-stats", () => null)
   // The pre-flight meter's latest reading (dB), null when nothing's arriving.
-  const meterDb = useState<number | null>("yt-stream-meter-db", () => null)
+  const meterDb = useState<number | null>("stream-meter-db", () => null)
   // Show the pre-flight check before each YouTube stream.
-  const checkBeforeStreaming = useState<boolean>("yt-stream-check-first", () => true)
-  const preflightOpen = useState<boolean>("yt-stream-preflight-open", () => false)
+  const checkBeforeStreaming = useState<boolean>("stream-check-first", () => true)
+  // Keep a copy of the broadcast on this computer (Movies/Cloud of Worship).
+  const recordLocally = useState<boolean>("stream-record-locally", () => false)
+  // True while the running session is also saving a copy on this computer.
+  const isRecording = useState<boolean>("stream-recording-active", () => false)
+  // True when the session only records: the live window is captured and saved,
+  // and nothing is sent to YouTube.
+  const isRecordOnly = useState<boolean>("stream-record-only", () => false)
+  const preflightOpen = useState<boolean>("stream-preflight-open", () => false)
   // The chosen quality tier, an id the backend knows (e.g. "1080p60").
-  const quality = useState<string>("yt-stream-quality", () => DEFAULT_STREAM_QUALITY)
+  const quality = useState<string>("stream-quality", () => DEFAULT_STREAM_QUALITY)
   // The tiers this computer offers, and the live window's height, from the
   // backend's plan. Empty until the plan has been read once.
-  const tiers = useState<StreamTier[]>("yt-stream-tiers", () => [])
-  const sourceHeight = useState<number | null>("yt-stream-source-height", () => null)
+  const tiers = useState<StreamTier[]>("stream-tiers", () => [])
+  const sourceHeight = useState<number | null>("stream-source-height", () => null)
 
   if (isDesktop && !settingsHydrated) {
     settingsHydrated = true
-    const saved = readSavedSettings()
+    const saved = readSavedStreamSettings()
     if (typeof saved.streamKey === "string") streamKey.value = saved.streamKey
     if (typeof saved.streamOnGoLive === "boolean") streamOnGoLive.value = saved.streamOnGoLive
     if (saved.audioDevice !== undefined) audioDevice.value = saved.audioDevice
@@ -204,7 +219,8 @@ export const useYoutubeStream = () => {
       checkBeforeStreaming.value = saved.checkBeforeStreaming
     }
     if (typeof saved.quality === "string") quality.value = saved.quality
-    watch([streamKey, streamOnGoLive, audioDevice, source, checkBeforeStreaming, quality], () => {
+    if (typeof saved.recordLocally === "boolean") recordLocally.value = saved.recordLocally
+    watch([streamKey, streamOnGoLive, audioDevice, source, checkBeforeStreaming, quality, recordLocally], () => {
       try {
         localStorage.setItem(
           SETTINGS_KEY,
@@ -215,6 +231,7 @@ export const useYoutubeStream = () => {
             source: source.value,
             checkBeforeStreaming: checkBeforeStreaming.value,
             quality: quality.value,
+            recordLocally: recordLocally.value,
           } satisfies SavedSettings)
         )
       } catch {
@@ -337,6 +354,8 @@ export const useYoutubeStream = () => {
                 if (message.payload.phase === "idle" || message.payload.phase === "error") {
                   stopCapture()
                   stats.value = null
+                  isRecording.value = false
+                  isRecordOnly.value = false
                 }
               }),
               listen<StreamStats>("stream://stats", (message) => {
@@ -344,6 +363,42 @@ export const useYoutubeStream = () => {
               }),
               listen<{ db: number }>("stream://audio-level", (message) => {
                 meterDb.value = message.payload.db
+              }),
+              listen<{ path: string; incomplete?: boolean }>("stream://recording", (message) => {
+                const saved = message.payload.path
+                useToast().add({
+                  title: message.payload.incomplete ? "Incomplete recording saved" : "Stream recording saved",
+                  description: saved.replace(/^.*\/Movies\//, "Movies/"),
+                  icon: "i-ph-record",
+                  timeout: 10000,
+                  actions: [
+                    {
+                      label: isMac ? "Show in Finder" : "Show in folder",
+                      click: () => {
+                        track("STREAM_RECORDING_REVEALED")
+                        void invokeTauri("reveal_in_file_manager", { path: saved }).catch((error) =>
+                          useToast().add({
+                            title: "Couldn't open the folder",
+                            description: messageOf(error),
+                            icon: "i-bx-error",
+                            color: "red",
+                          })
+                        )
+                      },
+                    },
+                  ],
+                })
+                track("STREAM_RECORDING_SAVED")
+              }),
+              listen<string>("stream://recording-error", (message) => {
+                isRecording.value = false
+                useToast().add({
+                  title: "Recording problem",
+                  description: message.payload,
+                  icon: "i-bx-error",
+                  color: "red",
+                  timeout: 0,
+                })
               }),
             ])
           )
@@ -406,7 +461,7 @@ export const useYoutubeStream = () => {
     } catch (error) {
       if (isGestureError(error)) {
         needsPicker.value = true
-        throw new Error("Choose the live output window to start the YouTube stream.")
+        throw new Error("Choose the live output window to start the stream.")
       }
       if (error instanceof DOMException && error.name === "NotAllowedError") {
         throw new Error("Window sharing was cancelled, so the stream didn't start.")
@@ -474,28 +529,51 @@ export const useYoutubeStream = () => {
 
   // Native capture by window ID; falls back to the in-page picker capture on
   // systems where the backend doesn't support it yet.
-  const startNativeWindowCapture = async () => {
+  const mixer = useAudioMixer()
+  // "Cloud of Worship 2026-11-25 09-30", in the computer's own time.
+  const recordingName = () => {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return `Cloud of Worship ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${now.getMilliseconds().toString().padStart(3, "0")}`
+  }
+
+  const startNativeWindowCapture = async (recordOnly = false) => {
     try {
-      return await invokeTauri<StreamStatus>("stream_start", {
-        streamKey: streamKey.value,
+      const name = recordLocally.value || recordOnly ? recordingName() : null
+      const started = await invokeTauri<StreamStatus>("stream_start", {
+        streamKey: recordOnly ? "" : streamKey.value,
         source: "native-window",
         audioDevice: audioDevice.value,
         quality: quality.value,
+        mixerSettings: mixer.settingsForStart(),
+        recordingName: name,
       })
+      isRecording.value = Boolean(name)
+      return started
     } catch (error) {
-      if (!messageOf(error).includes("isn't available on this OS")) throw error
+      if (recordOnly || !messageOf(error).includes("isn't available on this OS")) throw error
+      if (recordLocally.value) {
+        throw new Error("Local recording is not available for window sharing on this computer.")
+      }
       return startLiveWindowCapture()
     }
   }
 
-  const start = async () => {
+  const start = async (options: { recordOnly?: boolean } = {}) => {
     if (!isDesktop) return status.value
     isInvoking.value = true
+    const recordOnly = options.recordOnly === true
     try {
       stopCapture()
-      if (source.value === "live-window") {
+      if (recordOnly) {
+        status.value = await startNativeWindowCapture(true)
+        isRecordOnly.value = true
+      } else if (source.value === "live-window") {
         status.value = await startNativeWindowCapture()
       } else {
+        if (recordLocally.value) {
+          throw new Error("Local recording is available for the live window, not the test pattern.")
+        }
         status.value = await invokeTauri<StreamStatus>("stream_start", {
           streamKey: streamKey.value,
           source: source.value,
@@ -503,14 +581,17 @@ export const useYoutubeStream = () => {
           quality: quality.value,
         })
       }
-      track("YOUTUBE_STREAM_STARTED", {
+      track("STREAM_STARTED", {
+        recordOnly,
         source: source.value,
         quality: source.value === "live-window" ? quality.value : DEFAULT_STREAM_QUALITY,
       })
     } catch (error) {
       stopCapture()
+      isRecording.value = false
+      isRecordOnly.value = false
       status.value = { phase: "error", error: messageOf(error) }
-      track("YOUTUBE_STREAM_FAILED", {
+      track("STREAM_FAILED", {
         source: source.value,
         quality: quality.value,
         error: messageOf(error).slice(0, 120),
@@ -532,12 +613,14 @@ export const useYoutubeStream = () => {
       status.value = { phase: "error", error: messageOf(error) }
     } finally {
       isInvoking.value = false
+      isRecording.value = false
+      isRecordOnly.value = false
     }
     return status.value
   }
 
   // Asks the operator to confirm the pre-flight check; resolves with their
-  // choice. The check itself lives in YoutubePreflightModal.
+  // choice. The check itself lives in StreamPreflightModal.
   const requestPreflight = () => {
     resolvePreflightChoice?.("cancel")
     preflightOpen.value = true
@@ -636,6 +719,9 @@ export const useYoutubeStream = () => {
     stats: readonly(stats),
     meterDb: readonly(meterDb),
     checkBeforeStreaming,
+    recordLocally,
+    isRecording: readonly(isRecording),
+    isRecordOnly: readonly(isRecordOnly),
     quality,
     qualityChoices,
     qualityChoice,

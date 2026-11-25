@@ -236,7 +236,9 @@ export const useOperatorSession = () => {
       onMessage: (event, data) => {
         if (stageStreamFeed.handleMessage(event, data?.data)) return
         if (cameraShare.handleMessage(event, data?.data)) return
-        handleWebSocketMessage(data)
+        void handleWebSocketMessage(data).catch((error) =>
+          console.error("Failed to apply slide socket event:", error)
+        )
       },
       onConnected: () => {
         // Delivery state belongs to one admitted socket connection. The server

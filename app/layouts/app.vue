@@ -34,7 +34,8 @@
         :active-advert="currentState?.activeAdvert"
       />
       <UpgradePlanModal />
-      <YoutubePreflightModal v-if="isTauriApp && youtubeStreamingEnabled" />
+      <SlideConflictModal />
+      <StreamPreflightModal v-if="isTauriApp && streamingEnabled" />
       <OnboardingTour />
       <SatisfactionPromptModal ref="satisfactionPrompt" />
     </ClientOnly>
@@ -137,16 +138,16 @@ const { refreshLibrary } = useLibrary()
 const { fetchPlans } = useSubscriptionPlans()
 const { fetchUserSettings } = useUserSettings()
 const ndiBroadcast = useNdiBroadcast()
-const youtubeStream = useYoutubeStream()
-// Track stream status app-wide (not only while Display Settings is open), so
-// the Go Live controls always show whether YouTube is live.
-onMounted(() => youtubeStream.initialize())
-// Set while a "Go live on YouTube" request is opening the live window.
-let pendingYoutubeGoLive = false
+const streamOutput = useStreamOutput()
+// Track stream status app-wide (not only while Live Stream Settings is open), so
+// the Go Live controls always show whether the stream is live.
+onMounted(() => streamOutput.initialize())
+// Set while a "Go live and stream" request is opening the live window.
+let pendingStreamGoLive = false
 // Set when the operator chose "Live window only" in the pre-flight check.
-let skipYoutubeThisGoLive = false
+let skipStreamThisGoLive = false
 const isTauriApp = useTauri().isTauri
-const { isEnabled: youtubeStreamingEnabled } = useFeatureFlags("youtube-streaming")
+const { isEnabled: streamingEnabled } = useFeatureFlags("live-streaming")
 let tauriLiveWindowCloseListenerBound = false
 
 const { currentState } = storeToRefs(appStore)
@@ -321,6 +322,7 @@ const fetchChurch = async () => {
  * Throttled, because focus fires on every alt-tab between this window and the
  * live output, which during a service is constant.
  */
+const { refreshSubscriptionDetails } = useSubscriptionDetails()
 const PLAN_REVALIDATE_INTERVAL_MS = 5 * 60 * 1000
 // Seeded at setup so the boot fetch counts as the first confirmation.
 let lastPlanRevalidateAt = Date.now()
@@ -331,7 +333,9 @@ const revalidateChurchPlan = () => {
   if (Date.now() - lastPlanRevalidateAt < PLAN_REVALIDATE_INTERVAL_MS) return
 
   lastPlanRevalidateAt = Date.now()
-  fetchChurch()
+  // Not awaited: the plan check never blocks the window. Details follow the
+  // church so a plan that just changed decides whether they are fetched.
+  void fetchChurch().then(() => refreshSubscriptionDetails())
 }
 
 onMounted(() => {
@@ -481,21 +485,21 @@ emitter.on("selected-schedule", (schedule: Schedule) => {
   })
 })
 
-emitter.on("go-live", async (options?: { youtube?: boolean }) => {
+emitter.on("go-live", async (options?: { stream?: boolean }) => {
   const { isTauri } = useTauri()
-  // "Go live on YouTube" in the Go Live menu streams this once; the settings
+  // "Go live and stream" in the Go Live menu streams this once; the settings
   // toggle streams on every Go Live.
-  pendingYoutubeGoLive = options?.youtube === true
-  skipYoutubeThisGoLive = false
+  pendingStreamGoLive = options?.stream === true
+  skipStreamThisGoLive = false
 
   // Check the connection and sound first, unless the operator turned that off.
-  if (youtubeWillStreamOnGoLive() && youtubeStream.checkBeforeStreaming.value) {
-    const choice = await youtubeStream.requestPreflight()
+  if (willStreamOnGoLive() && streamOutput.checkBeforeStreaming.value) {
+    const choice = await streamOutput.requestPreflight()
     if (choice === "cancel") {
-      pendingYoutubeGoLive = false
+      pendingStreamGoLive = false
       return
     }
-    skipYoutubeThisGoLive = choice === "window-only"
+    skipStreamThisGoLive = choice === "window-only"
   }
 
   let browserLiveOpening: Promise<void> | undefined
@@ -515,14 +519,14 @@ emitter.on("go-live", async (options?: { youtube?: boolean }) => {
   // One flow: once the live window is up, also start the YouTube stream if the
   // operator asked for it and entered a key.
   await startYoutubeForLiveWindow()
-  pendingYoutubeGoLive = false
-  skipYoutubeThisGoLive = false
+  pendingStreamGoLive = false
+  skipStreamThisGoLive = false
 
   usePosthogCapture("GO_LIVE_BUTTON_CLICKED")
 })
 
 emitter.on("close-live-window", async () => {
-  await youtubeStream.stop()
+  await streamOutput.stop()
   await closeAllWindows()
   usePosthogCapture("CLOSE_LIVE_WINDOW_BUTTON_CLICKED")
 })
@@ -859,6 +863,8 @@ const downloadEssentialResources = async () => {
       }),
       refreshLibrary(),
       fetchPlans(),
+      // Feeds the expiry banner. Background only, never awaited by the UI.
+      refreshSubscriptionDetails(),
       saveAllBackgroundVideos(),
       // KJV Bible — only downloads once per device
       (async () => {
@@ -1175,34 +1181,41 @@ async function startNdiForLiveWindow() {
     useToast().add({
       title: "The live window opened without NDI",
       description:
-        error?.message || "Open Display Settings for details and retry options.",
+        error?.message || "Open Live Stream Settings for details and retry options.",
       icon: "i-bx-info-circle",
       color: "amber",
     })
   }
 }
 
-// Mirrors startNdiForLiveWindow: when the operator has turned on "stream to
-// YouTube when I go live" and entered a key, start the YouTube broadcast once
-// the live window is open (it is captured by window ID; see useYoutubeStream).
-function youtubeWillStreamOnGoLive() {
+// Mirrors startNdiForLiveWindow: when the operator has turned on "stream when I go live"
+// and entered a key, start the broadcast once
+// the live window is open (it is captured by window ID; see useStreamOutput).
+function willStreamOnGoLive() {
   return (
     useTauri().isTauri &&
-    youtubeStreamingEnabled.value &&
-    !skipYoutubeThisGoLive &&
-    (pendingYoutubeGoLive || youtubeStream.streamOnGoLive.value) &&
-    youtubeStream.hasStreamKey.value
+    streamingEnabled.value &&
+    !skipStreamThisGoLive &&
+    (pendingStreamGoLive || streamOutput.streamOnGoLive.value) &&
+    streamOutput.hasStreamKey.value
   )
 }
 
 async function startYoutubeForLiveWindow() {
-  if (!youtubeWillStreamOnGoLive()) return
+  // "Live window only" with the recording box ticked: save a copy of the live
+  // window without sending anything to YouTube.
+  const recordOnly =
+    skipStreamThisGoLive &&
+    streamOutput.recordLocally.value &&
+    useTauri().isTauri &&
+    streamingEnabled.value
+  if (!willStreamOnGoLive() && !recordOnly) return
   // Let the freshly opened live window finish its full-screen transition
   // before capturing it, so the capture picks up its final shape.
   await new Promise((resolve) => setTimeout(resolve, 2000))
-  const status = await youtubeStream.start()
-  if (status.phase === "error" && youtubeStream.needsPicker.value) {
-    offerYoutubeWindowPicker(status.error)
+  const status = await streamOutput.start({ recordOnly })
+  if (status.phase === "error" && streamOutput.needsPicker.value) {
+    offerStreamWindowPicker(status.error)
     return
   }
   if (status.phase === "error") showYoutubeStartError(status.error)
@@ -1210,9 +1223,9 @@ async function startYoutubeForLiveWindow() {
 
 // The window picker needs its own click (and a retry after a wrong pick); this
 // toast's button provides it.
-function offerYoutubeWindowPicker(reason: string | null) {
+function offerStreamWindowPicker(reason: string | null) {
   useToast().add({
-    title: "Start the YouTube stream",
+    title: "Start the stream",
     description:
       reason ||
       "Click below, then choose the “Cloud of Worship - Live Output” window (not the whole screen).",
@@ -1222,10 +1235,10 @@ function offerYoutubeWindowPicker(reason: string | null) {
       {
         label: "Choose live window",
         click: () => {
-          void youtubeStream.start().then((retry) => {
+          void streamOutput.start().then((retry) => {
             if (retry.phase !== "error") return
             // Wrong pick again (e.g. a whole screen): offer the picker again.
-            if (youtubeStream.needsPicker.value) offerYoutubeWindowPicker(retry.error)
+            if (streamOutput.needsPicker.value) offerStreamWindowPicker(retry.error)
             else showYoutubeStartError(retry.error)
           })
         },
@@ -1236,8 +1249,8 @@ function offerYoutubeWindowPicker(reason: string | null) {
 
 function showYoutubeStartError(error: string | null) {
   useToast().add({
-    title: "Live window opened, but YouTube streaming didn't start",
-    description: error || "Open Display Settings to check the stream.",
+    title: "Live window opened, but streaming didn't start",
+    description: error || "Open Live Stream Settings to check the stream.",
     icon: "i-bx-info-circle",
     color: "amber",
   })
@@ -1259,7 +1272,7 @@ async function trackTauriLiveWindow(liveWindow: any) {
     await liveWindow.once("tauri://close-requested", async () => {
       console.log("Live window closed")
       try {
-        await youtubeStream.stop()
+        await streamOutput.stop()
         await ndiBroadcast.stop()
       } catch (error) {
         console.warn("NDI cleanup after live window close failed:", error)
@@ -1343,6 +1356,21 @@ const displayHotplug = useDisplayHotplug(async (added, all) => {
 
 onBeforeUnmount(() => displayHotplug.stop())
 
+/**
+ * A window created with `fullscreen: true` goes full screen on the screen the
+ * app is on, whatever x/y it was given (macOS), so output windows are created
+ * windowed on their screen and made full screen from there.
+ */
+async function fullscreenOnScreen(win: any, x: number, y: number) {
+  try {
+    const { LogicalPosition } = await import("@tauri-apps/api/dpi")
+    await win.setPosition(new LogicalPosition(x, y))
+    await win.setFullscreen(true)
+  } catch (error) {
+    console.warn("Could not make the output window full screen:", error)
+  }
+}
+
 async function openTauriLiveWindow() {
   try {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow")
@@ -1374,7 +1402,7 @@ async function openTauriLiveWindow() {
       await trackTauriLiveWindow(existingLiveWindow)
       await existingLiveWindow.setFocus()
       await startNdiForLiveWindow()
-      if (youtubeWillStreamOnGoLive()) {
+      if (willStreamOnGoLive()) {
         await existingLiveWindow.setFullscreen(true).catch(console.error)
       }
       return
@@ -1451,11 +1479,13 @@ async function openTauriLiveWindow() {
       }
     }
 
-    // Get fullscreen setting from store. Streaming to YouTube always opens it
+    // Get fullscreen setting from store. Streaming always opens it
     // full screen (on its own desktop), so the broadcast fills the frame.
+    // The stream's picture size comes from the chosen quality, not from this
+    // window (see the capture's output size).
     const isFullscreen =
       (appStore.currentState.settings.liveWindowFullscreen ?? true) ||
-      youtubeWillStreamOnGoLive()
+      willStreamOnGoLive()
 
     // Window options are in logical units while monitors report physical
     // pixels, so a Retina/scaled projector needs the scale factor divided out —
@@ -1470,7 +1500,9 @@ async function openTauriLiveWindow() {
       decorations: !isFullscreen, // Show decorations only when not fullscreen
       resizable: true,
       closable: true,
-      fullscreen: isFullscreen,
+      // Full screen is applied once the window is on its screen (see
+      // fullscreenOnScreen); asked for at creation, macOS ignores x/y.
+      fullscreen: false,
       x: targetMonitor.position.x / scale,
       y: targetMonitor.position.y / scale,
       width: targetMonitor.size.width / scale,
@@ -1479,6 +1511,13 @@ async function openTauriLiveWindow() {
 
     // Capture can only resolve the native window after Tauri confirms creation.
     await liveWindow.once("tauri://created", async () => {
+      if (isFullscreen) {
+        await fullscreenOnScreen(
+          liveWindow,
+          targetMonitor.position.x / scale,
+          targetMonitor.position.y / scale
+        )
+      }
       await trackTauriLiveWindow(liveWindow)
       await startNdiForLiveWindow()
     })
@@ -1788,7 +1827,7 @@ async function openTauriStageWindow() {
       ...(monitor
         ? {
             decorations: false,
-            fullscreen: true,
+            fullscreen: false,
             x: monitor.position.x / scale,
             y: monitor.position.y / scale,
             width: monitor.size.width / scale,
@@ -1796,6 +1835,15 @@ async function openTauriStageWindow() {
           }
         : { decorations: true, fullscreen: false, width: 1280, height: 720 }),
     })
+    if (monitor) {
+      await stageWindow.once("tauri://created", () =>
+        fullscreenOnScreen(
+          stageWindow,
+          monitor.position.x / scale,
+          monitor.position.y / scale
+        )
+      )
+    }
 
     await stageWindow.once("tauri://error", (event: any) => {
       console.error("Stage display window failed to open:", event)
@@ -1907,12 +1955,19 @@ async function openTauriSlidesWindow(targetId: string): Promise<boolean> {
     resizable: true,
     closable: true,
     decorations: false,
-    fullscreen: true,
+    fullscreen: false,
     x: monitor.position.x / scale,
     y: monitor.position.y / scale,
     width: monitor.size.width / scale,
     height: monitor.size.height / scale,
   })
+  await slidesWindow.once("tauri://created", () =>
+    fullscreenOnScreen(
+      slidesWindow,
+      monitor.position.x / scale,
+      monitor.position.y / scale
+    )
+  )
   await slidesWindow.once("tauri://error", (event: any) => {
     console.error("Slides-only display window failed to open:", event)
   })

@@ -150,6 +150,7 @@ import {
   FontSize as TipTapFontSize,
 } from "@tiptap/extension-text-style"
 import { FontFamily as TipTapFontFamily } from "@tiptap/extension-font-family"
+import { FontWeight as TipTapFontWeight } from "~/utils/tiptapFontWeight"
 import { asFontFamily } from "~/utils/fontFamily"
 
 const props = defineProps<{
@@ -230,6 +231,7 @@ const getCommonExtensions = (placeholder: string, includeHeading = true) => {
     TipTapFontFamily.configure({
       types: ["textStyle"],
     }),
+    TipTapFontWeight,
     Color.configure({
       types: ["textStyle"],
     }),
@@ -313,8 +315,21 @@ const syncAllEditorContents = (contents: Array<string | undefined> = []) => {
   syncEditorContent(uneditableEditorThree.value, contents[2] || "")
 }
 
-// Function to apply default white color to editor
-const applyDefaultWhiteColor = (editor: any) => {
+// Whether the free layout box showing a content slot sets its own colour.
+const slotHasOwnColour = (slot: number) =>
+  !!textBoxesOf(props.slide)?.some((box) => box.source === slot && box.color)
+
+// The editors paint new text white by default. Inside a box with its own colour
+// that white would leak into typed words (the browser copies the element's
+// inline colour when it inserts text), so those editors set none.
+const editorColourStyle = (slot: number) =>
+  slotHasOwnColour(slot) ? "" : "color: #ffffff;"
+
+// Function to apply default white color to editor. A free layout box that sets
+// its own colour (a template's dark words on a light ground) keeps it instead,
+// or every word typed into it would come out white.
+const applyDefaultWhiteColor = (editor: any, slot?: number) => {
+  if (slot !== undefined && slotHasOwnColour(slot)) return
   queueEditorCommand(editor, (e) => e.chain().setColor("#ffffff").run())
 }
 
@@ -395,14 +410,16 @@ const editorOne = ref(
     editorProps: {
       attributes: {
         class: "tiptap-editor focus:outline-none min-h-[40px] px-4",
-        style: "color: #ffffff;",
+        get style() {
+          return editorColourStyle(0)
+        },
       },
     },
     onCreate: ({ editor }) => {
       emitDefaultEditableEditor(0, editor)
 
       // Apply default white color
-      applyDefaultWhiteColor(editor)
+      applyDefaultWhiteColor(editor, 0)
 
       // Apply default font if set
       if (
@@ -441,14 +458,16 @@ const editorTwo = ref(
     editorProps: {
       attributes: {
         class: "tiptap-editor focus:outline-none min-h-[100px] px-4",
-        style: "color: #ffffff;",
+        get style() {
+          return editorColourStyle(1)
+        },
       },
     },
     onCreate: ({ editor }) => {
       emitDefaultEditableEditor(1, editor)
 
       // Apply default white color
-      applyDefaultWhiteColor(editor)
+      applyDefaultWhiteColor(editor, 1)
 
       // Apply default font if set
       if (
@@ -478,12 +497,14 @@ const editorThree = ref(
     editorProps: {
       attributes: {
         class: "tiptap-editor focus:outline-none min-h-[150px] px-4",
-        style: "color: #ffffff;",
+        get style() {
+          return editorColourStyle(2)
+        },
       },
     },
     onCreate: ({ editor }) => {
       // Apply default white color
-      applyDefaultWhiteColor(editor)
+      applyDefaultWhiteColor(editor, 2)
 
       // Apply default font if set
       if (

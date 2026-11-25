@@ -467,7 +467,7 @@ export default function useSlides() {
   }
 
   /**
-   * Batch update slides online
+   * Save a new slide order online (index only)
    */
   const batchUpdateSlides = async (slides: Slide[]): Promise<Slide[]> => {
     if (!online.value) {
@@ -488,16 +488,20 @@ export default function useSlides() {
       }
 
       loading.value = true
-      const transportSlides = await Promise.all(
-        slides.map((slide) => toTransportSafeSlide(slide))
-      )
+      // Every caller is a reorder, so only the order goes. Sending whole
+      // slides wrote this device's copy of each one over the server's, which
+      // undid a teammate's newer edit and counted as an edit to every slide.
+      const order = slides
+        .filter((slide) => !!slide._id)
+        .map((slide) => ({ _id: slide._id, index: slide.index }))
+      if (!order.length) return []
       // appStore.setSlidesLoading(true)
 
       const { data, error } = await useAPIFetch(
         `/church/${churchId}/schedules/${activeSchedule._id}/slides/batch`,
         {
           method: 'PUT',
-          body: transportSlides,
+          body: order,
           key: 'batch-update-slides',
           dedupe: 'defer',
         }

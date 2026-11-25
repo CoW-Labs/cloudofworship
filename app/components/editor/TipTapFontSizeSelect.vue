@@ -57,6 +57,8 @@ const DEFAULT_FONT_SIZE = 100
 
 const props = defineProps<{
   editor?: Editor
+  /** A size to show instead of the editor's, for a text box with no editor. */
+  value?: number
 }>()
 
 const emit = defineEmits<{
@@ -92,7 +94,8 @@ const readFontSize = () => {
 }
 
 const syncFromEditor = () => {
-  fontSize.value = readFontSize()
+  fontSize.value =
+    props.value !== undefined ? clampFontSize(props.value) : readFontSize()
 }
 
 // Every doc or selection change goes through `transaction`, so one listener
@@ -113,6 +116,8 @@ watch(
   },
   { immediate: true }
 )
+
+watch(() => props.value, syncFromEditor)
 
 onBeforeUnmount(() => {
   detachListener?.()

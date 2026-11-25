@@ -1,4 +1,5 @@
 import { useOnline } from "@vueuse/core"
+import { computed, onScopeDispose, reactive } from "vue"
 import posthog from "posthog-js"
 import type { Slide } from "~/types"
 import { useAppStore } from "~/store/app"
@@ -7,7 +8,15 @@ import {
   flushSlideShadowWrites,
   useSlideRepository,
 } from "~/composables/useSlideRepository"
-import { isNetworkError, isNotFoundError } from "~/utils/apiErrors"
+import {
+  getAPIErrorStatus,
+  getConflictSlide,
+  isConflictError,
+  isNetworkError,
+  isNotFoundError,
+} from "~/utils/apiErrors"
+import { forgetOwnSlideRev, noteSlideRev, runSlideSave } from "~/utils/slideRev"
+import { notifySlideDatabaseChanged } from "~/composables/useSlideDatabaseNotifications"
 import { onSocketConnected } from "~/composables/useSocketIO"
 import { slideUpdatePath, toSlideUpdatePayload } from "~/utils/slideSync"
 
@@ -37,9 +46,29 @@ import { slideUpdatePath, toSlideUpdatePayload } from "~/utils/slideSync"
  */
 const RETRY_INTERVAL_MS = 30_000
 
+/**
+ * A slide edit the server refused because someone saved the slide first (409).
+ * Both versions are kept: the person's edit stays in IndexedDB as a pending
+ * record and the server's copy is held here, so nothing is overwritten until
+ * they choose. Memory only on purpose. After a reload the pending record is
+ * retried, meets the same 409 and lands back here, instead of a stored
+ * "conflict" that could outlive the thing it describes.
+ */
+export type SlideConflict = {
+  serverId: string
+  scheduleId: string
+  slideId: string
+  serverSlide: Slide
+  localSlide: Slide
+  localRevision: number
+}
+const slideConflicts = reactive(new Map<string, SlideConflict>())
+const rejectedRevisions = new Map<string, number>()
+
 let flushInFlight: Promise<void> | null = null
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 let triggersInstalled = false
+let onServerSlide: ((slide: Slide, acceptedTheirs: boolean) => void) | undefined
 
 /**
  * Captured at install time. Flushes fire from timers and socket callbacks,
@@ -54,7 +83,7 @@ const disarmRetry = () => {
   retryTimer = null
 }
 
-const armRetry = () => {
+export const scheduleSlideResync = () => {
   if (retryTimer) return
   retryTimer = setTimeout(() => {
     retryTimer = null
@@ -63,153 +92,181 @@ const armRetry = () => {
 }
 
 /**
- * Mark a slide as not yet delivered so the next flush picks it up. Called from
- * the edit path when a PUT fails at the network layer.
+ * The editor and retry queue share the same write path. Re-read the durable
+ * draft after taking the lock so a completed or superseded edit never sends.
  */
-export const markSlideUnsynced = async (slide: Slide) => {
-  if (!slide?.scheduleId || !slide?.id) return
-  try {
-    // The editor write is coalesced. Flush it first so we mark the exact latest
-    // durable snapshot, not an older record or no record at all.
+export const savePendingSlide = (
+  churchId: string,
+  scheduleId: string,
+  slideId: string,
+  serverId: string,
+  resolution?: SlideConflict
+) =>
+  runSlideSave(serverId, async () => {
+    const conflict = slideConflicts.get(serverId)
+    if (conflict !== resolution) return { status: "skipped" } as const
+
     await flushSlideShadowWrites()
     const repository = useSlideRepository()
-    await repository.markSlideSyncState(slide.scheduleId, slide.id, "pending")
-    armRetry()
-  } catch (error) {
-    console.error("Failed to mark slide unsynced:", error)
-  }
-}
+    const record = await repository.getStoredSlide(scheduleId, slideId)
+    if (
+      record?.serverId !== serverId ||
+      !record.resyncRequestedAt ||
+      record.deletedAt ||
+      (record.slide.churchId && record.slide.churchId !== churchId)
+    ) {
+      if (resolution) slideConflicts.delete(serverId)
+      return { status: "skipped" } as const
+    }
+    if (resolution && resolution.localRevision !== record.localRevision) {
+      slideConflicts.set(serverId, {
+        ...resolution,
+        localSlide: record.slide,
+        localRevision: record.localRevision,
+      })
+      return { status: "conflict" } as const
+    }
 
-/**
- * Push every pending slide edit to the server. Safe to call concurrently —
- * overlapping callers await the in-flight pass rather than double-sending.
- */
+    const body = await toSlideUpdatePayload(
+      record.slide,
+      resolution ? resolution.serverSlide.rev ?? 0 : undefined
+    )
+    const send = () =>
+      useAPIFetch<Slide>(slideUpdatePath(churchId, scheduleId, serverId), {
+        method: "PUT",
+        body,
+      })
+    const { data, error } = await (resyncNuxtApp
+      ? resyncNuxtApp.runWithContext(send)
+      : send())
+    if (!error?.value) {
+      rejectedRevisions.delete(serverId)
+      const saved = data?.value
+      noteSlideRev(serverId, saved?.rev)
+      await repository.markSlideSyncState(
+        scheduleId,
+        slideId,
+        "synced",
+        record.localRevision,
+        saved?.rev
+      )
+      slideConflicts.delete(serverId)
+      if (saved) onServerSlide?.(saved, false)
+      return { status: "saved", slide: saved } as const
+    }
+
+    const serverSlide = getConflictSlide(error.value)
+    if (isConflictError(error.value) && serverSlide) {
+      await flushSlideShadowWrites()
+      const latest =
+        (await repository.getStoredSlide(scheduleId, slideId)) ?? record
+      slideConflicts.set(serverId, {
+        serverId,
+        scheduleId,
+        slideId,
+        serverSlide,
+        localSlide: latest.slide,
+        localRevision: latest.localRevision,
+      })
+      usePosthogCapture("SLIDE_CONFLICT_DETECTED", {
+        slideType: latest.slide.type,
+      })
+      return { status: "conflict" } as const
+    }
+
+    if (isNotFoundError(error.value)) {
+      await repository.markSlideSyncState(
+        scheduleId,
+        slideId,
+        "synced",
+        record.localRevision
+      )
+      slideConflicts.delete(serverId)
+      rejectedRevisions.delete(serverId)
+      return { status: "missing" } as const
+    }
+
+    const status = getAPIErrorStatus(error.value)
+    if (
+      status &&
+      status >= 400 &&
+      status < 500 &&
+      status !== 408 &&
+      status !== 429
+    ) {
+      // Keep the draft, but don't send an identical rejected body every 30s.
+      rejectedRevisions.set(serverId, record.localRevision)
+    } else if (!resolution) {
+      scheduleSlideResync()
+    }
+    return { status: "failed", error: error.value } as const
+  })
+
+/** Push pending edits without duplicating a concurrent retry pass. */
 export const flushPendingSlides = async (): Promise<void> => {
   if (flushInFlight) return flushInFlight
 
   const runFlush = async () => {
-    const authStore = useAuthStore()
+    const churchId = useAuthStore().user?.churchId
     const appStore = useAppStore()
     const repository = useSlideRepository()
+    const isRetryable = (record: {
+      serverId?: string
+      localRevision: number
+      slide: Slide
+    }) =>
+      !!record.serverId &&
+      !slideConflicts.has(record.serverId) &&
+      rejectedRevisions.get(record.serverId) !== record.localRevision &&
+      (!churchId ||
+        !record.slide.churchId ||
+        record.slide.churchId === churchId)
 
-    // Read the queue before any other guard. Arming the retry timer without
-    // knowing there is work would leave a logged-out or offline app polling
-    // every 30s forever, since each firing re-arms.
-    let records: Awaited<ReturnType<typeof repository.getPendingSlides>>
     try {
-      records = await repository.getPendingSlides()
-    } catch (error) {
-      console.error("Failed to read pending slides:", error)
-      return
-    }
-
-    // A record with no `serverId` was never created server side. Those belong
-    // to the create flow, which owns its own retry; a PUT to a nonexistent id
-    // would 404 and delete the slide out from under the operator.
-    const retryable = records.filter(
-      (record) => record.serverId
-    )
-    if (!retryable.length) {
-      disarmRetry()
-      return
-    }
-
-    // Work is queued but we cannot send it yet. Keep the timer armed so the
-    // pass repeats once sign-in completes or the connection returns.
-    const churchId = authStore.user?.churchId
-    if (!churchId || !navigator.onLine) {
-      armRetry()
-      return
-    }
-
-    let delivered = 0
-    let failed = 0
-
-    for (const record of retryable) {
-      // `record` was read at the top of this pass, so it is the newest local
-      // copy. An edit landing *during* the pass bumps `localRevision`, which
-      // the guard on the "synced" write below catches.
-      const slide = record.slide
-      try {
-        const { error } = await useAPIFetch(
-          slideUpdatePath(churchId, slide.scheduleId, record.serverId!),
-          { method: "PUT", body: await toSlideUpdatePayload(slide) }
-        )
-
-        if (!error?.value) {
-          delivered += 1
-          await repository.markSlideSyncState(
-            slide.scheduleId,
-            slide.id,
-            "synced",
-            record.localRevision
-          )
-          continue
-        }
-
-        // The slide is gone server side. Retrying forever would keep the queue
-        // permanently dirty, so drop it from the retry set and let the existing
-        // 404 handling remove it from the schedule.
-        if (isNotFoundError(error.value)) {
-          await repository.markSlideSyncState(
-            slide.scheduleId,
-            slide.id,
-            "synced",
-            record.localRevision
-          )
-          continue
-        }
-
-        // Still unreachable — leave it pending for the next pass.
-        if (isNetworkError(error.value)) {
-          failed += 1
-          break
-        }
-
-        // A real server rejection (validation, auth). Retrying an identical
-        // body will fail identically, so stop retrying this one.
-        failed += 1
-        console.error("Slide resync rejected by server:", error.value)
-        await repository.markSlideSyncState(
-          slide.scheduleId,
-          slide.id,
-          "synced",
-          record.localRevision
-        )
-      } catch (error) {
-        failed += 1
-        console.error("Slide resync failed:", error)
-        break
-      }
-    }
-
-    if (delivered) {
-      appStore.setLastSynced(new Date().toISOString())
-      posthog.capture?.("slide_resync_delivered", {
-        delivered,
-        failed,
-        queued: retryable.length,
-      })
-    }
-
-    // A local edit may have landed while the request was in flight. In that
-    // case the revision guard above correctly leaves it pending, so determine
-    // timer state from the database instead of the stale counters from this
-    // pass. This also catches a different slide being queued concurrently.
-    try {
-      const remaining = await repository.getPendingSlides()
-      if (
-        remaining.some(
-          (record) => record.serverId
-        )
-      ) {
-        armRetry()
-      } else {
+      await flushSlideShadowWrites()
+      const records = (await repository.getPendingSlides()).filter(isRetryable)
+      if (!records.length) {
         disarmRetry()
+        return
       }
+      if (!churchId || !navigator.onLine) {
+        scheduleSlideResync()
+        return
+      }
+
+      let delivered = 0
+      let failed = 0
+      for (const record of records) {
+        const result = await savePendingSlide(
+          churchId,
+          record.scheduleId,
+          record.id,
+          record.serverId!
+        )
+        if (result.status === "saved") delivered += 1
+        if (result.status === "conflict") failed += 1
+        if (result.status === "failed") {
+          failed += 1
+          if (isNetworkError(result.error)) break
+          console.error("Slide resync rejected by server:", result.error)
+        }
+      }
+
+      if (delivered) {
+        appStore.setLastSynced(new Date().toISOString())
+        posthog.capture?.("slide_resync_delivered", {
+          delivered,
+          failed,
+          queued: records.length,
+        })
+      }
+
+      const remaining = await repository.getPendingSlides()
+      if (remaining.some(isRetryable)) scheduleSlideResync()
+      else disarmRetry()
     } catch (error) {
-      console.error("Failed to verify pending slide queue:", error)
-      armRetry()
+      console.error("Slide resync failed:", error)
+      scheduleSlideResync()
     }
   }
 
@@ -217,17 +274,111 @@ export const flushPendingSlides = async (): Promise<void> => {
     resyncNuxtApp ? resyncNuxtApp.runWithContext(runFlush) : runFlush()
   ).finally(() => {
     flushInFlight = null
-  }) as Promise<void>
+  })
 
   return flushInFlight
 }
+
+const resolveKeepMine = async (serverId: string) => {
+  const conflict = slideConflicts.get(serverId)
+  const churchId = useAuthStore().user?.churchId
+  if (!conflict || !churchId) return false
+  const result = await savePendingSlide(
+    churchId,
+    conflict.scheduleId,
+    conflict.slideId,
+    serverId,
+    conflict
+  )
+  if (result.status === "failed") throw result.error
+  if (result.status !== "saved") return false
+  useAppStore().setLastSynced(new Date().toISOString())
+  return true
+}
+
+const resolveKeepTheirs = (serverId: string) => {
+  const appStore = useAppStore()
+  return runSlideSave(serverId, async () => {
+    const conflict = slideConflicts.get(serverId)
+    if (!conflict) return false
+    await flushSlideShadowWrites()
+    const repository = useSlideRepository()
+    const draft = await repository.getStoredSlide(
+      conflict.scheduleId,
+      conflict.slideId
+    )
+    if (
+      draft?.serverId !== serverId ||
+      !draft.resyncRequestedAt ||
+      draft.deletedAt
+    ) {
+      slideConflicts.delete(serverId)
+      return false
+    }
+    if (draft.localRevision !== conflict.localRevision) {
+      slideConflicts.set(serverId, {
+        ...conflict,
+        localSlide: draft.slide,
+        localRevision: draft.localRevision,
+      })
+      return false
+    }
+    const slide = {
+      ...conflict.serverSlide,
+      _id: serverId,
+      id: conflict.slideId,
+      scheduleId: conflict.scheduleId,
+      rev: conflict.serverSlide.rev ?? 0,
+    }
+    if (!(await repository.replacePendingSlide(slide, draft.localRevision))) {
+      return false
+    }
+    if (appStore.activeSlidesById.has(slide.id)) {
+      appStore.setActiveSlides(
+        appStore.activeSlides.map((active) =>
+          active.id === slide.id && active.scheduleId === slide.scheduleId
+            ? slide
+            : active
+        )
+      )
+    }
+    notifySlideDatabaseChanged()
+    forgetOwnSlideRev(serverId)
+    rejectedRevisions.delete(serverId)
+    slideConflicts.delete(serverId)
+    onServerSlide?.(slide, true)
+    return true
+  })
+}
+
+export const useSlideConflicts = () => {
+  const authStore = useAuthStore()
+  return {
+    conflicts: computed(() =>
+      [...slideConflicts.values()].filter(
+        ({ localSlide }) => localSlide.churchId === authStore.user?.churchId
+      )
+    ),
+    resolveKeepMine,
+    resolveKeepTheirs,
+  }
+}
+
+export const hasSlideConflict = (serverId?: string) =>
+  !!serverId && slideConflicts.has(serverId)
 
 /**
  * Install the flush triggers. Idempotent — the operator window may mount the
  * host component more than once, and the queue is process-wide.
  */
-export const useSlideResync = () => {
-  if (triggersInstalled) return { flushPendingSlides, markSlideUnsynced }
+export const useSlideResync = (onSlide?: typeof onServerSlide) => {
+  if (onSlide) {
+    onServerSlide = onSlide
+    onScopeDispose(() => {
+      if (onServerSlide === onSlide) onServerSlide = undefined
+    })
+  }
+  if (triggersInstalled) return { flushPendingSlides }
   triggersInstalled = true
 
   const nuxtApp = useNuxtApp()
@@ -247,7 +398,7 @@ export const useSlideResync = () => {
   // before the queue drained — is only recoverable at startup.
   void flushPendingSlides()
 
-  return { flushPendingSlides, markSlideUnsynced }
+  return { flushPendingSlides }
 }
 
 export default useSlideResync

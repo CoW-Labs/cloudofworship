@@ -31,8 +31,8 @@
           'w-full h-full transition-all text-left rounded-lg overflow-hidden',
           { 'opacity-70 ': selectable },
         ]"
-        @click="!isLocked && $emit('click')"
-        @dblclick.prevent="!isLocked && $emit('take-live')"
+        @click="onCardClick"
+        @dblclick.prevent="onCardDoubleClick"
       >
         <DeferredSlidePreview
           preview-class="slide-preview text-white overflow-hidden md-preview"
@@ -365,6 +365,31 @@ const emit = defineEmits([
   "take-live",
   "pair-drop",
 ])
+
+// A double-click is two clicks and then a dblclick. In the grid a click opens
+// the slide in the editor, so without this a double-click would open it AND take
+// it live. The grid's click waits a beat; a double-click cancels it, leaving
+// only "take live". Elsewhere the click fires at once.
+const DOUBLE_CLICK_WINDOW_MS = 250
+let pendingClick: ReturnType<typeof setTimeout> | null = null
+const clearPendingClick = () => {
+  if (pendingClick) clearTimeout(pendingClick)
+  pendingClick = null
+}
+const onCardClick = () => {
+  if (isLocked.value) return
+  if (!props.gridType) return emit("click")
+  clearPendingClick()
+  pendingClick = setTimeout(() => {
+    pendingClick = null
+    emit("click")
+  }, DOUBLE_CLICK_WINDOW_MS)
+}
+const onCardDoubleClick = () => {
+  clearPendingClick()
+  if (!isLocked.value) emit("take-live")
+}
+onBeforeUnmount(clearPendingClick)
 
 // ── Drag a slide onto a camera to pair them ─────────────────────────────────
 // A type of our own, so the grid's media-file drop (which looks for "Files")

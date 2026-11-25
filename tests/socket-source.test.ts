@@ -10,6 +10,8 @@ vi.mock("socket.io-client", () => ({
     const socket = {
       connected: false,
       on: vi.fn(), removeAllListeners: vi.fn(), disconnect: vi.fn(),
+      // Reconnect events live on the Manager.
+      io: { on: vi.fn(), removeAllListeners: vi.fn() },
     }
     mocks.connections.push({ options, socket })
     return socket
@@ -23,6 +25,14 @@ vi.mock("~/store/auth", () => ({
   useAuthStore: () => ({ user: { _id: "user", fullname: "Operator" }, church: { _id: "church" } }),
 }))
 
+// The socket reads its auth through a callback, so each reconnect gets a fresh token.
+const authOf = (options: any) => {
+  let auth: any
+  if (typeof options.auth === "function") options.auth((value: any) => { auth = value })
+  else auth = options.auth
+  return auth
+}
+
 let scope: ReturnType<typeof effectScope>
 let managers: ReturnType<typeof useSocketIO>[]
 
@@ -33,6 +43,11 @@ beforeEach(() => {
   vi.stubGlobal("useRuntimeConfig", () => ({ public: { BASE_URL: "http://localhost:4500/api/v1" } }))
   vi.stubGlobal("useAuthToken", () => ({ getToken: () => "test-token" }))
   vi.stubGlobal("useNuxtApp", () => ({ provide: vi.fn() }))
+  vi.stubGlobal("document", {
+    visibilityState: "visible",
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  })
 })
 
 afterEach(() => {
@@ -70,7 +85,7 @@ describe("operator socket source identity", () => {
     managers.push(otherSchedule)
     otherSchedule.connect()
 
-    const identities = mocks.connections.map(({ options }) => options.auth)
+    const identities = mocks.connections.map(({ options }) => authOf(options))
     expect(identities).toHaveLength(3)
     expect(identities[0].liveSourceId).toEqual(expect.any(String))
     expect(identities[0].liveSourceId.length).toBeGreaterThan(0)
@@ -82,6 +97,6 @@ describe("operator socket source identity", () => {
     const manager = scope.run(() => useSocketIO({ scheduleId: "schedule", client }))!
     managers.push(manager)
     manager.connect()
-    expect(mocks.connections[0].options.auth).not.toHaveProperty("liveSourceId")
+    expect(authOf(mocks.connections[0].options)).not.toHaveProperty("liveSourceId")
   })
 })

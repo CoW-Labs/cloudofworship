@@ -16,10 +16,15 @@ export type SlideWriteOptions = {
    * flight, or while the device is offline.
    */
   requestResync?: boolean | ((slide: Slide) => boolean)
+  preservePending?: boolean | ((slide: Slide) => boolean)
 }
 
-export type ReplaceScheduleOptions = SlideWriteOptions & {
+export type ReplaceScheduleOptions = Omit<
+  SlideWriteOptions,
+  "preservePending"
+> & {
   removeMissing?: boolean
+  updatePendingOrder?: boolean
   preservePending?: boolean
 }
 
@@ -50,10 +55,15 @@ export interface SlideRepository {
     scheduleId: string,
     slideId: string,
     syncState: SlideSyncState,
-    expectedLocalRevision?: number
+    expectedLocalRevision?: number,
+    serverRev?: number
   ): Promise<void>
   putSlide(slide: Slide, options?: SlideWriteOptions): Promise<void>
   putSlides(slides: readonly Slide[], options?: SlideWriteOptions): Promise<void>
+  replacePendingSlide(
+    slide: Slide,
+    expectedLocalRevision: number
+  ): Promise<boolean>
   replaceScheduleSlides(
     scheduleId: string,
     slides: readonly Slide[],
@@ -84,6 +94,11 @@ const resolveSyncState = (slide: Slide, options?: SlideWriteOptions) => {
   return slide._id ? "synced" : "pending"
 }
 
+const shouldPreservePending = (slide: Slide, options?: SlideWriteOptions) =>
+  typeof options?.preservePending === "function"
+    ? options.preservePending(slide)
+    : options?.preservePending === true
+
 const resolveRequestResync = (slide: Slide, options?: SlideWriteOptions) =>
   typeof options?.requestResync === "function"
     ? options.requestResync(slide)
@@ -110,39 +125,56 @@ export const createSlideRepository = (
 
   const putPreparedSlides = async (
     prepared: Slide[],
-    options?: SlideWriteOptions
+    options?: SlideWriteOptions,
+    expectedLocalRevision?: number
   ) => {
-    if (!prepared.length) return
+    if (!prepared.length) return false
 
-    await db().transaction("rw", db().slides, async () => {
+    return await db().transaction("rw", db().slides, async () => {
       const keys = prepared.map(
         (slide) => [slide.scheduleId, slide.id] as [string, string]
       )
       const existing = await db().slides.bulkGet(keys)
       const storedAt = new Date().toISOString()
-      const records: StoredSlideRecord[] = prepared.map((slide, index) => {
+      const records: StoredSlideRecord[] = []
+      prepared.forEach((slide, index) => {
+        const previous = existing[index]
+        if (
+          expectedLocalRevision !== undefined &&
+          (previous?.localRevision !== expectedLocalRevision ||
+            !previous?.resyncRequestedAt)
+        )
+          return
+        if (
+          previous?.resyncRequestedAt &&
+          shouldPreservePending(slide, options)
+        )
+          return
+
         const syncState = resolveSyncState(slide, options)
-        return {
+        records.push({
           scheduleId: slide.scheduleId,
           id: slide.id,
           index: Number.isFinite(slide.index) ? slide.index : 0,
           serverId: slide._id,
           updatedAt: slide.updatedAt,
-          localRevision: (existing[index]?.localRevision || 0) + 1,
+          localRevision: (previous?.localRevision || 0) + 1,
           syncState,
           // A newer local edit must not erase a retry marker left by an older
           // failed request. A confirmed server/realtime write clears it.
           resyncRequestedAt:
             syncState === "pending"
-              ? existing[index]?.resyncRequestedAt ||
+              ? previous?.resyncRequestedAt ||
                 (resolveRequestResync(slide, options) ? storedAt : null)
               : null,
           storedAt,
           deletedAt: null,
           slide,
-        }
+        })
       })
+      if (!records.length) return false
       await db().slides.bulkPut(records)
+      return true
     })
   }
 
@@ -182,7 +214,8 @@ export const createSlideRepository = (
       scheduleId,
       slideId,
       syncState,
-      expectedLocalRevision
+      expectedLocalRevision,
+      serverRev
     ) {
       if (!scheduleId || !slideId) return
       await db().transaction("rw", db().slides, async () => {
@@ -199,6 +232,10 @@ export const createSlideRepository = (
         }
         await db().slides.put({
           ...record,
+          slide:
+            serverRev === undefined
+              ? record.slide
+              : { ...record.slide, rev: serverRev },
           syncState,
           resyncRequestedAt:
             syncState === "pending" ? new Date().toISOString() : null,
@@ -213,6 +250,15 @@ export const createSlideRepository = (
 
     async putSlides(slides, options) {
       await putPreparedSlides(await prepareSlides(slides), options)
+    },
+
+    async replacePendingSlide(slide, expectedLocalRevision) {
+      if (!isValidSlide(slide)) return false
+      return await putPreparedSlides(
+        [await sanitize(slide)],
+        { syncState: "synced" },
+        expectedLocalRevision
+      )
     },
 
     async replaceScheduleSlides(scheduleId, slides, options = {}) {
@@ -240,7 +286,13 @@ export const createSlideRepository = (
             previous?.resyncRequestedAt &&
             options.preservePending !== false
           ) {
-            return previous
+            return options.updatePendingOrder
+              ? {
+                  ...previous,
+                  index: slide.index,
+                  slide: { ...previous.slide, index: slide.index },
+                }
+              : previous
           }
           const syncState = resolveSyncState(slide, options)
           return {
@@ -352,7 +404,12 @@ let repositoryInstance: SlideRepository | null = null
 let shadowWriteTail: Promise<void> = Promise.resolve()
 const pendingSlidePuts = new Map<
   string,
-  { slide: Slide; syncState: SlideSyncState; requestResync: boolean }
+  {
+    slide: Slide
+    syncState: SlideSyncState
+    requestResync: boolean
+    preservePending: boolean
+  }
 >()
 let pendingSlidePutTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -405,6 +462,7 @@ const flushPendingSlidePuts = () => {
       {
         syncState: (slide) => entryFor(slide)?.syncState || "pending",
         requestResync: (slide) => !!entryFor(slide)?.requestResync,
+        preservePending: (slide) => !!entryFor(slide)?.preservePending,
       }
     )
   )
@@ -419,9 +477,12 @@ export const enqueueCoalescedSlideShadowPut = (
   if (!isValidSlide(slide)) return
   const key = shadowKey(slide.scheduleId, slide.id)
   const syncState = resolveSyncState(slide, options)
+  const preservePending = shouldPreservePending(slide, options)
+  if (preservePending && pendingSlidePuts.get(key)?.requestResync) return
   pendingSlidePuts.set(key, {
     slide,
     syncState,
+    preservePending,
     // A later pending write coalesced over an edit must not drop that edit's
     // replay request before it reaches the database.
     requestResync:
@@ -431,6 +492,25 @@ export const enqueueCoalescedSlideShadowPut = (
   if (!pendingSlidePutTimer) {
     pendingSlidePutTimer = setTimeout(flushPendingSlidePuts, intervalMs)
   }
+}
+
+export const getPendingSlideDraft = async (
+  scheduleId: string,
+  slideId: string
+) => {
+  const key = shadowKey(scheduleId, slideId)
+  const coalescedDraft = () => {
+    const entry = pendingSlidePuts.get(key)
+    return entry?.requestResync ? entry.slide : undefined
+  }
+  const pending = coalescedDraft()
+  if (pending) return pending
+  // A draft can be between the coalescer and IndexedDB.
+  await shadowWriteTail
+  const stored = await useSlideRepository().getStoredSlide(scheduleId, slideId)
+  return (
+    coalescedDraft() ?? (stored?.resyncRequestedAt ? stored.slide : undefined)
+  )
 }
 
 export const cancelPendingSlideShadowPut = (

@@ -288,10 +288,14 @@
     />
 
     <!-- TEMPLATES SECTION-->
-    <TemplatesList
+    <LazyTemplatesList
       v-else-if="page === 'templates'"
       class="fade-in-right h-full min-h-0 overflow-auto"
-      @close="page = ''"
+      :look-slide-id="templatesLookSlideId"
+      :text="templatesText"
+      @clear-look="templatesLookSlideId = ''"
+      @clear-text="templatesText = ''"
+      @close="closeTemplates"
     />
 
     <!-- SCHEDULES SECTION-->
@@ -431,6 +435,7 @@ onUnmounted(() => {
 const online = useOnline()
 // Rollout switch: the camera action is only offered while the flag is on.
 const { isEnabled: cameraSlideEnabled } = useFeatureFlags("camera-slide")
+const { isEnabled: templatesEnabled } = useFeatureFlags("view-slide-templates")
 const { savedSongs } = useLibrary()
 const { searchSongs } = useSongs()
 
@@ -537,16 +542,15 @@ const quickSearchSuggestionsByAction = {
     "background image",
     "audio file",
   ],
-  // Slide templates are hidden for everyone for now.
-  // templates: [
-  //   "Slide Templates",
-  //   "lower third template",
-  //   "sermon notes template",
-  //   "announcement template",
-  //   "Bible verse template",
-  //   "minimal worship template",
-  //   "countdown template",
-  // ],
+  templates: [
+    "Slide Templates",
+    "lower third template",
+    "sermon point template",
+    "announcement template",
+    "Bible verse template",
+    "starting soon slide",
+    "welcome slide",
+  ],
   alerts: [
     "Add Banners/Alert",
     "Remove Alert",
@@ -598,7 +602,7 @@ const quickSearchSuggestionsByAction = {
     "Display Settings",
     "Profile Settings",
     "Slide Background Settings",
-    "Microphone Settings",
+    "Audio/Video Settings",
     "Subscription Settings",
     "Overlay Settings",
     "Blank Settings",
@@ -614,14 +618,16 @@ const quickSearchSuggestionsByAction = {
     "Create New Schedule",
   ],
 }
-const quickSearchSuggestions = Object.values(
-  quickSearchSuggestionsByAction
-).flat()
+const quickSearchSuggestions = computed(() =>
+  Object.entries(quickSearchSuggestionsByAction)
+    .filter(([key]) => key !== "templates" || templatesEnabled.value)
+    .flatMap(([, list]) => list)
+)
 const quickSearchSuggestionIndex = ref(0)
 const quickSearchPlaceholder = computed(() =>
   activeScopeFilter.value
     ? activeScopeFilter.value.placeholder
-    : `Try "${quickSearchSuggestions[quickSearchSuggestionIndex.value]}"`
+    : `Try "${quickSearchSuggestions.value[quickSearchSuggestionIndex.value]}"`
 )
 let quickSearchSuggestionInterval: ReturnType<typeof setInterval> | null = null
 
@@ -997,6 +1003,8 @@ const validActions = computed(() => {
     if (props.mobile && desktopOnlyActions.includes(action.action)) return false
     if (action.featureFlag === "camera-slide" && !cameraSlideEnabled.value)
       return false
+    if (action.featureFlag === "view-slide-templates" && !templatesEnabled.value)
+      return false
     // EasyWorship's backup is decoded by a Tauri Rust command — there's no
     // browser-side way to read a Paradox database, so this only shows up
     // in the desktop app.
@@ -1019,6 +1027,7 @@ const visibleActionOrder: string[] = [
   appWideActions.addSong,
   appWideActions.newSongSearch,
   appWideActions.newSlide,
+  appWideActions.newTemplates,
   appWideActions.newMedia,
   appWideActions.newHymn,
   appWideActions.newSearchBible,
@@ -1219,7 +1228,20 @@ onEmitter("new-library", () => {
   page.value = "library"
 })
 
-onEmitter("new-templates", () => {
+// The gallery opens to make a new slide, or, when a verse or song slide's menu
+// sends its id, to give that slide a new look and keep its words.
+// A transcript line can also open it: the gallery then makes a new slide with
+// that line as its main text.
+const templatesLookSlideId = ref("")
+const templatesText = ref("")
+const closeTemplates = () => {
+  templatesLookSlideId.value = ""
+  templatesText.value = ""
+  page.value = ""
+}
+onEmitter("new-templates", (payload?: { lookSlideId?: string; text?: string }) => {
+  templatesLookSlideId.value = payload?.lookSlideId ?? ""
+  templatesText.value = payload?.text ?? ""
   page.value = "templates"
 })
 
@@ -1363,7 +1385,7 @@ const handleInputKeydown = (e: KeyboardEvent) => {
 onMounted(() => {
   quickSearchSuggestionInterval = setInterval(() => {
     quickSearchSuggestionIndex.value =
-      (quickSearchSuggestionIndex.value + 1) % quickSearchSuggestions.length
+      (quickSearchSuggestionIndex.value + 1) % quickSearchSuggestions.value.length
   }, 5000)
 
   // console.log("mounted", quickActions.value)

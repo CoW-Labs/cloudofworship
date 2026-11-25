@@ -1,4 +1,5 @@
 import { useOnline } from "@vueuse/core"
+import { reactive } from "vue"
 import { useAppStore } from "~/store/app"
 import { useAuthStore } from "~/store/auth"
 import type {

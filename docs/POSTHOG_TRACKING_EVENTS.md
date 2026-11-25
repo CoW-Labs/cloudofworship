@@ -102,6 +102,8 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 |------------|-----------|-------------|---------|
 | `REMOTE_CONTROL_CONNECTED` | `scheduleId` | Remote device connected via WebSocket | ✅ Added |
 | `REMOTE_CONTROL_DISCONNECTED` | `scheduleId` | Remote disconnected | ✅ Added |
+| `SLIDE_CONFLICT_DETECTED` | `slideType` | A saved edit was refused because a teammate saved the same slide first; both versions are kept and the choice dialog opens | ✅ Added |
+| `SLIDE_CONFLICT_RESOLVED` | `resolution` (`mine` / `theirs`), `slideType` | Person chose which version of a conflicted slide to keep | ✅ Added |
 | `REMOTE_CONTROL_RECONNECTED` | `scheduleId`, `retryCount` | Remote reconnected after failure | ⚠️ Missing |
 | `REMOTE_SLIDE_CHANGED` | `slideId`, `slideType` | Slide changed via remote control | ⚠️ Missing |
 | `TEAM_MEMBER_INVITED` | `role` | Invitation sent to team member | ✅ Exists |
@@ -155,8 +157,15 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `SLIDE_THEME_APPLIED` | `themeName` | Pre-built theme applied | ⚠️ Missing |
 | `STREAM_QUALITY_CHANGED` | `quality`, `codec`, `height`, `fps` | Operator picked a YouTube stream quality tier (settings or the pre-flight check); only fires on a real change to an available tier | ✅ Added |
 | `STREAM_QUALITY_UPSCALE_WARNING_SHOWN` | `quality`, `sourceHeight` | The pre-flight check warned that the chosen tier is taller than the live window, so the stream is only an upscale | ✅ Added |
-| `YOUTUBE_STREAM_STARTED` | `source`, `quality` | A YouTube stream started (`quality` is the tier id; sources other than the live window always use the default) | ✅ Added |
-| `YOUTUBE_STREAM_FAILED` | `source`, `quality`, `error` | Starting a YouTube stream failed; `error` is the first 120 characters of the app's own message | ✅ Added |
+| `STREAM_STARTED` | `source`, `quality`, `recordOnly` | A live stream started (`quality` is the tier id; sources other than the live window always use the default; `recordOnly` is true when the live window is only being recorded and nothing is sent to YouTube) | ✅ Added |
+| `STREAM_FAILED` | `source`, `quality`, `error` | Starting a live stream failed; `error` is the first 120 characters of the app's own message | ✅ Added |
+| `STREAM_KEY_UPDATE_LINK_CLICKED` | `from` | Operator clicked "Update stream key" in the pre-flight check; it closes the check and opens Live Stream Settings | ✅ Added |
+| `AUDIO_MIXER_OPENED` | none | Operator opened the audio mixer from the broadcast status bar | ✅ Added |
+| `AUDIO_MIXER_LEVEL_CHANGED` | `source` (`mic` or `app`), `percent` | Operator let go of a mixer slider (once per drag, not per step) | ✅ Added |
+| `AUDIO_MIXER_MUTE_CHANGED` | `source`, `muted` | Operator muted or unmuted the microphone or the app audio in the mixer | ✅ Added |
+| `STREAM_RECORDING_CHANGED` | `on` | Operator ticked or unticked "Also record this stream on this computer" in the pre-flight check | ✅ Added |
+| `STREAM_RECORDING_SAVED` | none | A local copy of a stream finished and was saved as an MP4 | ✅ Added |
+| `STREAM_RECORDING_REVEALED` | none | "Show in Finder / folder" was clicked on the recording-saved toast | ✅ Added |
 | `NDI_QUALITY_CHANGED` | `quality`, `fps`, `height` | Operator picked an NDI size and frame rate in settings; only fires on a real change to an available tier | ✅ Added |
 | `NDI_STARTED` | `quality`, `retry` | NDI broadcasting started (`retry` is true when it was a Retry after an error) | ✅ Added |
 | `NDI_START_FAILED` | `quality`, `error` | NDI could not start; `error` is the app's error code (e.g. `runtimeNotInstalled`, `capturePermissionDenied`) | ✅ Added |
@@ -187,8 +196,14 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `MEDIA_UPLOADED` | `mediaType`, `fileSize`, `source` | User uploads image/video | ⚠️ Missing |
 | `YOUTUBE_VIDEO_ADDED` | `videoUrl` | YouTube video embedded | ⚠️ Missing |
 | `VIMEO_VIDEO_ADDED` | `videoUrl` | Vimeo video embedded | ⚠️ Missing |
-| `TEMPLATE_BROWSED` | - | User opens templates gallery | ⚠️ Missing |
-| `TEMPLATE_APPLIED` | `templateName`, `slideType` | Pre-designed template applied | ⚠️ Missing |
+| `TEMPLATES_PAGE_OPENED` | `hasAccess`, `mode` | Slide Templates gallery opened; `mode` is `new-slide`, `look` when restyling a verse or song, or `text-line` when opened from a transcript line | ✅ Added |
+| `NEW_TEMPLATE_SLIDE_CREATED` | `templateId`, `source`, `category`, `from`? | A template was used to make a new slide; `source` is `starter` or `church`; `from` is `transcript` when made from a sermon transcript line | ✅ Added |
+| `TRANSCRIPT_LINE_TEMPLATE_OPENED` | none | The palette on a sermon transcript line was clicked, opening the gallery with that line as the text | ✅ Added |
+| `TEMPLATE_LOOK_APPLIED` | `templateId`, `source`, `look` | A verse or song slide took a template's look and kept its words; `look` is `scripture` or `song` | ✅ Added |
+| `SAVE_AS_TEMPLATE_OPENED` | `slideType`, `hasBoxes` | "Save as Template" opened on a slide; `hasBoxes` is false when the slide has no free layout yet | ✅ Added |
+| `TEMPLATE_SAVED` | `category`, `slideType`, `keptText`, `boxCount` | A church saved a slide as its own template | ✅ Added |
+| `TEMPLATE_SAVE_FAILED` | `error` | Saving a template failed | ✅ Added |
+| `TEMPLATE_DELETED` | `templateId` | A church deleted one of its own templates | ✅ Added |
 | `MEDIA_MUTE_TOGGLED` | `muted`, `slideType` | Mute button in the volume popover pressed (also the mute shortcut) | ✅ Added |
 | `MEDIA_VOLUME_CHANGED` | `volume`, `muted`, `slideType` | Volume slider settled on a level (debounced 800ms) | ✅ Added |
 | `GO_LIVE_MEDIA_STREAMED` | `mediaType` | Go Live waited 3s for a slide's media to be saved on this computer, then put it on screen streaming the cloud copy | ✅ Added |
@@ -253,7 +268,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 | `TRANSCRIPTION_CLEARED` | `provider`, `plan`, `segmentCount` | User clears the transcript | ✅ Added |
 | `TRANSCRIPTION_BIBLE_REFERENCE_CLICKED` | `reference`, `chapterOnly`, `inferred` | User clicks an inline Bible reference in the transcript. `chapterOnly` is true when only a chapter was said ("Joshua chapter 14", "in Philippians 2"), which opens verse 1. `inferred` is true when the verse was placed from context (a bare "verse 26", or "Isaiah 35," joined to a following "4 to 6") rather than said outright | ✅ Added |
 | `TRANSCRIPTION_SCRIPTURE_SUGGESTION_CLICKED` | `reference`, `displayLabel` | User clicks a scripture in the Scriptures tab | ✅ Added |
-| `TRANSCRIPTION_MIC_SETTINGS_OPENED` | `isTranscribing` | User opens Microphone Settings from the transcript panel's More menu (operator window only) | ✅ Added |
+| `TRANSCRIPTION_MIC_SETTINGS_OPENED` | `isTranscribing` | User opens Audio/Video Settings from the transcript panel's More menu (operator window only) | ✅ Added |
 
 ---
 
@@ -282,7 +297,7 @@ This document outlines all PostHog events tracked in Cloud of Worship presentati
 
 ### Medium Priority (Engagement Metrics)
 6. `LIBRARY_SLIDE_LOADED` / `LIBRARY_SONG_LOADED` - Library re-use patterns
-7. `TEMPLATE_APPLIED` - Template feature adoption
+7. `NEW_TEMPLATE_SLIDE_CREATED` - Template feature adoption
 8. `HYMN_SEARCH_PERFORMED` / `SONG_LYRICS_SEARCH_PERFORMED` - Search behavior
 9. `SCHEDULE_DELETED` / `SCHEDULE_RENAMED` - Schedule management patterns
 10. `SLIDE_BACKGROUND_CHANGED` - Customization depth

@@ -70,7 +70,7 @@ export const BADGE_HINTS = [
   "Shortcuts & Hotkeys in quick actions lists every key the app knows.",
   "What's New shows the latest features as they land.",
   "Join Community to swap tips with other church media teams.",
-  "Microphone Settings pick which mic transcription listens to.",
+  "Audio/Video Settings pick which mic transcription listens to.",
   "Profile Settings change your name and photo for the team.",
 ] as const
 

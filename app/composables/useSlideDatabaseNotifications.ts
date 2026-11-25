@@ -9,14 +9,19 @@ export type SlideDatabaseNotification = {
   sourceId: string
 }
 
-const sourceId =
-  globalThis.crypto?.randomUUID?.() ||
-  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+// Keep one identity per window even if Vite reloads the module while an
+// existing listener or a queued repository write still uses the old instance.
+const sourceKey = Symbol.for("cloud-of-worship.slide-database-source")
+const getSourceId = () => {
+  const scope = window as Window & { [sourceKey]?: string }
+  return scope[sourceKey] ??= globalThis.crypto?.randomUUID?.() ||
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
 export const notifySlideDatabaseChanged = () => {
   if (typeof window === "undefined") return
   postCrossWindowNotification<SlideDatabaseNotification>({
     kind: "slides-changed",
-    sourceId,
+    sourceId: getSourceId(),
   })
 }
 
@@ -33,7 +38,7 @@ export const useSlideDatabaseNotifications = (callback: () => void) => {
       const notification = envelope?.payload
       if (
         notification?.kind === "slides-changed" &&
-        notification.sourceId !== sourceId
+        notification.sourceId !== getSourceId()
       ) {
         callback()
       }

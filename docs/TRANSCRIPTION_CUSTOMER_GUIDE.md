@@ -4,7 +4,7 @@ Cloud of Worship can listen through your selected microphone, turn speech into a
 
 ## Before the service
 
-1. Open **Settings > Microphone Settings** and select the microphone you want to use.
+1. Open **Settings > Audio/Video Settings** and select the microphone you want to use.
 2. Open **Settings > Bible Slide Settings** and make sure the Bible translations you want are available on the device.
 3. Open **Settings > Other Settings** and review these options:
    - **Automatic transcription actions** allows detected Bible references and voice navigation controls to update the live slide.

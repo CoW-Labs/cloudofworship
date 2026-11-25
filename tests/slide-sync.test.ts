@@ -31,14 +31,18 @@ describe("slide sync helpers", () => {
   })
 
   it("removes route-owned fields and clears stale video keys", async () => {
-    const payload = await toSlideUpdatePayload(slide())
+    const payload = await toSlideUpdatePayload(slide({ rev: 3, saved: true }))
 
     expect(payload).not.toHaveProperty("_id")
     expect(payload).not.toHaveProperty("id")
     expect(payload).not.toHaveProperty("churchId")
     expect(payload).not.toHaveProperty("type")
+    expect(payload).not.toHaveProperty("scheduleId")
+    expect(payload).not.toHaveProperty("index")
+    expect(payload).not.toHaveProperty("saved")
+    expect(payload).not.toHaveProperty("rev")
     expect(payload).toMatchObject({
-      scheduleId: "schedule-one",
+      baseRev: 3,
       contents: ["Hello"],
       backgroundVideoKey: null,
     })
@@ -72,6 +76,7 @@ describe("slide sync helpers", () => {
     expect(await toSlideUpdatePayload(video)).toEqual({
       name: "Slide",
       slideStyle,
+      baseRev: null,
     })
   })
 })

@@ -70,8 +70,10 @@ pub(super) fn locate(app: &AppHandle, quality: StreamQuality) -> Result<Target, 
     found.is_on_screen()
   );
 
-  let aspect = if frame.size.height > 0.0 { frame.size.width / frame.size.height } else { 16.0 / 9.0 };
-  let width = quality.width_for(aspect);
+  // The picture is always the chosen quality's own size (1920x1080 for 1080p),
+  // whatever shape the window is. A window that isn't 16:9 keeps its shape
+  // inside it, with black bars, rather than changing the size we send.
+  let width = quality.width_for(16.0 / 9.0);
   let height = quality.height;
 
   // Prefer encoding on the GPU straight from capture surfaces. If this Mac
@@ -113,6 +115,7 @@ pub(super) fn start(window: SCWindow, sink: Arc<Sink>) -> Result<SCStream, Strin
     .with_height(height)
     .with_pixel_format(pixel_format)
     .with_scales_to_fit(true)
+    .with_preserves_aspect_ratio(true)
     .with_shows_cursor(false)
     .with_ignores_shadows_single_window(true)
     .with_queue_depth(queue_depth)
@@ -214,6 +217,21 @@ fn keep_rendering_when_hidden(window: &tauri::WebviewWindow) {
   if let Err(e) = result {
     log::warn!("could not reach the live window's web view ({e})");
   }
+}
+
+/// True when the live window is on the desktop (Space) that is showing.
+pub(super) fn live_window_visible(app: &AppHandle) -> Option<bool> {
+  let window = app.get_webview_window(LIVE_WINDOW_LABEL)?;
+  let pointer = window.ns_window().ok()? as usize;
+  let (sender, receiver) = mpsc::sync_channel(1);
+  window
+    .run_on_main_thread(move || {
+      let object = unsafe { &*(pointer as *const AnyObject) };
+      let on_active_space: bool = unsafe { objc2::msg_send![object, isOnActiveSpace] };
+      let _ = sender.send(on_active_space);
+    })
+    .ok()?;
+  receiver.recv_timeout(Duration::from_millis(500)).ok()
 }
 
 fn appkit_window_number(window: &tauri::WebviewWindow) -> Result<isize, String> {
