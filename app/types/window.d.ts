@@ -27,6 +27,8 @@ interface ScreenDetailed {
 
 interface Window {
   getScreenDetails(): Promise<ScreenDetails>
+  dataLayer: unknown[]
+  gtag: (...args: unknown[]) => void
 }
 
 export { }

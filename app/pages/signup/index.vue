@@ -763,6 +763,8 @@ const finishOnboarding = async () => {
   const planId = route.query.plan_id as string
   const churchId = authStore.church?._id
 
+  useGoogleAdsConversion().trackSignupConversion()
+
   if (authStore.user?.emailVerified) {
     usePosthogCapture("SIGNUP_COMPLETE", {
       userId: authStore.user._id,
